@@ -1136,41 +1136,56 @@ export const Cart = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {cartItems.map((item, index) => {
-                      const quantity = item.quantity;
-                      const rate = getDisplayRate(item);
-                      const taxableAmount = quantity * rate;
-                      const gstRate = 18;
-                      const gstAmount = (taxableAmount * gstRate) / 100;
-                      const totalAmount = taxableAmount + gstAmount;
+                     {(() => {
+                      // Calculate totals exactly like PDF generator does
+                      let previewSubTotal = 0;
+                      
+                      return cartItems.map((item, index) => {
+                        const quantity = Number(item.quantity || 0);
+                        const rate = Number(getDisplayRate(item));
+                        const taxableAmount = quantity * rate;
+                        previewSubTotal += taxableAmount;
+                        const gstRate = 18; // Matches PDF
+                        const gstAmount = (taxableAmount * gstRate) / 100;
+                        const totalAmount = taxableAmount + gstAmount;
+
+                        return (
+                          <tr key={item.id} className="border-b border-gray-900">
+                            <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{index + 1}</td>
+                            <td className="text-left p-2 text-[10px] text-gray-900 border-r border-gray-900">{item.name}</td>
+                            <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">090230</td>
+                            <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{quantity}</td>
+                            <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{item.unit}</td>
+                            <td className="text-right p-2 text-[10px] text-gray-900 border-r border-gray-900">Rs {rate.toFixed(2)}</td>
+                            <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{gstRate}%</td>
+                            <td className="text-right p-2 text-[10px] text-gray-900">Rs {totalAmount.toFixed(2)}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                    {(() => {
+                      const totalQty = cartItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+                      const subTotal = cartItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(getDisplayRate(item))), 0);
+                      const totalGst = (subTotal * 18) / 100;
+                      const grandTotal = subTotal + totalGst;
 
                       return (
-                        <tr key={item.id} className="border-b border-gray-900">
-                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{index + 1}</td>
-                          <td className="text-left p-2 text-[10px] text-gray-900 border-r border-gray-900">{item.name}</td>
-                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">090230</td>
-                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{quantity}</td>
-                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{item.unit}</td>
-                          <td className="text-right p-2 text-[10px] text-gray-900 border-r border-gray-900">Rs {rate.toFixed(2)}</td>
-                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{gstRate}%</td>
-                          <td className="text-right p-2 text-[10px] text-gray-900">Rs {totalAmount.toFixed(2)}</td>
+                        <tr className="border-b-2 border-gray-900 bg-gray-50">
+                          <td className="p-2 border-r border-gray-900"></td>
+                          <td className="text-left p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Total</td>
+                          <td className="p-2 border-r border-gray-900"></td>
+                          <td className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">
+                            {totalQty}
+                          </td>
+                          <td className="p-2 border-r border-gray-900"></td>
+                          <td className="p-2 border-r border-gray-900"></td>
+                          <td className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">
+                            Rs {totalGst.toFixed(2)}
+                          </td>
+                          <td className="text-right p-2 text-[10px] font-bold text-gray-900">Rs {grandTotal.toFixed(2)}</td>
                         </tr>
                       );
-                    })}
-                    <tr className="border-b-2 border-gray-900 bg-gray-50">
-                      <td className="p-2 border-r border-gray-900"></td>
-                      <td className="text-left p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Total</td>
-                      <td className="p-2 border-r border-gray-900"></td>
-                      <td className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">
-                        {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-                      </td>
-                      <td className="p-2 border-r border-gray-900"></td>
-                      <td className="p-2 border-r border-gray-900"></td>
-                      <td className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">
-                        Rs {((getSubtotal() * 18) / 100).toFixed(2)}
-                      </td>
-                      <td className="text-right p-2 text-[10px] font-bold text-gray-900">Rs {(getSubtotal() + (getSubtotal() * 18) / 100).toFixed(2)}</td>
-                    </tr>
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -1192,54 +1207,70 @@ export const Cart = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-gray-900">
-                        <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">090230</td>
-                        <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{getSubtotal().toFixed(2)}</td>
-                        <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
-                        <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
-                        <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
-                        <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
-                        <td className="text-right p-2 text-[9px] text-gray-900">{((getSubtotal() * 18) / 100).toFixed(2)}</td>
-                      </tr>
-                      <tr className="border-b-2 border-gray-900 bg-gray-50">
-                        <td className="text-center p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">TOTAL</td>
-                        <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{getSubtotal().toFixed(2)}</td>
-                        <td className="p-2 border-r border-gray-900"></td>
-                        <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
-                        <td className="p-2 border-r border-gray-900"></td>
-                        <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
-                        <td className="text-right p-2 text-[9px] font-bold text-gray-900">{((getSubtotal() * 18) / 100).toFixed(2)}</td>
-                      </tr>
+                      {(() => {
+                        const subTotal = cartItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(getDisplayRate(item))), 0);
+                        const cgst = (subTotal * 9) / 100;
+                        const sgst = (subTotal * 9) / 100;
+                        const totalGst = (subTotal * 18) / 100;
+
+                        return (
+                          <>
+                            <tr className="border-b border-gray-900">
+                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">090230</td>
+                              <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{subTotal.toFixed(2)}</td>
+                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
+                              <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{cgst.toFixed(2)}</td>
+                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
+                              <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{sgst.toFixed(2)}</td>
+                              <td className="text-right p-2 text-[9px] text-gray-900">{totalGst.toFixed(2)}</td>
+                            </tr>
+                            <tr className="border-b-2 border-gray-900 bg-gray-50">
+                              <td className="text-center p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">TOTAL</td>
+                              <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{subTotal.toFixed(2)}</td>
+                              <td className="p-2 border-r border-gray-900"></td>
+                              <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{cgst.toFixed(2)}</td>
+                              <td className="p-2 border-r border-gray-900"></td>
+                              <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{sgst.toFixed(2)}</td>
+                              <td className="text-right p-2 text-[9px] font-bold text-gray-900">{totalGst.toFixed(2)}</td>
+                            </tr>
+                          </>
+                        );
+                      })()}
                     </tbody>
                   </table>
                 </div>
               </div>
 
               {/* Totals on Right */}
-              <div className="flex justify-end">
-                <div className="w-64 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-900">Subtotal:</span>
-                    <span className="text-gray-900">Rs {getSubtotal().toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span className="text-gray-900">Total:</span>
-                    <span className="text-gray-900">Rs {(getSubtotal() + (getSubtotal() * 18) / 100).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
+              {(() => {
+                const subTotal = cartItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(getDisplayRate(item))), 0);
+                const grandTotal = subTotal + (subTotal * 18) / 100;
 
-              {/* Amount in Words */}
-              <div className="border-t pt-2">
-                <p className="text-xs font-bold text-gray-900">Invoice Amount in Words:</p>
-                <p className="text-xs text-gray-900 mt-1">
-                  {(() => {
-                    const total = getSubtotal() + (getSubtotal() * 18) / 100;
-                    // Simple conversion - you can enhance this
-                    return `Rupees ${Math.round(total)} Only`;
-                  })()}
-                </p>
-              </div>
+                return (
+                  <>
+                    <div className="flex justify-end">
+                      <div className="w-64 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-900">Subtotal:</span>
+                          <span className="text-gray-900">Rs {subTotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-bold border-t pt-2">
+                          <span className="text-gray-900">Total:</span>
+                          <span className="text-gray-900">Rs {grandTotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Amount in Words */}
+                    <div className="border-t pt-2">
+                      <p className="text-xs font-bold text-gray-900">Invoice Amount in Words:</p>
+                      <p className="text-xs text-gray-900 mt-1">
+                        Rupees {Math.round(grandTotal)} Only
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* Terms & Conditions */}
               <div className="border-2 border-gray-900 p-2">
