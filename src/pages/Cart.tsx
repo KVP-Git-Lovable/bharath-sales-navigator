@@ -247,6 +247,26 @@ export const Cart = () => {
     }
   }, [visitId]);
 
+  // Fetch company and retailer data for invoice preview
+  React.useEffect(() => {
+    const fetchInvoiceData = async () => {
+      // Fetch company data
+      const { data: company } = await supabase.from("companies").select("*").limit(1).maybeSingle();
+      if (company) setCompanyData(company);
+
+      // Fetch retailer data
+      if (validRetailerId) {
+        const { data: retailer } = await supabase
+          .from("retailers")
+          .select("name, address, phone, gst_number")
+          .eq("id", validRetailerId)
+          .single();
+        if (retailer) setRetailerData(retailer);
+      }
+    };
+    fetchInvoiceData();
+  }, [validRetailerId]);
+
   // Load cart items from localStorage with proper refresh handling
   React.useEffect(() => {
     const loadCartItems = () => {
