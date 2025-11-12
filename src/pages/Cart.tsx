@@ -1145,7 +1145,7 @@ export const Cart = () => {
                         const rate = Number(getDisplayRate(item));
                         const taxableAmount = quantity * rate;
                         previewSubTotal += taxableAmount;
-                        const gstRate = 18; // Matches PDF
+                        const gstRate = 5; // 2.5% CGST + 2.5% SGST = 5% total
                         const gstAmount = (taxableAmount * gstRate) / 100;
                         const totalAmount = taxableAmount + gstAmount;
 
@@ -1166,7 +1166,7 @@ export const Cart = () => {
                     {(() => {
                       const totalQty = cartItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
                       const subTotal = cartItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(getDisplayRate(item))), 0);
-                      const totalGst = (subTotal * 18) / 100;
+                      const totalGst = (subTotal * 5) / 100; // 5% total GST
                       const grandTotal = subTotal + totalGst;
 
                       return (
@@ -1209,18 +1209,18 @@ export const Cart = () => {
                     <tbody>
                       {(() => {
                         const subTotal = cartItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(getDisplayRate(item))), 0);
-                        const cgst = (subTotal * 9) / 100;
-                        const sgst = (subTotal * 9) / 100;
-                        const totalGst = (subTotal * 18) / 100;
+                        const cgst = (subTotal * 2.5) / 100; // 2.5% CGST
+                        const sgst = (subTotal * 2.5) / 100; // 2.5% SGST
+                        const totalGst = (subTotal * 5) / 100; // 5% total
 
                         return (
                           <>
                             <tr className="border-b border-gray-900">
                               <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">090230</td>
                               <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{subTotal.toFixed(2)}</td>
-                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
+                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">2.5</td>
                               <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{cgst.toFixed(2)}</td>
-                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
+                              <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">2.5</td>
                               <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{sgst.toFixed(2)}</td>
                               <td className="text-right p-2 text-[9px] text-gray-900">{totalGst.toFixed(2)}</td>
                             </tr>
@@ -1244,7 +1244,7 @@ export const Cart = () => {
               {/* Totals on Right */}
               {(() => {
                 const subTotal = cartItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(getDisplayRate(item))), 0);
-                const grandTotal = subTotal + (subTotal * 18) / 100;
+                const grandTotal = subTotal + (subTotal * 5) / 100; // 5% total GST
 
                 return (
                   <>
