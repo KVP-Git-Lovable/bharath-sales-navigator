@@ -88,6 +88,8 @@ export const Cart = () => {
   const [isCameraOpen, setIsCameraOpen] = React.useState(false);
   const [cameraMode, setCameraMode] = React.useState<"cheque" | "upi" | "neft">("cheque");
   const [showInvoicePreview, setShowInvoicePreview] = React.useState(false);
+  const [companyData, setCompanyData] = React.useState<any>(null);
+  const [retailerData, setRetailerData] = React.useState<any>(null);
 
   // Fix retailerId validation - don't use "." as a valid retailerId  
   const validRetailerId = retailerId && retailerId !== '.' && retailerId.length > 1 ? retailerId : null;
@@ -1052,83 +1054,211 @@ export const Cart = () => {
               </DialogTitle>
             </DialogHeader>
             
-            <div className="bg-white text-black p-6 rounded-lg space-y-6">
-              {/* Header */}
-              <div className="flex justify-between items-start border-b pb-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">TAX INVOICE</h1>
-                  <p className="text-sm text-gray-600 mt-1">Date: {visitDate ? format(new Date(visitDate), 'dd MMM yyyy') : format(new Date(), 'dd MMM yyyy')}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">Invoice #</p>
-                  <p className="font-bold text-gray-900">PENDING</p>
+            <div className="bg-white text-black p-8 rounded-lg space-y-4">
+              {/* Title */}
+              <div className="text-center">
+                <h1 className="text-xl font-bold text-gray-900">Tax Invoice</h1>
+              </div>
+
+              {/* Company Header Box */}
+              <div className="border-2 border-gray-900 p-4">
+                <div className="flex items-start gap-4">
+                  {companyData?.logo_url && (
+                    <img src={companyData.logo_url} alt="Company Logo" className="w-24 h-16 object-contain" />
+                  )}
+                  <div className="flex-1">
+                    <h2 className="text-lg font-bold text-gray-900">{companyData?.name || "BHARATH BEVERAGES"}</h2>
+                    <div className="text-xs text-gray-700 space-y-0.5 mt-1">
+                      {companyData?.address && <p>{companyData.address}</p>}
+                      {companyData?.contact_phone && <p>Phone: {companyData.contact_phone}</p>}
+                      {companyData?.email && <p>Email: {companyData.email}</p>}
+                      {companyData?.gstin && <p>GSTIN: {companyData.gstin}</p>}
+                      <p>State: {companyData?.state || "29-Karnataka"}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Bill To */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Bill To:</h3>
-                  <p className="font-bold text-gray-900">{retailerName}</p>
+              {/* Bill To and Invoice Details */}
+              <div className="grid grid-cols-2 gap-0">
+                <div className="border-2 border-gray-900 border-r-0 p-3">
+                  <h3 className="font-bold text-sm text-gray-900 mb-2">Bill To:</h3>
+                  <div className="text-xs text-gray-700 space-y-1">
+                    {retailerData?.name && <p className="font-semibold">{retailerData.name}</p>}
+                    {retailerData?.address && <p>{retailerData.address}</p>}
+                    {retailerData?.phone && <p>Contact: {retailerData.phone}</p>}
+                    {retailerData?.gst_number && <p>GSTIN: {retailerData.gst_number}</p>}
+                  </div>
+                </div>
+                <div className="border-2 border-gray-900 p-3">
+                  <h3 className="font-bold text-sm text-gray-900 mb-2">Invoice Details:</h3>
+                  <div className="text-xs text-gray-700 space-y-1">
+                    <p>No: <span className="font-semibold">PENDING</span></p>
+                    <p>Date: {visitDate ? format(new Date(visitDate), 'dd MMM yyyy') : format(new Date(), 'dd MMM yyyy')}</p>
+                    <p>Place Of Supply: Karnataka</p>
+                  </div>
                 </div>
               </div>
 
               {/* Items Table */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border-2 border-gray-900 overflow-hidden">
                 <table className="w-full">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="text-left p-3 text-sm font-semibold text-gray-900">Item</th>
-                      <th className="text-right p-3 text-sm font-semibold text-gray-900">Qty</th>
-                      <th className="text-right p-3 text-sm font-semibold text-gray-900">Rate</th>
-                      <th className="text-right p-3 text-sm font-semibold text-gray-900">Amount</th>
+                  <thead>
+                    <tr className="bg-white border-b-2 border-gray-900">
+                      <th className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">#</th>
+                      <th className="text-left p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Item Name</th>
+                      <th className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">HSN/SAC</th>
+                      <th className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Qty</th>
+                      <th className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Unit</th>
+                      <th className="text-right p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Rate (Rs)</th>
+                      <th className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">GST %</th>
+                      <th className="text-right p-2 text-[10px] font-bold text-gray-900">Amount (Rs)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cartItems.map((item, index) => (
-                      <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="p-3 text-sm text-gray-900">{item.name}</td>
-                        <td className="p-3 text-sm text-right text-gray-900">{item.quantity} {item.unit}</td>
-                        <td className="p-3 text-sm text-right text-gray-900">₹{getDisplayRate(item).toFixed(2)}</td>
-                        <td className="p-3 text-sm text-right text-gray-900">₹{formatINRTrunc2(computeItemTotal(item))}</td>
-                      </tr>
-                    ))}
+                    {cartItems.map((item, index) => {
+                      const quantity = item.quantity;
+                      const rate = getDisplayRate(item);
+                      const taxableAmount = quantity * rate;
+                      const gstRate = 18;
+                      const gstAmount = (taxableAmount * gstRate) / 100;
+                      const totalAmount = taxableAmount + gstAmount;
+
+                      return (
+                        <tr key={item.id} className="border-b border-gray-900">
+                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{index + 1}</td>
+                          <td className="text-left p-2 text-[10px] text-gray-900 border-r border-gray-900">{item.name}</td>
+                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">090230</td>
+                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{quantity}</td>
+                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{item.unit}</td>
+                          <td className="text-right p-2 text-[10px] text-gray-900 border-r border-gray-900">Rs {rate.toFixed(2)}</td>
+                          <td className="text-center p-2 text-[10px] text-gray-900 border-r border-gray-900">{gstRate}%</td>
+                          <td className="text-right p-2 text-[10px] text-gray-900">Rs {totalAmount.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-b-2 border-gray-900 bg-gray-50">
+                      <td className="p-2 border-r border-gray-900"></td>
+                      <td className="text-left p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">Total</td>
+                      <td className="p-2 border-r border-gray-900"></td>
+                      <td className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">
+                        {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                      </td>
+                      <td className="p-2 border-r border-gray-900"></td>
+                      <td className="p-2 border-r border-gray-900"></td>
+                      <td className="text-center p-2 text-[10px] font-bold text-gray-900 border-r border-gray-900">
+                        Rs {((getSubtotal() * 18) / 100).toFixed(2)}
+                      </td>
+                      <td className="text-right p-2 text-[10px] font-bold text-gray-900">Rs {(getSubtotal() + (getSubtotal() * 18) / 100).toFixed(2)}</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
 
-              {/* Totals */}
+              {/* Tax Summary */}
+              <div>
+                <h3 className="font-bold text-sm text-gray-900 mb-2">Tax Summary:</h3>
+                <div className="border-2 border-gray-900 overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-white border-b-2 border-gray-900">
+                        <th className="text-center p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">HSN/SAC</th>
+                        <th className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">Taxable Amt (Rs)</th>
+                        <th className="text-center p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">CGST Rate %</th>
+                        <th className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">CGST Amt (Rs)</th>
+                        <th className="text-center p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">SGST Rate %</th>
+                        <th className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">SGST Amt (Rs)</th>
+                        <th className="text-right p-2 text-[9px] font-bold text-gray-900">Total Tax (Rs)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-900">
+                        <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">090230</td>
+                        <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{getSubtotal().toFixed(2)}</td>
+                        <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
+                        <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
+                        <td className="text-center p-2 text-[9px] text-gray-900 border-r border-gray-900">9.0</td>
+                        <td className="text-right p-2 text-[9px] text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
+                        <td className="text-right p-2 text-[9px] text-gray-900">{((getSubtotal() * 18) / 100).toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b-2 border-gray-900 bg-gray-50">
+                        <td className="text-center p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">TOTAL</td>
+                        <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{getSubtotal().toFixed(2)}</td>
+                        <td className="p-2 border-r border-gray-900"></td>
+                        <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
+                        <td className="p-2 border-r border-gray-900"></td>
+                        <td className="text-right p-2 text-[9px] font-bold text-gray-900 border-r border-gray-900">{((getSubtotal() * 9) / 100).toFixed(2)}</td>
+                        <td className="text-right p-2 text-[9px] font-bold text-gray-900">{((getSubtotal() * 18) / 100).toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Totals on Right */}
               <div className="flex justify-end">
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-semibold text-gray-900">₹{formatINRTrunc2(getSubtotal())}</span>
+                    <span className="text-gray-900">Subtotal:</span>
+                    <span className="text-gray-900">Rs {getSubtotal().toFixed(2)}</span>
                   </div>
-                  {getDiscount() > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Discount:</span>
-                      <span className="font-semibold text-green-600">-₹{formatINRTrunc2(getDiscount())}</span>
+                  <div className="flex justify-between text-sm font-bold border-t pt-2">
+                    <span className="text-gray-900">Total:</span>
+                    <span className="text-gray-900">Rs {(getSubtotal() + (getSubtotal() * 18) / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount in Words */}
+              <div className="border-t pt-2">
+                <p className="text-xs font-bold text-gray-900">Invoice Amount in Words:</p>
+                <p className="text-xs text-gray-900 mt-1">
+                  {(() => {
+                    const total = getSubtotal() + (getSubtotal() * 18) / 100;
+                    // Simple conversion - you can enhance this
+                    return `Rupees ${Math.round(total)} Only`;
+                  })()}
+                </p>
+              </div>
+
+              {/* Terms & Conditions */}
+              <div className="border-2 border-gray-900 p-2">
+                <h3 className="font-bold text-xs text-gray-900 mb-1">Terms & Conditions:</h3>
+                <p className="text-[9px] text-gray-700">
+                  {companyData?.terms_conditions || "Thanks for doing business with us!"}
+                </p>
+              </div>
+
+              {/* Bank Details and Signature */}
+              <div className="grid grid-cols-2 gap-0">
+                <div className="border-2 border-gray-900 border-r-0 p-3">
+                  <h3 className="font-bold text-xs text-gray-900 mb-2">Bank Details:</h3>
+                  <div className="flex gap-3">
+                    {companyData?.qr_code_url && (
+                      <img src={companyData.qr_code_url} alt="QR Code" className="w-16 h-16 object-contain" />
+                    )}
+                    <div className="text-[9px] text-gray-700 space-y-1">
+                      {companyData?.account_holder_name && <p>Account Name: {companyData.account_holder_name}</p>}
+                      {companyData?.bank_name && <p>Bank: {companyData.bank_name}</p>}
+                      {companyData?.bank_account && <p>A/C No: {companyData.bank_account}</p>}
+                      {companyData?.ifsc && <p>IFSC: {companyData.ifsc}</p>}
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">CGST (9%):</span>
-                    <span className="font-semibold text-gray-900">₹{formatINRTrunc2(getCGST())}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">SGST (9%):</span>
-                    <span className="font-semibold text-gray-900">₹{formatINRTrunc2(getSGST())}</span>
-                  </div>
-                  <div className="border-t pt-2 flex justify-between">
-                    <span className="font-bold text-gray-900">Total:</span>
-                    <span className="font-bold text-lg text-gray-900">₹{formatINRTrunc2(getFinalTotal())}</span>
+                </div>
+                <div className="border-2 border-gray-900 p-3 flex flex-col justify-between">
+                  <h3 className="font-bold text-xs text-gray-900">For {companyData?.name || "BHARATH BEVERAGES"}:</h3>
+                  <div className="mt-auto">
+                    <div className="border-t border-gray-900 pt-1">
+                      <p className="text-[9px] text-gray-700">Authorized Signatory</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Footer Note */}
-              <div className="text-center text-sm text-gray-600 border-t pt-4">
-                <p>Thank you for your business!</p>
-                <p className="text-xs mt-1">This is a preview. Final invoice will be generated after order submission.</p>
+              <div className="text-center text-xs text-gray-600 border-t pt-3">
+                <p className="font-semibold">Thank you for your business!</p>
+                <p className="text-[10px] mt-1">This is a preview. Final invoice will be generated after order submission.</p>
               </div>
             </div>
           </DialogContent>
