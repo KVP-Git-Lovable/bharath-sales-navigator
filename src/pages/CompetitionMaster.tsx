@@ -16,6 +16,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { CompetitionDataList } from "@/components/competition/CompetitionDataList";
 import { CompetitionAISummary } from "@/components/competition/CompetitionAISummary";
 import { CompetitionRetailerAnalytics } from "@/components/competition/CompetitionRetailerAnalytics";
+import { SKUDetailModal } from "@/components/competition/SKUDetailModal";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Competitor {
   id: string;
@@ -23,6 +26,8 @@ interface Competitor {
   business_background: string;
   key_financial_stats: any;
   created_at: string;
+  sku_count?: number;
+  contact_count?: number;
 }
 
 interface CompetitorSKU {
@@ -57,6 +62,8 @@ export default function CompetitionMaster() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSKUDialogOpen, setIsSKUDialogOpen] = useState(false);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [selectedSKU, setSelectedSKU] = useState<any>(null);
+  const [showSKUDetail, setShowSKUDetail] = useState(false);
 
   const [formData, setFormData] = useState({
     competitor_name: "",
