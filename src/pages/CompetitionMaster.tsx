@@ -258,7 +258,7 @@ export default function CompetitionMaster() {
       if (error) throw error;
       toast({ title: "Success", description: "SKU added successfully" });
       setIsSKUDialogOpen(false);
-      setSKUForm({ sku_name: "", unit: "" });
+      setSKUForm({ sku_name: "", unit: "", is_active: true });
       fetchCompetitorDetails(selectedCompetitor.id);
     } catch (error) {
       toast({ title: "Error", description: "Failed to add SKU", variant: "destructive" });
@@ -268,11 +268,29 @@ export default function CompetitionMaster() {
   const handleAddContact = async () => {
     if (!selectedCompetitor) return;
     try {
-      const { error } = await supabase.from('competition_contacts').insert([{ competitor_id: selectedCompetitor.id, ...contactForm }]);
+      const contactData = {
+        competitor_id: selectedCompetitor.id,
+        ...contactForm,
+        competitor_since: contactForm.competitor_since ? parseInt(contactForm.competitor_since) : null
+      };
+      const { error } = await supabase.from('competition_contacts').insert([contactData]);
       if (error) throw error;
       toast({ title: "Success", description: "Contact added successfully" });
       setIsContactDialogOpen(false);
-      setContactForm({ contact_name: "", contact_phone: "", contact_email: "", designation: "" });
+      setContactForm({
+        contact_name: "",
+        contact_phone: "",
+        contact_email: "",
+        designation: "",
+        hq: "",
+        region_covered: "",
+        reporting_to: "",
+        level: "",
+        skill: "",
+        competitor_since: "",
+        role: "",
+        is_active: true
+      });
       fetchCompetitorDetails(selectedCompetitor.id);
     } catch (error) {
       toast({ title: "Error", description: "Failed to add contact", variant: "destructive" });
