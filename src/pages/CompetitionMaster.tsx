@@ -38,6 +38,7 @@ interface CompetitorSKU {
   demand?: string;
   observations?: number;
   avgStock?: string;
+  is_active?: boolean;
 }
 
 interface CompetitorContact {
@@ -47,6 +48,14 @@ interface CompetitorContact {
   contact_phone: string;
   contact_email: string;
   designation: string;
+  hq?: string;
+  region_covered?: string;
+  reporting_to?: string;
+  level?: string;
+  skill?: string;
+  competitor_since?: number;
+  role?: string;
+  is_active?: boolean;
 }
 
 export default function CompetitionMaster() {
@@ -462,20 +471,86 @@ export default function CompetitionMaster() {
             <TabsContent value="contacts" className="space-y-4">
               <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
                 <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Add Contact</Button></DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
                   <div className="space-y-4">
-                    <div><Label>Contact Name</Label><Input value={contactForm.contact_name} onChange={(e) => setContactForm({ ...contactForm, contact_name: e.target.value })} /></div>
-                    <div><Label>Phone</Label><Input value={contactForm.contact_phone} onChange={(e) => setContactForm({ ...contactForm, contact_phone: e.target.value })} /></div>
-                    <div><Label>Email</Label><Input value={contactForm.contact_email} onChange={(e) => setContactForm({ ...contactForm, contact_email: e.target.value })} /></div>
-                    <div><Label>Designation</Label><Input value={contactForm.designation} onChange={(e) => setContactForm({ ...contactForm, designation: e.target.value })} /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>Contact Name *</Label><Input value={contactForm.contact_name} onChange={(e) => setContactForm({ ...contactForm, contact_name: e.target.value })} /></div>
+                      <div><Label>Phone</Label><Input value={contactForm.contact_phone} onChange={(e) => setContactForm({ ...contactForm, contact_phone: e.target.value })} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>Email</Label><Input value={contactForm.contact_email} onChange={(e) => setContactForm({ ...contactForm, contact_email: e.target.value })} /></div>
+                      <div><Label>Designation</Label><Input value={contactForm.designation} onChange={(e) => setContactForm({ ...contactForm, designation: e.target.value })} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>HQ (Base Location)</Label><Input value={contactForm.hq} onChange={(e) => setContactForm({ ...contactForm, hq: e.target.value })} /></div>
+                      <div><Label>Region Covered</Label><Input value={contactForm.region_covered} onChange={(e) => setContactForm({ ...contactForm, region_covered: e.target.value })} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>Reporting To</Label><Input value={contactForm.reporting_to} onChange={(e) => setContactForm({ ...contactForm, reporting_to: e.target.value })} /></div>
+                      <div><Label>In Competitor Since (Year)</Label><Input type="number" value={contactForm.competitor_since} onChange={(e) => setContactForm({ ...contactForm, competitor_since: e.target.value })} placeholder="e.g. 2020" /></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label>Level</Label>
+                        <Select value={contactForm.level} onValueChange={(value) => setContactForm({ ...contactForm, level: value })}>
+                          <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Junior">Junior</SelectItem>
+                            <SelectItem value="Middle">Middle</SelectItem>
+                            <SelectItem value="Senior">Senior</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Skill</Label>
+                        <Select value={contactForm.skill} onValueChange={(value) => setContactForm({ ...contactForm, skill: value })}>
+                          <SelectTrigger><SelectValue placeholder="Select skill" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Good">Good</SelectItem>
+                            <SelectItem value="Average">Average</SelectItem>
+                            <SelectItem value="Not sure">Not sure</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Role</Label>
+                        <Select value={contactForm.role} onValueChange={(value) => setContactForm({ ...contactForm, role: value })}>
+                          <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Field Sales">Field Sales</SelectItem>
+                            <SelectItem value="Marketing">Marketing</SelectItem>
+                            <SelectItem value="Product management">Product management</SelectItem>
+                            <SelectItem value="Supply chain">Supply chain</SelectItem>
+                            <SelectItem value="Manager">Manager</SelectItem>
+                            <SelectItem value="Leadership">Leadership</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Active</Label>
+                      <Switch 
+                        checked={contactForm.is_active} 
+                        onCheckedChange={(checked) => setContactForm({ ...contactForm, is_active: checked })}
+                      />
+                    </div>
                     <Button onClick={handleAddContact} className="w-full">Add Contact</Button>
                   </div>
                 </DialogContent>
               </Dialog>
               <Table>
                 <TableHeader>
-                  <TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Email</TableHead><TableHead>Designation</TableHead></TableRow>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Designation</TableHead>
+                    <TableHead>HQ</TableHead>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Active</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contacts.map((contact) => (
@@ -484,6 +559,16 @@ export default function CompetitionMaster() {
                       <TableCell>{contact.contact_phone}</TableCell>
                       <TableCell>{contact.contact_email}</TableCell>
                       <TableCell>{contact.designation}</TableCell>
+                      <TableCell>{contact.hq}</TableCell>
+                      <TableCell>
+                        {contact.level && <Badge variant="outline">{contact.level}</Badge>}
+                      </TableCell>
+                      <TableCell>{contact.role}</TableCell>
+                      <TableCell>
+                        <Badge variant={contact.is_active === false ? 'secondary' : 'default'}>
+                          {contact.is_active === false ? 'No' : 'Yes'}
+                        </Badge>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
