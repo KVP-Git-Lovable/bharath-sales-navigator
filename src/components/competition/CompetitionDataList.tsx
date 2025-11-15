@@ -144,7 +144,15 @@ export function CompetitionDataList({ data, skus }: CompetitionDataListProps) {
                     <TableCell className="font-medium">
                       {skus.find(s => s.id === item.sku_id)?.sku_name || 'Unknown'}
                     </TableCell>
-                    <TableCell>{item.retailers?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto font-normal text-primary hover:underline"
+                        onClick={() => window.location.href = `/retailer/${item.retailer_id}`}
+                      >
+                        {item.retailers?.name || 'N/A'}
+                      </Button>
+                    </TableCell>
                     <TableCell>
                       {item.visits?.visit_date 
                         ? new Date(item.visits.visit_date).toLocaleDateString()

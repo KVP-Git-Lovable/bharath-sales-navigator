@@ -582,6 +582,13 @@ export default function CompetitionMaster() {
         </DialogContent>
       </Dialog>
 
+      <SKUDetailModal 
+        isOpen={showSKUDetail}
+        onClose={() => setShowSKUDetail(false)}
+        sku={selectedSKU}
+        competitionData={competitionData}
+      />
+
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Competitor</DialogTitle></DialogHeader>
