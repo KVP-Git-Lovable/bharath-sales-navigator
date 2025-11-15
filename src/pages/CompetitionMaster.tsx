@@ -341,6 +341,8 @@ export default function CompetitionMaster() {
               <TableRow>
                 <TableHead>Competitor Name</TableHead>
                 <TableHead>Business Background</TableHead>
+                <TableHead className="text-center"># SKUs</TableHead>
+                <TableHead className="text-center"># Contacts</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -348,8 +350,19 @@ export default function CompetitionMaster() {
             <TableBody>
               {competitors.map((competitor) => (
                 <TableRow key={competitor.id}>
-                  <TableCell className="font-medium">{competitor.competitor_name}</TableCell>
+                  <TableCell 
+                    className="font-medium cursor-pointer text-primary hover:underline"
+                    onClick={() => { setSelectedCompetitor(competitor); fetchCompetitorDetails(competitor.id); }}
+                  >
+                    {competitor.competitor_name}
+                  </TableCell>
                   <TableCell>{competitor.business_background?.substring(0, 100)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline">{competitor.sku_count || 0}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline">{competitor.contact_count || 0}</Badge>
+                  </TableCell>
                   <TableCell>{new Date(competitor.created_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -399,7 +412,14 @@ export default function CompetitionMaster() {
                   <DialogHeader><DialogTitle>Add SKU</DialogTitle></DialogHeader>
                   <div className="space-y-4">
                     <div><Label>SKU Name</Label><Input value={skuForm.sku_name} onChange={(e) => setSKUForm({ ...skuForm, sku_name: e.target.value })} /></div>
-                    <div><Label>Unit</Label><Input value={skuForm.unit} onChange={(e) => setSKUForm({ ...skuForm, unit: e.target.value })} /></div>
+                    <div><Label>Unit</Label><Input value={skuForm.unit} onChange={(e) => setSKUForm({ ...skuForm, unit: e.target.value })} placeholder="e.g. Pieces, Kg, Liters" /></div>
+                    <div className="flex items-center justify-between">
+                      <Label>Active</Label>
+                      <Switch 
+                        checked={skuForm.is_active} 
+                        onCheckedChange={(checked) => setSKUForm({ ...skuForm, is_active: checked })}
+                      />
+                    </div>
                     <Button onClick={handleAddSKU} className="w-full">Add SKU</Button>
                   </div>
                 </DialogContent>
@@ -412,16 +432,27 @@ export default function CompetitionMaster() {
                     <TableHead>Demand</TableHead>
                     <TableHead>Observations</TableHead>
                     <TableHead>Avg Stock</TableHead>
+                    <TableHead>Active</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {skus.map((sku) => (
                     <TableRow key={sku.id}>
-                      <TableCell className="font-medium">{sku.sku_name}</TableCell>
+                      <TableCell 
+                        className="font-medium cursor-pointer text-primary hover:underline"
+                        onClick={() => { setSelectedSKU(sku); setShowSKUDetail(true); }}
+                      >
+                        {sku.sku_name}
+                      </TableCell>
                       <TableCell>{sku.unit}</TableCell>
                       <TableCell><Badge variant={sku.demand === 'High' ? 'destructive' : sku.demand === 'Medium' ? 'default' : 'secondary'}>{sku.demand || 'Not Analyzed'}</Badge></TableCell>
                       <TableCell>{sku.observations || 0}</TableCell>
                       <TableCell>{sku.avgStock || '0'}</TableCell>
+                      <TableCell>
+                        <Badge variant={sku.is_active === false ? 'secondary' : 'default'}>
+                          {sku.is_active === false ? 'No' : 'Yes'}
+                        </Badge>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
