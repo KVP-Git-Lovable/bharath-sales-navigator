@@ -657,32 +657,56 @@ export type Database = {
       competition_contacts: {
         Row: {
           competitor_id: string
+          competitor_since: number | null
           contact_email: string | null
           contact_name: string
           contact_phone: string | null
           created_at: string
           designation: string | null
+          hq: string | null
           id: string
+          is_active: boolean | null
+          level: string | null
+          region_covered: string | null
+          reporting_to: string | null
+          role: string | null
+          skill: string | null
           updated_at: string
         }
         Insert: {
           competitor_id: string
+          competitor_since?: number | null
           contact_email?: string | null
           contact_name: string
           contact_phone?: string | null
           created_at?: string
           designation?: string | null
+          hq?: string | null
           id?: string
+          is_active?: boolean | null
+          level?: string | null
+          region_covered?: string | null
+          reporting_to?: string | null
+          role?: string | null
+          skill?: string | null
           updated_at?: string
         }
         Update: {
           competitor_id?: string
+          competitor_since?: number | null
           contact_email?: string | null
           contact_name?: string
           contact_phone?: string | null
           created_at?: string
           designation?: string | null
+          hq?: string | null
           id?: string
+          is_active?: boolean | null
+          level?: string | null
+          region_covered?: string | null
+          reporting_to?: string | null
+          role?: string | null
+          skill?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -862,6 +886,7 @@ export type Database = {
           competitor_id: string
           created_at: string
           id: string
+          is_active: boolean | null
           sku_name: string
           unit: string | null
           updated_at: string
@@ -870,6 +895,7 @@ export type Database = {
           competitor_id: string
           created_at?: string
           id?: string
+          is_active?: boolean | null
           sku_name: string
           unit?: string | null
           updated_at?: string
@@ -878,6 +904,7 @@ export type Database = {
           competitor_id?: string
           created_at?: string
           id?: string
+          is_active?: boolean | null
           sku_name?: string
           unit?: string | null
           updated_at?: string
