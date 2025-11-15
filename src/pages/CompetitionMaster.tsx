@@ -66,14 +66,23 @@ export default function CompetitionMaster() {
 
   const [skuForm, setSKUForm] = useState({
     sku_name: "",
-    unit: ""
+    unit: "",
+    is_active: true
   });
 
   const [contactForm, setContactForm] = useState({
     contact_name: "",
     contact_phone: "",
     contact_email: "",
-    designation: ""
+    designation: "",
+    hq: "",
+    region_covered: "",
+    reporting_to: "",
+    level: "",
+    skill: "",
+    competitor_since: "",
+    role: "",
+    is_active: true
   });
 
   useEffect(() => {
@@ -83,13 +92,31 @@ export default function CompetitionMaster() {
   const fetchCompetitors = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch competitors with rollup counts
+      const { data: competitorsData, error: competitorsError } = await supabase
         .from('competition_master')
         .select('*')
         .order('competitor_name');
 
-      if (error) throw error;
-      setCompetitors(data || []);
+      if (competitorsError) throw competitorsError;
+
+      // Fetch counts for SKUs and Contacts
+      const competitorIds = competitorsData?.map(c => c.id) || [];
+      
+      const [skusData, contactsData] = await Promise.all([
+        supabase.from('competition_skus').select('competitor_id').in('competitor_id', competitorIds),
+        supabase.from('competition_contacts').select('competitor_id').in('competitor_id', competitorIds)
+      ]);
+
+      // Add counts to competitors
+      const competitorsWithCounts = competitorsData?.map(competitor => ({
+        ...competitor,
+        sku_count: skusData.data?.filter(s => s.competitor_id === competitor.id).length || 0,
+        contact_count: contactsData.data?.filter(c => c.competitor_id === competitor.id).length || 0
+      }));
+
+      setCompetitors(competitorsWithCounts || []);
     } catch (error) {
       console.error('Error:', error);
       toast({
