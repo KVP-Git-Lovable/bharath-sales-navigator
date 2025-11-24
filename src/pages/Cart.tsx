@@ -786,6 +786,37 @@ export const Cart = () => {
       localStorage.removeItem('cart');
       setCartItems([]);
 
+      // Update visit status to productive if visit exists
+      if (actualVisitId) {
+        try {
+          if (result.offline) {
+            // Offline: Update visit in cache
+            console.log('📵 Updating visit status to productive in cache...');
+            const cachedVisits = await offlineStorage.getAll('visits');
+            const visit = cachedVisits.find((v: any) => v.id === actualVisitId);
+            if (visit) {
+              await offlineStorage.save('visits', {
+                ...visit,
+                status: 'productive'
+              });
+              console.log('✅ Visit status updated in cache');
+            }
+          } else {
+            // Online: Update in database (non-blocking)
+            console.log('🌐 Updating visit status to productive in database...');
+            supabase
+              .from('visits')
+              .update({ status: 'productive' })
+              .eq('id', actualVisitId)
+              .then(() => console.log('✅ Visit status updated in database'))
+              .catch(err => console.error('Failed to update visit:', err));
+          }
+        } catch (visitUpdateError) {
+          console.error('Error updating visit status:', visitUpdateError);
+          // Don't fail the order for this
+        }
+      }
+
       // BACKGROUND WORK - Don't block user navigation for non-critical tasks
       // Gamification, retailer sequences, and invoice DB records run in background
       (async () => {
