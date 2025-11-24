@@ -717,7 +717,11 @@ export const MyVisits = () => {
 
         // Only show retailers that either have a visit or are in planned beats
         if (!visit && !isPlanned) return null;
-        const status = hasOrder ? 'productive' as const : visit?.status === 'unproductive' ? 'unproductive' as const : hasCheckIn ? 'in-progress' as const : 'planned' as const;
+        // Determine status: check order first, then no_order_reason, then check_in, then planned
+        const status = hasOrder ? 'productive' as const : 
+                      (visit?.no_order_reason || visit?.status === 'unproductive') ? 'unproductive' as const : 
+                      hasCheckIn ? 'in-progress' as const : 
+                      'planned' as const;
         return {
           id: visit?.id || retailerId,
           retailerId: retailer.id,
