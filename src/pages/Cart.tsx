@@ -678,15 +678,15 @@ export const Cart = () => {
 
       console.time('⚡ Order Submission');
 
-      // For phone orders, create a visit first
+      // For phone orders, create a visit first (only when online)
       let actualVisitId = validVisitId;
-      if (isPhoneOrder && !validVisitId && validRetailerId) {
+      if (isPhoneOrder && !validVisitId && validRetailerId && connectivityStatus !== 'offline') {
         const today = new Date().toISOString().split('T')[0];
         const {
           data: newVisit,
           error: visitError
         } = await supabase.from('visits').insert({
-          user_id: user.id,
+          user_id: userIdToUse,
           retailer_id: validRetailerId,
           planned_date: today,
           status: 'productive',
@@ -703,6 +703,10 @@ export const Cart = () => {
           return;
         }
         actualVisitId = newVisit.id;
+      } else if (isPhoneOrder && !validVisitId && connectivityStatus === 'offline') {
+        // Offline phone order: Generate temp visit ID
+        actualVisitId = crypto.randomUUID();
+        console.log('📵 Generated temp visit ID for offline phone order:', actualVisitId);
       }
 
       // Prepare order data
@@ -777,7 +781,7 @@ export const Cart = () => {
             const { count: previousOrdersCount } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
-              .eq('user_id', user.id)
+              .eq('user_id', userIdToUse)
               .eq('retailer_id', validRetailerId)
               .neq('id', order.id);
 
