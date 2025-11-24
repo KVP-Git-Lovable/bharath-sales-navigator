@@ -793,7 +793,7 @@ export const Cart = () => {
             // Offline: Update visit in cache
             console.log('📵 Updating visit status to productive in cache...');
             const cachedVisits = await offlineStorage.getAll('visits');
-            const visit = cachedVisits.find((v: any) => v.id === actualVisitId);
+            const visit = cachedVisits.find((v: any) => v.id === actualVisitId) as any;
             if (visit) {
               await offlineStorage.save('visits', {
                 ...visit,
@@ -808,8 +808,9 @@ export const Cart = () => {
               .from('visits')
               .update({ status: 'productive' })
               .eq('id', actualVisitId)
+              .select()
               .then(() => console.log('✅ Visit status updated in database'))
-              .catch(err => console.error('Failed to update visit:', err));
+              .catch((err: any) => console.error('Failed to update visit:', err));
           }
         } catch (visitUpdateError) {
           console.error('Error updating visit status:', visitUpdateError);
