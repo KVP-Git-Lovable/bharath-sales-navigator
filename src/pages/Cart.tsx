@@ -741,15 +741,18 @@ export const Cart = () => {
       }));
 
       // Submit order using offline-capable utility
+      console.log('📤 Submitting order with connectivity:', connectivityStatus);
       const result = await submitOrderWithOfflineSupport(orderData, orderItems, {
         connectivityStatus,
         onOffline: () => {
+          console.log('📵 OFFLINE MODE: Order queued for sync');
           toast({
             title: "📵 Order Saved Offline",
             description: "Your order and invoice message will be synced automatically when you're back online",
           });
         },
         onOnline: () => {
+          console.log('✅ ONLINE MODE: Order submitted immediately');
           toast({
             title: "✅ Order Placed Successfully",
             description: `Order for ${retailerName} has been confirmed`,
@@ -759,10 +762,12 @@ export const Cart = () => {
 
       console.timeEnd('⚡ Order Submission');
 
-      console.log('✅ Order created successfully:', {
+      console.log('✅ Order submission result:', {
         orderId: result.order?.id,
         offline: result.offline,
-        retailerId: validRetailerId
+        success: result.success,
+        retailerId: validRetailerId,
+        connectivityStatus
       });
 
       // Clear cart immediately - user sees success

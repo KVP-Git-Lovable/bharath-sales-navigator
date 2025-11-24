@@ -22,6 +22,7 @@ export async function submitOrderWithOfflineSupport(
   
   if (!isOnline) {
     // Offline: Queue for sync
+    console.log('📵 OFFLINE: Queueing order for sync...');
     const orderId = crypto.randomUUID();
     const offlineOrder = {
       ...orderData,
@@ -37,12 +38,14 @@ export async function submitOrderWithOfflineSupport(
 
     // Save to offline storage
     await offlineStorage.save(STORES.ORDERS, { ...offlineOrder, items: offlineItems });
+    console.log('✅ Order saved to IndexedDB:', orderId);
     
     // Queue for sync
     await offlineStorage.addToSyncQueue('CREATE_ORDER', {
       order: offlineOrder,
       items: offlineItems
     });
+    console.log('✅ Order added to sync queue');
 
     options.onOffline?.();
 
@@ -53,6 +56,7 @@ export async function submitOrderWithOfflineSupport(
     };
   } else {
     // Online: Submit directly
+    console.log('🌐 ONLINE: Submitting order to server...');
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert(orderData)
@@ -60,6 +64,7 @@ export async function submitOrderWithOfflineSupport(
       .single();
 
     if (orderError) throw orderError;
+    console.log('✅ Order inserted to database:', order.id);
 
     const itemsWithOrderId = orderItems.map(item => ({
       ...item,
