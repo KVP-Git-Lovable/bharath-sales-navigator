@@ -769,8 +769,20 @@ export const Cart = () => {
         retailerId: validRetailerId,
         connectivityStatus
       });
+      
+      // Check if submission failed
+      if (!result.success) {
+        console.error('❌ Order submission failed');
+        toast({
+          title: "Order Submission Failed",
+          description: "Failed to save order. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
 
       // Clear cart immediately - user sees success
+      console.log('🗑️ Clearing cart from localStorage');
       localStorage.removeItem('cart');
       setCartItems([]);
 
