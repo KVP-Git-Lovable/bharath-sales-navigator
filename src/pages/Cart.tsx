@@ -596,19 +596,38 @@ export const Cart = () => {
     });
 
     try {
-      // Get current user
-      const {
-        data: {
-          user
+      // Get user ID - use cache when offline to avoid network dependency
+      let user;
+      let userIdToUse;
+      
+      if (connectivityStatus === 'offline') {
+        // Offline: Use cached user ID
+        const cachedUserId = localStorage.getItem('cached_user_id');
+        if (!cachedUserId) {
+          toast({
+            title: "User Data Missing",
+            description: "Please go online once to cache user data",
+            variant: "destructive"
+          });
+          return;
         }
-      } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to submit orders",
-          variant: "destructive"
-        });
-        return;
+        userIdToUse = cachedUserId;
+        console.log('📵 Using cached user ID for offline order:', userIdToUse);
+      } else {
+        // Online: Fetch from Supabase
+        const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+        if (!fetchedUser) {
+          toast({
+            title: "Authentication Required",
+            description: "Please sign in to submit orders",
+            variant: "destructive"
+          });
+          return;
+        }
+        user = fetchedUser;
+        userIdToUse = user.id;
+        // Cache for offline use
+        localStorage.setItem('cached_user_id', user.id);
       }
       const subtotal = getSubtotal();
       const discountAmount = getDiscount();
@@ -688,7 +707,7 @@ export const Cart = () => {
 
       // Prepare order data
       const orderData = {
-        user_id: user.id,
+        user_id: userIdToUse,
         visit_id: actualVisitId,
         retailer_id: validRetailerId,
         retailer_name: retailerName,
@@ -766,7 +785,7 @@ export const Cart = () => {
 
             // Award gamification points
             await awardPointsForOrder({
-              userId: user.id,
+              userId: userIdToUse,
               retailerId: validRetailerId,
               orderValue: totalAmount,
               orderItems: orderItems.map(item => ({
@@ -777,7 +796,7 @@ export const Cart = () => {
             });
 
             // Update retailer sequence
-            await updateRetailerSequence(user.id, validRetailerId);
+            await updateRetailerSequence(userIdToUse, validRetailerId);
 
             // Create invoice record (for future editing/management)
             const invoiceDate = new Date().toISOString().split('T')[0];
@@ -799,7 +818,7 @@ export const Cart = () => {
                 sub_total: subtotal,
                 total_tax: cgstAmount + sgstAmount,
                 total_amount: totalAmount,
-                created_by: user.id,
+                created_by: userIdToUse,
                 status: 'issued',
                 place_of_supply: '29-Karnataka',
                 order_id: order.id
