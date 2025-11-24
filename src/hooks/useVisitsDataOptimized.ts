@@ -127,30 +127,22 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
         });
 
         setProgressStats({ planned, productive, unproductive, totalOrders, totalOrderValue });
-        console.log('📊 Progress stats calculated (network):', { planned, productive, unproductive, totalOrders, totalOrderValue });
+        
+        setBeatPlans(filteredBeatPlans);
+        setVisits(filteredVisits);
+        setRetailers(filteredRetailers);
+        setOrders(filteredOrders);
+        setIsLoading(false);
+        hasLoadedFromCache = true;
+        console.log('✅ Loaded from cache instantly with progress stats:', { planned, productive, unproductive, totalOrders, totalOrderValue });
+      }
+    } catch (cacheError) {
+      console.log('Cache read error (non-critical):', cacheError);
+    }
 
-        // Cache ONLY current date data (don't bloat storage with historical data)
-        // Beat plans and retailers are already cached by useMasterDataCache
-        // Only cache visits for current date
-        await Promise.all([
-          ...visitsData.map(visit => offlineStorage.save(STORES.VISITS, visit))
-        ]);
-        
-        console.log('[VisitsData] ✅ Cached current date visits only (not storing orders/beat plans to save storage)');
-
-        // Update state with fresh data
-        setBeatPlans(beatPlansData);
-        setVisits(visitsData);
-        setRetailers(retailersData);
-        setOrders(ordersData);
-        
-        if (!hasLoadedFromCache) {
-          setIsLoading(false);
-        }
-        
-        setError(null);
-        console.log('🔄 Updated with fresh data from network');
-      } catch (networkError) {
+    // STEP 2: Background sync from network if online
+    if (navigator.onLine) {
+      try {
         console.log('Network sync failed, using cached data:', networkError);
         if (!hasLoadedFromCache) {
           setError(networkError);
