@@ -960,10 +960,18 @@ export const Cart = () => {
         } else if (result.offline && result.order && validRetailerId) {
           // OFFLINE: Queue message for later
           console.log('📵 Offline mode - queueing invoice SMS/WhatsApp for sync...');
+          console.log('📵 Order details for SMS queue:', {
+            orderId: result.order.id,
+            retailerId: validRetailerId,
+            retailerName
+          });
           
           // Fetch retailer phone from offline cache
           const cachedRetailers = await offlineStorage.getAll('retailers');
+          console.log('📦 Loaded retailers from cache:', cachedRetailers.length);
+          
           const retailer = cachedRetailers.find((r: any) => r.id === validRetailerId) as any;
+          console.log('📱 Found retailer in cache:', retailer ? `${retailer.name} - ${retailer.phone}` : 'NOT FOUND');
           
           if (retailer?.phone) {
             // Add to sync queue
@@ -974,9 +982,14 @@ export const Cart = () => {
               queuedAt: new Date().toISOString()
             });
             
-            console.log('✅ Invoice message queued for sync');
+            console.log('✅ Invoice SMS queued for sync - Queue item added');
+            
+            // Verify it was added
+            const queue = await offlineStorage.getSyncQueue();
+            console.log('📊 Current sync queue count:', queue.length);
+            
             toast({
-              title: "Message Queued",
+              title: "📤 Message Queued",
               description: "Invoice SMS will be sent when you're back online",
             });
           } else {
