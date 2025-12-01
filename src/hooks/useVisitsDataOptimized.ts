@@ -142,36 +142,13 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
           }
         }
 
-        let planned = 0;
-        let productive = 0;
-        let unproductive = 0;
         let totalOrders = filteredOrders.length;
         let totalOrderValue = filteredOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
 
-        // Create a set of retailer IDs that have visits
-        const visitRetailerIdsSet = new Set(filteredVisits.map((v: any) => v.retailer_id));
-
-        filteredVisits.forEach((visit: any) => {
-          const orderValue = ordersByRetailer.get(visit.retailer_id) || 0;
-          const hasOrder = orderValue > 0;
-          
-          // Check visit status directly from the visit record
-          if (visit.status === 'unproductive' || (visit.no_order_reason && !hasOrder)) {
-            unproductive++;
-          } else if (hasOrder || visit.status === 'productive') {
-            productive++;
-          } else if (visit.status === 'planned' || !visit.check_in_time) {
-            planned++;
-          }
-        });
-
-        // Count retailers from beat_data.retailer_ids that don't have visit records yet as planned
-        // This matches the network calculation logic for consistency
-        progressPlannedRetailerIds.forEach((retailerId: string) => {
-          if (!visitRetailerIdsSet.has(retailerId) && !ordersByRetailer.has(retailerId)) {
-            planned++;
-          }
-        });
+        // Match home dashboard logic: simply count visits by status
+        const planned = filteredVisits.filter((v: any) => v.status === 'planned').length;
+        const productive = filteredVisits.filter((v: any) => v.status === 'productive').length;
+        const unproductive = filteredVisits.filter((v: any) => v.status === 'unproductive').length;
 
         setProgressStats({ planned, productive, unproductive, totalOrders, totalOrderValue });
         console.log('📊 [CACHE] Progress stats calculated from cache:', { 
@@ -359,35 +336,13 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
           ordersByRetailer.set(o.retailer_id, (ordersByRetailer.get(o.retailer_id) || 0) + Number(o.total_amount || 0));
         });
 
-        let planned = 0;
-        let productive = 0;
-        let unproductive = 0;
         let totalOrders = ordersData.length;
         let totalOrderValue = ordersData.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
 
-        // Create a set of retailer IDs that have visits
-        const visitRetailerIdsSet = new Set(visitsData.map((v: any) => v.retailer_id));
-
-        // Process visits directly to ensure all visits are counted
-        visitsData.forEach((visit: any) => {
-          const hasOrder = ordersMap.has(visit.retailer_id);
-          
-          // Check visit status directly - match cache section logic
-          if (visit.status === 'unproductive' || (visit.no_order_reason && !hasOrder)) {
-            unproductive++;
-          } else if (hasOrder || visit.status === 'productive') {
-            productive++;
-          } else if (visit.status === 'planned' || !visit.check_in_time) {
-            planned++;
-          }
-        });
-
-        // Count retailers from beat plans that don't have visit records yet as planned
-        plannedRetailerIds.forEach((retailerId: string) => {
-          if (!visitRetailerIdsSet.has(retailerId) && !ordersMap.has(retailerId)) {
-            planned++;
-          }
-        });
+        // Match home dashboard logic: simply count visits by status
+        const planned = visitsData.filter((v: any) => v.status === 'planned').length;
+        const productive = visitsData.filter((v: any) => v.status === 'productive').length;
+        const unproductive = visitsData.filter((v: any) => v.status === 'unproductive').length;
 
         setProgressStats({ planned, productive, unproductive, totalOrders, totalOrderValue });
         console.log('📊 [NETWORK] Progress stats calculated from network:', { 
