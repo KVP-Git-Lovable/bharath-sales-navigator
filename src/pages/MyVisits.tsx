@@ -910,8 +910,8 @@ export const MyVisits = () => {
       const matchesSearch = visit.retailerName.toLowerCase().includes(searchTerm.toLowerCase()) || visit.phone.includes(searchTerm);
       let matchesStatus = true;
       if (statusFilter === 'planned') {
-        // Show planned, in-progress, and cancelled visits
-        matchesStatus = visit.status === 'planned' || visit.status === 'in-progress' || visit.status === 'cancelled';
+        // Show only planned visits (retailers without visits also have status='planned')
+        matchesStatus = visit.status === 'planned';
       } else if (statusFilter === 'unproductive') {
         matchesStatus = visit.status === 'unproductive';
       } else if (statusFilter) {
