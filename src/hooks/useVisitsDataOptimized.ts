@@ -75,23 +75,27 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
       // Get retailer IDs from visits, planned beats, AND orders
       const visitRetailerIds = filteredVisits.map((v: any) => v.retailer_id);
 
-      // Extract retailer IDs from beat_data.retailer_ids if specified
+      // Extract retailer IDs from beat_data.retailer_ids AND from beats without explicit retailer_ids
       let plannedRetailerIds: string[] = [];
-      let hasBeatDataWithRetailerIdsDefined = false;
+      const beatsWithoutRetailerIds: string[] = [];
+      
       for (const beatPlan of filteredBeatPlans) {
         const beatData = (beatPlan as any).beat_data as any;
-        if (beatData && Array.isArray(beatData.retailer_ids)) {
-          hasBeatDataWithRetailerIdsDefined = true;
+        if (beatData && Array.isArray(beatData.retailer_ids) && beatData.retailer_ids.length > 0) {
+          // This beat has explicit retailer_ids - use them
           plannedRetailerIds.push(...beatData.retailer_ids);
+        } else {
+          // This beat doesn't have retailer_ids - will fetch by beat_id
+          beatsWithoutRetailerIds.push(beatPlan.beat_id);
         }
       }
 
-      // If no specific retailer IDs are defined in beat_data for any plan, fall back to beat_id mapping
-      if (!hasBeatDataWithRetailerIdsDefined) {
-        const plannedBeatIds = filteredBeatPlans.map((bp: any) => bp.beat_id);
-        plannedRetailerIds = cachedRetailers
-          .filter((r: any) => r.user_id === userId && plannedBeatIds.includes(r.beat_id))
+      // Fetch retailers from beats that don't have explicit retailer_ids (from cache)
+      if (beatsWithoutRetailerIds.length > 0) {
+        const additionalRetailerIds = cachedRetailers
+          .filter((r: any) => r.user_id === userId && beatsWithoutRetailerIds.includes(r.beat_id))
           .map((r: any) => r.id);
+        plannedRetailerIds.push(...additionalRetailerIds);
       }
 
       const orderRetailerIds = filteredOrders.map((o: any) => o.retailer_id);
@@ -223,39 +227,42 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
         // Get all retailer IDs we need
         const visitRetailerIds = (visitsData || []).map((v: any) => v.retailer_id);
         
-        // Extract retailer IDs from beat_data.retailer_ids if specified
+        // Extract retailer IDs from beat_data.retailer_ids AND fetch from beats without explicit retailer_ids
         let plannedRetailerIds: string[] = [];
-        let hasBeatDataWithRetailerIdsDefined = false;
+        const beatsWithoutRetailerIds: string[] = [];
+        
         for (const beatPlan of beatPlansData) {
           const beatData = beatPlan.beat_data as any;
-          if (beatData && Array.isArray(beatData.retailer_ids)) {
-            hasBeatDataWithRetailerIdsDefined = true;
+          if (beatData && Array.isArray(beatData.retailer_ids) && beatData.retailer_ids.length > 0) {
+            // This beat has explicit retailer_ids - use them
             plannedRetailerIds.push(...beatData.retailer_ids);
+          } else {
+            // This beat doesn't have retailer_ids - will fetch by beat_id
+            beatsWithoutRetailerIds.push(beatPlan.beat_id);
           }
         }
         
-        console.log('📋 Planned retailer IDs from beat_data:', plannedRetailerIds);
+        console.log('📋 Planned retailer IDs from beat_data:', plannedRetailerIds.length);
+        console.log('📋 Beats without retailer_ids:', beatsWithoutRetailerIds.length);
         
-        // If no specific retailer IDs are defined in beat_data for any plan, fall back to fetching by beat_id
-        if (!hasBeatDataWithRetailerIdsDefined) {
-          const plannedBeatIds = (beatPlansData || []).map((bp: any) => bp.beat_id);
-          if (plannedBeatIds.length > 0) {
-            const { data: plannedRetailers, error: retailersError } = await supabase
-              .from('retailers')
-              .select('id')
-              .eq('user_id', userId)
-              .in('beat_id', plannedBeatIds);
+        // Fetch retailers from beats that don't have explicit retailer_ids
+        if (beatsWithoutRetailerIds.length > 0) {
+          const { data: additionalRetailers, error: retailersError } = await supabase
+            .from('retailers')
+            .select('id')
+            .eq('user_id', userId)
+            .in('beat_id', beatsWithoutRetailerIds);
 
-            if (retailersError) {
-              console.error('Error fetching planned retailers:', retailersError);
-            } else {
-              plannedRetailerIds = (plannedRetailers || []).map((r: any) => r.id);
-              console.log('📋 Found', plannedRetailerIds.length, 'retailers for', plannedBeatIds.length, 'planned beats (fallback by beat_id)');
-            }
+          if (retailersError) {
+            console.error('Error fetching retailers by beat_id:', retailersError);
+          } else {
+            const additionalIds = (additionalRetailers || []).map((r: any) => r.id);
+            plannedRetailerIds.push(...additionalIds);
+            console.log('📋 Found', additionalIds.length, 'additional retailers from', beatsWithoutRetailerIds.length, 'beats');
           }
-        } else {
-          console.log('📋 Using', plannedRetailerIds.length, 'specific retailers from beat plan data');
         }
+        
+        console.log('📋 Total planned retailer IDs:', plannedRetailerIds.length);
 
         // IMPORTANT: Also fetch orders for today to get retailer IDs from orders
         // This ensures retailers with orders show up even if not in planned beats or visits
