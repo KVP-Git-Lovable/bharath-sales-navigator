@@ -121,7 +121,6 @@ export function useOfflineSync() {
                 planned_date: plannedDate,
                 status: 'unproductive',
                 no_order_reason: noOrderReason,
-                visit_type: 'Regular Visit',
                 created_at: new Date().toISOString()
               })
               .select()
@@ -223,13 +222,57 @@ export function useOfflineSync() {
             }
           }
 
-          // Trigger visit status refresh (database trigger auto-updates visit status)
-          if (data.visitId || data.order?.visit_id) {
-            const visitId = data.visitId || data.order.visit_id;
-            const retailerId = data.order?.retailer_id;
+          // Trigger visit status refresh - create visit if doesn't exist
+          const retailerId = data.order?.retailer_id;
+          const userId = data.order?.user_id;
+          const plannedDate = data.order?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0];
+          let effectiveVisitId = data.visitId || data.order?.visit_id;
+          
+          // If no visit ID, try to find or create one
+          if (!effectiveVisitId && retailerId && userId) {
+            console.log('🔍 No visit ID found for order, looking for existing visit...');
+            const { data: existingVisit } = await supabase
+              .from('visits')
+              .select('id')
+              .eq('retailer_id', retailerId)
+              .eq('user_id', userId)
+              .eq('planned_date', plannedDate)
+              .maybeSingle();
             
-            // Explicitly update visit status to productive (don't rely only on DB trigger)
-            console.log('🔄 Updating visit status to productive after order sync:', { visitId });
+            if (existingVisit) {
+              effectiveVisitId = existingVisit.id;
+              console.log('✅ Found existing visit:', effectiveVisitId);
+            } else {
+              // Create a new visit for this order
+              console.log('📝 Creating new visit for synced order...');
+              const { data: newVisit, error: createVisitError } = await supabase
+                .from('visits')
+                .insert({
+                  retailer_id: retailerId,
+                  user_id: userId,
+                  planned_date: plannedDate,
+                  status: 'productive',
+                  check_out_time: new Date().toISOString(),
+                  created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+              
+              if (createVisitError) {
+                console.error('❌ Error creating visit for order:', createVisitError);
+              } else {
+                effectiveVisitId = newVisit.id;
+                console.log('✅ Created new visit for order:', effectiveVisitId);
+                
+                // Cache the new visit
+                await offlineStorage.save(STORES.VISITS, newVisit);
+              }
+            }
+          }
+          
+          // Update visit status to productive
+          if (effectiveVisitId) {
+            console.log('🔄 Updating visit status to productive after order sync:', { visitId: effectiveVisitId });
             const { error: visitUpdateError } = await supabase
               .from('visits')
               .update({
@@ -237,7 +280,7 @@ export function useOfflineSync() {
                 no_order_reason: null,
                 check_out_time: new Date().toISOString()
               })
-              .eq('id', visitId);
+              .eq('id', effectiveVisitId);
             
             if (visitUpdateError) {
               console.error('❌ Error updating visit status:', visitUpdateError);
@@ -245,10 +288,10 @@ export function useOfflineSync() {
               console.log('✅ Visit status updated to productive');
             }
             
-            console.log('✅ Order synced, dispatching visitStatusChanged event:', { visitId, retailerId });
+            console.log('✅ Order synced, dispatching visitStatusChanged event:', { visitId: effectiveVisitId, retailerId });
             
             window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-              detail: { visitId, status: 'productive', retailerId }
+              detail: { visitId: effectiveVisitId, status: 'productive', retailerId }
             }));
             
             // ALSO dispatch visitDataChanged to trigger full page reload with increased delay
@@ -297,10 +340,57 @@ export function useOfflineSync() {
               .eq('id', data.retailer_id);
           }
 
-          // Trigger visit status refresh (database trigger auto-updates visit status)
-          if (data.visit_id) {
-            // Explicitly update visit status to productive (don't rely only on DB trigger)
-            console.log('🔄 Updating visit status to productive after order sync (old format):', { visitId: data.visit_id });
+          // Trigger visit status refresh - create visit if doesn't exist
+          const retailerId = data.retailer_id;
+          const userId = data.user_id;
+          const plannedDate = data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0];
+          let effectiveVisitId = data.visit_id;
+          
+          // If no visit ID, try to find or create one
+          if (!effectiveVisitId && retailerId && userId) {
+            console.log('🔍 No visit ID found for order (old format), looking for existing visit...');
+            const { data: existingVisit } = await supabase
+              .from('visits')
+              .select('id')
+              .eq('retailer_id', retailerId)
+              .eq('user_id', userId)
+              .eq('planned_date', plannedDate)
+              .maybeSingle();
+            
+            if (existingVisit) {
+              effectiveVisitId = existingVisit.id;
+              console.log('✅ Found existing visit:', effectiveVisitId);
+            } else {
+              // Create a new visit for this order
+              console.log('📝 Creating new visit for synced order (old format)...');
+              const { data: newVisit, error: createVisitError } = await supabase
+                .from('visits')
+                .insert({
+                  retailer_id: retailerId,
+                  user_id: userId,
+                  planned_date: plannedDate,
+                  status: 'productive',
+                  check_out_time: new Date().toISOString(),
+                  created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+              
+              if (createVisitError) {
+                console.error('❌ Error creating visit for order (old format):', createVisitError);
+              } else {
+                effectiveVisitId = newVisit.id;
+                console.log('✅ Created new visit for order (old format):', effectiveVisitId);
+                
+                // Cache the new visit
+                await offlineStorage.save(STORES.VISITS, newVisit);
+              }
+            }
+          }
+          
+          // Update visit status to productive
+          if (effectiveVisitId) {
+            console.log('🔄 Updating visit status to productive after order sync (old format):', { visitId: effectiveVisitId });
             const { error: visitUpdateError } = await supabase
               .from('visits')
               .update({
@@ -308,7 +398,7 @@ export function useOfflineSync() {
                 no_order_reason: null,
                 check_out_time: new Date().toISOString()
               })
-              .eq('id', data.visit_id);
+              .eq('id', effectiveVisitId);
             
             if (visitUpdateError) {
               console.error('❌ Error updating visit status:', visitUpdateError);
@@ -317,12 +407,12 @@ export function useOfflineSync() {
             }
             
             console.log('✅ Order synced, dispatching visitStatusChanged event:', { 
-              visitId: data.visit_id, 
-              retailerId: data.retailer_id 
+              visitId: effectiveVisitId, 
+              retailerId
             });
             
             window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-              detail: { visitId: data.visit_id, status: 'productive', retailerId: data.retailer_id }
+              detail: { visitId: effectiveVisitId, status: 'productive', retailerId }
             }));
             
             // ALSO dispatch visitDataChanged to trigger full page reload with increased delay
