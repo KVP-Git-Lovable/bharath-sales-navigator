@@ -1264,6 +1264,71 @@ export const AddRetailer = () => {
                 <p className="text-xs text-muted-foreground">Select which beat this retailer belongs to</p>
               </div>
 
+              {/* Assign Territory */}
+              <div className="space-y-2">
+                <Label>Assign to Territory</Label>
+                <Popover open={territoryComboOpen} onOpenChange={setTerritoryComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={territoryComboOpen}
+                      className="w-full justify-between bg-background"
+                    >
+                      {selectedTerritoryId
+                        ? territories.find((t) => t.id === selectedTerritoryId)?.name
+                        : "Select territory..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search territory..." />
+                      <CommandList>
+                        <CommandEmpty>No territory found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            onSelect={() => {
+                              setSelectedTerritoryId(null);
+                              setTerritoryComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                !selectedTerritoryId ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            None
+                          </CommandItem>
+                          {territories.map((territory) => (
+                            <CommandItem
+                              key={territory.id}
+                              onSelect={() => {
+                                setSelectedTerritoryId(territory.id);
+                                setTerritoryComboOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedTerritoryId === territory.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span>{territory.name}</span>
+                                <span className="text-xs text-muted-foreground">{territory.region}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">Optionally assign this retailer to a sales territory</p>
+              </div>
+
               <div className="space-y-2 hidden">
                 <Label>Top 3 Competitors</Label>
                 <div className="space-y-2">
@@ -1329,94 +1394,6 @@ export const AddRetailer = () => {
                 </Select>
               </div>
 
-              {/* Assign to Beat */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="advancedBeat">Assign to Beat</Label>
-                  <Badge variant={connectivityStatus === 'offline' ? 'destructive' : 'default'} className="text-xs">
-                    {connectivityStatus === 'offline' ? '📴 Offline' : connectivityStatus === 'unknown' ? '❓ Unknown' : '🌐 Online'} • {beats.length} beats
-                  </Badge>
-                </div>
-                <Select value={selectedBeat} onValueChange={(value) => setSelectedBeat(value)}>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Select a beat" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border z-50">
-                    <SelectItem value="unassigned">Unassigned (No Beat)</SelectItem>
-                    {beats.map((beat) => (
-                      <SelectItem key={beat.beat_id} value={beat.beat_id}>
-                        {beat.beat_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Assign this retailer to a beat for visit planning</p>
-              </div>
-
-              {/* Assign Territory */}
-              <div className="space-y-2">
-                <Label>Assign to Territory</Label>
-                <Popover open={territoryComboOpen} onOpenChange={setTerritoryComboOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={territoryComboOpen}
-                      className="w-full justify-between bg-background"
-                    >
-                      {selectedTerritoryId
-                        ? territories.find((t) => t.id === selectedTerritoryId)?.name
-                        : "Select territory..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Search territory..." />
-                      <CommandList>
-                        <CommandEmpty>No territory found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            onSelect={() => {
-                              setSelectedTerritoryId(null);
-                              setTerritoryComboOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                !selectedTerritoryId ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            None
-                          </CommandItem>
-                          {territories.map((territory) => (
-                            <CommandItem
-                              key={territory.id}
-                              onSelect={() => {
-                                setSelectedTerritoryId(territory.id);
-                                setTerritoryComboOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedTerritoryId === territory.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex flex-col">
-                                <span>{territory.name}</span>
-                                <span className="text-xs text-muted-foreground">{territory.region}</span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <p className="text-xs text-muted-foreground">Optionally assign this retailer to a sales territory</p>
-              </div>
 
               {/* Quick Info */}
               <div className="p-3 bg-muted/30 rounded-lg">
