@@ -145,10 +145,18 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
         let totalOrders = filteredOrders.length;
         let totalOrderValue = filteredOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
 
-        // Match home dashboard logic: simply count visits by status
-        const planned = filteredVisits.filter((v: any) => v.status === 'planned').length;
+        // Count visits by status
+        let planned = filteredVisits.filter((v: any) => v.status === 'planned').length;
         const productive = filteredVisits.filter((v: any) => v.status === 'productive').length;
         const unproductive = filteredVisits.filter((v: any) => v.status === 'unproductive').length;
+
+        // Add retailers from beat plans that don't have visit records yet as planned
+        const visitRetailerIdsSet = new Set(filteredVisits.map((v: any) => v.retailer_id));
+        progressPlannedRetailerIds.forEach((retailerId: string) => {
+          if (!visitRetailerIdsSet.has(retailerId)) {
+            planned++;
+          }
+        });
 
         setProgressStats({ planned, productive, unproductive, totalOrders, totalOrderValue });
         console.log('📊 [CACHE] Progress stats calculated from cache:', { 
@@ -339,10 +347,18 @@ export const useVisitsDataOptimized = ({ userId, selectedDate }: UseVisitsDataOp
         let totalOrders = ordersData.length;
         let totalOrderValue = ordersData.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
 
-        // Match home dashboard logic: simply count visits by status
-        const planned = visitsData.filter((v: any) => v.status === 'planned').length;
+        // Count visits by status
+        let planned = visitsData.filter((v: any) => v.status === 'planned').length;
         const productive = visitsData.filter((v: any) => v.status === 'productive').length;
         const unproductive = visitsData.filter((v: any) => v.status === 'unproductive').length;
+
+        // Add retailers from beat plans that don't have visit records yet as planned
+        const visitRetailerIdsSet = new Set(visitsData.map((v: any) => v.retailer_id));
+        plannedRetailerIds.forEach((retailerId: string) => {
+          if (!visitRetailerIdsSet.has(retailerId)) {
+            planned++;
+          }
+        });
 
         setProgressStats({ planned, productive, unproductive, totalOrders, totalOrderValue });
         console.log('📊 [NETWORK] Progress stats calculated from network:', { 
