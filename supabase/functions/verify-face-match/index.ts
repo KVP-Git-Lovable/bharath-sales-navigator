@@ -25,8 +25,18 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
       console.error(`Failed to fetch image from ${url}: ${response.status}`);
       return null;
     }
+
     const arrayBuffer = await response.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    const chunkSize = 0x8000; // avoid "Maximum call stack size exceeded"
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+
+    const base64 = btoa(binary);
     return base64;
   } catch (error) {
     console.error(`Error fetching image: ${error}`);
@@ -77,6 +87,33 @@ serve(async (req) => {
     console.log(`Face verification attempt by user ${user.id}`)
     console.log(`Baseline URL: ${baselinePhotoUrl}`)
     console.log(`Attendance URL: ${attendancePhotoUrl}`)
+
+    // If both URLs are exactly the same, short‑circuit to a perfect match
+    if (baselinePhotoUrl === attendancePhotoUrl) {
+      const result: FaceMatchResponse = {
+        status: 'match',
+        confidence: 100,
+        verified: true,
+        message: 'Baseline and attendance photos are identical URLs; treating as perfect match.'
+      };
+
+      console.log('Face match result (short‑circuit identical URLs):', JSON.stringify(result));
+
+      try {
+        await supabaseClient.from('sensitive_data_access_log').insert({
+          user_id: user.id,
+          table_name: 'attendance',
+          action: 'face_verification_success_100%',
+        });
+      } catch (logError) {
+        console.error('Failed to log verification attempt (short‑circuit):', logError);
+      }
+
+      return new Response(
+        JSON.stringify(result),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Fetch both images as base64
     const [baselineBase64, attendanceBase64] = await Promise.all([
