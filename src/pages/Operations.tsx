@@ -271,14 +271,14 @@ const Operations = () => {
         let attendancePhotoUrl = null;
         let profilePictureUrl = null;
 
-        if (visit.check_in_time && visit.user_id) {
+        if (visit.user_id) {
           try {
-            const checkInDate = new Date(visit.check_in_time).toISOString().split('T')[0];
+            // Use planned_date from visit to match with attendance date
             const { data: attendanceData } = await supabase
               .from('attendance')
               .select('face_match_confidence, face_verification_status, check_in_photo_url')
               .eq('user_id', visit.user_id)
-              .eq('date', checkInDate)
+              .eq('date', visit.planned_date)
               .maybeSingle();
 
             if (attendanceData) {
