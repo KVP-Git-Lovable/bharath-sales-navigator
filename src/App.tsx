@@ -89,6 +89,7 @@ import PerformanceModuleAdmin from "./pages/admin/PerformanceModuleAdmin";
 import MyTargets from "./pages/MyTargets";
 import TeamTargets from "./pages/TeamTargets";
 import PendingPaymentsAll from "./pages/PendingPaymentsAll";
+import { TargetSetupMaster } from "./components/admin/TargetSetupMaster";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -260,6 +261,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
               <Route path="/admin/performance-module" element={<ProtectedRoute><PerformanceModuleAdmin /></ProtectedRoute>} />
               <Route path="/my-targets" element={<ProtectedRoute><MyTargets /></ProtectedRoute>} />
               <Route path="/team-targets" element={<ProtectedRoute><TeamTargets /></ProtectedRoute>} />
+              <Route path="/target-setup-master" element={<ProtectedRoute><TargetSetupMaster /></ProtectedRoute>} />
               <Route path="/features/beat-planning" element={<Suspense fallback={<LoadingScreen />}><BeatPlanningFeature /></Suspense>} />
               <Route path="/features/retailer-management" element={<Suspense fallback={<LoadingScreen />}><RetailerManagementFeature /></Suspense>} />
               <Route path="/features/visit-scheduling" element={<Suspense fallback={<LoadingScreen />}><VisitSchedulingFeature /></Suspense>} />
