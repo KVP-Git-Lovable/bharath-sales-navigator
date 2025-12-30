@@ -33,6 +33,8 @@ const UserProfile = () => {
   const [pointsModalOpen, setPointsModalOpen] = useState(false);
   const [totalPoints, setTotalPoints] = useState(0);
   
+  const [territories, setTerritories] = useState<{ id: string; name: string; territory_type: string | null }[]>([]);
+  
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
@@ -43,6 +45,9 @@ const UserProfile = () => {
     daily_da_allowance: '',
     manager_id: '',
     hq: '',
+    hq_territory_id: '',
+    district_territory_id: '',
+    state_territory_id: '',
     date_of_joining: '',
     date_of_exit: '',
     alternate_email: '',
@@ -54,6 +59,7 @@ const UserProfile = () => {
   useEffect(() => {
     if (userProfile && user) {
       fetchManagers();
+      fetchTerritories();
       fetchEmployeeData();
       fetchTotalPoints();
     }
@@ -67,6 +73,17 @@ const UserProfile = () => {
 
     if (data) {
       setManagers(data);
+    }
+  };
+
+  const fetchTerritories = async () => {
+    const { data } = await supabase
+      .from('territories')
+      .select('id, name, territory_type')
+      .order('name');
+
+    if (data) {
+      setTerritories(data);
     }
   };
 
@@ -90,6 +107,9 @@ const UserProfile = () => {
         daily_da_allowance: employeeData.daily_da_allowance?.toString() || '',
         manager_id: employeeData.manager_id || '',
         hq: employeeData.hq || '',
+        hq_territory_id: employeeData.hq_territory_id || '',
+        district_territory_id: employeeData.district_territory_id || '',
+        state_territory_id: employeeData.state_territory_id || '',
         date_of_joining: employeeData.date_of_joining || '',
         date_of_exit: employeeData.date_of_exit || '',
         alternate_email: employeeData.alternate_email || '',
@@ -141,6 +161,9 @@ const UserProfile = () => {
           daily_da_allowance: parseFloat(formData.daily_da_allowance) || 0,
           manager_id: formData.manager_id || null,
           hq: formData.hq,
+          hq_territory_id: formData.hq_territory_id || null,
+          district_territory_id: formData.district_territory_id || null,
+          state_territory_id: formData.state_territory_id || null,
           date_of_joining: formData.date_of_joining || null,
           date_of_exit: formData.date_of_exit || null,
           alternate_email: formData.alternate_email,
@@ -312,12 +335,58 @@ const UserProfile = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hq">Headquarters (HQ)</Label>
-                    <Input
-                      id="hq"
-                      value={formData.hq}
-                      onChange={(e) => setFormData(prev => ({ ...prev, hq: e.target.value }))}
-                    />
+                    <Label htmlFor="hq_territory_id">Headquarters (HQ)</Label>
+                    <Select 
+                      value={formData.hq_territory_id} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, hq_territory_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Headquarters" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {territories.map((territory) => (
+                          <SelectItem key={territory.id} value={territory.id}>
+                            {territory.name} {territory.territory_type ? `(${territory.territory_type})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="district_territory_id">District</Label>
+                    <Select 
+                      value={formData.district_territory_id} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, district_territory_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select District" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {territories.map((territory) => (
+                          <SelectItem key={territory.id} value={territory.id}>
+                            {territory.name} {territory.territory_type ? `(${territory.territory_type})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state_territory_id">State</Label>
+                    <Select 
+                      value={formData.state_territory_id} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, state_territory_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select State" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {territories.map((territory) => (
+                          <SelectItem key={territory.id} value={territory.id}>
+                            {territory.name} {territory.territory_type ? `(${territory.territory_type})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="date_of_joining">Date of Joining</Label>

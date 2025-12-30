@@ -362,6 +362,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          distributor_id: string | null
           id: string
           is_active: boolean | null
           territory_id: string | null
@@ -376,6 +377,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          distributor_id?: string | null
           id?: string
           is_active?: boolean | null
           territory_id?: string | null
@@ -390,6 +392,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          distributor_id?: string | null
           id?: string
           is_active?: boolean | null
           territory_id?: string | null
@@ -397,6 +400,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "beats_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "beats_territory_id_fkey"
             columns: ["territory_id"]
@@ -668,6 +678,652 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      coach_badges: {
+        Row: {
+          badge_color: string | null
+          created_at: string
+          criteria_competency_id: string | null
+          criteria_type: string
+          criteria_value: number
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          points_awarded: number | null
+        }
+        Insert: {
+          badge_color?: string | null
+          created_at?: string
+          criteria_competency_id?: string | null
+          criteria_type: string
+          criteria_value: number
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          points_awarded?: number | null
+        }
+        Update: {
+          badge_color?: string | null
+          created_at?: string
+          criteria_competency_id?: string | null
+          criteria_type?: string
+          criteria_value?: number
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          points_awarded?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_badges_criteria_competency_id_fkey"
+            columns: ["criteria_competency_id"]
+            isOneToOne: false
+            referencedRelation: "coach_competencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          message_type: string | null
+          metadata: Json | null
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          message_type?: string | null
+          metadata?: Json | null
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          message_type?: string | null
+          metadata?: Json | null
+          role?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coach_competencies: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      coach_daily_nudges: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          id: string
+          is_delivered: boolean | null
+          is_interacted: boolean | null
+          message: string | null
+          nudge_type: string
+          reference_id: string | null
+          scheduled_for: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          is_delivered?: boolean | null
+          is_interacted?: boolean | null
+          message?: string | null
+          nudge_type: string
+          reference_id?: string | null
+          scheduled_for?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          is_delivered?: boolean | null
+          is_interacted?: boolean | null
+          message?: string | null
+          nudge_type?: string
+          reference_id?: string | null
+          scheduled_for?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coach_feedback: {
+        Row: {
+          created_at: string
+          feedback_text: string | null
+          id: string
+          is_helpful: boolean | null
+          rating: number | null
+          reference_id: string | null
+          reference_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feedback_text?: string | null
+          id?: string
+          is_helpful?: boolean | null
+          rating?: number | null
+          reference_id?: string | null
+          reference_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feedback_text?: string | null
+          id?: string
+          is_helpful?: boolean | null
+          rating?: number | null
+          reference_id?: string | null
+          reference_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coach_learning_content: {
+        Row: {
+          competency_id: string | null
+          content_body: string | null
+          content_type: string
+          content_url: string | null
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          duration_minutes: number | null
+          id: string
+          is_active: boolean | null
+          points_on_completion: number | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          competency_id?: string | null
+          content_body?: string | null
+          content_type: string
+          content_url?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          points_on_completion?: number | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          competency_id?: string | null
+          content_body?: string | null
+          content_type?: string
+          content_url?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          points_on_completion?: number | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_learning_content_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "coach_competencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_quiz_attempts: {
+        Row: {
+          answered_at: string
+          id: string
+          is_correct: boolean | null
+          points_earned: number | null
+          question_id: string | null
+          user_answer: string | null
+          user_id: string
+        }
+        Insert: {
+          answered_at?: string
+          id?: string
+          is_correct?: boolean | null
+          points_earned?: number | null
+          question_id?: string | null
+          user_answer?: string | null
+          user_id: string
+        }
+        Update: {
+          answered_at?: string
+          id?: string
+          is_correct?: boolean | null
+          points_earned?: number | null
+          question_id?: string | null
+          user_answer?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_quiz_attempts_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "coach_quiz_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_quiz_questions: {
+        Row: {
+          competency_id: string | null
+          correct_answer: string
+          created_at: string
+          difficulty_level: string | null
+          explanation: string | null
+          id: string
+          is_active: boolean | null
+          learning_content_id: string | null
+          options: Json | null
+          points: number | null
+          question: string
+          question_type: string | null
+        }
+        Insert: {
+          competency_id?: string | null
+          correct_answer: string
+          created_at?: string
+          difficulty_level?: string | null
+          explanation?: string | null
+          id?: string
+          is_active?: boolean | null
+          learning_content_id?: string | null
+          options?: Json | null
+          points?: number | null
+          question: string
+          question_type?: string | null
+        }
+        Update: {
+          competency_id?: string | null
+          correct_answer?: string
+          created_at?: string
+          difficulty_level?: string | null
+          explanation?: string | null
+          id?: string
+          is_active?: boolean | null
+          learning_content_id?: string | null
+          options?: Json | null
+          points?: number | null
+          question?: string
+          question_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_quiz_questions_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "coach_competencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_quiz_questions_learning_content_id_fkey"
+            columns: ["learning_content_id"]
+            isOneToOne: false
+            referencedRelation: "coach_learning_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_scenario_attempts: {
+        Row: {
+          answered_at: string
+          id: string
+          is_best_choice: boolean | null
+          points_earned: number | null
+          scenario_id: string | null
+          selected_option: string | null
+          user_id: string
+        }
+        Insert: {
+          answered_at?: string
+          id?: string
+          is_best_choice?: boolean | null
+          points_earned?: number | null
+          scenario_id?: string | null
+          selected_option?: string | null
+          user_id: string
+        }
+        Update: {
+          answered_at?: string
+          id?: string
+          is_best_choice?: boolean | null
+          points_earned?: number | null
+          scenario_id?: string | null
+          selected_option?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_scenario_attempts_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "coach_scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_scenarios: {
+        Row: {
+          best_option: string
+          competency_id: string | null
+          created_at: string
+          difficulty_level: string | null
+          feedback: Json | null
+          id: string
+          is_active: boolean | null
+          options: Json | null
+          points: number | null
+          scenario_text: string
+          scenario_type: string | null
+          title: string
+        }
+        Insert: {
+          best_option: string
+          competency_id?: string | null
+          created_at?: string
+          difficulty_level?: string | null
+          feedback?: Json | null
+          id?: string
+          is_active?: boolean | null
+          options?: Json | null
+          points?: number | null
+          scenario_text: string
+          scenario_type?: string | null
+          title: string
+        }
+        Update: {
+          best_option?: string
+          competency_id?: string | null
+          created_at?: string
+          difficulty_level?: string | null
+          feedback?: Json | null
+          id?: string
+          is_active?: boolean | null
+          options?: Json | null
+          points?: number | null
+          scenario_text?: string
+          scenario_type?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_scenarios_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "coach_competencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_user_badges: {
+        Row: {
+          badge_id: string | null
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id?: string | null
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string | null
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_user_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "coach_badges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_user_competency_scores: {
+        Row: {
+          competency_id: string | null
+          created_at: string
+          current_score: number | null
+          id: string
+          last_calculated_at: string
+          learning_engagement_score: number | null
+          practical_score: number | null
+          previous_score: number | null
+          quiz_score: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          competency_id?: string | null
+          created_at?: string
+          current_score?: number | null
+          id?: string
+          last_calculated_at?: string
+          learning_engagement_score?: number | null
+          practical_score?: number | null
+          previous_score?: number | null
+          quiz_score?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          competency_id?: string | null
+          created_at?: string
+          current_score?: number | null
+          id?: string
+          last_calculated_at?: string
+          learning_engagement_score?: number | null
+          practical_score?: number | null
+          previous_score?: number | null
+          quiz_score?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_user_competency_scores_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "coach_competencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_user_overall_scores: {
+        Row: {
+          created_at: string
+          id: string
+          last_calculated_at: string
+          overall_competency_score: number | null
+          overall_learning_score: number | null
+          rank_percentile: number | null
+          total_content_completed: number | null
+          total_correct_answers: number | null
+          total_points_earned: number | null
+          total_quizzes_attempted: number | null
+          total_scenarios_completed: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_calculated_at?: string
+          overall_competency_score?: number | null
+          overall_learning_score?: number | null
+          rank_percentile?: number | null
+          total_content_completed?: number | null
+          total_correct_answers?: number | null
+          total_points_earned?: number | null
+          total_quizzes_attempted?: number | null
+          total_scenarios_completed?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_calculated_at?: string
+          overall_competency_score?: number | null
+          overall_learning_score?: number | null
+          rank_percentile?: number | null
+          total_content_completed?: number | null
+          total_correct_answers?: number | null
+          total_points_earned?: number | null
+          total_quizzes_attempted?: number | null
+          total_scenarios_completed?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coach_user_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          learning_content_id: string | null
+          progress_percent: number | null
+          started_at: string | null
+          status: string | null
+          time_spent_seconds: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          learning_content_id?: string | null
+          progress_percent?: number | null
+          started_at?: string | null
+          status?: string | null
+          time_spent_seconds?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          learning_content_id?: string | null
+          progress_percent?: number | null
+          started_at?: string | null
+          status?: string | null
+          time_spent_seconds?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_user_progress_learning_content_id_fkey"
+            columns: ["learning_content_id"]
+            isOneToOne: false
+            referencedRelation: "coach_learning_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_user_streaks: {
+        Row: {
+          created_at: string
+          current_streak: number | null
+          id: string
+          last_activity_date: string | null
+          longest_streak: number | null
+          total_learning_days: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number | null
+          id?: string
+          last_activity_date?: string | null
+          longest_streak?: number | null
+          total_learning_days?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number | null
+          id?: string
+          last_activity_date?: string | null
+          longest_streak?: number | null
+          total_learning_days?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       companies: {
         Row: {
@@ -1180,6 +1836,642 @@ export type Database = {
         }
         Relationships: []
       }
+      distributor_attachments: {
+        Row: {
+          created_at: string | null
+          distributor_id: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          distributor_id?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          distributor_id?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_attachments_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_beat_mappings: {
+        Row: {
+          beat_id: string
+          created_at: string
+          created_by: string | null
+          distributor_id: string
+          id: string
+        }
+        Insert: {
+          beat_id: string
+          created_at?: string
+          created_by?: string | null
+          distributor_id: string
+          id?: string
+        }
+        Update: {
+          beat_id?: string
+          created_at?: string
+          created_by?: string | null
+          distributor_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_beat_mappings_beat_id_fkey"
+            columns: ["beat_id"]
+            isOneToOne: false
+            referencedRelation: "beats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_beat_mappings_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_business_plan_months: {
+        Row: {
+          business_plan_id: string
+          created_at: string
+          id: string
+          month_name: string
+          month_number: number
+          quantity_target: number | null
+          target_revenue: number | null
+          updated_at: string
+        }
+        Insert: {
+          business_plan_id: string
+          created_at?: string
+          id?: string
+          month_name: string
+          month_number: number
+          quantity_target?: number | null
+          target_revenue?: number | null
+          updated_at?: string
+        }
+        Update: {
+          business_plan_id?: string
+          created_at?: string
+          id?: string
+          month_name?: string
+          month_number?: number
+          quantity_target?: number | null
+          target_revenue?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_business_plan_months_business_plan_id_fkey"
+            columns: ["business_plan_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_business_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_business_plan_products: {
+        Row: {
+          business_plan_id: string
+          created_at: string
+          id: string
+          product_id: string
+          product_name: string
+          quantity_target: number | null
+          revenue_target: number | null
+        }
+        Insert: {
+          business_plan_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          product_name: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+        }
+        Update: {
+          business_plan_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          product_name?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_business_plan_products_business_plan_id_fkey"
+            columns: ["business_plan_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_business_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_business_plan_retailers: {
+        Row: {
+          business_plan_id: string
+          created_at: string
+          growth_percent: number | null
+          id: string
+          last_year_revenue: number | null
+          quantity_target: number | null
+          retailer_id: string
+          retailer_name: string
+          target_revenue: number | null
+        }
+        Insert: {
+          business_plan_id: string
+          created_at?: string
+          growth_percent?: number | null
+          id?: string
+          last_year_revenue?: number | null
+          quantity_target?: number | null
+          retailer_id: string
+          retailer_name: string
+          target_revenue?: number | null
+        }
+        Update: {
+          business_plan_id?: string
+          created_at?: string
+          growth_percent?: number | null
+          id?: string
+          last_year_revenue?: number | null
+          quantity_target?: number | null
+          retailer_id?: string
+          retailer_name?: string
+          target_revenue?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_business_plan_retailers_business_plan_id_fkey"
+            columns: ["business_plan_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_business_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_business_plans: {
+        Row: {
+          coverage_target: string | null
+          created_at: string
+          distributor_id: string
+          id: string
+          notes: string | null
+          quantity_target: number | null
+          quantity_unit: string | null
+          revenue_target: number | null
+          territory_target: string | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          coverage_target?: string | null
+          created_at?: string
+          distributor_id: string
+          id?: string
+          notes?: string | null
+          quantity_target?: number | null
+          quantity_unit?: string | null
+          revenue_target?: number | null
+          territory_target?: string | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          coverage_target?: string | null
+          created_at?: string
+          distributor_id?: string
+          id?: string
+          notes?: string | null
+          quantity_target?: number | null
+          quantity_unit?: string | null
+          revenue_target?: number | null
+          territory_target?: string | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_business_plans_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_claims: {
+        Row: {
+          approved_amount: number | null
+          bill_urls: string[] | null
+          claim_amount: number
+          claim_date: string
+          claim_number: string
+          claim_type: string
+          created_at: string
+          created_by_user_id: string | null
+          damage_reason: string | null
+          description: string | null
+          distributor_id: string
+          expense_category: string | null
+          expense_date: string | null
+          id: string
+          km_traveled: number | null
+          paid_at: string | null
+          payment_reference: string | null
+          product_details: Json | null
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scheme_name: string | null
+          scheme_period: string | null
+          status: string
+          supporting_docs: string[] | null
+          target_achieved: number | null
+          updated_at: string
+          vehicle_number: string | null
+        }
+        Insert: {
+          approved_amount?: number | null
+          bill_urls?: string[] | null
+          claim_amount?: number
+          claim_date?: string
+          claim_number: string
+          claim_type: string
+          created_at?: string
+          created_by_user_id?: string | null
+          damage_reason?: string | null
+          description?: string | null
+          distributor_id: string
+          expense_category?: string | null
+          expense_date?: string | null
+          id?: string
+          km_traveled?: number | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          product_details?: Json | null
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheme_name?: string | null
+          scheme_period?: string | null
+          status?: string
+          supporting_docs?: string[] | null
+          target_achieved?: number | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Update: {
+          approved_amount?: number | null
+          bill_urls?: string[] | null
+          claim_amount?: number
+          claim_date?: string
+          claim_number?: string
+          claim_type?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          damage_reason?: string | null
+          description?: string | null
+          distributor_id?: string
+          expense_category?: string | null
+          expense_date?: string | null
+          id?: string
+          km_traveled?: number | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          product_details?: Json | null
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheme_name?: string | null
+          scheme_period?: string | null
+          status?: string
+          supporting_docs?: string[] | null
+          target_achieved?: number | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_claims_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_contacts: {
+        Row: {
+          address: string | null
+          birth_date: string | null
+          contact_name: string
+          created_at: string | null
+          designation: string | null
+          distributor_id: string | null
+          email: string | null
+          id: string
+          is_primary: boolean | null
+          phone: string | null
+          reports_to: string | null
+          role: string | null
+          updated_at: string | null
+          years_of_experience: number | null
+          years_with_distributor: number | null
+        }
+        Insert: {
+          address?: string | null
+          birth_date?: string | null
+          contact_name: string
+          created_at?: string | null
+          designation?: string | null
+          distributor_id?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          phone?: string | null
+          reports_to?: string | null
+          role?: string | null
+          updated_at?: string | null
+          years_of_experience?: number | null
+          years_with_distributor?: number | null
+        }
+        Update: {
+          address?: string | null
+          birth_date?: string | null
+          contact_name?: string
+          created_at?: string | null
+          designation?: string | null
+          distributor_id?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          phone?: string | null
+          reports_to?: string | null
+          role?: string | null
+          updated_at?: string | null
+          years_of_experience?: number | null
+          years_with_distributor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_contacts_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_contacts_reports_to_fkey"
+            columns: ["reports_to"]
+            isOneToOne: false
+            referencedRelation: "distributor_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_ideas: {
+        Row: {
+          attachment_urls: string[] | null
+          category: string
+          competitor_insight: string | null
+          competitor_name: string | null
+          created_at: string
+          created_by_user_id: string | null
+          description: string
+          distributor_id: string
+          estimated_value: number | null
+          expected_impact: string | null
+          id: string
+          idea_number: string
+          implementation_date: string | null
+          implementation_effort: string | null
+          implementation_status: string | null
+          market_segment: string | null
+          points_awarded: number | null
+          recognition_notes: string | null
+          region: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          suggested_packaging: string | null
+          suggested_price_range: string | null
+          suggested_product: string | null
+          target_audience: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          category: string
+          competitor_insight?: string | null
+          competitor_name?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          description: string
+          distributor_id: string
+          estimated_value?: number | null
+          expected_impact?: string | null
+          id?: string
+          idea_number: string
+          implementation_date?: string | null
+          implementation_effort?: string | null
+          implementation_status?: string | null
+          market_segment?: string | null
+          points_awarded?: number | null
+          recognition_notes?: string | null
+          region?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          suggested_packaging?: string | null
+          suggested_price_range?: string | null
+          suggested_product?: string | null
+          target_audience?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          category?: string
+          competitor_insight?: string | null
+          competitor_name?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          description?: string
+          distributor_id?: string
+          estimated_value?: number | null
+          expected_impact?: string | null
+          id?: string
+          idea_number?: string
+          implementation_date?: string | null
+          implementation_effort?: string | null
+          implementation_status?: string | null
+          market_segment?: string | null
+          points_awarded?: number | null
+          recognition_notes?: string | null
+          region?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          suggested_packaging?: string | null
+          suggested_price_range?: string | null
+          suggested_product?: string | null
+          target_audience?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_ideas_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_inventory: {
+        Row: {
+          available_quantity: number | null
+          batch_number: string | null
+          created_at: string
+          distributor_id: string
+          expiry_date: string | null
+          id: string
+          last_issued_date: string | null
+          last_received_date: string | null
+          location: string | null
+          manufacturing_date: string | null
+          max_stock_level: number | null
+          product_id: string
+          product_name: string
+          quantity: number
+          reorder_level: number | null
+          reserved_quantity: number
+          sku: string | null
+          total_value: number | null
+          unit: string
+          unit_cost: number | null
+          updated_at: string
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Insert: {
+          available_quantity?: number | null
+          batch_number?: string | null
+          created_at?: string
+          distributor_id: string
+          expiry_date?: string | null
+          id?: string
+          last_issued_date?: string | null
+          last_received_date?: string | null
+          location?: string | null
+          manufacturing_date?: string | null
+          max_stock_level?: number | null
+          product_id: string
+          product_name: string
+          quantity?: number
+          reorder_level?: number | null
+          reserved_quantity?: number
+          sku?: string | null
+          total_value?: number | null
+          unit?: string
+          unit_cost?: number | null
+          updated_at?: string
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Update: {
+          available_quantity?: number | null
+          batch_number?: string | null
+          created_at?: string
+          distributor_id?: string
+          expiry_date?: string | null
+          id?: string
+          last_issued_date?: string | null
+          last_received_date?: string | null
+          location?: string | null
+          manufacturing_date?: string | null
+          max_stock_level?: number | null
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          reorder_level?: number | null
+          reserved_quantity?: number
+          sku?: string | null
+          total_value?: number | null
+          unit?: string
+          unit_cost?: number | null
+          updated_at?: string
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_inventory_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_inventory_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_item_mappings: {
         Row: {
           category_id: string | null
@@ -1218,6 +2510,104 @@ export type Database = {
           },
         ]
       }
+      distributor_locations: {
+        Row: {
+          address: string | null
+          city: string | null
+          contact_phone: string | null
+          created_at: string | null
+          distributor_id: string | null
+          id: string
+          is_head_office: boolean | null
+          location_name: string
+          pincode: string | null
+          state: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          distributor_id?: string | null
+          id?: string
+          is_head_office?: boolean | null
+          location_name: string
+          pincode?: string | null
+          state?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          distributor_id?: string | null
+          id?: string
+          is_head_office?: boolean | null
+          location_name?: string
+          pincode?: string | null
+          state?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_locations_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_price_books: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          deactivated_at: string | null
+          distributor_id: string
+          id: string
+          is_active: boolean | null
+          price_book_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          deactivated_at?: string | null
+          distributor_id: string
+          id?: string
+          is_active?: boolean | null
+          price_book_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          deactivated_at?: string | null
+          distributor_id?: string
+          id?: string
+          is_active?: boolean | null
+          price_book_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_price_books_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_price_books_price_book_id_fkey"
+            columns: ["price_book_id"]
+            isOneToOne: false
+            referencedRelation: "price_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_retailer_mappings: {
         Row: {
           created_at: string
@@ -1248,57 +2638,295 @@ export type Database = {
         }
         Relationships: []
       }
-      distributors: {
+      distributor_support_requests: {
         Row: {
-          address: string | null
-          contact_person: string
+          assigned_at: string | null
+          assigned_to: string | null
+          attachment_urls: string[] | null
+          category: string
           created_at: string
-          credit_limit: number | null
-          email: string | null
-          gst_number: string | null
+          created_by_user_id: string | null
+          description: string
+          distributor_id: string
+          feedback_comment: string | null
           id: string
-          name: string
-          outstanding_amount: number | null
-          parent_id: string | null
-          parent_type: string | null
-          phone: string
+          priority: string
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          satisfaction_rating: number | null
+          screenshot_urls: string[] | null
           status: string
-          territory_id: string | null
+          subject: string
+          ticket_number: string
           updated_at: string
         }
         Insert: {
-          address?: string | null
-          contact_person: string
+          assigned_at?: string | null
+          assigned_to?: string | null
+          attachment_urls?: string[] | null
+          category: string
           created_at?: string
-          credit_limit?: number | null
-          email?: string | null
-          gst_number?: string | null
+          created_by_user_id?: string | null
+          description: string
+          distributor_id: string
+          feedback_comment?: string | null
           id?: string
-          name: string
-          outstanding_amount?: number | null
-          parent_id?: string | null
-          parent_type?: string | null
-          phone: string
+          priority?: string
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          satisfaction_rating?: number | null
+          screenshot_urls?: string[] | null
           status?: string
-          territory_id?: string | null
+          subject: string
+          ticket_number: string
           updated_at?: string
         }
         Update: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          attachment_urls?: string[] | null
+          category?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          description?: string
+          distributor_id?: string
+          feedback_comment?: string | null
+          id?: string
+          priority?: string
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          satisfaction_rating?: number | null
+          screenshot_urls?: string[] | null
+          status?: string
+          subject?: string
+          ticket_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_support_requests_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_users: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          auth_user_id: string | null
+          created_at: string
+          designation: string | null
+          distributor_id: string
+          email: string
+          email_sent_at: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string | null
+          password_set_at: string | null
+          phone: string | null
+          requested_at: string | null
+          role: string
+          updated_at: string
+          user_level: string | null
+          user_status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          designation?: string | null
+          distributor_id: string
+          email: string
+          email_sent_at?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          password_set_at?: string | null
+          phone?: string | null
+          requested_at?: string | null
+          role?: string
+          updated_at?: string
+          user_level?: string | null
+          user_status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          designation?: string | null
+          distributor_id?: string
+          email?: string
+          email_sent_at?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          password_set_at?: string | null
+          phone?: string | null
+          requested_at?: string | null
+          role?: string
+          updated_at?: string
+          user_level?: string | null
+          user_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_users_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributors: {
+        Row: {
+          about_business: string | null
+          address: string | null
+          annual_revenue: number | null
+          assets_trucks: number | null
+          assets_vans: number | null
+          business_hunger: string | null
+          competition_products: string[] | null
+          contact_person: string
+          coverage_area: string | null
+          created_at: string
+          credit_limit: number | null
+          distribution_experience_years: number | null
+          distribution_level: string | null
+          distributor_status: string | null
+          drop_reason: string | null
+          email: string | null
+          established_year: number | null
+          evaluation_checklist: Json | null
+          gst_number: string | null
+          id: string
+          name: string
+          network_retailers_count: number | null
+          onboarding_date: string | null
+          opportunities: string | null
+          other_products: string[] | null
+          outstanding_amount: number | null
+          parent_id: string | null
+          parent_type: string | null
+          partnership_status: string | null
+          phone: string
+          products_distributed: string[] | null
+          profitability: string | null
+          region_coverage: string | null
+          sales_team_size: number | null
+          status: string
+          strength: string | null
+          territory_id: string | null
+          threats: string | null
+          updated_at: string
+          weakness: string | null
+          years_of_relationship: number | null
+        }
+        Insert: {
+          about_business?: string | null
           address?: string | null
-          contact_person?: string
+          annual_revenue?: number | null
+          assets_trucks?: number | null
+          assets_vans?: number | null
+          business_hunger?: string | null
+          competition_products?: string[] | null
+          contact_person: string
+          coverage_area?: string | null
           created_at?: string
           credit_limit?: number | null
+          distribution_experience_years?: number | null
+          distribution_level?: string | null
+          distributor_status?: string | null
+          drop_reason?: string | null
           email?: string | null
+          established_year?: number | null
+          evaluation_checklist?: Json | null
           gst_number?: string | null
           id?: string
-          name?: string
+          name: string
+          network_retailers_count?: number | null
+          onboarding_date?: string | null
+          opportunities?: string | null
+          other_products?: string[] | null
           outstanding_amount?: number | null
           parent_id?: string | null
           parent_type?: string | null
-          phone?: string
+          partnership_status?: string | null
+          phone: string
+          products_distributed?: string[] | null
+          profitability?: string | null
+          region_coverage?: string | null
+          sales_team_size?: number | null
           status?: string
+          strength?: string | null
           territory_id?: string | null
+          threats?: string | null
           updated_at?: string
+          weakness?: string | null
+          years_of_relationship?: number | null
+        }
+        Update: {
+          about_business?: string | null
+          address?: string | null
+          annual_revenue?: number | null
+          assets_trucks?: number | null
+          assets_vans?: number | null
+          business_hunger?: string | null
+          competition_products?: string[] | null
+          contact_person?: string
+          coverage_area?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          distribution_experience_years?: number | null
+          distribution_level?: string | null
+          distributor_status?: string | null
+          drop_reason?: string | null
+          email?: string | null
+          established_year?: number | null
+          evaluation_checklist?: Json | null
+          gst_number?: string | null
+          id?: string
+          name?: string
+          network_retailers_count?: number | null
+          onboarding_date?: string | null
+          opportunities?: string | null
+          other_products?: string[] | null
+          outstanding_amount?: number | null
+          parent_id?: string | null
+          parent_type?: string | null
+          partnership_status?: string | null
+          phone?: string
+          products_distributed?: string[] | null
+          profitability?: string | null
+          region_coverage?: string | null
+          sales_team_size?: number | null
+          status?: string
+          strength?: string | null
+          territory_id?: string | null
+          threats?: string | null
+          updated_at?: string
+          weakness?: string | null
+          years_of_relationship?: number | null
         }
         Relationships: [
           {
@@ -1486,20 +3114,25 @@ export type Database = {
           aadhar_document_url: string | null
           address: string | null
           alternate_email: string | null
+          band: number | null
           certifications: Json | null
           created_at: string
-          daily_da_allowance: number
+          daily_da_allowance: number | null
           date_of_exit: string | null
           date_of_joining: string | null
+          district_territory_id: string | null
           education: string | null
           education_background: Json | null
           emergency_contact_number: string | null
           expertise_areas: string[] | null
           hq: string | null
+          hq_territory_id: string | null
           manager_id: string | null
-          monthly_salary: number
+          monthly_salary: number | null
           pan_document_url: string | null
           photo_url: string | null
+          secondary_manager_id: string | null
+          state_territory_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1507,20 +3140,25 @@ export type Database = {
           aadhar_document_url?: string | null
           address?: string | null
           alternate_email?: string | null
+          band?: number | null
           certifications?: Json | null
           created_at?: string
-          daily_da_allowance?: number
+          daily_da_allowance?: number | null
           date_of_exit?: string | null
           date_of_joining?: string | null
+          district_territory_id?: string | null
           education?: string | null
           education_background?: Json | null
           emergency_contact_number?: string | null
           expertise_areas?: string[] | null
           hq?: string | null
+          hq_territory_id?: string | null
           manager_id?: string | null
-          monthly_salary?: number
+          monthly_salary?: number | null
           pan_document_url?: string | null
           photo_url?: string | null
+          secondary_manager_id?: string | null
+          state_territory_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1528,22 +3166,76 @@ export type Database = {
           aadhar_document_url?: string | null
           address?: string | null
           alternate_email?: string | null
+          band?: number | null
           certifications?: Json | null
           created_at?: string
-          daily_da_allowance?: number
+          daily_da_allowance?: number | null
           date_of_exit?: string | null
           date_of_joining?: string | null
+          district_territory_id?: string | null
           education?: string | null
           education_background?: Json | null
           emergency_contact_number?: string | null
           expertise_areas?: string[] | null
           hq?: string | null
+          hq_territory_id?: string | null
           manager_id?: string | null
-          monthly_salary?: number
+          monthly_salary?: number | null
           pan_document_url?: string | null
           photo_url?: string | null
+          secondary_manager_id?: string | null
+          state_territory_id?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_district_territory_id_fkey"
+            columns: ["district_territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_hq_territory_id_fkey"
+            columns: ["hq_territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_state_territory_id_fkey"
+            columns: ["state_territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_master_config: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          fixed_ta_amount: number | null
+          id: string
+          ta_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          ta_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          ta_type?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2005,6 +3697,946 @@ export type Database = {
         }
         Relationships: []
       }
+      inst_accounts: {
+        Row: {
+          account_name: string
+          account_owner: string | null
+          account_type: string | null
+          annual_revenue: number | null
+          billing_address: string | null
+          city: string | null
+          created_at: string
+          credit_limit: number | null
+          email: string | null
+          employee_count: number | null
+          gst_number: string | null
+          id: string
+          industry: string | null
+          is_active: boolean | null
+          pan_number: string | null
+          parent_account_id: string | null
+          payment_terms: number | null
+          phone: string | null
+          pincode: string | null
+          shipping_address: string | null
+          state: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          account_name: string
+          account_owner?: string | null
+          account_type?: string | null
+          annual_revenue?: number | null
+          billing_address?: string | null
+          city?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          email?: string | null
+          employee_count?: number | null
+          gst_number?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean | null
+          pan_number?: string | null
+          parent_account_id?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          pincode?: string | null
+          shipping_address?: string | null
+          state?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_owner?: string | null
+          account_type?: string | null
+          annual_revenue?: number | null
+          billing_address?: string | null
+          city?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          email?: string | null
+          employee_count?: number | null
+          gst_number?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean | null
+          pan_number?: string | null
+          parent_account_id?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          pincode?: string | null
+          shipping_address?: string | null
+          state?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_accounts_parent_account_id_fkey"
+            columns: ["parent_account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_collections: {
+        Row: {
+          account_id: string
+          amount: number
+          bank_name: string | null
+          cheque_number: string | null
+          collected_by: string | null
+          collection_date: string
+          collection_number: string
+          created_at: string
+          id: string
+          invoice_id: string
+          notes: string | null
+          payment_method: string | null
+          reference_number: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount?: number
+          bank_name?: string | null
+          cheque_number?: string | null
+          collected_by?: string | null
+          collection_date?: string
+          collection_number: string
+          created_at?: string
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          bank_name?: string | null
+          cheque_number?: string | null
+          collected_by?: string | null
+          collection_date?: string
+          collection_number?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_collections_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_collections_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "inst_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_contacts: {
+        Row: {
+          account_id: string
+          created_at: string
+          department: string | null
+          designation: string | null
+          email: string | null
+          first_name: string
+          id: string
+          is_decision_maker: boolean | null
+          is_primary_contact: boolean | null
+          last_name: string | null
+          mobile: string | null
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          department?: string | null
+          designation?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          is_decision_maker?: boolean | null
+          is_primary_contact?: boolean | null
+          last_name?: string | null
+          mobile?: string | null
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          department?: string | null
+          designation?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_decision_maker?: boolean | null
+          is_primary_contact?: boolean | null
+          last_name?: string | null
+          mobile?: string | null
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_invoice_lines: {
+        Row: {
+          commitment_line_id: string | null
+          created_at: string
+          description: string | null
+          discount_amount: number | null
+          id: string
+          invoice_id: string
+          line_total: number
+          product_id: string
+          quantity: number
+          tax_amount: number | null
+          unit_price: number
+        }
+        Insert: {
+          commitment_line_id?: string | null
+          created_at?: string
+          description?: string | null
+          discount_amount?: number | null
+          id?: string
+          invoice_id: string
+          line_total?: number
+          product_id: string
+          quantity?: number
+          tax_amount?: number | null
+          unit_price?: number
+        }
+        Update: {
+          commitment_line_id?: string | null
+          created_at?: string
+          description?: string | null
+          discount_amount?: number | null
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          product_id?: string
+          quantity?: number
+          tax_amount?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_invoice_lines_commitment_line_id_fkey"
+            columns: ["commitment_line_id"]
+            isOneToOne: false
+            referencedRelation: "inst_order_commitment_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "inst_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_invoice_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inst_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_invoices: {
+        Row: {
+          account_id: string
+          balance_amount: number | null
+          created_at: string
+          created_by: string
+          discount_amount: number | null
+          due_date: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          order_commitment_id: string | null
+          paid_amount: number | null
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          balance_amount?: number | null
+          created_at?: string
+          created_by: string
+          discount_amount?: number | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          notes?: string | null
+          order_commitment_id?: string | null
+          paid_amount?: number | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          balance_amount?: number | null
+          created_at?: string
+          created_by?: string
+          discount_amount?: number | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          order_commitment_id?: string | null
+          paid_amount?: number | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_invoices_order_commitment_id_fkey"
+            columns: ["order_commitment_id"]
+            isOneToOne: false
+            referencedRelation: "inst_order_commitments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_leads: {
+        Row: {
+          address: string | null
+          annual_potential_value: number | null
+          assigned_to: string | null
+          city: string | null
+          company_name: string
+          converted_account_id: string | null
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          industry_type: string | null
+          lead_name: string
+          lead_source: string | null
+          lead_status: string | null
+          notes: string | null
+          phone: string | null
+          pincode: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          annual_potential_value?: number | null
+          assigned_to?: string | null
+          city?: string | null
+          company_name: string
+          converted_account_id?: string | null
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          industry_type?: string | null
+          lead_name: string
+          lead_source?: string | null
+          lead_status?: string | null
+          notes?: string | null
+          phone?: string | null
+          pincode?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          annual_potential_value?: number | null
+          assigned_to?: string | null
+          city?: string | null
+          company_name?: string
+          converted_account_id?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          industry_type?: string | null
+          lead_name?: string
+          lead_source?: string | null
+          lead_status?: string | null
+          notes?: string | null
+          phone?: string | null
+          pincode?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inst_opportunities: {
+        Row: {
+          account_id: string
+          amount: number | null
+          closed_date: string | null
+          competitors: string | null
+          contact_id: string | null
+          created_at: string
+          description: string | null
+          expected_close_date: string | null
+          id: string
+          lead_source: string | null
+          next_step: string | null
+          opportunity_name: string
+          owner_id: string | null
+          probability: number | null
+          stage: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount?: number | null
+          closed_date?: string | null
+          competitors?: string | null
+          contact_id?: string | null
+          created_at?: string
+          description?: string | null
+          expected_close_date?: string | null
+          id?: string
+          lead_source?: string | null
+          next_step?: string | null
+          opportunity_name: string
+          owner_id?: string | null
+          probability?: number | null
+          stage?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number | null
+          closed_date?: string | null
+          competitors?: string | null
+          contact_id?: string | null
+          created_at?: string
+          description?: string | null
+          expected_close_date?: string | null
+          id?: string
+          lead_source?: string | null
+          next_step?: string | null
+          opportunity_name?: string
+          owner_id?: string | null
+          probability?: number | null
+          stage?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_opportunities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "inst_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_order_commitment_lines: {
+        Row: {
+          actual_delivery_date: string | null
+          actual_quantity: number | null
+          actual_value: number | null
+          created_at: string
+          delivered_quantity: number | null
+          id: string
+          order_commitment_id: string
+          planned_delivery_date: string | null
+          planned_quantity: number
+          planned_value: number | null
+          product_id: string
+          status: string | null
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          actual_quantity?: number | null
+          actual_value?: number | null
+          created_at?: string
+          delivered_quantity?: number | null
+          id?: string
+          order_commitment_id: string
+          planned_delivery_date?: string | null
+          planned_quantity?: number
+          planned_value?: number | null
+          product_id: string
+          status?: string | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          actual_quantity?: number | null
+          actual_value?: number | null
+          created_at?: string
+          delivered_quantity?: number | null
+          id?: string
+          order_commitment_id?: string
+          planned_delivery_date?: string | null
+          planned_quantity?: number
+          planned_value?: number | null
+          product_id?: string
+          status?: string | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_order_commitment_lines_order_commitment_id_fkey"
+            columns: ["order_commitment_id"]
+            isOneToOne: false
+            referencedRelation: "inst_order_commitments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_order_commitment_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inst_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_order_commitments: {
+        Row: {
+          account_id: string
+          commitment_date: string
+          commitment_number: string
+          created_at: string
+          created_by: string
+          delivery_end_date: string | null
+          delivery_start_date: string | null
+          id: string
+          notes: string | null
+          opportunity_id: string | null
+          quote_id: string | null
+          status: string | null
+          total_actual_value: number | null
+          total_planned_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          commitment_date?: string
+          commitment_number: string
+          created_at?: string
+          created_by: string
+          delivery_end_date?: string | null
+          delivery_start_date?: string | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          quote_id?: string | null
+          status?: string | null
+          total_actual_value?: number | null
+          total_planned_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          commitment_date?: string
+          commitment_number?: string
+          created_at?: string
+          created_by?: string
+          delivery_end_date?: string | null
+          delivery_start_date?: string | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          quote_id?: string | null
+          status?: string | null
+          total_actual_value?: number | null
+          total_planned_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_order_commitments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_order_commitments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "inst_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_order_commitments_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "inst_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_price_book_entries: {
+        Row: {
+          created_at: string
+          discount_percentage: number | null
+          final_price: number
+          id: string
+          list_price: number
+          max_quantity: number | null
+          min_quantity: number | null
+          price_book_id: string
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          discount_percentage?: number | null
+          final_price?: number
+          id?: string
+          list_price?: number
+          max_quantity?: number | null
+          min_quantity?: number | null
+          price_book_id: string
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          discount_percentage?: number | null
+          final_price?: number
+          id?: string
+          list_price?: number
+          max_quantity?: number | null
+          min_quantity?: number | null
+          price_book_id?: string
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_price_book_entries_price_book_id_fkey"
+            columns: ["price_book_id"]
+            isOneToOne: false
+            referencedRelation: "inst_price_books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_price_book_entries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inst_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_price_books: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          currency: string | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          is_standard: boolean | null
+          price_book_name: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          currency?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_standard?: boolean | null
+          price_book_name: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          currency?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_standard?: boolean | null
+          price_book_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_price_books_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_products: {
+        Row: {
+          base_price: number
+          category: string | null
+          created_at: string
+          description: string | null
+          gst_rate: number | null
+          hsn_code: string | null
+          id: string
+          is_active: boolean | null
+          min_order_quantity: number | null
+          product_code: string
+          product_name: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          base_price?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          gst_rate?: number | null
+          hsn_code?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_order_quantity?: number | null
+          product_code: string
+          product_name: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          gst_rate?: number | null
+          hsn_code?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_order_quantity?: number | null
+          product_code?: string
+          product_name?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inst_quote_line_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount_amount: number | null
+          discount_percentage: number | null
+          id: string
+          line_total: number
+          product_id: string
+          quantity: number
+          quote_id: string
+          sort_order: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount_amount?: number | null
+          discount_percentage?: number | null
+          id?: string
+          line_total?: number
+          product_id: string
+          quantity?: number
+          quote_id: string
+          sort_order?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount_amount?: number | null
+          discount_percentage?: number | null
+          id?: string
+          line_total?: number
+          product_id?: string
+          quantity?: number
+          quote_id?: string
+          sort_order?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_quote_line_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inst_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_quote_line_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "inst_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inst_quotes: {
+        Row: {
+          account_id: string
+          approved_by: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string
+          discount_amount: number | null
+          id: string
+          notes: string | null
+          opportunity_id: string | null
+          price_book_id: string | null
+          quote_date: string
+          quote_number: string
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          terms_and_conditions: string | null
+          total_amount: number | null
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          account_id: string
+          approved_by?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by: string
+          discount_amount?: number | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          price_book_id?: string | null
+          quote_date?: string
+          quote_number: string
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          terms_and_conditions?: string | null
+          total_amount?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          account_id?: string
+          approved_by?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string
+          discount_amount?: number | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          price_book_id?: string | null
+          quote_date?: string
+          quote_number?: string
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          terms_and_conditions?: string | null
+          total_amount?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inst_quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "inst_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_quotes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "inst_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_quotes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "inst_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inst_quotes_price_book_id_fkey"
+            columns: ["price_book_id"]
+            isOneToOne: false
+            referencedRelation: "inst_price_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           cgst_amount: number | null
@@ -2156,8 +4788,10 @@ export type Database = {
           beat_plan_id: string | null
           branding_rating: number | null
           branding_status: string | null
+          competition_knowledge: string | null
           competition_presence: string | null
           competition_rating: number | null
+          consumer_feedback: string | null
           conversation_highlights: string | null
           created_at: string | null
           distributor_feedback_rating: number | null
@@ -2167,22 +4801,39 @@ export type Database = {
           future_growth_rating: number | null
           growth_potential: string | null
           id: string
+          joint_sales_impact: string | null
           manager_id: string
+          monthly_potential_6months: number | null
+          new_products_introduced: string | null
+          order_increase_amount: number | null
+          placement_feedback: string | null
           pricing_compliance: string | null
+          pricing_feedback: string | null
           pricing_feedback_rating: number | null
           product_feedback_rating: number | null
+          product_packaging_feedback: string | null
+          product_quality_feedback: string | null
+          product_sku_range_feedback: string | null
+          product_usp_feedback: string | null
+          promotion_vs_competition: string | null
           retailer_id: string
           retailer_notes: string | null
+          retailing_feedback: string | null
           retailing_rating: number | null
+          sales_increase_feedback: string | null
           sales_trend: string | null
           sales_trends_rating: number | null
           sampling_rating: number | null
           sampling_status: string | null
           scheme_awareness: string | null
+          schemes_feedback: string | null
           schemes_rating: number | null
+          service_feedback: string | null
           shelf_visibility: string | null
+          trends_feedback: string | null
           updated_at: string | null
           visit_id: string | null
+          willingness_to_grow_range: string | null
         }
         Insert: {
           action_items?: string | null
@@ -2190,8 +4841,10 @@ export type Database = {
           beat_plan_id?: string | null
           branding_rating?: number | null
           branding_status?: string | null
+          competition_knowledge?: string | null
           competition_presence?: string | null
           competition_rating?: number | null
+          consumer_feedback?: string | null
           conversation_highlights?: string | null
           created_at?: string | null
           distributor_feedback_rating?: number | null
@@ -2201,22 +4854,39 @@ export type Database = {
           future_growth_rating?: number | null
           growth_potential?: string | null
           id?: string
+          joint_sales_impact?: string | null
           manager_id: string
+          monthly_potential_6months?: number | null
+          new_products_introduced?: string | null
+          order_increase_amount?: number | null
+          placement_feedback?: string | null
           pricing_compliance?: string | null
+          pricing_feedback?: string | null
           pricing_feedback_rating?: number | null
           product_feedback_rating?: number | null
+          product_packaging_feedback?: string | null
+          product_quality_feedback?: string | null
+          product_sku_range_feedback?: string | null
+          product_usp_feedback?: string | null
+          promotion_vs_competition?: string | null
           retailer_id: string
           retailer_notes?: string | null
+          retailing_feedback?: string | null
           retailing_rating?: number | null
+          sales_increase_feedback?: string | null
           sales_trend?: string | null
           sales_trends_rating?: number | null
           sampling_rating?: number | null
           sampling_status?: string | null
           scheme_awareness?: string | null
+          schemes_feedback?: string | null
           schemes_rating?: number | null
+          service_feedback?: string | null
           shelf_visibility?: string | null
+          trends_feedback?: string | null
           updated_at?: string | null
           visit_id?: string | null
+          willingness_to_grow_range?: string | null
         }
         Update: {
           action_items?: string | null
@@ -2224,8 +4894,10 @@ export type Database = {
           beat_plan_id?: string | null
           branding_rating?: number | null
           branding_status?: string | null
+          competition_knowledge?: string | null
           competition_presence?: string | null
           competition_rating?: number | null
+          consumer_feedback?: string | null
           conversation_highlights?: string | null
           created_at?: string | null
           distributor_feedback_rating?: number | null
@@ -2235,22 +4907,39 @@ export type Database = {
           future_growth_rating?: number | null
           growth_potential?: string | null
           id?: string
+          joint_sales_impact?: string | null
           manager_id?: string
+          monthly_potential_6months?: number | null
+          new_products_introduced?: string | null
+          order_increase_amount?: number | null
+          placement_feedback?: string | null
           pricing_compliance?: string | null
+          pricing_feedback?: string | null
           pricing_feedback_rating?: number | null
           product_feedback_rating?: number | null
+          product_packaging_feedback?: string | null
+          product_quality_feedback?: string | null
+          product_sku_range_feedback?: string | null
+          product_usp_feedback?: string | null
+          promotion_vs_competition?: string | null
           retailer_id?: string
           retailer_notes?: string | null
+          retailing_feedback?: string | null
           retailing_rating?: number | null
+          sales_increase_feedback?: string | null
           sales_trend?: string | null
           sales_trends_rating?: number | null
           sampling_rating?: number | null
           sampling_status?: string | null
           scheme_awareness?: string | null
+          schemes_feedback?: string | null
           schemes_rating?: number | null
+          service_feedback?: string | null
           shelf_visibility?: string | null
+          trends_feedback?: string | null
           updated_at?: string | null
           visit_id?: string | null
+          willingness_to_grow_range?: string | null
         }
         Relationships: [
           {
@@ -2467,6 +5156,39 @@ export type Database = {
         }
         Relationships: []
       }
+      license_config: {
+        Row: {
+          created_at: string
+          field_sales_enabled: boolean | null
+          id: string
+          institutional_sales_enabled: boolean | null
+          license_type: string
+          max_users: number | null
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          field_sales_enabled?: boolean | null
+          id?: string
+          institutional_sales_enabled?: boolean | null
+          license_type?: string
+          max_users?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          field_sales_enabled?: boolean | null
+          id?: string
+          institutional_sales_enabled?: boolean | null
+          license_type?: string
+          max_users?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -2533,37 +5255,52 @@ export type Database = {
       order_items: {
         Row: {
           category: string
+          cgst_amount: number | null
           created_at: string
+          discount_amount: number | null
+          hsn_code: string | null
           id: string
           order_id: string
+          original_rate: number | null
           product_id: string
           product_name: string
           quantity: number
           rate: number
+          sgst_amount: number | null
           total: number
           unit: string
         }
         Insert: {
           category: string
+          cgst_amount?: number | null
           created_at?: string
+          discount_amount?: number | null
+          hsn_code?: string | null
           id?: string
           order_id: string
+          original_rate?: number | null
           product_id: string
           product_name: string
           quantity: number
           rate: number
+          sgst_amount?: number | null
           total: number
           unit: string
         }
         Update: {
           category?: string
+          cgst_amount?: number | null
           created_at?: string
+          discount_amount?: number | null
+          hsn_code?: string | null
           id?: string
           order_id?: string
+          original_rate?: number | null
           product_id?: string
           product_name?: string
           quantity?: number
           rate?: number
+          sgst_amount?: number | null
           total?: number
           unit?: string
         }
@@ -2586,6 +5323,7 @@ export type Database = {
           distributor_id: string | null
           distributor_name: string | null
           id: string
+          idempotency_key: string | null
           invoice_number: string | null
           is_credit_order: boolean | null
           order_date: string | null
@@ -2610,6 +5348,7 @@ export type Database = {
           distributor_id?: string | null
           distributor_name?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
@@ -2634,6 +5373,7 @@ export type Database = {
           distributor_id?: string | null
           distributor_name?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
@@ -2684,6 +5424,39 @@ export type Database = {
           ip_address?: string | null
           user_agent?: string | null
           was_successful?: boolean
+        }
+        Relationships: []
+      }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          method: string
+          phone_number: string | null
+          token: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          method?: string
+          phone_number?: string | null
+          token: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          method?: string
+          phone_number?: string | null
+          token?: string
+          used?: boolean
+          user_id?: string
         }
         Relationships: []
       }
@@ -2767,6 +5540,364 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      permanent_deletion_log: {
+        Row: {
+          created_at: string
+          deleted_from_bin_at: string
+          deleted_from_bin_by: string
+          id: string
+          module_name: string
+          original_deleted_at: string
+          original_deleted_by: string
+          original_id: string
+          original_table: string
+          record_data: Json
+          record_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          deleted_from_bin_at?: string
+          deleted_from_bin_by: string
+          id?: string
+          module_name: string
+          original_deleted_at: string
+          original_deleted_by: string
+          original_id: string
+          original_table: string
+          record_data: Json
+          record_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          deleted_from_bin_at?: string
+          deleted_from_bin_by?: string
+          id?: string
+          module_name?: string
+          original_deleted_at?: string
+          original_deleted_by?: string
+          original_id?: string
+          original_table?: string
+          record_data?: Json
+          record_name?: string | null
+        }
+        Relationships: []
+      }
+      price_book_entries: {
+        Row: {
+          created_at: string
+          discount_percent: number | null
+          final_price: number
+          id: string
+          is_active: boolean | null
+          list_price: number
+          min_quantity: number | null
+          price_book_id: string
+          product_id: string
+          uom: string | null
+          updated_at: string
+          variant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          discount_percent?: number | null
+          final_price?: number
+          id?: string
+          is_active?: boolean | null
+          list_price?: number
+          min_quantity?: number | null
+          price_book_id: string
+          product_id: string
+          uom?: string | null
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          discount_percent?: number | null
+          final_price?: number
+          id?: string
+          is_active?: boolean | null
+          list_price?: number
+          min_quantity?: number | null
+          price_book_id?: string
+          product_id?: string
+          uom?: string | null
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_book_entries_price_book_id_fkey"
+            columns: ["price_book_id"]
+            isOneToOne: false
+            referencedRelation: "price_books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_book_entries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_book_entries_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_books: {
+        Row: {
+          apply_to_all_territories: boolean | null
+          cloned_from: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          description: string | null
+          distributor_category: string | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          is_standard: boolean | null
+          name: string
+          price_book_type: string
+          target_type: string | null
+          territory_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          apply_to_all_territories?: boolean | null
+          cloned_from?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          distributor_category?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_standard?: boolean | null
+          name: string
+          price_book_type?: string
+          target_type?: string | null
+          territory_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apply_to_all_territories?: boolean | null
+          cloned_from?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          distributor_category?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_standard?: boolean | null
+          name?: string
+          price_book_type?: string
+          target_type?: string | null
+          territory_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_books_cloned_from_fkey"
+            columns: ["cloned_from"]
+            isOneToOne: false
+            referencedRelation: "price_books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_books_territory_id_fkey"
+            columns: ["territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_order_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string
+          damaged_quantity: number | null
+          discount_percent: number | null
+          expiry_date: string | null
+          id: string
+          line_total: number
+          order_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          received_quantity: number | null
+          sku: string | null
+          tax_percent: number | null
+          unit: string
+          unit_price: number
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string
+          damaged_quantity?: number | null
+          discount_percent?: number | null
+          expiry_date?: string | null
+          id?: string
+          line_total?: number
+          order_id: string
+          product_id: string
+          product_name: string
+          quantity?: number
+          received_quantity?: number | null
+          sku?: string | null
+          tax_percent?: number | null
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string
+          damaged_quantity?: number | null
+          discount_percent?: number | null
+          expiry_date?: string | null
+          id?: string
+          line_total?: number
+          order_id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          received_quantity?: number | null
+          sku?: string | null
+          tax_percent?: number | null
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by_user_id: string | null
+          discount_amount: number
+          dispatch_reference: string | null
+          dispatched_at: string | null
+          distributor_id: string
+          expected_delivery_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          order_number: string
+          payment_status: string
+          payment_terms: string | null
+          shipping_address: string | null
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          transporter_name: string | null
+          updated_at: string
+          vehicle_number: string | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          discount_amount?: number
+          dispatch_reference?: string | null
+          dispatched_at?: string | null
+          distributor_id: string
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          order_number: string
+          payment_status?: string
+          payment_terms?: string | null
+          shipping_address?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          transporter_name?: string | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          discount_amount?: number
+          dispatch_reference?: string | null
+          dispatched_at?: string | null
+          distributor_id?: string
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          order_number?: string
+          payment_status?: string
+          payment_terms?: string | null
+          shipping_address?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          transporter_name?: string | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_orders_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_categories: {
         Row: {
@@ -3073,6 +6204,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profile_attachments: {
+        Row: {
+          attached_by: string
+          created_at: string
+          description: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attached_by: string
+          created_at?: string
+          description?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attached_by?: string
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profile_object_permissions: {
         Row: {
@@ -3443,6 +6613,72 @@ export type Database = {
         }
         Relationships: []
       }
+      recycle_bin: {
+        Row: {
+          created_at: string
+          deleted_at: string
+          deleted_by: string
+          id: string
+          module_name: string
+          original_id: string
+          original_table: string
+          record_data: Json
+          record_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string
+          deleted_by: string
+          id?: string
+          module_name: string
+          original_id: string
+          original_table: string
+          record_data: Json
+          record_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string
+          deleted_by?: string
+          id?: string
+          module_name?: string
+          original_id?: string
+          original_table?: string
+          record_data?: Json
+          record_name?: string | null
+        }
+        Relationships: []
+      }
+      recycle_bin_config: {
+        Row: {
+          auto_delete_days: number | null
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          require_confirmation: boolean | null
+          show_deletion_log_to_users: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          auto_delete_days?: number | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          require_confirmation?: boolean | null
+          show_deletion_log_to_users?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          auto_delete_days?: number | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          require_confirmation?: boolean | null
+          show_deletion_log_to_users?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       regularization_requests: {
         Row: {
           approved_at: string | null
@@ -3559,33 +6795,57 @@ export type Database = {
       retailer_feedback: {
         Row: {
           comments: string | null
+          consumer_satisfaction: number | null
           created_at: string
+          feedback_date: string | null
           feedback_type: string
           id: string
+          product_packaging: number | null
+          product_placement: number | null
+          product_quality: number | null
+          product_sku_range: number | null
           rating: number | null
           retailer_id: string
+          score: number | null
+          summary_notes: string | null
           updated_at: string
           user_id: string
           visit_id: string | null
         }
         Insert: {
           comments?: string | null
+          consumer_satisfaction?: number | null
           created_at?: string
+          feedback_date?: string | null
           feedback_type: string
           id?: string
+          product_packaging?: number | null
+          product_placement?: number | null
+          product_quality?: number | null
+          product_sku_range?: number | null
           rating?: number | null
           retailer_id: string
+          score?: number | null
+          summary_notes?: string | null
           updated_at?: string
           user_id: string
           visit_id?: string | null
         }
         Update: {
           comments?: string | null
+          consumer_satisfaction?: number | null
           created_at?: string
+          feedback_date?: string | null
           feedback_type?: string
           id?: string
+          product_packaging?: number | null
+          product_placement?: number | null
+          product_quality?: number | null
+          product_sku_range?: number | null
           rating?: number | null
           retailer_id?: string
+          score?: number | null
+          summary_notes?: string | null
           updated_at?: string
           user_id?: string
           visit_id?: string | null
@@ -3602,6 +6862,7 @@ export type Database = {
           metadata: Json | null
           points: number
           program_id: string
+          target_config: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -3613,6 +6874,7 @@ export type Database = {
           metadata?: Json | null
           points?: number
           program_id: string
+          target_config?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -3624,6 +6886,7 @@ export type Database = {
           metadata?: Json | null
           points?: number
           program_id?: string
+          target_config?: Json | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3858,6 +7121,132 @@ export type Database = {
           },
         ]
       }
+      retailer_loyalty_reward_redemptions: {
+        Row: {
+          created_at: string | null
+          delivery_address: string | null
+          delivery_notes: string | null
+          id: string
+          points_redeemed: number
+          processed_at: string | null
+          processed_by: string | null
+          program_id: string
+          requested_at: string | null
+          retailer_id: string
+          reward_id: string
+          status: string | null
+          tracking_info: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_address?: string | null
+          delivery_notes?: string | null
+          id?: string
+          points_redeemed: number
+          processed_at?: string | null
+          processed_by?: string | null
+          program_id: string
+          requested_at?: string | null
+          retailer_id: string
+          reward_id: string
+          status?: string | null
+          tracking_info?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_address?: string | null
+          delivery_notes?: string | null
+          id?: string
+          points_redeemed?: number
+          processed_at?: string | null
+          processed_by?: string | null
+          program_id?: string
+          requested_at?: string | null
+          retailer_id?: string
+          reward_id?: string
+          status?: string | null
+          tracking_info?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_loyalty_reward_redemptions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailer_loyalty_reward_redemptions_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailer_loyalty_reward_redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retailer_loyalty_rewards: {
+        Row: {
+          cash_value: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          points_required: number
+          program_id: string
+          reward_name: string
+          reward_type: string
+          stock_quantity: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cash_value?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          points_required: number
+          program_id: string
+          reward_name: string
+          reward_type: string
+          stock_quantity?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cash_value?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          points_required?: number
+          program_id?: string
+          reward_name?: string
+          reward_type?: string
+          stock_quantity?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_loyalty_rewards_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retailer_loyalty_tracking: {
         Row: {
           consecutive_order_count: number | null
@@ -3983,6 +7372,7 @@ export type Database = {
           category: string | null
           competitors: string[] | null
           created_at: string
+          distributor_id: string | null
           entity_type: string
           gst_number: string | null
           id: string
@@ -4005,6 +7395,7 @@ export type Database = {
           priority: string | null
           productive_visits_3m: number | null
           retail_type: string | null
+          state: string | null
           status: string | null
           territory_id: string | null
           total_visits_3m: number | null
@@ -4021,6 +7412,7 @@ export type Database = {
           category?: string | null
           competitors?: string[] | null
           created_at?: string
+          distributor_id?: string | null
           entity_type?: string
           gst_number?: string | null
           id?: string
@@ -4043,6 +7435,7 @@ export type Database = {
           priority?: string | null
           productive_visits_3m?: number | null
           retail_type?: string | null
+          state?: string | null
           status?: string | null
           territory_id?: string | null
           total_visits_3m?: number | null
@@ -4059,6 +7452,7 @@ export type Database = {
           category?: string | null
           competitors?: string[] | null
           created_at?: string
+          distributor_id?: string | null
           entity_type?: string
           gst_number?: string | null
           id?: string
@@ -4081,6 +7475,7 @@ export type Database = {
           priority?: string | null
           productive_visits_3m?: number | null
           retail_type?: string | null
+          state?: string | null
           status?: string | null
           territory_id?: string | null
           total_visits_3m?: number | null
@@ -4089,6 +7484,13 @@ export type Database = {
           verified?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "retailers_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "retailers_territory_id_fkey"
             columns: ["territory_id"]
@@ -4283,6 +7685,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_config: {
+        Row: {
+          account_sid: string | null
+          auth_token: string | null
+          created_at: string | null
+          from_number: string | null
+          id: string
+          is_active: boolean | null
+          provider: string
+          updated_at: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          account_sid?: string | null
+          auth_token?: string | null
+          created_at?: string | null
+          from_number?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          updated_at?: string | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          account_sid?: string | null
+          auth_token?: string | null
+          created_at?: string | null
+          from_number?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          updated_at?: string | null
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
       social_comments: {
         Row: {
           content: string
@@ -4347,6 +7785,33 @@ export type Database = {
           },
         ]
       }
+      social_post_attachments: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_type: string | null
+          file_url: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: []
+      }
       social_posts: {
         Row: {
           content: string
@@ -4393,6 +7858,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      social_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       stock: {
         Row: {
@@ -4471,6 +7960,154 @@ export type Database = {
           visit_id?: string | null
         }
         Relationships: []
+      }
+      stockist_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          stockist_id: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          stockist_id?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          stockist_id?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockist_attachments_stockist_id_fkey"
+            columns: ["stockist_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stockist_contacts: {
+        Row: {
+          address: string | null
+          contact_name: string
+          created_at: string | null
+          designation: string | null
+          email: string | null
+          id: string
+          is_primary: boolean | null
+          phone: string | null
+          reports_to: string | null
+          stockist_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          contact_name: string
+          created_at?: string | null
+          designation?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          phone?: string | null
+          reports_to?: string | null
+          stockist_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          contact_name?: string
+          created_at?: string | null
+          designation?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          phone?: string | null
+          reports_to?: string | null
+          stockist_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockist_contacts_reports_to_fkey"
+            columns: ["reports_to"]
+            isOneToOne: false
+            referencedRelation: "stockist_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stockist_contacts_stockist_id_fkey"
+            columns: ["stockist_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stockist_locations: {
+        Row: {
+          address: string | null
+          city: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          is_head_office: boolean | null
+          location_name: string
+          pincode: string | null
+          state: string | null
+          stockist_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_head_office?: boolean | null
+          location_name: string
+          pincode?: string | null
+          state?: string | null
+          stockist_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_head_office?: boolean | null
+          location_name?: string
+          pincode?: string | null
+          state?: string | null
+          stockist_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockist_locations_stockist_id_fkey"
+            columns: ["stockist_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_requests: {
         Row: {
@@ -4603,6 +8240,60 @@ export type Database = {
         }
         Relationships: []
       }
+      target_setup_master: {
+        Row: {
+          annual_quantity_target: number
+          annual_revenue_target: number
+          band: number
+          created_at: string
+          created_by: string | null
+          id: string
+          state_territory_id: string | null
+          territory_id: string | null
+          unit_of_measure: string
+          updated_at: string
+        }
+        Insert: {
+          annual_quantity_target?: number
+          annual_revenue_target?: number
+          band: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          state_territory_id?: string | null
+          territory_id?: string | null
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Update: {
+          annual_quantity_target?: number
+          annual_revenue_target?: number
+          band?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          state_territory_id?: string | null
+          territory_id?: string | null
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_setup_master_state_territory_id_fkey"
+            columns: ["state_territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "target_setup_master_territory_id_fkey"
+            columns: ["territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       territories: {
         Row: {
           assigned_distributor_ids: Json | null
@@ -4611,9 +8302,12 @@ export type Database = {
           child_territories_count: number | null
           competitor_ids: string[] | null
           created_at: string
+          created_by: string | null
           description: string | null
           id: string
+          last_updated_by: string | null
           name: string
+          owner_id: string | null
           parent_id: string | null
           pincode_ranges: string[] | null
           population: number | null
@@ -4631,9 +8325,12 @@ export type Database = {
           child_territories_count?: number | null
           competitor_ids?: string[] | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
+          last_updated_by?: string | null
           name: string
+          owner_id?: string | null
           parent_id?: string | null
           pincode_ranges?: string[] | null
           population?: number | null
@@ -4651,9 +8348,12 @@ export type Database = {
           child_territories_count?: number | null
           competitor_ids?: string[] | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
+          last_updated_by?: string | null
           name?: string
+          owner_id?: string | null
           parent_id?: string | null
           pincode_ranges?: string[] | null
           population?: number | null
@@ -5729,6 +9429,7 @@ export type Database = {
       }
       vans: {
         Row: {
+          assigned_user_id: string | null
           created_at: string
           created_by: string | null
           driver_address: string | null
@@ -5749,6 +9450,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_user_id?: string | null
           created_at?: string
           created_by?: string | null
           driver_address?: string | null
@@ -5769,6 +9471,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_user_id?: string | null
           created_at?: string
           created_by?: string | null
           driver_address?: string | null
@@ -5792,51 +9495,87 @@ export type Database = {
       }
       vendors: {
         Row: {
+          about_business: string | null
+          annual_revenue: number | null
+          assets_trucks: number | null
+          assets_vans: number | null
+          business_hunger: string | null
           city: string | null
           competitors: string[] | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
+          coverage_area: string | null
           created_at: string
           created_by: string
+          established_year: number | null
           id: string
           is_approved: boolean
           name: string
+          other_products: string[] | null
+          products_distributed: string[] | null
+          profitability: string | null
           region_pincodes: string[]
+          sales_team_size: number | null
           skills: string[]
           state: string | null
+          stockist_status: string | null
           updated_at: string
         }
         Insert: {
+          about_business?: string | null
+          annual_revenue?: number | null
+          assets_trucks?: number | null
+          assets_vans?: number | null
+          business_hunger?: string | null
           city?: string | null
           competitors?: string[] | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          coverage_area?: string | null
           created_at?: string
           created_by: string
+          established_year?: number | null
           id?: string
           is_approved?: boolean
           name: string
+          other_products?: string[] | null
+          products_distributed?: string[] | null
+          profitability?: string | null
           region_pincodes?: string[]
+          sales_team_size?: number | null
           skills?: string[]
           state?: string | null
+          stockist_status?: string | null
           updated_at?: string
         }
         Update: {
+          about_business?: string | null
+          annual_revenue?: number | null
+          assets_trucks?: number | null
+          assets_vans?: number | null
+          business_hunger?: string | null
           city?: string | null
           competitors?: string[] | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          coverage_area?: string | null
           created_at?: string
           created_by?: string
+          established_year?: number | null
           id?: string
           is_approved?: boolean
           name?: string
+          other_products?: string[] | null
+          products_distributed?: string[] | null
+          profitability?: string | null
           region_pincodes?: string[]
+          sales_team_size?: number | null
           skills?: string[]
           state?: string | null
+          stockist_status?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -5899,6 +9638,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          visit_type: string | null
         }
         Insert: {
           check_in_address?: string | null
@@ -5922,6 +9662,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          visit_type?: string | null
         }
         Update: {
           check_in_address?: string | null
@@ -5945,6 +9686,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          visit_type?: string | null
         }
         Relationships: []
       }
@@ -5980,7 +9722,47 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      orders_total_amount: {
+        Row: {
+          total_amount: number | null
+        }
+        Insert: {
+          total_amount?: number | null
+        }
+        Update: {
+          total_amount?: number | null
+        }
+        Relationships: []
+      }
+      productive_summary_daywise: {
+        Row: {
+          planned_date: string | null
+          productive_visits: number | null
+          productivity_percentage: number | null
+          total_visits: number | null
+          unproductive_visits: number | null
+        }
+        Relationships: []
+      }
+      productive_summary_week: {
+        Row: {
+          planned_date: string | null
+          productive_visits: number | null
+          productivity_percentage: number | null
+          total_visits: number | null
+          unproductive_visits: number | null
+        }
+        Relationships: []
+      }
+      productive_view: {
+        Row: {
+          full_name: string | null
+          productive_visits: number | null
+          productivity_percentage: number | null
+          total_visits: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_beat_adherence: {
@@ -6037,12 +9819,21 @@ export type Database = {
         }[]
       }
       cleanup_expired_recommendations: { Args: never; Returns: undefined }
+      cleanup_expired_reset_tokens: { Args: never; Returns: undefined }
       cleanup_old_execution_logs: { Args: never; Returns: undefined }
       create_approval_workflow: {
         Args: { user_id_param: string }
         Returns: undefined
       }
       generate_invoice_number: { Args: never; Returns: string }
+      get_all_subordinates: {
+        Args: { manager_user_id: string }
+        Returns: {
+          full_name: string
+          level: number
+          subordinate_user_id: string
+        }[]
+      }
       get_authenticated_email: { Args: never; Returns: string }
       get_basic_profiles_for_admin: {
         Args: never
@@ -6051,6 +9842,22 @@ export type Database = {
           full_name: string
           id: string
           username: string
+        }[]
+      }
+      get_direct_reports: {
+        Args: { manager_user_id: string }
+        Returns: {
+          full_name: string
+          profile_picture_url: string
+          subordinate_user_id: string
+        }[]
+      }
+      get_employee_basic_info: {
+        Args: { employee_user_id: string }
+        Returns: {
+          full_name: string
+          hq: string
+          user_id: string
         }[]
       }
       get_limited_profiles_for_admin: {
@@ -6074,6 +9881,43 @@ export type Database = {
           total_attempts: number
         }[]
       }
+      get_product_revenue_performance: {
+        Args: { end_date?: string; start_date?: string; user_full_name: string }
+        Returns: {
+          full_name: string
+          product_name: string
+          quantity_sold: number
+          revenue: number
+          unit: string
+        }[]
+      }
+      get_productivity_summary:
+        | {
+            Args: { user_full_name: string }
+            Returns: {
+              full_name: string
+              planned_date: string
+              productive_visits: number
+              productivity_percentage: number
+              total_visits: number
+              unproductive_visits: number
+            }[]
+          }
+        | {
+            Args: {
+              end_date?: string
+              start_date?: string
+              user_full_name: string
+            }
+            Returns: {
+              full_name: string
+              planned_date: string
+              productive_visits: number
+              productivity_percentage: number
+              total_visits: number
+              unproductive_visits: number
+            }[]
+          }
       get_public_vendors: {
         Args: never
         Returns: {
@@ -6161,6 +10005,18 @@ export type Database = {
       }
       hash_hint_answer: { Args: { answer: string }; Returns: string }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
+      is_manager: { Args: { user_id_param: string }; Returns: boolean }
+      list_team_members: {
+        Args: never
+        Returns: {
+          full_name: string
+          hq: string
+          manager_id: string
+          profile_picture_url: string
+          user_id: string
+          username: string
+        }[]
+      }
       log_sensitive_access: {
         Args: { p_action: string; p_record_id: string; p_table_name: string }
         Returns: undefined

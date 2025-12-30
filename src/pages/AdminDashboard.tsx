@@ -12,12 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft } from 'lucide-react';
+import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Target } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import HolidayManagement from '@/components/HolidayManagement';
 import CreateUserForm from '@/components/CreateUserForm';
 import UserInvitationForm from '@/components/UserInvitationForm';
 import ApproverManagement from '@/components/ApproverManagement';
+import TargetSetupMaster from '@/components/admin/TargetSetupMaster';
 
 interface User {
   id: string;
@@ -254,7 +255,7 @@ export const AdminDashboard = () => {
 
         {/* Admin Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Overview
@@ -275,9 +276,13 @@ export const AdminDashboard = () => {
               <Shield className="h-4 w-4" />
               Approvers
             </TabsTrigger>
+            <TabsTrigger value="target-setup" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Target Setup
+            </TabsTrigger>
             <TabsTrigger value="holidays" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              Holiday Calendar
+              Holidays
             </TabsTrigger>
           </TabsList>
 
@@ -416,6 +421,10 @@ export const AdminDashboard = () => {
 
           <TabsContent value="approvers" className="space-y-6">
             <ApproverManagement />
+          </TabsContent>
+
+          <TabsContent value="target-setup" className="space-y-4">
+            <TargetSetupMaster />
           </TabsContent>
 
           <TabsContent value="holidays" className="space-y-4">
