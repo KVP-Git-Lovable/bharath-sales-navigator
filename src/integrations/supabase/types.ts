@@ -7119,6 +7119,131 @@ export type Database = {
         }
         Relationships: []
       }
+      retailer_gift_redemptions: {
+        Row: {
+          created_at: string | null
+          delivery_address: string | null
+          fulfillment_notes: string | null
+          gift_id: string | null
+          id: string
+          points_redeemed: number
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          requested_at: string | null
+          retailer_id: string
+          status: string | null
+          subscription_id: string | null
+          updated_at: string | null
+          voucher_code: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_address?: string | null
+          fulfillment_notes?: string | null
+          gift_id?: string | null
+          id?: string
+          points_redeemed: number
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string | null
+          retailer_id: string
+          status?: string | null
+          subscription_id?: string | null
+          updated_at?: string | null
+          voucher_code?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_address?: string | null
+          fulfillment_notes?: string | null
+          gift_id?: string | null
+          id?: string
+          points_redeemed?: number
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string | null
+          retailer_id?: string
+          status?: string | null
+          subscription_id?: string | null
+          updated_at?: string | null
+          voucher_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_gift_redemptions_gift_id_fkey"
+            columns: ["gift_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_gifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailer_gift_redemptions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_gift_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retailer_gift_subscriptions: {
+        Row: {
+          achieved_at: string | null
+          cancelled_at: string | null
+          created_at: string | null
+          gift_id: string | null
+          id: string
+          notes: string | null
+          points_at_subscription: number | null
+          progress_points: number | null
+          retailer_id: string
+          status: string | null
+          subscribed_at: string | null
+          target_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          achieved_at?: string | null
+          cancelled_at?: string | null
+          created_at?: string | null
+          gift_id?: string | null
+          id?: string
+          notes?: string | null
+          points_at_subscription?: number | null
+          progress_points?: number | null
+          retailer_id: string
+          status?: string | null
+          subscribed_at?: string | null
+          target_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          achieved_at?: string | null
+          cancelled_at?: string | null
+          created_at?: string | null
+          gift_id?: string | null
+          id?: string
+          notes?: string | null
+          points_at_subscription?: number | null
+          progress_points?: number | null
+          retailer_id?: string
+          status?: string | null
+          subscribed_at?: string | null
+          target_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_gift_subscriptions_gift_id_fkey"
+            columns: ["gift_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_gifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retailer_loyalty_actions: {
         Row: {
           action_name: string
@@ -7201,42 +7326,253 @@ export type Database = {
           },
         ]
       }
+      retailer_loyalty_gifts: {
+        Row: {
+          cash_equivalent: number | null
+          created_at: string | null
+          description: string | null
+          eligibility_criteria: Json | null
+          gift_name: string
+          gift_type: string
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          is_limited_stock: boolean | null
+          minimum_monthly_orders: number | null
+          minimum_order_value: number | null
+          plan_id: string | null
+          points_required: number
+          sort_order: number | null
+          stock_quantity: number | null
+          target_description: string | null
+          target_duration_months: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cash_equivalent?: number | null
+          created_at?: string | null
+          description?: string | null
+          eligibility_criteria?: Json | null
+          gift_name: string
+          gift_type: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          is_limited_stock?: boolean | null
+          minimum_monthly_orders?: number | null
+          minimum_order_value?: number | null
+          plan_id?: string | null
+          points_required: number
+          sort_order?: number | null
+          stock_quantity?: number | null
+          target_description?: string | null
+          target_duration_months?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cash_equivalent?: number | null
+          created_at?: string | null
+          description?: string | null
+          eligibility_criteria?: Json | null
+          gift_name?: string
+          gift_type?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          is_limited_stock?: boolean | null
+          minimum_monthly_orders?: number | null
+          minimum_order_value?: number | null
+          plan_id?: string | null
+          points_required?: number
+          sort_order?: number | null
+          stock_quantity?: number | null
+          target_description?: string | null
+          target_duration_months?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_loyalty_gifts_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retailer_loyalty_parameters: {
+        Row: {
+          award_period: string | null
+          consecutive_required: number | null
+          created_at: string | null
+          description: string | null
+          focused_categories: string[] | null
+          focused_products: string[] | null
+          frequency_days: number | null
+          growth_percentage: number | null
+          id: string
+          is_enabled: boolean | null
+          max_awards_per_period: number | null
+          max_value: number | null
+          metadata: Json | null
+          min_value: number | null
+          parameter_name: string
+          parameter_type: string
+          plan_id: string | null
+          points: number
+          qualifying_criteria: string | null
+          target_value: number | null
+          tier_config: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          award_period?: string | null
+          consecutive_required?: number | null
+          created_at?: string | null
+          description?: string | null
+          focused_categories?: string[] | null
+          focused_products?: string[] | null
+          frequency_days?: number | null
+          growth_percentage?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          max_awards_per_period?: number | null
+          max_value?: number | null
+          metadata?: Json | null
+          min_value?: number | null
+          parameter_name: string
+          parameter_type: string
+          plan_id?: string | null
+          points: number
+          qualifying_criteria?: string | null
+          target_value?: number | null
+          tier_config?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          award_period?: string | null
+          consecutive_required?: number | null
+          created_at?: string | null
+          description?: string | null
+          focused_categories?: string[] | null
+          focused_products?: string[] | null
+          frequency_days?: number | null
+          growth_percentage?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          max_awards_per_period?: number | null
+          max_value?: number | null
+          metadata?: Json | null
+          min_value?: number | null
+          parameter_name?: string
+          parameter_type?: string
+          plan_id?: string | null
+          points?: number
+          qualifying_criteria?: string | null
+          target_value?: number | null
+          tier_config?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_loyalty_parameters_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retailer_loyalty_plans: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string
+          id: string
+          is_active: boolean | null
+          is_all_territories: boolean | null
+          plan_name: string
+          points_to_rupee_conversion: number | null
+          start_date: string
+          territories: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          is_all_territories?: boolean | null
+          plan_name: string
+          points_to_rupee_conversion?: number | null
+          start_date: string
+          territories?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          is_all_territories?: boolean | null
+          plan_name?: string
+          points_to_rupee_conversion?: number | null
+          start_date?: string
+          territories?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       retailer_loyalty_points: {
         Row: {
           action_id: string
           awarded_by_user_id: string | null
+          description: string | null
           earned_at: string | null
           id: string
           metadata: Json | null
+          parameter_id: string | null
           points: number
           program_id: string
           reference_id: string | null
           reference_type: string | null
           retailer_id: string
+          visit_id: string | null
         }
         Insert: {
           action_id: string
           awarded_by_user_id?: string | null
+          description?: string | null
           earned_at?: string | null
           id?: string
           metadata?: Json | null
+          parameter_id?: string | null
           points?: number
           program_id: string
           reference_id?: string | null
           reference_type?: string | null
           retailer_id: string
+          visit_id?: string | null
         }
         Update: {
           action_id?: string
           awarded_by_user_id?: string | null
+          description?: string | null
           earned_at?: string | null
           id?: string
           metadata?: Json | null
+          parameter_id?: string | null
           points?: number
           program_id?: string
           reference_id?: string | null
           reference_type?: string | null
           retailer_id?: string
+          visit_id?: string | null
         }
         Relationships: [
           {
@@ -7244,6 +7580,13 @@ export type Database = {
             columns: ["action_id"]
             isOneToOne: false
             referencedRelation: "retailer_loyalty_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailer_loyalty_points_parameter_id_fkey"
+            columns: ["parameter_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_loyalty_parameters"
             referencedColumns: ["id"]
           },
           {
@@ -10546,6 +10889,22 @@ export type Database = {
           total_visits: number | null
         }
         Relationships: []
+      }
+      retailer_loyalty_balance: {
+        Row: {
+          retailer_id: string | null
+          total_points: number | null
+          total_transactions: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_loyalty_points_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
