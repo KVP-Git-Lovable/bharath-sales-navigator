@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Layout } from "@/components/Layout";
-import { Search, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, Camera, Image as ImageIcon, MapPin, User, MapPinned } from "lucide-react";
+import { Search, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, Camera, Image as ImageIcon, MapPin, User, MapPinned, ExternalLink } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { CameraCapture } from "@/components/CameraCapture";
 import { format, subMonths, isAfter, isBefore, startOfMonth } from "date-fns";
@@ -86,6 +87,7 @@ export default function RetailManagement() {
   const [verifyAddress, setVerifyAddress] = useState(false);
   const [verifyContact, setVerifyContact] = useState(false);
   const [verifyTerritory, setVerifyTerritory] = useState(false);
+  const [verificationNote, setVerificationNote] = useState("");
 
   useEffect(() => {
     document.title = "Retail Management | Admin Panel";
@@ -180,6 +182,7 @@ export default function RetailManagement() {
     setVerifyAddress(retailer.verification_address || false);
     setVerifyContact(retailer.verification_contact || false);
     setVerifyTerritory(retailer.verification_territory || false);
+    setVerificationNote("");
     setVerifyDialogOpen(true);
   };
 
@@ -214,6 +217,25 @@ export default function RetailManagement() {
         variant: "destructive" 
       });
     } else {
+      // Send notification to retailer owner if needs attention
+      if (newStatus === 'needs_attention' && selectedRetailer.user_id) {
+        const gaps: string[] = [];
+        if (!verifyAddress) gaps.push("Address & Geo Stamp");
+        if (!verifyContact) gaps.push("Retailer Name & Owner Contact");
+        if (!verifyTerritory) gaps.push("Territory Assignment");
+        
+        const notificationMessage = `Retailer "${selectedRetailer.name}" needs attention. Verification gaps: ${gaps.join(", ")}. ${verificationNote ? `Note: ${verificationNote}` : ""}`;
+        
+        await supabase.from("notifications").insert({
+          user_id: selectedRetailer.user_id,
+          title: "Retailer Verification: Needs Attention",
+          message: notificationMessage,
+          type: "verification",
+          related_table: "retailers",
+          related_id: selectedRetailer.id
+        });
+      }
+      
       toast({ 
         title: allVerified ? "Retailer Verified" : "Verification Updated",
         description: allVerified 
@@ -223,6 +245,11 @@ export default function RetailManagement() {
       setVerifyDialogOpen(false);
       loadData();
     }
+  };
+  
+  const openGoogleMaps = (address: string) => {
+    const encodedAddress = encodeURIComponent(address);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
   };
 
   const handlePhotoCapture = async (blob: Blob) => {
@@ -575,7 +602,16 @@ export default function RetailManagement() {
                           </TableCell>
                           <TableCell>{retailer.contact_person || '-'}</TableCell>
                           <TableCell>{retailer.phone || 'N/A'}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{retailer.address}</TableCell>
+                          <TableCell className="max-w-[180px]">
+                            <button
+                              onClick={() => openGoogleMaps(retailer.address)}
+                              className="flex items-center gap-1 hover:text-primary hover:underline text-left text-sm group"
+                              title="Open in Google Maps"
+                            >
+                              <span className="truncate">{retailer.address}</span>
+                              <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          </TableCell>
                           <TableCell>
                             {retailer.territory_name ? (
                               <Badge variant="outline">{retailer.territory_name}</Badge>
@@ -672,10 +708,26 @@ export default function RetailManagement() {
             
             {(verifyAddress || verifyContact || verifyTerritory) && 
              !(verifyAddress && verifyContact && verifyTerritory) && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm">Partial verification will mark as "Needs Attention"</span>
-              </div>
+              <>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm">Partial verification will mark as "Needs Attention"</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="verification-note">Note for Sales Team Member</Label>
+                  <Textarea
+                    id="verification-note"
+                    placeholder="Add a note explaining what needs attention..."
+                    value={verificationNote}
+                    onChange={(e) => setVerificationNote(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This note will be sent to the retailer owner in the Collaboration Center
+                  </p>
+                </div>
+              </>
             )}
           </div>
           
