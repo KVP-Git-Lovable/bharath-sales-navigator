@@ -2098,41 +2098,89 @@ export const VisitCard = ({
       let offlineOrders: any[] = [];
       try {
         const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+        // Format target date as YYYY-MM-DD for comparison
+        const targetDateStr = targetDate.toISOString().split('T')[0];
+        
         offlineOrders = cachedOrders.filter((o: any) => {
+          // Check by order_date first (exact date match), fallback to created_at
+          if (o.order_date) {
+            const orderDateStr = o.order_date.split('T')[0];
+            return o.user_id === user.id && o.retailer_id === retailerId && orderDateStr === targetDateStr;
+          }
+          // Fallback to created_at timestamp comparison
           const orderDate = new Date(o.created_at);
-          return (
-            o.user_id === user.id &&
-            o.retailer_id === retailerId &&
-            orderDate >= dayStart &&
-            orderDate <= dayEnd
-          );
+          return o.user_id === user.id && o.retailer_id === retailerId && orderDate >= dayStart && orderDate <= dayEnd;
         });
+        console.log('[VisitCard] Offline orders found:', offlineOrders.length, 'for retailer:', retailerId);
       } catch (e) {
         console.log('[VisitCard] Error reading offline orders:', e);
       }
       
-      // Then try Supabase (if online)
+      // Then try Supabase (if online) with timeout to avoid blocking
       let dbOrders: any[] = [];
       if (navigator.onLine) {
         try {
-          const { data } = await supabase.from('orders').select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number').eq('user_id', user.id).eq('retailer_id', retailerId).eq('status', 'confirmed').gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString());
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+          
+          const { data } = await supabase
+            .from('orders')
+            .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, order_items(product_name, quantity, rate, original_rate, total, unit)')
+            .eq('user_id', user.id)
+            .eq('retailer_id', retailerId)
+            .eq('status', 'confirmed')
+            .gte('created_at', dayStart.toISOString())
+            .lte('created_at', dayEnd.toISOString())
+            .abortSignal(controller.signal);
+          
+          clearTimeout(timeoutId);
           dbOrders = data || [];
-        } catch (e) {
-          console.log('[VisitCard] Error fetching orders from DB:', e);
+        } catch (e: any) {
+          if (e.name === 'AbortError') {
+            console.log('[VisitCard] DB fetch timed out, using offline data');
+          } else {
+            console.log('[VisitCard] Error fetching orders from DB:', e);
+          }
         }
       }
       
-      // Merge orders, avoiding duplicates (prefer DB version for metadata, but offline for items)
-      const dbOrderIds = new Set(dbOrders.map(o => o.id));
-      const uniqueOfflineOrders = offlineOrders.filter(o => !dbOrderIds.has(o.id));
-      const orders = [...dbOrders, ...uniqueOfflineOrders];
+      // Merge orders: prioritize DB for metadata but preserve offline items
+      // If DB order exists, merge in offline items data
+      const mergedOrders: any[] = [];
+      const dbOrderMap = new Map(dbOrders.map(o => [o.id, o]));
+      const offlineOrderMap = new Map(offlineOrders.map(o => [o.id, o]));
       
-      setOrdersTodayList(orders as any);
-      if (orders.length > 0) {
+      // Add all DB orders, enriching with offline item data if available
+      dbOrders.forEach(dbOrder => {
+        const offlineVersion = offlineOrderMap.get(dbOrder.id);
+        // If DB order has no items but offline version does, use offline items
+        const hasDBItems = dbOrder.order_items && dbOrder.order_items.length > 0;
+        const hasOfflineItems = offlineVersion?.items && offlineVersion.items.length > 0;
+        
+        if (!hasDBItems && hasOfflineItems) {
+          mergedOrders.push({ ...dbOrder, items: offlineVersion.items });
+        } else if (hasDBItems) {
+          mergedOrders.push({ ...dbOrder, items: dbOrder.order_items });
+        } else {
+          mergedOrders.push(dbOrder);
+        }
+      });
+      
+      // Add offline-only orders (not in DB yet)
+      offlineOrders.forEach(offlineOrder => {
+        if (!dbOrderMap.has(offlineOrder.id)) {
+          mergedOrders.push(offlineOrder);
+        }
+      });
+      
+      console.log('[VisitCard] Merged orders:', mergedOrders.length, 'with items:', mergedOrders.filter(o => o.items?.length > 0).length);
+      
+      setOrdersTodayList(mergedOrders as any);
+      if (mergedOrders.length > 0) {
         // CRITICAL FIX: Also calculate and set order totals when loading order details
-        const totalOrderValue = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
-        const creditOrders = orders.filter((o: any) => !!o.is_credit_order);
-        const cashOrders = orders.filter((o: any) => !o.is_credit_order);
+        const totalOrderValue = mergedOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+        const creditOrders = mergedOrders.filter((o: any) => !!o.is_credit_order);
+        const cashOrders = mergedOrders.filter((o: any) => !o.is_credit_order);
         const paidFromCash = cashOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
         const totalPaidFromCredit = creditOrders.reduce((sum: number, o: any) => sum + Number(o.credit_paid_amount || 0), 0);
         const totalPaidToday = paidFromCash + totalPaidFromCredit;
@@ -2141,7 +2189,6 @@ export const VisitCard = ({
         
         // Update the order value and payment states
         if (totalOrderValue > 0) {
-          // This is from DB fetch, so use 'db' source
           updateOrderValue(totalOrderValue, 'db');
           setPaidTodayAmount(totalPaidToday);
           setCreditPendingAmount(updatedPending);
@@ -2149,15 +2196,16 @@ export const VisitCard = ({
         }
         
         // Store the most recent order ID for invoice generation
-        setLastOrderId(orders[0].id);
+        setLastOrderId(mergedOrders[0].id);
         
-        // For order items - prioritize offline items first (they have full item data)
+        // Extract items from merged orders (items are already attached from merge logic above)
         let allItems: any[] = [];
         
-        // First: Get items from offline orders (these always have items attached)
-        offlineOrders.forEach((order: any) => {
-          if (order.items && Array.isArray(order.items)) {
-            order.items.forEach((item: any) => {
+        // Get items from all merged orders
+        mergedOrders.forEach((order: any) => {
+          const orderItems = order.items || order.order_items || [];
+          if (Array.isArray(orderItems)) {
+            orderItems.forEach((item: any) => {
               allItems.push({
                 product_name: item.product_name || item.name,
                 quantity: item.quantity,
@@ -2171,10 +2219,10 @@ export const VisitCard = ({
           }
         });
         
-        // Second: If we have DB orders and no items yet, try fetching from DB
-        const dbOrderIds_arr = dbOrders.map(o => o.id);
-        if (dbOrderIds_arr.length > 0 && allItems.length === 0 && navigator.onLine) {
+        // If still no items, try fetching from DB directly (fallback)
+        if (allItems.length === 0 && dbOrders.length > 0 && navigator.onLine) {
           try {
+            const dbOrderIds_arr = dbOrders.map(o => o.id);
             const { data: items } = await supabase.from('order_items').select('product_name, quantity, rate, original_rate, total, order_id, unit').in('order_id', dbOrderIds_arr);
             if (items && items.length > 0) {
               allItems = items;
@@ -2184,60 +2232,36 @@ export const VisitCard = ({
           }
         }
         
-        // CRITICAL FIX: If DB orders exist but have no items in DB,
-        // check offline cache for items (handles slow network partial sync)
-        if (dbOrderIds_arr.length > 0 && allItems.length === 0) {
-          // Try to get items from offline storage - first by order ID, then by retailer+date
-          for (const orderId of dbOrderIds_arr) {
-            try {
-              let cachedOrder = await offlineStorage.getById<any>(STORES.ORDERS, orderId);
-              
-              // If not found by ID, search by retailer+date (handles different IDs from sync)
-              if (!cachedOrder || !cachedOrder.items || cachedOrder.items.length === 0) {
-                const allCachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
-                cachedOrder = allCachedOrders.find((o: any) => {
-                  if (o.retailer_id !== retailerId) return false;
-                  const orderDate = new Date(o.created_at);
-                  return orderDate >= dayStart && orderDate <= dayEnd && o.items && o.items.length > 0;
+        // Final fallback: check offline cache by retailer+date
+        if (allItems.length === 0) {
+          try {
+            const allCachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+            const targetDateStr = targetDate.toISOString().split('T')[0];
+            const matchingOrder = allCachedOrders.find((o: any) => {
+              if (o.retailer_id !== retailerId) return false;
+              const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
+              return orderDateStr === targetDateStr && o.items && o.items.length > 0;
+            });
+            
+            if (matchingOrder && matchingOrder.items) {
+              matchingOrder.items.forEach((item: any) => {
+                allItems.push({
+                  product_name: item.product_name || item.name,
+                  quantity: item.quantity,
+                  rate: item.rate,
+                  original_rate: item.original_rate || item.rate,
+                  total: item.total || (item.quantity * item.rate),
+                  order_id: matchingOrder.id,
+                  unit: item.unit || 'piece'
                 });
-              }
-              
-              if (cachedOrder && cachedOrder.items && Array.isArray(cachedOrder.items)) {
-                cachedOrder.items.forEach((item: any) => {
-                  allItems.push({
-                    product_name: item.product_name || item.name,
-                    quantity: item.quantity,
-                    rate: item.rate,
-                    original_rate: item.original_rate || item.rate,
-                    total: item.total || (item.quantity * item.rate),
-                    order_id: orderId,
-                    unit: item.unit || 'piece'
-                  });
-                });
-                break; // Found items, stop searching
-              }
-            } catch (e) {
-              // Continue if cache read fails
+              });
             }
+          } catch (e) {
+            console.log('[VisitCard] Fallback cache lookup failed:', e);
           }
         }
         
-        // For offline orders, get items from order.items property (stored with order)
-        uniqueOfflineOrders.forEach((order: any) => {
-          if (order.items && Array.isArray(order.items)) {
-            order.items.forEach((item: any) => {
-              allItems.push({
-                product_name: item.product_name || item.name,
-                quantity: item.quantity,
-                rate: item.rate,
-                original_rate: item.original_rate || item.rate,
-                total: item.total || (item.quantity * item.rate),
-                order_id: order.id,
-                unit: item.unit || 'piece'
-              });
-            });
-          }
-        });
+        console.log('[VisitCard] Total items found:', allItems.length);
 
         // Helper function to convert quantity and rate for display
         // Uses original_rate (MRP from product master) for accurate display
