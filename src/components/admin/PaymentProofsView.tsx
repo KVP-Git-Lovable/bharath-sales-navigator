@@ -28,6 +28,7 @@ export const PaymentProofsView = () => {
   const [selectedProof, setSelectedProof] = useState<OrderWithProof | null>(null);
   const [dateFilter, setDateFilter] = useState("");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
+  const [showOnlyWithProofs, setShowOnlyWithProofs] = useState(false);
 
   useEffect(() => {
     fetchPaymentProofs();
@@ -49,8 +50,13 @@ export const PaymentProofsView = () => {
           payment_proof_url,
           created_at
         `)
-        .not('payment_proof_url', 'is', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      // Only filter for proofs if checkbox is checked
+      if (showOnlyWithProofs) {
+        query = query.not('payment_proof_url', 'is', null);
+      }
 
       if (dateFilter) {
         query = query.gte('order_date', dateFilter);
@@ -102,7 +108,7 @@ export const PaymentProofsView = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Date Filter (From)</Label>
               <Input
@@ -123,7 +129,23 @@ export const PaymentProofsView = () => {
                 <option value="cheque">Cheque</option>
                 <option value="upi">UPI</option>
                 <option value="neft">NEFT</option>
+                <option value="credit">Credit</option>
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Show Only With Proofs</Label>
+              <div className="flex items-center h-10">
+                <input
+                  type="checkbox"
+                  id="showOnlyWithProofs"
+                  checked={showOnlyWithProofs}
+                  onChange={(e) => setShowOnlyWithProofs(e.target.checked)}
+                  className="w-4 h-4 rounded border-input"
+                />
+                <label htmlFor="showOnlyWithProofs" className="ml-2 text-sm">
+                  Only with proofs
+                </label>
+              </div>
             </div>
             <div className="flex items-end">
               <Button onClick={fetchPaymentProofs} className="w-full">
