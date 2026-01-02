@@ -15,8 +15,8 @@ interface RetailerPoints {
   total_points: number;
   retailer?: {
     retailer_name: string;
-    owner_name: string;
-    territory_id: string;
+    phone: string | null;
+    beat_id: string | null;
   };
 }
 
@@ -24,13 +24,13 @@ interface PointTransaction {
   id: string;
   retailer_id: string;
   points: number;
-  action_type: string;
+  reference_type: string | null;
   description: string | null;
-  created_at: string;
+  earned_at: string;
   parameter?: {
     parameter_name: string;
     parameter_type: string;
-  };
+  } | null;
 }
 
 export function LoyaltyPointsDashboard() {
@@ -72,7 +72,7 @@ export function LoyaltyPointsDashboard() {
 
       const { data: retailers, error: retailersError } = await supabase
         .from("retailers")
-        .select("id, name, owner_name, territory_id")
+        .select("id, name, phone, beat_id")
         .in("id", retailerIds);
 
       if (retailersError) throw retailersError;
@@ -84,8 +84,8 @@ export function LoyaltyPointsDashboard() {
           total_points: aggregated[id],
           retailer: retailer ? {
             retailer_name: retailer.name,
-            owner_name: retailer.owner_name,
-            territory_id: retailer.territory_id,
+            phone: retailer.phone,
+            beat_id: retailer.beat_id,
           } : undefined,
         };
       }).sort((a, b) => b.total_points - a.total_points) as RetailerPoints[];
@@ -103,13 +103,13 @@ export function LoyaltyPointsDashboard() {
           id,
           retailer_id,
           points,
-          action_type,
+          reference_type,
           description,
-          created_at,
+          earned_at,
           parameter:retailer_loyalty_parameters(parameter_name, parameter_type)
         `)
         .eq("retailer_id", selectedRetailer.retailer_id)
-        .order("created_at", { ascending: false })
+        .order("earned_at", { ascending: false })
         .limit(50);
       
       if (error) throw error;
@@ -153,7 +153,7 @@ export function LoyaltyPointsDashboard() {
     const search = searchTerm.toLowerCase();
     return (
       item.retailer?.retailer_name?.toLowerCase().includes(search) ||
-      item.retailer?.owner_name?.toLowerCase().includes(search)
+      item.retailer?.phone?.toLowerCase().includes(search)
     );
   });
 
@@ -266,7 +266,7 @@ export function LoyaltyPointsDashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{item.retailer?.retailer_name || "Unknown"}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {item.retailer?.owner_name}
+                      {item.retailer?.phone || "No phone"}
                     </p>
                   </div>
                   <div className="text-right">
@@ -298,7 +298,7 @@ export function LoyaltyPointsDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-lg">{selectedRetailer.retailer?.retailer_name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedRetailer.retailer?.owner_name}</p>
+                    <p className="text-sm text-muted-foreground">{selectedRetailer.retailer?.phone}</p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1">
@@ -327,7 +327,7 @@ export function LoyaltyPointsDashboard() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {tx.parameter?.parameter_name || tx.action_type || "Points"}
+                            {tx.parameter?.parameter_name || tx.reference_type || "Points"}
                           </p>
                           {tx.description && (
                             <p className="text-xs text-muted-foreground truncate">{tx.description}</p>
@@ -338,7 +338,7 @@ export function LoyaltyPointsDashboard() {
                             {tx.points >= 0 ? '+' : ''}{tx.points}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(tx.created_at), "dd MMM")}
+                            {format(new Date(tx.earned_at), "dd MMM")}
                           </p>
                         </div>
                       </div>
