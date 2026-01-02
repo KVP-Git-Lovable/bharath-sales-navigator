@@ -427,6 +427,122 @@ export const VisitCard = ({
     loadRetailerData();
   }, [showRetailerOverview, visit.retailerId, visit.id]);
 
+  // AUTO-LOAD ORDERS FROM OFFLINE STORAGE ON MOUNT
+  // This ensures orders persist across navigation (e.g., going to Attendance and back)
+  useEffect(() => {
+    const loadOfflineOrdersOnMount = async () => {
+      if (!userId) return;
+      
+      const retailerId = visit.retailerId || visit.id;
+      const targetDate = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
+      const targetDateStr = targetDate.split('T')[0];
+      
+      try {
+        // Load orders from offline storage immediately (no network required)
+        const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+        
+        const matchingOrders = cachedOrders.filter((o: any) => {
+          const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
+          return o.user_id === userId && 
+                 o.retailer_id === retailerId && 
+                 orderDateStr === targetDateStr;
+        });
+        
+        if (matchingOrders.length > 0) {
+          console.log('[VisitCard] Auto-loaded orders from offline storage on mount:', matchingOrders.length);
+          
+          // Only set if current ordersTodayList is empty (don't override if already loaded)
+          if (ordersTodayList.length === 0) {
+            setOrdersTodayList(matchingOrders);
+            setLastOrderId(matchingOrders[0].id);
+            
+            // Calculate totals
+            const totalValue = matchingOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+            if (totalValue > 0) {
+              updateOrderValue(totalValue, 'cache');
+              setHasOrderToday(true);
+              setCurrentStatus('productive');
+              setStatusLoadedFromDB(true);
+              setPhase('completed');
+              
+              // Also extract items for immediate display in "View More"
+              let allItems: any[] = [];
+              matchingOrders.forEach((order: any) => {
+                const orderItems = order.items || order.order_items || [];
+                if (Array.isArray(orderItems)) {
+                  orderItems.forEach((item: any) => {
+                    allItems.push({
+                      product_name: item.product_name || item.name,
+                      quantity: item.quantity,
+                      rate: item.rate,
+                      original_rate: item.original_rate || item.rate,
+                      unit: item.unit || 'piece'
+                    });
+                  });
+                }
+              });
+              
+              if (allItems.length > 0) {
+                // Group items for display
+                const grouped = new Map<string, any>();
+                allItems.forEach(it => {
+                  const key = it.product_name;
+                  const existing = grouped.get(key);
+                  const qty = Number(it.quantity || 0);
+                  const rate = Number(it.rate || 0);
+                  const originalRate = Number(it.original_rate || it.rate || 0);
+                  const unit = it.unit || 'piece';
+                  const unitLower = unit.toLowerCase().trim();
+                  
+                  let displayQty = qty;
+                  let displayUnit = unit;
+                  let displayRate = originalRate || rate;
+                  
+                  if (unitLower === 'grams' || unitLower === 'g' || unitLower === 'gram') {
+                    displayQty = qty / 1000;
+                    displayUnit = 'KG';
+                    displayRate = (originalRate || rate) * 1000;
+                  }
+                  
+                  if (existing) {
+                    existing.displayQty += displayQty;
+                    existing.quantity += qty;
+                  } else {
+                    grouped.set(key, {
+                      product_name: key,
+                      quantity: qty,
+                      rate: rate,
+                      actualRate: displayRate,
+                      displayQty: displayQty,
+                      displayUnit: displayUnit
+                    });
+                  }
+                });
+                
+                setLastOrderItems(Array.from(grouped.values()));
+              }
+              
+              // Calculate payment states
+              const creditOrders = matchingOrders.filter((o: any) => !!o.is_credit_order);
+              const cashOrders = matchingOrders.filter((o: any) => !o.is_credit_order);
+              const paidFromCash = cashOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+              const totalPaidFromCredit = creditOrders.reduce((sum: number, o: any) => sum + Number(o.credit_paid_amount || 0), 0);
+              const creditOrdersTotal = creditOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+              
+              setPaidTodayAmount(paidFromCash + totalPaidFromCredit);
+              setCreditPendingAmount(Math.max(0, creditOrdersTotal - totalPaidFromCredit));
+              setIsCreditOrder(creditOrders.length > 0);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('[VisitCard] Error auto-loading offline orders:', e);
+      }
+    };
+    
+    loadOfflineOrdersOnMount();
+  }, [userId, visit.retailerId, visit.id, selectedDate]); // Run on mount and when key props change
+
   // Memoized retailer ID for this card
   const myRetailerId = visit.retailerId || visit.id;
 
@@ -891,17 +1007,55 @@ export const VisitCard = ({
             
             setHasOrderToday(true);
           } else {
-            setHasOrderToday(false);
-            // Reset order value only if we have db-level confirmation of no orders
-            setActualOrderValue(0);
-            setOrderValueSource('db'); // Mark as from DB so cache can't overwrite
-            console.log('💰 Reset actualOrderValue to 0 (confirmed from DB)');
-            setIsCreditOrder(false);
-            setCreditPendingAmount(0);
-            setCreditPaidAmount(0);
-            setPaidTodayAmount(0);
-            setOrdersTodayList([]);
-            setPreviousPendingCleared(0);
+            // DB returned no orders - check offline storage as fallback before resetting
+            try {
+              const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+              const offlineOrders = cachedOrders.filter((o: any) => {
+                const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
+                return o.user_id === currentUserId && 
+                       o.retailer_id === visitRetailerId && 
+                       orderDateStr === targetDate;
+              });
+              
+              if (offlineOrders.length > 0) {
+                console.log('[VisitCard] DB returned no orders but found in offline storage:', offlineOrders.length);
+                setOrdersTodayList(offlineOrders);
+                setLastOrderId(offlineOrders[0].id);
+                
+                const totalValue = offlineOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+                if (totalValue > 0) {
+                  updateOrderValue(totalValue, 'cache');
+                  setHasOrderToday(true);
+                  setCurrentStatus('productive');
+                  setStatusLoadedFromDB(true);
+                  setPhase('completed');
+                }
+              } else {
+                // Truly no orders anywhere - reset
+                setHasOrderToday(false);
+                setActualOrderValue(0);
+                setOrderValueSource('db');
+                console.log('💰 Reset actualOrderValue to 0 (confirmed from DB and offline)');
+                setIsCreditOrder(false);
+                setCreditPendingAmount(0);
+                setCreditPaidAmount(0);
+                setPaidTodayAmount(0);
+                setOrdersTodayList([]);
+                setPreviousPendingCleared(0);
+              }
+            } catch (cacheErr) {
+              console.log('[VisitCard] Offline fallback error:', cacheErr);
+              // Reset on error
+              setHasOrderToday(false);
+              setActualOrderValue(0);
+              setOrderValueSource('db');
+              setIsCreditOrder(false);
+              setCreditPendingAmount(0);
+              setCreditPaidAmount(0);
+              setPaidTodayAmount(0);
+              setOrdersTodayList([]);
+              setPreviousPendingCleared(0);
+            }
           }
     } catch (error) {
       console.log('❌ Status check error:', error);
