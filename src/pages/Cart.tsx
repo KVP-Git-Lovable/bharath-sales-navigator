@@ -696,53 +696,73 @@ export const Cart = () => {
 
       console.time('⚡ Order Submission');
 
-      // For phone orders, create a visit first
+      // ALWAYS ensure we have a visit for this order (phone orders AND regular orders)
+      // This ensures visit_id is never NULL in orders, fixing Today's Progress update issues
       let actualVisitId = validVisitId;
-      if (isPhoneOrder && !validVisitId && validRetailerId) {
-        const today = getLocalTodayDate();
-        const isOnline = connectivityStatus === 'online' && navigator.onLine;
-        
+      const today = getLocalTodayDate();
+      const isOnline = connectivityStatus === 'online' && navigator.onLine;
+      
+      // If no visit exists, find or create one
+      if (!actualVisitId && validRetailerId && currentUserId) {
+        // First check if a visit already exists for this retailer today
         if (isOnline) {
-          // Online: Create visit via Supabase
-          const {
-            data: newVisit,
-            error: visitError
-          } = await supabase.from('visits').insert({
-            user_id: currentUserId,
-            retailer_id: validRetailerId,
-            planned_date: today,
-            status: 'productive',
-            skip_check_in_reason: 'phone-order',
-            skip_check_in_time: new Date().toISOString()
-          }).select().single();
+          const { data: existingVisit } = await supabase
+            .from('visits')
+            .select('id')
+            .eq('user_id', currentUserId)
+            .eq('retailer_id', validRetailerId)
+            .eq('planned_date', today)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
           
-          if (visitError) {
-            console.error('Error creating phone order visit:', visitError);
-            // Don't block offline - continue without visit ID
-            console.warn('Continuing without visit ID for offline sync');
+          if (existingVisit) {
+            actualVisitId = existingVisit.id;
+            console.log('[Cart] Found existing visit:', actualVisitId);
           } else {
-            actualVisitId = newVisit.id;
+            // Create new visit with productive status
+            const { data: newVisit, error: visitError } = await supabase
+              .from('visits')
+              .insert({
+                user_id: currentUserId,
+                retailer_id: validRetailerId,
+                planned_date: today,
+                status: 'productive',
+                skip_check_in_reason: isPhoneOrder ? 'phone-order' : 'direct-order',
+                skip_check_in_time: new Date().toISOString()
+              })
+              .select()
+              .single();
+            
+            if (visitError) {
+              console.error('Error creating visit:', visitError);
+              // Continue with generated ID for offline sync
+            } else if (newVisit) {
+              actualVisitId = newVisit.id;
+              console.log('[Cart] Created new visit:', actualVisitId);
+            }
           }
-        } else {
-          // Offline: Generate local visit ID and queue for sync
-          const localVisitId = crypto.randomUUID();
-          actualVisitId = localVisitId;
+        }
+        
+        // If still no visit ID (offline or error), generate one for local use
+        if (!actualVisitId) {
+          actualVisitId = crypto.randomUUID();
           
           const offlineVisit = {
-            id: localVisitId,
+            id: actualVisitId,
             user_id: currentUserId,
             retailer_id: validRetailerId,
             planned_date: today,
             status: 'productive',
-            skip_check_in_reason: 'phone-order',
+            skip_check_in_reason: isPhoneOrder ? 'phone-order' : 'direct-order',
             skip_check_in_time: new Date().toISOString(),
             created_at: new Date().toISOString()
           };
           
-          // Queue visit creation for sync
+          // Queue visit creation for sync and save locally
           await offlineStorage.addToSyncQueue('CREATE_VISIT', offlineVisit);
           await offlineStorage.save(STORES.VISITS, offlineVisit);
-          console.log('📵 Phone order visit queued for offline sync:', localVisitId);
+          console.log('📵 Visit queued for offline sync:', actualVisitId);
         }
       }
 
@@ -750,8 +770,7 @@ export const Cart = () => {
       const schemeDetailsText = formatSchemeDetailsForInvoice(orderCalculation.appliedSchemes);
 
       // Prepare order data - use currentUserId which works both online and offline
-      // Only include visit_id if it's a valid UUID (not offline-generated)
-      const shouldIncludeVisitId = actualVisitId && /^[0-9a-fA-F-]{36}$/.test(actualVisitId);
+      // ALWAYS include visit_id - we now ensure it always exists above
       
       // CRITICAL FIX: Generate idempotency key to prevent duplicate orders
       // This key is unique per order attempt and will be checked before insertion
@@ -759,7 +778,7 @@ export const Cart = () => {
       
       const orderData = {
         user_id: currentUserId,
-        ...(shouldIncludeVisitId && { visit_id: actualVisitId }),
+        visit_id: actualVisitId, // ALWAYS include - ensures database trigger can update visit status
         retailer_id: validRetailerId,
         retailer_name: retailerName,
         order_date: getLocalTodayDate(),
