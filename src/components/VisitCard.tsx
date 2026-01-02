@@ -42,7 +42,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { RetailerDetailModal } from "./RetailerDetailModal";
 import { FeedbackListView } from "./FeedbackListView";
 import { getLocalTodayDate } from "@/utils/dateUtils";
-import { VisitLoyaltyPanel } from "./loyalty/VisitLoyaltyPanel";
+import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 interface Visit {
   id: string;
   retailerId?: string;
@@ -2510,9 +2510,9 @@ export const VisitCard = ({
               )}
             </div>
             {visit.retailerId && (
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <CreditScoreDisplay retailerId={visit.retailerId} variant="compact" />
-                <VisitLoyaltyPanel retailerId={visit.retailerId} compact />
+                <LoyaltyScoreBadge retailerId={visit.retailerId} />
               </div>
             )}
           </div>
