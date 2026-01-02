@@ -1028,29 +1028,47 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       });
 
       // FIX: Handle order data - either from order object or create from orderValue
-      const orderToProcess = order || (orderValue && retailerId && status === 'productive' ? {
-        id: `order_${Date.now()}_${retailerId}`,
+      // Ensure all required fields are present for proper state updates
+      const orderToProcess = order && order.id ? {
+        ...order,
+        retailer_id: order.retailer_id || retailerId,
+        user_id: order.user_id || currentUserId,
+        total_amount: Number(order.total_amount) || 0,
+        order_date: order.order_date || currentDate,
+        status: order.status || 'confirmed',
+        visit_id: order.visit_id || visitId,
+        created_at: order.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } : (orderValue && retailerId && status === 'productive' ? {
+        id: `order_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         retailer_id: retailerId,
         user_id: currentUserId,
-        total_amount: orderValue,
+        total_amount: Number(orderValue) || 0,
         order_date: currentDate,
         status: 'confirmed',
         visit_id: visitId,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       } : null);
       
-      if (orderToProcess) {
+      if (orderToProcess && orderToProcess.total_amount > 0) {
         setOrders(prev => {
-          const existing = prev.find(o => o.id === orderToProcess.id);
+          // Check for existing order by ID first
+          const existingById = prev.find(o => o.id === orderToProcess.id);
           let updated;
-          if (existing) {
-            updated = prev.map(o => o.id === orderToProcess.id ? { ...orderToProcess, updated_at: new Date().toISOString() } : o);
+          
+          if (existingById) {
+            // Update existing order
+            updated = prev.map(o => o.id === orderToProcess.id ? orderToProcess : o);
+            console.log('[LocalEvent] Updated existing order by ID:', orderToProcess.id);
           } else {
             // Check if there's already an order for this retailer today (avoid duplicates)
             const existingRetailerOrder = prev.find(o => 
               o.retailer_id === orderToProcess.retailer_id && 
-              o.order_date === currentDate
+              o.order_date === currentDate &&
+              Math.abs(Number(o.total_amount) - Number(orderToProcess.total_amount)) < 0.01 // Same amount = likely duplicate
             );
+            
             if (existingRetailerOrder) {
               // Update existing order value instead of adding duplicate
               updated = prev.map(o => 
@@ -1060,7 +1078,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
               );
               console.log('[LocalEvent] Updated existing retailer order:', existingRetailerOrder.id);
             } else {
-              updated = [...prev, { ...orderToProcess, updated_at: new Date().toISOString() }];
+              // Add new order
+              updated = [...prev, orderToProcess];
+              console.log('[LocalEvent] Added new order:', orderToProcess.id);
             }
           }
           
@@ -1074,7 +1094,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           const updatedCache = { ...cached, orders: updated, timestamp: Date.now() };
           cacheRef.current.set(currentDate, updatedCache);
           
-          // Persist
+          // Persist order to offline storage immediately
           offlineStorage.save(STORES.ORDERS, orderToProcess).catch(() => {});
           
           // FIX #4: Save snapshot for persistence
@@ -1089,7 +1109,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
             }).catch(() => {});
           }
           
-          console.log('[LocalEvent] Order updated/added:', orderToProcess.id, 'Total orders:', updated.length, 'Value:', orderToProcess.total_amount);
+          console.log('[LocalEvent] Order state updated. Total orders:', updated.length, 'Value:', orderToProcess.total_amount);
           return updated;
         });
       }

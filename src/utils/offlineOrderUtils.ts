@@ -72,13 +72,25 @@ export async function submitOrderWithOfflineSupport(
     ]);
     
     // STEP 3: Dispatch events IMMEDIATELY for instant UI update
+    // Include COMPLETE order data with items for proper state updates
     window.dispatchEvent(new CustomEvent('visitStatusChanged', {
       detail: {
         visitId: orderData.visit_id || orderId,
         status: 'productive',
         retailerId: orderData.retailer_id,
         orderValue,
-        order: { ...normalizedOrder, items: normalizedItems }
+        order: {
+          id: orderId,
+          retailer_id: orderData.retailer_id,
+          user_id: orderData.user_id,
+          total_amount: orderValue,
+          order_date: orderDate,
+          status: 'confirmed',
+          visit_id: orderData.visit_id || orderId,
+          created_at: normalizedOrder.created_at,
+          updated_at: normalizedOrder.created_at,
+          items: normalizedItems // Include items for complete order data
+        }
       }
     }));
     window.dispatchEvent(new Event('visitDataChanged'));
