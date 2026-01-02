@@ -1,19 +1,33 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Layout } from "@/components/Layout";
-import { Search, CheckCircle2, XCircle, ArrowLeft, Camera, Image as ImageIcon } from "lucide-react";
+import { Search, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, Camera, Image as ImageIcon, MapPin, User, MapPinned } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
 import { CameraCapture } from "@/components/CameraCapture";
+import { format, subMonths, isAfter, isBefore, startOfMonth } from "date-fns";
+
+interface Territory {
+  id: string;
+  name: string;
+}
+
+interface Profile {
+  id: string;
+  full_name: string;
+  username: string;
+}
 
 interface Retailer {
   id: string;
@@ -25,92 +39,173 @@ interface Retailer {
   beat_name: string | null;
   photo_url: string | null;
   verified: boolean;
+  verification_status: string | null;
+  verification_address: boolean;
+  verification_contact: boolean;
+  verification_territory: boolean;
+  status: string | null;
+  last_visit_date: string | null;
+  territory_id: string | null;
+  territory_name: string | null;
   created_at: string;
   user_id: string;
   profiles?: {
     full_name: string;
   } | null;
+  contact_person?: string | null;
 }
+
+type VerificationStatusFilter = 'all' | 'verified' | 'pending' | 'needs_attention' | 'dropped';
+type LastVisitedFilter = 'all' | 'this_month' | 'last_month' | '3_months' | '6_months';
 
 export default function RetailManagement() {
   const { userRole, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
+  const [territories, setTerritories] = useState<Territory[]>([]);
+  const [salesTeam, setSalesTeam] = useState<Profile[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  
+  // Filters
   const [search, setSearch] = useState("");
-  const [verifiedFilter, setVerifiedFilter] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [territoryFilter, setTerritoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [salesMemberFilter, setSalesMemberFilter] = useState<string>("all");
+  const [verifiedFilter, setVerifiedFilter] = useState<VerificationStatusFilter>('all');
+  const [lastVisitedFilter, setLastVisitedFilter] = useState<LastVisitedFilter>('all');
+  
+  // Dialogs
   const [selectedRetailer, setSelectedRetailer] = useState<Retailer | null>(null);
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  
+  // Verification checkboxes
+  const [verifyAddress, setVerifyAddress] = useState(false);
+  const [verifyContact, setVerifyContact] = useState(false);
+  const [verifyTerritory, setVerifyTerritory] = useState(false);
 
   useEffect(() => {
     document.title = "Retail Management | Admin Panel";
   }, []);
 
-  const loadRetailers = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("retailers")
-      .select("*")
-      .order("created_at", { ascending: false });
+    
+    // Fetch all data in parallel
+    const [retailersRes, territoriesRes, profilesRes] = await Promise.all([
+      supabase.from("retailers").select("*").order("created_at", { ascending: false }),
+      supabase.from("territories").select("id, name").order("name"),
+      supabase.from("profiles").select("id, full_name, username")
+    ]);
 
-    if (error) {
+    if (retailersRes.error) {
       toast({ 
         title: "Failed to load retailers", 
-        description: error.message, 
+        description: retailersRes.error.message, 
         variant: "destructive" 
       });
-    } else {
-      // Fetch user profiles and beat names to display correctly
-      const userIds = [...new Set((data || []).map(r => r.user_id))];
-      const [profilesRes, beatsRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, full_name, username")
-          .in("id", userIds),
-        supabase
-          .from("beats")
-          .select("beat_id, beat_name")
-      ]);
-      
-      const profiles = profilesRes.data;
-      const beats = beatsRes.data;
-      
-      const profileMap = new Map(
-        (profiles || []).map((p: any) => [p.id, { full_name: p.full_name, username: p.username }])
-      );
-      const beatMap = new Map((beats || []).map((b: any) => [b.beat_id, b.beat_name]));
-      
-      const retailersWithProfiles = (data || []).map((r: any) => {
-        const prof = r.user_id ? profileMap.get(r.user_id) : null;
-        const displayName = prof?.full_name || prof?.username || 'Unknown';
-        const displayBeatName = r.beat_name || (r.beat_id ? beatMap.get(r.beat_id) : null) || r.beat_id;
-        return {
-          ...r,
-          beat_name: displayBeatName,
-          profiles: r.user_id ? { full_name: displayName } : null
-        };
-      });
-      
-      setRetailers(retailersWithProfiles as Retailer[]);
+      setLoading(false);
+      return;
     }
+
+    const data = retailersRes.data || [];
+    const territoriesData = territoriesRes.data || [];
+    const profilesData = profilesRes.data || [];
+    
+    setTerritories(territoriesData);
+    setSalesTeam(profilesData);
+
+    // Extract unique categories
+    const uniqueCategories = [...new Set(data.map(r => r.category).filter(Boolean))] as string[];
+    setCategories(uniqueCategories);
+
+    // Build maps
+    const profileMap = new Map(profilesData.map((p: any) => [p.id, { full_name: p.full_name, username: p.username }]));
+    const territoryMap = new Map(territoriesData.map((t: any) => [t.id, t.name]));
+
+    // Fetch beats for beat names
+    const beatsRes = await supabase.from("beats").select("beat_id, beat_name");
+    const beatMap = new Map((beatsRes.data || []).map((b: any) => [b.beat_id, b.beat_name]));
+    
+    // Calculate 6 months ago for auto-drop
+    const sixMonthsAgo = subMonths(new Date(), 6);
+
+    const retailersWithDetails = data.map((r: any) => {
+      const prof = r.user_id ? profileMap.get(r.user_id) : null;
+      const displayName = prof?.full_name || prof?.username || 'Unknown';
+      const displayBeatName = r.beat_name || (r.beat_id ? beatMap.get(r.beat_id) : null) || r.beat_id;
+      const territoryName = r.territory_id ? territoryMap.get(r.territory_id) : null;
+      
+      // Calculate verification status
+      let verificationStatus = r.verification_status || 'pending';
+      
+      // Auto-drop logic: if inactive OR last visit > 6 months
+      const isInactive = r.status === 'inactive';
+      const lastVisit = r.last_visit_date ? new Date(r.last_visit_date) : null;
+      const isStale = lastVisit ? isBefore(lastVisit, sixMonthsAgo) : false;
+      
+      if (isInactive || isStale) {
+        verificationStatus = 'dropped';
+      } else if (r.verification_address && r.verification_contact && r.verification_territory) {
+        verificationStatus = 'verified';
+      } else if (r.verification_address || r.verification_contact || r.verification_territory) {
+        // At least one but not all verified
+        verificationStatus = 'needs_attention';
+      }
+      
+      return {
+        ...r,
+        beat_name: displayBeatName,
+        territory_name: territoryName,
+        verification_status: verificationStatus,
+        profiles: r.user_id ? { full_name: displayName } : null
+      };
+    });
+    
+    setRetailers(retailersWithDetails as Retailer[]);
     setLoading(false);
   };
 
   useEffect(() => {
     if (userRole === 'admin') {
-      loadRetailers();
+      loadData();
     }
   }, [userRole]);
 
-  const toggleVerification = async (retailer: Retailer) => {
-    const newVerifiedStatus = !retailer.verified;
+  const openVerifyDialog = (retailer: Retailer) => {
+    setSelectedRetailer(retailer);
+    setVerifyAddress(retailer.verification_address || false);
+    setVerifyContact(retailer.verification_contact || false);
+    setVerifyTerritory(retailer.verification_territory || false);
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerification = async () => {
+    if (!selectedRetailer) return;
+    
+    const allVerified = verifyAddress && verifyContact && verifyTerritory;
+    const someVerified = verifyAddress || verifyContact || verifyTerritory;
+    
+    let newStatus = 'pending';
+    if (allVerified) {
+      newStatus = 'verified';
+    } else if (someVerified) {
+      newStatus = 'needs_attention';
+    }
     
     const { error } = await supabase
       .from("retailers")
-      .update({ verified: newVerifiedStatus })
-      .eq("id", retailer.id);
+      .update({ 
+        verification_address: verifyAddress,
+        verification_contact: verifyContact,
+        verification_territory: verifyTerritory,
+        verification_status: newStatus,
+        verified: allVerified
+      })
+      .eq("id", selectedRetailer.id);
 
     if (error) {
       toast({ 
@@ -120,10 +215,13 @@ export default function RetailManagement() {
       });
     } else {
       toast({ 
-        title: newVerifiedStatus ? "Retailer Verified" : "Verification Removed",
-        description: `${retailer.name} has been ${newVerifiedStatus ? 'verified' : 'unverified'}.`
+        title: allVerified ? "Retailer Verified" : "Verification Updated",
+        description: allVerified 
+          ? `${selectedRetailer.name} has been fully verified.`
+          : `${selectedRetailer.name} verification status updated.`
       });
-      loadRetailers();
+      setVerifyDialogOpen(false);
+      loadData();
     }
   };
 
@@ -158,7 +256,7 @@ export default function RetailManagement() {
       
       setCameraOpen(false);
       setPhotoDialogOpen(false);
-      loadRetailers();
+      loadData();
     } catch (error: any) {
       console.error('Upload error:', error);
       toast({ 
@@ -188,24 +286,101 @@ export default function RetailManagement() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Apply filters
   const filteredRetailers = retailers.filter(r => {
+    // Search filter
     const matchesSearch = !search || 
       r.name.toLowerCase().includes(search.toLowerCase()) ||
       (r.phone || '').includes(search) ||
       r.address.toLowerCase().includes(search.toLowerCase()) ||
       (r.profiles?.full_name || '').toLowerCase().includes(search.toLowerCase());
     
-    const matchesVerified = verifiedFilter === 'all' || 
-      (verifiedFilter === 'verified' && r.verified) ||
-      (verifiedFilter === 'unverified' && !r.verified);
+    // Territory filter
+    const matchesTerritory = territoryFilter === 'all' || r.territory_id === territoryFilter;
     
-    return matchesSearch && matchesVerified;
+    // Category filter
+    const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
+    
+    // Sales member filter
+    const matchesSalesMember = salesMemberFilter === 'all' || r.user_id === salesMemberFilter;
+    
+    // Verification status filter
+    const matchesVerified = verifiedFilter === 'all' || r.verification_status === verifiedFilter;
+    
+    // Last visited filter
+    let matchesLastVisited = true;
+    if (lastVisitedFilter !== 'all' && r.last_visit_date) {
+      const visitDate = new Date(r.last_visit_date);
+      const now = new Date();
+      
+      switch (lastVisitedFilter) {
+        case 'this_month':
+          matchesLastVisited = isAfter(visitDate, startOfMonth(now));
+          break;
+        case 'last_month':
+          matchesLastVisited = isAfter(visitDate, startOfMonth(subMonths(now, 1))) && 
+                               isBefore(visitDate, startOfMonth(now));
+          break;
+        case '3_months':
+          matchesLastVisited = isAfter(visitDate, subMonths(now, 3));
+          break;
+        case '6_months':
+          matchesLastVisited = isAfter(visitDate, subMonths(now, 6));
+          break;
+      }
+    } else if (lastVisitedFilter !== 'all' && !r.last_visit_date) {
+      matchesLastVisited = false;
+    }
+    
+    return matchesSearch && matchesTerritory && matchesCategory && 
+           matchesSalesMember && matchesVerified && matchesLastVisited;
   });
 
   const stats = {
     total: retailers.length,
-    verified: retailers.filter(r => r.verified).length,
-    unverified: retailers.filter(r => !r.verified).length,
+    verified: retailers.filter(r => r.verification_status === 'verified').length,
+    needsAttention: retailers.filter(r => r.verification_status === 'needs_attention').length,
+    dropped: retailers.filter(r => r.verification_status === 'dropped').length,
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'verified':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Verified</Badge>;
+      case 'needs_attention':
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Needs Attention</Badge>;
+      case 'dropped':
+        return <Badge className="bg-red-100 text-red-800 border-red-200">Dropped</Badge>;
+      default:
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Pending</Badge>;
+    }
+  };
+
+  const getActionButton = (retailer: Retailer) => {
+    // If inactive or dropped, no action needed
+    if (retailer.status === 'inactive' || retailer.verification_status === 'dropped') {
+      return (
+        <Badge variant="outline" className="text-muted-foreground">
+          No Action
+        </Badge>
+      );
+    }
+    
+    if (retailer.verification_status === 'verified') {
+      return (
+        <Button variant="outline" size="sm" onClick={() => openVerifyDialog(retailer)}>
+          <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" />
+          Verified
+        </Button>
+      );
+    }
+    
+    return (
+      <Button size="sm" onClick={() => openVerifyDialog(retailer)}>
+        <CheckCircle2 className="h-4 w-4 mr-1" />
+        Verify
+      </Button>
+    );
   };
 
   return (
@@ -225,7 +400,8 @@ export default function RetailManagement() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Retailers</CardTitle>
@@ -237,7 +413,7 @@ export default function RetailManagement() {
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Verified</CardTitle>
+              <CardTitle className="text-sm font-medium text-green-600">Verified</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{stats.verified}</div>
@@ -246,10 +422,19 @@ export default function RetailManagement() {
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pending Verification</CardTitle>
+              <CardTitle className="text-sm font-medium text-amber-600">Needs Attention</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.unverified}</div>
+              <div className="text-2xl font-bold text-amber-600">{stats.needsAttention}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-red-600">Dropped</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{stats.dropped}</div>
             </CardContent>
           </Card>
         </div>
@@ -259,39 +444,79 @@ export default function RetailManagement() {
             <CardTitle>All Retailers</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            {/* Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+              <div className="relative sm:col-span-2 lg:col-span-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                 <Input 
-                  placeholder="Search by name, phone, address, or user..." 
+                  placeholder="Search..." 
                   value={search} 
                   onChange={(e) => setSearch(e.target.value)} 
                   className="pl-9" 
                 />
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant={verifiedFilter === 'all' ? 'default' : 'outline'} 
-                  onClick={() => setVerifiedFilter('all')}
-                  size="sm"
-                >
-                  All
-                </Button>
-                <Button 
-                  variant={verifiedFilter === 'verified' ? 'default' : 'outline'} 
-                  onClick={() => setVerifiedFilter('verified')}
-                  size="sm"
-                >
-                  Verified
-                </Button>
-                <Button 
-                  variant={verifiedFilter === 'unverified' ? 'default' : 'outline'} 
-                  onClick={() => setVerifiedFilter('unverified')}
-                  size="sm"
-                >
-                  Unverified
-                </Button>
-              </div>
+              
+              <Select value={territoryFilter} onValueChange={setTerritoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Territory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Territories</SelectItem>
+                  {territories.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={salesMemberFilter} onValueChange={setSalesMemberFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sales Team" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sales Team</SelectItem>
+                  {salesTeam.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.full_name || s.username}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={verifiedFilter} onValueChange={(v) => setVerifiedFilter(v as VerificationStatusFilter)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Verification Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="verified">Verified</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="needs_attention">Needs Attention</SelectItem>
+                  <SelectItem value="dropped">Dropped</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={lastVisitedFilter} onValueChange={(v) => setLastVisitedFilter(v as LastVisitedFilter)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Last Visited" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="last_month">Last Month</SelectItem>
+                  <SelectItem value="3_months">Last 3 Months</SelectItem>
+                  <SelectItem value="6_months">Last 6 Months</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {loading ? (
@@ -299,24 +524,27 @@ export default function RetailManagement() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Photo</TableHead>
                       <TableHead>Retailer Name</TableHead>
+                      <TableHead>Contact Person</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Address</TableHead>
-                      <TableHead>Beat Name</TableHead>
-                      <TableHead>Added By</TableHead>
+                      <TableHead>Territory</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Last Visited</TableHead>
+                      <TableHead>Added By</TableHead>
+                      <TableHead>Verification</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRetailers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                           No retailers found
                         </TableCell>
                       </TableRow>
@@ -335,48 +563,39 @@ export default function RetailManagement() {
                             </Avatar>
                           </TableCell>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => navigate(`/retailer/${retailer.id}`)}
+                              className="flex items-center gap-2 hover:text-primary hover:underline text-left"
+                            >
                               {retailer.name}
-                              {retailer.verified && (
+                              {retailer.verification_status === 'verified' && (
                                 <CheckCircle2 className="h-4 w-4 text-blue-600" />
                               )}
-                            </div>
+                            </button>
                           </TableCell>
+                          <TableCell>{retailer.contact_person || '-'}</TableCell>
                           <TableCell>{retailer.phone || 'N/A'}</TableCell>
-                          <TableCell className="max-w-xs truncate">{retailer.address}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{retailer.address}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{retailer.beat_name || retailer.beat_id}</Badge>
+                            {retailer.territory_name ? (
+                              <Badge variant="outline">{retailer.territory_name}</Badge>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={retailer.status === 'active' ? 'default' : 'secondary'}>
+                              {retailer.status === 'active' ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {retailer.last_visit_date 
+                              ? format(new Date(retailer.last_visit_date), 'dd MMM yyyy')
+                              : '-'
+                            }
                           </TableCell>
                           <TableCell>{retailer.profiles?.full_name || 'Unknown'}</TableCell>
-                          <TableCell>
-                            {retailer.verified ? (
-                              <Badge className="bg-green-100 text-green-800 border-green-200">
-                                Verified
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                                Pending
-                              </Badge>
-                            )}
-                          </TableCell>
+                          <TableCell>{getStatusBadge(retailer.verification_status)}</TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant={retailer.verified ? "outline" : "default"}
-                              size="sm"
-                              onClick={() => toggleVerification(retailer)}
-                            >
-                              {retailer.verified ? (
-                                <>
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Unverify
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                                  Verify
-                                </>
-                              )}
-                            </Button>
+                            {getActionButton(retailer)}
                           </TableCell>
                         </TableRow>
                       ))
@@ -388,6 +607,88 @@ export default function RetailManagement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Verification Dialog */}
+      <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Verify Retailer</DialogTitle>
+            <DialogDescription>
+              {selectedRetailer?.name} - Please verify the following details
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex items-start space-x-3 p-3 rounded-lg border">
+              <Checkbox 
+                id="verify-address" 
+                checked={verifyAddress}
+                onCheckedChange={(checked) => setVerifyAddress(checked as boolean)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="verify-address" className="flex items-center gap-2 cursor-pointer">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Address & Geo Stamp
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Verify the retailer's physical address and location coordinates
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3 p-3 rounded-lg border">
+              <Checkbox 
+                id="verify-contact" 
+                checked={verifyContact}
+                onCheckedChange={(checked) => setVerifyContact(checked as boolean)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="verify-contact" className="flex items-center gap-2 cursor-pointer">
+                  <User className="h-4 w-4 text-primary" />
+                  Retailer Name & Owner Contact
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Verify the retailer name and owner contact information
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3 p-3 rounded-lg border">
+              <Checkbox 
+                id="verify-territory" 
+                checked={verifyTerritory}
+                onCheckedChange={(checked) => setVerifyTerritory(checked as boolean)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="verify-territory" className="flex items-center gap-2 cursor-pointer">
+                  <MapPinned className="h-4 w-4 text-primary" />
+                  Territory Assignment
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Verify the retailer is assigned to the correct territory
+                </p>
+              </div>
+            </div>
+            
+            {(verifyAddress || verifyContact || verifyTerritory) && 
+             !(verifyAddress && verifyContact && verifyTerritory) && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm">Partial verification will mark as "Needs Attention"</span>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVerifyDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleVerification}>
+              {verifyAddress && verifyContact && verifyTerritory ? 'Verify' : 'Update Status'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Photo Dialog */}
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
