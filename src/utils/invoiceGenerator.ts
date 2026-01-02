@@ -927,25 +927,54 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
     throw new Error("Order not found in database or offline cache.");
   }
 
-  // Fetch company with template selection
-  const { data: company } = await supabase
-    .from("companies")
-    .select("*")
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  // Fetch company with template selection - try online first, fallback to cache
+  let company: any = null;
+  try {
+    const { data: companyData } = await supabase
+      .from("companies")
+      .select("*")
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    company = companyData;
+    // Cache company for offline use
+    if (company) {
+      await offlineStorage.save(STORES.SYNC_METADATA, { id: 'company_cache', data: company });
+    }
+  } catch (e) {
+    console.log('📴 Offline: fetching company from cache');
+  }
+  
+  // Fallback to cached company if offline
+  if (!company) {
+    const cachedCompany = await offlineStorage.getById<any>(STORES.SYNC_METADATA, 'company_cache');
+    company = cachedCompany?.data;
+  }
 
-  if (!company) throw new Error("Company not found");
+  if (!company) {
+    // Use minimal fallback for offline invoice generation
+    company = { name: "Invoice", address: "", phone: "", gstin: "", state: "" };
+  }
 
-  // Fetch retailer with state and beat_name
+  // Fetch retailer with state and beat_name - try online first, fallback to cache
   let retailer: any = null;
   if (order.retailer_id) {
-    const { data: retailerData } = await supabase
-      .from("retailers")
-      .select("name, address, phone, gst_number, state, beat_id, beat_name")
-      .eq("id", order.retailer_id)
-      .single();
-    retailer = retailerData;
+    try {
+      const { data: retailerData } = await supabase
+        .from("retailers")
+        .select("name, address, phone, gst_number, state, beat_id, beat_name")
+        .eq("id", order.retailer_id)
+        .single();
+      retailer = retailerData;
+    } catch (e) {
+      console.log('📴 Offline: fetching retailer from cache');
+    }
+    
+    // Fallback to cached retailer
+    if (!retailer) {
+      const cachedRetailers = await offlineStorage.getAll<any>(STORES.RETAILERS);
+      retailer = cachedRetailers.find((r: any) => r.id === order.retailer_id);
+    }
   }
 
   if (!retailer) {
@@ -955,78 +984,100 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
   // Fetch beat name - try retailer.beat_name first, then lookup from beats table
   let beatName = retailer?.beat_name || "";
   if (!beatName && retailer?.beat_id) {
-    const { data: beatData } = await supabase
-      .from("beats")
-      .select("beat_name")
-      .eq("id", retailer.beat_id)
-      .single();
-    beatName = beatData?.beat_name || "";
+    try {
+      const { data: beatData } = await supabase
+        .from("beats")
+        .select("beat_name")
+        .eq("id", retailer.beat_id)
+        .single();
+      beatName = beatData?.beat_name || "";
+    } catch (e) {
+      // Offline: try from beat_plans cache
+      const cachedBeatPlans = await offlineStorage.getAll<any>(STORES.BEAT_PLANS);
+      const matchingBeat = cachedBeatPlans.find((bp: any) => bp.beat_id === retailer.beat_id);
+      beatName = matchingBeat?.beat_name || "";
+    }
   }
 
-  // Fetch salesman name
+  // Fetch salesman name - try online first, fallback to cache
   let salesmanName = "";
   if (order.user_id) {
-    const { data: userData } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", order.user_id)
-      .single();
-    salesmanName = userData?.full_name || "";
+    try {
+      const { data: userData } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", order.user_id)
+        .single();
+      salesmanName = userData?.full_name || "";
+      // Cache profile for offline use
+      if (userData) {
+        await offlineStorage.save(STORES.SYNC_METADATA, { id: `profile_${order.user_id}`, data: userData });
+      }
+    } catch (e) {
+      // Offline: try from cache
+      const cachedProfile = await offlineStorage.getById<any>(STORES.SYNC_METADATA, `profile_${order.user_id}`);
+      salesmanName = cachedProfile?.data?.full_name || "";
+    }
   }
 
   // Scheme details not stored in orders table currently
   let schemeDetails = "";
 
   // Enrich order items with HSN codes and precise rates from products if missing
+  // This is optional enrichment - offline mode will work without it
   const orderItemsWithHsn = await Promise.all(
     (order.order_items || []).map(async (item: any) => {
       let enrichedItem = { ...item };
       
-      // Try to fetch HSN code and precise rate from product or variant
-      if (item.product_id) {
-        // First try to get from product
-        const { data: productData } = await supabase
-          .from("products")
-          .select("hsn_code, rate, unit")
-          .eq("id", item.product_id)
-          .maybeSingle();
-        
-        if (productData) {
-          // Set HSN code if missing
-          if (!enrichedItem.hsn_code) {
-            enrichedItem.hsn_code = productData.hsn_code;
-          }
-          
-          // Use product's precise rate for better display accuracy
-          // Product rate is stored in per-unit format (e.g., per KG for grams items)
-          // Only override if unit matches and we can use precise rate
-          if (productData.rate && productData.unit) {
-            const productUnit = (productData.unit || '').toLowerCase();
-            const itemUnit = (item.unit || '').toLowerCase();
-            const isGramsUnit = itemUnit === 'grams' || itemUnit === 'gram' || itemUnit === 'g';
-            
-            // If product has precise rate stored (per KG), use it for display
-            if (isGramsUnit && productData.rate > 1) {
-              // Store the precise per-KG rate for display conversion
-              enrichedItem.precise_rate_per_kg = productData.rate;
-            }
-          }
-        }
-        
-        // Also check if it's a variant (product_id might be variant_id in some cases)
-        if (!enrichedItem.hsn_code) {
-          const { data: variantData } = await supabase
-            .from("product_variants")
-            .select("hsn_code, price")
+      // Try to fetch HSN code and precise rate from product or variant (skip if offline)
+      if (item.product_id && navigator.onLine) {
+        try {
+          // First try to get from product
+          const { data: productData } = await supabase
+            .from("products")
+            .select("hsn_code, rate, unit")
             .eq("id", item.product_id)
             .maybeSingle();
           
-          if (variantData?.hsn_code) {
-            enrichedItem.hsn_code = variantData.hsn_code;
+          if (productData) {
+            // Set HSN code if missing
+            if (!enrichedItem.hsn_code) {
+              enrichedItem.hsn_code = productData.hsn_code;
+            }
+            
+            // Use product's precise rate for better display accuracy
+            // Product rate is stored in per-unit format (e.g., per KG for grams items)
+            // Only override if unit matches and we can use precise rate
+            if (productData.rate && productData.unit) {
+              const itemUnit = (item.unit || '').toLowerCase();
+              const isGramsUnit = itemUnit === 'grams' || itemUnit === 'gram' || itemUnit === 'g';
+              
+              // If product has precise rate stored (per KG), use it for display
+              if (isGramsUnit && productData.rate > 1) {
+                // Store the precise per-KG rate for display conversion
+                enrichedItem.precise_rate_per_kg = productData.rate;
+              }
+            }
           }
-          if (variantData?.price && variantData.price > 1) {
-            enrichedItem.precise_rate_per_kg = variantData.price;
+          
+          // Also check if it's a variant (product_id might be variant_id in some cases)
+          if (!enrichedItem.hsn_code) {
+            const { data: variantData } = await supabase
+              .from("product_variants")
+              .select("hsn_code, price")
+              .eq("id", item.product_id)
+              .maybeSingle();
+            
+            if (variantData?.hsn_code) {
+              enrichedItem.hsn_code = variantData.hsn_code;
+            }
+            if (variantData?.price && variantData.price > 1) {
+              enrichedItem.precise_rate_per_kg = variantData.price;
+            }
           }
+        } catch (e) {
+          // Offline or error - continue with item as-is
+          console.log('📴 Offline: skipping product enrichment for invoice');
         }
       }
       

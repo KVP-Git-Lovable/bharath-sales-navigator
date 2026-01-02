@@ -12,8 +12,9 @@ export function SlowConnectionBanner() {
   const isOffline = !isOnline || manualOfflineMode;
   const isSlowMode = slowModeEnabled && !isOffline;
   
-  // Show if: offline, slow connection, manual offline mode, or slow mode enabled
-  const shouldShow = !isOnline || isSlow || manualOfflineMode || slowModeEnabled;
+  // ONLY show if: slow connection (not offline) OR manual offline mode OR slow mode enabled
+  // Do NOT show when simply offline - user doesn't want the red notification
+  const shouldShow = (isSlow && isOnline && !manualOfflineMode) || manualOfflineMode || slowModeEnabled;
   
   if (!shouldShow) {
     return null;

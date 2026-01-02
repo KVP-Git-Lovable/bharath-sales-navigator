@@ -2094,12 +2094,7 @@ export const VisitCard = ({
       const dayEnd = new Date(targetDate);
       dayEnd.setHours(23, 59, 59, 999);
       
-      // First try Supabase
-      const {
-        data: dbOrders
-      } = await supabase.from('orders').select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number').eq('user_id', user.id).eq('retailer_id', retailerId).eq('status', 'confirmed').gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString());
-      
-      // Also check offline storage for orders not yet synced
+      // First try offline storage (instant) - always check this first for responsiveness
       let offlineOrders: any[] = [];
       try {
         const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
@@ -2116,10 +2111,21 @@ export const VisitCard = ({
         console.log('[VisitCard] Error reading offline orders:', e);
       }
       
-      // Merge orders, avoiding duplicates (prefer DB version)
-      const dbOrderIds = new Set((dbOrders || []).map(o => o.id));
+      // Then try Supabase (if online)
+      let dbOrders: any[] = [];
+      if (navigator.onLine) {
+        try {
+          const { data } = await supabase.from('orders').select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number').eq('user_id', user.id).eq('retailer_id', retailerId).eq('status', 'confirmed').gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString());
+          dbOrders = data || [];
+        } catch (e) {
+          console.log('[VisitCard] Error fetching orders from DB:', e);
+        }
+      }
+      
+      // Merge orders, avoiding duplicates (prefer DB version for metadata, but offline for items)
+      const dbOrderIds = new Set(dbOrders.map(o => o.id));
       const uniqueOfflineOrders = offlineOrders.filter(o => !dbOrderIds.has(o.id));
-      const orders = [...(dbOrders || []), ...uniqueOfflineOrders];
+      const orders = [...dbOrders, ...uniqueOfflineOrders];
       
       setOrdersTodayList(orders as any);
       if (orders.length > 0) {
@@ -2145,13 +2151,37 @@ export const VisitCard = ({
         // Store the most recent order ID for invoice generation
         setLastOrderId(orders[0].id);
         
-        // For order items, first try from DB
-        const dbOrderIds_arr = (dbOrders || []).map(o => o.id);
+        // For order items - prioritize offline items first (they have full item data)
         let allItems: any[] = [];
         
-        if (dbOrderIds_arr.length > 0) {
-          const { data: items } = await supabase.from('order_items').select('product_name, quantity, rate, original_rate, total, order_id, unit').in('order_id', dbOrderIds_arr);
-          allItems = items || [];
+        // First: Get items from offline orders (these always have items attached)
+        offlineOrders.forEach((order: any) => {
+          if (order.items && Array.isArray(order.items)) {
+            order.items.forEach((item: any) => {
+              allItems.push({
+                product_name: item.product_name || item.name,
+                quantity: item.quantity,
+                rate: item.rate,
+                original_rate: item.original_rate || item.rate,
+                total: item.total || (item.quantity * item.rate),
+                order_id: order.id,
+                unit: item.unit || 'piece'
+              });
+            });
+          }
+        });
+        
+        // Second: If we have DB orders and no items yet, try fetching from DB
+        const dbOrderIds_arr = dbOrders.map(o => o.id);
+        if (dbOrderIds_arr.length > 0 && allItems.length === 0 && navigator.onLine) {
+          try {
+            const { data: items } = await supabase.from('order_items').select('product_name, quantity, rate, original_rate, total, order_id, unit').in('order_id', dbOrderIds_arr);
+            if (items && items.length > 0) {
+              allItems = items;
+            }
+          } catch (e) {
+            console.log('[VisitCard] Error fetching order items from DB:', e);
+          }
         }
         
         // CRITICAL FIX: If DB orders exist but have no items in DB,
