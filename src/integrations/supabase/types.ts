@@ -8011,6 +8011,10 @@ export type Database = {
           total_visits_3m: number | null
           updated_at: string
           user_id: string
+          verification_address: boolean | null
+          verification_contact: boolean | null
+          verification_status: string | null
+          verification_territory: boolean | null
           verified: boolean
         }
         Insert: {
@@ -8051,6 +8055,10 @@ export type Database = {
           total_visits_3m?: number | null
           updated_at?: string
           user_id: string
+          verification_address?: boolean | null
+          verification_contact?: boolean | null
+          verification_status?: string | null
+          verification_territory?: boolean | null
           verified?: boolean
         }
         Update: {
@@ -8091,6 +8099,10 @@ export type Database = {
           total_visits_3m?: number | null
           updated_at?: string
           user_id?: string
+          verification_address?: boolean | null
+          verification_contact?: boolean | null
+          verification_status?: string | null
+          verification_territory?: boolean | null
           verified?: boolean
         }
         Relationships: [
