@@ -54,37 +54,18 @@ export function GiftMasterManagement() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>("all");
   const [editingGift, setEditingGift] = useState<LoyaltyGift | null>(null);
   const [viewingGift, setViewingGift] = useState<LoyaltyGift | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: plans } = useQuery({
-    queryKey: ["retailer-loyalty-plans"],
+  const { data: gifts, isLoading } = useQuery({
+    queryKey: ["retailer-loyalty-gifts"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("retailer_loyalty_plans")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: gifts, isLoading } = useQuery({
-    queryKey: ["retailer-loyalty-gifts", selectedPlan],
-    queryFn: async () => {
-      let query = supabase
         .from("retailer_loyalty_gifts")
         .select("*")
         .order("sort_order", { ascending: true });
-      
-      if (selectedPlan !== "all") {
-        query = query.eq("plan_id", selectedPlan);
-      }
-      
-      const { data, error } = await query;
       if (error) throw error;
       return data as LoyaltyGift[];
     },
@@ -153,10 +134,8 @@ export function GiftMasterManagement() {
   const handleCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const planId = formData.get("plan_id") as string;
     
     const gift: Partial<LoyaltyGift> = {
-      plan_id: planId === "none" ? null : planId,
       gift_name: formData.get("gift_name") as string,
       description: formData.get("description") as string,
       gift_type: formData.get("gift_type") as string,
@@ -180,10 +159,8 @@ export function GiftMasterManagement() {
     e.preventDefault();
     if (!editingGift) return;
     const formData = new FormData(e.currentTarget);
-    const planId = formData.get("plan_id") as string;
     
     const updates: Partial<LoyaltyGift> = {
-      plan_id: planId === "none" ? null : planId,
       gift_name: formData.get("gift_name") as string,
       description: formData.get("description") as string,
       gift_type: formData.get("gift_type") as string,
@@ -213,19 +190,6 @@ export function GiftMasterManagement() {
           </p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filter by plan" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Gifts</SelectItem>
-              {plans?.map((plan) => (
-                <SelectItem key={plan.id} value={plan.id}>
-                  {plan.plan_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -261,22 +225,6 @@ export function GiftMasterManagement() {
                               <span>{type.icon}</span>
                               <span>{type.label}</span>
                             </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="plan_id">Associated Plan</Label>
-                    <Select name="plan_id" defaultValue="none">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select plan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No specific plan</SelectItem>
-                        {plans?.map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id}>
-                            {plan.plan_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -587,22 +535,6 @@ export function GiftMasterManagement() {
                             <span>{type.icon}</span>
                             <span>{type.label}</span>
                           </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="edit_plan_id">Associated Plan</Label>
-                  <Select name="plan_id" defaultValue={editingGift.plan_id || "none"}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No specific plan</SelectItem>
-                      {plans?.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.plan_name}
                         </SelectItem>
                       ))}
                     </SelectContent>

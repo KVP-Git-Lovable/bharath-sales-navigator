@@ -3,7 +3,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Loader2, Gift } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LoyaltyPlanManagement } from "@/components/loyalty/LoyaltyPlanManagement";
 import { LoyaltyParameterConfig } from "@/components/loyalty/LoyaltyParameterConfig";
 import { GiftMasterManagement } from "@/components/loyalty/GiftMasterManagement";
 import { LoyaltyPointsDashboard } from "@/components/loyalty/LoyaltyPointsDashboard";
@@ -52,9 +51,8 @@ export default function RetailerLoyaltyAdmin() {
         </Card>
 
         {/* Management Tabs */}
-        <Tabs defaultValue="plans" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7">
-            <TabsTrigger value="plans">Plans</TabsTrigger>
+        <Tabs defaultValue="parameters" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
             <TabsTrigger value="parameters">Parameters</TabsTrigger>
             <TabsTrigger value="gifts">Gifts</TabsTrigger>
             <TabsTrigger value="points">Points</TabsTrigger>
@@ -62,10 +60,6 @@ export default function RetailerLoyaltyAdmin() {
             <TabsTrigger value="redemptions">Redemptions</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="plans" className="space-y-4">
-            <LoyaltyPlanManagement />
-          </TabsContent>
 
           <TabsContent value="parameters" className="space-y-4">
             <LoyaltyParameterConfig />

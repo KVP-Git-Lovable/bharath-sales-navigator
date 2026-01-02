@@ -112,38 +112,21 @@ interface LoyaltyParameter {
 export function LoyaltyParameterConfig() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("");
   const [editingParam, setEditingParam] = useState<LoyaltyParameter | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: plans } = useQuery({
-    queryKey: ["retailer-loyalty-plans"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("retailer_loyalty_plans")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const { data: parameters, isLoading } = useQuery({
-    queryKey: ["retailer-loyalty-parameters", selectedPlan],
+    queryKey: ["retailer-loyalty-parameters"],
     queryFn: async () => {
-      if (!selectedPlan) return [];
       const { data, error } = await supabase
         .from("retailer_loyalty_parameters")
         .select("*")
-        .eq("plan_id", selectedPlan)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as LoyaltyParameter[];
     },
-    enabled: !!selectedPlan,
   });
 
   const createMutation = useMutation({
@@ -213,7 +196,6 @@ export function LoyaltyParameterConfig() {
     const configFields = PARAMETER_CONFIGS[selectedType] || [];
     
     const param: Partial<LoyaltyParameter> = {
-      plan_id: selectedPlan,
       parameter_type: selectedType,
       parameter_name: formData.get("parameter_name") as string,
       description: formData.get("description") as string,
@@ -268,24 +250,12 @@ export function LoyaltyParameterConfig() {
           </p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-            <SelectTrigger className="w-full sm:w-[250px]">
-              <SelectValue placeholder="Select a plan" />
-            </SelectTrigger>
-            <SelectContent>
-              {plans?.map((plan) => (
-                <SelectItem key={plan.id} value={plan.id}>
-                  {plan.plan_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Dialog open={isCreateOpen} onOpenChange={(open) => {
             setIsCreateOpen(open);
             if (!open) setSelectedType("");
           }}>
             <DialogTrigger asChild>
-              <Button disabled={!selectedPlan}>
+              <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Parameter
               </Button>
@@ -407,14 +377,7 @@ export function LoyaltyParameterConfig() {
         </div>
       </div>
 
-      {!selectedPlan ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Select a plan to configure parameters</p>
-          </CardContent>
-        </Card>
-      ) : isLoading ? (
+      {isLoading ? (
         <div className="flex items-center justify-center p-8">Loading parameters...</div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -486,7 +449,7 @@ export function LoyaltyParameterConfig() {
         </div>
       )}
 
-      {parameters?.length === 0 && selectedPlan && (
+      {parameters?.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
