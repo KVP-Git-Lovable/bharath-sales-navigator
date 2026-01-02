@@ -3,12 +3,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Loader2, Gift } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProgramsManagement } from "@/components/loyalty/ProgramsManagement";
-import { ActionsManagement } from "@/components/loyalty/ActionsManagement";
-import { RetailerPointsDashboard } from "@/components/loyalty/RetailerPointsDashboard";
-import { RedemptionsManagement } from "@/components/loyalty/RedemptionsManagement";
+import { LoyaltyPlanManagement } from "@/components/loyalty/LoyaltyPlanManagement";
+import { LoyaltyParameterConfig } from "@/components/loyalty/LoyaltyParameterConfig";
+import { GiftMasterManagement } from "@/components/loyalty/GiftMasterManagement";
+import { LoyaltyPointsDashboard } from "@/components/loyalty/LoyaltyPointsDashboard";
+import { GiftSubscriptionsManagement } from "@/components/loyalty/GiftSubscriptionsManagement";
+import { GiftRedemptionsManagement } from "@/components/loyalty/GiftRedemptionsManagement";
 import { LoyaltyAnalytics } from "@/components/loyalty/LoyaltyAnalytics";
-import { RewardsManagement } from "@/components/loyalty/RewardsManagement";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function RetailerLoyaltyAdmin() {
@@ -43,7 +44,7 @@ export default function RetailerLoyaltyAdmin() {
                   Retailer Loyalty Program
                 </CardTitle>
                 <CardDescription className="mt-1">
-                  Manage programs, actions, points, and redemptions to boost retailer engagement
+                  Manage loyalty plans, earning parameters, gifts, and redemptions
                 </CardDescription>
               </div>
             </div>
@@ -51,34 +52,39 @@ export default function RetailerLoyaltyAdmin() {
         </Card>
 
         {/* Management Tabs */}
-        <Tabs defaultValue="programs" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-            <TabsTrigger value="programs">Programs</TabsTrigger>
-            <TabsTrigger value="rewards">Rewards</TabsTrigger>
-            <TabsTrigger value="actions">Actions</TabsTrigger>
+        <Tabs defaultValue="plans" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7">
+            <TabsTrigger value="plans">Plans</TabsTrigger>
+            <TabsTrigger value="parameters">Parameters</TabsTrigger>
+            <TabsTrigger value="gifts">Gifts</TabsTrigger>
             <TabsTrigger value="points">Points</TabsTrigger>
+            <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
             <TabsTrigger value="redemptions">Redemptions</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="programs" className="space-y-4">
-            <ProgramsManagement />
+          <TabsContent value="plans" className="space-y-4">
+            <LoyaltyPlanManagement />
           </TabsContent>
 
-          <TabsContent value="rewards" className="space-y-4">
-            <RewardsManagement />
+          <TabsContent value="parameters" className="space-y-4">
+            <LoyaltyParameterConfig />
           </TabsContent>
 
-          <TabsContent value="actions" className="space-y-4">
-            <ActionsManagement />
+          <TabsContent value="gifts" className="space-y-4">
+            <GiftMasterManagement />
           </TabsContent>
 
           <TabsContent value="points" className="space-y-4">
-            <RetailerPointsDashboard />
+            <LoyaltyPointsDashboard />
+          </TabsContent>
+
+          <TabsContent value="subscriptions" className="space-y-4">
+            <GiftSubscriptionsManagement />
           </TabsContent>
 
           <TabsContent value="redemptions" className="space-y-4">
-            <RedemptionsManagement />
+            <GiftRedemptionsManagement />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-4">
