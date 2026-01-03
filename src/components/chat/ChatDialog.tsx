@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Zap } from 'lucide-react';
+import { Send, Loader2, RefreshCw, Zap, Sparkles, AlertTriangle, TrendingUp, Users, Calendar, ChevronRight, X, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -7,12 +7,15 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from './ChatMessage';
 import { useChatCache } from '@/hooks/useChatCache';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   id?: string;
   isCached?: boolean;
+  type?: 'text' | 'insight' | 'alert';
 }
 
 interface ChatDialogProps {
@@ -24,36 +27,95 @@ type LoadingState = 'idle' | 'connecting' | 'analyzing' | 'fetching' | 'generati
 const LOADING_MESSAGES: Record<LoadingState, string> = {
   idle: '',
   connecting: 'Connecting...',
-  analyzing: 'Analyzing your question...',
-  fetching: 'Fetching data...',
-  generating: 'Generating response...'
+  analyzing: 'Understanding your request...',
+  fetching: 'Fetching your data...',
+  generating: 'Crafting response...'
 };
 
-const TIMEOUT_MS = 30000; // 30 seconds
+const TIMEOUT_MS = 45000;
 const MAX_RETRIES = 2;
-const RETRY_DELAY_BASE = 1000; // 1 second, will exponentially increase
+const RETRY_DELAY_BASE = 1000;
+
+// Manager quick actions
+const MANAGER_QUICK_ACTIONS = [
+  { label: '👥 Team Status', query: 'How is my team doing today?', icon: Users },
+  { label: '⚠️ Alerts', query: 'Show me any exception alerts', icon: AlertTriangle },
+  { label: '📊 Performance', query: 'Team performance this month', icon: TrendingUp },
+  { label: '🗓️ Attendance', query: 'Who has checked in today?', icon: Calendar },
+];
+
+// Field user quick actions
+const FIELD_QUICK_ACTIONS = [
+  { label: '📍 My Visits', query: 'What are my visits today?', icon: Calendar },
+  { label: '💰 Sales', query: 'Show me my sales summary', icon: TrendingUp },
+  { label: '⭐ Top Retailers', query: 'Who are my top retailers?', icon: Users },
+  { label: '📦 Stock', query: 'Check stock levels', icon: AlertTriangle },
+];
 
 export const ChatDialog = ({ onClose }: ChatDialogProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Hi! 👋 I\'m your AI assistant for Bharath Beverages.\n\nI can help you with:\n• Today\'s visits & beat plans\n• Sales reports & analytics\n• Retailer information\n• Stock levels & inventory\n• Payment tracking\n\nTry asking: "my visits" or "sales summary"'
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [userName, setUserName] = useState<string>('');
+  const [isManager, setIsManager] = useState(false);
+  const [showInsightCards, setShowInsightCards] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
-  const { getCachedResponse, cacheResponse, isCacheableQuery } = useChatCache();
+  const { getCachedResponse, cacheResponse } = useChatCache();
+
+  // Fetch user info on mount
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        
+        const firstName = profile?.full_name?.split(' ')[0] || 'there';
+        setUserName(firstName);
+        
+        const managerRoles = ['admin', 'manager', 'asm', 'rsm', 'zsm', 'nsm'];
+        setIsManager(roles?.some(r => managerRoles.includes(r.role?.toLowerCase())) || false);
+        
+        // Set personalized greeting
+        const hour = new Date().getHours();
+        let greeting = 'Good morning';
+        if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
+        else if (hour >= 17) greeting = 'Good evening';
+        
+        const roleLabel = roles?.some(r => managerRoles.includes(r.role?.toLowerCase())) 
+          ? 'Manager' 
+          : 'field sales';
+        
+        setMessages([{
+          role: 'assistant',
+          content: `${greeting}, ${firstName}! 👋\n\nI'm your AI assistant, ready to help with your ${roleLabel} activities.\n\n**What can I help you with?**\n- 📊 Check performance & analytics\n- 📍 View visits & schedules\n- 💰 Track sales & collections\n- ⚠️ Get alerts on issues\n\nJust ask me anything or tap a quick action below!`
+        }]);
+      }
+    };
+    
+    fetchUserInfo();
+  }, []);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const scrollArea = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollArea) {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
     }
   }, [messages]);
 
@@ -144,6 +206,8 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
       '/order-entry': 'Order Entry',
       '/attendance': 'Attendance',
       '/schemes': 'Schemes',
+      '/distributors': 'Distributors',
+      '/team': 'Team Management',
     };
     return pageMap[path] || path;
   }, []);
@@ -171,7 +235,7 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
               content: m.content
             })),
             conversationId,
-            pageContext: getPageContext() // Send current page for context
+            pageContext: getPageContext()
           }),
         },
         TIMEOUT_MS
@@ -179,7 +243,7 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
 
       if (!response.ok) {
         if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again in a moment.');
+          throw new Error('Too many requests. Please wait a moment.');
         }
         if (response.status === 402) {
           throw new Error('AI service credits exhausted. Please contact your administrator.');
@@ -254,11 +318,14 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
       }
       throw error;
     }
-  }, [conversationId]);
+  }, [conversationId, getPageContext]);
 
   const sendMessage = async (customInput?: string) => {
     const messageText = customInput || input;
     if (!messageText.trim() || isLoading) return;
+
+    // Hide insight cards after first message
+    setShowInsightCards(false);
 
     const userMessage: Message = { role: 'user', content: messageText };
     setMessages(prev => [...prev, userMessage]);
@@ -280,9 +347,6 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
       }]);
       setIsLoading(false);
       setLoadingState('idle');
-      
-      // Optionally refresh in background for next time
-      refreshCacheInBackground(messageText, [...messages, userMessage]);
       return;
     }
 
@@ -321,69 +385,9 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
     }
   };
 
-  // Refresh cache in background without blocking UI
-  const refreshCacheInBackground = async (query: string, recentMessages: Message[]) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-assistant`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            messages: recentMessages.slice(-10).map(m => ({
-              role: m.role,
-              content: m.content
-            })),
-            conversationId
-          }),
-        }
-      );
-
-      if (!response.ok || !response.body) return;
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let content = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        let newlineIndex: number;
-        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-          let line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
-          if (!line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') break;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) content += delta;
-          } catch {}
-        }
-      }
-
-      if (content) {
-        cacheResponse(query, content);
-      }
-    } catch (e) {
-      // Silent fail for background refresh
-    }
-  };
-
   const handleRetry = () => {
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
     if (lastUserMessage) {
-      // Remove failed assistant message if present
       setMessages(prev => {
         const last = prev[prev.length - 1];
         if (last?.role === 'assistant' && !last.content) {
@@ -407,11 +411,31 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
     sendMessage(query);
   };
 
+  const quickActions = isManager ? MANAGER_QUICK_ACTIONS : FIELD_QUICK_ACTIONS;
+
   return (
-    <div className="flex flex-col flex-1 overflow-hidden h-full">
+    <div className="flex flex-col flex-1 overflow-hidden h-full bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+            <Sparkles className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm">AI Assistant</h3>
+            <p className="text-xs text-muted-foreground">
+              {isManager ? 'Manager Mode' : 'Field Sales Mode'}
+            </p>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
       {/* Messages Area */}
       <ScrollArea className="flex-1 p-3 sm:p-4" ref={scrollRef}>
-        <div className="space-y-3 sm:space-y-4 max-w-full">
+        <div className="space-y-4 max-w-full">
           {messages.map((message, index) => (
             <div key={index} className="relative">
               <ChatMessage message={message} />
@@ -423,96 +447,79 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
               )}
             </div>
           ))}
+          
           {isLoading && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">
-                {LOADING_MESSAGES[loadingState]}
-                {retryCount > 0 && ` (Retry ${retryCount}/${MAX_RETRIES})`}
-              </span>
+            <div className="flex items-center gap-3 text-muted-foreground pl-11">
+              <div className="flex items-center gap-2 bg-muted rounded-lg px-4 py-2.5">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">
+                  {LOADING_MESSAGES[loadingState]}
+                  {retryCount > 0 && ` (Retry ${retryCount}/${MAX_RETRIES})`}
+                </span>
+              </div>
             </div>
           )}
         </div>
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t p-3 sm:p-4 bg-background shrink-0">
+      <div className="border-t p-3 sm:p-4 bg-background shrink-0 space-y-3">
         {/* Quick Actions */}
-        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickAction('my visits')}
-            disabled={isLoading}
-            className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
-          >
-            📍 My Visits
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickAction('sales summary')}
-            disabled={isLoading}
-            className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
-          >
-            💰 Sales
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickAction('top retailers')}
-            disabled={isLoading}
-            className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
-          >
-            ⭐ Retailers
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickAction('stock levels')}
-            disabled={isLoading}
-            className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
-          >
-            📦 Stock
-          </Button>
+        <div className="flex flex-wrap gap-1.5">
+          {quickActions.map((action, idx) => (
+            <Button
+              key={idx}
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickAction(action.query)}
+              disabled={isLoading}
+              className="text-xs h-8 gap-1.5 bg-background hover:bg-primary/5 hover:border-primary/30"
+            >
+              <action.icon className="h-3.5 w-3.5" />
+              {action.label.replace(/^[^\s]+\s/, '')}
+            </Button>
+          ))}
         </div>
 
+        {/* Input */}
         <div className="flex gap-2">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask anything..."
-            className="min-h-[50px] sm:min-h-[60px] resize-none text-sm"
+            placeholder={isManager ? "Ask about your team, alerts, or performance..." : "Ask about visits, sales, or retailers..."}
+            className="min-h-[48px] max-h-[120px] resize-none text-sm bg-muted/50 border-muted"
             disabled={isLoading}
-            rows={2}
+            rows={1}
           />
           <div className="flex flex-col gap-1">
             <Button
               onClick={() => sendMessage()}
               disabled={!input.trim() || isLoading}
               size="icon"
-              className="shrink-0 h-[24px] w-[50px] sm:h-[29px] sm:w-[60px]"
+              className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90"
             >
               {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Send className="h-4 w-4" />
+                <Send className="h-5 w-5" />
               )}
             </Button>
-            {isLoading && (
-              <Button
-                onClick={handleRetry}
-                variant="outline"
-                size="icon"
-                className="shrink-0 h-[24px] w-[50px] sm:h-[29px] sm:w-[60px]"
-                title="Cancel and retry"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            )}
           </div>
         </div>
+        
+        {/* Retry button */}
+        {!isLoading && messages.length > 1 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRetry}
+            className="w-full gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </Button>
+        )}
       </div>
     </div>
   );

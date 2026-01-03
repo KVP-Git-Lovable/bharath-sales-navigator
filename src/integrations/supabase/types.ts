@@ -137,6 +137,66 @@ export type Database = {
           },
         ]
       }
+      ai_insights: {
+        Row: {
+          action_data: Json | null
+          action_type: string | null
+          category: string
+          created_at: string
+          description: string
+          expires_at: string | null
+          id: string
+          insight_type: string
+          is_actioned: boolean | null
+          is_dismissed: boolean | null
+          is_read: boolean | null
+          priority: string
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_data?: Json | null
+          action_type?: string | null
+          category: string
+          created_at?: string
+          description: string
+          expires_at?: string | null
+          id?: string
+          insight_type: string
+          is_actioned?: boolean | null
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          priority?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_data?: Json | null
+          action_type?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          insight_type?: string
+          is_actioned?: boolean | null
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          priority?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       analytics_likes: {
         Row: {
           created_at: string
@@ -11050,6 +11110,7 @@ export type Database = {
           product_details: string
         }[]
       }
+      cleanup_expired_insights: { Args: never; Returns: undefined }
       cleanup_expired_recommendations: { Args: never; Returns: undefined }
       cleanup_expired_reset_tokens: { Args: never; Returns: undefined }
       cleanup_old_execution_logs: { Args: never; Returns: undefined }

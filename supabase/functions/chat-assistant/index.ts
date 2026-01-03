@@ -10,6 +10,26 @@ const corsHeaders = {
 const userContextCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 
+// Check if user is a manager/admin
+async function checkIfManager(supabase: any, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId);
+  
+  return data?.some((r: any) => ['admin', 'manager', 'asm', 'rsm', 'zsm', 'nsm'].includes(r.role?.toLowerCase())) || false;
+}
+
+// Get team members for a manager
+async function getTeamMembers(supabase: any, managerId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('manager_id', managerId);
+  
+  return data?.map((p: any) => p.id) || [];
+}
+
 // Enhanced user context with more data
 async function getUserContext(supabase: any, userId: string) {
   const cached = userContextCache.get(userId);
@@ -21,6 +41,9 @@ async function getUserContext(supabase: any, userId: string) {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   try {
+    const isManager = await checkIfManager(supabase, userId);
+    const teamMembers = isManager ? await getTeamMembers(supabase, userId) : [];
+
     // Fetch comprehensive user context in parallel
     const [
       profileResult, 
@@ -29,7 +52,8 @@ async function getUserContext(supabase: any, userId: string) {
       todayBeatResult,
       pendingPaymentsResult,
       recentOrdersResult,
-      territoryResult
+      territoryResult,
+      teamStatsResult
     ] = await Promise.all([
       supabase.from('profiles').select('full_name, username').eq('id', userId).maybeSingle(),
       supabase.from('user_roles').select('role').eq('user_id', userId),
@@ -41,7 +65,11 @@ async function getUserContext(supabase: any, userId: string) {
         .eq('user_id', userId).neq('payment_status', 'paid').limit(5),
       supabase.from('orders').select('id, total_amount, created_at')
         .eq('user_id', userId).gte('order_date', weekAgo).order('created_at', { ascending: false }).limit(5),
-      supabase.from('user_territories').select('territory:territories(name)').eq('user_id', userId).limit(1)
+      supabase.from('user_territories').select('territory:territories(name)').eq('user_id', userId).limit(1),
+      // Get team stats for managers
+      isManager && teamMembers.length > 0 ? 
+        supabase.from('visits').select('user_id, status').in('user_id', teamMembers).eq('planned_date', today) :
+        Promise.resolve({ data: [] })
     ]);
 
     const isAdmin = rolesResult.data?.some((r: any) => r.role === 'admin') || false;
@@ -60,10 +88,26 @@ async function getUserContext(supabase: any, userId: string) {
     const totalPending = pendingPaymentsResult.data?.reduce((sum: number, r: any) => sum + (r.total_amount || 0), 0) || 0;
     const recentSales = recentOrdersResult.data?.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0) || 0;
 
+    // Calculate team stats for managers
+    let teamStats = null;
+    if (isManager && teamStatsResult.data) {
+      const teamVisits = teamStatsResult.data;
+      teamStats = {
+        teamSize: teamMembers.length,
+        totalVisitsToday: teamVisits.length,
+        completedVisitsToday: teamVisits.filter((v: any) => v.status === 'completed').length,
+        inProgressVisitsToday: teamVisits.filter((v: any) => v.status === 'in_progress').length,
+        pendingVisitsToday: teamVisits.filter((v: any) => v.status === 'scheduled').length
+      };
+    }
+
     const context = {
       profile: profileResult.data || { full_name: 'User', username: 'user' },
       isAdmin,
-      userRole: isAdmin ? 'Manager/Admin' : 'Field Sales User',
+      isManager,
+      teamMembers,
+      teamStats,
+      userRole: isAdmin ? 'Admin' : (isManager ? 'Manager' : 'Field Sales User'),
       todayVisits: todayVisitsResult.data || [],
       todayBeat: todayBeatResult.data?.beat_name || null,
       territory: territoryResult.data?.[0]?.territory?.name || null,
@@ -88,10 +132,12 @@ async function getUserContext(supabase: any, userId: string) {
     return context;
   } catch (error) {
     console.error('Error fetching user context:', error);
-    // Return default context on error
     return {
       profile: { full_name: 'User', username: 'user' },
       isAdmin: false,
+      isManager: false,
+      teamMembers: [],
+      teamStats: null,
       userRole: 'Field Sales User',
       todayVisits: [],
       todayBeat: null,
@@ -109,61 +155,609 @@ async function getUserContext(supabase: any, userId: string) {
 }
 
 // Query classification for routing
-function classifyQuery(message: string): { category: string; priority: string; suggestedTools: string[] } {
+function classifyQuery(message: string): { category: string; priority: string; suggestedTools: string[]; isManagerQuery: boolean } {
   const lower = message.toLowerCase();
   
+  // Manager-specific queries
+  const managerPatterns = /team|staff|members|who|everyone|all users|my people|subordinates|compare|benchmark|exception|alert|anomaly|underperform|not (checked|visited|working)/i;
+  const isManagerQuery = managerPatterns.test(lower);
+  
   // High priority - urgent business queries
-  if (/overdue|urgent|critical|immediately|asap/i.test(lower)) {
-    return { category: 'urgent', priority: 'high', suggestedTools: ['get_overdue_visits', 'get_pending_collections'] };
+  if (/overdue|urgent|critical|immediately|asap|alert|exception|problem/i.test(lower)) {
+    return { category: 'urgent', priority: 'high', suggestedTools: ['get_exception_alerts', 'get_overdue_visits', 'get_pending_collections'], isManagerQuery };
+  }
+  
+  // Team/Manager queries
+  if (/team|staff|performance|members|who|everyone/i.test(lower)) {
+    return { category: 'team', priority: 'high', suggestedTools: ['get_team_performance', 'get_team_attendance'], isManagerQuery: true };
+  }
+  
+  // Comparison queries
+  if (/compare|vs|versus|better|worse|top|bottom|ranking/i.test(lower)) {
+    return { category: 'comparison', priority: 'medium', suggestedTools: ['compare_team_members', 'get_team_performance'], isManagerQuery: true };
+  }
+  
+  // Territory/Distributor queries
+  if (/territory|territories|area|region|distributor|distribution/i.test(lower)) {
+    return { category: 'territory', priority: 'medium', suggestedTools: ['get_territory_overview', 'get_distributor_health'], isManagerQuery };
   }
   
   // Data queries
   if (/visits?|schedule|today|beat|plan/i.test(lower)) {
-    return { category: 'visits', priority: 'medium', suggestedTools: ['get_visit_summary', 'get_beat_schedule'] };
+    return { category: 'visits', priority: 'medium', suggestedTools: ['get_visit_summary', 'get_beat_schedule'], isManagerQuery };
   }
   if (/sales|orders?|revenue|performance/i.test(lower)) {
-    return { category: 'sales', priority: 'medium', suggestedTools: ['get_sales_report'] };
+    return { category: 'sales', priority: 'medium', suggestedTools: ['get_sales_report'], isManagerQuery };
   }
   if (/payments?|pending|outstanding|collect|dues?/i.test(lower)) {
-    return { category: 'payments', priority: 'high', suggestedTools: ['get_pending_collections'] };
+    return { category: 'payments', priority: 'high', suggestedTools: ['get_pending_collections'], isManagerQuery };
   }
   if (/retailers?|customers?|shops?/i.test(lower)) {
-    return { category: 'retailers', priority: 'medium', suggestedTools: ['get_retailer_analytics', 'check_retailer_status'] };
+    return { category: 'retailers', priority: 'medium', suggestedTools: ['get_retailer_analytics', 'check_retailer_status'], isManagerQuery };
   }
   if (/stock|inventory|products?/i.test(lower)) {
-    return { category: 'inventory', priority: 'medium', suggestedTools: ['get_inventory_status'] };
+    return { category: 'inventory', priority: 'medium', suggestedTools: ['get_inventory_status'], isManagerQuery };
   }
   if (/scheme|offer|discount|promotion/i.test(lower)) {
-    return { category: 'schemes', priority: 'medium', suggestedTools: ['get_active_schemes'] };
+    return { category: 'schemes', priority: 'medium', suggestedTools: ['get_active_schemes'], isManagerQuery };
   }
   
   // Navigation queries
   if (/how (do|can|to)|where|navigate|go to|find|add|create/i.test(lower)) {
-    return { category: 'navigation', priority: 'low', suggestedTools: ['get_navigation_help'] };
+    return { category: 'navigation', priority: 'low', suggestedTools: ['get_navigation_help'], isManagerQuery: false };
   }
   
   // Analytics
   if (/compare|trend|growth|analysis|top|best|worst/i.test(lower)) {
-    return { category: 'analytics', priority: 'medium', suggestedTools: ['get_performance_trends'] };
+    return { category: 'analytics', priority: 'medium', suggestedTools: ['get_performance_trends'], isManagerQuery };
   }
   
-  return { category: 'general', priority: 'low', suggestedTools: [] };
+  return { category: 'general', priority: 'low', suggestedTools: [], isManagerQuery: false };
 }
 
 // Execute database queries based on tool calls
-async function executeQuery(supabase: any, userId: string, toolName: string, params: any) {
+async function executeQuery(supabase: any, userId: string, toolName: string, params: any, userContext: any) {
   const today = new Date().toISOString().split('T')[0];
   const { filters = {} } = params;
+  const isManager = userContext.isManager;
+  const teamMembers = userContext.teamMembers || [];
   
   switch(toolName) {
+    // ==================== MANAGER-SPECIFIC TOOLS ====================
+    
+    case 'get_team_performance': {
+      if (!isManager) {
+        return { error: 'This feature is only available for managers.' };
+      }
+      
+      const period = filters.period || 'today';
+      let startDate = today;
+      let endDate = today;
+      
+      if (period === 'week') {
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      } else if (period === 'month') {
+        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      }
+      
+      // Get team profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', teamMembers);
+      
+      // Get visits, orders, and attendance for all team members
+      const [visitsResult, ordersResult, attendanceResult] = await Promise.all([
+        supabase.from('visits')
+          .select('user_id, status')
+          .in('user_id', teamMembers)
+          .gte('planned_date', startDate)
+          .lte('planned_date', endDate),
+        supabase.from('orders')
+          .select('user_id, total_amount, status')
+          .in('user_id', teamMembers)
+          .gte('order_date', startDate)
+          .lte('order_date', endDate),
+        supabase.from('attendance')
+          .select('user_id, status, check_in_time')
+          .in('user_id', teamMembers)
+          .gte('date', startDate)
+          .lte('date', endDate)
+      ]);
+      
+      // Aggregate by team member
+      const teamPerformance = (profiles || []).map((p: any) => {
+        const userVisits = (visitsResult.data || []).filter((v: any) => v.user_id === p.id);
+        const userOrders = (ordersResult.data || []).filter((o: any) => o.user_id === p.id);
+        const userAttendance = (attendanceResult.data || []).filter((a: any) => a.user_id === p.id);
+        
+        return {
+          name: p.full_name || p.username,
+          user_id: p.id,
+          visits: {
+            total: userVisits.length,
+            completed: userVisits.filter((v: any) => v.status === 'completed').length,
+            completion_rate: userVisits.length > 0 
+              ? Math.round((userVisits.filter((v: any) => v.status === 'completed').length / userVisits.length) * 100) 
+              : 0
+          },
+          orders: {
+            count: userOrders.length,
+            total_value: userOrders.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0)
+          },
+          attendance: {
+            present_days: userAttendance.filter((a: any) => a.status === 'present').length,
+            late_days: userAttendance.filter((a: any) => a.check_in_time && new Date(`2000-01-01T${a.check_in_time}`).getHours() >= 10).length
+          }
+        };
+      });
+      
+      // Sort by performance (orders value)
+      teamPerformance.sort((a: any, b: any) => b.orders.total_value - a.orders.total_value);
+      
+      const totalVisits = teamPerformance.reduce((sum: number, p: any) => sum + p.visits.completed, 0);
+      const totalOrders = teamPerformance.reduce((sum: number, p: any) => sum + p.orders.total_value, 0);
+      
+      return {
+        period: `${startDate} to ${endDate}`,
+        team_size: teamMembers.length,
+        summary: {
+          total_visits_completed: totalVisits,
+          total_orders_value: totalOrders,
+          avg_orders_per_person: teamMembers.length > 0 ? Math.round(totalOrders / teamMembers.length) : 0
+        },
+        team_members: teamPerformance
+      };
+    }
+    
+    case 'get_team_attendance': {
+      if (!isManager) {
+        return { error: 'This feature is only available for managers.' };
+      }
+      
+      const targetDate = filters.date || today;
+      
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', teamMembers);
+      
+      const { data: attendance } = await supabase
+        .from('attendance')
+        .select('user_id, status, check_in_time, check_out_time, check_in_address')
+        .in('user_id', teamMembers)
+        .eq('date', targetDate);
+      
+      const attendanceMap = new Map((attendance || []).map((a: any) => [a.user_id, a]));
+      
+      const teamAttendance = (profiles || []).map((p: any) => {
+        const att = attendanceMap.get(p.id);
+        return {
+          name: p.full_name,
+          user_id: p.id,
+          status: att?.status || 'not_checked_in',
+          check_in_time: att?.check_in_time || null,
+          check_out_time: att?.check_out_time || null,
+          location: att?.check_in_address || null
+        };
+      });
+      
+      const checkedIn = teamAttendance.filter((a: any) => a.status === 'present').length;
+      const notCheckedIn = teamAttendance.filter((a: any) => a.status === 'not_checked_in').length;
+      
+      return {
+        date: targetDate,
+        summary: {
+          checked_in: checkedIn,
+          not_checked_in: notCheckedIn,
+          on_leave: teamAttendance.filter((a: any) => a.status === 'leave').length,
+          total: teamMembers.length
+        },
+        members: teamAttendance,
+        alerts: notCheckedIn > 0 ? `⚠️ ${notCheckedIn} team member(s) have not checked in yet!` : null
+      };
+    }
+    
+    case 'compare_team_members': {
+      if (!isManager) {
+        return { error: 'This feature is only available for managers.' };
+      }
+      
+      const { member1_name, member2_name } = params;
+      const period = filters.period || 'month';
+      
+      let startDate = today;
+      if (period === 'week') {
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      } else if (period === 'month') {
+        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      }
+      
+      // Find team members by name
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', teamMembers);
+      
+      const findMember = (name: string) => {
+        const lower = name?.toLowerCase() || '';
+        return profiles?.find((p: any) => 
+          p.full_name?.toLowerCase().includes(lower) || 
+          p.username?.toLowerCase().includes(lower)
+        );
+      };
+      
+      const m1 = findMember(member1_name);
+      const m2 = findMember(member2_name);
+      
+      if (!m1 && !m2) {
+        // If no specific members, compare top 2
+        const sorted = profiles || [];
+        if (sorted.length < 2) return { error: 'Need at least 2 team members to compare' };
+        // Will compare first 2
+      }
+      
+      const membersToCompare = [m1, m2].filter(Boolean);
+      if (membersToCompare.length < 2 && profiles && profiles.length >= 2) {
+        // Add more members if needed
+        for (const p of profiles) {
+          if (membersToCompare.length >= 2) break;
+          if (!membersToCompare.find((m: any) => m.id === p.id)) {
+            membersToCompare.push(p);
+          }
+        }
+      }
+      
+      // Get data for comparison
+      const comparisonData = await Promise.all(membersToCompare.map(async (member: any) => {
+        const [visits, orders] = await Promise.all([
+          supabase.from('visits')
+            .select('status')
+            .eq('user_id', member.id)
+            .gte('planned_date', startDate),
+          supabase.from('orders')
+            .select('total_amount')
+            .eq('user_id', member.id)
+            .gte('order_date', startDate)
+        ]);
+        
+        const visitData = visits.data || [];
+        const orderData = orders.data || [];
+        
+        return {
+          name: member.full_name || member.username,
+          visits_completed: visitData.filter((v: any) => v.status === 'completed').length,
+          total_visits: visitData.length,
+          visit_completion_rate: visitData.length > 0 
+            ? Math.round((visitData.filter((v: any) => v.status === 'completed').length / visitData.length) * 100)
+            : 0,
+          orders_count: orderData.length,
+          total_sales: orderData.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0)
+        };
+      }));
+      
+      return {
+        period: `${startDate} to ${today}`,
+        comparison: comparisonData,
+        winner: comparisonData[0]?.total_sales > comparisonData[1]?.total_sales 
+          ? comparisonData[0]?.name 
+          : comparisonData[1]?.name
+      };
+    }
+    
+    case 'get_exception_alerts': {
+      const alerts: any[] = [];
+      const targetUsers = isManager && teamMembers.length > 0 ? teamMembers : [userId];
+      
+      // Check for team members not checked in (after 10 AM)
+      const hour = new Date().getHours();
+      if (hour >= 10 && isManager) {
+        const { data: attendance } = await supabase
+          .from('attendance')
+          .select('user_id')
+          .in('user_id', teamMembers)
+          .eq('date', today);
+        
+        const checkedInUsers = new Set((attendance || []).map((a: any) => a.user_id));
+        
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', teamMembers);
+        
+        const notCheckedIn = (profiles || []).filter((p: any) => !checkedInUsers.has(p.id));
+        
+        if (notCheckedIn.length > 0) {
+          alerts.push({
+            type: 'attendance',
+            severity: 'high',
+            message: `${notCheckedIn.length} team member(s) haven't checked in yet`,
+            details: notCheckedIn.map((p: any) => p.full_name)
+          });
+        }
+      }
+      
+      // Check for overdue visits
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const { data: overdueVisits } = await supabase
+        .from('visits')
+        .select('id, planned_date, retailers(name), user_id')
+        .in('user_id', targetUsers)
+        .eq('status', 'scheduled')
+        .lt('planned_date', today)
+        .limit(10);
+      
+      if (overdueVisits && overdueVisits.length > 0) {
+        alerts.push({
+          type: 'overdue_visits',
+          severity: 'medium',
+          message: `${overdueVisits.length} overdue visit(s) need attention`,
+          details: overdueVisits.map((v: any) => ({ 
+            retailer: v.retailers?.name, 
+            date: v.planned_date 
+          }))
+        });
+      }
+      
+      // Check for high pending collections
+      const { data: pendingOrders } = await supabase
+        .from('orders')
+        .select('retailer_id, total_amount, retailers(name)')
+        .in('user_id', targetUsers)
+        .neq('payment_status', 'paid')
+        .order('total_amount', { ascending: false })
+        .limit(10);
+      
+      const totalPending = (pendingOrders || []).reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
+      if (totalPending > 10000) {
+        alerts.push({
+          type: 'pending_collections',
+          severity: totalPending > 50000 ? 'high' : 'medium',
+          message: `₹${totalPending.toLocaleString('en-IN')} pending collections`,
+          details: (pendingOrders || []).slice(0, 5).map((o: any) => ({
+            retailer: o.retailers?.name,
+            amount: o.total_amount
+          }))
+        });
+      }
+      
+      // Check for retailers not visited in 14+ days
+      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const { data: dormantRetailers } = await supabase
+        .from('retailers')
+        .select('id, name, last_visit_date')
+        .in('user_id', targetUsers)
+        .lt('last_visit_date', twoWeeksAgo)
+        .eq('status', 'active')
+        .order('last_visit_date', { ascending: true })
+        .limit(10);
+      
+      if (dormantRetailers && dormantRetailers.length > 0) {
+        alerts.push({
+          type: 'dormant_retailers',
+          severity: 'low',
+          message: `${dormantRetailers.length} active retailer(s) not visited in 14+ days`,
+          details: (dormantRetailers || []).slice(0, 5).map((r: any) => ({
+            name: r.name,
+            last_visit: r.last_visit_date
+          }))
+        });
+      }
+      
+      return {
+        total_alerts: alerts.length,
+        high_priority: alerts.filter(a => a.severity === 'high').length,
+        alerts: alerts.sort((a, b) => {
+          const severityOrder = { high: 0, medium: 1, low: 2 };
+          return (severityOrder[a.severity as keyof typeof severityOrder] || 2) - (severityOrder[b.severity as keyof typeof severityOrder] || 2);
+        })
+      };
+    }
+    
+    case 'get_territory_overview': {
+      if (!isManager) {
+        return { error: 'This feature is only available for managers.' };
+      }
+      
+      // Get territories for manager's team
+      const { data: userTerritories } = await supabase
+        .from('user_territories')
+        .select('territory_id, territory:territories(id, name)')
+        .in('user_id', [...teamMembers, userId]);
+      
+      const territoryIds = [...new Set((userTerritories || []).map((ut: any) => ut.territory_id))];
+      
+      // Get retailers count and sales by territory
+      const { data: retailers } = await supabase
+        .from('retailers')
+        .select('id, territory_id, last_order_value, pending_amount, status')
+        .in('territory_id', territoryIds);
+      
+      // Get orders for this month
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('total_amount, retailers!inner(territory_id)')
+        .gte('order_date', monthStart);
+      
+      // Aggregate by territory
+      const territories = [...new Set((userTerritories || []).map((ut: any) => ut.territory))];
+      const territoryData = territories.filter(Boolean).map((t: any) => {
+        const territoryRetailers = (retailers || []).filter((r: any) => r.territory_id === t.id);
+        const territoryOrders = (orders || []).filter((o: any) => o.retailers?.territory_id === t.id);
+        
+        return {
+          name: t.name,
+          retailers: {
+            total: territoryRetailers.length,
+            active: territoryRetailers.filter((r: any) => r.status === 'active').length
+          },
+          mtd_sales: territoryOrders.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0),
+          pending_collections: territoryRetailers.reduce((sum: number, r: any) => sum + (r.pending_amount || 0), 0)
+        };
+      });
+      
+      return {
+        total_territories: territoryData.length,
+        territories: territoryData,
+        summary: {
+          total_retailers: territoryData.reduce((sum, t) => sum + t.retailers.total, 0),
+          total_mtd_sales: territoryData.reduce((sum, t) => sum + t.mtd_sales, 0),
+          total_pending: territoryData.reduce((sum, t) => sum + t.pending_collections, 0)
+        }
+      };
+    }
+    
+    case 'get_distributor_health': {
+      // Get distributors and their secondary order stats
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const lastMonthStart = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0];
+      const lastMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0];
+      
+      const { data: distributors } = await supabase
+        .from('distributors')
+        .select('id, name, contact_person, territory_id')
+        .limit(20);
+      
+      if (!distributors || distributors.length === 0) {
+        return { message: 'No distributors found' };
+      }
+      
+      const distributorIds = distributors.map((d: any) => d.id);
+      
+      // Get this month's orders
+      const { data: thisMonthOrders } = await supabase
+        .from('orders')
+        .select('distributor_id, total_amount')
+        .in('distributor_id', distributorIds)
+        .gte('order_date', monthStart);
+      
+      // Get last month's orders
+      const { data: lastMonthOrders } = await supabase
+        .from('orders')
+        .select('distributor_id, total_amount')
+        .in('distributor_id', distributorIds)
+        .gte('order_date', lastMonthStart)
+        .lte('order_date', lastMonthEnd);
+      
+      const distributorHealth = distributors.map((d: any) => {
+        const thisMonth = (thisMonthOrders || []).filter((o: any) => o.distributor_id === d.id);
+        const lastMonth = (lastMonthOrders || []).filter((o: any) => o.distributor_id === d.id);
+        
+        const thisMonthTotal = thisMonth.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
+        const lastMonthTotal = lastMonth.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
+        
+        const growth = lastMonthTotal > 0 
+          ? Math.round(((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100) 
+          : (thisMonthTotal > 0 ? 100 : 0);
+        
+        return {
+          name: d.name,
+          contact: d.contact_person,
+          mtd_orders: thisMonth.length,
+          mtd_value: thisMonthTotal,
+          last_month_value: lastMonthTotal,
+          growth_percent: growth,
+          health_status: growth >= 10 ? 'good' : (growth >= 0 ? 'stable' : 'declining')
+        };
+      });
+      
+      // Sort by MTD value
+      distributorHealth.sort((a: any, b: any) => b.mtd_value - a.mtd_value);
+      
+      return {
+        total_distributors: distributorHealth.length,
+        distributors: distributorHealth,
+        summary: {
+          healthy: distributorHealth.filter((d: any) => d.health_status === 'good').length,
+          stable: distributorHealth.filter((d: any) => d.health_status === 'stable').length,
+          declining: distributorHealth.filter((d: any) => d.health_status === 'declining').length
+        }
+      };
+    }
+    
+    case 'get_proactive_insights': {
+      // Generate proactive insights for the user
+      const insights: any[] = [];
+      const targetUsers = isManager && teamMembers.length > 0 ? teamMembers : [userId];
+      
+      // Quick wins - retailers with high potential
+      const { data: potentialRetailers } = await supabase
+        .from('retailers')
+        .select('name, avg_monthly_orders_3m, last_order_value')
+        .in('user_id', targetUsers)
+        .order('avg_monthly_orders_3m', { ascending: false })
+        .limit(5);
+      
+      if (potentialRetailers && potentialRetailers.length > 0) {
+        insights.push({
+          type: 'opportunity',
+          icon: '💡',
+          title: 'Top Potential Retailers',
+          message: `Your best performers: ${potentialRetailers.slice(0, 3).map((r: any) => r.name).join(', ')}`,
+          action: 'Focus visits on these retailers for maximum impact'
+        });
+      }
+      
+      // Month-end push
+      const dayOfMonth = new Date().getDate();
+      if (dayOfMonth >= 25) {
+        const { data: monthTarget } = await supabase
+          .from('user_period_targets')
+          .select('target_value, achieved_value')
+          .eq('user_id', userId)
+          .eq('period_type', 'month')
+          .maybeSingle();
+        
+        if (monthTarget) {
+          const gap = (monthTarget.target_value || 0) - (monthTarget.achieved_value || 0);
+          if (gap > 0) {
+            insights.push({
+              type: 'alert',
+              icon: '🎯',
+              title: 'Month-End Push',
+              message: `₹${gap.toLocaleString('en-IN')} to go to hit target. ${6 - (dayOfMonth - 25)} days left!`,
+              action: 'Prioritize high-value retailers and collections'
+            });
+          }
+        }
+      }
+      
+      // Streak recognition
+      const weekVisits = await supabase
+        .from('visits')
+        .select('planned_date')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .gte('planned_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      
+      if (weekVisits.data && weekVisits.data.length >= 25) {
+        insights.push({
+          type: 'kudos',
+          icon: '🔥',
+          title: 'Great Week!',
+          message: `${weekVisits.data.length} visits completed this week. Keep up the momentum!`,
+          action: null
+        });
+      }
+      
+      return {
+        insights,
+        generated_at: new Date().toISOString()
+      };
+    }
+    
+    // ==================== EXISTING FIELD USER TOOLS ====================
+    
     case 'get_sales_report': {
       const startDate = filters.start_date || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const endDate = filters.end_date || today;
+      const targetUsers = isManager && teamMembers.length > 0 ? [...teamMembers, userId] : [userId];
       
       const { data, error } = await supabase
         .from('orders')
         .select(`id, order_date, total_amount, status, retailers(name, address)`)
-        .eq('user_id', userId)
+        .in('user_id', targetUsers)
         .gte('order_date', startDate)
         .lte('order_date', endDate)
         .order('order_date', { ascending: false });
@@ -174,16 +768,24 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
       const confirmedOrders = data?.filter((o: any) => o.status === 'confirmed').length || 0;
       
       return {
-        summary: { total_sales: totalSales, total_orders: data?.length || 0, confirmed_orders: confirmedOrders, period: `${startDate} to ${endDate}` },
+        summary: { 
+          total_sales: totalSales, 
+          total_orders: data?.length || 0, 
+          confirmed_orders: confirmedOrders, 
+          period: `${startDate} to ${endDate}`,
+          scope: isManager ? 'Team' : 'Personal'
+        },
         orders: data?.slice(0, 10)
       };
     }
     
     case 'get_visit_summary': {
+      const targetUsers = isManager && teamMembers.length > 0 ? [...teamMembers, userId] : [userId];
+      
       const { data, error } = await supabase
         .from('visits')
-        .select(`id, planned_date, status, visit_type, retailers(name, address, phone)`)
-        .eq('user_id', userId)
+        .select(`id, planned_date, status, visit_type, user_id, retailers(name, address, phone)`)
+        .in('user_id', targetUsers)
         .gte('planned_date', today)
         .order('planned_date', { ascending: true });
       
@@ -194,16 +796,18 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
         completed: data?.filter((v: any) => v.status === 'completed').length || 0,
         pending: data?.filter((v: any) => v.status === 'scheduled').length || 0,
         in_progress: data?.filter((v: any) => v.status === 'in_progress').length || 0,
+        scope: isManager ? 'Team' : 'Personal',
         visits: data?.slice(0, 15)
       };
     }
     
     case 'get_overdue_visits': {
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const targetUsers = isManager && teamMembers.length > 0 ? [...teamMembers, userId] : [userId];
+      
       const { data, error } = await supabase
         .from('visits')
         .select(`id, planned_date, status, retailers(name, phone)`)
-        .eq('user_id', userId)
+        .in('user_id', targetUsers)
         .eq('status', 'scheduled')
         .lt('planned_date', today)
         .order('planned_date', { ascending: true })
@@ -214,10 +818,12 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
     }
     
     case 'get_pending_collections': {
+      const targetUsers = isManager && teamMembers.length > 0 ? [...teamMembers, userId] : [userId];
+      
       const { data, error } = await supabase
         .from('retailers')
         .select(`id, name, phone, address, pending_amount, last_visit_date, last_order_value`)
-        .eq('user_id', userId)
+        .in('user_id', targetUsers)
         .gt('pending_amount', 0)
         .order('pending_amount', { ascending: false })
         .limit(15);
@@ -228,6 +834,7 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
       return {
         total_pending: totalPending,
         retailer_count: data?.length || 0,
+        scope: isManager ? 'Team' : 'Personal',
         retailers: data
       };
     }
@@ -249,7 +856,6 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
       const { data, error } = await supabase
         .from('retailers')
         .select(`id, name, phone, address, last_visit_date, last_order_value, pending_amount, avg_monthly_orders_3m`)
-        .eq('user_id', userId)
         .ilike('name', `%${retailer_name}%`)
         .limit(5);
       
@@ -316,12 +922,13 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
     
     case 'get_performance_trends': {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const targetUsers = isManager && teamMembers.length > 0 ? [...teamMembers, userId] : [userId];
       
       const [ordersResult, visitsResult] = await Promise.all([
         supabase.from('orders').select('order_date, total_amount')
-          .eq('user_id', userId).gte('order_date', thirtyDaysAgo),
+          .in('user_id', targetUsers).gte('order_date', thirtyDaysAgo),
         supabase.from('visits').select('planned_date, status')
-          .eq('user_id', userId).gte('planned_date', thirtyDaysAgo)
+          .in('user_id', targetUsers).gte('planned_date', thirtyDaysAgo)
       ]);
       
       const totalSales = ordersResult.data?.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0) || 0;
@@ -330,6 +937,7 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
       
       return {
         period: '30 days',
+        scope: isManager ? 'Team' : 'Personal',
         total_sales: totalSales,
         order_count: ordersResult.data?.length || 0,
         visit_completion_rate: totalVisits > 0 ? Math.round((completedVisits / totalVisits) * 100) : 0,
@@ -359,7 +967,6 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
         }
       };
       
-      // Find best match
       const taskLower = (task || '').toLowerCase();
       for (const [key, guide] of Object.entries(navigationGuides)) {
         if (taskLower.includes(key.replace('_', ' ')) || taskLower.includes(key.replace('_', ''))) {
@@ -384,22 +991,115 @@ function selectModel(messages: any[], classification: any): { model: string; max
   ];
   
   if (greetingPatterns.some(p => p.test(lastMessage.trim()))) {
-    return { model: 'google/gemini-2.5-flash', maxTokens: 300, temperature: 0.7 };
+    return { model: 'google/gemini-2.5-flash', maxTokens: 400, temperature: 0.7 };
   }
   
-  // Complex analytics, comparisons, or urgent queries - use pro model
+  // Complex analytics, comparisons, manager queries, or urgent queries - use pro model
   if (classification.category === 'analytics' || 
+      classification.category === 'team' ||
+      classification.category === 'comparison' ||
       classification.priority === 'high' ||
-      /compare|analyze|trend|why|explain|suggest|recommend|help me/i.test(lastMessage)) {
-    return { model: 'google/gemini-2.5-pro', maxTokens: 2000, temperature: 0.5 };
+      classification.isManagerQuery ||
+      /compare|analyze|trend|why|explain|suggest|recommend|help me|team|exception|alert/i.test(lastMessage)) {
+    return { model: 'google/gemini-2.5-pro', maxTokens: 2500, temperature: 0.5 };
   }
   
   // Default - use capable flash model for good conversational quality
-  return { model: 'google/gemini-2.5-flash', maxTokens: 1200, temperature: 0.6 };
+  return { model: 'google/gemini-2.5-flash', maxTokens: 1500, temperature: 0.6 };
 }
 
-// Enhanced tools definition
+// Enhanced tools definition with manager tools
 const TOOLS = [
+  // ==================== MANAGER-SPECIFIC TOOLS ====================
+  {
+    type: "function",
+    function: {
+      name: "get_team_performance",
+      description: "Get performance metrics for all team members including visits, orders, and attendance. MANAGER ONLY.",
+      parameters: {
+        type: "object",
+        properties: {
+          filters: {
+            type: "object",
+            properties: {
+              period: { type: "string", enum: ["today", "week", "month"], description: "Time period for analysis" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_team_attendance",
+      description: "Get today's attendance status for all team members - who has checked in, who hasn't. MANAGER ONLY.",
+      parameters: {
+        type: "object",
+        properties: {
+          filters: {
+            type: "object",
+            properties: {
+              date: { type: "string", description: "Date YYYY-MM-DD, defaults to today" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "compare_team_members",
+      description: "Compare performance between two team members side-by-side. MANAGER ONLY.",
+      parameters: {
+        type: "object",
+        properties: {
+          member1_name: { type: "string", description: "First team member name" },
+          member2_name: { type: "string", description: "Second team member name" },
+          filters: {
+            type: "object",
+            properties: {
+              period: { type: "string", enum: ["week", "month"], description: "Comparison period" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_exception_alerts",
+      description: "Get alerts for exceptions - team not checked in, overdue visits, high pending amounts, dormant retailers.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_territory_overview",
+      description: "Get overview of all territories including retailer counts, MTD sales, and pending collections. MANAGER ONLY.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_distributor_health",
+      description: "Get health status of distributors - MTD orders, growth trends, performance comparison.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_proactive_insights",
+      description: "Get AI-generated proactive insights - opportunities, alerts, and recommendations.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  // ==================== EXISTING FIELD USER TOOLS ====================
   {
     type: "function",
     function: {
@@ -547,7 +1247,6 @@ serve(async (req) => {
     if (rawMessages && Array.isArray(rawMessages)) {
       messages = rawMessages;
     } else if (message && typeof message === 'string') {
-      // Convert single message to array format
       messages = [{ role: 'user', content: message }];
     } else {
       return new Response(JSON.stringify({ error: 'Either messages array or message string is required' }), {
@@ -592,60 +1291,119 @@ serve(async (req) => {
       contextualTips += `\n📍 ${pendingVisits} visits still pending today.`;
     }
     
-    const systemPrompt = `You are a smart, friendly AI assistant for Bharath Beverages Field Sales Management. You help field sales representatives work more efficiently.
+    // Team stats for managers
+    let teamContextBlock = '';
+    if (userContext.isManager && userContext.teamStats) {
+      const ts = userContext.teamStats;
+      teamContextBlock = `
+**Your Team Today:**
+- Team Size: ${ts.teamSize} members
+- Visits: ${ts.completedVisitsToday}/${ts.totalVisitsToday} completed
+- In Progress: ${ts.inProgressVisitsToday}
+- Pending: ${ts.pendingVisitsToday}`;
+    }
+    
+    // Role-specific system prompt
+    const roleSpecificInstructions = userContext.isManager ? `
+**Manager Capabilities:**
+You have access to powerful team management tools:
+- View all team members' performance, attendance, and activities
+- Compare team members' metrics
+- Get exception alerts (who hasn't checked in, overdue tasks, etc.)
+- Analyze territory and distributor health
+- See aggregated team data
+
+When answering manager queries:
+- Be proactive about highlighting issues and opportunities
+- Suggest actions they can take to improve team performance
+- Compare against targets and historical data when available
+- Always mention if data is for the whole team vs individual
+
+**Quick Actions for Managers:**
+• "Team status" - Overview of all team members today
+• "Who hasn't checked in?" - Attendance alerts
+• "Compare [Name1] and [Name2]" - Side-by-side comparison
+• "Exception alerts" - All issues needing attention
+• "Territory overview" - All territories summary
+• "Distributor health" - Secondary order analysis
+` : `
+**Field User Capabilities:**
+You help with day-to-day sales activities:
+- Track and manage visits
+- View sales and orders
+- Check retailer information
+- Monitor pending collections
+- Access schemes and inventory
+
+**Quick Actions:**
+• "My visits" - Today's schedule
+• "Sales summary" - Recent orders
+• "Pending payments" - Outstanding collections
+• "Top retailers" - Best performers
+`;
+
+    const systemPrompt = `You are an intelligent, proactive AI assistant for Bharath Beverages Field Sales Management. You're like a smart colleague who anticipates needs and provides actionable insights.
 
 **Your Personality:**
-- Be warm, helpful, and conversational - like a knowledgeable colleague
-- Use natural language, not robotic responses
-- Be proactive - suggest actions and share insights
-- Keep responses concise but informative
+- Be warm, conversational, and genuinely helpful
+- Be PROACTIVE - don't wait to be asked, suggest relevant insights
+- Use natural language with personality, not robotic responses
+- Celebrate wins and provide encouragement
+- When sharing data, always interpret it and suggest next steps
+- Use emojis sparingly but effectively to add warmth
 
 **User Profile:**
 - Name: ${userContext.profile?.full_name || 'User'}
-- Role: ${userContext.userRole}
+- Role: ${userContext.userRole}${userContext.isManager ? ' 👔' : ''}
 - Territory: ${userContext.territory || 'Not assigned'}
 - Today's Beat: ${userContext.todayBeat || 'No beat planned'}
 
 **Current Context:**
 - Date: ${new Date().toLocaleDateString('en-IN')} (${timeOfDay})
-- Day ${dayOfMonth} of month${isMonthEnd ? ' (Month-end)' : ''}${isWeekend ? ' (Weekend)' : ''}
+- Day ${dayOfMonth} of month${isMonthEnd ? ' ⚡ MONTH-END' : ''}${isWeekend ? ' 🏠 Weekend' : ''}
 ${pageContext ? `- Current page: ${pageContext}` : ''}
 
 **Today's Progress:**
-- Visits: ${completedVisits}/${userContext.todayVisits.length} completed
+- Visits: ${completedVisits}/${todayVisits.length} completed
 - Pending: ${pendingVisits} visits remaining
 ${contextualTips}
+${teamContextBlock}
 
 **Recent Performance (7 days):**
 - Orders: ${userContext.recentPerformance.orderCount}
 - Sales: ₹${userContext.recentPerformance.totalSales.toLocaleString('en-IN')}
 
-**How to Respond:**
-- Greet users warmly and address them by name when appropriate
-- For data queries, use the tools to fetch real-time information
-- Present data in a readable format with bullet points
-- Format currency as ₹X,XXX (Indian format)
-- After showing data, offer helpful suggestions or next steps
-- For "how to" questions, give clear step-by-step guidance
-- If something isn't clear, ask clarifying questions
-- Be encouraging and supportive of their sales efforts
+${roleSpecificInstructions}
 
-**Available Quick Actions (suggest these when relevant):**
-• Check visits → "my visits" or "today's schedule"
-• Review payments → "pending payments" or "collections"
-• Sales overview → "sales summary" or "my performance"
-• Find retailers → "top retailers" or search by name
-• View offers → "active schemes" or "promotions"
+**Response Style:**
+1. **Greetings**: Be warm! "Good ${timeOfDay}, ${userContext.profile?.full_name?.split(' ')[0] || 'there'}! 👋"
+2. **Data Queries**: Fetch data, present clearly with bullet points, then give actionable insight
+3. **Alerts**: Lead with the most important info, use ⚠️ for warnings, ✅ for good news
+4. **Comparisons**: Use tables or side-by-side format, declare a "winner" when comparing
+5. **Navigation**: Give step-by-step with numbered points
 
-Use the available tools to fetch real-time data. Always interpret the data meaningfully for the user.`;
+**Formatting:**
+- Currency: ₹X,XXX (Indian format with commas)
+- Dates: DD MMM YYYY (e.g., 15 Jan 2024)
+- Percentages: XX% with context (good/bad)
+- Lists: Use bullet points for 3+ items
+- Keep responses focused - don't over-explain
+
+**Proactive Behaviors:**
+- If it's after 10 AM and team members haven't checked in, mention it
+- If pending collections are high, suggest prioritization
+- If it's month-end, emphasize target completion
+- Celebrate when metrics look good!
+
+Always use the available tools to fetch real-time data. Interpret the data meaningfully - don't just dump raw numbers.`;
 
     // Select model based on query
     const { model, maxTokens, temperature } = selectModel(messages, classification);
-    console.log(`Using model: ${model}, maxTokens: ${maxTokens}, temp: ${temperature}, category: ${classification.category}`);
+    console.log(`Using model: ${model}, maxTokens: ${maxTokens}, temp: ${temperature}, category: ${classification.category}, isManager: ${userContext.isManager}`);
     
     const aiMessages = [
       { role: 'system', content: systemPrompt },
-      ...messages.slice(-12) // Keep more history for better context
+      ...messages.slice(-12)
     ];
     
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -692,7 +1450,6 @@ Use the available tools to fetch real-time data. Always interpret the data meani
       async start(controller) {
         let buffer = '';
         let toolCallsBuffer: any[] = [];
-        let currentToolCall: any = null;
         
         try {
           while (true) {
@@ -745,7 +1502,7 @@ Use the available tools to fetch real-time data. Always interpret the data meani
                         const args = toolCall.function.arguments ? JSON.parse(toolCall.function.arguments) : {};
                         console.log(`Executing tool: ${toolCall.function.name}`, args);
                         
-                        const result = await executeQuery(supabase, user.id, toolCall.function.name, args);
+                        const result = await executeQuery(supabase, user.id, toolCall.function.name, args, userContext);
                         
                         // Format result nicely
                         let formattedResult = `\n\n**${toolCall.function.name.replace(/_/g, ' ').replace(/^get /, '').toUpperCase()}:**\n\n`;
