@@ -10,10 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ShoppingCart, Search, Filter, Calendar, Store, IndianRupee } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ShoppingCart, Search, Filter, Calendar, ChevronDown, ChevronRight, IndianRupee, Store, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
+interface OrderItem {
+  id: string;
+  product_name: string;
+  quantity: number;
+  rate: number;
+  total: number;
+  unit: string;
+}
 
 interface Order {
   id: string;
@@ -26,6 +37,7 @@ interface Order {
   invoice_number: string | null;
   is_credit_order: boolean;
   payment_method: string | null;
+  items?: OrderItem[];
 }
 
 interface Props {
@@ -40,6 +52,30 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800",
 };
 
+interface DateGroup {
+  date: string;
+  formattedDate: string;
+  orders: Order[];
+  totalValue: number;
+  orderCount: number;
+}
+
+interface RetailerGroup {
+  retailerId: string;
+  retailerName: string;
+  orders: Order[];
+  totalValue: number;
+  products: { productName: string; quantity: number; unit: string; total: number }[];
+}
+
+interface ProductGroup {
+  productName: string;
+  unit: string;
+  totalQuantity: number;
+  totalValue: number;
+  retailers: { retailerName: string; quantity: number; total: number }[];
+}
+
 export function DistributorSecondaryOrders({ distributorId }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
@@ -48,6 +84,7 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadOrders();
@@ -68,7 +105,7 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
 
       const distributorName = distData?.name || '';
 
-      // Get all retailers linked to this distributor (both via distributor_id and legacy parent_name)
+      // Get all retailers linked to this distributor
       const { data: retailers } = await supabase
         .from('retailers')
         .select('id')
@@ -76,10 +113,9 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
 
       const retailerIds = retailers?.map(r => r.id) || [];
 
-      // Get orders - either directly linked to distributor OR from linked retailers
       let allOrders: Order[] = [];
 
-      // Orders directly linked to this distributor (snapshot at order time)
+      // Orders directly linked to this distributor
       const { data: directOrders, error: directError } = await supabase
         .from('orders')
         .select('id, retailer_id, retailer_name, total_amount, status, order_date, created_at, invoice_number, is_credit_order, payment_method')
@@ -90,19 +126,18 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
       if (directError) throw directError;
       if (directOrders) allOrders = [...directOrders];
 
-      // Also get orders from currently linked retailers (for orders that don't have distributor_id set)
+      // Also get orders from currently linked retailers
       if (retailerIds.length > 0) {
         const { data: retailerOrders, error: retailerError } = await supabase
           .from('orders')
           .select('id, retailer_id, retailer_name, total_amount, status, order_date, created_at, invoice_number, is_credit_order, payment_method')
           .in('retailer_id', retailerIds)
-          .is('distributor_id', null) // Only get orders without distributor_id (not already captured)
+          .is('distributor_id', null)
           .order('created_at', { ascending: false })
           .limit(500);
 
         if (retailerError) throw retailerError;
         if (retailerOrders) {
-          // Merge avoiding duplicates
           const existingIds = new Set(allOrders.map(o => o.id));
           retailerOrders.forEach(o => {
             if (!existingIds.has(o.id)) {
@@ -112,7 +147,28 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
         }
       }
 
-      // Sort all orders by created_at descending
+      // Fetch order items for all orders
+      if (allOrders.length > 0) {
+        const orderIds = allOrders.map(o => o.id);
+        const { data: orderItems } = await supabase
+          .from('order_items')
+          .select('id, order_id, product_name, quantity, rate, total, unit')
+          .in('order_id', orderIds);
+
+        if (orderItems) {
+          const itemsByOrder = orderItems.reduce((acc, item) => {
+            if (!acc[item.order_id]) acc[item.order_id] = [];
+            acc[item.order_id].push(item);
+            return acc;
+          }, {} as Record<string, OrderItem[]>);
+
+          allOrders = allOrders.map(order => ({
+            ...order,
+            items: itemsByOrder[order.id] || []
+          }));
+        }
+      }
+
       allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       setOrders(allOrders);
@@ -126,21 +182,19 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
   const applyFilters = () => {
     let filtered = [...orders];
 
-    // Search filter
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(order =>
         order.retailer_name?.toLowerCase().includes(search) ||
-        order.invoice_number?.toLowerCase().includes(search)
+        order.invoice_number?.toLowerCase().includes(search) ||
+        order.items?.some(item => item.product_name.toLowerCase().includes(search))
       );
     }
 
-    // Status filter
     if (statusFilter && statusFilter !== "all") {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Date filter
     if (dateFilter) {
       filtered = filtered.filter(order => {
         const orderDate = order.order_date || order.created_at.split('T')[0];
@@ -157,10 +211,118 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
     setDateFilter("");
   };
 
+  // Group orders by date
+  const groupedByDate: DateGroup[] = (() => {
+    const dateMap = new Map<string, Order[]>();
+    
+    filteredOrders.forEach(order => {
+      const date = order.order_date || order.created_at.split('T')[0];
+      if (!dateMap.has(date)) {
+        dateMap.set(date, []);
+      }
+      dateMap.get(date)!.push(order);
+    });
+
+    return Array.from(dateMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, orders]) => ({
+        date,
+        formattedDate: format(new Date(date), 'EEEE, MMM d, yyyy'),
+        orders,
+        totalValue: orders.reduce((sum, o) => sum + (o.total_amount || 0), 0),
+        orderCount: orders.length
+      }));
+  })();
+
+  // Group orders by retailer for a date
+  const getRetailerGroups = (orders: Order[]): RetailerGroup[] => {
+    const retailerMap = new Map<string, RetailerGroup>();
+
+    orders.forEach(order => {
+      const key = order.retailer_id;
+      if (!retailerMap.has(key)) {
+        retailerMap.set(key, {
+          retailerId: order.retailer_id,
+          retailerName: order.retailer_name,
+          orders: [],
+          totalValue: 0,
+          products: []
+        });
+      }
+      const group = retailerMap.get(key)!;
+      group.orders.push(order);
+      group.totalValue += order.total_amount || 0;
+
+      // Aggregate products
+      order.items?.forEach(item => {
+        const existingProduct = group.products.find(p => p.productName === item.product_name);
+        if (existingProduct) {
+          existingProduct.quantity += item.quantity;
+          existingProduct.total += item.total;
+        } else {
+          group.products.push({
+            productName: item.product_name,
+            quantity: item.quantity,
+            unit: item.unit,
+            total: item.total
+          });
+        }
+      });
+    });
+
+    return Array.from(retailerMap.values()).sort((a, b) => b.totalValue - a.totalValue);
+  };
+
+  // Group orders by product for a date (packing list view)
+  const getProductGroups = (orders: Order[]): ProductGroup[] => {
+    const productMap = new Map<string, ProductGroup>();
+
+    orders.forEach(order => {
+      order.items?.forEach(item => {
+        const key = item.product_name;
+        if (!productMap.has(key)) {
+          productMap.set(key, {
+            productName: item.product_name,
+            unit: item.unit,
+            totalQuantity: 0,
+            totalValue: 0,
+            retailers: []
+          });
+        }
+        const group = productMap.get(key)!;
+        group.totalQuantity += item.quantity;
+        group.totalValue += item.total;
+
+        const existingRetailer = group.retailers.find(r => r.retailerName === order.retailer_name);
+        if (existingRetailer) {
+          existingRetailer.quantity += item.quantity;
+          existingRetailer.total += item.total;
+        } else {
+          group.retailers.push({
+            retailerName: order.retailer_name,
+            quantity: item.quantity,
+            total: item.total
+          });
+        }
+      });
+    });
+
+    return Array.from(productMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+  };
+
+  const toggleDate = (date: string) => {
+    const newExpanded = new Set(expandedDates);
+    if (newExpanded.has(date)) {
+      newExpanded.delete(date);
+    } else {
+      newExpanded.add(date);
+    }
+    setExpandedDates(newExpanded);
+  };
+
   // Summary stats
   const totalAmount = filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
   const pendingCount = filteredOrders.filter(o => o.status === 'pending').length;
-  const deliveredCount = filteredOrders.filter(o => o.status === 'delivered').length;
 
   if (loading) {
     return (
@@ -223,7 +385,7 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by retailer or invoice..."
+              placeholder="Search by retailer, invoice or product..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -260,49 +422,116 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
         </CardHeader>
 
         <CardContent>
-          {filteredOrders.length === 0 ? (
+          {groupedByDate.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               No secondary orders found
             </p>
           ) : (
-            <div className="space-y-2">
-              {filteredOrders.map(order => (
-                <div 
-                  key={order.id} 
-                  className="border rounded-lg p-3 hover:bg-muted/50 transition-colors"
+            <div className="space-y-3">
+              {groupedByDate.map(dateGroup => (
+                <Collapsible 
+                  key={dateGroup.date}
+                  open={expandedDates.has(dateGroup.date)}
+                  onOpenChange={() => toggleDate(dateGroup.date)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{order.retailer_name}</span>
-                        <Badge className={STATUS_COLORS[order.status] || "bg-gray-100"}>
-                          {order.status}
-                        </Badge>
-                        {order.is_credit_order && (
-                          <Badge variant="outline" className="text-xs">Credit</Badge>
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                      <div className="flex items-center gap-3">
+                        {expandedDates.has(dateGroup.date) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
+                        <div>
+                          <p className="font-medium text-sm">{dateGroup.formattedDate}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {dateGroup.orderCount} order{dateGroup.orderCount !== 1 ? 's' : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
-                        {order.invoice_number && (
-                          <span>#{order.invoice_number}</span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {format(new Date(order.order_date || order.created_at), 'MMM d, yyyy')}
-                        </span>
-                        {order.payment_method && (
-                          <span className="capitalize">{order.payment_method}</span>
-                        )}
+                      <div className="text-right">
+                        <p className="font-semibold text-sm flex items-center gap-1">
+                          <IndianRupee className="h-3 w-3" />
+                          {dateGroup.totalValue.toLocaleString('en-IN')}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-sm flex items-center gap-1">
-                        <IndianRupee className="h-3 w-3" />
-                        {order.total_amount?.toLocaleString('en-IN') || 0}
-                      </p>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent className="mt-2">
+                    <div className="border rounded-lg p-3">
+                      <Tabs defaultValue="retailer" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-3">
+                          <TabsTrigger value="retailer" className="gap-1 text-xs">
+                            <Store className="h-3 w-3" />
+                            By Retailer
+                          </TabsTrigger>
+                          <TabsTrigger value="product" className="gap-1 text-xs">
+                            <Package className="h-3 w-3" />
+                            By Product
+                          </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="retailer" className="space-y-3 mt-0">
+                          {getRetailerGroups(dateGroup.orders).map(retailer => (
+                            <div key={retailer.retailerId} className="border rounded-lg p-3 bg-background">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Store className="h-4 w-4 text-primary" />
+                                  <span className="font-medium text-sm">{retailer.retailerName}</span>
+                                </div>
+                                <span className="font-semibold text-sm">
+                                  ₹{retailer.totalValue.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                              <div className="space-y-1 pl-6">
+                                {retailer.products.map((product, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>{product.productName}</span>
+                                    <span>
+                                      {product.quantity} {product.unit} • ₹{product.total.toLocaleString('en-IN')}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </TabsContent>
+
+                        <TabsContent value="product" className="space-y-3 mt-0">
+                          {getProductGroups(dateGroup.orders).map((product, idx) => (
+                            <div key={idx} className="border rounded-lg p-3 bg-background">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-primary" />
+                                  <span className="font-medium text-sm">{product.productName}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-semibold text-sm">
+                                    {product.totalQuantity} {product.unit}
+                                  </span>
+                                  <p className="text-xs text-muted-foreground">
+                                    ₹{product.totalValue.toLocaleString('en-IN')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="space-y-1 pl-6">
+                                {product.retailers.map((retailer, ridx) => (
+                                  <div key={ridx} className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>{retailer.retailerName}</span>
+                                    <span>
+                                      {retailer.quantity} {product.unit} • ₹{retailer.total.toLocaleString('en-IN')}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </TabsContent>
+                      </Tabs>
                     </div>
-                  </div>
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
               ))}
             </div>
           )}
