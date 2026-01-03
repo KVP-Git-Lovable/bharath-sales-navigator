@@ -2350,10 +2350,12 @@ export type Database = {
           distributor_id: string | null
           email: string | null
           id: string
+          is_active: boolean | null
           is_primary: boolean | null
           phone: string | null
           reports_to: string | null
           role: string | null
+          seniority: string | null
           updated_at: string | null
           years_of_experience: number | null
           years_with_distributor: number | null
@@ -2367,10 +2369,12 @@ export type Database = {
           distributor_id?: string | null
           email?: string | null
           id?: string
+          is_active?: boolean | null
           is_primary?: boolean | null
           phone?: string | null
           reports_to?: string | null
           role?: string | null
+          seniority?: string | null
           updated_at?: string | null
           years_of_experience?: number | null
           years_with_distributor?: number | null
@@ -2384,10 +2388,12 @@ export type Database = {
           distributor_id?: string | null
           email?: string | null
           id?: string
+          is_active?: boolean | null
           is_primary?: boolean | null
           phone?: string | null
           reports_to?: string | null
           role?: string | null
+          seniority?: string | null
           updated_at?: string | null
           years_of_experience?: number | null
           years_with_distributor?: number | null

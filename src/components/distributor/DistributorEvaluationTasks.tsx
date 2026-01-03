@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,9 @@ import {
   Paperclip,
   User,
   Calendar,
-  Clock
+  Clock,
+  Upload,
+  X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -90,11 +92,14 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
   const [editingTask, setEditingTask] = useState<EvaluationTask | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     status: "pending",
     owner_user_id: "",
     notes: "",
     due_date: "",
+    attachment_urls: [] as string[],
   });
 
   useEffect(() => {
@@ -116,7 +121,10 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
       if (!data || data.length === 0) {
         await initializeTasks();
       } else {
-        setTasks(data);
+        setTasks(data.map(t => ({
+          ...t,
+          attachment_urls: t.attachment_urls || []
+        })));
       }
     } catch (error: any) {
       toast.error("Failed to load tasks: " + error.message);
@@ -126,26 +134,30 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
   };
 
   const initializeTasks = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
 
-    const tasksToCreate = EVALUATION_TASKS.map(task => ({
-      distributor_id: distributorId,
-      task_key: task.key,
-      task_label: task.label,
-      status: 'pending',
-      created_by: userId,
-    }));
+      const tasksToCreate = EVALUATION_TASKS.map(task => ({
+        distributor_id: distributorId,
+        task_key: task.key,
+        task_label: task.label,
+        status: 'pending',
+        created_by: userId,
+      }));
 
-    const { data, error } = await supabase
-      .from('distributor_evaluation_tasks')
-      .insert(tasksToCreate)
-      .select();
+      const { data, error } = await supabase
+        .from('distributor_evaluation_tasks')
+        .insert(tasksToCreate)
+        .select();
 
-    if (error) {
+      if (error) throw error;
+      setTasks((data || []).map(t => ({
+        ...t,
+        attachment_urls: t.attachment_urls || []
+      })));
+    } catch (error: any) {
       toast.error("Failed to initialize tasks: " + error.message);
-    } else {
-      setTasks(data || []);
     }
   };
 
@@ -164,8 +176,50 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
       owner_user_id: task.owner_user_id || "",
       notes: task.notes || "",
       due_date: task.due_date || "",
+      attachment_urls: task.attachment_urls || [],
     });
     setDialogOpen(true);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingTask) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${distributorId}/${editingTask.task_key}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('distributor-attachments')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('distributor-attachments')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({
+        ...prev,
+        attachment_urls: [...prev.attachment_urls, publicUrl]
+      }));
+      toast.success("File uploaded");
+    } catch (error: any) {
+      toast.error("Upload failed: " + error.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeAttachment = (urlToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      attachment_urls: prev.attachment_urls.filter(url => url !== urlToRemove)
+    }));
   };
 
   const handleSave = async () => {
@@ -181,6 +235,7 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
         owner_user_id: formData.owner_user_id || null,
         notes: formData.notes || null,
         due_date: formData.due_date || null,
+        attachment_urls: formData.attachment_urls,
         updated_by: userId,
       };
 
@@ -267,7 +322,8 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
           {tasks.map(task => (
             <div 
               key={task.id} 
-              className="border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              className="border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => handleEdit(task)}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -301,7 +357,7 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
                   )}
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(task)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(task); }}>
                 <Edit className="h-4 w-4" />
               </Button>
             </div>
@@ -311,7 +367,7 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
 
       {/* Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingTask?.task_label}</DialogTitle>
           </DialogHeader>
@@ -370,6 +426,40 @@ export function DistributorEvaluationTasks({ distributorId }: Props) {
                 placeholder="Add notes about this task..."
                 rows={3}
               />
+            </div>
+
+            {/* Attachments */}
+            <div>
+              <Label>Attachments</Label>
+              <div className="mt-2 space-y-2">
+                {formData.attachment_urls.map((url, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-muted p-2 rounded text-sm">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate flex-1">
+                      {url.split('/').pop()}
+                    </a>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAttachment(url)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {uploading ? "Uploading..." : "Upload File"}
+                </Button>
+              </div>
             </div>
 
             {editingTask && (

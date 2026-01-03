@@ -302,6 +302,18 @@ export default function DistributorDetail() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
+            {/* About Business - First */}
+            {distributor.about_business && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">About Business</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{distributor.about_business}</p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Quick Stats */}
             <div className="grid grid-cols-2 gap-3">
               <Card>
@@ -424,17 +436,7 @@ export default function DistributorDetail() {
               </Card>
             )}
 
-            {/* About */}
-            {distributor.about_business && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">About Business</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{distributor.about_business}</p>
-                </CardContent>
-              </Card>
-            )}
+            {/* About Business already shown at top */}
 
             {/* Attachments */}
             <DistributorAttachments distributorId={distributor.id} />
