@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Map, ChevronRight, Search, Filter } from "lucide-react";
+import { Map as MapIcon, ChevronRight, Search, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -35,44 +35,220 @@ export function DistributorTerritories({ distributorId }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [distributorName, setDistributorName] = useState<string | null>(null);
 
   useEffect(() => {
     loadTerritories();
 
-    // Real-time subscription for territories table
-    const channel = supabase
+    // Real-time subscription for territories table (direct changes)
+    const territoriesChannel = supabase
       .channel(`distributor-territories-${distributorId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'territories'
+          event: "*",
+          schema: "public",
+          table: "territories",
         },
-        () => {
-          loadTerritories();
-        }
+        () => loadTerritories()
+      )
+      .subscribe();
+
+    // Changes in beats / retailer assignments can affect derived territory mapping
+    const beatsChannel = supabase
+      .channel(`distributor-territories-beats-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "beats",
+          filter: `distributor_id=eq.${distributorId}`,
+        },
+        () => loadTerritories()
+      )
+      .subscribe();
+
+    const mappingsChannel = supabase
+      .channel(`distributor-territories-mappings-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "distributor_beat_mappings",
+          filter: `distributor_id=eq.${distributorId}`,
+        },
+        () => loadTerritories()
+      )
+      .subscribe();
+
+    const retailersByIdChannel = supabase
+      .channel(`distributor-territories-retailers-by-id-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retailers",
+          filter: `distributor_id=eq.${distributorId}`,
+        },
+        () => loadTerritories()
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(territoriesChannel);
+      supabase.removeChannel(beatsChannel);
+      supabase.removeChannel(mappingsChannel);
+      supabase.removeChannel(retailersByIdChannel);
     };
   }, [distributorId]);
 
+  useEffect(() => {
+    if (!distributorName) return;
+
+    const encodedName = encodeURIComponent(distributorName);
+    const retailersByParentChannel = supabase
+      .channel(`distributor-territories-retailers-by-parent-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retailers",
+          filter: `parent_name=eq.${encodedName}`,
+        },
+        () => loadTerritories()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(retailersByParentChannel);
+    };
+  }, [distributorId, distributorName]);
+
   const loadTerritories = async () => {
     try {
-      // Get territories that have this distributor in their assigned_distributor_ids array
-      const { data, error } = await supabase
-        .from('territories')
-        .select('id, name, region, territory_type, pincode_ranges')
-        .contains('assigned_distributor_ids', [distributorId])
-        .order('name');
+      setLoading(true);
 
-      if (error) throw error;
-      setTerritories(data || []);
+      // Fetch distributor details (name needed for legacy linkage)
+      let name = distributorName;
+      let distributorTerritoryId: string | null = null;
+      const { data: dist, error: distError } = await supabase
+        .from("distributors")
+        .select("name, territory_id")
+        .eq("id", distributorId)
+        .maybeSingle();
+      if (distError) throw distError;
+
+      name = dist?.name ?? name ?? null;
+      distributorTerritoryId = (dist as any)?.territory_id ?? null;
+      if (name && name !== distributorName) setDistributorName(name);
+
+      // Collect beat codes + territory_ids from linked retailers
+      const beatCodes = new Set<string>();
+      const territoryIds = new Set<string>();
+
+      const { data: r1, error: r1Error } = await supabase
+        .from("retailers")
+        .select("beat_id, territory_id")
+        .eq("distributor_id", distributorId);
+      if (r1Error) throw r1Error;
+      ((r1 as any[]) || []).forEach((r: any) => {
+        if (r?.beat_id) beatCodes.add(r.beat_id);
+        if (r?.territory_id) territoryIds.add(r.territory_id);
+      });
+
+      if (name) {
+        const { data: r2, error: r2Error } = await supabase
+          .from("retailers")
+          .select("beat_id, territory_id")
+          .eq("parent_type", "Distributor")
+          .eq("parent_name", name);
+        if (r2Error) throw r2Error;
+        ((r2 as any[]) || []).forEach((r: any) => {
+          if (r?.beat_id) beatCodes.add(r.beat_id);
+          if (r?.territory_id) territoryIds.add(r.territory_id);
+        });
+      }
+
+      if (distributorTerritoryId) territoryIds.add(distributorTerritoryId);
+
+      // Explicit beat mappings (references beats.id)
+      const { data: mappings, error: mappingsError } = await supabase
+        .from("distributor_beat_mappings")
+        .select("beat_id")
+        .eq("distributor_id", distributorId);
+      if (mappingsError) throw mappingsError;
+      const mappedBeatRowIds = ((mappings as any[]) || []).map((m: any) => m.beat_id);
+
+      // Fetch beats (direct + derived) to include their territory_id
+      const beatRowsById = new Map<string, { territory_id: string | null }>();
+
+      const { data: b1, error: b1Error } = await supabase
+        .from("beats")
+        .select("id, territory_id")
+        .eq("distributor_id", distributorId);
+      if (b1Error) throw b1Error;
+      ((b1 as any[]) || []).forEach((b: any) =>
+        beatRowsById.set(b.id, { territory_id: b.territory_id ?? null })
+      );
+
+      const derivedBeatCodes = Array.from(beatCodes);
+      if (derivedBeatCodes.length > 0) {
+        const { data: b2, error: b2Error } = await supabase
+          .from("beats")
+          .select("id, territory_id")
+          .in("beat_id", derivedBeatCodes);
+        if (b2Error) throw b2Error;
+        ((b2 as any[]) || []).forEach((b: any) =>
+          beatRowsById.set(b.id, { territory_id: b.territory_id ?? null })
+        );
+      }
+
+      if (mappedBeatRowIds.length > 0) {
+        const { data: b3, error: b3Error } = await supabase
+          .from("beats")
+          .select("id, territory_id")
+          .in("id", mappedBeatRowIds);
+        if (b3Error) throw b3Error;
+        ((b3 as any[]) || []).forEach((b: any) =>
+          beatRowsById.set(b.id, { territory_id: b.territory_id ?? null })
+        );
+      }
+
+      Array.from(beatRowsById.values()).forEach((b) => {
+        if (b.territory_id) territoryIds.add(b.territory_id);
+      });
+
+      // Fetch territories (1) by explicit ids, (2) via assigned_distributor_ids JSON contains
+      const territoriesById = new Map<string, Territory>();
+
+      const idsArray = Array.from(territoryIds);
+      if (idsArray.length > 0) {
+        const { data: byIds, error: byIdsError } = await supabase
+          .from("territories")
+          .select("id, name, region, territory_type, pincode_ranges")
+          .in("id", idsArray)
+          .order("name");
+        if (byIdsError) throw byIdsError;
+        ((byIds as any[]) || []).forEach((t: any) => territoriesById.set(t.id, t as Territory));
+      }
+
+      const { data: assigned, error: assignedError } = await supabase
+        .from("territories")
+        .select("id, name, region, territory_type, pincode_ranges")
+        .filter("assigned_distributor_ids", "cs", `["${distributorId}"]`)
+        .order("name");
+      if (assignedError) throw assignedError;
+      ((assigned as any[]) || []).forEach((t: any) => territoriesById.set(t.id, t as Territory));
+
+      setTerritories(
+        Array.from(territoriesById.values()).sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch (error: any) {
-      console.error("Failed to load territories:", error.message);
+      toast.error("Failed to load territories: " + error.message);
       setTerritories([]);
     } finally {
       setLoading(false);
@@ -105,7 +281,7 @@ export function DistributorTerritories({ distributorId }: Props) {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <Map className="h-4 w-4" />
+          <MapIcon className="h-4 w-4" />
           Territories ({filteredTerritories.length})
         </CardTitle>
       </CardHeader>
@@ -179,7 +355,7 @@ export function DistributorTerritories({ distributorId }: Props) {
               >
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <Map className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <MapIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
                     <p className="font-medium text-sm text-primary hover:underline">{territory.name}</p>
