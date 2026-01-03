@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Info, CreditCard, AlertCircle } from "lucide-react";
+import { Info, CreditCard, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreditScoreRationale } from "@/components/credit/CreditScoreRationale";
 import { CreditLimitWidget } from "@/components/credit/CreditLimitWidget";
+import { useCreditScoreCalculation } from "@/hooks/useCreditScoreCalculation";
 
 interface CreditScoreDisplayProps {
   retailerId: string;
@@ -19,6 +21,9 @@ export const CreditScoreDisplay = ({
   variant = "compact",
   showCreditLimit = false 
 }: CreditScoreDisplayProps) => {
+  const { triggerCalculation, isCalculating } = useCreditScoreCalculation(retailerId);
+  const hasTriggeredCalculation = useRef(false);
+
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['credit-config'],
     queryFn: async () => {
@@ -44,6 +49,20 @@ export const CreditScoreDisplay = ({
     },
     enabled: !!config?.is_enabled
   });
+
+  // Auto-trigger calculation if AI-driven mode and no score exists
+  useEffect(() => {
+    if (
+      config?.is_enabled && 
+      config?.scoring_mode === 'ai_driven' && 
+      !creditScore && 
+      !scoreLoading && 
+      !hasTriggeredCalculation.current
+    ) {
+      hasTriggeredCalculation.current = true;
+      triggerCalculation();
+    }
+  }, [config, creditScore, scoreLoading, triggerCalculation]);
 
   const { data: retailer } = useQuery({
     queryKey: ['retailer-manual-score', retailerId],
@@ -108,7 +127,14 @@ export const CreditScoreDisplay = ({
 
   if (variant === "compact") {
     // Show loading state
-    if (isLoading) return null;
+    if (isLoading || isCalculating) {
+      return (
+        <Badge variant="outline" className="text-muted-foreground bg-muted/30 border-muted">
+          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+          Calculating...
+        </Badge>
+      );
+    }
     
     // Show placeholder if no score yet
     if (!score) {
@@ -167,7 +193,14 @@ export const CreditScoreDisplay = ({
               {config.scoring_mode === 'manual' ? 'Manual Entry' : 'AI-Driven Calculation'}
             </CardDescription>
           </div>
-          {score ? (
+          {isCalculating ? (
+            <div className="text-right">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Calculating...</span>
+              </div>
+            </div>
+          ) : score ? (
             <div className="text-right">
               <div className={`text-3xl font-bold px-3 py-1 rounded-lg ${getScoreColor(score)}`}>
                 {score.toFixed(1)}/10
