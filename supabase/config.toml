@@ -59,3 +59,6 @@ verify_jwt = true
 
 [functions.generate-target-advice]
 verify_jwt = true
+
+[functions.ai-insights-engine]
+verify_jwt = true
