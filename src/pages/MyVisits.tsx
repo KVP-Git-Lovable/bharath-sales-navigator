@@ -46,6 +46,7 @@ interface Visit {
   retailerName: string;
   address: string;
   phone: string;
+  contactName?: string;
   retailerCategory: string;
   status: "planned" | "in-progress" | "productive" | "unproductive" | "store-closed" | "cancelled";
   visitType: string;
@@ -326,6 +327,7 @@ export const MyVisits = () => {
         retailerName: retailer.name || '',
         address: retailer.address || '',
         phone: retailer.phone || '',
+        contactName: retailer.contact_name || '',
         retailerCategory: retailer.category || '',
         status,
         visitType: 'Regular Visit',
@@ -844,6 +846,7 @@ export const MyVisits = () => {
           retailerName: retailer.name,
           address: retailer.address,
           phone: retailer.phone || '',
+          contactName: retailer.contact_name || '',
           retailerCategory: retailer.category || 'Category A',
           priority: retailer.priority || 'medium',
           status,
