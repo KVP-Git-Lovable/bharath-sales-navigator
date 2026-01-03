@@ -325,6 +325,7 @@ export const OrderEntry = () => {
   // Retailer visit tracking states
   const [retailerLat, setRetailerLat] = useState<number | undefined>(undefined);
   const [retailerLng, setRetailerLng] = useState<number | undefined>(undefined);
+  const [retailerBeatId, setRetailerBeatId] = useState<string | undefined>(undefined);
   const [showVisitDetailsModal, setShowVisitDetailsModal] = useState(false);
   const [hasTrackedVisit, setHasTrackedVisit] = useState(false);
   const [isSettingLocation, setIsSettingLocation] = useState(false);
@@ -425,6 +426,9 @@ export const OrderEntry = () => {
           setRetailerLat(cachedRetailer.latitude);
           setRetailerLng(cachedRetailer.longitude);
         }
+        if (cachedRetailer?.beat_id) {
+          setRetailerBeatId(cachedRetailer.beat_id);
+        }
       } catch (cacheError) {
         DEV_LOG && console.log('📍 Cache read failed (non-critical):', cacheError);
       }
@@ -434,13 +438,18 @@ export const OrderEntry = () => {
         const fetchFromNetwork = () => {
           supabase
             .from('retailers')
-            .select('latitude, longitude')
+            .select('latitude, longitude, beat_id')
             .eq('id', validRetailerId)
             .single()
             .then(({ data, error }) => {
-              if (!error && data?.latitude && data?.longitude) {
-                setRetailerLat(data.latitude);
-                setRetailerLng(data.longitude);
+              if (!error && data) {
+                if (data.latitude && data.longitude) {
+                  setRetailerLat(data.latitude);
+                  setRetailerLng(data.longitude);
+                }
+                if (data.beat_id) {
+                  setRetailerBeatId(data.beat_id);
+                }
               }
             });
         };
@@ -1777,6 +1786,7 @@ export const OrderEntry = () => {
                 />
                 <SmartBasketButton
                   retailerId={validRetailerId || ''}
+                  beatId={retailerBeatId}
                   onAutoFillProducts={(results) => {
                     if (orderMode === "table" && tableFormRef.current) {
                       tableFormRef.current.applyVoiceAutoFill(results);
