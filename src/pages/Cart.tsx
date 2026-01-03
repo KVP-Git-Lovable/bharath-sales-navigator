@@ -364,14 +364,21 @@ export const Cart = () => {
     }
     setCartItems(prev => prev.map(item => {
       if (item.id === productId) {
+        // Calculate the ratio to update display_quantity proportionally
+        const quantityRatio = item.quantity > 0 ? newQuantity / item.quantity : 1;
+        const newDisplayQuantity = item.display_quantity !== undefined 
+          ? item.display_quantity * quantityRatio 
+          : newQuantity;
+
         const updatedItem = {
           ...item,
-          quantity: newQuantity
+          quantity: newQuantity,
+          display_quantity: newDisplayQuantity
         };
 
         // Remove pre-calculated total so schemes are recalculated based on new quantity
-        delete updatedItem.total;
-        console.log('Updating quantity for:', updatedItem.name, 'New quantity:', newQuantity, 'Schemes will be recalculated');
+        delete (updatedItem as any).total;
+        console.log('Updating quantity for:', updatedItem.name, 'New quantity:', newQuantity, 'Display quantity:', newDisplayQuantity, 'Schemes will be recalculated');
 
         // Update OrderEntry quantities storage - make sure to sync correctly
         updateOrderEntryQuantities(productId, newQuantity);
