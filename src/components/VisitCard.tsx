@@ -196,6 +196,7 @@ export const VisitCard = ({
     is_credit_order: boolean;
     credit_paid_amount: number;
     invoice_number?: string;
+    distributor_name?: string | null;
   }>>([]);
   const [previousPendingCleared, setPreviousPendingCleared] = useState<number>(0);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
@@ -915,10 +916,11 @@ export const VisitCard = ({
           }
 
           // Fetch orders for today - CRITICAL: Filter by user_id for proper data visibility
+          // Include distributor_name to show which distributor was mapped at order time
           // @ts-ignore to bypass TypeScript deep type inference issue
           const ordersResponse = await supabase
             .from('orders')
-            .select('*, order_items(*)')
+            .select('*, order_items(*), distributor_name')
             .eq('retailer_id', visitRetailerId)
             .eq('user_id', currentUserId)
             .eq('order_date', targetDate)
@@ -2797,6 +2799,13 @@ export const VisitCard = ({
               {orderPreviewOpen && <>
                   {/* Order Summary (All payments) */}
                   <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md space-y-1">
+                    {/* Show distributor name if available */}
+                    {ordersTodayList.length > 0 && ordersTodayList[0]?.distributor_name && (
+                      <div className="flex justify-between items-center text-xs pb-1 border-b border-amber-200 dark:border-amber-700">
+                        <span className="text-muted-foreground">Distributor:</span>
+                        <span className="font-medium text-primary">{ordersTodayList[0].distributor_name}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-muted-foreground">Total Amount:</span>
                       <span className="font-semibold">₹{Math.round(actualOrderValue).toLocaleString()}</span>

@@ -196,14 +196,32 @@ export const Cart = () => {
   const [retailerData, setRetailerData] = React.useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = React.useState<any>(null);
   const [selectedTemplateItems, setSelectedTemplateItems] = React.useState<any[]>([]);
-  // Background fetch for pending amount - non-blocking (schemes now come from useOfflineSchemes)
+  const [distributorInfo, setDistributorInfo] = React.useState<{ id: string | null; name: string | null }>({ id: null, name: null });
+  
+  // Background fetch for pending amount AND distributor - non-blocking (schemes now come from useOfflineSchemes)
   React.useEffect(() => {
     // Only fetch if online
     if (!navigator.onLine || !validRetailerId) return;
     
-    supabase.from('retailers').select('pending_amount').eq('id', validRetailerId).single()
+    // Fetch retailer's pending amount and distributor mapping
+    supabase.from('retailers').select('pending_amount, distributor_id, distributors(id, name)').eq('id', validRetailerId).single()
       .then(({ data }) => {
-        if (data) setPendingAmountFromPrevious(Number(data.pending_amount ?? 0));
+        if (data) {
+          setPendingAmountFromPrevious(Number(data.pending_amount ?? 0));
+          // Store distributor info for order submission
+          const distributor = data.distributors as any;
+          if (distributor) {
+            setDistributorInfo({ id: distributor.id, name: distributor.name });
+          } else if (data.distributor_id) {
+            // Fallback: distributor_id exists but join failed, fetch separately
+            supabase.from('distributors').select('id, name').eq('id', data.distributor_id).single()
+              .then(({ data: distData }) => {
+                if (distData) {
+                  setDistributorInfo({ id: distData.id, name: distData.name });
+                }
+              });
+          }
+        }
       });
   }, [validRetailerId]);
 
@@ -788,6 +806,9 @@ export const Cart = () => {
         visit_id: actualVisitId, // ALWAYS include - ensures database trigger can update visit status
         retailer_id: validRetailerId,
         retailer_name: retailerName,
+        // CRITICAL: Store distributor at order time - this preserves the mapping even if retailer's distributor changes later
+        distributor_id: distributorInfo.id || null,
+        distributor_name: distributorInfo.name || null,
         order_date: getLocalTodayDate(),
         subtotal,
         discount_amount: discountAmount,
