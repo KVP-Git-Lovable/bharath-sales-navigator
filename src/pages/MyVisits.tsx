@@ -1083,10 +1083,10 @@ export const MyVisits = () => {
 
   // Use progressStats from the optimized hook for accurate counts
   // These are calculated directly from the database/cache with proper status logic
-  const plannedVisitsCount = progressStats.planned;
+  const plannedVisitsCount = progressStats.planned; // Pending visits (renamed from planned)
   const productiveVisits = progressStats.productive;
   const unproductiveVisits = progressStats.unproductive;
-  const totalOrdersToday = progressStats.totalOrders;
+  const totalPlannedVisits = progressStats.totalPlanned; // Total planned (doesn't change)
   const totalOrderValue = progressStats.totalOrderValue;
   const handleViewDetails = (visitId: string) => {
     window.location.href = `/visit/${visitId}`;
@@ -1281,20 +1281,19 @@ export const MyVisits = () => {
               </div>
             </div>
             
-             {/* Stats Grid - Mobile Responsive */}
+             {/* Stats Grid - Mobile Responsive - Reordered: Planned, Pending | Productive, Unproductive | Total Order Value, Points Earned */}
              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-               <button onClick={() => navigate(`/today-summary?date=${selectedDate}`)} className="bg-gradient-to-r from-success/10 to-success/5 p-2 sm:p-3 rounded-lg border border-success/20 cursor-pointer hover:from-success/15 hover:to-success/10 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
-                 <div className="text-base sm:text-xl font-bold text-success leading-tight">₹{Math.round(totalOrderValue).toLocaleString()}</div>
-                 <div className="text-[9px] sm:text-xs text-success/80 font-medium mt-1 leading-tight">{t('visits.totalOrderValue')}</div>
+               {/* Row 1: Planned, Pending */}
+               <button className="bg-gradient-to-br from-indigo-50 to-indigo-100 hover:from-indigo-100 hover:to-indigo-150 border border-indigo-200 p-2 sm:p-3 rounded-lg text-center transition-all flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px]">
+                 <div className="text-base sm:text-xl font-bold text-indigo-600 leading-tight">{totalPlannedVisits}</div>
+                 <div className="text-[9px] sm:text-xs font-medium text-indigo-600/80 mt-1 leading-tight">Planned Visits</div>
                </button>
-               <button onClick={handleOrdersClick} className="bg-gradient-to-r from-primary/10 to-primary/5 p-2 sm:p-3 rounded-lg border border-primary/20 cursor-pointer hover:from-primary/15 hover:to-primary/10 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
-                 <div className="text-base sm:text-xl font-bold text-primary leading-tight">{totalOrdersToday}</div>
-                 <div className="text-[9px] sm:text-xs text-primary/80 font-medium mt-1 leading-tight">{t('visits.todaysOrder')}</div>
+               <button onClick={() => handleStatusClick("planned")} className={`p-2 sm:p-3 rounded-lg text-center transition-all transform hover:scale-105 flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px] ${statusFilter === "planned" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25" : "bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 border border-blue-200"}`}>
+                 <div className="text-base sm:text-xl font-bold leading-tight">{plannedVisitsCount}</div>
+                 <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">Pending Visits</div>
                </button>
-                <button onClick={() => handleStatusClick("planned")} className={`p-2 sm:p-3 rounded-lg text-center transition-all transform hover:scale-105 flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px] ${statusFilter === "planned" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25" : "bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 border border-blue-200"}`}>
-                  <div className="text-base sm:text-xl font-bold leading-tight">{plannedVisitsCount}</div>
-                  <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.planned')}</div>
-                </button>
+               
+               {/* Row 2: Productive, Unproductive */}
                <button onClick={() => handleStatusClick("productive")} className={`p-2 sm:p-3 rounded-lg text-center transition-all transform hover:scale-105 flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px] ${statusFilter === "productive" ? "bg-success text-success-foreground shadow-lg shadow-success/25" : "bg-gradient-to-br from-success/10 to-success/20 hover:from-success/20 hover:to-success/30 border border-success/30 text-success"}`}>
                  <div className="text-base sm:text-xl font-bold leading-tight">{productiveVisits}</div>
                  <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.productive')}</div>
@@ -1303,9 +1302,15 @@ export const MyVisits = () => {
                  <div className="text-base sm:text-xl font-bold leading-tight">{unproductiveVisits}</div>
                  <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.unproductive')}</div>
                </button>
+               
+               {/* Row 3: Total Order Value, Points Earned */}
+               <button onClick={() => navigate(`/today-summary?date=${selectedDate}`)} className="bg-gradient-to-r from-success/10 to-success/5 p-2 sm:p-3 rounded-lg border border-success/20 cursor-pointer hover:from-success/15 hover:to-success/10 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
+                 <div className="text-base sm:text-xl font-bold text-success leading-tight">₹{Math.round(totalOrderValue).toLocaleString()}</div>
+                 <div className="text-[9px] sm:text-xs text-success/80 font-medium mt-1 leading-tight">{t('visits.totalOrderValue')}</div>
+               </button>
                <button onClick={() => setIsPointsDialogOpen(true)} className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 p-2 sm:p-3 rounded-lg border border-amber-500/20 cursor-pointer hover:from-amber-500/15 hover:to-yellow-500/15 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
                  <div className="text-base sm:text-xl font-bold text-amber-600 leading-tight">{pointsEarnedToday}</div>
-                 <div className="text-[9px] sm:text-xs text-amber-600/80 font-medium mt-1 leading-tight">Points Earned Today</div>
+                 <div className="text-[9px] sm:text-xs text-amber-600/80 font-medium mt-1 leading-tight">Points Earned</div>
                </button>
              </div>
            </CardContent>

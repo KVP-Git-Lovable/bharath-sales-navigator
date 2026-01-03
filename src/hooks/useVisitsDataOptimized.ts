@@ -17,11 +17,12 @@ interface PointsData {
 }
 
 interface ProgressStats {
-  planned: number;
+  planned: number; // Pending visits (not yet visited)
   productive: number;
   unproductive: number;
   totalOrders: number;
   totalOrderValue: number;
+  totalPlanned: number; // Total planned visits (doesn't change when status changes)
 }
 
 // SMART SYNC: Track individual item changes by ID + timestamp
@@ -133,12 +134,17 @@ const calculateStats = (visits: any[], orders: any[], retailers: any[], selected
     if (!countedRetailers.has(r.id)) planned++;
   });
 
+  // Total planned = all retailers in the beat (doesn't change when visit status changes)
+  // This is the total count of planned visits for the day
+  const totalPlanned = retailers.length;
+
   return {
     planned,
     productive,
     unproductive,
     totalOrders: dateFilteredOrders.length,
-    totalOrderValue: dateFilteredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+    totalOrderValue: dateFilteredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+    totalPlanned
   };
 };
 
@@ -546,13 +552,16 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       ]).catch(e => console.error('[SmartSync] Storage error:', e));
 
       // Save snapshot (background) - pass date to calculateStats for proper filtering
+      // Include points for faster loading on next visit
       saveMyVisitsSnapshot(uid, date, {
         beatPlans: currentCache.beatPlans,
         visits: currentCache.visits,
         retailers: currentCache.retailers,
         orders: currentCache.orders,
         progressStats: calculateStats(currentCache.visits, currentCache.orders, currentCache.retailers, date),
-        currentBeatName: currentCache.beatPlans.map((p: any) => p.beat_name).join(', ')
+        currentBeatName: currentCache.beatPlans.map((p: any) => p.beat_name).join(', '),
+        pointsTotal: pointsFetched.total,
+        pointsByRetailer: Array.from(pointsFetched.byRetailer.entries())
       }).catch(e => console.error('[SmartSync] Snapshot error:', e));
 
       // Update sync timestamp
@@ -699,6 +708,17 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         setVisits(snapshot.visits || []);
         setRetailers(mergedRetailers);
         setOrders(snapshot.orders || []);
+        
+        // FIX: Load points from snapshot for instant display
+        if (snapshot.pointsTotal !== undefined || snapshot.pointsByRetailer) {
+          const pointsFromSnapshot: PointsData = {
+            total: snapshot.pointsTotal || 0,
+            byRetailer: new Map(snapshot.pointsByRetailer || [])
+          };
+          setPointsData(pointsFromSnapshot);
+          console.log('[LoadData] Loaded points from snapshot:', pointsFromSnapshot.total);
+        }
+        
         setIsLoading(false);
         setHasLoadedOnce(true);
         
@@ -706,6 +726,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         cacheRef.current.set(selectedDate, { 
           ...snapshot, 
           retailers: mergedRetailers,
+          points: snapshot.pointsByRetailer ? { total: snapshot.pointsTotal || 0, byRetailer: snapshot.pointsByRetailer } : undefined,
           timestamp: Date.now() 
         });
         
@@ -877,14 +898,16 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         offlineStorage.mergeData(STORES.ORDERS, ordersData)
       ]);
 
-      // Save snapshot
+      // Save snapshot - include points for faster loading
       await saveMyVisitsSnapshot(uid, date, {
         beatPlans: beatPlansData,
         visits: visitsData,
         retailers: retailersData,
         orders: ordersData,
         progressStats: calculateStats(visitsData, ordersData, retailersData, date),
-        currentBeatName: beatPlansData.map(p => p.beat_name).join(', ')
+        currentBeatName: beatPlansData.map(p => p.beat_name).join(', '),
+        pointsTotal: pointsFetched.total,
+        pointsByRetailer: Array.from(pointsFetched.byRetailer.entries())
       });
 
       // Update sync timestamp
