@@ -16,13 +16,8 @@ import {
   Calendar,
   Users,
   Truck,
-  ChevronDown,
-  ChevronUp,
   FileText,
-  Target,
   Store,
-  Map,
-  BookOpen
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,7 +32,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { DistributorContacts } from "@/components/distributor/DistributorContacts";
 import { DistributorAttachments } from "@/components/distributor/DistributorAttachments";
 import { DistributorBeats } from "@/components/distributor/DistributorBeats";
 import { DistributorRetailers } from "@/components/distributor/DistributorRetailers";
@@ -46,7 +40,9 @@ import { DistributorFYPlan } from "@/components/distributor/DistributorFYPlan";
 import { DistributorPortalUsers } from "@/components/distributor/DistributorPortalUsers";
 import { DistributorPriceBooks } from "@/components/distributor/DistributorPriceBooks";
 import { DistributorPrimaryOrders } from "@/components/distributor/DistributorPrimaryOrders";
-import { EvaluationChecklist } from "@/components/distributor/EvaluationChecklist";
+import { DistributorEvaluationTasks } from "@/components/distributor/DistributorEvaluationTasks";
+import { DistributorContactsList } from "@/components/distributor/DistributorContactsList";
+import { DistributorSecondaryOrders } from "@/components/distributor/DistributorSecondaryOrders";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 
 interface Distributor {
@@ -78,7 +74,6 @@ interface Distributor {
   threats: string | null;
   about_business: string | null;
   parent_id: string | null;
-  evaluation_checklist: any;
   created_at: string;
 }
 
@@ -113,7 +108,6 @@ export default function DistributorDetail() {
   const [distributor, setDistributor] = useState<Distributor | null>(null);
   const [parentDistributor, setParentDistributor] = useState<{name: string} | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showEvaluation, setShowEvaluation] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -295,34 +289,13 @@ export default function DistributorDetail() {
           </CardContent>
         </Card>
 
-        {/* Evaluation Checklist Toggle */}
-        <Button
-          variant="outline"
-          className="w-full justify-between"
-          onClick={() => setShowEvaluation(!showEvaluation)}
-        >
-          <span className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Evaluation Checklist
-          </span>
-          {showEvaluation ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
-
-        {showEvaluation && (
-          <EvaluationChecklist
-            distributorId={distributor.id}
-            checklist={distributor.evaluation_checklist || {}}
-            onUpdate={loadDistributor}
-          />
-        )}
-
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-7 w-full">
             <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-            <TabsTrigger value="orders" className="text-xs">Orders</TabsTrigger>
+            <TabsTrigger value="primary-orders" className="text-xs">Primary Order</TabsTrigger>
+            <TabsTrigger value="secondary-orders" className="text-xs">Secondary</TabsTrigger>
             <TabsTrigger value="network" className="text-xs">Network</TabsTrigger>
-            <TabsTrigger value="contacts" className="text-xs">Contacts</TabsTrigger>
             <TabsTrigger value="portal" className="text-xs">Portal</TabsTrigger>
             <TabsTrigger value="pricing" className="text-xs">Pricing</TabsTrigger>
             <TabsTrigger value="business" className="text-xs">FY Plan</TabsTrigger>
@@ -368,6 +341,12 @@ export default function DistributorDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Contacts (Collapsible within Overview) */}
+            <DistributorContactsList distributorId={distributor.id} />
+
+            {/* Evaluation Tasks (Collapsible within Overview) */}
+            <DistributorEvaluationTasks distributorId={distributor.id} />
 
             {/* Products */}
             {(distributor.products_distributed?.length || distributor.other_products?.length) && (
@@ -461,18 +440,18 @@ export default function DistributorDetail() {
             <DistributorAttachments distributorId={distributor.id} />
           </TabsContent>
 
-          <TabsContent value="orders" className="mt-4">
+          <TabsContent value="primary-orders" className="mt-4">
             <DistributorPrimaryOrders distributorId={distributor.id} />
+          </TabsContent>
+
+          <TabsContent value="secondary-orders" className="mt-4">
+            <DistributorSecondaryOrders distributorId={distributor.id} />
           </TabsContent>
 
           <TabsContent value="network" className="space-y-4 mt-4">
             <DistributorBeats distributorId={distributor.id} />
             <DistributorRetailers distributorId={distributor.id} />
             <DistributorTerritories distributorId={distributor.id} />
-          </TabsContent>
-
-          <TabsContent value="contacts" className="mt-4">
-            <DistributorContacts distributorId={distributor.id} />
           </TabsContent>
 
           <TabsContent value="portal" className="mt-4">
