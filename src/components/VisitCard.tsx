@@ -33,6 +33,7 @@ import { useLocationFeature } from "@/hooks/useLocationFeature";
 import { useRetailerVisitTracking } from "@/hooks/useRetailerVisitTracking";
 import { RetailerVisitDetailsModal } from "./RetailerVisitDetailsModal";
 import { CreditScoreDisplay } from "./CreditScoreDisplay";
+import { CollectionTalkingPoints } from "./credit/CollectionTalkingPoints";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { visitStatusCache } from "@/lib/visitStatusCache";
 import { retailerStatusRegistry } from "@/lib/retailerStatusRegistry";
@@ -222,6 +223,8 @@ export const VisitCard = ({
   const [showVanSales, setShowVanSales] = useState(false);
   const [showRetailerOverview, setShowRetailerOverview] = useState(false);
   const [retailerOverviewData, setRetailerOverviewData] = useState<any>(null);
+  const [showCreditTalkingPoints, setShowCreditTalkingPoints] = useState(false);
+  const [creditLimitData, setCreditLimitData] = useState<{ creditLimit: number; score: number; avgDso: number } | null>(null);
   const {
     isVanSalesEnabled
   } = useVanSales();
@@ -2567,10 +2570,21 @@ export const VisitCard = ({
                     </p>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowPaymentModal(true)}>
-                  <IndianRupee className="w-3 h-3" />
-                  Make Payment
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 gap-1 text-xs text-primary"
+                    onClick={() => setShowCreditTalkingPoints(true)}
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    Tips
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowPaymentModal(true)}>
+                    <IndianRupee className="w-3 h-3" />
+                    Pay
+                  </Button>
+                </div>
               </div>
             </div>}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
@@ -3449,6 +3463,25 @@ export const VisitCard = ({
             }}
           />
         )}
+
+        {/* Credit Talking Points Dialog */}
+        <Dialog open={showCreditTalkingPoints} onOpenChange={setShowCreditTalkingPoints}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Collection Tips for {visit.retailerName}</DialogTitle>
+            </DialogHeader>
+            <CollectionTalkingPoints
+              outstandingAmount={pendingAmount}
+              creditLimit={creditLimitData?.creditLimit || pendingAmount * 2}
+              creditScore={creditLimitData?.score || 6}
+              avgDso={creditLimitData?.avgDso || 35}
+              targetDays={30}
+              loyaltyPoints={0}
+              onTimePaymentBonus={50}
+              retailerName={visit.retailerName}
+            />
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>;
 };

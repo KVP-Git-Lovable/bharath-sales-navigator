@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info, TrendingUp, Clock, ShoppingCart, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import { CreditScoreRationale } from "@/components/credit/CreditScoreRationale";
+import { CreditLimitWidget } from "@/components/credit/CreditLimitWidget";
 interface CreditScoreDisplayProps {
   retailerId: string;
   variant?: "compact" | "full";
@@ -151,12 +152,12 @@ const CreditScoreBreakdown = ({ score, creditScore, config, showCreditLimit }: a
           This credit score has been manually entered by an administrator.
         </p>
         {showCreditLimit && creditScore?.credit_limit && (
-          <div className="p-4 bg-primary/5 rounded-lg">
-            <div className="text-sm text-muted-foreground">Credit Limit</div>
-            <div className="text-2xl font-bold text-primary">
-              ₹{creditScore.credit_limit.toLocaleString()}
-            </div>
-          </div>
+          <CreditLimitWidget
+            creditLimit={creditScore.credit_limit}
+            outstandingAmount={0}
+            score={score}
+            compact
+          />
         )}
       </div>
     );
@@ -172,112 +173,30 @@ const CreditScoreBreakdown = ({ score, creditScore, config, showCreditLimit }: a
 
   const isNewRetailer = !creditScore.growth_rate_score && !creditScore.repayment_dso_score;
 
-  if (isNewRetailer) {
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          This is a new retailer with insufficient historical data. 
-          The score shown is the default starting score configured by the admin.
-        </p>
-        {showCreditLimit && (
-          <div className="p-4 bg-primary/5 rounded-lg">
-            <div className="text-sm text-muted-foreground">Credit Limit</div>
-            <div className="text-2xl font-bold text-primary">
-              ₹{creditScore.credit_limit?.toLocaleString() || '0'}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Will be calculated after sufficient order history
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
-        {/* Growth Rate */}
-        <div className="flex items-start gap-3">
-          <TrendingUp className="h-5 w-5 text-primary mt-0.5" />
-          <div className="flex-1">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Average Growth Rate</span>
-              <span className="text-sm font-bold">
-                {creditScore.growth_rate_score?.toFixed(1) || 0}/{config.weight_growth_rate?.toFixed(1)}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {creditScore.avg_growth_rate?.toFixed(1)}% avg. monthly growth
-            </div>
-            <div className="mt-1 bg-secondary rounded-full h-2">
-              <div 
-                className="bg-primary rounded-full h-2 transition-all"
-                style={{ width: `${(creditScore.growth_rate_score / config.weight_growth_rate) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
+      <CreditScoreRationale
+        score={score}
+        growthRateScore={creditScore.growth_rate_score || 0}
+        repaymentDsoScore={creditScore.repayment_dso_score || 0}
+        orderFrequencyScore={creditScore.order_frequency_score || 0}
+        avgGrowthRate={creditScore.avg_growth_rate || 0}
+        avgDso={creditScore.avg_dso || 0}
+        avgOrderFrequency={creditScore.avg_order_frequency || 0}
+        weightGrowthRate={config.weight_growth_rate || 4}
+        weightRepaymentDso={config.weight_repayment_dso || 4}
+        weightOrderFrequency={config.weight_order_frequency || 2}
+        targetDays={config.payment_term_days || 30}
+        isNewRetailer={isNewRetailer}
+      />
 
-        {/* Repayment DSO */}
-        <div className="flex items-start gap-3">
-          <Clock className="h-5 w-5 text-primary mt-0.5" />
-          <div className="flex-1">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Repayment DSO</span>
-              <span className="text-sm font-bold">
-                {creditScore.repayment_dso_score?.toFixed(1) || 0}/{config.weight_repayment_dso?.toFixed(1)}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Avg. {creditScore.avg_dso?.toFixed(0)} days (Target: {config.payment_term_days} days)
-            </div>
-            <div className="mt-1 bg-secondary rounded-full h-2">
-              <div 
-                className="bg-primary rounded-full h-2 transition-all"
-                style={{ width: `${(creditScore.repayment_dso_score / config.weight_repayment_dso) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Order Frequency */}
-        <div className="flex items-start gap-3">
-          <ShoppingCart className="h-5 w-5 text-primary mt-0.5" />
-          <div className="flex-1">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Order Frequency</span>
-              <span className="text-sm font-bold">
-                {creditScore.order_frequency_score?.toFixed(1) || 0}/{config.weight_order_frequency?.toFixed(1)}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Avg. {creditScore.avg_order_frequency?.toFixed(1)} orders per visit
-            </div>
-            <div className="mt-1 bg-secondary rounded-full h-2">
-              <div 
-                className="bg-primary rounded-full h-2 transition-all"
-                style={{ width: `${(creditScore.order_frequency_score / config.weight_order_frequency) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {showCreditLimit && (
-        <div className="p-4 bg-primary/5 rounded-lg">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="text-sm text-muted-foreground">Credit Limit</div>
-              <div className="text-2xl font-bold text-primary">
-                ₹{creditScore.credit_limit?.toLocaleString()}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Based on last month's revenue: ₹{creditScore.last_month_revenue?.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
+      {showCreditLimit && creditScore?.credit_limit && (
+        <CreditLimitWidget
+          creditLimit={creditScore.credit_limit}
+          outstandingAmount={0}
+          score={score}
+          scoreLabel={isNewRetailer ? "New Retailer" : undefined}
+        />
       )}
 
       <div className="text-xs text-muted-foreground">
