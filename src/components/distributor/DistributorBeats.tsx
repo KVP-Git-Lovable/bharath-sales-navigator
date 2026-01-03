@@ -29,42 +29,166 @@ export function DistributorBeats({ distributorId }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [distributorName, setDistributorName] = useState<string | null>(null);
 
   useEffect(() => {
     loadBeats();
 
-    // Real-time subscription
-    const channel = supabase
+    // Real-time subscriptions
+    const beatsChannel = supabase
       .channel(`distributor-beats-${distributorId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'beats',
-          filter: `distributor_id=eq.${distributorId}`
+          event: "*",
+          schema: "public",
+          table: "beats",
+          filter: `distributor_id=eq.${distributorId}`,
         },
-        () => {
-          loadBeats();
-        }
+        () => loadBeats()
+      )
+      .subscribe();
+
+    const mappingsChannel = supabase
+      .channel(`distributor-beat-mappings-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "distributor_beat_mappings",
+          filter: `distributor_id=eq.${distributorId}`,
+        },
+        () => loadBeats()
+      )
+      .subscribe();
+
+    const retailersByIdChannel = supabase
+      .channel(`distributor-beats-retailers-by-id-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retailers",
+          filter: `distributor_id=eq.${distributorId}`,
+        },
+        () => loadBeats()
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(beatsChannel);
+      supabase.removeChannel(mappingsChannel);
+      supabase.removeChannel(retailersByIdChannel);
     };
   }, [distributorId]);
 
+  useEffect(() => {
+    if (!distributorName) return;
+
+    // Retailers linked via legacy parent_name
+    const encodedName = encodeURIComponent(distributorName);
+    const retailersByParentChannel = supabase
+      .channel(`distributor-beats-retailers-by-parent-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retailers",
+          filter: `parent_name=eq.${encodedName}`,
+        },
+        () => loadBeats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(retailersByParentChannel);
+    };
+  }, [distributorId, distributorName]);
+
   const loadBeats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('beats')
-        .select('id, beat_id, beat_name, category, is_active, average_km, travel_allowance')
-        .eq('distributor_id', distributorId)
-        .order('beat_name');
+      setLoading(true);
 
-      if (error) throw error;
-      setBeats(data || []);
+      // Fetch distributor name (needed for legacy linkage)
+      let name = distributorName;
+      if (!name) {
+        const { data: dist, error: distError } = await supabase
+          .from("distributors")
+          .select("name")
+          .eq("id", distributorId)
+          .maybeSingle();
+
+        if (distError) throw distError;
+        name = dist?.name ?? null;
+        setDistributorName(name);
+      }
+
+      // Beat IDs derived from linked retailers
+      const retailerBeatIds = new Set<string>();
+
+      const { data: r1, error: r1Error } = await supabase
+        .from("retailers")
+        .select("beat_id")
+        .eq("distributor_id", distributorId);
+      if (r1Error) throw r1Error;
+      (r1 || []).forEach((r) => retailerBeatIds.add(r.beat_id));
+
+      if (name) {
+        const { data: r2, error: r2Error } = await supabase
+          .from("retailers")
+          .select("beat_id")
+          .eq("parent_type", "Distributor")
+          .eq("parent_name", name);
+        if (r2Error) throw r2Error;
+        (r2 || []).forEach((r) => retailerBeatIds.add(r.beat_id));
+      }
+
+      // Beat IDs mapped explicitly via distributor_beat_mappings (references beats.id)
+      const { data: mappings, error: mappingsError } = await supabase
+        .from("distributor_beat_mappings")
+        .select("beat_id")
+        .eq("distributor_id", distributorId);
+      if (mappingsError) throw mappingsError;
+      const mappedBeatRowIds = (mappings || []).map((m) => m.beat_id);
+
+      const beatsById = new Map<string, Beat>();
+
+      // 1) Direct linkage on beats.distributor_id
+      const { data: direct, error: directError } = await supabase
+        .from("beats")
+        .select("id, beat_id, beat_name, category, is_active, average_km, travel_allowance")
+        .eq("distributor_id", distributorId)
+        .order("beat_name");
+      if (directError) throw directError;
+      (direct || []).forEach((b) => beatsById.set(b.id, b));
+
+      // 2) Derived linkage via retailers.beat_id -> beats.beat_id
+      const derivedBeatCodes = Array.from(retailerBeatIds).filter(Boolean);
+      if (derivedBeatCodes.length > 0) {
+        const { data: derived, error: derivedError } = await supabase
+          .from("beats")
+          .select("id, beat_id, beat_name, category, is_active, average_km, travel_allowance")
+          .in("beat_id", derivedBeatCodes)
+          .order("beat_name");
+        if (derivedError) throw derivedError;
+        (derived || []).forEach((b) => beatsById.set(b.id, b));
+      }
+
+      // 3) Explicit mappings to beats.id
+      if (mappedBeatRowIds.length > 0) {
+        const { data: mapped, error: mappedError } = await supabase
+          .from("beats")
+          .select("id, beat_id, beat_name, category, is_active, average_km, travel_allowance")
+          .in("id", mappedBeatRowIds)
+          .order("beat_name");
+        if (mappedError) throw mappedError;
+        (mapped || []).forEach((b) => beatsById.set(b.id, b));
+      }
+
+      setBeats(Array.from(beatsById.values()).sort((a, b) => a.beat_name.localeCompare(b.beat_name)));
     } catch (error: any) {
       toast.error("Failed to load beats: " + error.message);
     } finally {

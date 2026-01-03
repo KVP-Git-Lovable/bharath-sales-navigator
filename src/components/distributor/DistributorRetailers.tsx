@@ -43,42 +43,101 @@ export function DistributorRetailers({ distributorId }: Props) {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [distributorName, setDistributorName] = useState<string | null>(null);
 
   useEffect(() => {
     loadRetailers();
 
-    // Real-time subscription
-    const channel = supabase
-      .channel(`distributor-retailers-${distributorId}`)
+    // Real-time subscription (records with explicit distributor_id)
+    const byDistributorId = supabase
+      .channel(`distributor-retailers-by-id-${distributorId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'retailers',
-          filter: `distributor_id=eq.${distributorId}`
+          event: "*",
+          schema: "public",
+          table: "retailers",
+          filter: `distributor_id=eq.${distributorId}`,
         },
-        () => {
-          loadRetailers();
-        }
+        () => loadRetailers()
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(byDistributorId);
     };
   }, [distributorId]);
 
+  useEffect(() => {
+    if (!distributorName) return;
+
+    // Real-time subscription (legacy linkage via parent_name)
+    const encodedName = encodeURIComponent(distributorName);
+    const byParentName = supabase
+      .channel(`distributor-retailers-by-parent-${distributorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retailers",
+          filter: `parent_name=eq.${encodedName}`,
+        },
+        () => loadRetailers()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(byParentName);
+    };
+  }, [distributorId, distributorName]);
+
   const loadRetailers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('retailers')
-        .select('id, name, phone, address, category, priority, status, beat_name')
-        .eq('distributor_id', distributorId)
-        .order('name');
+      setLoading(true);
 
-      if (error) throw error;
-      setRetailers(data || []);
+      // Fetch distributor name (needed for legacy parent_name linkage)
+      let name = distributorName;
+      if (!name) {
+        const { data: dist, error: distError } = await supabase
+          .from("distributors")
+          .select("name")
+          .eq("id", distributorId)
+          .maybeSingle();
+
+        if (distError) throw distError;
+        name = dist?.name ?? null;
+        setDistributorName(name);
+      }
+
+      const results = new Map<string, Retailer>();
+
+      // 1) New linkage: retailers.distributor_id
+      const { data: byId, error: byIdError } = await supabase
+        .from("retailers")
+        .select("id, name, phone, address, category, priority, status, beat_name")
+        .eq("distributor_id", distributorId)
+        .order("name");
+
+      if (byIdError) throw byIdError;
+      (byId || []).forEach((r) => results.set(r.id, r));
+
+      // 2) Legacy linkage: retailers.parent_name + parent_type
+      if (name) {
+        const { data: byParent, error: byParentError } = await supabase
+          .from("retailers")
+          .select("id, name, phone, address, category, priority, status, beat_name")
+          .eq("parent_type", "Distributor")
+          .eq("parent_name", name)
+          .order("name");
+
+        if (byParentError) throw byParentError;
+        (byParent || []).forEach((r) => results.set(r.id, r));
+      }
+
+      setRetailers(
+        Array.from(results.values()).sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch (error: any) {
       toast.error("Failed to load retailers: " + error.message);
     } finally {
