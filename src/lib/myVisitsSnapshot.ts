@@ -16,9 +16,12 @@ interface SnapshotData {
     unproductive: number;
     totalOrders: number;
     totalOrderValue: number;
+    totalPlanned?: number; // Total planned visits (doesn't change)
   };
   currentBeatName: string;
   timestamp: number;
+  pointsTotal?: number; // Total points earned for the day
+  pointsByRetailer?: Array<[string, { name: string; points: number; visitId: string | null }]>; // Points by retailer
 }
 
 const SNAPSHOT_KEY_PREFIX = 'myvisits_snapshot_';
@@ -43,8 +46,11 @@ export const saveMyVisitsSnapshot = async (
       unproductive: number;
       totalOrders: number;
       totalOrderValue: number;
+      totalPlanned?: number;
     };
     currentBeatName: string;
+    pointsTotal?: number;
+    pointsByRetailer?: Array<[string, { name: string; points: number; visitId: string | null }]>;
   }
 ): Promise<void> => {
   try {
