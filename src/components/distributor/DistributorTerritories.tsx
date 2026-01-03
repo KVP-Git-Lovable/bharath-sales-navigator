@@ -170,8 +170,8 @@ export function DistributorTerritories({ distributorId }: Props) {
         const { data: r2, error: r2Error } = await supabase
           .from("retailers")
           .select("beat_id, territory_id")
-          .eq("parent_type", "Distributor")
-          .eq("parent_name", name);
+          .eq("parent_name", name)
+          .or("parent_type.eq.Distributor,parent_type.is.null");
         if (r2Error) throw r2Error;
         ((r2 as any[]) || []).forEach((r: any) => {
           if (r?.beat_id) beatCodes.add(r.beat_id);

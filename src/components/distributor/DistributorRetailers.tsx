@@ -133,8 +133,8 @@ export function DistributorRetailers({ distributorId }: Props) {
         const { data: byParent, error: byParentError } = await supabase
           .from("retailers")
           .select("id, name, phone, address, category, priority, status, beat_name")
-          .eq("parent_type", "Distributor")
           .eq("parent_name", name)
+          .or("parent_type.eq.Distributor,parent_type.is.null")
           .order("name");
 
         if (byParentError) throw byParentError;
