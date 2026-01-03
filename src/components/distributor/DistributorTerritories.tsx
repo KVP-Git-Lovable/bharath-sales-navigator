@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Map as MapIcon, ChevronRight, Search, Filter } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Map as MapIcon, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Search, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -28,6 +30,8 @@ const typeColors: Record<string, string> = {
   'area': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
 };
 
+const ITEMS_PER_PAGE = 5;
+
 export function DistributorTerritories({ distributorId }: Props) {
   const navigate = useNavigate();
   const [territories, setTerritories] = useState<Territory[]>([]);
@@ -36,6 +40,8 @@ export function DistributorTerritories({ distributorId }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [distributorName, setDistributorName] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadTerritories();
@@ -277,109 +283,159 @@ export function DistributorTerritories({ distributorId }: Props) {
     });
   }, [territories, searchQuery, typeFilter, regionFilter]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter, regionFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTerritories.length / ITEMS_PER_PAGE);
+  const paginatedTerritories = filteredTerritories.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <MapIcon className="h-4 w-4" />
-          Territories ({filteredTerritories.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search territories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-9"
-            />
-          </div>
-          <div className="flex gap-2">
-            {types.length > 0 && (
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[120px] h-9">
-                  <Filter className="h-3 w-3 mr-1" />
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {types.map(t => (
-                    <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {regions.length > 0 && (
-              <Select value={regionFilter} onValueChange={setRegionFilter}>
-                <SelectTrigger className="w-[130px] h-9">
-                  <SelectValue placeholder="Region" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Regions</SelectItem>
-                  {regions.map(r => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </div>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="pb-3">
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between cursor-pointer">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapIcon className="h-4 w-4" />
+                Territories ({filteredTerritories.length})
+              </CardTitle>
+              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </div>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="space-y-3">
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search territories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-9"
+                />
+              </div>
+              <div className="flex gap-2">
+                {types.length > 0 && (
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-[120px] h-9">
+                      <Filter className="h-3 w-3 mr-1" />
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      {types.map(t => (
+                        <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {regions.length > 0 && (
+                  <Select value={regionFilter} onValueChange={setRegionFilter}>
+                    <SelectTrigger className="w-[130px] h-9">
+                      <SelectValue placeholder="Region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Regions</SelectItem>
+                      {regions.map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
 
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2].map(i => (
-              <div key={i} className="h-12 bg-muted animate-pulse rounded" />
-            ))}
-          </div>
-        ) : filteredTerritories.length === 0 ? (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">
-              {territories.length === 0 ? "No territories assigned" : "No territories match your filters"}
-            </p>
-            {territories.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Assign this distributor to territories in Territory Master
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {filteredTerritories.map(territory => (
-              <div
-                key={territory.id}
-                className="flex items-center justify-between border rounded-lg p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => navigate(`/territory/${territory.id}`)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <MapIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm text-primary hover:underline">{territory.name}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                      <Badge variant="outline" className="text-xs">{territory.region}</Badge>
-                      {territory.territory_type && (
-                        <Badge className={`text-xs capitalize ${typeColors[territory.territory_type] || 'bg-gray-100'}`}>
-                          {territory.territory_type}
-                        </Badge>
-                      )}
-                      {territory.pincode_ranges && territory.pincode_ranges.length > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {territory.pincode_ranges.length} pincodes
-                        </span>
-                      )}
+            {loading ? (
+              <div className="space-y-2">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-12 bg-muted animate-pulse rounded" />
+                ))}
+              </div>
+            ) : filteredTerritories.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">
+                  {territories.length === 0 ? "No territories assigned" : "No territories match your filters"}
+                </p>
+                {territories.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Assign this distributor to territories in Territory Master
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {paginatedTerritories.map(territory => (
+                    <div
+                      key={territory.id}
+                      className="flex items-center justify-between border rounded-lg p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/territory/${territory.id}`)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          <MapIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm text-primary hover:underline">{territory.name}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-xs">{territory.region}</Badge>
+                            {territory.territory_type && (
+                              <Badge className={`text-xs capitalize ${typeColors[territory.territory_type] || 'bg-gray-100'}`}>
+                                {territory.territory_type}
+                              </Badge>
+                            )}
+                            {territory.pincode_ranges && territory.pincode_ranges.length > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                {territory.pincode_ranges.length} pincodes
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-xs text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
+                )}
+              </>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
