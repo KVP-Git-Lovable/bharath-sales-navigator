@@ -63,6 +63,7 @@ export const BeatDetail = () => {
   const [retailerSearch, setRetailerSearch] = useState("");
   const [selectedRetailer, setSelectedRetailer] = useState<any>(null);
   const [showRetailerModal, setShowRetailerModal] = useState(false);
+  const [beatQueryId, setBeatQueryId] = useState<string>(id || "");
 
   const filteredRetailers = useMemo(() => {
     if (!beatData?.retailers) return [];
@@ -98,26 +99,32 @@ export const BeatDetail = () => {
     retailersByMonth: []
   });
   
-  const { metrics, loading: metricsLoading } = useBeatMetrics(id || '', user?.id || '');
+  const { metrics, loading: metricsLoading } = useBeatMetrics(beatQueryId || "", user?.id || "");
   const { recommendations, generateRecommendation, provideFeedback, loading: recommendationsLoading } = useRecommendations('beat_visit', beatData?.id);
 
+  useEffect(() => {
+    if (id) setBeatQueryId(id);
+  }, [id]);
   useEffect(() => {
     if (!user || !id) return;
 
     const fetchBeatData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch beat from beats table
+
+        // Fetch beat from beats table (support both beats.id UUID and beats.beat_id code)
         const { data: beat, error: beatError } = await supabase
           .from('beats')
           .select('*')
-          .eq('beat_id', id)
-          .single();
+          .or(`id.eq.${id},beat_id.eq.${id}`)
+          .maybeSingle();
 
         if (beatError && beatError.code !== 'PGRST116') {
           console.error('Error fetching beat:', beatError);
         }
+
+        const resolvedBeatId = beat?.beat_id ?? id;
+        setBeatQueryId(resolvedBeatId);
 
         // If not found in beats, try beat_plans
         let beatInfo: any = beat;
@@ -125,7 +132,7 @@ export const BeatDetail = () => {
           const { data: beatPlan, error: beatPlanError } = await supabase
             .from('beat_plans')
             .select('beat_id, beat_name, beat_data, created_at')
-            .eq('beat_id', id)
+            .eq('beat_id', resolvedBeatId)
             .eq('user_id', user.id)
             .single();
 
@@ -154,7 +161,7 @@ export const BeatDetail = () => {
         const { data: retailers, error: retailersError } = await supabase
           .from('retailers')
           .select('id, name, address, phone, category, priority, last_visit_date, order_value')
-          .eq('beat_id', id)
+          .eq('beat_id', resolvedBeatId)
           .eq('user_id', user.id);
 
         if (retailersError) {
@@ -165,7 +172,7 @@ export const BeatDetail = () => {
         // Calculate FY order value for each retailer
         const retailerIds = retailers?.map(r => r.id) || [];
         let retailersWithFY = retailers || [];
-        
+
         if (retailerIds.length > 0) {
           // Determine current FY (April to March)
           const now = new Date();
@@ -173,21 +180,21 @@ export const BeatDetail = () => {
           const currentMonth = now.getMonth(); // 0-indexed
           const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1; // April is month 3
           const fyStart = new Date(fyStartYear, 3, 1); // April 1st
-          
+
           const { data: fyOrders } = await supabase
             .from('orders')
             .select('retailer_id, total_amount')
             .in('retailer_id', retailerIds)
             .eq('status', 'confirmed')
             .gte('created_at', fyStart.toISOString());
-          
+
           // Aggregate FY order value per retailer
           const fyOrderMap = new Map<string, number>();
           fyOrders?.forEach(order => {
             const current = fyOrderMap.get(order.retailer_id) || 0;
             fyOrderMap.set(order.retailer_id, current + (order.total_amount || 0));
           });
-          
+
           retailersWithFY = (retailers || []).map(r => ({
             ...r,
             fyOrderValue: fyOrderMap.get(r.id) || 0
@@ -195,15 +202,15 @@ export const BeatDetail = () => {
         }
 
         // Calculate performance stats
-        await calculatePerformanceStats(id, user.id, retailersWithFY);
+        await calculatePerformanceStats(resolvedBeatId, user.id, retailersWithFY);
 
         // Generate SWOT analysis
         generateSWOT(retailersWithFY, metrics);
 
         setBeatData({
           id: beat?.id, // Database UUID
-          beat_id: id,
-          beat_name: beatInfo?.beat_name || id,
+          beat_id: resolvedBeatId,
+          beat_name: beatInfo?.beat_name || resolvedBeatId,
           category: beatInfo?.category || 'General',
           created_at: beatInfo?.created_at || new Date().toISOString(),
           travel_allowance: beat?.travel_allowance,
