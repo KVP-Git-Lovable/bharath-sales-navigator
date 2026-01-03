@@ -92,15 +92,6 @@ const PerformanceDashboard = () => {
             ))}
           </div>
 
-          {/* AI Recommendations */}
-          <AIRecommendations
-            overall={overall}
-            territories={territories}
-            beats={beats}
-            retailers={retailers}
-            isLoading={isLoading}
-          />
-
           {/* Overall Performance */}
           <OverallPerformanceHeader performance={overall} isLoading={isLoading} period={selectedPeriod} />
 
@@ -158,6 +149,15 @@ const PerformanceDashboard = () => {
               isLoading={isLoading} 
             />
           </div>
+
+          {/* AI Recommendations - after territory and retailer performance */}
+          <AIRecommendations
+            overall={overall}
+            territories={territories}
+            beats={beats}
+            retailers={retailers}
+            isLoading={isLoading}
+          />
 
           {/* Link to My Target */}
           <Card className="bg-muted/50">

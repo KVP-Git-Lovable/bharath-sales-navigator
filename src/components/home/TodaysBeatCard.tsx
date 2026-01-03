@@ -1,8 +1,8 @@
-import { MapPin, Users, CheckCircle, Clock, ChevronLeft, ChevronRight, TrendingUp, UserPlus, Zap } from "lucide-react";
+import { MapPin, Users, CheckCircle, Clock, TrendingUp, UserPlus, Zap, Sparkles, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { format, addDays, subDays } from "date-fns";
+import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUserTargetProgress, TargetPeriod, TargetBasis } from "@/hooks/useUserTargetProgress";
 import { useAuth } from "@/hooks/useAuth";
@@ -65,17 +65,6 @@ export const TodaysBeatCard = ({
     targetBasis
   );
 
-  const handlePrevDay = () => {
-    onDateChange(subDays(selectedDate, 1));
-  };
-
-  const handleNextDay = () => {
-    onDateChange(addDays(selectedDate, 1));
-  };
-
-  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-  const isFuture = selectedDate > new Date();
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -124,34 +113,6 @@ export const TodaysBeatCard = ({
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-lg overflow-hidden">
       <CardContent className="p-5 space-y-5">
-        {/* Date Navigation Header */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handlePrevDay}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">
-              {isToday ? "Today's Beat" : format(selectedDate, 'MMM dd, yyyy')}
-            </p>
-          </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleNextDay}
-            disabled={isFuture}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
         {/* Beat Name */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -236,19 +197,64 @@ export const TodaysBeatCard = ({
             </div>
           </div>
 
-          {/* Gap indicator - highlighted below the line */}
+          {/* Gap indicator with Target Advisor and Performance buttons */}
           {gap > 0 && !targetLoading && (
-            <div className="flex justify-end mt-2">
-              <div className="text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
-                {formatGapValue(gap)} to go
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
+                  {formatGapValue(gap)} to go
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/target-advisor?period=${targetPeriod}`)}
+                  className="text-xs h-8 gap-1"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Target Advisor
+                </Button>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/performance-dashboard')}
+                className="text-xs h-8 gap-1 w-full"
+              >
+                <BarChart3 className="h-3 w-3" />
+                View Performance
+              </Button>
+            </div>
+          )}
+          {gap === 0 && !targetLoading && target > 0 && (
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="text-sm font-bold text-success bg-success/10 px-3 py-1.5 rounded-md border border-success/20 text-center">
+                Target Achieved! 🎉
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/performance-dashboard')}
+                className="text-xs h-8 gap-1 w-full"
+              >
+                <BarChart3 className="h-3 w-3" />
+                View Performance
+              </Button>
             </div>
           )}
           {target === 0 && !targetLoading && (
-            <div className="flex justify-end mt-2">
+            <div className="flex items-center justify-between mt-2">
               <div className="text-xs text-muted-foreground italic">
                 No target set in My Profile
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/performance-dashboard')}
+                className="text-xs h-8 gap-1"
+              >
+                <BarChart3 className="h-3 w-3" />
+                Performance
+              </Button>
             </div>
           )}
         </div>
