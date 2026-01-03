@@ -17,7 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { 
   Phone, MapPin, Edit2, ExternalLink, TrendingUp, Trash2, ShoppingCart, 
   Check, ChevronsUpDown, FileText, Download, Send, Loader2, ChevronLeft, 
-  ChevronRight, Calendar, BarChart3, User, Building, Gift, Target
+  ChevronRight, Calendar, BarChart3, User, Building, Gift, Target, CreditCard
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +27,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, startOfWeek, endOfWeek, startOfQuarter, endOfQuarter, subQuarters, subMonths as subM, startOfDay, subDays, startOfYear } from "date-fns";
 import { RetailerLoyaltySection } from "./loyalty/RetailerLoyaltySection";
 import { TargetVsActualCard } from "./performance/TargetVsActualCard";
+import { CreditScoreDisplay } from "./CreditScoreDisplay";
 
 interface RetailerInvoice {
   id: string;
@@ -753,12 +754,15 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-5 h-9">
+          <TabsList className="grid w-full grid-cols-6 h-9">
             <TabsTrigger value="overview" className="text-xs">
               <TrendingUp className="h-3 w-3 mr-1" /> Overview
             </TabsTrigger>
             <TabsTrigger value="details" className="text-xs">
               <User className="h-3 w-3 mr-1" /> Details
+            </TabsTrigger>
+            <TabsTrigger value="credit" className="text-xs">
+              <CreditCard className="h-3 w-3 mr-1" /> Credit
             </TabsTrigger>
             <TabsTrigger value="calendar" className="text-xs">
               <Calendar className="h-3 w-3 mr-1" /> Calendar
@@ -929,6 +933,15 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                 retailerId={formData.id} 
                 retailerName={formData.name}
                 territoryId={formData.territory_id}
+              />
+            </TabsContent>
+
+            {/* Credit Tab */}
+            <TabsContent value="credit" className="mt-0 space-y-3">
+              <CreditScoreDisplay 
+                retailerId={formData.id} 
+                variant="full" 
+                showCreditLimit 
               />
             </TabsContent>
 

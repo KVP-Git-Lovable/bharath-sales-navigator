@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, Trash2, Calendar, Users, Check, ShoppingCart, Phone, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, Users, Check, ShoppingCart, Phone, CheckCircle2, CreditCard } from "lucide-react";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
@@ -24,6 +24,7 @@ import { MassEditBeatsModal } from "@/components/MassEditBeatsModal";
 import { RetailerDetailModal } from "@/components/RetailerDetailModal";
 import { BulkImportRetailersModal } from "@/components/BulkImportRetailersModal";
 import { RetailerAnalytics } from "@/components/RetailerAnalytics";
+import { CreditScoreDisplay } from "@/components/CreditScoreDisplay";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
@@ -689,6 +690,10 @@ export const MyRetailers = () => {
                           <span>{r.category}</span>
                         </div>
                       )}
+                      {/* Credit Score Display */}
+                      <div className="pt-2 border-t">
+                        <CreditScoreDisplay retailerId={r.id} variant="compact" showCreditLimit />
+                      </div>
                     </div>
                   </div>
                 </Card>
