@@ -59,17 +59,63 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
 
   const loadOrders = async () => {
     try {
-      // Get orders directly linked to this distributor via distributor_id
-      // This ensures orders remain linked even if retailer mapping changes
-      const { data: ordersData, error: ordersError } = await supabase
+      // First get distributor details for legacy matching
+      const { data: distData } = await supabase
+        .from('distributors')
+        .select('id, name')
+        .eq('id', distributorId)
+        .single();
+
+      const distributorName = distData?.name || '';
+
+      // Get all retailers linked to this distributor (both via distributor_id and legacy parent_name)
+      const { data: retailers } = await supabase
+        .from('retailers')
+        .select('id')
+        .or(`distributor_id.eq.${distributorId},and(parent_type.eq.Distributor,parent_name.ilike.${distributorName})`);
+
+      const retailerIds = retailers?.map(r => r.id) || [];
+
+      // Get orders - either directly linked to distributor OR from linked retailers
+      let allOrders: Order[] = [];
+
+      // Orders directly linked to this distributor (snapshot at order time)
+      const { data: directOrders, error: directError } = await supabase
         .from('orders')
         .select('id, retailer_id, retailer_name, total_amount, status, order_date, created_at, invoice_number, is_credit_order, payment_method')
         .eq('distributor_id', distributorId)
         .order('created_at', { ascending: false })
         .limit(500);
 
-      if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
+      if (directError) throw directError;
+      if (directOrders) allOrders = [...directOrders];
+
+      // Also get orders from currently linked retailers (for orders that don't have distributor_id set)
+      if (retailerIds.length > 0) {
+        const { data: retailerOrders, error: retailerError } = await supabase
+          .from('orders')
+          .select('id, retailer_id, retailer_name, total_amount, status, order_date, created_at, invoice_number, is_credit_order, payment_method')
+          .in('retailer_id', retailerIds)
+          .is('distributor_id', null) // Only get orders without distributor_id (not already captured)
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (retailerError) throw retailerError;
+        if (retailerOrders) {
+          // Merge avoiding duplicates
+          const existingIds = new Set(allOrders.map(o => o.id));
+          retailerOrders.forEach(o => {
+            if (!existingIds.has(o.id)) {
+              allOrders.push(o);
+            }
+          });
+        }
+      }
+
+      // Sort all orders by created_at descending
+      allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setOrders(allOrders);
     } catch (error: any) {
       toast.error("Failed to load orders: " + error.message);
     } finally {
