@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { CameraCapture } from "@/components/CameraCapture";
 import { format, subMonths, isAfter, isBefore, startOfMonth } from "date-fns";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 
 interface Territory {
   id: string;
@@ -363,6 +365,21 @@ export default function RetailManagement() {
            matchesSalesMember && matchesVerified && matchesLastVisited;
   });
 
+  // Pagination - 10 items per page
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems: paginatedRetailers,
+    goToPage,
+    nextPage,
+    prevPage,
+    startIndex,
+    endIndex,
+    totalItems,
+    hasNextPage,
+    hasPrevPage,
+  } = usePagination(filteredRetailers, { pageSize: 10 });
+
   const stats = {
     total: retailers.length,
     verified: retailers.filter(r => r.verification_status === 'verified').length,
@@ -569,14 +586,14 @@ export default function RetailManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRetailers.length === 0 ? (
+                    {paginatedRetailers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                           No retailers found
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredRetailers.map((retailer) => (
+                      paginatedRetailers.map((retailer) => (
                         <TableRow key={retailer.id}>
                           <TableCell>
                             <Avatar 
@@ -585,7 +602,7 @@ export default function RetailManagement() {
                             >
                               <AvatarImage src={retailer.photo_url || undefined} />
                               <AvatarFallback>
-                                <ImageIcon className="w-4 h-4" />
+                                <ImageIcon className="w-4 w-4" />
                               </AvatarFallback>
                             </Avatar>
                           </TableCell>
@@ -638,6 +655,20 @@ export default function RetailManagement() {
                     )}
                   </TableBody>
                 </Table>
+                
+                {/* Pagination */}
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalItems={totalItems}
+                  hasNextPage={hasNextPage}
+                  hasPrevPage={hasPrevPage}
+                  onNextPage={nextPage}
+                  onPrevPage={prevPage}
+                  onGoToPage={goToPage}
+                />
               </div>
             )}
           </CardContent>
