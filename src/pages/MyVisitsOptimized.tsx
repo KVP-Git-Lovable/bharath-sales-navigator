@@ -279,13 +279,15 @@ export const loadAllVisitsForDateOptimized = async (
             const networkRetailers = retailersResult?.data || [];
             const networkOrders = ordersResult?.data || [];
 
-            // Cache retailers and orders
-            for (const retailer of networkRetailers) {
-              await offlineStorage.save(STORES.RETAILERS, retailer);
-            }
-            for (const order of networkOrders) {
-              await offlineStorage.save(STORES.ORDERS, order);
-            }
+            // Cache retailers and orders (single write per store)
+            await Promise.all([
+              networkRetailers.length
+                ? offlineStorage.mergeData(STORES.RETAILERS, networkRetailers)
+                : Promise.resolve(),
+              networkOrders.length
+                ? offlineStorage.mergeData(STORES.ORDERS, networkOrders)
+                : Promise.resolve(),
+            ]);
 
             // Update UI with fresh data
             processAndSetRetailers(

@@ -114,6 +114,19 @@ class OfflineStorage {
     }
   }
 
+  // Replace the entire store in ONE write (critical for large datasets like retailers)
+  async replaceAll<T>(storeName: string, items: T[]): Promise<void> {
+    await this.ensureReady();
+
+    try {
+      await this.setStoreData(storeName, items as any[]);
+      console.log(`[OfflineStorage] ✅ Replaced ${storeName} with ${items.length} items`);
+    } catch (error) {
+      console.error(`[OfflineStorage] ❌ Failed to replace ${storeName}:`, error);
+      throw error;
+    }
+  }
+
   async getById<T>(storeName: string, id: string): Promise<T | null> {
     await this.ensureReady();
     

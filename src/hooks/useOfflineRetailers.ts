@@ -191,11 +191,9 @@ export function useOfflineRetailers() {
 
         if (error) throw error;
 
-        // Update cache
+        // Update cache (single merge write)
         if (data) {
-          for (const retailer of data) {
-            await offlineStorage.save(STORES.RETAILERS, retailer);
-          }
+          await offlineStorage.mergeData(STORES.RETAILERS, data as any);
         }
 
         return { success: true, data: data || [] };

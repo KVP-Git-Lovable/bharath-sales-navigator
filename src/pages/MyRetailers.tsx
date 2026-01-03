@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { UserSelector } from "@/components/UserSelector";
@@ -79,6 +79,7 @@ export const MyRetailers = () => {
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [potentialFilter, setPotentialFilter] = useState<string | undefined>();
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
   const [retailTypeFilter, setRetailTypeFilter] = useState<string | undefined>();
@@ -185,11 +186,8 @@ export const MyRetailers = () => {
         // Save new data first, then clear old data to prevent data loss
         if (data && data.length > 0) {
           console.log('🔄 Updating retailers cache with fresh data:', data.length);
-          // Save all new retailers first
-          for (const retailer of data) {
-            await offlineStorage.save(STORES.RETAILERS, retailer);
-          }
-          setRetailers(data);
+          await offlineStorage.mergeData(STORES.RETAILERS, data as any);
+          setRetailers([...data].sort((a, b) => a.name.localeCompare(b.name)));
         }
       } catch (networkError: any) {
         // Silent fail - cached data is already displayed
@@ -215,25 +213,27 @@ export const MyRetailers = () => {
   }, [retailers]);
 
   const filtered = useMemo(() => {
-    let result = retailers.filter(r => {
-      const searchLower = search.toLowerCase();
-      const matchesSearch = !search || 
+    const searchLower = deferredSearch.trim().toLowerCase();
+    const categoryLower = (categoryFilter || '').trim().toLowerCase();
+    const retailTypeLower = (retailTypeFilter || '').trim().toLowerCase();
+
+    return retailers.filter((r) => {
+      const matchesSearch =
+        !searchLower ||
         r.name.toLowerCase().includes(searchLower) ||
         (r.phone || '').toLowerCase().includes(searchLower) ||
         r.address.toLowerCase().includes(searchLower) ||
         (r.category || '').toLowerCase().includes(searchLower) ||
         r.beat_id.toLowerCase().includes(searchLower);
-      
+
       const matchesPotential = !potentialFilter || r.potential === potentialFilter;
-      const matchesCategory = !categoryFilter || (r.category || '').toLowerCase().includes(categoryFilter.toLowerCase());
-      const matchesRetailType = !retailTypeFilter || (r.retail_type || '').toLowerCase().includes(retailTypeFilter.toLowerCase());
+      const matchesCategory = !categoryLower || (r.category || '').toLowerCase().includes(categoryLower);
+      const matchesRetailType = !retailTypeLower || (r.retail_type || '').toLowerCase().includes(retailTypeLower);
       const matchesBeat = !beatFilter || r.beat_id === beatFilter;
-      
+
       return matchesSearch && matchesPotential && matchesCategory && matchesRetailType && matchesBeat;
     });
-    
-    return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [retailers, search, potentialFilter, categoryFilter, retailTypeFilter, beatFilter]);
+  }, [retailers, deferredSearch, potentialFilter, categoryFilter, retailTypeFilter, beatFilter]);
 
   // Pagination - 10 items per page
   const {

@@ -412,11 +412,8 @@ export const MyBeats = () => {
             .order('name');
 
           if (!error && onlineData) {
-            // Update cache
-            await offlineStorage.clear(STORES.RETAILERS);
-            for (const retailer of onlineData) {
-              await offlineStorage.save(STORES.RETAILERS, retailer);
-            }
+            // Update cache (single write to avoid UI hangs on large datasets)
+            await offlineStorage.replaceAll(STORES.RETAILERS, onlineData);
             
             // Update UI with fresh data
             const retailersWithMetrics = onlineData.map((retailer: any) => ({

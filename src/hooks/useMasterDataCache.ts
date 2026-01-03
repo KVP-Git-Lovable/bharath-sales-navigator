@@ -192,10 +192,7 @@ export function useMasterDataCache() {
 
       // Only clear and update cache if fetch succeeded
       if (retailers) {
-        await offlineStorage.clear(STORES.RETAILERS);
-        for (const retailer of retailers) {
-          await offlineStorage.save(STORES.RETAILERS, retailer);
-        }
+        await offlineStorage.replaceAll(STORES.RETAILERS, retailers);
         console.log(`[Cache] ✅ ${retailers.length} retailers cached`);
       }
       onProgress?.('retailers', 'done');
@@ -431,8 +428,7 @@ export function useMasterDataCache() {
       onProgress('retailers', 'loading');
       const { data: retailers } = await supabase.from('retailers').select('*').eq('user_id', user.id);
       if (retailers) {
-        await offlineStorage.clear(STORES.RETAILERS);
-        for (const r of retailers) await offlineStorage.save(STORES.RETAILERS, r);
+        await offlineStorage.replaceAll(STORES.RETAILERS, retailers);
       }
       summary.retailers = retailers?.length || 0;
       onItemCount?.('retailers', summary.retailers);
