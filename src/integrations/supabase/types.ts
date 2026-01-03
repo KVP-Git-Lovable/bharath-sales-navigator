@@ -2409,6 +2409,65 @@ export type Database = {
           },
         ]
       }
+      distributor_evaluation_tasks: {
+        Row: {
+          attachment_urls: string[] | null
+          completed_date: string | null
+          created_at: string
+          created_by: string | null
+          distributor_id: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          owner_user_id: string | null
+          status: string
+          task_key: string
+          task_label: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          distributor_id: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          status?: string
+          task_key: string
+          task_label: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          distributor_id?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          status?: string
+          task_key?: string
+          task_label?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_evaluation_tasks_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_ideas: {
         Row: {
           attachment_urls: string[] | null
