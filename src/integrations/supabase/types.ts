@@ -7981,6 +7981,8 @@ export type Database = {
           beat_name: string | null
           category: string | null
           competitors: string[] | null
+          contact_name: string | null
+          contact_title: string | null
           created_at: string
           distributor_id: string | null
           entity_type: string
@@ -8025,6 +8027,8 @@ export type Database = {
           beat_name?: string | null
           category?: string | null
           competitors?: string[] | null
+          contact_name?: string | null
+          contact_title?: string | null
           created_at?: string
           distributor_id?: string | null
           entity_type?: string
@@ -8069,6 +8073,8 @@ export type Database = {
           beat_name?: string | null
           category?: string | null
           competitors?: string[] | null
+          contact_name?: string | null
+          contact_title?: string | null
           created_at?: string
           distributor_id?: string | null
           entity_type?: string

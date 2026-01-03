@@ -34,6 +34,8 @@ export const AddRetailer = () => {
   const plannedBeats = location.state?.plannedBeats || [];
   const [retailerData, setRetailerData] = useState({
     name: "",
+    contactName: "",
+    contactTitle: "",
     gstNumber: "",
     phone: "",
     address: "",
@@ -54,6 +56,11 @@ export const AddRetailer = () => {
     manual_credit_score: "",
     state: ""
   });
+  
+  // State to track the scanned board photo URL
+  const [scannedBoardPhotoUrl, setScannedBoardPhotoUrl] = useState<string | null>(null);
+  
+  const contactTitles = ["Shop owner", "Support staff", "Family member", "Others"];
 
   const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
@@ -519,6 +526,38 @@ export const AddRetailer = () => {
             const compressedImage = await compressImage(base64Image);
 
             try {
+              // Upload the scanned image to Supabase Storage for reuse
+              const fileName = `${user.id}/${Date.now()}_scanned_board.jpg`;
+              
+              // Convert compressed base64 to blob for upload
+              const fetchRes = await fetch(compressedImage);
+              const blob = await fetchRes.blob();
+              
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('retailer-photos')
+                .upload(fileName, blob, {
+                  cacheControl: '3600',
+                  upsert: false
+                });
+
+              if (!uploadError && uploadData) {
+                // Get public URL
+                const { data: urlData } = supabase.storage
+                  .from('retailer-photos')
+                  .getPublicUrl(fileName);
+                
+                const uploadedPhotoUrl = urlData.publicUrl;
+                
+                // Set as scanned board preview
+                setScannedBoardPhotoUrl(uploadedPhotoUrl);
+                
+                // Also use this as retailer photo if no photo is set yet
+                if (!retailerData.photo_url) {
+                  handleInputChange('photo_url', uploadedPhotoUrl);
+                  setCapturedPhotoPreview(compressedImage);
+                }
+              }
+
               // Call edge function with compressed image
               const { data, error } = await supabase.functions.invoke('scan-board', {
                 body: { imageBase64: compressedImage }
@@ -566,13 +605,13 @@ export const AddRetailer = () => {
               if (fieldsFound.length > 0) {
                 toast({ 
                   title: 'Success!', 
-                  description: `Found ${fieldsFound.join(', ')} from the board`,
+                  description: `Found ${fieldsFound.join(', ')} from the board. Photo saved as retailer photo.`,
                   duration: 3000
                 });
               } else {
                 toast({ 
                   title: 'Scan Complete', 
-                  description: 'No clear information found. Please enter details manually.',
+                  description: 'No clear information found. Photo saved. Please enter details manually.',
                   duration: 3000
                 });
               }
@@ -635,6 +674,8 @@ export const AddRetailer = () => {
     const payload: any = {
       user_id: user.id,
       name: retailerData.name,
+      contact_name: retailerData.contactName || null,
+      contact_title: retailerData.contactTitle || null,
       gst_number: retailerData.gstNumber || null,
       phone: retailerData.phone,
       address: retailerData.address,
@@ -774,29 +815,74 @@ export const AddRetailer = () => {
               <CardTitle className="text-lg">{t('retailer.information')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Scan Board Section */}
-              <div className="space-y-2 p-3 bg-muted/30 rounded-lg border border-dashed">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-semibold">{t('retailer.quickScan')}</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('retailer.quickScanDesc')}
-                    </p>
+              {/* Scan Board & Retailer Photo Section - Side by Side with Background */}
+              <div className="p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 rounded-xl border border-primary/20">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Scan Board */}
+                  <div className="space-y-3">
+                    <div className="flex flex-col items-center text-center p-3 bg-background/80 rounded-lg border">
+                      <ScanLine className="h-8 w-8 text-primary mb-2" />
+                      <Label className="text-sm font-semibold">{t('retailer.quickScan')}</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {t('retailer.quickScanDesc')}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={handleScanBoard}
+                        disabled={isScanningBoard}
+                        className="w-full"
+                      >
+                        <ScanLine size={16} className="mr-2" />
+                        {isScanningBoard ? t('retailer.scanning') : t('retailer.scanBoard')}
+                      </Button>
+                      {scannedBoardPhotoUrl && (
+                        <div className="mt-2 w-16 h-16 border-2 border-primary rounded-lg overflow-hidden">
+                          <img
+                            src={scannedBoardPhotoUrl}
+                            alt="Scanned board"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    onClick={handleScanBoard}
-                    disabled={isScanningBoard}
-                    className="flex items-center gap-2"
-                  >
-                    <ScanLine size={16} />
-                    {isScanningBoard ? t('retailer.scanning') : t('retailer.scanBoard')}
-                  </Button>
+                  
+                  {/* Retailer Photo */}
+                  <div className="space-y-3">
+                    <div className="flex flex-col items-center text-center p-3 bg-background/80 rounded-lg border">
+                      <Camera className="h-8 w-8 text-accent mb-2" />
+                      <Label className="text-sm font-semibold">{t('retailer.retailerPhoto')}</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {t('retailer.photoDesc')}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePhotoCapture}
+                        disabled={isUploadingPhoto}
+                        className="w-full"
+                      >
+                        <Camera size={16} className="mr-2" />
+                        {isUploadingPhoto ? t('retailer.uploading') : t('retailer.takePhoto')}
+                      </Button>
+                      {(capturedPhotoPreview || retailerData.photo_url) && (
+                        <div className="mt-2 w-16 h-16 border-2 border-accent rounded-lg overflow-hidden">
+                          <img
+                            src={capturedPhotoPreview || retailerData.photo_url}
+                            alt="Retailer photo"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              {/* Retailer Name */}
               <div className="space-y-2">
                 <Label htmlFor="name">{t('retailer.retailerName')} *</Label>
                 <Input
@@ -808,6 +894,36 @@ export const AddRetailer = () => {
                 />
               </div>
 
+              {/* Contact Name and Title - Under Retailer Name */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contactName">Contact Name</Label>
+                  <Input
+                    id="contactName"
+                    placeholder="Enter contact person name"
+                    value={retailerData.contactName}
+                    onChange={(e) => handleInputChange("contactName", e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contactTitle">Title</Label>
+                  <Select 
+                    value={retailerData.contactTitle} 
+                    onValueChange={(value) => handleInputChange("contactTitle", value)}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select title" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border z-50">
+                      {contactTitles.map((title) => (
+                        <SelectItem key={title} value={title}>{title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="gstNumber">{t('retailer.gstNumber')}</Label>
                 <Input
@@ -817,38 +933,6 @@ export const AddRetailer = () => {
                   onChange={(e) => handleInputChange("gstNumber", e.target.value)}
                   className="bg-background"
                 />
-              </div>
-
-              {/* Photo Attachment Section */}
-              <div className="space-y-2">
-                <Label>{t('retailer.retailerPhoto')}</Label>
-                <div className="flex items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePhotoCapture}
-                    disabled={isUploadingPhoto}
-                    className="flex items-center gap-2"
-                  >
-                    <Camera size={16} />
-                    {isUploadingPhoto ? t('retailer.uploading') : t('retailer.takePhoto')}
-                  </Button>
-                  
-                  {(capturedPhotoPreview || retailerData.photo_url) && (
-                    <div className="flex items-center gap-2">
-                      <div className="w-12 h-12 border rounded-lg overflow-hidden bg-muted">
-                        <img
-                          src={capturedPhotoPreview || retailerData.photo_url}
-                          alt="Retailer photo"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <span className="text-sm text-muted-foreground">{t('retailer.photoCaptured')}</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">{t('retailer.photoDesc')}</p>
               </div>
 
               <div className="space-y-2">
