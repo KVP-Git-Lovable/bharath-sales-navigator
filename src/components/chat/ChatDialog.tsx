@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Zap, Sparkles, AlertTriangle, TrendingUp, Users, Calendar, ChevronRight, X, Mic, MicOff } from 'lucide-react';
+import { Send, Loader2, Zap, Sparkles, AlertTriangle, TrendingUp, Users, Calendar, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -8,7 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from './ChatMessage';
 import { useChatCache } from '@/hooks/useChatCache';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { useProactiveInsights } from '@/hooks/useProactiveInsights';
+import { ProactiveInsightCard } from './ProactiveInsightCard';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -61,11 +62,12 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
   const [retryCount, setRetryCount] = useState(0);
   const [userName, setUserName] = useState<string>('');
   const [isManager, setIsManager] = useState(false);
-  const [showInsightCards, setShowInsightCards] = useState(true);
+  const [showInsights, setShowInsights] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
   const { getCachedResponse, cacheResponse } = useChatCache();
+  const { insights, dismissInsight, isLoading: insightsLoading } = useProactiveInsights();
 
   // Fetch user info on mount
   useEffect(() => {
@@ -325,7 +327,7 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
     if (!messageText.trim() || isLoading) return;
 
     // Hide insight cards after first message
-    setShowInsightCards(false);
+    setShowInsights(false);
 
     const userMessage: Message = { role: 'user', content: messageText };
     setMessages(prev => [...prev, userMessage]);
@@ -460,6 +462,60 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
               )}
             </div>
           ))}
+
+          {/* Proactive Insights Section */}
+          {showInsights && insights.length > 0 && messages.length <= 1 && (
+            <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-500">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Today's Insights</span>
+                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                    {insights.length}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowInsights(false)}
+                  className="h-6 text-xs text-muted-foreground"
+                >
+                  Hide
+                  <ChevronUp className="h-3 w-3 ml-1" />
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
+                {insights.slice(0, 3).map((insight) => (
+                  <ProactiveInsightCard
+                    key={insight.id}
+                    insight={insight}
+                    onDismiss={dismissInsight}
+                  />
+                ))}
+              </div>
+              
+              {insights.length > 3 && (
+                <p className="text-xs text-center text-muted-foreground">
+                  +{insights.length - 3} more insights available
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Collapsed insights toggle */}
+          {!showInsights && insights.length > 0 && messages.length <= 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInsights(true)}
+              className="w-full text-xs gap-2"
+            >
+              <Sparkles className="h-3 w-3" />
+              Show {insights.length} insights
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          )}
           
           {isLoading && !messages[messages.length - 1]?.content && (
             <div className="flex items-center gap-3 pl-11 animate-in fade-in duration-200">
