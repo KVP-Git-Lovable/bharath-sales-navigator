@@ -13,7 +13,8 @@ import {
   MapPin,
   Users,
   Truck,
-  Filter
+  Filter,
+  ArrowRightLeft
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RetailerRemapDialog } from "@/components/distributor/RetailerRemapDialog";
 
 interface Distributor {
   id: string;
@@ -75,6 +77,7 @@ export default function DistributorMaster() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [showRemapDialog, setShowRemapDialog] = useState(false);
 
   useEffect(() => {
     loadDistributors();
@@ -121,13 +124,23 @@ export default function DistributorMaster() {
             <h1 className="text-xl font-bold text-foreground">Distributor Master</h1>
             <p className="text-sm text-muted-foreground">Manage your distribution network</p>
           </div>
-          <Button 
-            onClick={() => navigate('/add-distributor')}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add New
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setShowRemapDialog(true)}
+              className="gap-2"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Remap
+            </Button>
+            <Button 
+              onClick={() => navigate('/add-distributor')}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add New
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -304,6 +317,13 @@ export default function DistributorMaster() {
             ))}
           </div>
         )}
+
+        {/* Remap Dialog */}
+        <RetailerRemapDialog 
+          open={showRemapDialog} 
+          onOpenChange={setShowRemapDialog}
+          onSuccess={loadDistributors}
+        />
       </div>
     </Layout>
   );

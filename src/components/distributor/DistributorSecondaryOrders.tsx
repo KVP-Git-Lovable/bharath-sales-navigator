@@ -59,27 +59,12 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
 
   const loadOrders = async () => {
     try {
-      // First get all retailers linked to this distributor
-      const { data: retailers, error: retailerError } = await supabase
-        .from('retailers')
-        .select('id')
-        .eq('distributor_id', distributorId);
-
-      if (retailerError) throw retailerError;
-
-      if (!retailers || retailers.length === 0) {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      const retailerIds = retailers.map(r => r.id);
-
-      // Get orders from these retailers
+      // Get orders directly linked to this distributor via distributor_id
+      // This ensures orders remain linked even if retailer mapping changes
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, retailer_id, retailer_name, total_amount, status, order_date, created_at, invoice_number, is_credit_order, payment_method')
-        .in('retailer_id', retailerIds)
+        .eq('distributor_id', distributorId)
         .order('created_at', { ascending: false })
         .limit(500);
 
