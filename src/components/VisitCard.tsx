@@ -50,6 +50,7 @@ interface Visit {
   retailerName: string;
   address: string;
   phone: string;
+  contactName?: string;
   retailerCategory: string;
   status: "planned" | "in-progress" | "productive" | "unproductive" | "store-closed" | "cancelled";
   visitType: string;
@@ -2601,7 +2602,7 @@ export const VisitCard = ({
               if (cleaned) window.location.href = `tel:${cleaned}`;
             }} title="Call">
                 <Phone size={12} className="sm:size-3.5" />
-                <span>{visit.phone}</span>
+                <span>{visit.contactName ? `${visit.contactName} - ` : ''}{visit.phone}</span>
               </a>
             </div>
           </div>
