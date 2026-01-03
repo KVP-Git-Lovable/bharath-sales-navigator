@@ -349,6 +349,11 @@ export const SmartBasketButton: React.FC<SmartBasketButtonProps> = ({
                                     <Badge variant="outline" className="text-[10px] h-4">
                                       {formatDaysAgo(item.lastOrdered)}
                                     </Badge>
+                                    {item.rate > 0 && (
+                                      <Badge variant="secondary" className="text-[10px] h-4 bg-green-100 text-green-700">
+                                        ₹{item.rate.toFixed(2)}
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -409,13 +414,18 @@ export const SmartBasketButton: React.FC<SmartBasketButtonProps> = ({
                                   <div className="font-medium text-sm truncate mb-1">
                                     {item.variantName || item.productName}
                                   </div>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1 flex-wrap">
                                     <Badge className="text-[10px] h-4 bg-blue-500">
                                       {item.beatPenetration}% of beat
                                     </Badge>
                                     <span className="text-[10px] text-muted-foreground">
                                       ({item.retailerCount}/{item.totalBeatRetailers} retailers)
                                     </span>
+                                    {item.rate > 0 && (
+                                      <Badge variant="secondary" className="text-[10px] h-4 bg-green-100 text-green-700">
+                                        ₹{item.rate.toFixed(2)}
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

@@ -13,6 +13,7 @@ interface RepeatOrderSuggestion {
   variantName?: string;
   quantity: number;
   unit: string;
+  rate: number;
   confidence: number;
   orderCount: number;
   lastOrdered: string;
@@ -26,6 +27,7 @@ interface BeatTrendingSuggestion {
   variantName?: string;
   suggestedQuantity: number;
   unit: string;
+  rate: number;
   beatPenetration: number;
   retailerCount: number;
   totalBeatRetailers: number;
@@ -110,7 +112,16 @@ serve(async (req) => {
 
     console.log('📊 Retailer orders found:', retailerOrders?.length || 0);
 
-    // 2. Analyze repeat order patterns
+  // 2. Analyze repeat order patterns
+    // Helper to parse product_id which may contain variant info
+    const parseProductId = (productId: string): { baseProductId: string; variantId?: string } => {
+      if (productId.includes('_variant_')) {
+        const parts = productId.split('_variant_');
+        return { baseProductId: parts[0], variantId: parts[1] };
+      }
+      return { baseProductId: productId, variantId: undefined };
+    };
+
     const repeatOrderMap = new Map<string, {
       productId: string;
       productName: string;
@@ -118,21 +129,33 @@ serve(async (req) => {
       variantName?: string;
       quantities: number[];
       units: string[];
+      rates: number[];
       orderDates: string[];
     }>();
 
     for (const order of retailerOrders || []) {
       for (const item of order.order_items || []) {
         const key = item.product_id;
+        const { baseProductId, variantId } = parseProductId(item.product_id);
+        
+        // Extract variant name from product_name if it contains " - "
+        let productName = item.product_name;
+        let variantName: string | undefined = undefined;
+        if (item.product_name.includes(' - ')) {
+          const nameParts = item.product_name.split(' - ');
+          productName = nameParts[0];
+          variantName = nameParts[1];
+        }
         
         if (!repeatOrderMap.has(key)) {
           repeatOrderMap.set(key, {
-            productId: item.product_id,
-            productName: item.product_name,
-            variantId: undefined,
-            variantName: undefined,
+            productId: baseProductId,
+            productName: variantName || productName,
+            variantId: variantId,
+            variantName: variantName,
             quantities: [],
             units: [],
+            rates: [],
             orderDates: []
           });
         }
@@ -140,6 +163,7 @@ serve(async (req) => {
         const entry = repeatOrderMap.get(key)!;
         entry.quantities.push(item.quantity);
         entry.units.push(item.unit || 'KG');
+        entry.rates.push(item.rate || 0);
         entry.orderDates.push(order.created_at);
       }
     }
@@ -177,6 +201,9 @@ serve(async (req) => {
       // Final confidence score
       const confidence = (frequency * 0.5) + (recencyScore * 0.3) + (consistencyScore * 0.2);
       
+      // Get most recent rate
+      const latestRate = data.rates.length > 0 ? data.rates[0] : 0;
+      
       repeatOrderSuggestions.push({
         productId: data.productId,
         productName: data.productName,
@@ -184,6 +211,7 @@ serve(async (req) => {
         variantName: data.variantName,
         quantity: typicalQty,
         unit: preferredUnit,
+        rate: latestRate,
         confidence: Math.round(confidence * 100) / 100,
         orderCount,
         lastOrdered: data.orderDates[0],
@@ -224,7 +252,8 @@ serve(async (req) => {
               product_id,
               product_name,
               quantity,
-              unit
+              unit,
+              rate
             )
           `)
           .in('retailer_id', beatRetailerIds)
@@ -241,21 +270,33 @@ serve(async (req) => {
             retailerIds: Set<string>;
             quantities: number[];
             units: string[];
+            rates: number[];
           }>();
 
           for (const order of beatOrders) {
             for (const item of order.order_items || []) {
               const key = item.product_id;
+              const { baseProductId, variantId } = parseProductId(item.product_id);
+              
+              // Extract variant name from product_name if it contains " - "
+              let productName = item.product_name;
+              let variantName: string | undefined = undefined;
+              if (item.product_name.includes(' - ')) {
+                const nameParts = item.product_name.split(' - ');
+                productName = nameParts[0];
+                variantName = nameParts[1];
+              }
               
               if (!beatProductMap.has(key)) {
                 beatProductMap.set(key, {
-                  productId: item.product_id,
-                  productName: item.product_name,
-                  variantId: undefined,
-                  variantName: undefined,
+                  productId: baseProductId,
+                  productName: variantName || productName,
+                  variantId: variantId,
+                  variantName: variantName,
                   retailerIds: new Set(),
                   quantities: [],
-                  units: []
+                  units: [],
+                  rates: []
                 });
               }
               
@@ -263,6 +304,7 @@ serve(async (req) => {
               entry.retailerIds.add(order.retailer_id);
               entry.quantities.push(item.quantity);
               entry.units.push(item.unit || 'KG');
+              entry.rates.push(item.rate || 0);
             }
           }
 
@@ -271,12 +313,14 @@ serve(async (req) => {
             Array.from(repeatOrderMap.keys())
           );
 
-          // Find products with high penetration that current retailer hasn't ordered
+          // Lower threshold to 20% for trending and also suggest popular products 
+          // that current retailer orders LESS frequently than others in beat
           for (const [key, data] of beatProductMap.entries()) {
             const penetration = data.retailerIds.size / totalBeatRetailers;
             
-            // Only suggest if penetration > 30% AND current retailer hasn't ordered
-            if (penetration >= 0.30 && !currentRetailerProducts.has(key)) {
+            // Suggest if penetration >= 20% AND current retailer hasn't ordered recently
+            // (relaxed condition - also suggest if retailer ordered but much less frequently)
+            if (penetration >= 0.20 && !currentRetailerProducts.has(key)) {
               // Calculate suggested quantity (median of beat orders)
               const sortedQty = [...data.quantities].sort((a, b) => a - b);
               const suggestedQty = sortedQty[Math.floor(sortedQty.length / 2)];
@@ -288,6 +332,9 @@ serve(async (req) => {
               }, {} as Record<string, number>);
               const preferredUnit = Object.entries(unitCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'KG';
               
+              // Get most recent rate
+              const latestRate = data.rates.length > 0 ? data.rates[data.rates.length - 1] : 0;
+              
               beatTrendingSuggestions.push({
                 productId: data.productId,
                 productName: data.productName,
@@ -295,6 +342,7 @@ serve(async (req) => {
                 variantName: data.variantName,
                 suggestedQuantity: suggestedQty,
                 unit: preferredUnit,
+                rate: latestRate,
                 beatPenetration: Math.round(penetration * 100),
                 retailerCount: data.retailerIds.size,
                 totalBeatRetailers,
@@ -303,9 +351,9 @@ serve(async (req) => {
             }
           }
 
-          // Sort by penetration and take top 5
+          // Sort by penetration and take top 10
           beatTrendingSuggestions.sort((a, b) => b.beatPenetration - a.beatPenetration);
-          beatTrendingSuggestions = beatTrendingSuggestions.slice(0, 5);
+          beatTrendingSuggestions = beatTrendingSuggestions.slice(0, 10);
         }
       }
     }
