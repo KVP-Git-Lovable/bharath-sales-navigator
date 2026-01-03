@@ -137,6 +137,8 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
   const [loading, setLoading] = useState(false);
   const [beats, setBeats] = useState<{ beat_id: string; beat_name: string }[]>([]);
   const [territories, setTerritories] = useState<{ id: string; name: string; region: string }[]>([]);
+  const [distributors, setDistributors] = useState<{ id: string; name: string }[]>([]);
+  const [distributorOpen, setDistributorOpen] = useState(false);
   const [territoryOpen, setTerritoryOpen] = useState(false);
   const [creditConfig, setCreditConfig] = useState<{is_enabled: boolean, scoring_mode: string} | null>(null);
   const [invoices, setInvoices] = useState<RetailerInvoice[]>([]);
@@ -190,6 +192,7 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
       loadBeats();
       loadTerritories();
       loadCreditConfig();
+      loadDistributors();
     }
   }, [user, isOpen]);
 
@@ -524,6 +527,21 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
       setTerritories(data || []);
     } catch (error: any) {
       console.error('Error loading territories:', error);
+    }
+  };
+
+  const loadDistributors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('distributors')
+        .select('id, name')
+        .eq('status', 'active')
+        .order('name');
+      
+      if (error) throw error;
+      setDistributors(data || []);
+    } catch (error: any) {
+      console.error('Error loading distributors:', error);
     }
   };
 
@@ -1285,7 +1303,37 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                   <div>
                     <Label className="text-xs text-muted-foreground">Parent Name / Distributor</Label>
                     {isEditing ? (
-                      <Input value={formData.parent_name || ''} onChange={(e) => setFormData({...formData, parent_name: e.target.value})} className="h-8 text-sm mt-1" placeholder="Distributor name" />
+                      <Popover open={distributorOpen} onOpenChange={setDistributorOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" aria-expanded={distributorOpen} className="w-full h-8 text-sm mt-1 justify-between font-normal">
+                            {formData.parent_name || "Select distributor..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[250px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search distributors..." className="h-9" />
+                            <CommandList>
+                              <CommandEmpty>No distributor found.</CommandEmpty>
+                              <CommandGroup>
+                                {distributors.map((dist) => (
+                                  <CommandItem
+                                    key={dist.id}
+                                    value={dist.name}
+                                    onSelect={() => {
+                                      setFormData({...formData, parent_name: dist.name});
+                                      setDistributorOpen(false);
+                                    }}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", formData.parent_name === dist.name ? "opacity-100" : "opacity-0")} />
+                                    {dist.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     ) : (
                       <p className="text-sm">{formData.parent_name || associatedDistributor || '-'}</p>
                     )}
@@ -1306,14 +1354,16 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                         <SelectTrigger className="h-8 text-sm mt-1"><SelectValue placeholder="Select type" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="Grocery Store">Grocery Store</SelectItem>
-                          <SelectItem value="Supermarket">Supermarket</SelectItem>
-                          <SelectItem value="Convenience Store">Convenience Store</SelectItem>
-                          <SelectItem value="Provision Store">Provision Store</SelectItem>
-                          <SelectItem value="General Store">General Store</SelectItem>
+                          <SelectItem value="Individual stall">Individual stall</SelectItem>
+                          <SelectItem value="Kirana store">Kirana store</SelectItem>
+                          <SelectItem value="Super market">Super market</SelectItem>
+                          <SelectItem value="Bakery">Bakery</SelectItem>
                           <SelectItem value="Milk Parlour">Milk Parlour</SelectItem>
                           <SelectItem value="Hotel">Hotel</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
+                          <SelectItem value="Restaurants">Restaurants</SelectItem>
+                          <SelectItem value="Catering Services">Catering Services</SelectItem>
+                          <SelectItem value="Business Office">Business Office</SelectItem>
+                          <SelectItem value="Others">Others</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
