@@ -223,6 +223,22 @@ export default function AddDistributor() {
             </CardContent>
           </Card>
 
+          {/* About Business - Moved up */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">About Business</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                id="about_business"
+                value={formData.about_business}
+                onChange={(e) => handleChange("about_business", e.target.value)}
+                placeholder="Additional notes about the business"
+                rows={3}
+              />
+            </CardContent>
+          </Card>
+
           {/* Distribution Details */}
           <Card>
             <CardHeader className="pb-3">
@@ -491,21 +507,7 @@ export default function AddDistributor() {
             </CardContent>
           </Card>
 
-          {/* About Business */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">About Business</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                id="about_business"
-                value={formData.about_business}
-                onChange={(e) => handleChange("about_business", e.target.value)}
-                placeholder="Additional notes about the business"
-                rows={3}
-              />
-            </CardContent>
-          </Card>
+          {/* About Business section already shown after Basic Information */}
 
           {/* Submit Button */}
           <Button type="submit" className="w-full gap-2" disabled={loading}>

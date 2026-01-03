@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { 
   Dialog,
   DialogContent,
@@ -10,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Users, Phone, Mail, Edit, Trash2, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Users, Phone, Mail, Edit, Trash2, Calendar, ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -31,6 +33,8 @@ interface Contact {
   role: string | null;
   reports_to: string | null;
   is_primary: boolean;
+  is_active: boolean;
+  seniority: string | null;
   years_of_experience: number | null;
   years_with_distributor: number | null;
   birth_date: string | null;
@@ -39,6 +43,27 @@ interface Contact {
 interface Props {
   distributorId: string;
 }
+
+const ROLE_OPTIONS = [
+  { value: "owner", label: "Owner" },
+  { value: "director", label: "Director" },
+  { value: "manager", label: "Manager" },
+  { value: "sales", label: "Sales" },
+  { value: "operations", label: "Operations" },
+  { value: "finance", label: "Finance" },
+  { value: "warehouse", label: "Warehouse" },
+  { value: "delivery", label: "Delivery" },
+  { value: "admin", label: "Admin" },
+  { value: "other", label: "Other" },
+];
+
+const SENIORITY_OPTIONS = [
+  { value: "c_level", label: "C-Level" },
+  { value: "executive", label: "Executive" },
+  { value: "senior", label: "Senior" },
+  { value: "mid", label: "Mid-Level" },
+  { value: "entry", label: "Entry" },
+];
 
 export function DistributorContactsList({ distributorId }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -53,8 +78,10 @@ export function DistributorContactsList({ distributorId }: Props) {
     email: "",
     address: "",
     role: "",
+    seniority: "",
     reports_to: "",
     is_primary: false,
+    is_active: true,
     years_of_experience: "",
     years_with_distributor: "",
     birth_date: "",
@@ -73,7 +100,10 @@ export function DistributorContactsList({ distributorId }: Props) {
         .order('is_primary', { ascending: false });
 
       if (error) throw error;
-      setContacts(data || []);
+      setContacts((data || []).map(c => ({
+        ...c,
+        is_active: c.is_active ?? true,
+      })));
     } catch (error: any) {
       toast.error("Failed to load contacts: " + error.message);
     } finally {
@@ -89,8 +119,10 @@ export function DistributorContactsList({ distributorId }: Props) {
       email: "",
       address: "",
       role: "",
+      seniority: "",
       reports_to: "",
       is_primary: false,
+      is_active: true,
       years_of_experience: "",
       years_with_distributor: "",
       birth_date: "",
@@ -107,8 +139,10 @@ export function DistributorContactsList({ distributorId }: Props) {
       email: contact.email || "",
       address: contact.address || "",
       role: contact.role || "",
+      seniority: contact.seniority || "",
       reports_to: contact.reports_to || "",
       is_primary: contact.is_primary,
+      is_active: contact.is_active ?? true,
       years_of_experience: contact.years_of_experience?.toString() || "",
       years_with_distributor: contact.years_with_distributor?.toString() || "",
       birth_date: contact.birth_date || "",
@@ -133,8 +167,10 @@ export function DistributorContactsList({ distributorId }: Props) {
         email: formData.email.trim() || null,
         address: formData.address.trim() || null,
         role: formData.role || null,
+        seniority: formData.seniority || null,
         reports_to: formData.reports_to || null,
         is_primary: formData.is_primary,
+        is_active: formData.is_active,
         years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : null,
         years_with_distributor: formData.years_with_distributor ? parseInt(formData.years_with_distributor) : null,
         birth_date: formData.birth_date || null,
@@ -180,6 +216,7 @@ export function DistributorContactsList({ distributorId }: Props) {
   };
 
   const primaryContact = contacts.find(c => c.is_primary);
+  const activeContacts = contacts.filter(c => c.is_active !== false);
 
   return (
     <Card>
@@ -191,7 +228,7 @@ export function DistributorContactsList({ distributorId }: Props) {
           >
             <CardTitle className="text-sm flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Contacts ({contacts.length})
+              Contacts ({activeContacts.length})
             </CardTitle>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
@@ -222,11 +259,12 @@ export function DistributorContactsList({ distributorId }: Props) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="designation">Designation</Label>
+                    <Label htmlFor="designation">Title/Designation</Label>
                     <Input
                       id="designation"
                       value={formData.designation}
                       onChange={(e) => setFormData(prev => ({ ...prev, designation: e.target.value }))}
+                      placeholder="e.g., Sales Manager"
                     />
                   </div>
                   <div>
@@ -236,12 +274,39 @@ export function DistributorContactsList({ distributorId }: Props) {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="owner">Owner</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="sales">Sales</SelectItem>
-                        <SelectItem value="operations">Operations</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        {ROLE_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Seniority</Label>
+                    <Select value={formData.seniority} onValueChange={(v) => setFormData(prev => ({ ...prev, seniority: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select seniority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SENIORITY_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Reports To</Label>
+                    <Select value={formData.reports_to} onValueChange={(v) => setFormData(prev => ({ ...prev, reports_to: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select manager" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {contacts.filter(c => c.id !== editingContact?.id).map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.contact_name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -276,21 +341,6 @@ export function DistributorContactsList({ distributorId }: Props) {
                   />
                 </div>
 
-                <div>
-                  <Label>Reports To</Label>
-                  <Select value={formData.reports_to} onValueChange={(v) => setFormData(prev => ({ ...prev, reports_to: v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select manager" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {contacts.filter(c => c.id !== editingContact?.id).map(c => (
-                        <SelectItem key={c.id} value={c.id}>{c.contact_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="years_of_experience">Experience (Years)</Label>
@@ -322,15 +372,23 @@ export function DistributorContactsList({ distributorId }: Props) {
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="is_primary"
-                    checked={formData.is_primary}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_primary: e.target.checked }))}
-                    className="h-4 w-4"
-                  />
-                  <Label htmlFor="is_primary">Primary Contact</Label>
+                <div className="flex items-center justify-between gap-4 pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="is_primary"
+                      checked={formData.is_primary}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_primary: checked }))}
+                    />
+                    <Label htmlFor="is_primary">Primary Contact</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="is_active"
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                    />
+                    <Label htmlFor="is_active">Active</Label>
+                  </div>
                 </div>
 
                 <Button type="submit" className="w-full">
@@ -369,23 +427,33 @@ export function DistributorContactsList({ distributorId }: Props) {
           ) : (
             <div className="space-y-3">
               {contacts.map(contact => (
-                <div key={contact.id} className="border rounded-lg p-3 relative">
-                  {contact.is_primary && (
-                    <span className="absolute top-2 right-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                      Primary
-                    </span>
-                  )}
+                <div key={contact.id} className={`border rounded-lg p-3 relative ${!contact.is_active ? 'opacity-60 bg-muted/30' : ''}`}>
+                  <div className="flex gap-2 absolute top-2 right-2">
+                    {contact.is_primary && (
+                      <Badge className="bg-primary/10 text-primary text-xs">Primary</Badge>
+                    )}
+                    {!contact.is_active && (
+                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                    )}
+                  </div>
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                    <div className="flex-1 pr-20">
                       <p className="font-medium">{contact.contact_name}</p>
                       {contact.designation && (
                         <p className="text-sm text-muted-foreground">{contact.designation}</p>
                       )}
-                      {contact.role && (
-                        <span className="text-xs bg-muted px-2 py-0.5 rounded capitalize">{contact.role}</span>
-                      )}
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {contact.role && (
+                          <Badge variant="outline" className="text-xs capitalize">{contact.role}</Badge>
+                        )}
+                        {contact.seniority && (
+                          <Badge variant="secondary" className="text-xs capitalize">
+                            {contact.seniority.replace('_', '-')}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 mt-6">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(contact)}>
                         <Edit className="h-3 w-3" />
                       </Button>
@@ -405,6 +473,12 @@ export function DistributorContactsList({ distributorId }: Props) {
                       <span className="flex items-center gap-1">
                         <Mail className="h-3 w-3" />
                         {contact.email}
+                      </span>
+                    )}
+                    {contact.address && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {contact.address}
                       </span>
                     )}
                     {contact.birth_date && (
