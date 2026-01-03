@@ -24,6 +24,11 @@ interface CreditConfig {
   target_order_frequency: number | null;
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
 export async function calculateCreditScore(retailerId: string): Promise<CreditScoreResult | null> {
   try {
     // 1. Get active credit config
@@ -78,10 +83,12 @@ export async function calculateCreditScore(retailerId: string): Promise<CreditSc
 
     if (visitsError) throw visitsError;
 
-    // Check if new retailer (no orders in lookback period)
+    // Check if new retailer (no / too few orders in lookback period)
     if (!orders || orders.length < 2) {
+      const startingScore = clampNumber(cfg.new_retailer_starting_score, 0, 10);
+
       const result: CreditScoreResult = {
-        score: cfg.new_retailer_starting_score,
+        score: startingScore,
         credit_limit: 10000, // Default starting limit
         growth_rate_score: 0,
         repayment_dso_score: 0,
@@ -157,18 +164,21 @@ export async function calculateCreditScore(retailerId: string): Promise<CreditSc
     const targetFreq = cfg.target_order_frequency || 2;
     const orderFrequencyScore = Math.min(2, Math.max(0, (avgOrderFrequency / targetFreq) * 2));
 
-    // 8. Calculate Final Score (weighted average, scale to 10)
-    const totalWeight = cfg.weight_growth_rate + cfg.weight_repayment_dso + cfg.weight_order_frequency;
+    // 8. Calculate Final Score (ensure 0-10)
     const weightedScore = (
       (growthRateScore * cfg.weight_growth_rate) +
       (dsoScore * cfg.weight_repayment_dso) +
       (orderFrequencyScore * cfg.weight_order_frequency)
     );
-    const finalScore = (weightedScore / totalWeight) * 10;
+
+    // Max possible weightedScore when component scores are at their maximums (4, 4, 2)
+    const maxPossible = (4 * cfg.weight_growth_rate) + (4 * cfg.weight_repayment_dso) + (2 * cfg.weight_order_frequency);
+    const finalScore = clampNumber(maxPossible > 0 ? (weightedScore / maxPossible) * 10 : 0, 0, 10);
 
     // 9. Calculate Credit Limit
     const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-    const avgMonthlyRevenue = totalRevenue / cfg.lookback_period_months;
+    const denomMonths = Math.max(1, cfg.lookback_period_months);
+    const avgMonthlyRevenue = totalRevenue / denomMonths;
     const creditLimit = Math.round(avgMonthlyRevenue * cfg.credit_multiplier * (finalScore / 10));
 
     const result: CreditScoreResult = {
