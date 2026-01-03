@@ -54,6 +54,8 @@ interface OrderItem {
 interface Retailer {
   id: string;
   name: string;
+  contact_name?: string | null;
+  contact_title?: string | null;
   address: string;
   phone: string | null;
   category: string | null;
@@ -86,6 +88,8 @@ interface Retailer {
   revenue_growth_12m?: number | null;
   total_order_value_fy?: number | null;
 }
+
+const contactTitles = ["Shop owner", "Support staff", "Family member", "Others"];
 
 interface RetailerDetailModalProps {
   isOpen: boolean;
@@ -534,6 +538,8 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
         .from('retailers')
         .update({
           name: formData.name,
+          contact_name: formData.contact_name,
+          contact_title: formData.contact_title,
           phone: formData.phone,
           address: formData.address,
           category: formData.category,
@@ -1119,27 +1125,59 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                 <CardHeader className="py-2 px-3">
                   <CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4" /> Owner Details</CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Owner's Name</Label>
-                    {isEditing ? (
-                      <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="h-8 text-sm mt-1" />
-                    ) : (
-                      <p className="text-sm font-medium">{formData.name}</p>
-                    )}
+                <CardContent className="p-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Owner's Name</Label>
+                      {isEditing ? (
+                        <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="h-8 text-sm mt-1" />
+                      ) : (
+                        <p className="text-sm font-medium">{formData.name}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Owner's Number</Label>
+                      {isEditing ? (
+                        <Input value={formData.phone || ''} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="h-8 text-sm mt-1" />
+                      ) : formData.phone ? (
+                        <a href={`tel:${formData.phone}`} className="flex items-center gap-1 text-sm hover:text-primary">
+                          <Phone size={12} className="text-primary" /> {formData.phone}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">-</p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Owner's Number</Label>
-                    {isEditing ? (
-                      <Input value={formData.phone || ''} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="h-8 text-sm mt-1" />
-                    ) : formData.phone ? (
-                      <a href={`tel:${formData.phone}`} className="flex items-center gap-1 text-sm hover:text-primary">
-                        <Phone size={12} className="text-primary" /> {formData.phone}
-                      </a>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">-</p>
-                    )}
+                  
+                  {/* Contact Name and Title */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Contact Name</Label>
+                      {isEditing ? (
+                        <Input value={formData.contact_name || ''} onChange={(e) => setFormData({...formData, contact_name: e.target.value})} className="h-8 text-sm mt-1" placeholder="Contact person name" />
+                      ) : (
+                        <p className="text-sm">{formData.contact_name || '-'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Title</Label>
+                      {isEditing ? (
+                        <Select value={formData.contact_title || ''} onValueChange={(value) => setFormData({...formData, contact_title: value})}>
+                          <SelectTrigger className="h-8 text-sm mt-1">
+                            <SelectValue placeholder="Select title" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border z-50">
+                            {contactTitles.map((title) => (
+                              <SelectItem key={title} value={title}>{title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm">{formData.contact_title || '-'}</p>
+                      )}
+                    </div>
                   </div>
+                  
                   <div>
                     <Label className="text-xs text-muted-foreground">GST Number</Label>
                     {isEditing ? (
