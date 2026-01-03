@@ -747,7 +747,7 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
               </div>
               <div>
                 <span className="text-muted-foreground">Distributor:</span>{' '}
-                <span className="font-medium">{associatedDistributor || 'Not mapped'}</span>
+                <span className="font-medium">{associatedDistributor || formData.parent_name || 'Not mapped'}</span>
               </div>
             </div>
           </div>
@@ -777,13 +777,13 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
+        <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-6 h-9">
-            <TabsTrigger value="overview" className="text-xs">
-              <TrendingUp className="h-3 w-3 mr-1" /> Overview
-            </TabsTrigger>
             <TabsTrigger value="details" className="text-xs">
               <User className="h-3 w-3 mr-1" /> Details
+            </TabsTrigger>
+            <TabsTrigger value="highlight" className="text-xs">
+              <TrendingUp className="h-3 w-3 mr-1" /> Highlight
             </TabsTrigger>
             <TabsTrigger value="credit" className="text-xs">
               <CreditCard className="h-3 w-3 mr-1" /> Credit
@@ -800,8 +800,8 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
           </TabsList>
 
           <div className="flex-1 overflow-y-auto mt-3">
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="mt-0 space-y-4">
+            {/* Highlight Tab */}
+            <TabsContent value="highlight" className="mt-0 space-y-4">
               {/* Key Metrics - Mobile responsive with truncation */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <Card className="p-2 sm:p-3">
