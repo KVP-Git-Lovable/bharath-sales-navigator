@@ -20,14 +20,31 @@ async function checkIfManager(supabase: any, userId: string): Promise<boolean> {
   return data?.some((r: any) => ['admin', 'manager', 'asm', 'rsm', 'zsm', 'nsm'].includes(r.role?.toLowerCase())) || false;
 }
 
-// Get team members for a manager
+// Get team members for a manager from employees table
 async function getTeamMembers(supabase: any, managerId: string): Promise<string[]> {
-  const { data } = await supabase
-    .from('profiles')
-    .select('id')
+  // Get direct reports from employees table
+  const { data: directReports } = await supabase
+    .from('employees')
+    .select('user_id')
     .eq('manager_id', managerId);
   
-  return data?.map((p: any) => p.id) || [];
+  // Also try the get_all_subordinates function if available
+  let subordinates: string[] = [];
+  try {
+    const { data: allSubs } = await supabase.rpc('get_all_subordinates', { manager_user_id: managerId });
+    if (allSubs && allSubs.length > 0) {
+      subordinates = allSubs.map((s: any) => s.subordinate_user_id).filter((id: string) => id !== managerId);
+    }
+  } catch (e) {
+    // Function might not exist, use direct reports only
+  }
+  
+  // Combine both results, prefer subordinates if available
+  if (subordinates.length > 0) {
+    return [...new Set(subordinates)];
+  }
+  
+  return directReports?.map((p: any) => p.user_id) || [];
 }
 
 // Enhanced user context with more data
@@ -981,6 +998,189 @@ async function executeQuery(supabase: any, userId: string, toolName: string, par
   }
 }
 
+// Format tool results into natural language
+function formatToolResult(toolName: string, result: any): string {
+  if (result.error) {
+    return `\n\n⚠️ ${result.error}\n`;
+  }
+  
+  switch (toolName) {
+    case 'get_team_performance': {
+      if (!result.team_members || result.team_members.length === 0) {
+        return `\n\n📊 **Team Performance** (${result.period})\n\nNo team members found. Please ensure your team is configured in the system.\n`;
+      }
+      
+      let response = `\n\n📊 **Team Performance** (${result.period})\n\n`;
+      response += `**Summary:**\n`;
+      response += `- 👥 Team Size: ${result.team_size} members\n`;
+      response += `- ✅ Visits Completed: ${result.summary.total_visits_completed}\n`;
+      response += `- 💰 Total Orders: ₹${result.summary.total_orders_value.toLocaleString('en-IN')}\n`;
+      response += `- 📈 Avg per Person: ₹${result.summary.avg_orders_per_person.toLocaleString('en-IN')}\n\n`;
+      
+      response += `**Team Members:**\n`;
+      result.team_members.forEach((m: any, i: number) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
+        response += `${medal} **${m.name}** - ₹${m.orders.total_value.toLocaleString('en-IN')} (${m.visits.completed}/${m.visits.total} visits, ${m.visits.completion_rate}%)\n`;
+      });
+      return response;
+    }
+    
+    case 'get_team_attendance': {
+      let response = `\n\n📋 **Team Attendance** (${result.date})\n\n`;
+      
+      if (!result.members || result.members.length === 0) {
+        response += `No team members found. Please ensure your team is configured.\n`;
+        return response;
+      }
+      
+      const { checked_in, not_checked_in, on_leave, total } = result.summary;
+      response += `**Summary:** ✅ ${checked_in}/${total} checked in`;
+      if (not_checked_in > 0) response += ` | ⚠️ ${not_checked_in} pending`;
+      if (on_leave > 0) response += ` | 🏠 ${on_leave} on leave`;
+      response += `\n\n`;
+      
+      if (result.alerts) {
+        response += `${result.alerts}\n\n`;
+      }
+      
+      response += `**Details:**\n`;
+      result.members.forEach((m: any) => {
+        const status = m.status === 'present' ? '✅' : m.status === 'leave' ? '🏠' : '⏳';
+        response += `${status} **${m.name}**`;
+        if (m.check_in_time) response += ` - In: ${m.check_in_time}`;
+        if (m.location) response += ` @ ${m.location.substring(0, 30)}...`;
+        response += `\n`;
+      });
+      return response;
+    }
+    
+    case 'compare_team_members': {
+      if (!result.comparison || result.comparison.length < 2) {
+        return `\n\n⚠️ Need at least 2 team members to compare.\n`;
+      }
+      
+      let response = `\n\n📊 **Team Comparison** (${result.period})\n\n`;
+      
+      const [m1, m2] = result.comparison;
+      response += `| Metric | ${m1.name} | ${m2.name} |\n`;
+      response += `|--------|----------|----------|\n`;
+      response += `| 📍 Visits | ${m1.visits_completed}/${m1.total_visits} (${m1.visit_completion_rate}%) | ${m2.visits_completed}/${m2.total_visits} (${m2.visit_completion_rate}%) |\n`;
+      response += `| 🛒 Orders | ${m1.orders_count} | ${m2.orders_count} |\n`;
+      response += `| 💰 Sales | ₹${m1.total_sales.toLocaleString('en-IN')} | ₹${m2.total_sales.toLocaleString('en-IN')} |\n\n`;
+      
+      // Winner declaration
+      const salesWinner = m1.total_sales > m2.total_sales ? m1.name : m2.name;
+      response += `🏆 **Sales Leader:** ${salesWinner}\n`;
+      return response;
+    }
+    
+    case 'get_exception_alerts': {
+      let response = `\n\n⚠️ **Exception Alerts**\n\n`;
+      
+      if (result.attendance_alerts?.length > 0) {
+        response += `**Not Checked In:**\n`;
+        result.attendance_alerts.forEach((a: any) => {
+          response += `- ⏳ ${a.name} - not checked in\n`;
+        });
+        response += `\n`;
+      }
+      
+      if (result.overdue_visits > 0) {
+        response += `📍 **Overdue Visits:** ${result.overdue_visits} visits need attention\n\n`;
+      }
+      
+      if (result.high_pending_collections?.length > 0) {
+        response += `💰 **High Pending Collections:**\n`;
+        result.high_pending_collections.forEach((r: any) => {
+          response += `- ${r.retailer_name}: ₹${r.amount.toLocaleString('en-IN')}\n`;
+        });
+        response += `\n`;
+      }
+      
+      if (result.declining_retailers?.length > 0) {
+        response += `📉 **Declining Retailers:**\n`;
+        result.declining_retailers.forEach((r: any) => {
+          response += `- ${r.name}: ${r.decline_percent}% drop\n`;
+        });
+      }
+      
+      if (!result.attendance_alerts?.length && !result.overdue_visits && !result.high_pending_collections?.length && !result.declining_retailers?.length) {
+        response += `✅ No critical alerts at this time. Great job!\n`;
+      }
+      
+      return response;
+    }
+    
+    case 'get_visit_summary': {
+      let response = `\n\n📍 **Today's Visits**\n\n`;
+      if (!result.visits || result.visits.length === 0) {
+        response += `No visits planned for today.\n`;
+        return response;
+      }
+      
+      response += `**Summary:** ${result.completed}/${result.total} completed (${result.completion_rate}%)\n\n`;
+      result.visits.slice(0, 5).forEach((v: any) => {
+        const icon = v.status === 'completed' ? '✅' : v.status === 'in_progress' ? '🔄' : '⏳';
+        response += `${icon} ${v.retailer_name} - ${v.status}\n`;
+      });
+      if (result.visits.length > 5) {
+        response += `\n...and ${result.visits.length - 5} more visits.\n`;
+      }
+      return response;
+    }
+    
+    case 'get_sales_report': {
+      let response = `\n\n💰 **Sales Report** (${result.period})\n\n`;
+      response += `- Total Orders: ${result.total_orders}\n`;
+      response += `- Total Revenue: ₹${result.total_revenue?.toLocaleString('en-IN') || 0}\n`;
+      response += `- Average Order: ₹${result.avg_order_value?.toLocaleString('en-IN') || 0}\n`;
+      return response;
+    }
+    
+    case 'get_pending_collections': {
+      let response = `\n\n💵 **Pending Collections**\n\n`;
+      if (!result.retailers || result.retailers.length === 0) {
+        response += `✅ No pending collections. Great work!\n`;
+        return response;
+      }
+      response += `**Total Pending:** ₹${result.total_pending?.toLocaleString('en-IN') || 0}\n\n`;
+      result.retailers.slice(0, 5).forEach((r: any) => {
+        response += `• ${r.name}: ₹${r.pending_amount?.toLocaleString('en-IN') || 0}\n`;
+      });
+      return response;
+    }
+    
+    case 'get_retailer_analytics': {
+      let response = `\n\n🏪 **Top Retailers**\n\n`;
+      if (!result.retailers || result.retailers.length === 0) {
+        response += `No retailer data available.\n`;
+        return response;
+      }
+      result.retailers.slice(0, 5).forEach((r: any, i: number) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
+        response += `${medal} ${r.name} - ₹${r.total_orders?.toLocaleString('en-IN') || 0}\n`;
+      });
+      return response;
+    }
+    
+    default: {
+      // Fallback: format as readable list
+      let response = `\n\n📋 **Results:**\n\n`;
+      if (typeof result === 'object') {
+        Object.entries(result).forEach(([key, value]) => {
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          if (typeof value === 'number') {
+            response += `• ${label}: ${value.toLocaleString('en-IN')}\n`;
+          } else if (typeof value === 'string') {
+            response += `• ${label}: ${value}\n`;
+          }
+        });
+      }
+      return response;
+    }
+  }
+}
+
 // Dynamic model selection based on query complexity and context
 function selectModel(messages: any[], classification: any): { model: string; maxTokens: number; temperature: number } {
   const lastMessage = messages[messages.length - 1]?.content?.toLowerCase() || '';
@@ -991,21 +1191,16 @@ function selectModel(messages: any[], classification: any): { model: string; max
   ];
   
   if (greetingPatterns.some(p => p.test(lastMessage.trim()))) {
-    return { model: 'google/gemini-2.5-flash', maxTokens: 400, temperature: 0.7 };
+    return { model: 'google/gemini-2.5-flash-lite', maxTokens: 300, temperature: 0.7 };
   }
   
-  // Complex analytics, comparisons, manager queries, or urgent queries - use pro model
-  if (classification.category === 'analytics' || 
-      classification.category === 'team' ||
-      classification.category === 'comparison' ||
-      classification.priority === 'high' ||
-      classification.isManagerQuery ||
-      /compare|analyze|trend|why|explain|suggest|recommend|help me|team|exception|alert/i.test(lastMessage)) {
-    return { model: 'google/gemini-2.5-pro', maxTokens: 2500, temperature: 0.5 };
+  // Most queries should use flash for speed - only use pro for truly complex analysis
+  if (classification.category === 'analytics' && /trend|analyze|why|explain|deep/i.test(lastMessage)) {
+    return { model: 'google/gemini-2.5-pro', maxTokens: 2000, temperature: 0.5 };
   }
   
-  // Default - use capable flash model for good conversational quality
-  return { model: 'google/gemini-2.5-flash', maxTokens: 1500, temperature: 0.6 };
+  // Default - use flash model for fast responses (covers team, comparison, data queries)
+  return { model: 'google/gemini-2.5-flash', maxTokens: 1200, temperature: 0.5 };
 }
 
 // Enhanced tools definition with manager tools
@@ -1504,12 +1699,11 @@ Always use the available tools to fetch real-time data. Interpret the data meani
                         
                         const result = await executeQuery(supabase, user.id, toolCall.function.name, args, userContext);
                         
-                        // Format result nicely
-                        let formattedResult = `\n\n**${toolCall.function.name.replace(/_/g, ' ').replace(/^get /, '').toUpperCase()}:**\n\n`;
-                        formattedResult += '```json\n' + JSON.stringify(result, null, 2) + '\n```';
+                        // Format result as natural language based on the tool
+                        const formattedContent = formatToolResult(toolCall.function.name, result);
                         
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                          choices: [{ delta: { content: formattedResult }, index: 0 }]
+                          choices: [{ delta: { content: formattedContent }, index: 0 }]
                         })}\n\n`));
                       } catch (toolError: any) {
                         const errorMsg = toolError?.message || JSON.stringify(toolError) || 'Unknown error';

@@ -416,31 +416,44 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
   return (
     <div className="flex flex-col flex-1 overflow-hidden h-full bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-primary/5 to-transparent">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
+              <Sparkles className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-background" />
           </div>
           <div>
             <h3 className="font-semibold text-sm">AI Assistant</h3>
-            <p className="text-xs text-muted-foreground">
-              {isManager ? 'Manager Mode' : 'Field Sales Mode'}
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {isManager ? (
+                <>
+                  <Users className="h-3 w-3" />
+                  Manager Mode
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="h-3 w-3" />
+                  Field Sales
+                </>
+              )}
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive">
           <X className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Messages Area */}
-      <ScrollArea className="flex-1 p-3 sm:p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 px-3 py-4 sm:px-4" ref={scrollRef}>
         <div className="space-y-4 max-w-full">
           {messages.map((message, index) => (
-            <div key={index} className="relative">
+            <div key={index} className="relative animate-in fade-in slide-in-from-bottom-2 duration-300">
               <ChatMessage message={message} />
               {message.isCached && (
-                <span className="absolute top-0 right-0 flex items-center gap-1 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className="absolute -top-1 right-2 flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                   <Zap className="h-3 w-3" />
                   Instant
                 </span>
@@ -448,11 +461,15 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
             </div>
           ))}
           
-          {isLoading && (
-            <div className="flex items-center gap-3 text-muted-foreground pl-11">
-              <div className="flex items-center gap-2 bg-muted rounded-lg px-4 py-2.5">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">
+          {isLoading && !messages[messages.length - 1]?.content && (
+            <div className="flex items-center gap-3 pl-11 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5 bg-muted/80 rounded-xl px-4 py-3 shadow-sm">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-sm text-muted-foreground">
                   {LOADING_MESSAGES[loadingState]}
                   {retryCount > 0 && ` (Retry ${retryCount}/${MAX_RETRIES})`}
                 </span>
@@ -463,7 +480,7 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t p-3 sm:p-4 bg-background shrink-0 space-y-3">
+      <div className="border-t p-3 sm:p-4 bg-gradient-to-t from-muted/30 to-background shrink-0 space-y-3">
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-1.5">
           {quickActions.map((action, idx) => (
@@ -473,53 +490,45 @@ export const ChatDialog = ({ onClose }: ChatDialogProps) => {
               size="sm"
               onClick={() => handleQuickAction(action.query)}
               disabled={isLoading}
-              className="text-xs h-8 gap-1.5 bg-background hover:bg-primary/5 hover:border-primary/30"
+              className="text-xs h-7 gap-1.5 bg-background/80 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-colors"
             >
-              <action.icon className="h-3.5 w-3.5" />
+              <action.icon className="h-3 w-3" />
               {action.label.replace(/^[^\s]+\s/, '')}
             </Button>
           ))}
         </div>
 
         {/* Input */}
-        <div className="flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={isManager ? "Ask about your team, alerts, or performance..." : "Ask about visits, sales, or retailers..."}
-            className="min-h-[48px] max-h-[120px] resize-none text-sm bg-muted/50 border-muted"
-            disabled={isLoading}
-            rows={1}
-          />
-          <div className="flex flex-col gap-1">
-            <Button
-              onClick={() => sendMessage()}
-              disabled={!input.trim() || isLoading}
-              size="icon"
-              className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90"
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </Button>
+        <div className="flex gap-2 items-end">
+          <div className="flex-1 relative">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={isManager ? "Ask about team, alerts, or performance..." : "Ask about visits, sales, or retailers..."}
+              className="min-h-[48px] max-h-[120px] resize-none text-sm bg-background border-muted focus:border-primary/50 rounded-xl pr-12"
+              disabled={isLoading}
+              rows={1}
+            />
           </div>
+          <Button
+            onClick={() => sendMessage()}
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </Button>
         </div>
         
-        {/* Retry button */}
-        {!isLoading && messages.length > 1 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRetry}
-            className="w-full gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Retry
-          </Button>
-        )}
+        {/* Powered by hint */}
+        <p className="text-center text-[10px] text-muted-foreground/60">
+          Powered by AI • Responses may vary
+        </p>
       </div>
     </div>
   );
