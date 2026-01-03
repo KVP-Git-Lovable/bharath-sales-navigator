@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Search, Pencil, Trash2, Calendar, Users, Check, ShoppingCart, Phone, CheckCircle2 } from "lucide-react";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -232,6 +234,21 @@ export const MyRetailers = () => {
     
     return result.sort((a, b) => a.name.localeCompare(b.name));
   }, [retailers, search, potentialFilter, categoryFilter, retailTypeFilter, beatFilter]);
+
+  // Pagination - 10 items per page
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems: paginatedRetailers,
+    goToPage,
+    nextPage,
+    prevPage,
+    startIndex,
+    endIndex,
+    totalItems,
+    hasNextPage,
+    hasPrevPage,
+  } = usePagination(filtered, { pageSize: 10 });
 
   const beats = useMemo(() => {
     return [...new Set(retailers.map(r => r.beat_id))].filter(Boolean).sort();
@@ -599,7 +616,7 @@ export const MyRetailers = () => {
           <CardContent className="pt-6">
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
-              {filtered.map(r => (
+              {paginatedRetailers.map(r => (
                 <Card key={r.id} className="p-4">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -676,11 +693,25 @@ export const MyRetailers = () => {
                   </div>
                 </Card>
               ))}
-              {filtered.length === 0 && (
+              {paginatedRetailers.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   {loading ? 'Loading...' : 'No retailers found'}
                 </div>
               )}
+              
+              {/* Mobile Pagination */}
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                totalItems={totalItems}
+                hasNextPage={hasNextPage}
+                hasPrevPage={hasPrevPage}
+                onNextPage={nextPage}
+                onPrevPage={prevPage}
+                onGoToPage={goToPage}
+              />
             </div>
 
             {/* Desktop Table View */}
@@ -702,7 +733,7 @@ export const MyRetailers = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map(r => {
+                  {paginatedRetailers.map(r => {
                     const shortAddress = r.address.length > 30 ? r.address.substring(0, 30) + '...' : r.address;
                     const isAddressExpanded = expandedAddress === r.id;
                     
@@ -787,13 +818,27 @@ export const MyRetailers = () => {
                       </TableRow>
                     );
                   })}
-                  {filtered.length === 0 && (
+                  {paginatedRetailers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground">{loading ? 'Loading...' : 'No retailers found'}</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
+              
+              {/* Desktop Pagination */}
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                totalItems={totalItems}
+                hasNextPage={hasNextPage}
+                hasPrevPage={hasPrevPage}
+                onNextPage={nextPage}
+                onPrevPage={prevPage}
+                onGoToPage={goToPage}
+              />
             </div>
           </CardContent>
         </Card>
