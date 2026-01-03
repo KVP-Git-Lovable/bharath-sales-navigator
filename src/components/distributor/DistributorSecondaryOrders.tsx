@@ -96,7 +96,7 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
 
   const loadOrders = async () => {
     try {
-      // First get distributor details for legacy matching
+      // First get distributor details for matching
       const { data: distData } = await supabase
         .from('distributors')
         .select('id, name')
@@ -104,14 +104,33 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
         .single();
 
       const distributorName = distData?.name || '';
-
-      // Get all retailers linked to this distributor
-      const { data: retailers } = await supabase
-        .from('retailers')
-        .select('id')
-        .or(`distributor_id.eq.${distributorId},and(parent_type.eq.Distributor,parent_name.ilike.${distributorName})`);
-
-      const retailerIds = retailers?.map(r => r.id) || [];
+      
+      // Get retailer IDs from multiple sources:
+      // 1. distributor_retailer_mappings table
+      // 2. retailers.distributor_id field
+      // 3. retailers.parent_name matching distributor name
+      
+      const retailerIdSet = new Set<string>();
+      
+      // From distributor_retailer_mappings
+      const { data: mappedRetailers } = await supabase
+        .from('distributor_retailer_mappings')
+        .select('retailer_id')
+        .eq('distributor_id', distributorId);
+      
+      mappedRetailers?.forEach(r => retailerIdSet.add(r.retailer_id));
+      
+      // From retailers table (direct link or parent_name match)
+      if (distributorName) {
+        const { data: linkedRetailers } = await supabase
+          .from('retailers')
+          .select('id')
+          .or(`distributor_id.eq.${distributorId},parent_name.ilike.${distributorName}`);
+        
+        linkedRetailers?.forEach(r => retailerIdSet.add(r.id));
+      }
+      
+      const retailerIds = Array.from(retailerIdSet);
 
       let allOrders: Order[] = [];
 
@@ -126,13 +145,12 @@ export function DistributorSecondaryOrders({ distributorId }: Props) {
       if (directError) throw directError;
       if (directOrders) allOrders = [...directOrders];
 
-      // Also get orders from currently linked retailers
+      // Also get orders from linked retailers (regardless of distributor_id on order)
       if (retailerIds.length > 0) {
         const { data: retailerOrders, error: retailerError } = await supabase
           .from('orders')
           .select('id, retailer_id, retailer_name, total_amount, status, order_date, created_at, invoice_number, is_credit_order, payment_method')
           .in('retailer_id', retailerIds)
-          .is('distributor_id', null)
           .order('created_at', { ascending: false })
           .limit(500);
 
