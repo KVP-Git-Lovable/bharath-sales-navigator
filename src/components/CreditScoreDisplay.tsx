@@ -3,10 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Info, TrendingUp, Clock, ShoppingCart, CreditCard } from "lucide-react";
+import { Info, CreditCard, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreditScoreRationale } from "@/components/credit/CreditScoreRationale";
 import { CreditLimitWidget } from "@/components/credit/CreditLimitWidget";
+
 interface CreditScoreDisplayProps {
   retailerId: string;
   variant?: "compact" | "full";
@@ -18,7 +19,7 @@ export const CreditScoreDisplay = ({
   variant = "compact",
   showCreditLimit = false 
 }: CreditScoreDisplayProps) => {
-  const { data: config } = useQuery({
+  const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['credit-config'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -30,7 +31,7 @@ export const CreditScoreDisplay = ({
     }
   });
 
-  const { data: creditScore, isLoading } = useQuery({
+  const { data: creditScore, isLoading: scoreLoading } = useQuery({
     queryKey: ['credit-score', retailerId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -58,17 +59,32 @@ export const CreditScoreDisplay = ({
     enabled: config?.is_enabled && config?.scoring_mode === 'manual'
   });
 
-  if (!config?.is_enabled || isLoading) {
-    return null;
+  // Don't show anything if credit management is disabled (only for compact)
+  if (!config?.is_enabled) {
+    if (variant === "compact") return null;
+    // For full variant, show disabled message
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Credit Score
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <AlertCircle className="h-4 w-4" />
+            <p className="text-sm">Credit management is not enabled.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
+  const isLoading = configLoading || scoreLoading;
   const score = config.scoring_mode === 'manual' 
     ? retailer?.manual_credit_score 
     : creditScore?.score;
-
-  if (!score) {
-    return null;
-  }
 
   const getScoreColor = (score: number) => {
     if (score >= 8) return "text-green-600 bg-green-50 border-green-200";
@@ -83,16 +99,41 @@ export const CreditScoreDisplay = ({
     return "Poor";
   };
 
+  // Format credit limit for display
+  const formatCreditLimit = (amount: number) => {
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+    if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}K`;
+    return `₹${amount.toLocaleString()}`;
+  };
+
   if (variant === "compact") {
+    // Show loading state
+    if (isLoading) return null;
+    
+    // Show placeholder if no score yet
+    if (!score) {
+      return (
+        <Badge variant="outline" className="text-muted-foreground bg-muted/30 border-muted">
+          <CreditCard className="mr-1 h-3 w-3" />
+          No Score
+        </Badge>
+      );
+    }
+
     return (
       <Dialog>
         <DialogTrigger asChild>
           <Button variant="ghost" size="sm" className="h-auto p-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Badge variant="outline" className={getScoreColor(score)}>
                 <CreditCard className="mr-1 h-3 w-3" />
                 {score.toFixed(1)}/10
               </Badge>
+              {creditScore?.credit_limit && (
+                <span className="text-xs text-muted-foreground">
+                  {formatCreditLimit(creditScore.credit_limit)}
+                </span>
+              )}
               <Info className="h-3 w-3 text-muted-foreground" />
             </div>
           </Button>
@@ -112,24 +153,39 @@ export const CreditScoreDisplay = ({
     );
   }
 
+  // Full variant - always show card
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Credit Score</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Credit Score
+            </CardTitle>
             <CardDescription>
               {config.scoring_mode === 'manual' ? 'Manual Entry' : 'AI-Driven Calculation'}
             </CardDescription>
           </div>
-          <div className="text-right">
-            <div className={`text-3xl font-bold ${getScoreColor(score)}`}>
-              {score.toFixed(1)}/10
+          {score ? (
+            <div className="text-right">
+              <div className={`text-3xl font-bold px-3 py-1 rounded-lg ${getScoreColor(score)}`}>
+                {score.toFixed(1)}/10
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">
+                {getScoreLabel(score)}
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {getScoreLabel(score)}
+          ) : (
+            <div className="text-right">
+              <div className="text-2xl font-bold text-muted-foreground">
+                --/10
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Not calculated
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -146,6 +202,21 @@ export const CreditScoreDisplay = ({
 
 const CreditScoreBreakdown = ({ score, creditScore, config, showCreditLimit }: any) => {
   if (config.scoring_mode === 'manual') {
+    if (!score) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              No manual credit score has been set for this retailer yet.
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            An administrator can set a credit score (0-10) from the retailer's profile.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
@@ -163,11 +234,24 @@ const CreditScoreBreakdown = ({ score, creditScore, config, showCreditLimit }: a
     );
   }
 
-  if (!creditScore) {
+  if (!creditScore || !score) {
     return (
-      <p className="text-sm text-muted-foreground">
-        No AI-driven score calculated yet. Score will be generated based on historical data.
-      </p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+          <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            No AI-driven score calculated yet.
+          </p>
+        </div>
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p><strong>Score will be generated based on:</strong></p>
+          <ul className="list-disc list-inside space-y-0.5 ml-2">
+            <li>Sales growth rate over time</li>
+            <li>Payment speed (Days Sales Outstanding)</li>
+            <li>Order frequency per visit</li>
+          </ul>
+        </div>
+      </div>
     );
   }
 
