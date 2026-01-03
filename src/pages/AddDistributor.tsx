@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { OwnerSelector } from "@/components/distributor/OwnerSelector";
 
 interface Distributor {
   id: string;
@@ -55,6 +56,8 @@ export default function AddDistributor() {
     opportunities: "",
     threats: "",
     about_business: "",
+    owner_id: "",
+    owner_name: "",
   });
 
   useEffect(() => {
@@ -112,6 +115,8 @@ export default function AddDistributor() {
         opportunities: formData.opportunities.trim() || null,
         threats: formData.threats.trim() || null,
         about_business: formData.about_business.trim() || null,
+        owner_id: formData.owner_id || null,
+        owner_name: formData.owner_name || null,
       };
 
       const { data, error } = await supabase
@@ -220,6 +225,19 @@ export default function AddDistributor() {
                   placeholder="GST registration number"
                 />
               </div>
+
+              {/* Owner Selector */}
+              <OwnerSelector
+                value={formData.owner_id || null}
+                valueName={formData.owner_name || null}
+                onChange={(id, name) => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    owner_id: id || "", 
+                    owner_name: name || "" 
+                  }));
+                }}
+              />
             </CardContent>
           </Card>
 

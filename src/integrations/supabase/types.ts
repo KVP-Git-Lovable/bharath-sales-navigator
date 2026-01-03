@@ -3032,6 +3032,8 @@ export type Database = {
           opportunities: string | null
           other_products: string[] | null
           outstanding_amount: number | null
+          owner_id: string | null
+          owner_name: string | null
           parent_id: string | null
           parent_type: string | null
           partnership_status: string | null
@@ -3075,6 +3077,8 @@ export type Database = {
           opportunities?: string | null
           other_products?: string[] | null
           outstanding_amount?: number | null
+          owner_id?: string | null
+          owner_name?: string | null
           parent_id?: string | null
           parent_type?: string | null
           partnership_status?: string | null
@@ -3118,6 +3122,8 @@ export type Database = {
           opportunities?: string | null
           other_products?: string[] | null
           outstanding_amount?: number | null
+          owner_id?: string | null
+          owner_name?: string | null
           parent_id?: string | null
           parent_type?: string | null
           partnership_status?: string | null
