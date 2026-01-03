@@ -9,6 +9,7 @@ export interface RepeatOrderSuggestion {
   variantName?: string;
   quantity: number;
   unit: string;
+  rate: number;
   confidence: number;
   orderCount: number;
   lastOrdered: string;
@@ -22,6 +23,7 @@ export interface BeatTrendingSuggestion {
   variantName?: string;
   suggestedQuantity: number;
   unit: string;
+  rate: number;
   beatPenetration: number;
   retailerCount: number;
   totalBeatRetailers: number;
