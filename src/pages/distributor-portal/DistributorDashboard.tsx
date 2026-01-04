@@ -22,7 +22,8 @@ import {
   Lightbulb,
   Building,
   Users,
-  Target
+  Target,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -261,6 +262,10 @@ const DistributorDashboard = () => {
           <Button variant="outline" onClick={() => navigate('/distributor-portal/inventory')}>
             <Package className="w-4 h-4 mr-2" />
             Inventory
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/distributor-portal/returns')}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Returns
           </Button>
           <Button variant="outline" onClick={() => navigate('/distributor-portal/claims')}>
             <FileText className="w-4 h-4 mr-2" />
