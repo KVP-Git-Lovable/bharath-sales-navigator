@@ -568,7 +568,7 @@ export const BeatPlanning = () => {
     if (!effectiveUserId) return;
     
     setIsGeneratingPlan(true);
-    const loadingToast = toast.loading('Generating optimized weekly plan...');
+    const loadingToast = toast.loading('Generating optimized plan for this week and next...');
     
     try {
       const { data, error } = await supabase.functions.invoke('auto-generate-beat-plan', {
@@ -581,8 +581,19 @@ export const BeatPlanning = () => {
       if (error) throw error;
       
       toast.dismiss(loadingToast);
-      const plansCreated = data?.results?.[0]?.plansCreated || 0;
-      toast.success(`Created ${plansCreated} beat plans for next week!`);
+      
+      const result = data?.results?.[0];
+      if (result?.status === 'success') {
+        const plansCreated = result.plansCreated || 0;
+        const prescheduled = result.prescheduledPreserved || 0;
+        
+        toast.success(`Created ${plansCreated} new plans, preserved ${prescheduled} pre-scheduled beats!`);
+        
+        // Navigate to rationale page with the plan result
+        navigate('/auto-plan-rationale', { state: { planResult: result } });
+      } else {
+        toast.error(result?.reason || 'Failed to generate plan');
+      }
       
       // Refresh current view
       loadBeatPlans(toLocalISODate(selectedDate));
