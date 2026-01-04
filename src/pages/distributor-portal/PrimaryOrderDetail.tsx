@@ -66,7 +66,7 @@ const PrimaryOrderDetail = () => {
     } catch (error) {
       console.error('Error loading order:', error);
       toast.error('Failed to load order details');
-      navigate('/distributor-portal/orders');
+      navigate('/distributor-portal/primary-orders');
     } finally {
       setLoading(false);
     }
@@ -133,7 +133,7 @@ const PrimaryOrderDetail = () => {
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/orders')}>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/primary-orders')}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -320,7 +320,7 @@ const PrimaryOrderDetail = () => {
             <Button 
               variant="outline" 
               className="flex-1"
-              onClick={() => navigate(`/distributor-portal/orders/${orderId}/edit`)}
+              onClick={() => navigate(`/distributor-portal/primary-order/${orderId}/edit`)}
             >
               Edit Order
             </Button>
@@ -339,7 +339,7 @@ const PrimaryOrderDetail = () => {
           <div className="flex gap-3">
             <Button 
               className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={() => navigate(`/distributor-portal/grn/${orderId}`)}
+              onClick={() => navigate(`/distributor-portal/goods-receipt/${orderId}`)}
             >
               <ClipboardCheck className="w-4 h-4 mr-2" />
               Receive Goods (Create GRN)

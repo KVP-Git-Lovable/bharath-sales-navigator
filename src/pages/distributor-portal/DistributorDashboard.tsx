@@ -246,11 +246,11 @@ const DistributorDashboard = () => {
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => navigate('/distributor-portal/orders/new')}>
+          <Button onClick={() => navigate('/distributor-portal/create-primary-order')}>
             <Plus className="w-4 h-4 mr-2" />
             New Order
           </Button>
-          <Button variant="outline" onClick={() => navigate('/distributor-portal/orders')}>
+          <Button variant="outline" onClick={() => navigate('/distributor-portal/primary-orders')}>
             <ClipboardList className="w-4 h-4 mr-2" />
             Primary Orders
           </Button>
@@ -375,7 +375,7 @@ const DistributorDashboard = () => {
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => navigate('/distributor-portal/orders')}
+                onClick={() => navigate('/distributor-portal/primary-orders')}
               >
                 View All
                 <ArrowRight className="w-4 h-4 ml-1" />
@@ -389,7 +389,7 @@ const DistributorDashboard = () => {
                 <p>No orders yet</p>
                 <Button 
                   variant="link" 
-                  onClick={() => navigate('/distributor-portal/orders/new')}
+                  onClick={() => navigate('/distributor-portal/create-primary-order')}
                   className="mt-2"
                 >
                   Create your first order
@@ -401,7 +401,7 @@ const DistributorDashboard = () => {
                   <div 
                     key={order.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-                    onClick={() => navigate(`/distributor-portal/orders/${order.id}`)}
+                    onClick={() => navigate(`/distributor-portal/primary-order/${order.id}`)}
                   >
                     <div>
                       <p className="font-medium text-foreground">{order.order_number}</p>

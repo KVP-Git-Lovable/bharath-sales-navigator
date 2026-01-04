@@ -81,7 +81,7 @@ const GoodsReceipt = () => {
     } catch (error) {
       console.error('Error loading order:', error);
       toast.error('Failed to load order details');
-      navigate('/distributor-portal/orders');
+      navigate('/distributor-portal/primary-orders');
     } finally {
       setLoading(false);
     }
@@ -199,7 +199,7 @@ const GoodsReceipt = () => {
         .eq('id', orderId);
 
       toast.success('GRN confirmed! Inventory updated.');
-      navigate('/distributor-portal/orders');
+      navigate('/distributor-portal/primary-orders');
     } catch (error) {
       console.error('Error confirming GRN:', error);
       toast.error('Failed to confirm GRN');
@@ -235,7 +235,7 @@ const GoodsReceipt = () => {
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/orders')}>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/primary-orders')}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -380,7 +380,7 @@ const GoodsReceipt = () => {
           <Button 
             variant="outline" 
             className="flex-1"
-            onClick={() => navigate('/distributor-portal/orders')}
+            onClick={() => navigate('/distributor-portal/primary-orders')}
           >
             Cancel
           </Button>
