@@ -122,32 +122,24 @@ const DistributorInventory = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background standalone-page">
-      {/* Header */}
-      <header className="sticky-header-safe z-50 bg-card border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/dashboard')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="font-semibold text-foreground">Inventory</h1>
-              <p className="text-xs text-muted-foreground">{inventory.length} products</p>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
+          <p className="text-muted-foreground">{inventory.length} products in stock</p>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-2">
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/distributor-portal/inventory-ledger')}>
             <BookOpen className="w-4 h-4 mr-2" />
             View Ledger
@@ -336,7 +328,6 @@ const DistributorInventory = () => {
             })}
           </div>
         )}
-      </main>
     </div>
   );
 };

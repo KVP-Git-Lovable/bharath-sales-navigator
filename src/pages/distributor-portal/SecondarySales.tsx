@@ -537,82 +537,43 @@ const SecondarySales = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background standalone-page">
-      {/* Admin Impersonation Banner */}
-      {isImpersonated && (
-        <div className="sticky-header-safe z-[60] bg-amber-500 text-white px-4 py-2">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              <span className="text-sm font-medium">
-                Admin Viewing Mode: {user?.full_name}
-              </span>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleLogout}
-              className="h-7 text-white hover:bg-amber-600"
-            >
-              <X className="w-4 h-4 mr-1" />
-              Exit View
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Secondary Sales</h1>
+          <p className="text-muted-foreground">Orders from field sales visits</p>
         </div>
-      )}
+      </div>
 
-      {/* Header */}
-      <header className={`sticky ${isImpersonated ? 'top-[calc(var(--sat)+40px)]' : 'sticky-header-safe'} z-50 bg-card border-b shadow-sm`}>
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/dashboard')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="font-semibold text-foreground">Secondary Sales</h1>
-              <p className="text-xs text-muted-foreground">
-                Orders from field sales visits
-              </p>
-            </div>
-          </div>
-          {!isImpersonated && (
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-2xl font-bold text-primary">{filteredOrders.length}</p>
-              <p className="text-xs text-muted-foreground">Total Orders</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">₹{(totalAmount/1000).toFixed(1)}K</p>
-              <p className="text-xs text-muted-foreground">Total Value</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
-              <p className="text-xs text-muted-foreground">Pending</p>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-primary">{filteredOrders.length}</p>
+            <p className="text-xs text-muted-foreground">Total Orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-green-600">₹{(totalAmount/1000).toFixed(1)}K</p>
+            <p className="text-xs text-muted-foreground">Total Value</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
+            <p className="text-xs text-muted-foreground">Pending</p>
+          </CardContent>
+        </Card>
+      </div>
 
         {/* Search and Filters */}
         <Card>
@@ -834,7 +795,6 @@ const SecondarySales = () => {
             )}
           </CardContent>
         </Card>
-      </main>
 
       {/* Delivery Status Dialog */}
       <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>

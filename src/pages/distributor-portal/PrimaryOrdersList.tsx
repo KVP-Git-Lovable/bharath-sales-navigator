@@ -84,32 +84,24 @@ const PrimaryOrdersList = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background standalone-page">
-      {/* Header */}
-      <header className="sticky-header-safe z-50 bg-card border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/dashboard')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="font-semibold text-foreground">Primary Orders</h1>
-              <p className="text-xs text-muted-foreground">{orders.length} orders</p>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Primary Orders</h1>
+          <p className="text-muted-foreground">{orders.length} orders total</p>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-        {/* Actions Bar */}
-        <div className="flex flex-col sm:flex-row gap-3">
+      {/* Actions Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
           <Button onClick={() => navigate('/distributor-portal/create-primary-order')} className="shrink-0">
             <Plus className="w-4 h-4 mr-2" />
             New Order
@@ -217,7 +209,6 @@ const PrimaryOrdersList = () => {
             ))}
           </div>
         )}
-      </main>
     </div>
   );
 };
