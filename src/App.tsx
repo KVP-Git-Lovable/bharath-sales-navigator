@@ -7,7 +7,7 @@ import { PricingPage } from "@/pages/website/PricingPage";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { RoleBasedAuthPage } from "@/components/auth/RoleBasedAuthPage";
@@ -373,6 +373,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/primary-orders" element={<ProtectedRoute><PrimaryOrders /></ProtectedRoute>} />
 
         {/* Distributor Portal Routes */}
+        <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
         <Route path="/distributor-portal/login" element={<DistributorLogin />} />
         <Route path="/distributor-portal/dashboard" element={<DistributorDashboard />} />
         <Route path="/distributor-portal/primary-orders" element={<PrimaryOrdersList />} />
