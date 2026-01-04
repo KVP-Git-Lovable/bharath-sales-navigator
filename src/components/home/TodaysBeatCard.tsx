@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { useUserTargetProgress, TargetPeriod, TargetBasis } from "@/hooks/useUserTargetProgress";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
@@ -28,13 +28,20 @@ interface TodaysBeatCardProps {
   onDateChange: (date: Date) => void;
 }
 
-const PERIOD_OPTIONS: { value: TargetPeriod; label: string }[] = [
-  { value: 'today', label: 'Today' },
+// Grouped period options - Past and Future
+const PAST_PERIOD_OPTIONS: { value: TargetPeriod; label: string }[] = [
   { value: 'yesterday', label: 'Yesterday' },
+  { value: 'last_week', label: 'Last Week' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'last_quarter', label: 'Last Quarter' },
+];
+
+const FUTURE_PERIOD_OPTIONS: { value: TargetPeriod; label: string }[] = [
+  { value: 'today', label: 'Today' },
   { value: 'this_week', label: 'This Week' },
   { value: 'this_month', label: 'This Month' },
   { value: 'this_quarter', label: 'This Quarter' },
-  { value: 'this_year', label: 'This Year' },
+  { value: 'this_year', label: 'This FY' },
 ];
 
 const BASIS_OPTIONS: { value: TargetBasis; label: string }[] = [
@@ -110,6 +117,12 @@ export const TodaysBeatCard = ({
 
   const displayBeatName = beatName || beatPlan?.beat_name || 'Not Planned';
 
+  // Get display label for current period
+  const getPeriodLabel = (period: TargetPeriod) => {
+    const allOptions = [...PAST_PERIOD_OPTIONS, ...FUTURE_PERIOD_OPTIONS];
+    return allOptions.find(opt => opt.value === period)?.label || period;
+  };
+
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-lg overflow-hidden">
       <CardContent className="p-5 space-y-5">
@@ -135,11 +148,22 @@ export const TodaysBeatCard = ({
                 <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
-                {PERIOD_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">Current / Future</SelectLabel>
+                  {FUTURE_PERIOD_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">Past</SelectLabel>
+                  {PAST_PERIOD_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={targetBasis} onValueChange={(v) => setTargetBasis(v as TargetBasis)}>
@@ -156,19 +180,21 @@ export const TodaysBeatCard = ({
             </Select>
           </div>
 
-          {/* Progress Display */}
+          {/* Target Display - Fixed target for period */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">
-                {targetBasis === 'revenue' ? 'Revenue' : 'Quantity'} Achieved
+                Target ({getPeriodLabel(targetPeriod)})
               </p>
               <p className="text-sm font-bold text-foreground">
-                {targetLoading ? '...' : formatValue(actual)}
+                {targetLoading ? '...' : formatValue(target)}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground mb-0.5">Progress</p>
-              <p className="text-sm font-bold text-success">{targetLoading ? '...' : `${progress}%`}</p>
+              <p className="text-xs text-muted-foreground mb-0.5">Achievement</p>
+              <p className={`text-sm font-bold ${progress >= 100 ? 'text-success' : progress >= 50 ? 'text-warning' : 'text-destructive'}`}>
+                {targetLoading ? '...' : `${progress}%`}
+              </p>
             </div>
           </div>
           
@@ -177,16 +203,20 @@ export const TodaysBeatCard = ({
             <div className="absolute inset-0 flex items-center">
               <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-success to-success/80 rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%` }}
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    progress >= 100 ? 'bg-gradient-to-r from-success to-success/80' :
+                    progress >= 50 ? 'bg-gradient-to-r from-warning to-warning/80' :
+                    'bg-gradient-to-r from-destructive to-destructive/80'
+                  }`}
+                  style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
             </div>
 
-            {/* Pin Marker - positioned above the line */}
+            {/* Pin Marker - positioned above the line showing Actual */}
             <div 
               className="absolute -translate-x-1/2 z-10 transition-all duration-500"
-              style={{ left: `${Math.max(progress, 5)}%`, top: '-18px' }}
+              style={{ left: `${Math.min(Math.max(progress, 5), 95)}%`, top: '-18px' }}
             >
               <div className="flex flex-col items-center">
                 <div className="bg-primary text-primary-foreground px-2.5 py-1 rounded-lg shadow-lg text-[10px] font-bold whitespace-nowrap border-2 border-background">

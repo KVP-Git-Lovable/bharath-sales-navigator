@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { Recommendation } from '@/hooks/useRecommendations';
 import { RecommendationCard } from './RecommendationCard';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 interface AIRecommendationBannerProps {
   recommendations: Recommendation[];
@@ -13,6 +15,7 @@ interface AIRecommendationBannerProps {
   type: 'beat_visit' | 'retailer_priority' | 'discussion_points' | 'optimal_day';
   beatId?: string;
   retailerId?: string;
+  compact?: boolean;
 }
 
 export function AIRecommendationBanner({
@@ -21,6 +24,7 @@ export function AIRecommendationBanner({
   onFeedback,
   loading,
   type,
+  compact = false,
 }: AIRecommendationBannerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -29,7 +33,7 @@ export function AIRecommendationBanner({
       case 'beat_visit':
         return 'Beat Recommendations';
       case 'retailer_priority':
-        return 'Priority Retailers';
+        return compact ? 'Priority' : 'Priority Retailers';
       case 'discussion_points':
         return 'Discussion Points';
       case 'optimal_day':
@@ -54,6 +58,65 @@ export function AIRecommendationBanner({
     }
   };
 
+  // Compact mode - collapsible button style for MyVisits
+  if (compact) {
+    return (
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="justify-between gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10 h-8 text-xs px-2 w-full"
+          >
+            <div className="flex items-center gap-2">
+              <Users className="h-3 w-3 text-primary" />
+              <span>{getTitle()}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {recommendations.length > 0 && (
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {recommendations.length}
+                </span>
+              )}
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </div>
+          </Button>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent className="mt-2">
+          <div className="space-y-2 p-3 rounded-lg bg-gradient-to-br from-primary/5 to-transparent border border-primary/10">
+            {recommendations.length === 0 ? (
+              <div className="text-center py-2">
+                <p className="text-[10px] text-muted-foreground mb-2">{getDescription()}</p>
+                <Button
+                  size="sm"
+                  onClick={onGenerate}
+                  disabled={loading}
+                  className="flex items-center gap-1 h-6 text-[10px] px-2"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {loading ? '...' : 'Get Insights'}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recommendations.map((rec) => (
+                  <RecommendationCard
+                    key={rec.id}
+                    recommendation={rec}
+                    onFeedback={(feedbackType) => onFeedback(rec.id, feedbackType)}
+                    compact
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  }
+
+  // Original non-compact mode
   if (recommendations.length === 0) {
     return (
       <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">

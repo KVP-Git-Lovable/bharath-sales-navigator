@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays, getMonth, getYear, getDaysInMonth, getDay } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays, subWeeks, subMonths, subQuarters, getMonth, getYear, getDaysInMonth, getDay } from 'date-fns';
 
-export type TargetPeriod = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year';
+export type TargetPeriod = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'last_week' | 'last_month' | 'last_quarter';
 export type TargetBasis = 'revenue' | 'quantity';
 
 interface MonthTarget {
@@ -85,10 +85,19 @@ export function useUserTargetProgress(
         return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
       case 'this_week':
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+      case 'last_week':
+        const lastWeekDate = subWeeks(now, 1);
+        return { start: startOfWeek(lastWeekDate, { weekStartsOn: 1 }), end: endOfWeek(lastWeekDate, { weekStartsOn: 1 }) };
       case 'this_month':
         return { start: startOfMonth(now), end: endOfMonth(now) };
+      case 'last_month':
+        const lastMonthDate = subMonths(now, 1);
+        return { start: startOfMonth(lastMonthDate), end: endOfMonth(lastMonthDate) };
       case 'this_quarter':
         return { start: startOfQuarter(now), end: endOfQuarter(now) };
+      case 'last_quarter':
+        const lastQuarterDate = subQuarters(now, 1);
+        return { start: startOfQuarter(lastQuarterDate), end: endOfQuarter(lastQuarterDate) };
       case 'this_year':
         // FY year: April to March
         const fyYear = getFYYear(now);
@@ -157,9 +166,12 @@ export function useUserTargetProgress(
                 calculatedTarget = (monthTarget.quantity_target || 0) / workingDays;
               }
             }
-          } else if (period === 'this_week') {
+          } else if (period === 'this_week' || period === 'last_week') {
             // Weekly target = monthly target / 4 (approximate weeks per month)
-            const monthTarget = monthData?.find(m => m.month_number === currentFYMonthNumber);
+            // For last_week, use the month of last week's start
+            const targetDate = period === 'last_week' ? subWeeks(now, 1) : now;
+            const targetFYMonthNumber = getFYMonthNumber(getMonth(targetDate));
+            const monthTarget = monthData?.find(m => m.month_number === targetFYMonthNumber);
             if (monthTarget) {
               if (basis === 'revenue') {
                 calculatedTarget = (monthTarget.revenue_target || 0) / 4;
@@ -167,18 +179,22 @@ export function useUserTargetProgress(
                 calculatedTarget = (monthTarget.quantity_target || 0) / 4;
               }
             }
-          } else if (period === 'this_month') {
-            const monthTarget = monthData?.find(m => m.month_number === currentFYMonthNumber);
+          } else if (period === 'this_month' || period === 'last_month') {
+            const targetDate = period === 'last_month' ? subMonths(now, 1) : now;
+            const targetFYMonthNumber = getFYMonthNumber(getMonth(targetDate));
+            const monthTarget = monthData?.find(m => m.month_number === targetFYMonthNumber);
             if (monthTarget) {
               calculatedTarget = basis === 'revenue' 
                 ? (monthTarget.revenue_target || 0)
                 : (monthTarget.quantity_target || 0);
             }
-          } else if (period === 'this_quarter') {
-            // Get current quarter's months (FY quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar)
-            const quarterStart = currentFYMonthNumber <= 3 ? 1 : 
-                                 currentFYMonthNumber <= 6 ? 4 :
-                                 currentFYMonthNumber <= 9 ? 7 : 10;
+          } else if (period === 'this_quarter' || period === 'last_quarter') {
+            // Get quarter's months (FY quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar)
+            const targetDate = period === 'last_quarter' ? subQuarters(now, 1) : now;
+            const targetFYMonthNumber = getFYMonthNumber(getMonth(targetDate));
+            const quarterStart = targetFYMonthNumber <= 3 ? 1 : 
+                                 targetFYMonthNumber <= 6 ? 4 :
+                                 targetFYMonthNumber <= 9 ? 7 : 10;
             const quarterMonths = [quarterStart, quarterStart + 1, quarterStart + 2];
             
             const quarterTargets = monthData?.filter(m => quarterMonths.includes(m.month_number)) || [];
