@@ -91,7 +91,7 @@ export default function CompetencyDashboard() {
   
   // Build team member options for dropdown
   const teamMemberOptions = [
-    { value: '', label: 'Myself' },
+    { value: 'self', label: 'Myself' },
     ...(subordinates?.map(s => ({
       value: s.subordinate_user_id,
       label: s.full_name || 'Unknown'
@@ -109,7 +109,7 @@ export default function CompetencyDashboard() {
         rightContent={
           <div className="flex items-center gap-2">
             {isManager && (
-              <Select value={selectedUserId || ''} onValueChange={(val) => setSelectedUserId(val || null)}>
+              <Select value={selectedUserId || 'self'} onValueChange={(val) => setSelectedUserId(val === 'self' ? null : val)}>
                 <SelectTrigger className="w-[120px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
                   <Users className="h-4 w-4 mr-1" />
                   <SelectValue placeholder="Myself" />
