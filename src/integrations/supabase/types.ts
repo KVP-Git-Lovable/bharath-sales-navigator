@@ -1562,6 +1562,114 @@ export type Database = {
         }
         Relationships: []
       }
+      competency_coaching_notes: {
+        Row: {
+          acknowledged_at: string | null
+          action_items: Json | null
+          competency_template_id: string | null
+          created_at: string | null
+          id: string
+          is_acknowledged: boolean | null
+          manager_id: string
+          note: string
+          scorecard_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          action_items?: Json | null
+          competency_template_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          manager_id: string
+          note: string
+          scorecard_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          action_items?: Json | null
+          competency_template_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          manager_id?: string
+          note?: string
+          scorecard_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competency_coaching_notes_competency_template_id_fkey"
+            columns: ["competency_template_id"]
+            isOneToOne: false
+            referencedRelation: "competency_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competency_coaching_notes_scorecard_id_fkey"
+            columns: ["scorecard_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_scorecards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competency_templates: {
+        Row: {
+          calculation_formula: Json
+          category: string
+          competency_code: string
+          competency_name: string
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          max_score: number | null
+          role_type: string
+          sort_order: number | null
+          updated_at: string | null
+          weightage: number
+        }
+        Insert: {
+          calculation_formula?: Json
+          category: string
+          competency_code: string
+          competency_name: string
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_score?: number | null
+          role_type: string
+          sort_order?: number | null
+          updated_at?: string | null
+          weightage: number
+        }
+        Update: {
+          calculation_formula?: Json
+          category?: string
+          competency_code?: string
+          competency_name?: string
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_score?: number | null
+          role_type?: string
+          sort_order?: number | null
+          updated_at?: string | null
+          weightage?: number
+        }
+        Relationships: []
+      }
       competition_contacts: {
         Row: {
           competitor_id: string
@@ -9614,6 +9722,53 @@ export type Database = {
         }
         Relationships: []
       }
+      user_competency_monthly_scores: {
+        Row: {
+          calculated_at: string | null
+          competency_template_id: string
+          created_at: string | null
+          id: string
+          month_year: string
+          previous_month_score: number | null
+          raw_metrics: Json | null
+          score: number
+          trend: string | null
+          user_id: string
+        }
+        Insert: {
+          calculated_at?: string | null
+          competency_template_id: string
+          created_at?: string | null
+          id?: string
+          month_year: string
+          previous_month_score?: number | null
+          raw_metrics?: Json | null
+          score: number
+          trend?: string | null
+          user_id: string
+        }
+        Update: {
+          calculated_at?: string | null
+          competency_template_id?: string
+          created_at?: string | null
+          id?: string
+          month_year?: string
+          previous_month_score?: number | null
+          raw_metrics?: Json | null
+          score?: number
+          trend?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_competency_monthly_scores_competency_template_id_fkey"
+            columns: ["competency_template_id"]
+            isOneToOne: false
+            referencedRelation: "competency_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_invitations: {
         Row: {
           completed_at: string | null
@@ -9653,6 +9808,69 @@ export type Database = {
           manager_id?: string | null
           phone_number?: string | null
           status?: string | null
+        }
+        Relationships: []
+      }
+      user_monthly_scorecards: {
+        Row: {
+          ai_action_plan: Json | null
+          ai_improvement_areas: Json | null
+          ai_strengths: Json | null
+          ai_summary: string | null
+          created_at: string | null
+          id: string
+          is_published: boolean | null
+          manager_id: string | null
+          month_year: string
+          overall_score: number
+          performance_band: string | null
+          published_at: string | null
+          rank_in_team: number | null
+          role_type: string
+          total_team_members: number | null
+          updated_at: string | null
+          user_id: string
+          weighted_score: number | null
+        }
+        Insert: {
+          ai_action_plan?: Json | null
+          ai_improvement_areas?: Json | null
+          ai_strengths?: Json | null
+          ai_summary?: string | null
+          created_at?: string | null
+          id?: string
+          is_published?: boolean | null
+          manager_id?: string | null
+          month_year: string
+          overall_score: number
+          performance_band?: string | null
+          published_at?: string | null
+          rank_in_team?: number | null
+          role_type: string
+          total_team_members?: number | null
+          updated_at?: string | null
+          user_id: string
+          weighted_score?: number | null
+        }
+        Update: {
+          ai_action_plan?: Json | null
+          ai_improvement_areas?: Json | null
+          ai_strengths?: Json | null
+          ai_summary?: string | null
+          created_at?: string | null
+          id?: string
+          is_published?: boolean | null
+          manager_id?: string | null
+          month_year?: string
+          overall_score?: number
+          performance_band?: string | null
+          published_at?: string | null
+          rank_in_team?: number | null
+          role_type?: string
+          total_team_members?: number | null
+          updated_at?: string | null
+          user_id?: string
+          weighted_score?: number | null
         }
         Relationships: []
       }
