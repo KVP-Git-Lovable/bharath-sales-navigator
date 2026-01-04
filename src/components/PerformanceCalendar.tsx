@@ -160,6 +160,7 @@ export const PerformanceCalendar = () => {
       const dataByDate = new Map<string, DayData>();
       const holidayDates = new Set(holidays?.map(h => h.date) || []);
       const leaveDates = new Set<string>();
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
 
       // Process leave dates
       leaves?.forEach(leave => {
@@ -186,6 +187,25 @@ export const PerformanceCalendar = () => {
         if (plan.joint_sales_manager_id) {
           dayData.hasJointSales = true;
           dayData.jointSalesMemberName = jointSalesMemberMap.get(plan.joint_sales_manager_id);
+        }
+      });
+
+      // Initialize all beat plan dates first (to show future planned beats)
+      beatPlanMap.forEach((beatPlanInfo, dateKey) => {
+        if (!dataByDate.has(dateKey)) {
+          dataByDate.set(dateKey, {
+            date: new Date(dateKey),
+            beatName: beatPlanInfo.beatNames.join(', '),
+            plannedVisits: 0,
+            completedVisits: 0,
+            productiveVisits: 0,
+            revenue: 0,
+            productivity: 0,
+            isHoliday: holidayDates.has(dateKey),
+            isLeave: leaveDates.has(dateKey),
+            hasJointSales: beatPlanInfo.hasJointSales,
+            jointSalesMemberName: beatPlanInfo.jointSalesMemberName
+          });
         }
       });
 
@@ -328,10 +348,19 @@ export const PerformanceCalendar = () => {
     navigate(`/today-summary?date=${format(date, 'yyyy-MM-dd')}`);
   };
 
-  const getColorClass = (dayData: DayData | undefined) => {
+  const getColorClass = (dayData: DayData | undefined, dateKey: string) => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const isFutureDate = dateKey > todayStr;
+    
     if (!dayData) return 'bg-background';
     if (dayData.isHoliday && filters.holidays) return 'bg-muted';
     if (dayData.isLeave && filters.leaves) return 'bg-muted';
+    
+    // Future planned beats - show in blue/info color
+    if (isFutureDate && dayData.beatName && dayData.completedVisits === 0) {
+      return 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800';
+    }
+    
     if (dayData.completedVisits === 0 && filters.planned) return 'bg-background';
     
     if (dayData.productivity >= 50) return 'bg-success/20 border-success/40';
@@ -393,7 +422,7 @@ export const PerformanceCalendar = () => {
                     "min-h-[68px] md:min-h-[78px] p-1 md:p-1.5 border rounded transition-all",
                     "hover:shadow active:scale-95 md:hover:scale-[1.02]",
                     "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100",
-                    getColorClass(dayData),
+                    getColorClass(dayData, dateKey),
                     isToday && "ring-1.5 ring-primary"
                   )}
                 >
@@ -405,6 +434,7 @@ export const PerformanceCalendar = () => {
                       {format(day, 'd')}
                     </div>
                     
+                    {/* Show completed visits data */}
                     {isCurrentMonth && dayData && dayData.completedVisits > 0 && (
                       <div className="text-[9px] md:text-[10px] space-y-px leading-tight">
                         {dayData.beatName && (
@@ -432,6 +462,26 @@ export const PerformanceCalendar = () => {
                           <div className="text-primary font-bold">
                             ₹{dayData.revenue >= 1000 ? (dayData.revenue / 1000).toFixed(1) + 'k' : dayData.revenue}
                           </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Show planned beats for future dates (no visits yet) */}
+                    {isCurrentMonth && dayData && dayData.completedVisits === 0 && dayData.beatName && dateKey > format(new Date(), 'yyyy-MM-dd') && (
+                      <div className="text-[9px] md:text-[10px] space-y-px leading-tight">
+                        <div className="font-semibold text-blue-600 dark:text-blue-400 truncate" title={dayData.beatName}>
+                          📅 {dayData.beatName.length > 8 ? dayData.beatName.substring(0, 8) + '..' : dayData.beatName}
+                        </div>
+                        <div className="text-muted-foreground text-[8px]">
+                          Planned
+                        </div>
+                        {dayData.hasJointSales && (
+                          <span 
+                            className="text-blue-600 cursor-help" 
+                            title={dayData.jointSalesMemberName ? `Joint Sales with ${dayData.jointSalesMemberName}` : "Joint Sales Visit"}
+                          >
+                            🔵
+                          </span>
                         )}
                       </div>
                     )}
