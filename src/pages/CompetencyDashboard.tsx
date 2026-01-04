@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, Sparkles, Loader2 } from "lucide-react";
+import { RefreshCw, Sparkles, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, subMonths, startOfMonth } from "date-fns";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { useCompetencyScores, useMonthlyScorecard, useCompetencyHistory, useCalculateCompetencyScores, useGenerateCompetencyInsights } from "@/hooks/useCompetencyScores";
+import { CompetencyHeader } from "@/components/competency/CompetencyHeader";
+import { EmployeeRecognitionBanner } from "@/components/competency/EmployeeRecognitionBanner";
 import { OverallScoreCard } from "@/components/competency/OverallScoreCard";
 import { CompetencyScoreCard } from "@/components/competency/CompetencyScoreCard";
+import { CompetencyRadarChart } from "@/components/competency/CompetencyRadarChart";
 import { ImprovementPlanCard } from "@/components/competency/ImprovementPlanCard";
 import { CompetencyHistoryChart } from "@/components/competency/CompetencyHistoryChart";
 
@@ -26,8 +30,9 @@ const getMonthOptions = () => {
 
 export default function CompetencyDashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [companyName, setCompanyName] = useState("SalesCoach AI");
   
   const { data: scores, isLoading: scoresLoading } = useCompetencyScores(selectedMonth);
   const { data: scorecard, isLoading: scorecardLoading } = useMonthlyScorecard(selectedMonth);
@@ -35,6 +40,17 @@ export default function CompetencyDashboard() {
   
   const calculateScores = useCalculateCompetencyScores();
   const generateInsights = useGenerateCompetencyInsights();
+
+  // Fetch company name
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const { data } = await supabase.from('companies').select('name').limit(1).single();
+        if (data?.name) setCompanyName(data.name);
+      } catch (e) { /* use default */ }
+    };
+    fetchCompany();
+  }, []);
 
   const handleCalculateScores = async () => {
     if (!user?.id) return;
@@ -59,23 +75,19 @@ export default function CompetencyDashboard() {
   const monthOptions = getMonthOptions();
   const isLoading = scoresLoading || scorecardLoading;
   const hasScores = scores && scores.length > 0;
+  const employeeName = userProfile?.full_name || user?.email?.split('@')[0] || 'Team Member';
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-lg font-semibold">Competency Dashboard</h1>
-              <p className="text-xs text-muted-foreground">AI-driven performance insights</p>
-            </div>
-          </div>
+      {/* Header with hamburger menu and company name */}
+      <CompetencyHeader
+        title="My Competency Dashboard"
+        subtitle="AI-driven performance insights"
+        companyName={companyName}
+        onBack={() => navigate(-1)}
+        rightContent={
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[130px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -84,10 +96,17 @@ export default function CompetencyDashboard() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
+        }
+      />
 
       <div className="p-4 space-y-6 pb-24">
+        {/* Employee Recognition Banner */}
+        <EmployeeRecognitionBanner
+          employeeName={employeeName}
+          overallScore={scorecard?.overall_score}
+          performanceBand={scorecard?.performance_band as any}
+        />
+
         {/* Action Buttons */}
         <div className="flex gap-2">
           <Button onClick={handleCalculateScores} disabled={calculateScores.isPending} className="flex-1">
@@ -122,6 +141,11 @@ export default function CompetencyDashboard() {
                 rankInTeam={scorecard.rank_in_team}
                 totalTeamMembers={scorecard.total_team_members}
               />
+            )}
+
+            {/* Radar Chart */}
+            {scores && scores.length > 2 && (
+              <CompetencyRadarChart scores={scores} />
             )}
 
             {/* History Chart */}
