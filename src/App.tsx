@@ -128,6 +128,8 @@ import ResetPassword from "./pages/ResetPassword";
 // Distributor Portal Pages
 import DistributorLogin from "./pages/distributor-portal/DistributorLogin";
 import DistributorDashboard from "./pages/distributor-portal/DistributorDashboard";
+import DMSLayout from "./pages/distributor-portal/DMSLayout";
+import DMSHomePage from "./pages/distributor-portal/DMSHomePage";
 import PrimaryOrdersList from "./pages/distributor-portal/PrimaryOrdersList";
 import CreatePrimaryOrder from "./pages/distributor-portal/CreatePrimaryOrder";
 import PrimaryOrderDetail from "./pages/distributor-portal/PrimaryOrderDetail";
@@ -379,24 +381,29 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         {/* Distributor Portal Routes */}
         <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
         <Route path="/distributor-portal/login" element={<DistributorLogin />} />
-        <Route path="/distributor-portal/dashboard" element={<DistributorDashboard />} />
-        <Route path="/distributor-portal/primary-orders" element={<PrimaryOrdersList />} />
-        <Route path="/distributor-portal/create-primary-order" element={<CreatePrimaryOrder />} />
-        <Route path="/distributor-portal/primary-order/:id" element={<PrimaryOrderDetail />} />
-        <Route path="/distributor-portal/inventory" element={<DistributorInventory />} />
-        <Route path="/distributor-portal/secondary-sales" element={<SecondarySales />} />
-        <Route path="/distributor-portal/packing-list" element={<PackingList />} />
-        <Route path="/distributor-portal/goods-receipt/:orderId" element={<GoodsReceipt />} />
-        <Route path="/distributor-portal/claims" element={<DistributorClaims />} />
-        <Route path="/distributor-portal/support" element={<DistributorSupport />} />
-        <Route path="/distributor-portal/ideas" element={<DistributorIdeas />} />
-        <Route path="/distributor-portal/profile" element={<DistributorProfile />} />
-        <Route path="/distributor-portal/contacts" element={<DistributorContactsPortal />} />
-        <Route path="/distributor-portal/fy-plan" element={<DistributorFYPlanPage />} />
-        <Route path="/distributor-portal/returns" element={<RetailerReturns />} />
-        <Route path="/distributor-portal/company-returns" element={<CompanyReturns />} />
-        <Route path="/distributor-portal/inventory-ledger" element={<InventoryLedger />} />
-        <Route path="/distributor-portal/stock-adjustments" element={<StockAdjustments />} />
+        
+        {/* DMS Layout with persistent sidebar */}
+        <Route path="/distributor-portal" element={<DMSLayout />}>
+          <Route path="dashboard" element={<DMSHomePage />} />
+          <Route path="primary-orders" element={<PrimaryOrdersList />} />
+          <Route path="create-primary-order" element={<CreatePrimaryOrder />} />
+          <Route path="primary-order/:id" element={<PrimaryOrderDetail />} />
+          <Route path="inventory" element={<DistributorInventory />} />
+          <Route path="secondary-sales" element={<SecondarySales />} />
+          <Route path="packing-list" element={<PackingList />} />
+          <Route path="goods-receipt/:orderId" element={<GoodsReceipt />} />
+          <Route path="goods-receipt" element={<GoodsReceipt />} />
+          <Route path="claims" element={<DistributorClaims />} />
+          <Route path="support" element={<DistributorSupport />} />
+          <Route path="ideas" element={<DistributorIdeas />} />
+          <Route path="profile" element={<DistributorProfile />} />
+          <Route path="contacts" element={<DistributorContactsPortal />} />
+          <Route path="fy-plan" element={<DistributorFYPlanPage />} />
+          <Route path="returns" element={<RetailerReturns />} />
+          <Route path="company-returns" element={<CompanyReturns />} />
+          <Route path="inventory-ledger" element={<InventoryLedger />} />
+          <Route path="stock-adjustments" element={<StockAdjustments />} />
+        </Route>
 
         {/* Institutional Sales Routes */}
         <Route path="/institutional" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
