@@ -1,14 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, Sparkles, Loader2, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { format, subMonths, startOfMonth } from "date-fns";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useCompetencyScores, useMonthlyScorecard, useCompetencyHistory, useCalculateCompetencyScores, useGenerateCompetencyInsights } from "@/hooks/useCompetencyScores";
-import { CompetencyHeader } from "@/components/competency/CompetencyHeader";
 import { EmployeeRecognitionBanner } from "@/components/competency/EmployeeRecognitionBanner";
 import { OverallScoreCard } from "@/components/competency/OverallScoreCard";
 import { CompetencyScoreCard } from "@/components/competency/CompetencyScoreCard";
@@ -30,10 +27,8 @@ const getMonthOptions = () => {
 };
 
 export default function CompetencyDashboard() {
-  const navigate = useNavigate();
   const { user, userProfile } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [companyName, setCompanyName] = useState("SalesCoach AI");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   
   const { subordinates, isManager, isLoading: subordinatesLoading } = useSubordinates();
@@ -47,17 +42,6 @@ export default function CompetencyDashboard() {
   
   const calculateScores = useCalculateCompetencyScores();
   const generateInsights = useGenerateCompetencyInsights();
-
-  // Fetch company name
-  useEffect(() => {
-    const fetchCompany = async () => {
-      try {
-        const { data } = await supabase.from('companies').select('name').limit(1).single();
-        if (data?.name) setCompanyName(data.name);
-      } catch (e) { /* use default */ }
-    };
-    fetchCompany();
-  }, []);
 
   const handleCalculateScores = async () => {
     if (!viewingUserId) return;
@@ -99,43 +83,39 @@ export default function CompetencyDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header with hamburger menu and company name */}
-      <CompetencyHeader
-        title="My Competency Dashboard"
-        subtitle="AI-driven performance insights"
-        companyName={companyName}
-        onBack={() => navigate(-1)}
-        rightContent={
-          <div className="flex items-center gap-2">
-            {isManager && (
-              <Select value={selectedUserId || 'self'} onValueChange={(val) => setSelectedUserId(val === 'self' ? null : val)}>
-                <SelectTrigger className="w-[120px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
-                  <Users className="h-4 w-4 mr-1" />
-                  <SelectValue placeholder="Myself" />
-                </SelectTrigger>
-                <SelectContent>
-                  {teamMemberOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[130px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
-                <SelectValue />
+    <div className="p-4 space-y-6 pb-24">
+      {/* Page Title with Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">My Competency Dashboard</h1>
+          <p className="text-sm text-muted-foreground">AI-driven performance insights</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isManager && (
+            <Select value={selectedUserId || 'self'} onValueChange={(val) => setSelectedUserId(val === 'self' ? null : val)}>
+              <SelectTrigger className="w-[140px]">
+                <Users className="h-4 w-4 mr-1" />
+                <SelectValue placeholder="Myself" />
               </SelectTrigger>
               <SelectContent>
-                {monthOptions.map(option => (
+                {teamMemberOptions.map(option => (
                   <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        }
-      />
-
-      <div className="p-4 space-y-6 pb-24">
+          )}
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
         {/* Employee Recognition Banner */}
         <EmployeeRecognitionBanner
           employeeName={employeeName}
@@ -208,7 +188,6 @@ export default function CompetencyDashboard() {
             )}
           </>
         )}
-      </div>
     </div>
   );
 }

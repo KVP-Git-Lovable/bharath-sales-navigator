@@ -1,16 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, RefreshCw, Users, TrendingUp, TrendingDown, Award } from "lucide-react";
+import { Loader2, RefreshCw, Users } from "lucide-react";
 import { format, subMonths, startOfMonth } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CompetencyHeader } from "@/components/competency/CompetencyHeader";
 import { TeamCompetencyTable } from "@/components/competency/TeamCompetencyTable";
 import { CoachingNotesDialog } from "@/components/competency/CoachingNotesDialog";
 import { useCompetencyTemplates } from "@/hooks/useCompetencyScores";
@@ -42,7 +41,6 @@ export default function TeamCompetency() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedMonth, setSelectedMonth] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [companyName, setCompanyName] = useState("SalesCoach AI");
   const [coachingDialogOpen, setCoachingDialogOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
   const [selectedMemberName, setSelectedMemberName] = useState<string>("");
@@ -50,17 +48,6 @@ export default function TeamCompetency() {
 
   const { subordinates, subordinateIds, isManager, isLoading: subordinatesLoading } = useSubordinates();
   const { data: templates } = useCompetencyTemplates('field_executive');
-
-  // Fetch company name
-  useEffect(() => {
-    const fetchCompany = async () => {
-      try {
-        const { data } = await supabase.from('companies').select('name').limit(1).single();
-        if (data?.name) setCompanyName(data.name);
-      } catch (e) { /* use default */ }
-    };
-    fetchCompany();
-  }, []);
 
   // Fetch team scorecards
   const { data: teamScorecards, isLoading: scorecardsLoading } = useQuery({
@@ -214,46 +201,35 @@ export default function TeamCompetency() {
 
   if (!isManager && !subordinatesLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <CompetencyHeader
-          title="Team Competency"
-          subtitle="View and manage team performance"
-          companyName={companyName}
-          onBack={() => navigate(-1)}
-        />
-        <div className="flex items-center justify-center py-24">
-          <div className="text-center">
-            <Users className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Manager Access Required</h2>
-            <p className="text-muted-foreground">This page is only available to managers with team members.</p>
-          </div>
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center">
+          <Users className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Manager Access Required</h2>
+          <p className="text-muted-foreground">This page is only available to managers with team members.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <CompetencyHeader
-        title="Team Competency"
-        subtitle={`${teamMembers.length} team members`}
-        companyName={companyName}
-        onBack={() => navigate(-1)}
-        rightContent={
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[130px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        }
-      />
-
-      <div className="p-4 space-y-6 pb-24">
+    <div className="p-4 space-y-6 pb-24">
+      {/* Page Title with Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Team Competency</h1>
+          <p className="text-sm text-muted-foreground">{teamMembers.length} team members</p>
+        </div>
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map(option => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
         {/* Team Stats */}
         {teamStats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -307,8 +283,6 @@ export default function TeamCompetency() {
             />
           </CardContent>
         </Card>
-      </div>
-
       {/* Coaching Notes Dialog */}
       <CoachingNotesDialog
         open={coachingDialogOpen}
