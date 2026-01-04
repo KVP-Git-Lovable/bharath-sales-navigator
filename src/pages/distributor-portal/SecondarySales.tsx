@@ -140,61 +140,124 @@ const SecondarySales = () => {
     try {
       setLoading(true);
       
-      // Get retailers mapped to this distributor
-      const { data: retailers } = await supabase
+      // Get distributor name for matching
+      const { data: distData } = await supabase
+        .from('distributors')
+        .select('id, name')
+        .eq('id', distributorId)
+        .single();
+      
+      const distributorName = distData?.name || '';
+      
+      // Get retailer IDs from multiple sources (same logic as DistributorSecondaryOrders)
+      const retailerIdSet = new Set<string>();
+      const retailerMap = new Map<string, any>();
+      
+      // From distributor_retailer_mappings
+      const { data: mappedRetailers } = await supabase
+        .from('distributor_retailer_mappings')
+        .select('retailer_id')
+        .eq('distributor_id', distributorId);
+      
+      mappedRetailers?.forEach(r => retailerIdSet.add(r.retailer_id));
+      
+      // From retailers table (direct link or parent_name match)
+      const { data: linkedRetailers } = await supabase
         .from('retailers')
         .select('id, name, address, phone, beat_name, beat_id')
-        .eq('distributor_id', distributorId);
-
-      if (!retailers || retailers.length === 0) {
+        .or(`distributor_id.eq.${distributorId}${distributorName ? `,parent_name.ilike.${distributorName}` : ''}`);
+      
+      linkedRetailers?.forEach(r => {
+        retailerIdSet.add(r.id);
+        retailerMap.set(r.id, r);
+      });
+      
+      const retailerIds = Array.from(retailerIdSet);
+      
+      if (retailerIds.length === 0) {
         setOrders([]);
         setLoading(false);
         return;
       }
 
-      const retailerIds = retailers.map(r => r.id);
-      const retailerMap = new Map(retailers.map(r => [r.id, r]));
+      // Fetch retailer details for IDs from mappings that weren't in linkedRetailers
+      const missingIds = retailerIds.filter(id => !retailerMap.has(id));
+      if (missingIds.length > 0) {
+        const { data: missingRetailers } = await supabase
+          .from('retailers')
+          .select('id, name, address, phone, beat_name, beat_id')
+          .in('id', missingIds);
+        missingRetailers?.forEach(r => retailerMap.set(r.id, r));
+      }
 
       // Get unique beats
-      const uniqueBeats = [...new Set(retailers.filter(r => r.beat_name).map(r => ({ 
+      const allRetailers = Array.from(retailerMap.values());
+      const uniqueBeats = [...new Set(allRetailers.filter(r => r.beat_name).map(r => ({ 
         id: r.beat_id || r.beat_name, 
         name: r.beat_name 
       })))];
       setBeats(uniqueBeats.filter((b, i, arr) => arr.findIndex(x => x.name === b.name) === i));
 
-      // Get orders from these retailers (last 30 days)
-      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-      const { data: ordersData, error } = await supabase
+      // Get orders - both directly linked to distributor AND from linked retailers
+      let allOrders: any[] = [];
+      
+      // Orders directly linked to this distributor
+      const { data: directOrders } = await supabase
         .from('orders')
         .select('*')
-        .in('retailer_id', retailerIds)
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false });
+        .eq('distributor_id', distributorId)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      
+      if (directOrders) allOrders = [...directOrders];
 
-      if (error) throw error;
+      // Also get orders from linked retailers (regardless of distributor_id on order)
+      if (retailerIds.length > 0) {
+        const { data: retailerOrders, error } = await supabase
+          .from('orders')
+          .select('*')
+          .in('retailer_id', retailerIds)
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (error) throw error;
+        if (retailerOrders) {
+          const existingIds = new Set(allOrders.map(o => o.id));
+          retailerOrders.forEach(o => {
+            if (!existingIds.has(o.id)) {
+              allOrders.push(o);
+            }
+          });
+        }
+      }
 
       // Fetch order items for all orders
-      const orderIds = ordersData?.map(o => o.id) || [];
-      const { data: itemsData } = await supabase
-        .from('order_items')
-        .select('*')
-        .in('order_id', orderIds);
+      if (allOrders.length > 0) {
+        const orderIds = allOrders.map(o => o.id);
+        const { data: itemsData } = await supabase
+          .from('order_items')
+          .select('*')
+          .in('order_id', orderIds);
 
-      const itemsMap = new Map<string, OrderItem[]>();
-      itemsData?.forEach(item => {
-        const existing = itemsMap.get(item.order_id) || [];
-        existing.push(item);
-        itemsMap.set(item.order_id, existing);
-      });
+        const itemsMap = new Map<string, OrderItem[]>();
+        itemsData?.forEach(item => {
+          const existing = itemsMap.get(item.order_id) || [];
+          existing.push(item);
+          itemsMap.set(item.order_id, existing);
+        });
 
-      // Combine data
-      const enrichedOrders = ordersData?.map(order => ({
-        ...order,
-        retailer: retailerMap.get(order.retailer_id),
-        items: itemsMap.get(order.id) || [],
-      })) || [];
+        // Combine data
+        allOrders = allOrders.map(order => ({
+          ...order,
+          retailer: retailerMap.get(order.retailer_id),
+          items: itemsMap.get(order.id) || [],
+        }));
+      }
+      
+      // Sort by date
+      allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      setOrders(enrichedOrders);
+      setOrders(allOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
       toast.error('Failed to load secondary orders');
