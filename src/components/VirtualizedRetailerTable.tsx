@@ -67,14 +67,33 @@ export const VirtualizedRetailerTable: React.FC<VirtualizedRetailerTableProps> =
     return retailers.slice(startIndex, endIndex);
   }, [retailers, startIndex, endIndex]);
 
+  // Throttle ref to prevent excessive scroll updates
+  const scrollThrottleRef = useRef<number | null>(null);
+  
   // Handle scroll with throttling for performance
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const newScrollTop = e.currentTarget.scrollTop;
-    // Only update if scroll changed significantly (reduces re-renders)
-    if (Math.abs(newScrollTop - scrollTop) > rowHeight / 2) {
-      setScrollTop(newScrollTop);
-    }
+    
+    // Throttle to 60fps (16ms) for smooth scrolling
+    if (scrollThrottleRef.current) return;
+    
+    scrollThrottleRef.current = requestAnimationFrame(() => {
+      scrollThrottleRef.current = null;
+      // Only update if scroll changed significantly (reduces re-renders)
+      if (Math.abs(newScrollTop - scrollTop) > rowHeight / 2) {
+        setScrollTop(newScrollTop);
+      }
+    });
   }, [scrollTop, rowHeight]);
+  
+  // Cleanup throttle on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollThrottleRef.current) {
+        cancelAnimationFrame(scrollThrottleRef.current);
+      }
+    };
+  }, []);
 
   // Total height for scroll area
   const totalHeight = retailers.length * rowHeight;

@@ -7,6 +7,7 @@
 
 import { offlineStorage } from '@/lib/offlineStorage';
 import { clearRetailerIndex, buildRetailerIndex, getRetailerIndex } from '@/lib/retailerIndex';
+import { cleanupOldSnapshots } from '@/lib/myVisitsSnapshot';
 
 // Track when cleanup was last performed
 let lastCleanupTime = 0;
@@ -28,6 +29,11 @@ export function periodicMemoryCleanup(): void {
     // Clear memory cache in offline storage (forces re-read from Preferences next time)
     offlineStorage.clearMemoryCache();
     console.log('[MemoryManager] Cleared offline storage memory cache');
+    
+    // Clean old snapshots asynchronously
+    cleanupOldSnapshots().catch(err => {
+      console.warn('[MemoryManager] Error cleaning old snapshots:', err);
+    });
   } catch (error) {
     console.warn('[MemoryManager] Error during cleanup:', error);
   }
@@ -88,4 +94,25 @@ export function getMemoryStats(): {
   }
   
   return stats;
+}
+
+/**
+ * Initialize memory pressure listener (Chrome only)
+ * Triggers cleanup when browser signals memory pressure
+ */
+export function initMemoryPressureHandler(): void {
+  // Listen for visibility change to cleanup when app is backgrounded
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      console.log('[MemoryManager] App backgrounded, triggering cleanup');
+      forceMemoryCleanup();
+    }
+  });
+  
+  // Listen for page unload
+  window.addEventListener('pagehide', () => {
+    forceMemoryCleanup();
+  });
+  
+  console.log('[MemoryManager] Memory pressure handlers initialized');
 }
