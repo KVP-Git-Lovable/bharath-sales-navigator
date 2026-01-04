@@ -124,6 +124,20 @@ interface MonthTarget {
   revenueTarget: number;
 }
 
+interface Retailer {
+  id: string;
+  name: string;
+}
+
+interface RetailerTarget {
+  id: string;
+  retailer_id: string;
+  retailer_name: string;
+  last_year_revenue: number;
+  target_revenue: number;
+  growth_percent: number;
+}
+
 const DistributorFYPlanPage = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<BusinessPlan[]>([]);
@@ -145,6 +159,16 @@ const DistributorFYPlanPage = () => {
   // Monthly targets state
   const [monthTargets, setMonthTargets] = useState<MonthTarget[]>([]);
   const [monthEqualDivide, setMonthEqualDivide] = useState(true);
+  
+  // Retailer targets state
+  const [retailers, setRetailers] = useState<Retailer[]>([]);
+  const [retailerTargets, setRetailerTargets] = useState<RetailerTarget[]>([]);
+  const [retailerDialogOpen, setRetailerDialogOpen] = useState(false);
+  const [retailerForm, setRetailerForm] = useState({
+    retailer_id: "",
+    last_year_revenue: "",
+    target_revenue: "",
+  });
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
 
   const [planForm, setPlanForm] = useState({
@@ -167,6 +191,7 @@ const DistributorFYPlanPage = () => {
     setDistributorId(user.distributor_id);
     loadPlans(user.distributor_id);
     loadProductsWithCategories();
+    loadRetailers(user.distributor_id);
   }, [navigate]);
 
   useEffect(() => {
@@ -174,6 +199,12 @@ const DistributorFYPlanPage = () => {
       loadExistingTargets();
     }
   }, [selectedPlan, productCategories]);
+
+  useEffect(() => {
+    if (selectedPlan) {
+      loadRetailerTargets();
+    }
+  }, [selectedPlan]);
 
   const loadPlans = async (distId: string) => {
     try {
@@ -239,6 +270,58 @@ const DistributorFYPlanPage = () => {
       
       setProductCategories(Array.from(categoryMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
     }
+  };
+
+  const loadRetailers = async (distId: string) => {
+    // Get retailer IDs from multiple sources (same logic as secondary sales)
+    const retailerIdSet = new Set<string>();
+    
+    // Get distributor name for matching
+    const { data: distData } = await supabase
+      .from('distributors')
+      .select('id, name')
+      .eq('id', distId)
+      .single();
+    
+    const distributorName = distData?.name || '';
+    
+    // From distributor_retailer_mappings
+    const { data: mappedRetailers } = await supabase
+      .from('distributor_retailer_mappings')
+      .select('retailer_id')
+      .eq('distributor_id', distId);
+    
+    mappedRetailers?.forEach(r => retailerIdSet.add(r.retailer_id));
+    
+    // From retailers table (direct link or parent_name match)
+    const { data: linkedRetailers } = await supabase
+      .from('retailers')
+      .select('id, name')
+      .or(`distributor_id.eq.${distId}${distributorName ? `,parent_name.ilike.${distributorName}` : ''}`);
+    
+    linkedRetailers?.forEach(r => retailerIdSet.add(r.id));
+    
+    // Fetch all retailer details
+    const retailerIds = Array.from(retailerIdSet);
+    if (retailerIds.length > 0) {
+      const { data } = await supabase
+        .from('retailers')
+        .select('id, name')
+        .in('id', retailerIds)
+        .order('name');
+      setRetailers(data || []);
+    } else {
+      setRetailers([]);
+    }
+  };
+
+  const loadRetailerTargets = async () => {
+    if (!selectedPlan) return;
+    const { data } = await supabase
+      .from('distributor_business_plan_retailers')
+      .select('*')
+      .eq('business_plan_id', selectedPlan.id);
+    setRetailerTargets(data || []);
   };
 
   const loadExistingTargets = async () => {
@@ -508,6 +591,49 @@ const DistributorFYPlanPage = () => {
     setMonthEqualDivide(false);
   };
 
+  // Retailer handlers
+  const handleAddRetailerTarget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlan || !retailerForm.retailer_id) return;
+
+    const retailer = retailers.find(r => r.id === retailerForm.retailer_id);
+    if (!retailer) return;
+
+    const lastYear = parseFloat(retailerForm.last_year_revenue) || 0;
+    const target = parseFloat(retailerForm.target_revenue) || 0;
+    const growth = lastYear > 0 ? ((target - lastYear) / lastYear) * 100 : 0;
+
+    try {
+      const { error } = await supabase
+        .from('distributor_business_plan_retailers')
+        .insert({
+          business_plan_id: selectedPlan.id,
+          retailer_id: retailerForm.retailer_id,
+          retailer_name: retailer.name,
+          last_year_revenue: lastYear,
+          target_revenue: target,
+          growth_percent: growth,
+        });
+
+      if (error) throw error;
+      toast.success("Retailer target added");
+      setRetailerDialogOpen(false);
+      setRetailerForm({ retailer_id: "", last_year_revenue: "", target_revenue: "" });
+      loadRetailerTargets();
+    } catch (error: any) {
+      toast.error("Failed to add retailer: " + error.message);
+    }
+  };
+
+  const handleDeleteRetailerTarget = async (id: string) => {
+    const { error } = await supabase
+      .from('distributor_business_plan_retailers')
+      .delete()
+      .eq('id', id);
+    if (error) toast.error("Failed to delete");
+    else loadRetailerTargets();
+  };
+
   const saveAllTargets = async () => {
     if (!selectedPlan || !distributorId) return;
     setSaving(true);
@@ -558,6 +684,7 @@ const DistributorFYPlanPage = () => {
   const totalProductRev = categoryTargets.reduce((sum, cat) => sum + cat.revenueTarget, 0);
   const totalMonthQty = monthTargets.reduce((sum, m) => sum + m.quantityTarget, 0);
   const totalMonthRev = monthTargets.reduce((sum, m) => sum + m.revenueTarget, 0);
+  const totalRetailerRev = retailerTargets.reduce((sum, r) => sum + r.target_revenue, 0);
 
   if (loading) {
     return (
@@ -650,9 +777,10 @@ const DistributorFYPlanPage = () => {
 
         {selectedPlan ? (
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="products">Products</TabsTrigger>
+              <TabsTrigger value="retailers">Retailers</TabsTrigger>
               <TabsTrigger value="months">Months</TabsTrigger>
             </TabsList>
 
@@ -716,6 +844,13 @@ const DistributorFYPlanPage = () => {
                       <div className="text-right">
                         <p className="font-medium">{totalProductQty.toLocaleString('en-IN')} {selectedPlan.quantity_unit}</p>
                         <p className="text-xs text-muted-foreground">₹{totalProductRev.toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <span className="text-sm">Retailer Allocation</span>
+                      <div className="text-right">
+                        <p className="font-medium">{retailerTargets.length} retailers</p>
+                        <p className="text-xs text-muted-foreground">₹{totalRetailerRev.toLocaleString('en-IN')}</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
@@ -902,6 +1037,106 @@ const DistributorFYPlanPage = () => {
                       <span className="ml-3">₹{totalMonthRev.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Retailers Tab */}
+            <TabsContent value="retailers" className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Store className="h-4 w-4" />
+                      Retailer Growth Targets
+                    </CardTitle>
+                    <Dialog open={retailerDialogOpen} onOpenChange={setRetailerDialogOpen}>
+                      <Button size="sm" variant="outline" className="gap-1 h-7" onClick={() => setRetailerDialogOpen(true)}>
+                        <Plus className="h-3 w-3" />
+                        Add
+                      </Button>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Retailer Target</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAddRetailerTarget} className="space-y-4">
+                          <div>
+                            <Label>Retailer</Label>
+                            <Select
+                              value={retailerForm.retailer_id}
+                              onValueChange={(v) => setRetailerForm(prev => ({ ...prev, retailer_id: v }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select retailer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {retailers.map(r => (
+                                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Last Year Revenue (₹)</Label>
+                            <Input
+                              type="number"
+                              value={retailerForm.last_year_revenue}
+                              onChange={(e) => setRetailerForm(prev => ({ ...prev, last_year_revenue: e.target.value }))}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <Label>Target Revenue (₹)</Label>
+                            <Input
+                              type="number"
+                              value={retailerForm.target_revenue}
+                              onChange={(e) => setRetailerForm(prev => ({ ...prev, target_revenue: e.target.value }))}
+                              placeholder="0"
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button type="submit" className="w-full">Add Retailer</Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {retailerTargets.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No retailer targets added</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {retailerTargets.map(rt => (
+                        <div key={rt.id} className="flex items-center justify-between border rounded p-3">
+                          <div>
+                            <p className="text-sm font-medium">{rt.retailer_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Last Year: ₹{rt.last_year_revenue.toLocaleString('en-IN')} → Target: ₹{rt.target_revenue.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={rt.growth_percent >= 0 ? "default" : "destructive"} className="text-xs">
+                              {rt.growth_percent >= 0 ? '+' : ''}{rt.growth_percent.toFixed(1)}%
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive"
+                              onClick={() => handleDeleteRetailerTarget(rt.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="border-t pt-2 mt-2">
+                        <p className="text-sm font-medium text-right">
+                          Total Target: ₹{totalRetailerRev.toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
