@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, getMonth, getYear, subDays } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, getMonth, getYear, subDays, subWeeks, subMonths, subQuarters } from 'date-fns';
 
-export type PerformancePeriod = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year';
+export type PerformancePeriod = 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year';
 
 export interface PerformanceData {
   id: string;
@@ -81,10 +81,19 @@ export function usePerformanceSummary(
         return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
       case 'this_week':
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+      case 'last_week':
+        const lastWeek = subWeeks(now, 1);
+        return { start: startOfWeek(lastWeek, { weekStartsOn: 1 }), end: endOfWeek(lastWeek, { weekStartsOn: 1 }) };
       case 'this_month':
         return { start: startOfMonth(now), end: endOfMonth(now) };
+      case 'last_month':
+        const lastMonth = subMonths(now, 1);
+        return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
       case 'this_quarter':
         return { start: startOfQuarter(now), end: endOfQuarter(now) };
+      case 'last_quarter':
+        const lastQuarter = subQuarters(now, 1);
+        return { start: startOfQuarter(lastQuarter), end: endOfQuarter(lastQuarter) };
       case 'this_year':
         const fyYear = getFYYear(now);
         const fyStart = new Date(fyYear - 1, 3, 1);
@@ -146,31 +155,35 @@ export function usePerformanceSummary(
         let overallQuantityTarget = 0;
         let periodMultiplier = 1;
 
+        // Determine which month to use for targets (for past periods, use the month from dateRange)
+        const targetDate = dateRange.start;
+        const targetFYMonthNumber = getFYMonthNumber(getMonth(targetDate));
+
         if (period === 'this_year') {
           overallRevenueTarget = planData.revenue_target || 0;
           overallQuantityTarget = planData.quantity_target || 0;
-        } else if (period === 'this_month') {
-          const monthTarget = monthData?.find(m => m.month_number === currentFYMonthNumber);
+        } else if (period === 'this_month' || period === 'last_month') {
+          const monthTarget = monthData?.find(m => m.month_number === targetFYMonthNumber);
           overallRevenueTarget = monthTarget?.revenue_target || 0;
           overallQuantityTarget = monthTarget?.quantity_target || 0;
           periodMultiplier = (monthTarget?.revenue_target || 0) / (planData.revenue_target || 1);
-        } else if (period === 'this_quarter') {
-          const quarterStart = currentFYMonthNumber <= 3 ? 1 : 
-                               currentFYMonthNumber <= 6 ? 4 :
-                               currentFYMonthNumber <= 9 ? 7 : 10;
+        } else if (period === 'this_quarter' || period === 'last_quarter') {
+          const quarterStart = targetFYMonthNumber <= 3 ? 1 : 
+                               targetFYMonthNumber <= 6 ? 4 :
+                               targetFYMonthNumber <= 9 ? 7 : 10;
           const quarterMonths = [quarterStart, quarterStart + 1, quarterStart + 2];
           const quarterTargets = monthData?.filter(m => quarterMonths.includes(m.month_number)) || [];
           overallRevenueTarget = quarterTargets.reduce((sum, m) => sum + (m.revenue_target || 0), 0);
           overallQuantityTarget = quarterTargets.reduce((sum, m) => sum + (m.quantity_target || 0), 0);
           periodMultiplier = overallRevenueTarget / (planData.revenue_target || 1);
-        } else if (period === 'this_week') {
-          const monthTarget = monthData?.find(m => m.month_number === currentFYMonthNumber);
+        } else if (period === 'this_week' || period === 'last_week') {
+          const monthTarget = monthData?.find(m => m.month_number === targetFYMonthNumber);
           overallRevenueTarget = (monthTarget?.revenue_target || 0) / 4;
           overallQuantityTarget = (monthTarget?.quantity_target || 0) / 4;
           periodMultiplier = overallRevenueTarget / (planData.revenue_target || 1);
         } else {
           // today or yesterday - daily target
-          const monthTarget = monthData?.find(m => m.month_number === currentFYMonthNumber);
+          const monthTarget = monthData?.find(m => m.month_number === targetFYMonthNumber);
           overallRevenueTarget = (monthTarget?.revenue_target || 0) / 26; // ~26 working days
           overallQuantityTarget = (monthTarget?.quantity_target || 0) / 26;
           periodMultiplier = overallRevenueTarget / (planData.revenue_target || 1);

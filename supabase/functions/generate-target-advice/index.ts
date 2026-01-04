@@ -75,9 +75,9 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(100);
 
-    // Fetch active schemes
+    // Fetch active schemes from product_schemes table
     const { data: activeSchemes } = await supabase
-      .from('schemes')
+      .from('product_schemes')
       .select('id, name, description, start_date, end_date, scheme_type')
       .eq('is_active', true)
       .gte('end_date', new Date().toISOString())
