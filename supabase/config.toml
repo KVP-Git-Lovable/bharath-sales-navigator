@@ -62,3 +62,9 @@ verify_jwt = true
 
 [functions.ai-insights-engine]
 verify_jwt = true
+
+[functions.calculate-competency-scores]
+verify_jwt = true
+
+[functions.generate-competency-insights]
+verify_jwt = true
