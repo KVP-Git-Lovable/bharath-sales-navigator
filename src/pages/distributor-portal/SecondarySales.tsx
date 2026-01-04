@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   Dialog,
   DialogContent,
@@ -38,7 +39,9 @@ import {
   Building2,
   LogOut,
   ShieldCheck,
-  X
+  X,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
@@ -79,6 +82,30 @@ interface OrderItem {
   total: number;
 }
 
+interface DateGroup {
+  date: string;
+  formattedDate: string;
+  orders: SecondaryOrder[];
+  totalValue: number;
+  orderCount: number;
+}
+
+interface RetailerGroup {
+  retailerId: string;
+  retailerName: string;
+  orders: SecondaryOrder[];
+  totalValue: number;
+  products: { productName: string; quantity: number; unit: string; total: number }[];
+}
+
+interface ProductGroup {
+  productName: string;
+  unit: string;
+  totalQuantity: number;
+  totalValue: number;
+  retailers: { retailerName: string; quantity: number; total: number }[];
+}
+
 const SecondarySales = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<DistributorUser | null>(null);
@@ -94,6 +121,9 @@ const SecondarySales = () => {
   const [amountCollected, setAmountCollected] = useState<string>('');
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
   const [updating, setUpdating] = useState(false);
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [dateFilter, setDateFilter] = useState('');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('distributor_user');
@@ -176,7 +206,8 @@ const SecondarySales = () => {
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.retailer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.retailer?.address?.toLowerCase().includes(searchQuery.toLowerCase());
+      order.retailer?.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.items?.some(item => item.product_name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesBeat = selectedBeat === 'all' || order.retailer?.beat_name === selectedBeat;
     
@@ -186,25 +217,133 @@ const SecondarySales = () => {
       (selectedStatus === 'partial' && order.status === 'partial_delivery') ||
       (selectedStatus === 'cancelled' && order.status === 'cancelled');
     
-    return matchesSearch && matchesBeat && matchesStatus;
+    const matchesDate = !dateFilter || (order.order_date || order.created_at.split('T')[0]) === dateFilter;
+    
+    return matchesSearch && matchesBeat && matchesStatus && matchesDate;
   });
 
-  // Group orders by beat
-  const groupedByBeat = filteredOrders.reduce((acc, order) => {
-    const beat = order.retailer?.beat_name || 'Unassigned';
-    if (!acc[beat]) {
-      acc[beat] = [];
+  // Group orders by date
+  const groupedByDate: DateGroup[] = (() => {
+    const dateMap = new Map<string, SecondaryOrder[]>();
+    
+    filteredOrders.forEach(order => {
+      const date = order.order_date || order.created_at.split('T')[0];
+      if (!dateMap.has(date)) {
+        dateMap.set(date, []);
+      }
+      dateMap.get(date)!.push(order);
+    });
+
+    return Array.from(dateMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, orders]) => ({
+        date,
+        formattedDate: formatDateLabel(date),
+        orders,
+        totalValue: orders.reduce((sum, o) => sum + (o.total_amount || 0), 0),
+        orderCount: orders.length
+      }));
+  })();
+
+  function formatDateLabel(dateStr: string): string {
+    const date = new Date(dateStr);
+    if (isToday(date)) return `Today, ${format(date, 'MMM d')}`;
+    if (isYesterday(date)) return `Yesterday, ${format(date, 'MMM d')}`;
+    return format(date, 'EEEE, MMM d, yyyy');
+  }
+
+  // Group orders by retailer for a date
+  const getRetailerGroups = (orders: SecondaryOrder[]): RetailerGroup[] => {
+    const retailerMap = new Map<string, RetailerGroup>();
+
+    orders.forEach(order => {
+      const key = order.retailer_id;
+      if (!retailerMap.has(key)) {
+        retailerMap.set(key, {
+          retailerId: order.retailer_id,
+          retailerName: order.retailer_name,
+          orders: [],
+          totalValue: 0,
+          products: []
+        });
+      }
+      const group = retailerMap.get(key)!;
+      group.orders.push(order);
+      group.totalValue += order.total_amount || 0;
+
+      // Aggregate products
+      order.items?.forEach(item => {
+        const existingProduct = group.products.find(p => p.productName === item.product_name);
+        if (existingProduct) {
+          existingProduct.quantity += item.quantity;
+          existingProduct.total += item.total;
+        } else {
+          group.products.push({
+            productName: item.product_name,
+            quantity: item.quantity,
+            unit: item.unit,
+            total: item.total
+          });
+        }
+      });
+    });
+
+    return Array.from(retailerMap.values()).sort((a, b) => b.totalValue - a.totalValue);
+  };
+
+  // Group orders by product for a date
+  const getProductGroups = (orders: SecondaryOrder[]): ProductGroup[] => {
+    const productMap = new Map<string, ProductGroup>();
+
+    orders.forEach(order => {
+      order.items?.forEach(item => {
+        const key = item.product_name;
+        if (!productMap.has(key)) {
+          productMap.set(key, {
+            productName: item.product_name,
+            unit: item.unit,
+            totalQuantity: 0,
+            totalValue: 0,
+            retailers: []
+          });
+        }
+        const group = productMap.get(key)!;
+        group.totalQuantity += item.quantity;
+        group.totalValue += item.total;
+
+        const existingRetailer = group.retailers.find(r => r.retailerName === order.retailer_name);
+        if (existingRetailer) {
+          existingRetailer.quantity += item.quantity;
+          existingRetailer.total += item.total;
+        } else {
+          group.retailers.push({
+            retailerName: order.retailer_name,
+            quantity: item.quantity,
+            total: item.total
+          });
+        }
+      });
+    });
+
+    return Array.from(productMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+  };
+
+  const toggleDate = (date: string) => {
+    const newExpanded = new Set(expandedDates);
+    if (newExpanded.has(date)) {
+      newExpanded.delete(date);
+    } else {
+      newExpanded.add(date);
     }
-    acc[beat].push(order);
-    return acc;
-  }, {} as Record<string, SecondaryOrder[]>);
+    setExpandedDates(newExpanded);
+  };
 
   const deductInventory = async (orderItems: OrderItem[]) => {
     const distributorId = user?.distributor_id;
     if (!distributorId || !orderItems.length) return;
 
     for (const item of orderItems) {
-      // Find matching inventory by product name (since we don't have product_id in order_items)
+      // Find matching inventory by product name
       const { data: inventoryItems } = await supabase
         .from('distributor_inventory')
         .select('*')
@@ -304,13 +443,6 @@ const SecondarySales = () => {
     );
   };
 
-  const getDateLabel = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (isToday(date)) return 'Today';
-    if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'dd MMM yyyy');
-  };
-
   const handleLogout = async () => {
     const isImpersonated = user?.is_impersonated;
     if (isImpersonated) {
@@ -326,7 +458,19 @@ const SecondarySales = () => {
     navigate('/distributor-portal/login');
   };
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedBeat('all');
+    setSelectedStatus('all');
+    setDateFilter('');
+  };
+
   const isImpersonated = user?.is_impersonated;
+
+  // Summary stats
+  const totalAmount = filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const pendingCount = filteredOrders.filter(o => o.status === 'confirmed').length;
+  const deliveredCount = filteredOrders.filter(o => o.status === 'delivered').length;
 
   if (loading) {
     return (
@@ -365,7 +509,7 @@ const SecondarySales = () => {
       <header className={`sticky ${isImpersonated ? 'top-[calc(var(--sat)+40px)]' : 'sticky-header-safe'} z-50 bg-card border-b shadow-sm`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/dashboard')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
@@ -385,189 +529,248 @@ const SecondarySales = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
-        {/* Search and Filters */}
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by retailer or address..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={selectedBeat} onValueChange={setSelectedBeat}>
-            <SelectTrigger className="w-full md:w-48">
-              <SelectValue placeholder="Filter by beat" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Beats</SelectItem>
-              {beats.map(beat => (
-                <SelectItem key={beat.id} value={beat.name}>{beat.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-full md:w-40">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            onClick={() => navigate('/distributor-portal/packing-list')}
-          >
-            <Package className="w-4 h-4 mr-2" />
-            Packing List
-          </Button>
-        </div>
-
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pending</p>
-                <p className="text-lg font-bold">{orders.filter(o => o.status === 'confirmed').length}</p>
-              </div>
-            </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-primary">{filteredOrders.length}</p>
+              <p className="text-xs text-muted-foreground">Total Orders</p>
+            </CardContent>
           </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Delivered</p>
-                <p className="text-lg font-bold">{orders.filter(o => o.status === 'delivered').length}</p>
-              </div>
-            </div>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-green-600">₹{(totalAmount/1000).toFixed(1)}K</p>
+              <p className="text-xs text-muted-foreground">Total Value</p>
+            </CardContent>
           </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <Truck className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Partial</p>
-                <p className="text-lg font-bold">{orders.filter(o => o.status === 'partial_delivery').length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <IndianRupee className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Value</p>
-                <p className="text-lg font-bold">
-                  ₹{orders.filter(o => o.status === 'confirmed').reduce((sum, o) => sum + (o.total_amount || 0), 0).toLocaleString('en-IN')}
-                </p>
-              </div>
-            </div>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+            </CardContent>
           </Card>
         </div>
 
-        {/* Orders Grouped by Beat */}
-        {Object.keys(groupedByBeat).length === 0 ? (
-          <Card className="p-8 text-center">
-            <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">No secondary orders found</p>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {Object.entries(groupedByBeat).map(([beat, beatOrders]) => (
-              <Card key={beat}>
-                <CardHeader className="py-3 px-4 bg-muted/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-primary" />
-                      <CardTitle className="text-sm font-medium">{beat}</CardTitle>
-                    </div>
-                    <Badge variant="secondary">{beatOrders.length} orders</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 divide-y">
-                  {beatOrders.map(order => (
-                    <div key={order.id} className="p-4 hover:bg-muted/30 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Store className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium">{order.retailer_name}</span>
-                            {getStatusBadge(order.status)}
-                          </div>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {order.retailer?.address || 'No address'}
-                            </span>
-                            {order.retailer?.phone && (
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-3 h-3" />
-                                {order.retailer.phone}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {getDateLabel(order.created_at)}
-                            </span>
-                          </div>
-                          
-                          {/* Order Items */}
-                          {order.items && order.items.length > 0 && (
-                            <div className="mt-2 p-2 bg-muted/50 rounded-lg">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Items:</p>
-                              <div className="space-y-1">
-                                {order.items.slice(0, 3).map(item => (
-                                  <div key={item.id} className="flex justify-between text-sm">
-                                    <span>{item.product_name}</span>
-                                    <span className="text-muted-foreground">
-                                      {item.quantity} {item.unit} × ₹{item.rate}
-                                    </span>
-                                  </div>
-                                ))}
-                                {order.items.length > 3 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    +{order.items.length - 3} more items
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+        {/* Search and Filters */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Secondary Orders ({filteredOrders.length})
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-1"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <Filter className="h-3 w-3" />
+                  Filters
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/distributor-portal/packing-list')}
+                >
+                  <Package className="w-3 h-3 mr-1" />
+                  Packing
+                </Button>
+              </div>
+            </div>
 
-                        <div className="text-right space-y-2">
-                          <p className="text-lg font-bold text-primary">
-                            ₹{order.total_amount?.toLocaleString('en-IN') || '0'}
+            {/* Search Bar */}
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by retailer, product or address..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Filters */}
+            {showFilters && (
+              <div className="flex gap-2 mt-3 flex-wrap">
+                <Select value={selectedBeat} onValueChange={setSelectedBeat}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Beat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Beats</SelectItem>
+                    {beats.map(beat => (
+                      <SelectItem key={beat.id} value={beat.name}>{beat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="partial">Partial</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-40"
+                />
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear
+                </Button>
+              </div>
+            )}
+          </CardHeader>
+
+          <CardContent>
+            {groupedByDate.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No secondary orders found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {groupedByDate.map(dateGroup => (
+                  <Collapsible 
+                    key={dateGroup.date}
+                    open={expandedDates.has(dateGroup.date)}
+                    onOpenChange={() => toggleDate(dateGroup.date)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-3">
+                          {expandedDates.has(dateGroup.date) ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <div>
+                            <p className="font-medium text-sm">{dateGroup.formattedDate}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {dateGroup.orderCount} order{dateGroup.orderCount !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm flex items-center gap-1">
+                            <IndianRupee className="h-3 w-3" />
+                            {dateGroup.totalValue.toLocaleString('en-IN')}
                           </p>
-                          <Button
-                            size="sm"
-                            variant={order.status === 'confirmed' ? 'default' : 'outline'}
-                            onClick={() => openDeliveryDialog(order)}
-                          >
-                            <Truck className="w-3 h-3 mr-1" />
-                            {order.status === 'confirmed' ? 'Deliver' : 'Update'}
-                          </Button>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="mt-2">
+                      <div className="border rounded-lg p-3">
+                        <Tabs defaultValue="retailer" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 mb-3">
+                            <TabsTrigger value="retailer" className="gap-1 text-xs">
+                              <Store className="h-3 w-3" />
+                              By Retailer
+                            </TabsTrigger>
+                            <TabsTrigger value="product" className="gap-1 text-xs">
+                              <Package className="h-3 w-3" />
+                              By Product
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="retailer" className="space-y-3 mt-0">
+                            {getRetailerGroups(dateGroup.orders).map(retailer => (
+                              <div key={retailer.retailerId} className="border rounded-lg p-3 bg-background">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Store className="h-4 w-4 text-primary" />
+                                    <span className="font-medium text-sm">{retailer.retailerName}</span>
+                                    {retailer.orders[0] && getStatusBadge(retailer.orders[0].status)}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-sm">
+                                      ₹{retailer.totalValue.toLocaleString('en-IN')}
+                                    </span>
+                                    {retailer.orders[0]?.status === 'confirmed' && (
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        className="h-7 text-xs"
+                                        onClick={() => openDeliveryDialog(retailer.orders[0])}
+                                      >
+                                        <Truck className="w-3 h-3 mr-1" />
+                                        Deliver
+                                      </Button>
+                                    )}
+                                    {retailer.orders[0]?.status !== 'confirmed' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs"
+                                        onClick={() => openDeliveryDialog(retailer.orders[0])}
+                                      >
+                                        Update
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="space-y-1 pl-6">
+                                  {retailer.products.map((product, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs text-muted-foreground">
+                                      <span>{product.productName}</span>
+                                      <span>
+                                        {product.quantity} {product.unit} • ₹{product.total.toLocaleString('en-IN')}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </TabsContent>
+
+                          <TabsContent value="product" className="space-y-3 mt-0">
+                            {getProductGroups(dateGroup.orders).map((product, idx) => (
+                              <div key={idx} className="border rounded-lg p-3 bg-background">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-primary" />
+                                    <span className="font-medium text-sm">{product.productName}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="font-semibold text-sm">
+                                      {product.totalQuantity} {product.unit}
+                                    </span>
+                                    <p className="text-xs text-muted-foreground">
+                                      ₹{product.totalValue.toLocaleString('en-IN')}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="space-y-1 pl-6">
+                                  {product.retailers.map((retailer, ridx) => (
+                                    <div key={ridx} className="flex items-center justify-between text-xs text-muted-foreground">
+                                      <span>{retailer.retailerName}</span>
+                                      <span>
+                                        {retailer.quantity} {product.unit} • ₹{retailer.total.toLocaleString('en-IN')}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
 
       {/* Delivery Status Dialog */}

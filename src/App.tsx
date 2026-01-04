@@ -381,7 +381,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/distributor-portal/inventory" element={<DistributorInventory />} />
         <Route path="/distributor-portal/secondary-sales" element={<SecondarySales />} />
         <Route path="/distributor-portal/packing-list" element={<PackingList />} />
-        <Route path="/distributor-portal/goods-receipt" element={<GoodsReceipt />} />
+        <Route path="/distributor-portal/goods-receipt/:orderId" element={<GoodsReceipt />} />
         <Route path="/distributor-portal/claims" element={<DistributorClaims />} />
         <Route path="/distributor-portal/support" element={<DistributorSupport />} />
         <Route path="/distributor-portal/ideas" element={<DistributorIdeas />} />

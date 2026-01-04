@@ -276,7 +276,7 @@ const CreatePrimaryOrder = () => {
       if (itemsError) throw itemsError;
 
       toast.success(submit ? 'Order submitted successfully!' : 'Order saved as draft');
-      navigate('/distributor-portal/orders');
+      navigate('/distributor-portal/primary-orders');
     } catch (error: any) {
       console.error('Error saving order:', error);
       toast.error(error.message || 'Failed to save order');
@@ -293,7 +293,7 @@ const CreatePrimaryOrder = () => {
       <header className="sticky-header-safe z-50 bg-card border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/orders')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-portal/primary-orders')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>

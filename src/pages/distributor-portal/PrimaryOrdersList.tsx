@@ -110,7 +110,7 @@ const PrimaryOrdersList = () => {
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
         {/* Actions Bar */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button onClick={() => navigate('/distributor-portal/orders/new')} className="shrink-0">
+          <Button onClick={() => navigate('/distributor-portal/create-primary-order')} className="shrink-0">
             <Plus className="w-4 h-4 mr-2" />
             New Order
           </Button>
@@ -153,7 +153,7 @@ const PrimaryOrdersList = () => {
                   ? 'Try adjusting your filters' 
                   : 'Create your first primary order'}
               </p>
-              <Button onClick={() => navigate('/distributor-portal/orders/new')}>
+              <Button onClick={() => navigate('/distributor-portal/create-primary-order')}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Order
               </Button>
@@ -165,7 +165,7 @@ const PrimaryOrdersList = () => {
               <Card 
                 key={order.id}
                 className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/distributor-portal/orders/${order.id}`)}
+                onClick={() => navigate(`/distributor-portal/primary-order/${order.id}`)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
@@ -203,7 +203,7 @@ const PrimaryOrdersList = () => {
                           className="bg-green-600 hover:bg-green-700 text-xs"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/distributor-portal/grn/${order.id}`);
+                            navigate(`/distributor-portal/goods-receipt/${order.id}`);
                           }}
                         >
                           <ClipboardCheck className="w-3 h-3 mr-1" />
