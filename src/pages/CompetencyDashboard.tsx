@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Sparkles, Loader2 } from "lucide-react";
+import { RefreshCw, Sparkles, Loader2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, subMonths, startOfMonth } from "date-fns";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { CompetencyScoreCard } from "@/components/competency/CompetencyScoreCard
 import { CompetencyRadarChart } from "@/components/competency/CompetencyRadarChart";
 import { ImprovementPlanCard } from "@/components/competency/ImprovementPlanCard";
 import { CompetencyHistoryChart } from "@/components/competency/CompetencyHistoryChart";
+import { useSubordinates } from "@/hooks/useSubordinates";
 
 const getMonthOptions = () => {
   const options = [];
@@ -33,10 +34,16 @@ export default function CompetencyDashboard() {
   const { user, userProfile } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [companyName, setCompanyName] = useState("SalesCoach AI");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   
-  const { data: scores, isLoading: scoresLoading } = useCompetencyScores(selectedMonth);
-  const { data: scorecard, isLoading: scorecardLoading } = useMonthlyScorecard(selectedMonth);
-  const { data: history } = useCompetencyHistory();
+  const { subordinates, isManager, isLoading: subordinatesLoading } = useSubordinates();
+  
+  // Use selected user ID or current user
+  const viewingUserId = selectedUserId || user?.id;
+  
+  const { data: scores, isLoading: scoresLoading } = useCompetencyScores(selectedMonth, viewingUserId);
+  const { data: scorecard, isLoading: scorecardLoading } = useMonthlyScorecard(selectedMonth, viewingUserId);
+  const { data: history } = useCompetencyHistory(viewingUserId);
   
   const calculateScores = useCalculateCompetencyScores();
   const generateInsights = useGenerateCompetencyInsights();
@@ -53,9 +60,9 @@ export default function CompetencyDashboard() {
   }, []);
 
   const handleCalculateScores = async () => {
-    if (!user?.id) return;
+    if (!viewingUserId) return;
     try {
-      await calculateScores.mutateAsync({ userId: user.id, monthYear: selectedMonth });
+      await calculateScores.mutateAsync({ userId: viewingUserId, monthYear: selectedMonth });
       toast.success("Competency scores calculated successfully!");
     } catch (error: any) {
       toast.error(error.message || "Failed to calculate scores");
@@ -63,9 +70,9 @@ export default function CompetencyDashboard() {
   };
 
   const handleGenerateInsights = async () => {
-    if (!user?.id) return;
+    if (!viewingUserId) return;
     try {
-      await generateInsights.mutateAsync({ userId: user.id, monthYear: selectedMonth });
+      await generateInsights.mutateAsync({ userId: viewingUserId, monthYear: selectedMonth });
       toast.success("AI insights generated successfully!");
     } catch (error: any) {
       toast.error(error.message || "Failed to generate insights");
@@ -73,9 +80,23 @@ export default function CompetencyDashboard() {
   };
 
   const monthOptions = getMonthOptions();
-  const isLoading = scoresLoading || scorecardLoading;
+  const isLoading = scoresLoading || scorecardLoading || subordinatesLoading;
   const hasScores = scores && scores.length > 0;
-  const employeeName = userProfile?.full_name || user?.email?.split('@')[0] || 'Team Member';
+  
+  // Get display name for selected user
+  const selectedSubordinate = subordinates?.find(s => s.subordinate_user_id === selectedUserId);
+  const employeeName = selectedUserId 
+    ? (selectedSubordinate?.full_name || 'Team Member')
+    : (userProfile?.full_name || user?.email?.split('@')[0] || 'Team Member');
+  
+  // Build team member options for dropdown
+  const teamMemberOptions = [
+    { value: '', label: 'Myself' },
+    ...(subordinates?.map(s => ({
+      value: s.subordinate_user_id,
+      label: s.full_name || 'Unknown'
+    })) || [])
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,16 +107,31 @@ export default function CompetencyDashboard() {
         companyName={companyName}
         onBack={() => navigate(-1)}
         rightContent={
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[130px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <Select value={selectedUserId || ''} onValueChange={(val) => setSelectedUserId(val || null)}>
+                <SelectTrigger className="w-[120px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
+                  <Users className="h-4 w-4 mr-1" />
+                  <SelectValue placeholder="Myself" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMemberOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[130px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         }
       />
 
