@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { TimelineView } from "@/components/TimelineView";
 import { toast } from "sonner";
 import { useRecommendations } from "@/hooks/useRecommendations";
-import { AIRecommendationBanner } from "@/components/AIRecommendationBanner";
+
 import { VanStockManagement } from "@/components/VanStockManagement";
 import { useLocationFeature } from "@/hooks/useLocationFeature";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
@@ -39,7 +39,7 @@ import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
 import { UserSelector } from "@/components/UserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
-import { TargetVsActualCard } from "@/components/TargetVsActualCard";
+import { InsightsPanel } from "@/components/visits/InsightsPanel";
 
 interface Visit {
   id: string;
@@ -1328,24 +1328,16 @@ export const MyVisits = () => {
            </CardContent>
         </Card>
 
-        {/* Target vs Actual & Priority Retailers Section */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* Target vs Actual - Collapsible */}
-          <TargetVsActualCard userId={user?.id} compact />
-          
-          {/* Priority Retailers - Collapsible */}
-          {plannedBeats.length > 0 && currentBeatId && (
-            <AIRecommendationBanner 
-              recommendations={retailerPriorityRecs} 
-              onGenerate={() => generateRetailerRecs('retailer_priority', currentBeatId)} 
-              onFeedback={provideRetailerFeedback} 
-              loading={retailerRecsLoading} 
-              type="retailer_priority" 
-              beatId={currentBeatId}
-              compact
-            />
-          )}
-        </div>
+        {/* Insights Panel - Target vs Actual & Priority Retailers */}
+        <InsightsPanel
+          userId={user?.id}
+          recommendations={retailerPriorityRecs}
+          onGenerateRecommendations={() => currentBeatId && generateRetailerRecs('retailer_priority', currentBeatId)}
+          onFeedback={provideRetailerFeedback}
+          recommendationsLoading={retailerRecsLoading}
+          beatId={currentBeatId}
+          hasBeat={plannedBeats.length > 0 && !!currentBeatId}
+        />
 
         {/* Enhanced Search and Filter Bar - Mobile Optimized */}
         <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
