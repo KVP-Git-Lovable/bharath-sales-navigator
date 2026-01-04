@@ -75,8 +75,10 @@ export const VirtualizedVisitList = ({
 
   const hasMore = displayCount < deferredVisits.length;
 
-  // Load more on scroll
+  // Load more on scroll - with proper cleanup
   useEffect(() => {
+    const controller = new AbortController();
+    
     const handleScroll = () => {
       if (loadingRef.current || !hasMore) return;
 
@@ -89,14 +91,19 @@ export const VirtualizedVisitList = ({
         
         // Use requestAnimationFrame to batch DOM updates
         requestAnimationFrame(() => {
-          setDisplayCount(prev => Math.min(prev + LOAD_MORE_SIZE, deferredVisits.length));
+          if (!controller.signal.aborted) {
+            setDisplayCount(prev => Math.min(prev + LOAD_MORE_SIZE, deferredVisits.length));
+          }
           loadingRef.current = false;
         });
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true, signal: controller.signal } as AddEventListenerOptions);
+    
+    return () => {
+      controller.abort();
+    };
   }, [hasMore, deferredVisits.length]);
 
   // Immediate load more for fast scrollers

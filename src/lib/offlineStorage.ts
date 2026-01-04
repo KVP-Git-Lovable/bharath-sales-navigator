@@ -50,11 +50,27 @@ class OfflineStorage {
   // In-memory cache to avoid repeated JSON parsing
   private memoryCache: Map<string, { data: any[]; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 60000; // 1 minute cache
+  private readonly MAX_CACHE_SIZE = 10; // Limit number of cached stores to prevent memory bloat
 
   async init(): Promise<void> {
     if (this.initialized) return;
     console.log('[OfflineStorage] ✅ Capacitor Preferences ready - data persists across app restarts');
     this.initialized = true;
+  }
+
+  // Prune cache if it exceeds max size (LRU-like: remove oldest entries)
+  private pruneCache(): void {
+    if (this.memoryCache.size <= this.MAX_CACHE_SIZE) return;
+    
+    // Sort by timestamp, remove oldest entries
+    const entries = Array.from(this.memoryCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    
+    const toRemove = entries.slice(0, entries.length - this.MAX_CACHE_SIZE);
+    for (const [key] of toRemove) {
+      this.memoryCache.delete(key);
+    }
+    console.log(`[OfflineStorage] Pruned ${toRemove.length} cache entries`);
   }
 
   private async ensureReady(): Promise<void> {
@@ -97,8 +113,9 @@ class OfflineStorage {
       const key = this.getStoreKey(storeName);
       await Preferences.set({ key, value: JSON.stringify(data) });
       
-      // Update memory cache
+      // Update memory cache and prune if needed
       this.memoryCache.set(storeName, { data, timestamp: Date.now() });
+      this.pruneCache();
     } catch (error) {
       console.error(`[OfflineStorage] Error writing ${storeName}:`, error);
       throw error;
