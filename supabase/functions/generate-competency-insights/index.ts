@@ -128,21 +128,19 @@ Respond ONLY with valid JSON in this exact format:
     let aiInsights;
 
     if (lovableApiKey) {
-      // Use Lovable AI API
-      const aiResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
+      // Use Lovable AI Gateway
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${lovableApiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: "You are a sales performance coach. Respond only with valid JSON." },
             { role: "user", content: aiPrompt }
           ],
-          temperature: 0.7,
-          max_tokens: 1500,
         }),
       });
 
