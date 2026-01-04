@@ -26,6 +26,25 @@ interface DayPlan {
   beat_name: string;
   retailers: RetailerScore[];
   estimated_value: number;
+  is_prescheduled: boolean;
+  rationale: string;
+}
+
+interface BeatRationale {
+  beat_id: string;
+  beat_name: string;
+  date: string;
+  day: string;
+  is_prescheduled: boolean;
+  rationale: string;
+  factors: {
+    retailer_count: number;
+    high_priority_count: number;
+    pending_collections: number;
+    avg_days_since_visit: number;
+    estimated_value: number;
+    historical_pattern_match: boolean;
+  };
 }
 
 serve(async (req) => {
@@ -34,7 +53,6 @@ serve(async (req) => {
   }
 
   try {
-    // Use service role key for scheduled jobs (no user auth)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -59,29 +77,32 @@ serve(async (req) => {
     console.log(`📊 Processing ${users?.length || 0} users`);
 
     const results = [];
-    const weekStart = getNextWeekStart();
-    const weekDays = getWeekDays(weekStart);
 
     for (const user of users || []) {
       try {
         console.log(`👤 Generating plan for user: ${user.full_name} (${user.id})`);
         
-        // Check if plans already exist for this week (unless force regenerate)
-        if (!forceRegenerate) {
-          const { data: existingPlans } = await supabaseClient
-            .from('beat_plans')
-            .select('id')
-            .eq('user_id', user.id)
-            .gte('plan_date', weekDays[0].date)
-            .lte('plan_date', weekDays[5].date)
-            .limit(1);
+        // Get planning dates: remaining current week (from today) + entire next week
+        const planningDays = getPlanningDays();
+        console.log(`📅 Planning for ${planningDays.length} days:`, planningDays.map(d => d.date));
 
-          if (existingPlans && existingPlans.length > 0) {
-            console.log(`⏭️ Skipping ${user.full_name} - plans already exist for this week`);
-            results.push({ userId: user.id, status: 'skipped', reason: 'Plans already exist' });
-            continue;
+        // Fetch existing beat plans (pre-scheduled / recurring)
+        const { data: existingPlans } = await supabaseClient
+          .from('beat_plans')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('plan_date', planningDays[0].date)
+          .lte('plan_date', planningDays[planningDays.length - 1].date);
+
+        const existingPlansByDate: { [date: string]: any } = {};
+        (existingPlans || []).forEach(plan => {
+          // Only consider non-auto-generated plans as pre-scheduled
+          if (!plan.beat_data?.auto_generated) {
+            existingPlansByDate[plan.plan_date] = plan;
           }
-        }
+        });
+
+        console.log(`📌 Found ${Object.keys(existingPlansByDate).length} pre-scheduled beats`);
 
         // Fetch user's beats
         const { data: beats } = await supabaseClient
@@ -133,17 +154,40 @@ serve(async (req) => {
         // Score retailers
         const scoredRetailers = scoreRetailers(retailers, recentOrders || [], recentVisits || []);
         
-        // Generate weekly plan
+        // Generate weekly plan respecting pre-scheduled beats
         const weeklyPlan = generateWeeklyPlan(
           beats,
           scoredRetailers,
-          weekDays,
-          historicalPlans || []
+          planningDays,
+          historicalPlans || [],
+          existingPlansByDate
         );
 
-        // Save beat plans to database
-        const plansToInsert = weeklyPlan
+        // Build rationale for each day
+        const planRationales: BeatRationale[] = weeklyPlan
           .filter(day => day.beat_id)
+          .map(day => ({
+            beat_id: day.beat_id,
+            beat_name: day.beat_name,
+            date: day.date,
+            day: day.day,
+            is_prescheduled: day.is_prescheduled,
+            rationale: day.rationale,
+            factors: {
+              retailer_count: day.retailers.length,
+              high_priority_count: day.retailers.filter(r => r.priority_score > 70).length,
+              pending_collections: day.retailers.reduce((sum, r) => sum + r.pending_amount, 0),
+              avg_days_since_visit: day.retailers.length > 0 
+                ? Math.round(day.retailers.reduce((sum, r) => sum + r.days_since_last_visit, 0) / day.retailers.length)
+                : 0,
+              estimated_value: day.estimated_value,
+              historical_pattern_match: false, // Will be set in generateWeeklyPlan
+            },
+          }));
+
+        // Save beat plans to database (only for days without pre-scheduled beats)
+        const plansToInsert = weeklyPlan
+          .filter(day => day.beat_id && !day.is_prescheduled)
           .map(day => ({
             user_id: user.id,
             beat_id: day.beat_id,
@@ -152,6 +196,7 @@ serve(async (req) => {
             beat_data: {
               auto_generated: true,
               generated_at: new Date().toISOString(),
+              rationale: day.rationale,
               retailers: day.retailers.map(r => ({
                 id: r.retailer_id,
                 name: r.retailer_name,
@@ -163,14 +208,28 @@ serve(async (req) => {
           }));
 
         if (plansToInsert.length > 0) {
-          // Delete existing plans for this week if force regenerate
+          // Delete existing auto-generated plans for these dates
           if (forceRegenerate) {
-            await supabaseClient
-              .from('beat_plans')
-              .delete()
-              .eq('user_id', user.id)
-              .gte('plan_date', weekDays[0].date)
-              .lte('plan_date', weekDays[5].date);
+            const datesToDelete = plansToInsert.map(p => p.plan_date);
+            for (const dateToDelete of datesToDelete) {
+              // Only delete auto-generated plans, preserve manual ones
+              const { data: existingForDate } = await supabaseClient
+                .from('beat_plans')
+                .select('id, beat_data')
+                .eq('user_id', user.id)
+                .eq('plan_date', dateToDelete);
+              
+              const autoGeneratedIds = (existingForDate || [])
+                .filter(p => p.beat_data?.auto_generated)
+                .map(p => p.id);
+              
+              if (autoGeneratedIds.length > 0) {
+                await supabaseClient
+                  .from('beat_plans')
+                  .delete()
+                  .in('id', autoGeneratedIds);
+              }
+            }
           }
 
           const { error: insertError } = await supabaseClient
@@ -192,10 +251,15 @@ serve(async (req) => {
               user_id: user.id,
               action_type: 'auto_beat_plan',
               action_data: {
-                week_start: weekDays[0].date,
+                planning_period: {
+                  start: planningDays[0].date,
+                  end: planningDays[planningDays.length - 1].date,
+                },
                 plans_created: plansToInsert.length,
+                prescheduled_preserved: Object.keys(existingPlansByDate).length,
                 total_retailers: plansToInsert.reduce((acc, p) => acc + (p.beat_data.retailers?.length || 0), 0),
                 estimated_value: plansToInsert.reduce((acc, p) => acc + (p.beat_data.estimated_value || 0), 0),
+                rationales: planRationales,
               },
               status: 'executed',
               executed_at: new Date().toISOString(),
@@ -208,10 +272,30 @@ serve(async (req) => {
             userName: user.full_name,
             status: 'success', 
             plansCreated: plansToInsert.length,
-            weekStart: weekDays[0].date,
+            prescheduledPreserved: Object.keys(existingPlansByDate).length,
+            planningPeriod: {
+              start: planningDays[0].date,
+              end: planningDays[planningDays.length - 1].date,
+            },
+            rationales: planRationales,
+            weeklyPlan: weeklyPlan.filter(d => d.beat_id),
           });
         } else {
-          results.push({ userId: user.id, status: 'skipped', reason: 'No plans generated' });
+          // All days are pre-scheduled, return the existing plan info
+          results.push({ 
+            userId: user.id, 
+            userName: user.full_name,
+            status: 'success', 
+            plansCreated: 0,
+            prescheduledPreserved: Object.keys(existingPlansByDate).length,
+            planningPeriod: {
+              start: planningDays[0].date,
+              end: planningDays[planningDays.length - 1].date,
+            },
+            rationales: planRationales,
+            weeklyPlan: weeklyPlan.filter(d => d.beat_id),
+            message: 'All days have pre-scheduled beats',
+          });
         }
 
       } catch (userError: any) {
@@ -249,28 +333,42 @@ serve(async (req) => {
   }
 });
 
-// Get next Monday's date
-function getNextWeekStart(): Date {
+// Get planning days: remaining current week (Mon-Sat) + entire next week (Mon-Sat)
+function getPlanningDays(): { day: string; date: string }[] {
   const now = new Date();
-  const dayOfWeek = now.getDay();
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
-  const nextMonday = new Date(now);
-  nextMonday.setDate(now.getDate() + daysUntilMonday);
-  nextMonday.setHours(0, 0, 0, 0);
-  return nextMonday;
-}
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const result: { day: string; date: string }[] = [];
 
-// Get array of weekdays (Monday to Saturday)
-function getWeekDays(weekStart: Date): { day: string; date: string }[] {
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days.map((day, index) => {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + index);
-    return {
-      day,
+  // Current week: from today until Saturday (if today is Mon-Sat)
+  // Week runs Mon (1) to Sat (6), Sunday (0) is off
+  if (dayOfWeek >= 1 && dayOfWeek <= 6) {
+    // Add remaining days of current week (today to Saturday)
+    for (let d = dayOfWeek; d <= 6; d++) {
+      const date = new Date(now);
+      date.setDate(now.getDate() + (d - dayOfWeek));
+      result.push({
+        day: days[d],
+        date: date.toISOString().split('T')[0],
+      });
+    }
+  }
+
+  // Next week: Monday to Saturday
+  const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+  const nextMonday = new Date(now);
+  nextMonday.setDate(now.getDate() + daysUntilNextMonday);
+
+  for (let d = 0; d < 6; d++) { // Mon to Sat = 6 days
+    const date = new Date(nextMonday);
+    date.setDate(nextMonday.getDate() + d);
+    result.push({
+      day: days[date.getDay()],
       date: date.toISOString().split('T')[0],
-    };
-  });
+    });
+  }
+
+  return result;
 }
 
 // Score retailers based on multiple factors
@@ -379,12 +477,13 @@ function scoreRetailers(
   });
 }
 
-// Generate optimized weekly plan
+// Generate optimized weekly plan respecting pre-scheduled beats
 function generateWeeklyPlan(
   beats: any[],
   scoredRetailers: RetailerScore[],
-  weekDays: { day: string; date: string }[],
-  historicalPlans: any[]
+  planningDays: { day: string; date: string }[],
+  historicalPlans: any[],
+  existingPlansByDate: { [date: string]: any }
 ): DayPlan[] {
   // Group retailers by beat
   const retailersByBeat: { [key: string]: RetailerScore[] } = {};
@@ -417,6 +516,9 @@ function generateWeeklyPlan(
     const totalScore = beatRetailers.reduce((sum, r) => sum + r.priority_score, 0);
     const totalPending = beatRetailers.reduce((sum, r) => sum + r.pending_amount, 0);
     const totalValue = beatRetailers.reduce((sum, r) => sum + r.avg_order_value, 0);
+    const avgDaysSinceVisit = beatRetailers.length > 0 
+      ? beatRetailers.reduce((sum, r) => sum + r.days_since_last_visit, 0) / beatRetailers.length
+      : 0;
     
     return {
       ...beat,
@@ -425,6 +527,7 @@ function generateWeeklyPlan(
       totalPending,
       totalValue,
       avgScore: beatRetailers.length > 0 ? totalScore / beatRetailers.length : 0,
+      avgDaysSinceVisit,
     };
   }).sort((a, b) => b.avgScore - a.avgScore);
 
@@ -432,10 +535,31 @@ function generateWeeklyPlan(
   const weeklyPlan: DayPlan[] = [];
   const usedBeats = new Set<string>();
 
-  weekDays.forEach(({ day, date }) => {
+  planningDays.forEach(({ day, date }) => {
+    // Check if there's a pre-scheduled beat for this date
+    const prescheduled = existingPlansByDate[date];
+    if (prescheduled) {
+      const beatRetailers = retailersByBeat[prescheduled.beat_id] || [];
+      const topRetailers = beatRetailers.slice(0, 15);
+      usedBeats.add(prescheduled.beat_id);
+      
+      weeklyPlan.push({
+        day,
+        date,
+        beat_id: prescheduled.beat_id,
+        beat_name: prescheduled.beat_name,
+        retailers: topRetailers,
+        estimated_value: topRetailers.reduce((sum, r) => sum + r.avg_order_value, 0),
+        is_prescheduled: true,
+        rationale: `Pre-scheduled beat - This beat was manually planned and preserved.`,
+      });
+      return;
+    }
+
     // Find best beat for this day
     let bestBeat = null;
     let bestMatchScore = -1;
+    let matchReason = '';
 
     for (const beat of beatScores) {
       if (usedBeats.has(beat.beat_id)) continue;
@@ -444,22 +568,47 @@ function generateWeeklyPlan(
       // Calculate match score based on historical preference
       let matchScore = beat.avgScore;
       const dayPrefs = beatDayPreference[beat.beat_id];
+      let hasHistoricalMatch = false;
+      
       if (dayPrefs && dayPrefs[day]) {
         matchScore += dayPrefs[day] * 5; // Bonus for historical pattern
+        hasHistoricalMatch = true;
       }
 
       if (matchScore > bestMatchScore) {
         bestMatchScore = matchScore;
-        bestBeat = beat;
+        bestBeat = { ...beat, hasHistoricalMatch };
       }
     }
 
     if (bestBeat) {
       usedBeats.add(bestBeat.beat_id);
       const beatRetailers = retailersByBeat[bestBeat.beat_id] || [];
-      
-      // Take top retailers (max 15 per day for realistic visit count)
       const topRetailers = beatRetailers.slice(0, 15);
+      
+      // Build rationale
+      const rationalePoints: string[] = [];
+      
+      if (bestBeat.hasHistoricalMatch) {
+        rationalePoints.push(`Matches your historical pattern for ${day}s`);
+      }
+      
+      if (bestBeat.avgDaysSinceVisit > 14) {
+        rationalePoints.push(`Retailers need attention (avg ${Math.round(bestBeat.avgDaysSinceVisit)} days since last visit)`);
+      }
+      
+      if (bestBeat.totalPending > 5000) {
+        rationalePoints.push(`₹${Math.round(bestBeat.totalPending).toLocaleString()} in pending collections`);
+      }
+      
+      const highPriorityCount = beatRetailers.filter(r => r.priority_score > 70).length;
+      if (highPriorityCount > 0) {
+        rationalePoints.push(`${highPriorityCount} high-priority retailers`);
+      }
+      
+      if (rationalePoints.length === 0) {
+        rationalePoints.push('Best available beat based on overall scoring');
+      }
       
       weeklyPlan.push({
         day,
@@ -468,6 +617,8 @@ function generateWeeklyPlan(
         beat_name: bestBeat.beat_name,
         retailers: topRetailers,
         estimated_value: topRetailers.reduce((sum, r) => sum + r.avg_order_value, 0),
+        is_prescheduled: false,
+        rationale: rationalePoints.join(' • '),
       });
     } else {
       // No available beat for this day
@@ -478,6 +629,8 @@ function generateWeeklyPlan(
         beat_name: '',
         retailers: [],
         estimated_value: 0,
+        is_prescheduled: false,
+        rationale: 'No beats available for this day',
       });
     }
   });
