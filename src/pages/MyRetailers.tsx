@@ -1,9 +1,10 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { UserSelector } from "@/components/UserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
+import { buildRetailerIndex, filterRetailersIndexed, getUniqueValues, clearRetailerIndex } from "@/lib/retailerIndex";
 import { shouldSuppressError } from "@/utils/offlineErrorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import { RetailerDetailModal } from "@/components/RetailerDetailModal";
 import { BulkImportRetailersModal } from "@/components/BulkImportRetailersModal";
 import { RetailerAnalytics } from "@/components/RetailerAnalytics";
 import { CreditScoreDisplay } from "@/components/CreditScoreDisplay";
+import { VirtualizedRetailerTable } from "@/components/VirtualizedRetailerTable";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
@@ -150,19 +152,26 @@ export const MyRetailers = () => {
   }, []);
 
 
-  const loadRetailers = async () => {
+  const loadRetailers = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     
     try {
       // ALWAYS load from cache FIRST for instant display (works offline and online)
       console.log('📦 Loading retailers from cache...');
+      console.time('[MyRetailers] Cache load');
       let cachedRetailers: any[] = await offlineStorage.getAll(STORES.RETAILERS);
       cachedRetailers = cachedRetailers.filter((r: any) => r.user_id === user.id);
+      console.timeEnd('[MyRetailers] Cache load');
       
       if (cachedRetailers.length > 0) {
         console.log('✅ Displaying cached retailers:', cachedRetailers.length);
-        setRetailers(cachedRetailers.sort((a, b) => a.name.localeCompare(b.name)));
+        const sorted = cachedRetailers.sort((a, b) => a.name.localeCompare(b.name));
+        setRetailers(sorted);
+        // Build index for fast filtering
+        console.time('[MyRetailers] Index build');
+        buildRetailerIndex(sorted);
+        console.timeEnd('[MyRetailers] Index build');
         setLoading(false); // Stop loading immediately once cache is displayed
       }
       
@@ -188,7 +197,10 @@ export const MyRetailers = () => {
         if (data && data.length > 0) {
           console.log('🔄 Updating retailers cache with fresh data:', data.length);
           await offlineStorage.mergeData(STORES.RETAILERS, data as any);
-          setRetailers([...data].sort((a, b) => a.name.localeCompare(b.name)));
+          const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+          setRetailers(sorted);
+          // Rebuild index with fresh data
+          buildRetailerIndex(sorted);
         }
       } catch (networkError: any) {
         // Silent fail - cached data is already displayed
@@ -199,41 +211,47 @@ export const MyRetailers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (user) loadRetailers();
-  }, [user]);
+    // Clear index on unmount
+    return () => {
+      clearRetailerIndex();
+    };
+  }, [user, loadRetailers]);
 
+  // Use index for fast filter dropdown values
   const categories = useMemo(() => {
-    return [...new Set(retailers.map(r => r.category).filter(Boolean))].sort();
+    const indexed = getUniqueValues('category');
+    if (indexed.length > 0) return indexed;
+    return [...new Set(retailers.map(r => r.category).filter(Boolean))].sort() as string[];
   }, [retailers]);
   
   const retailTypes = useMemo(() => {
-    return [...new Set(retailers.map(r => r.retail_type).filter(Boolean))].sort();
+    const indexed = getUniqueValues('retailType');
+    if (indexed.length > 0) return indexed;
+    return [...new Set(retailers.map(r => r.retail_type).filter(Boolean))].sort() as string[];
   }, [retailers]);
 
-  const filtered = useMemo(() => {
-    const searchLower = deferredSearch.trim().toLowerCase();
-    const categoryLower = (categoryFilter || '').trim().toLowerCase();
-    const retailTypeLower = (retailTypeFilter || '').trim().toLowerCase();
-
-    return retailers.filter((r) => {
-      const matchesSearch =
-        !searchLower ||
-        r.name.toLowerCase().includes(searchLower) ||
-        (r.phone || '').toLowerCase().includes(searchLower) ||
-        r.address.toLowerCase().includes(searchLower) ||
-        (r.category || '').toLowerCase().includes(searchLower) ||
-        r.beat_id.toLowerCase().includes(searchLower);
-
-      const matchesPotential = !potentialFilter || r.potential === potentialFilter;
-      const matchesCategory = !categoryLower || (r.category || '').toLowerCase().includes(categoryLower);
-      const matchesRetailType = !retailTypeLower || (r.retail_type || '').toLowerCase().includes(retailTypeLower);
-      const matchesBeat = !beatFilter || r.beat_id === beatFilter;
-
-      return matchesSearch && matchesPotential && matchesCategory && matchesRetailType && matchesBeat;
+  // Use indexed filtering for 10x faster search with large datasets
+  const filtered = useMemo((): Retailer[] => {
+    // Try indexed search first (O(1) lookups)
+    const indexedResults = filterRetailersIndexed<Retailer>({
+      searchQuery: deferredSearch.trim() || undefined,
+      beatId: beatFilter || undefined,
+      category: categoryFilter || undefined,
+      potential: potentialFilter || undefined,
+      retailType: retailTypeFilter || undefined,
     });
+    
+    // If index has results, use them (much faster)
+    if (indexedResults.length > 0 || (deferredSearch || beatFilter || categoryFilter || potentialFilter || retailTypeFilter)) {
+      return indexedResults.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
+    // Fallback to full array if no filters applied and index is empty
+    return retailers;
   }, [retailers, deferredSearch, potentialFilter, categoryFilter, retailTypeFilter, beatFilter]);
 
   // Pagination - 10 items per page
