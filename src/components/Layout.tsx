@@ -1,8 +1,10 @@
 import { ReactNode, useEffect, memo, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { ChatWidget } from "./chat/ChatWidget";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { periodicMemoryCleanup } from "@/utils/memoryManager";
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,8 +13,14 @@ interface LayoutProps {
 export const Layout = memo(({ children }: LayoutProps) => {
   const { cacheAllMasterData, isOnline } = useMasterDataCache();
   const { processSyncQueue } = useOfflineSync();
+  const location = useLocation();
   const hasCachedRef = useRef(false);
   const wasOfflineRef = useRef(false);
+
+  // Periodic memory cleanup on route changes to prevent memory bloat
+  useEffect(() => {
+    periodicMemoryCleanup();
+  }, [location.pathname]);
 
   // Auto-cache master data when online - only once per session
   useEffect(() => {

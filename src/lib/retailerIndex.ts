@@ -269,9 +269,30 @@ export function getUniqueValues(field: 'beat' | 'category' | 'potential' | 'reta
  * Clear the index (call on logout or when switching users)
  */
 export function clearRetailerIndex(): void {
+  if (currentIndex) {
+    // Explicitly clear all Maps and Sets to help GC
+    currentIndex.byId.clear();
+    currentIndex.byBeat.clear();
+    currentIndex.byCategory.clear();
+    currentIndex.byPotential.clear();
+    currentIndex.byRetailType.clear();
+    currentIndex.searchIndex.clear();
+    currentIndex.allIds.clear();
+  }
   currentIndex = null;
   indexVersion++;
-  console.log('[RetailerIndex] Index cleared');
+  console.log('[RetailerIndex] Index cleared and memory released');
+}
+
+/**
+ * Get memory usage estimate (for debugging)
+ */
+export function getIndexMemoryEstimate(): { retailers: number; searchTokens: number } {
+  if (!currentIndex) return { retailers: 0, searchTokens: 0 };
+  return {
+    retailers: currentIndex.byId.size,
+    searchTokens: currentIndex.searchIndex.size
+  };
 }
 
 /**
