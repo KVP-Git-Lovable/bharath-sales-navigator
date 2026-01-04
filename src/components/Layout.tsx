@@ -4,11 +4,14 @@ import { Navbar } from "./Navbar";
 import { ChatWidget } from "./chat/ChatWidget";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
-import { periodicMemoryCleanup } from "@/utils/memoryManager";
+import { periodicMemoryCleanup, initMemoryPressureHandler } from "@/utils/memoryManager";
 
 interface LayoutProps {
   children: ReactNode;
 }
+
+// Initialize memory pressure handlers once
+let memoryHandlersInitialized = false;
 
 export const Layout = memo(({ children }: LayoutProps) => {
   const { cacheAllMasterData, isOnline } = useMasterDataCache();
@@ -16,6 +19,14 @@ export const Layout = memo(({ children }: LayoutProps) => {
   const location = useLocation();
   const hasCachedRef = useRef(false);
   const wasOfflineRef = useRef(false);
+
+  // Initialize memory pressure handlers once per app lifecycle
+  useEffect(() => {
+    if (!memoryHandlersInitialized) {
+      memoryHandlersInitialized = true;
+      initMemoryPressureHandler();
+    }
+  }, []);
 
   // Periodic memory cleanup on route changes to prevent memory bloat
   useEffect(() => {

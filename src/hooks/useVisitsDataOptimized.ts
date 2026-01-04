@@ -209,6 +209,22 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   // SMART SYNC: Lock to prevent multiple syncs
   const smartSyncLockRef = useRef(false);
   
+  // MEMORY OPTIMIZATION: Limit cached dates to prevent unbounded growth
+  const MAX_CACHED_DATES = 7;
+  
+  const pruneDateCache = useCallback(() => {
+    if (cacheRef.current.size <= MAX_CACHED_DATES) return;
+    
+    const entries = Array.from(cacheRef.current.entries())
+      .sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+    
+    const toRemove = entries.slice(0, entries.length - MAX_CACHED_DATES);
+    for (const [key] of toRemove) {
+      cacheRef.current.delete(key);
+    }
+    console.log(`[useVisitsData] Pruned ${toRemove.length} old date caches, remaining: ${cacheRef.current.size}`);
+  }, []);
+  
   // STALE CLOSURE FIX: Keep refs in sync with latest values for event handlers
   const userIdRef = useRef(effectiveUserId);
   const selectedDateRef = useRef(selectedDate);
@@ -889,8 +905,10 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         timestamp: Date.now()
       };
       cacheRef.current.set(date, cacheData);
+      
+      // MEMORY: Prune old date caches to prevent unbounded growth
+      pruneDateCache();
 
-      // Save to offline storage
       await Promise.all([
         offlineStorage.mergeData(STORES.BEAT_PLANS, beatPlansData),
         offlineStorage.mergeData(STORES.VISITS, visitsData),
