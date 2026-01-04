@@ -176,6 +176,25 @@ const GoodsReceipt = () => {
               last_received_date: new Date().toISOString().split('T')[0],
             });
         }
+
+        // Log inward transaction
+        await supabase
+          .from('distributor_inventory_transactions')
+          .insert({
+            distributor_id: distributorId,
+            product_id: item.product_id,
+            variant_id: item.variant_id || null,
+            transaction_type: 'inward',
+            quantity: item.received_quantity,
+            reference_type: 'primary_order',
+            reference_id: orderId,
+            reference_number: order.order_number,
+            batch_number: item.batch_number || null,
+            unit: item.unit,
+            unit_cost: item.unit_price,
+            notes: `GRN from primary order ${order.order_number}`,
+            created_by: (await supabase.auth.getUser()).data.user?.id,
+          });
       }
 
       // 3. Check if all items fully received

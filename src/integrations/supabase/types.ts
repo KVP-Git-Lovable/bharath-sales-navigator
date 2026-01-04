@@ -2508,6 +2508,163 @@ export type Database = {
           },
         ]
       }
+      distributor_company_return_items: {
+        Row: {
+          batch_number: string | null
+          company_return_id: string
+          created_at: string
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          product_name: string
+          quantity: number
+          reason: string
+          source: string | null
+          source_return_id: string | null
+          total: number | null
+          unit: string | null
+          unit_cost: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          company_return_id: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          product_name: string
+          quantity: number
+          reason: string
+          source?: string | null
+          source_return_id?: string | null
+          total?: number | null
+          unit?: string | null
+          unit_cost?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          company_return_id?: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          reason?: string
+          source?: string | null
+          source_return_id?: string | null
+          total?: number | null
+          unit?: string | null
+          unit_cost?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_company_return_items_company_return_id_fkey"
+            columns: ["company_return_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_company_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_company_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_company_return_items_source_return_id_fkey"
+            columns: ["source_return_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_company_return_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_company_returns: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          credit_note_amount: number | null
+          credit_note_date: string | null
+          credit_note_number: string | null
+          distributor_id: string
+          id: string
+          notes: string | null
+          picked_up_at: string | null
+          return_date: string
+          return_number: string
+          status: string
+          submitted_at: string | null
+          total_quantity: number | null
+          total_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_note_amount?: number | null
+          credit_note_date?: string | null
+          credit_note_number?: string | null
+          distributor_id: string
+          id?: string
+          notes?: string | null
+          picked_up_at?: string | null
+          return_date?: string
+          return_number: string
+          status?: string
+          submitted_at?: string | null
+          total_quantity?: number | null
+          total_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_note_amount?: number | null
+          credit_note_date?: string | null
+          credit_note_number?: string | null
+          distributor_id?: string
+          id?: string
+          notes?: string | null
+          picked_up_at?: string | null
+          return_date?: string
+          return_number?: string
+          status?: string
+          submitted_at?: string | null
+          total_quantity?: number | null
+          total_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_company_returns_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_contacts: {
         Row: {
           address: string | null
@@ -2846,6 +3003,88 @@ export type Database = {
           },
         ]
       }
+      distributor_inventory_transactions: {
+        Row: {
+          batch_number: string | null
+          created_at: string
+          created_by: string | null
+          distributor_id: string
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          running_balance: number | null
+          transaction_type: string
+          unit: string | null
+          unit_cost: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          distributor_id: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          running_balance?: number | null
+          transaction_type: string
+          unit?: string | null
+          unit_cost?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          distributor_id?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          running_balance?: number | null
+          transaction_type?: string
+          unit?: string | null
+          unit_cost?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_inventory_transactions_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_inventory_transactions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_inventory_transactions_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_item_mappings: {
         Row: {
           category_id: string | null
@@ -3011,6 +3250,161 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      distributor_return_items: {
+        Row: {
+          added_to_stock: boolean | null
+          batch_number: string | null
+          condition: string
+          created_at: string
+          id: string
+          notes: string | null
+          product_id: string
+          product_name: string
+          quantity: number
+          reason: string
+          return_id: string
+          total: number | null
+          unit: string | null
+          unit_price: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          added_to_stock?: boolean | null
+          batch_number?: string | null
+          condition?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          product_name: string
+          quantity: number
+          reason: string
+          return_id: string
+          total?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          added_to_stock?: boolean | null
+          batch_number?: string | null
+          condition?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          reason?: string
+          return_id?: string
+          total?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_return_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          distributor_id: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          order_number: string | null
+          retailer_id: string
+          return_date: string
+          return_number: string
+          status: string
+          total_quantity: number | null
+          total_value: number | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          distributor_id: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          order_number?: string | null
+          retailer_id: string
+          return_date?: string
+          return_number: string
+          status?: string
+          total_quantity?: number | null
+          total_value?: number | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          distributor_id?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          order_number?: string | null
+          retailer_id?: string
+          return_date?: string
+          return_number?: string
+          status?: string
+          total_quantity?: number | null
+          total_value?: number | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_returns_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_returns_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       distributor_support_requests: {
         Row: {

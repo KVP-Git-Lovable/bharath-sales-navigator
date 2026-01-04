@@ -141,6 +141,10 @@ import DistributorIdeas from "./pages/distributor-portal/DistributorIdeas";
 import DistributorProfile from "./pages/distributor-portal/DistributorProfile";
 import DistributorContactsPortal from "./pages/distributor-portal/DistributorContacts";
 import DistributorFYPlanPage from "./pages/distributor-portal/DistributorFYPlan";
+import RetailerReturns from "./pages/distributor-portal/RetailerReturns";
+import CompanyReturns from "./pages/distributor-portal/CompanyReturns";
+import InventoryLedger from "./pages/distributor-portal/InventoryLedger";
+import StockAdjustments from "./pages/distributor-portal/StockAdjustments";
 
 // Institutional Sales pages
 import InstitutionalSalesDashboard from "./pages/institutional/InstitutionalSalesDashboard";
@@ -389,6 +393,10 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/distributor-portal/profile" element={<DistributorProfile />} />
         <Route path="/distributor-portal/contacts" element={<DistributorContactsPortal />} />
         <Route path="/distributor-portal/fy-plan" element={<DistributorFYPlanPage />} />
+        <Route path="/distributor-portal/returns" element={<RetailerReturns />} />
+        <Route path="/distributor-portal/company-returns" element={<CompanyReturns />} />
+        <Route path="/distributor-portal/inventory-ledger" element={<InventoryLedger />} />
+        <Route path="/distributor-portal/stock-adjustments" element={<StockAdjustments />} />
 
         {/* Institutional Sales Routes */}
         <Route path="/institutional" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
