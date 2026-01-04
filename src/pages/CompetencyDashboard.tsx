@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Sparkles, Loader2, Users } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useCompetencyScores, useMonthlyScorecard, useCompetencyHistory, useCalculateCompetencyScores, useGenerateCompetencyInsights } from "@/hooks/useCompetencyScores";
+import { useSubordinates } from "@/hooks/useSubordinates";
+import { EmployeeRecognitionBanner } from "@/components/competency/EmployeeRecognitionBanner";
+import { CompetencyHistoryChart } from "@/components/competency/CompetencyHistoryChart";
+import { OverallScoreCard } from "@/components/competency/OverallScoreCard";
+import { CompetencyRadarChart } from "@/components/competency/CompetencyRadarChart";
+import { CompetencyScoreCard } from "@/components/competency/CompetencyScoreCard";
+import { ImprovementPlanCard } from "@/components/competency/ImprovementPlanCard";
+import { Layout } from "@/components/Layout";
+import { Sparkles, RefreshCw, Users, Loader2 } from "lucide-react";
 import { format, subMonths, startOfMonth } from "date-fns";
 import { toast } from "sonner";
-import { useCompetencyScores, useMonthlyScorecard, useCompetencyHistory, useCalculateCompetencyScores, useGenerateCompetencyInsights } from "@/hooks/useCompetencyScores";
-import { EmployeeRecognitionBanner } from "@/components/competency/EmployeeRecognitionBanner";
-import { OverallScoreCard } from "@/components/competency/OverallScoreCard";
-import { CompetencyScoreCard } from "@/components/competency/CompetencyScoreCard";
-import { CompetencyRadarChart } from "@/components/competency/CompetencyRadarChart";
-import { ImprovementPlanCard } from "@/components/competency/ImprovementPlanCard";
-import { CompetencyHistoryChart } from "@/components/competency/CompetencyHistoryChart";
-import { useSubordinates } from "@/hooks/useSubordinates";
 
 const getMonthOptions = () => {
   const options = [];
@@ -83,39 +86,41 @@ export default function CompetencyDashboard() {
   ];
 
   return (
-    <div className="p-4 space-y-6 pb-24">
-      {/* Page Title with Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">My Competency Dashboard</h1>
-          <p className="text-sm text-muted-foreground">AI-driven performance insights</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isManager && (
-            <Select value={selectedUserId || 'self'} onValueChange={(val) => setSelectedUserId(val === 'self' ? null : val)}>
+    <Layout>
+      <div className="p-4 space-y-6 pb-24">
+        {/* Page Title with Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold">My Competency Dashboard</h1>
+            <p className="text-sm text-muted-foreground">AI-driven performance insights</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <Select value={selectedUserId || 'self'} onValueChange={(val) => setSelectedUserId(val === 'self' ? null : val)}>
+                <SelectTrigger className="w-[140px]">
+                  <Users className="h-4 w-4 mr-1" />
+                  <SelectValue placeholder="Myself" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMemberOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[140px]">
-                <Users className="h-4 w-4 mr-1" />
-                <SelectValue placeholder="Myself" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {teamMemberOptions.map(option => (
+                {monthOptions.map(option => (
                   <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          </div>
         </div>
-      </div>
+        
         {/* Employee Recognition Banner */}
         <EmployeeRecognitionBanner
           employeeName={employeeName}
@@ -188,6 +193,7 @@ export default function CompetencyDashboard() {
             )}
           </>
         )}
-    </div>
+      </div>
+    </Layout>
   );
 }
