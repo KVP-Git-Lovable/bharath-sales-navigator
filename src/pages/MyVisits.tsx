@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, differenceInDays } from "date-fns";
 import { SearchInput } from "@/components/SearchInput";
@@ -39,6 +39,7 @@ import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
 import { UserSelector } from "@/components/UserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
+import { TargetVsActualCard } from "@/components/TargetVsActualCard";
 
 interface Visit {
   id: string;
@@ -1327,10 +1328,24 @@ export const MyVisits = () => {
            </CardContent>
         </Card>
 
-        {/* AI Recommendations Section */}
-        {plannedBeats.length > 0 && currentBeatId && <div className="space-y-3">
-            <AIRecommendationBanner recommendations={retailerPriorityRecs} onGenerate={() => generateRetailerRecs('retailer_priority', currentBeatId)} onFeedback={provideRetailerFeedback} loading={retailerRecsLoading} type="retailer_priority" beatId={currentBeatId} />
-          </div>}
+        {/* Target vs Actual & Priority Retailers Section */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Target vs Actual - Collapsible */}
+          <TargetVsActualCard userId={user?.id} compact />
+          
+          {/* Priority Retailers - Collapsible */}
+          {plannedBeats.length > 0 && currentBeatId && (
+            <AIRecommendationBanner 
+              recommendations={retailerPriorityRecs} 
+              onGenerate={() => generateRetailerRecs('retailer_priority', currentBeatId)} 
+              onFeedback={provideRetailerFeedback} 
+              loading={retailerRecsLoading} 
+              type="retailer_priority" 
+              beatId={currentBeatId}
+              compact
+            />
+          )}
+        </div>
 
         {/* Enhanced Search and Filter Bar - Mobile Optimized */}
         <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
