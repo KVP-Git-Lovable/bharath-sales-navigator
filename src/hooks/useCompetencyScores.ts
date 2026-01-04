@@ -13,6 +13,9 @@ export interface CompetencyTemplate {
   weightage: number;
   icon: string | null;
   sort_order: number;
+  is_active: boolean;
+  max_score: number | null;
+  calculation_formula: Record<string, any>;
 }
 
 export interface CompetencyScore {
