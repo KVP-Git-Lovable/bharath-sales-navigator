@@ -245,27 +245,31 @@ serve(async (req) => {
           console.log(`✅ Created ${plansToInsert.length} beat plans for ${user.full_name}`);
           
           // Log the autonomous action
-          await supabaseClient
-            .from('ai_autonomous_actions')
-            .insert({
-              user_id: user.id,
-              action_type: 'auto_beat_plan',
-              action_data: {
-                planning_period: {
-                  start: planningDays[0].date,
-                  end: planningDays[planningDays.length - 1].date,
+          try {
+            await supabaseClient
+              .from('ai_autonomous_actions')
+              .insert({
+                user_id: user.id,
+                action_type: 'auto_beat_plan',
+                action_data: {
+                  planning_period: {
+                    start: planningDays[0].date,
+                    end: planningDays[planningDays.length - 1].date,
+                  },
+                  plans_created: plansToInsert.length,
+                  prescheduled_preserved: Object.keys(existingPlansByDate).length,
+                  total_retailers: plansToInsert.reduce((acc, p) => acc + (p.beat_data.retailers?.length || 0), 0),
+                  estimated_value: plansToInsert.reduce((acc, p) => acc + (p.beat_data.estimated_value || 0), 0),
+                  rationales: planRationales,
                 },
-                plans_created: plansToInsert.length,
-                prescheduled_preserved: Object.keys(existingPlansByDate).length,
-                total_retailers: plansToInsert.reduce((acc, p) => acc + (p.beat_data.retailers?.length || 0), 0),
-                estimated_value: plansToInsert.reduce((acc, p) => acc + (p.beat_data.estimated_value || 0), 0),
-                rationales: planRationales,
-              },
-              status: 'executed',
-              executed_at: new Date().toISOString(),
-              can_undo: true,
-              undo_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            }).catch(err => console.log('Could not log autonomous action:', err));
+                status: 'executed',
+                executed_at: new Date().toISOString(),
+                can_undo: true,
+                undo_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              });
+          } catch (actionErr) {
+            console.log('Could not log autonomous action:', actionErr);
+          }
 
           results.push({ 
             userId: user.id, 
