@@ -337,38 +337,50 @@ serve(async (req) => {
   }
 });
 
-// Get planning days: remaining current week (Mon-Sat) + entire next week (Mon-Sat)
+// Get planning days: only FUTURE dates (exclude today/past)
+// - From tomorrow through this week's Saturday (Mon–Sat)
+// - Plus the following week Monday–Saturday
 function getPlanningDays(): { day: string; date: string }[] {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const result: { day: string; date: string }[] = [];
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  // Current week: from today until Saturday (if today is Mon-Sat)
-  // Week runs Mon (1) to Sat (6), Sunday (0) is off
-  if (dayOfWeek >= 1 && dayOfWeek <= 6) {
-    // Add remaining days of current week (today to Saturday)
-    for (let d = dayOfWeek; d <= 6; d++) {
-      const date = new Date(now);
-      date.setDate(now.getDate() + (d - dayOfWeek));
-      result.push({
-        day: days[d],
-        date: date.toISOString().split('T')[0],
-      });
-    }
+  // Start from tomorrow
+  const start = new Date(now);
+  start.setDate(now.getDate() + 1);
+
+  // Skip Sundays (off day)
+  if (start.getDay() === 0) {
+    start.setDate(start.getDate() + 1);
   }
 
-  // Next week: Monday to Saturday
-  const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
-  const nextMonday = new Date(now);
-  nextMonday.setDate(now.getDate() + daysUntilNextMonday);
+  const result: { day: string; date: string }[] = [];
 
-  for (let d = 0; d < 6; d++) { // Mon to Sat = 6 days
-    const date = new Date(nextMonday);
-    date.setDate(nextMonday.getDate() + d);
+  // Safety: if we somehow landed on Sunday again, return empty
+  if (start.getDay() === 0) return result;
+
+  // End of the first planning week = Saturday of start's week
+  const endOfWeekSaturday = new Date(start);
+  endOfWeekSaturday.setDate(start.getDate() + (6 - start.getDay()));
+
+  // Add dates from start -> Saturday (Mon–Sat)
+  for (let d = new Date(start); d <= endOfWeekSaturday; d.setDate(d.getDate() + 1)) {
     result.push({
-      day: days[date.getDay()],
-      date: date.toISOString().split('T')[0],
+      day: dayNames[d.getDay()],
+      date: d.toISOString().split('T')[0],
+    });
+  }
+
+  // Next planning week Monday (skip Sunday)
+  const nextWeekMonday = new Date(endOfWeekSaturday);
+  nextWeekMonday.setDate(endOfWeekSaturday.getDate() + 2);
+
+  // Add next week Monday–Saturday (6 days)
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(nextWeekMonday);
+    d.setDate(nextWeekMonday.getDate() + i);
+    result.push({
+      day: dayNames[d.getDay()],
+      date: d.toISOString().split('T')[0],
     });
   }
 
@@ -535,9 +547,41 @@ function generateWeeklyPlan(
     };
   }).sort((a, b) => b.avgScore - a.avgScore);
 
-  // Assign beats to days (max 1 beat per day, prefer historical patterns)
+  // Assign beats to days (fills every day; cycles beats if beats < days)
   const weeklyPlan: DayPlan[] = [];
-  const usedBeats = new Set<string>();
+  let usedBeats = new Set<string>();
+  let lastAssignedBeatId: string | null = null;
+
+  const evaluateBeatForDay = (beat: any, dayName: string) => {
+    let score = beat.avgScore;
+    const dayPrefs = beatDayPreference[beat.beat_id];
+    let hasHistoricalMatch = false;
+
+    if (dayPrefs && dayPrefs[dayName]) {
+      score += dayPrefs[dayName] * 5; // Bonus for historical pattern
+      hasHistoricalMatch = true;
+    }
+
+    return { score, hasHistoricalMatch };
+  };
+
+  const pickBestBeat = (dayName: string, predicate: (b: any) => boolean) => {
+    let best: any = null;
+    let bestScore = -Infinity;
+
+    for (const beat of beatScores) {
+      if (beat.retailerCount === 0) continue;
+      if (!predicate(beat)) continue;
+
+      const { score, hasHistoricalMatch } = evaluateBeatForDay(beat, dayName);
+      if (score > bestScore) {
+        bestScore = score;
+        best = { ...beat, hasHistoricalMatch };
+      }
+    }
+
+    return best;
+  };
 
   planningDays.forEach(({ day, date }) => {
     // Check if there's a pre-scheduled beat for this date
@@ -545,8 +589,7 @@ function generateWeeklyPlan(
     if (prescheduled) {
       const beatRetailers = retailersByBeat[prescheduled.beat_id] || [];
       const topRetailers = beatRetailers.slice(0, 15);
-      usedBeats.add(prescheduled.beat_id);
-      
+
       weeklyPlan.push({
         day,
         date,
@@ -557,63 +600,58 @@ function generateWeeklyPlan(
         is_prescheduled: true,
         rationale: `Pre-scheduled beat - This beat was manually planned and preserved.`,
       });
+
+      // Keep consecutive-day de-duplication working even across prescheduled days
+      lastAssignedBeatId = prescheduled.beat_id;
       return;
     }
 
-    // Find best beat for this day
-    let bestBeat = null;
-    let bestMatchScore = -1;
-    let matchReason = '';
+    // Pick the best beat; prefer variety, but never leave days blank.
+    let bestBeat =
+      pickBestBeat(day, (b) => !usedBeats.has(b.beat_id) && b.beat_id !== lastAssignedBeatId) ||
+      pickBestBeat(day, (b) => !usedBeats.has(b.beat_id));
 
-    for (const beat of beatScores) {
-      if (usedBeats.has(beat.beat_id)) continue;
-      if (beat.retailerCount === 0) continue;
-
-      // Calculate match score based on historical preference
-      let matchScore = beat.avgScore;
-      const dayPrefs = beatDayPreference[beat.beat_id];
-      let hasHistoricalMatch = false;
-      
-      if (dayPrefs && dayPrefs[day]) {
-        matchScore += dayPrefs[day] * 5; // Bonus for historical pattern
-        hasHistoricalMatch = true;
-      }
-
-      if (matchScore > bestMatchScore) {
-        bestMatchScore = matchScore;
-        bestBeat = { ...beat, hasHistoricalMatch };
-      }
+    // If all beats are used, reset and cycle again.
+    if (!bestBeat) {
+      usedBeats = new Set<string>();
+      bestBeat =
+        pickBestBeat(day, (b) => b.beat_id !== lastAssignedBeatId) ||
+        pickBestBeat(day, () => true);
     }
 
     if (bestBeat) {
       usedBeats.add(bestBeat.beat_id);
+      lastAssignedBeatId = bestBeat.beat_id;
+
       const beatRetailers = retailersByBeat[bestBeat.beat_id] || [];
       const topRetailers = beatRetailers.slice(0, 15);
-      
+
       // Build rationale
       const rationalePoints: string[] = [];
-      
+
       if (bestBeat.hasHistoricalMatch) {
         rationalePoints.push(`Matches your historical pattern for ${day}s`);
       }
-      
+
       if (bestBeat.avgDaysSinceVisit > 14) {
-        rationalePoints.push(`Retailers need attention (avg ${Math.round(bestBeat.avgDaysSinceVisit)} days since last visit)`);
+        rationalePoints.push(
+          `Retailers need attention (avg ${Math.round(bestBeat.avgDaysSinceVisit)} days since last visit)`
+        );
       }
-      
+
       if (bestBeat.totalPending > 5000) {
         rationalePoints.push(`₹${Math.round(bestBeat.totalPending).toLocaleString()} in pending collections`);
       }
-      
-      const highPriorityCount = beatRetailers.filter(r => r.priority_score > 70).length;
+
+      const highPriorityCount = beatRetailers.filter((r) => r.priority_score > 70).length;
       if (highPriorityCount > 0) {
         rationalePoints.push(`${highPriorityCount} high-priority retailers`);
       }
-      
+
       if (rationalePoints.length === 0) {
         rationalePoints.push('Best available beat based on overall scoring');
       }
-      
+
       weeklyPlan.push({
         day,
         date,
