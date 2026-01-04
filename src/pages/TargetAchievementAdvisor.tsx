@@ -11,9 +11,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const periodOptions: { value: PerformancePeriod; label: string }[] = [
-  { value: 'today', label: 'Today' },
+// Period options grouped into Past (Review) and Future (Planning)
+const pastPeriodOptions: { value: PerformancePeriod; label: string }[] = [
   { value: 'yesterday', label: 'Yesterday' },
+  { value: 'last_week', label: 'Last Week' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'last_quarter', label: 'Last Quarter' },
+];
+
+const futurePeriodOptions: { value: PerformancePeriod; label: string }[] = [
+  { value: 'today', label: 'Today' },
   { value: 'this_week', label: 'This Week' },
   { value: 'this_month', label: 'This Month' },
   { value: 'this_quarter', label: 'This Quarter' },
@@ -146,8 +153,11 @@ const TargetAchievementAdvisor = () => {
       today: 'Today',
       yesterday: 'Yesterday',
       this_week: 'This Week',
+      last_week: 'Last Week',
       this_month: 'This Month',
+      last_month: 'Last Month',
       this_quarter: 'This Quarter',
+      last_quarter: 'Last Quarter',
       this_year: 'This FY',
     };
     return labels[p] || p;
@@ -155,55 +165,111 @@ const TargetAchievementAdvisor = () => {
 
   return (
     <Layout>
-      <div className="p-4 pb-24">
+      <div className="pb-24">
         <div className="max-w-3xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-              className="shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h1 className="text-xl font-bold text-foreground">Target Achievement Advisor</h1>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                AI-powered recommendations for {formatPeriodLabel(selectedPeriod)}
-              </p>
+          {/* Hero Header with Background */}
+          <div className="relative overflow-hidden rounded-b-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70">
+            {/* Abstract pattern overlay */}
+            <div className="absolute inset-0 opacity-10">
+              <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <pattern id="advisor-grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <circle cx="20" cy="20" r="1.5" fill="white" />
+                    <path d="M 40 0 L 0 40" stroke="white" strokeWidth="0.5" opacity="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#advisor-grid)" />
+                <circle cx="350" cy="50" r="80" fill="white" opacity="0.08" />
+                <circle cx="50" cy="150" r="60" fill="white" opacity="0.05" />
+              </svg>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={generateAdvice}
-              disabled={isGenerating || dataLoading}
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-2", isGenerating && "animate-spin")} />
-              Refresh
-            </Button>
+            
+            {/* Floating icons decoration */}
+            <div className="absolute right-4 top-8 opacity-20">
+              <Target className="h-16 w-16 text-white" />
+            </div>
+            <div className="absolute right-20 bottom-4 opacity-15">
+              <TrendingUp className="h-12 w-12 text-white" />
+            </div>
+            
+            {/* Header content */}
+            <div className="relative px-4 pt-4 pb-6">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(-1)}
+                  className="shrink-0 text-white/90 hover:text-white hover:bg-white/10"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-white/20 rounded-lg backdrop-blur-sm">
+                      <Sparkles className="h-5 w-5 text-white" />
+                    </div>
+                    <h1 className="text-xl font-bold text-white">Target Achievement Advisor</h1>
+                  </div>
+                  <p className="text-sm text-white/80 mt-1 ml-9">
+                    AI-powered recommendations for {formatPeriodLabel(selectedPeriod)}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Refresh button */}
+              <div className="mt-4 ml-9">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={generateAdvice}
+                  disabled={isGenerating || dataLoading}
+                  className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
+                >
+                  <RefreshCw className={cn("h-4 w-4 mr-2", isGenerating && "animate-spin")} />
+                  Refresh Advice
+                </Button>
+              </div>
+            </div>
           </div>
 
-          {/* Period Selector */}
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Period:</span>
-            <Select value={selectedPeriod} onValueChange={(v) => handlePeriodChange(v as PerformancePeriod)}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {periodOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="px-4 space-y-6">
+            {/* Period Selector - Grouped */}
+            <div className="p-4 bg-muted/50 rounded-xl border">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Select Period</span>
+              </div>
+              <Select value={selectedPeriod} onValueChange={(v) => handlePeriodChange(v as PerformancePeriod)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Future / Current periods */}
+                  <div className="px-2 py-1.5">
+                    <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                      📈 Current & Future
+                    </span>
+                  </div>
+                  {futurePeriodOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  
+                  {/* Past periods */}
+                  <div className="px-2 py-1.5 mt-2 border-t">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      📊 Past Review
+                    </span>
+                  </div>
+                  {pastPeriodOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
           {/* Motivational Quote */}
           {quote && (
@@ -404,6 +470,7 @@ const TargetAchievementAdvisor = () => {
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
     </Layout>
