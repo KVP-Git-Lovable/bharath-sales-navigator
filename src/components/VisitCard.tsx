@@ -2575,7 +2575,7 @@ export const VisitCard = ({
               </div>
             )}
           </div>
-          <div className="flex sm:flex-col items-start sm:items-end gap-2 sm:gap-1">
+          <div className="flex sm:flex-col items-start sm:items-end gap-1">
             <div className="flex flex-wrap gap-1">
               <Badge className={`${getStatusColor(displayStatus)} text-xs px-2 py-1`}>
                 {getStatusText(displayStatus)}
@@ -2598,11 +2598,11 @@ export const VisitCard = ({
                   <UserCheck size={12} className="mr-1" />
                   Joint Visit
                 </Badge>}
+              {hasStockRecords && <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-xs px-2 py-1 cursor-pointer transition-all" variant="secondary" onClick={() => setShowStockDataModal(true)}>
+                  <Package size={12} className="mr-1" />
+                  {stockRecordCount} Stock{stockRecordCount !== 1 ? 's' : ''}
+                </Badge>}
             </div>
-            {hasStockRecords && <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-xs px-2 py-1 cursor-pointer transition-all" variant="secondary" onClick={() => setShowStockDataModal(true)}>
-                <Package size={12} className="mr-1" />
-                {stockRecordCount} Stock{stockRecordCount !== 1 ? 's' : ''}
-              </Badge>}
             <div className="text-xs text-muted-foreground">{visit.retailerCategory}</div>
           </div>
         </div>
