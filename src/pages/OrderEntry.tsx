@@ -1653,14 +1653,6 @@ export const OrderEntry = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2 px-2 sm:px-3 py-2 sm:py-3 gap-2">
             {/* Left side - Back button and Title */}
             <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 overflow-hidden">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => navigate('/my-visits')} 
-                className="text-primary-foreground hover:bg-primary-foreground/20 h-8 w-8 shrink-0"
-              >
-                <ArrowLeft size={18} />
-              </Button>
               <div className="min-w-0 flex-1 overflow-hidden">
                 <CardTitle className="text-sm sm:text-base font-medium leading-tight truncate">
                   {isPhoneOrder ? t('order.phoneOrderEntry') : t('order.orderEntry')}
