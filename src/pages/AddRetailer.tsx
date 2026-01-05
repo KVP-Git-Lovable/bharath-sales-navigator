@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Layout } from "@/components/Layout";
-import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil } from "lucide-react";
+import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -384,6 +384,21 @@ export const AddRetailer = () => {
       setCapturedPhotoPreview(editingRetailer.photo_url);
     }
   }, [isEditMode, editingRetailer]);
+
+  // Pre-fill distributor selection when editing
+  useEffect(() => {
+    if (isEditMode && editingRetailer?.distributor_id && distributors.length > 0) {
+      // Check if the distributor exists in loaded distributors
+      const existingDistributor = distributors.find(d => d.id === editingRetailer.distributor_id);
+      if (existingDistributor && !retailerData.selectedDistributors.includes(editingRetailer.distributor_id)) {
+        setRetailerData(prev => ({
+          ...prev,
+          selectedDistributors: [editingRetailer.distributor_id],
+          parentName: existingDistributor.name
+        }));
+      }
+    }
+  }, [isEditMode, editingRetailer, distributors]);
 
   const loadCreditConfig = async () => {
     try {
@@ -879,11 +894,20 @@ export const AddRetailer = () => {
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(returnTo)}
+                className="text-primary-foreground hover:bg-primary-foreground/20"
+              >
+                <ArrowLeft size={20} />
+              </Button>
               <div>
                 <CardTitle className="text-xl font-bold">
                   {isEditMode ? t('retailer.editRetailer', 'Edit Retailer') : t('retailer.addRetailer')}
                 </CardTitle>
-                <p className="text-primary-foreground/80">
+                <p className="text-primary-foreground/80 text-sm">
                   {isEditMode ? editingRetailer?.name : t('retailer.subtitle')}
                 </p>
               </div>
@@ -900,17 +924,17 @@ export const AddRetailer = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Scan Board & Retailer Photo Section - Side by Side with Background */}
-              <div className="p-4 bg-muted/50 rounded-xl border border-border">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-muted/50 rounded-xl border border-border">
+                <div className="grid grid-cols-2 gap-2">
                   {/* Scan Board */}
-                  <div className="flex flex-col items-center text-center p-4 bg-background rounded-lg border border-border h-full">
-                    <ScanLine className="h-10 w-10 text-muted-foreground mb-2" />
-                    <Label className="text-sm font-semibold mb-1">{t('retailer.quickScan')}</Label>
-                    <p className="text-xs text-muted-foreground mb-3 flex-1">
+                  <div className="flex flex-col items-center text-center p-3 bg-background rounded-lg border border-border min-h-[180px]">
+                    <ScanLine className="h-8 w-8 text-muted-foreground mb-1 flex-shrink-0" />
+                    <Label className="text-xs font-semibold mb-0.5">{t('retailer.quickScan')}</Label>
+                    <p className="text-[10px] text-muted-foreground mb-2 flex-1 leading-tight">
                       {t('retailer.quickScanDesc')}
                     </p>
                     {scannedBoardPhotoUrl && (
-                      <div className="mb-3 w-14 h-14 border-2 border-primary rounded-lg overflow-hidden">
+                      <div className="mb-2 w-12 h-12 border-2 border-primary rounded-lg overflow-hidden flex-shrink-0">
                         <img
                           src={scannedBoardPhotoUrl}
                           alt="Scanned board"
@@ -924,22 +948,22 @@ export const AddRetailer = () => {
                       size="sm"
                       onClick={handleScanBoard}
                       disabled={isScanningBoard}
-                      className="w-full mt-auto"
+                      className="w-full mt-auto text-xs px-2"
                     >
-                      <ScanLine size={16} className="mr-2" />
-                      {isScanningBoard ? t('retailer.scanning') : t('retailer.scanBoard')}
+                      <ScanLine size={14} className="mr-1 flex-shrink-0" />
+                      <span className="truncate">{isScanningBoard ? 'Scanning...' : 'Scan Board'}</span>
                     </Button>
                   </div>
                   
                   {/* Retailer Photo */}
-                  <div className="flex flex-col items-center text-center p-4 bg-background rounded-lg border border-border h-full">
-                    <Camera className="h-10 w-10 text-muted-foreground mb-2" />
-                    <Label className="text-sm font-semibold mb-1">{t('retailer.retailerPhoto')}</Label>
-                    <p className="text-xs text-muted-foreground mb-3 flex-1">
+                  <div className="flex flex-col items-center text-center p-3 bg-background rounded-lg border border-border min-h-[180px]">
+                    <Camera className="h-8 w-8 text-muted-foreground mb-1 flex-shrink-0" />
+                    <Label className="text-xs font-semibold mb-0.5">{t('retailer.retailerPhoto')}</Label>
+                    <p className="text-[10px] text-muted-foreground mb-2 flex-1 leading-tight">
                       {t('retailer.photoDesc')}
                     </p>
                     {(capturedPhotoPreview || retailerData.photo_url) && (
-                      <div className="mb-3 w-14 h-14 border-2 border-primary rounded-lg overflow-hidden">
+                      <div className="mb-2 w-12 h-12 border-2 border-primary rounded-lg overflow-hidden flex-shrink-0">
                         <img
                           src={capturedPhotoPreview || retailerData.photo_url}
                           alt="Retailer photo"
@@ -953,10 +977,10 @@ export const AddRetailer = () => {
                       size="sm"
                       onClick={handlePhotoCapture}
                       disabled={isUploadingPhoto}
-                      className="w-full mt-auto"
+                      className="w-full mt-auto text-xs px-2"
                     >
-                      <Camera size={16} className="mr-2" />
-                      {isUploadingPhoto ? t('retailer.uploading') : t('retailer.takePhoto')}
+                      <Camera size={14} className="mr-1 flex-shrink-0" />
+                      <span className="truncate">{isUploadingPhoto ? 'Uploading...' : 'Take Photo'}</span>
                     </Button>
                   </div>
                 </div>
