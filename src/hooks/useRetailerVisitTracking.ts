@@ -225,17 +225,24 @@ export const useRetailerVisitTracking = ({
     }
   }, [userId, retailerId, selectedDate]);
 
-  // Update time spent every second for active logs
+  // Update time spent every second ONLY for active logs (no end_time yet)
   useEffect(() => {
-    // Run timer if we have a log - calculate time from start_time to now
-    if (currentLog && currentLog.start_time) {
+    // Only run timer if visit is still active (end_time equals start_time means active)
+    const isActive = currentLog && currentLog.start_time && 
+      (!currentLog.end_time || currentLog.end_time === currentLog.start_time);
+    
+    if (isActive) {
       intervalRef.current = setInterval(() => {
         const startTime = new Date(currentLog.start_time).getTime();
         const now = Date.now();
         const spent = Math.floor((now - startTime) / 1000);
         setTimeSpent(spent);
       }, 1000);
-    } else {
+    } else if (currentLog && currentLog.time_spent_seconds !== null) {
+      // Visit is completed - show the fixed time_spent_seconds
+      setTimeSpent(currentLog.time_spent_seconds);
+      
+      // Clear any running interval
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
