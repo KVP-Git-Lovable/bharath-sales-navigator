@@ -25,12 +25,16 @@ export const CreditScoreDisplay = ({
   const hasTriggeredCalculation = useRef(false);
 
   const { data: config, isLoading: configLoading } = useQuery({
-    queryKey: ['credit-config'],
+    queryKey: ['credit-config-active'],
     queryFn: async () => {
+      // Get any active enabled config (territory filtering happens at calculation time)
       const { data, error } = await supabase
         .from('credit_management_config')
         .select('*')
-        .single();
+        .eq('is_enabled', true)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
       return data;
     }

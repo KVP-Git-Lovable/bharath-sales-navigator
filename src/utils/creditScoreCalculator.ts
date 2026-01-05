@@ -31,18 +31,50 @@ function clampNumber(value: number, min: number, max: number): number {
 
 export async function calculateCreditScore(retailerId: string): Promise<CreditScoreResult | null> {
   try {
-    // 1. Get active credit config
-    const { data: config, error: configError } = await supabase
+    // 1. Get retailer's territory first
+    const { data: retailerData, error: retailerError } = await supabase
+      .from('retailers')
+      .select('territory_id')
+      .eq('id', retailerId)
+      .single();
+
+    if (retailerError) {
+      console.error('Error fetching retailer:', retailerError);
+      return null;
+    }
+
+    // 2. Get all active credit configs
+    const { data: configs, error: configError } = await supabase
       .from('credit_management_config')
       .select('*')
       .eq('is_enabled', true)
       .eq('is_active', true)
-      .eq('scoring_mode', 'ai_driven')
-      .limit(1)
-      .maybeSingle();
+      .eq('scoring_mode', 'ai_driven');
 
-    if (configError || !config) {
+    if (configError || !configs || configs.length === 0) {
       console.log('No active AI-driven credit config found');
+      return null;
+    }
+
+    // 3. Find matching config - either matching territory or empty territory_ids (global config)
+    let config = configs.find(c => {
+      const territories = c.territory_ids as string[] || [];
+      // If no territories specified, it applies globally
+      if (territories.length === 0) return true;
+      // If retailer has no territory, use global config only
+      if (!retailerData?.territory_id) return territories.length === 0;
+      // Check if retailer's territory is in config's territories
+      return territories.includes(retailerData.territory_id);
+    });
+
+    // Fallback to first config if no match (treat as global)
+    if (!config) {
+      config = configs[0];
+      console.log('No matching territory config, using default config');
+    }
+
+    if (!config) {
+      console.log('No credit config found');
       return null;
     }
 
