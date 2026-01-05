@@ -718,12 +718,33 @@ export function useOfflineSync() {
         
       case 'CREATE_VISIT_LOG':
         console.log('Syncing retailer visit log:', data);
-        // Remove the offline-generated ID before inserting to let Supabase generate a new one
-        const { id: offlineId, ...visitLogData } = data;
-        const { error: visitLogError } = await supabase
+        // Check if log already exists for this retailer/user/date to prevent duplicates
+        const { data: existingLogs, error: checkLogError } = await supabase
           .from('retailer_visit_logs')
-          .insert(visitLogData);
-        if (visitLogError) throw visitLogError;
+          .select('id')
+          .eq('user_id', data.user_id)
+          .eq('retailer_id', data.retailer_id)
+          .eq('visit_date', data.visit_date)
+          .limit(1);
+        
+        if (!checkLogError && existingLogs && existingLogs.length > 0) {
+          console.log('⚠️ Visit log already exists, updating instead:', existingLogs[0].id);
+          // Update existing log instead of creating duplicate
+          await supabase
+            .from('retailer_visit_logs')
+            .update({
+              end_time: data.end_time,
+              time_spent_seconds: data.time_spent_seconds
+            })
+            .eq('id', existingLogs[0].id);
+        } else {
+          // Remove the offline-generated ID before inserting to let Supabase generate a new one
+          const { id: offlineId, ...visitLogData } = data;
+          const { error: visitLogError } = await supabase
+            .from('retailer_visit_logs')
+            .insert(visitLogData);
+          if (visitLogError) throw visitLogError;
+        }
         
         // Remove from offline storage after successful sync
         try {
@@ -731,6 +752,35 @@ export function useOfflineSync() {
           console.log('✅ Removed synced visit log from offline storage');
         } catch (deleteError) {
           console.log('Note: Could not remove visit log from offline storage:', deleteError);
+        }
+        break;
+        
+      case 'UPDATE_VISIT_LOG':
+        console.log('Syncing visit log update:', data);
+        // Find the existing log by user/retailer/date and update
+        const { data: logsToUpdate, error: findLogError } = await supabase
+          .from('retailer_visit_logs')
+          .select('id')
+          .eq('user_id', data.user_id)
+          .eq('retailer_id', data.retailer_id)
+          .eq('visit_date', data.visit_date)
+          .order('start_time', { ascending: false })
+          .limit(1);
+        
+        if (findLogError) throw findLogError;
+        
+        if (logsToUpdate && logsToUpdate.length > 0) {
+          const { error: updateLogError } = await supabase
+            .from('retailer_visit_logs')
+            .update({
+              end_time: data.end_time,
+              time_spent_seconds: data.time_spent_seconds
+            })
+            .eq('id', logsToUpdate[0].id);
+          if (updateLogError) throw updateLogError;
+          console.log('✅ Visit log updated in database');
+        } else {
+          console.log('⚠️ No existing log found to update, skipping');
         }
         break;
         
