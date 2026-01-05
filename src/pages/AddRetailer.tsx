@@ -900,68 +900,64 @@ export const AddRetailer = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Scan Board & Retailer Photo Section - Side by Side with Background */}
-              <div className="p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 rounded-xl border border-primary/20">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-muted/50 rounded-xl border border-border">
+                <div className="grid grid-cols-2 gap-3">
                   {/* Scan Board */}
-                  <div className="space-y-3">
-                    <div className="flex flex-col items-center text-center p-3 bg-background/80 rounded-lg border">
-                      <ScanLine className="h-8 w-8 text-primary mb-2" />
-                      <Label className="text-sm font-semibold">{t('retailer.quickScan')}</Label>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {t('retailer.quickScanDesc')}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        onClick={handleScanBoard}
-                        disabled={isScanningBoard}
-                        className="w-full"
-                      >
-                        <ScanLine size={16} className="mr-2" />
-                        {isScanningBoard ? t('retailer.scanning') : t('retailer.scanBoard')}
-                      </Button>
-                      {scannedBoardPhotoUrl && (
-                        <div className="mt-2 w-16 h-16 border-2 border-primary rounded-lg overflow-hidden">
-                          <img
-                            src={scannedBoardPhotoUrl}
-                            alt="Scanned board"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex flex-col items-center text-center p-4 bg-background rounded-lg border border-border h-full">
+                    <ScanLine className="h-10 w-10 text-muted-foreground mb-2" />
+                    <Label className="text-sm font-semibold mb-1">{t('retailer.quickScan')}</Label>
+                    <p className="text-xs text-muted-foreground mb-3 flex-1">
+                      {t('retailer.quickScanDesc')}
+                    </p>
+                    {scannedBoardPhotoUrl && (
+                      <div className="mb-3 w-14 h-14 border-2 border-primary rounded-lg overflow-hidden">
+                        <img
+                          src={scannedBoardPhotoUrl}
+                          alt="Scanned board"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={handleScanBoard}
+                      disabled={isScanningBoard}
+                      className="w-full mt-auto"
+                    >
+                      <ScanLine size={16} className="mr-2" />
+                      {isScanningBoard ? t('retailer.scanning') : t('retailer.scanBoard')}
+                    </Button>
                   </div>
                   
                   {/* Retailer Photo */}
-                  <div className="space-y-3">
-                    <div className="flex flex-col items-center text-center p-3 bg-background/80 rounded-lg border">
-                      <Camera className="h-8 w-8 text-accent mb-2" />
-                      <Label className="text-sm font-semibold">{t('retailer.retailerPhoto')}</Label>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {t('retailer.photoDesc')}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handlePhotoCapture}
-                        disabled={isUploadingPhoto}
-                        className="w-full"
-                      >
-                        <Camera size={16} className="mr-2" />
-                        {isUploadingPhoto ? t('retailer.uploading') : t('retailer.takePhoto')}
-                      </Button>
-                      {(capturedPhotoPreview || retailerData.photo_url) && (
-                        <div className="mt-2 w-16 h-16 border-2 border-accent rounded-lg overflow-hidden">
-                          <img
-                            src={capturedPhotoPreview || retailerData.photo_url}
-                            alt="Retailer photo"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex flex-col items-center text-center p-4 bg-background rounded-lg border border-border h-full">
+                    <Camera className="h-10 w-10 text-muted-foreground mb-2" />
+                    <Label className="text-sm font-semibold mb-1">{t('retailer.retailerPhoto')}</Label>
+                    <p className="text-xs text-muted-foreground mb-3 flex-1">
+                      {t('retailer.photoDesc')}
+                    </p>
+                    {(capturedPhotoPreview || retailerData.photo_url) && (
+                      <div className="mb-3 w-14 h-14 border-2 border-primary rounded-lg overflow-hidden">
+                        <img
+                          src={capturedPhotoPreview || retailerData.photo_url}
+                          alt="Retailer photo"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePhotoCapture}
+                      disabled={isUploadingPhoto}
+                      className="w-full mt-auto"
+                    >
+                      <Camera size={16} className="mr-2" />
+                      {isUploadingPhoto ? t('retailer.uploading') : t('retailer.takePhoto')}
+                    </Button>
                   </div>
                 </div>
               </div>
