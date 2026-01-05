@@ -63,8 +63,9 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       devOptions: {
-        enabled: false, // Disabled in dev to prevent HMR conflicts - enable only in production
-        type: 'module'
+        enabled: true, // Enable PWA in dev mode for testing install prompt
+        type: 'module',
+        navigateFallback: 'index.html'
       }
     })
   ].filter(Boolean),
