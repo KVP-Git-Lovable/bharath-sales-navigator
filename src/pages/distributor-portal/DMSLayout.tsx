@@ -85,40 +85,57 @@ const DMSLayout = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for pending admin impersonation
-    const pendingImpersonation = localStorage.getItem('pending_impersonation');
-    if (pendingImpersonation) {
-      try {
-        const impersonationData = JSON.parse(pendingImpersonation);
-        if (Date.now() - impersonationData.timestamp < 30000) {
-          localStorage.setItem('distributor_user', JSON.stringify(impersonationData.distributorUser));
-          localStorage.setItem('distributor_id', impersonationData.distributorId);
-          sessionStorage.setItem('admin_impersonation', JSON.stringify({
-            adminUserId: impersonationData.adminUserId,
-            returnUrl: impersonationData.returnUrl,
-            impersonatedUser: impersonationData.impersonatedUser,
-          }));
-          localStorage.removeItem('pending_impersonation');
-          setUser(impersonationData.distributorUser);
-          setLoading(false);
-          toast.success(`Viewing portal as ${impersonationData.impersonatedUser}`, {
-            description: 'Admin viewing mode active',
-          });
-          return;
-        }
-      } catch (e) {
-        console.error('Failed to parse impersonation data:', e);
+    const initializeUser = async () => {
+      // Check for impersonate URL param which signals new tab from admin
+      const urlParams = new URLSearchParams(window.location.search);
+      const isImpersonateRequest = urlParams.get('impersonate') === 'true';
+      
+      if (isImpersonateRequest) {
+        // Wait a moment for localStorage to sync across tabs
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      localStorage.removeItem('pending_impersonation');
-    }
+      
+      // Check for pending admin impersonation
+      const pendingImpersonation = localStorage.getItem('pending_impersonation');
+      if (pendingImpersonation) {
+        try {
+          const impersonationData = JSON.parse(pendingImpersonation);
+          if (Date.now() - impersonationData.timestamp < 30000) {
+            localStorage.setItem('distributor_user', JSON.stringify(impersonationData.distributorUser));
+            localStorage.setItem('distributor_id', impersonationData.distributorId);
+            sessionStorage.setItem('admin_impersonation', JSON.stringify({
+              adminUserId: impersonationData.adminUserId,
+              returnUrl: impersonationData.returnUrl,
+              impersonatedUser: impersonationData.impersonatedUser,
+            }));
+            localStorage.removeItem('pending_impersonation');
+            setUser(impersonationData.distributorUser);
+            setLoading(false);
+            
+            // Clear the URL param
+            window.history.replaceState({}, '', window.location.pathname);
+            
+            toast.success(`Viewing portal as ${impersonationData.impersonatedUser}`, {
+              description: 'Admin viewing mode active',
+            });
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse impersonation data:', e);
+        }
+        localStorage.removeItem('pending_impersonation');
+      }
 
-    const storedUser = localStorage.getItem('distributor_user');
-    if (!storedUser) {
-      navigate('/distributor-portal/login');
-      return;
-    }
-    setUser(JSON.parse(storedUser));
-    setLoading(false);
+      const storedUser = localStorage.getItem('distributor_user');
+      if (!storedUser) {
+        navigate('/distributor-portal/login');
+        return;
+      }
+      setUser(JSON.parse(storedUser));
+      setLoading(false);
+    };
+    
+    initializeUser();
   }, [navigate]);
 
   const handleLogout = async () => {
