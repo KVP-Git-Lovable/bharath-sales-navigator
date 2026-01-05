@@ -1,16 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays, subWeeks, subMonths, subQuarters, getMonth, getYear, getDaysInMonth, getDay } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, getMonth, getYear, getDaysInMonth, getDay } from 'date-fns';
 
 export type TargetPeriod = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'last_week' | 'last_month' | 'last_quarter';
 export type TargetBasis = 'revenue' | 'quantity';
-
-interface MonthTarget {
-  monthNumber: number;
-  quantityTarget: number;
-  revenueTarget: number;
-  workingDays: number;
-}
 
 interface UserTargetProgress {
   target: number;
@@ -54,7 +47,6 @@ const getWorkingDaysInMonth = (calendarMonth: number, calendarYear: number): num
 const getFYYear = (date: Date): number => {
   const month = getMonth(date);
   const year = getYear(date);
-  // If month is Jan-Mar (0-2), FY is current year, otherwise FY is next year
   return month < 3 ? year : year + 1;
 };
 
@@ -63,6 +55,10 @@ const getFYMonthNumber = (calendarMonth: number): number => {
   const monthInfo = FY_MONTHS.find(m => m.calendarMonth === calendarMonth);
   return monthInfo?.number || 1;
 };
+
+// Cache for plan data to avoid repeated fetches
+const planCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minute cache
 
 export function useUserTargetProgress(
   userId: string | undefined,
@@ -73,8 +69,9 @@ export function useUserTargetProgress(
   const [actual, setActual] = useState(0);
   const [unit, setUnit] = useState('Units');
   const [isLoading, setIsLoading] = useState(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Calculate date range based on period
+  // Calculate date range based on period - memoized with stable keys
   const dateRange = useMemo(() => {
     const now = new Date();
     switch (period) {
@@ -99,15 +96,18 @@ export function useUserTargetProgress(
         const lastQuarterDate = subQuarters(now, 1);
         return { start: startOfQuarter(lastQuarterDate), end: endOfQuarter(lastQuarterDate) };
       case 'this_year':
-        // FY year: April to March
         const fyYear = getFYYear(now);
-        const fyStart = new Date(fyYear - 1, 3, 1); // April 1 of previous calendar year
-        const fyEnd = new Date(fyYear, 2, 31, 23, 59, 59); // March 31 of FY year
+        const fyStart = new Date(fyYear - 1, 3, 1);
+        const fyEnd = new Date(fyYear, 2, 31, 23, 59, 59);
         return { start: fyStart, end: fyEnd };
       default:
         return { start: startOfDay(now), end: endOfDay(now) };
     }
   }, [period]);
+
+  // Create stable date strings for dependency
+  const startStr = useMemo(() => dateRange.start.toISOString(), [dateRange.start.getTime()]);
+  const endStr = useMemo(() => dateRange.end.toISOString(), [dateRange.end.getTime()]);
 
   useEffect(() => {
     if (!userId) {
@@ -115,22 +115,54 @@ export function useUserTargetProgress(
       return;
     }
 
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     const fetchData = async () => {
       setIsLoading(true);
       try {
         const now = new Date();
         const fyYear = getFYYear(now);
-        const currentCalendarMonth = getMonth(now);
-        const currentCalendarYear = getYear(now);
-        const currentFYMonthNumber = getFYMonthNumber(currentCalendarMonth);
+        const cacheKey = `${userId}_${fyYear}`;
 
-        // Fetch the user's business plan for current FY
-        const { data: planData } = await supabase
-          .from('user_business_plans')
-          .select('id, quantity_target, quantity_unit, revenue_target')
-          .eq('user_id', userId)
-          .eq('year', fyYear)
-          .single();
+        // Check cache for plan data
+        let planData: any = null;
+        let monthData: any[] | null = null;
+        const cached = planCache.get(cacheKey);
+        
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+          planData = cached.data.planData;
+          monthData = cached.data.monthData;
+        } else {
+          // Fetch plan and month data in parallel
+          const [planResult, monthResult] = await Promise.all([
+            supabase
+              .from('user_business_plans')
+              .select('id, quantity_target, quantity_unit, revenue_target')
+              .eq('user_id', userId)
+              .eq('year', fyYear)
+              .single(),
+            supabase
+              .from('user_business_plan_months')
+              .select('month_number, quantity_target, revenue_target, business_plan_id')
+              .order('month_number')
+          ]);
+
+          planData = planResult.data;
+          // Filter month data for this plan
+          monthData = planData 
+            ? monthResult.data?.filter(m => m.business_plan_id === planData.id) || []
+            : [];
+
+          // Cache the result
+          planCache.set(cacheKey, {
+            data: { planData, monthData },
+            timestamp: Date.now()
+          });
+        }
 
         if (!planData) {
           setTarget(0);
@@ -138,21 +170,11 @@ export function useUserTargetProgress(
         } else {
           setUnit(planData.quantity_unit || 'Units');
 
-        // Get monthly targets
-        const { data: monthData } = await supabase
-          .from('user_business_plan_months')
-          .select('month_number, quantity_target, revenue_target')
-          .eq('business_plan_id', planData.id);
-
           let calculatedTarget = 0;
 
           if (period === 'today' || period === 'yesterday') {
-            // Get daily average from current month
-            const targetMonth = period === 'yesterday' 
-              ? getFYMonthNumber(getMonth(subDays(now, 1)))
-              : currentFYMonthNumber;
-            
             const targetDate = period === 'yesterday' ? subDays(now, 1) : now;
+            const targetMonth = getFYMonthNumber(getMonth(targetDate));
             const targetCalendarMonth = getMonth(targetDate);
             const targetCalendarYear = getYear(targetDate);
             
@@ -160,24 +182,18 @@ export function useUserTargetProgress(
             const workingDays = getWorkingDaysInMonth(targetCalendarMonth, targetCalendarYear);
             
             if (monthTarget && workingDays > 0) {
-              if (basis === 'revenue') {
-                calculatedTarget = (monthTarget.revenue_target || 0) / workingDays;
-              } else {
-                calculatedTarget = (monthTarget.quantity_target || 0) / workingDays;
-              }
+              calculatedTarget = basis === 'revenue'
+                ? (monthTarget.revenue_target || 0) / workingDays
+                : (monthTarget.quantity_target || 0) / workingDays;
             }
           } else if (period === 'this_week' || period === 'last_week') {
-            // Weekly target = monthly target / 4 (approximate weeks per month)
-            // For last_week, use the month of last week's start
             const targetDate = period === 'last_week' ? subWeeks(now, 1) : now;
             const targetFYMonthNumber = getFYMonthNumber(getMonth(targetDate));
             const monthTarget = monthData?.find(m => m.month_number === targetFYMonthNumber);
             if (monthTarget) {
-              if (basis === 'revenue') {
-                calculatedTarget = (monthTarget.revenue_target || 0) / 4;
-              } else {
-                calculatedTarget = (monthTarget.quantity_target || 0) / 4;
-              }
+              calculatedTarget = basis === 'revenue'
+                ? (monthTarget.revenue_target || 0) / 4
+                : (monthTarget.quantity_target || 0) / 4;
             }
           } else if (period === 'this_month' || period === 'last_month') {
             const targetDate = period === 'last_month' ? subMonths(now, 1) : now;
@@ -189,7 +205,6 @@ export function useUserTargetProgress(
                 : (monthTarget.quantity_target || 0);
             }
           } else if (period === 'this_quarter' || period === 'last_quarter') {
-            // Get quarter's months (FY quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar)
             const targetDate = period === 'last_quarter' ? subQuarters(now, 1) : now;
             const targetFYMonthNumber = getFYMonthNumber(getMonth(targetDate));
             const quarterStart = targetFYMonthNumber <= 3 ? 1 : 
@@ -198,11 +213,9 @@ export function useUserTargetProgress(
             const quarterMonths = [quarterStart, quarterStart + 1, quarterStart + 2];
             
             const quarterTargets = monthData?.filter(m => quarterMonths.includes(m.month_number)) || [];
-            if (basis === 'revenue') {
-              calculatedTarget = quarterTargets.reduce((sum, m) => sum + (m.revenue_target || 0), 0);
-            } else {
-              calculatedTarget = quarterTargets.reduce((sum, m) => sum + (m.quantity_target || 0), 0);
-            }
+            calculatedTarget = basis === 'revenue'
+              ? quarterTargets.reduce((sum, m) => sum + (m.revenue_target || 0), 0)
+              : quarterTargets.reduce((sum, m) => sum + (m.quantity_target || 0), 0);
           } else if (period === 'this_year') {
             calculatedTarget = basis === 'revenue' 
               ? (planData.revenue_target || 0)
@@ -212,12 +225,8 @@ export function useUserTargetProgress(
           setTarget(calculatedTarget);
         }
 
-        // Fetch actual performance from orders
-        const startStr = dateRange.start.toISOString();
-        const endStr = dateRange.end.toISOString();
-
+        // Fetch actual performance - optimized single query approach
         if (basis === 'revenue') {
-          // Get total revenue from orders
           const { data: ordersData } = await supabase
             .from('orders')
             .select('total_amount')
@@ -228,41 +237,45 @@ export function useUserTargetProgress(
           const totalRevenue = ordersData?.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0) || 0;
           setActual(totalRevenue);
         } else {
-          // Get total quantity from order_items
+          // Use a join to get quantities in one query
           const { data: ordersData } = await supabase
             .from('orders')
-            .select('id')
+            .select('id, order_items(quantity)')
             .eq('user_id', userId)
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
-          if (ordersData && ordersData.length > 0) {
-            const orderIds = ordersData.map(o => o.id);
-            const { data: itemsData } = await supabase
-              .from('order_items')
-              .select('quantity')
-              .in('order_id', orderIds);
-
-            const totalQuantity = itemsData?.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) || 0;
-            setActual(totalQuantity);
-          } else {
-            setActual(0);
-          }
+          const totalQuantity = ordersData?.reduce((sum, order) => {
+            const orderQty = (order.order_items as any[])?.reduce(
+              (itemSum, item) => itemSum + (Number(item.quantity) || 0), 0
+            ) || 0;
+            return sum + orderQty;
+          }, 0) || 0;
+          setActual(totalQuantity);
         }
       } catch (error) {
-        console.error('Error fetching target progress:', error);
-        setTarget(0);
-        setActual(0);
+        if ((error as any)?.name !== 'AbortError') {
+          console.error('Error fetching target progress:', error);
+          setTarget(0);
+          setActual(0);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [userId, period, basis, dateRange.start.toISOString(), dateRange.end.toISOString()]);
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [userId, period, basis, startStr, endStr]);
 
   const progress = target > 0 ? Math.min(Math.round((actual / target) * 100), 100) : 0;
-  const gap = Math.max(target - actual, 0);
+  // Gap is now difference (can be negative if exceeding target)
+  const gap = actual - target;
 
   return {
     target,

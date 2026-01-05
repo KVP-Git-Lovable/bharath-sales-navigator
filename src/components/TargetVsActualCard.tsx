@@ -67,10 +67,27 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
   };
 
   const formatGapValue = (value: number) => {
+    const absValue = Math.abs(value);
+    const sign = value >= 0 ? '+' : '-';
     if (targetBasis === 'revenue') {
-      return formatCurrency(value);
+      // Format with K/L/Cr suffix for compact display
+      if (absValue >= 10000000) return `${sign}₹${(absValue / 10000000).toFixed(1)}Cr`;
+      if (absValue >= 100000) return `${sign}₹${(absValue / 100000).toFixed(1)}L`;
+      if (absValue >= 1000) return `${sign}₹${(absValue / 1000).toFixed(1)}K`;
+      return `${sign}₹${Math.round(absValue)}`;
     }
-    return formatQuantity(value, unit);
+    if (absValue >= 1000) return `${sign}${(absValue / 1000).toFixed(1)}K ${unit}`;
+    return `${sign}${Math.round(absValue)} ${unit}`;
+  };
+
+  const getGapColor = () => {
+    if (gap >= 0) return 'text-success';
+    return 'text-destructive';
+  };
+
+  const getGapBgColor = () => {
+    if (gap >= 0) return 'bg-success/10 border-success/20';
+    return 'bg-destructive/10 border-destructive/20';
   };
 
   const getPeriodLabel = (period: TargetPeriod) => {
@@ -201,14 +218,13 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
 
           {/* Actions */}
           <div className="flex gap-2 mt-1">
-            {gap > 0 && !targetLoading && (
-              <div className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-1 rounded border border-primary/20 flex-shrink-0">
-                {formatGapValue(gap)} to go
-              </div>
-            )}
-            {gap === 0 && !targetLoading && target > 0 && (
-              <div className="text-[10px] font-medium text-success bg-success/10 px-2 py-1 rounded border border-success/20 flex-shrink-0">
-                Target Achieved! 🎉
+            {!targetLoading && target > 0 && (
+              <div className={cn(
+                "text-[10px] font-medium px-2 py-1 rounded border flex-shrink-0",
+                getGapColor(),
+                getGapBgColor()
+              )}>
+                {gap === 0 ? 'On Target ✓' : formatGapValue(gap)}
               </div>
             )}
             <Button
