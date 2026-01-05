@@ -411,6 +411,7 @@ export const OrderEntry = () => {
     startTracking,
     endTracking,
     recordActivity,
+    recordAction,
     recheckLocation
   } = useRetailerVisitTracking({
     retailerId: validRetailerId || '',
@@ -1725,12 +1726,9 @@ export const OrderEntry = () => {
                   variant={orderMode === "grid" ? "default" : "outline"} 
                   onClick={() => {
                     setOrderMode("grid");
-                    if (!hasTrackedVisit && userId) {
-                      startTracking('order', isPhoneOrder).then(() => setHasTrackedVisit(true));
-                    } else {
-                      recordActivity();
-                    }
-                  }} 
+                    // Record action for time tracking - first call = check-in, subsequent = check-out update
+                    recordAction('order').catch(() => {});
+                  }}
                   className="flex-1 h-7 text-xs" 
                   size="sm"
                 >
@@ -1741,12 +1739,9 @@ export const OrderEntry = () => {
                   variant={orderMode === "table" ? "default" : "outline"} 
                   onClick={() => {
                     setOrderMode("table");
-                    if (!hasTrackedVisit && userId) {
-                      startTracking('order', isPhoneOrder).then(() => setHasTrackedVisit(true));
-                    } else {
-                      recordActivity();
-                    }
-                  }} 
+                    // Record action for time tracking - first call = check-in, subsequent = check-out update
+                    recordAction('order').catch(() => {});
+                  }}
                   className="flex-1 h-7 text-xs" 
                   size="sm"
                 >
@@ -1757,12 +1752,9 @@ export const OrderEntry = () => {
                   variant="outline" 
                   onClick={() => {
                     setShowImageCapture(true);
-                    if (!hasTrackedVisit && userId) {
-                      startTracking('order', isPhoneOrder).then(() => setHasTrackedVisit(true));
-                    } else {
-                      recordActivity();
-                    }
-                  }} 
+                    // Record action for time tracking - first call = check-in, subsequent = check-out update
+                    recordAction('order').catch(() => {});
+                  }}
                   className="flex-1 h-7 text-xs" 
                   size="sm" 
                   title="AI Stock Capture"
@@ -1843,12 +1835,9 @@ export const OrderEntry = () => {
                   variant={orderMode === "return-stock" ? "default" : "outline"} 
                   onClick={() => {
                     setOrderMode("return-stock");
-                    if (!hasTrackedVisit && userId) {
-                      startTracking('order', isPhoneOrder).then(() => setHasTrackedVisit(true));
-                    } else {
-                      recordActivity();
-                    }
-                  }} 
+                    // Record action for time tracking - first call = check-in, subsequent = check-out update
+                    recordAction('order').catch(() => {});
+                  }}
                   className="flex-1 h-7 text-xs" 
                   size="sm"
                 >
@@ -1859,12 +1848,9 @@ export const OrderEntry = () => {
                   variant={orderMode === "no-order" ? "default" : "outline"} 
                   onClick={() => {
                     setOrderMode("no-order");
-                    if (!hasTrackedVisit && userId) {
-                      startTracking('order', isPhoneOrder).then(() => setHasTrackedVisit(true));
-                    } else {
-                      recordActivity();
-                    }
-                  }} 
+                    // Record action for time tracking - first call = check-in, subsequent = check-out update
+                    recordAction('order').catch(() => {});
+                  }}
                   className="flex-1 h-7 text-xs" 
                   size="sm"
                 >
@@ -1875,12 +1861,9 @@ export const OrderEntry = () => {
                   variant={orderMode === "competition" ? "default" : "outline"} 
                   onClick={() => {
                     setOrderMode("competition");
-                    if (!hasTrackedVisit && userId) {
-                      startTracking('order', isPhoneOrder).then(() => setHasTrackedVisit(true));
-                    } else {
-                      recordActivity();
-                    }
-                  }} 
+                    // Record action for time tracking - first call = check-in, subsequent = check-out update
+                    recordAction('order').catch(() => {});
+                  }}
                   className={`flex-1 h-7 text-xs ${hasCompetitionData ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
                   size="sm"
                 >
