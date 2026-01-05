@@ -62,7 +62,7 @@ import { AddBeat } from "./pages/AddBeat";
 import AddRecords from "./pages/AddRecords";
 import Leaderboard from "./pages/Leaderboard";
 import Performance from "./pages/Performance";
-import SalesCoach from "./pages/SalesCoach";
+
 import CompetencyDashboard from "./pages/CompetencyDashboard";
 import TeamCompetency from "./pages/TeamCompetency";
 import CompetencyAdmin from "./pages/CompetencyAdmin";
@@ -338,7 +338,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/activities-info" element={<ProtectedRoute><ActivitiesInfo /></ProtectedRoute>} />
         <Route path="/badges-info" element={<ProtectedRoute><BadgesInfo /></ProtectedRoute>} />
         <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
-        <Route path="/sales-coach" element={<ProtectedRoute><SalesCoach /></ProtectedRoute>} />
+        
         <Route path="/competency-dashboard" element={<ProtectedRoute><CompetencyDashboard /></ProtectedRoute>} />
         <Route path="/team-competency" element={<ProtectedRoute><TeamCompetency /></ProtectedRoute>} />
         <Route path="/competency-admin" element={<ProtectedRoute><CompetencyAdmin /></ProtectedRoute>} />

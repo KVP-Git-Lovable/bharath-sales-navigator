@@ -25,7 +25,6 @@ import {
   Gift,
   CreditCard,
   Trophy,
-  BookOpen,
   Target,
   TrendingUp,
   Shield,
@@ -82,7 +81,6 @@ export const Navbar = memo(() => {
     // Add remaining items
     baseItems.push(
       { icon: Target, label: "My Competency", href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
-      { icon: BookOpen, label: "Sales Coach", href: "/sales-coach", color: "from-teal-500 to-teal-600" },
       { icon: Trash2, label: "Recycle Bin", href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
     );
 
