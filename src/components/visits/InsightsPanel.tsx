@@ -68,13 +68,37 @@ export const InsightsPanel = ({
   };
 
   const formatQuantity = (qty: number, unitLabel: string) => {
-    if (qty >= 1000) return `${(qty / 1000).toFixed(1)}K`;
-    return `${Math.round(qty)}`;
+    // Quantity should always show the unit (Kg/Units), not "K" short-format
+    return `${qty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${unitLabel}`;
   };
 
   const formatValue = (value: number) => {
     if (targetBasis === 'revenue') return formatCurrency(value);
     return formatQuantity(value, unit);
+  };
+
+  const delta = actual - target; // +ve => overachieved, -ve => gap
+  const absDelta = Math.abs(delta);
+
+  const getDeltaLabel = () => {
+    if (target <= 0) return 'Gap';
+    if (delta > 0) return 'Overachieved';
+    if (delta < 0) return 'Gap';
+    return 'On Target';
+  };
+
+  const getDeltaValue = () => {
+    if (targetLoading) return '...';
+    if (target <= 0) return '—';
+    if (delta === 0) return '✓';
+    if (delta > 0) return `+${formatValue(absDelta)}`;
+    return formatValue(absDelta);
+  };
+
+  const getDeltaColor = () => {
+    if (delta > 0) return 'text-success';
+    if (delta < 0) return 'text-destructive';
+    return 'text-success';
   };
 
   const getProgressColor = () => {
@@ -245,9 +269,9 @@ export const InsightsPanel = ({
                   </p>
                 </div>
                 <div className="bg-background/60 rounded-lg p-2 text-center">
-                  <p className="text-[9px] text-muted-foreground font-medium uppercase">Gap</p>
-                  <p className="text-sm font-bold text-primary">
-                    {targetLoading ? '...' : gap > 0 ? formatValue(gap) : '✓'}
+                  <p className="text-[9px] text-muted-foreground font-medium uppercase">{getDeltaLabel()}</p>
+                  <p className={cn("text-sm font-bold", getDeltaColor())}>
+                    {getDeltaValue()}
                   </p>
                 </div>
               </div>

@@ -97,8 +97,8 @@ export const TodaysBeatCard = ({
   };
 
   const formatQuantity = (qty: number, unitLabel: string) => {
-    if (qty >= 1000) return `${(qty / 1000).toFixed(1)}K ${unitLabel}`;
-    return `${Math.round(qty)} ${unitLabel}`;
+    // Quantity should always show the actual unit (Kg/Units), not "K" short-format
+    return `${qty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${unitLabel}`;
   };
 
   const formatValue = (value: number) => {
@@ -109,10 +109,11 @@ export const TodaysBeatCard = ({
   };
 
   const formatGapValue = (value: number) => {
+    const absValue = Math.abs(value);
     if (targetBasis === 'revenue') {
-      return formatCurrencyNoDecimal(value);
+      return formatCurrencyNoDecimal(absValue);
     }
-    return formatQuantity(value, unit);
+    return formatQuantity(absValue, unit);
   };
 
   const displayBeatName = beatName || beatPlan?.beat_name || 'Not Planned';
@@ -227,12 +228,12 @@ export const TodaysBeatCard = ({
             </div>
           </div>
 
-          {/* Gap indicator with Target Advisor and Performance buttons */}
-          {gap > 0 && !targetLoading && (
+          {/* Gap / Overachieved indicator with Target Advisor and Performance buttons */}
+          {gap < 0 && !targetLoading && target > 0 && (
             <div className="flex flex-col gap-2 mt-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
-                  {formatGapValue(gap)} to go
+                  Gap: {formatGapValue(gap)} to go
                 </div>
                 <Button
                   variant="outline"
@@ -255,6 +256,35 @@ export const TodaysBeatCard = ({
               </Button>
             </div>
           )}
+
+          {gap > 0 && !targetLoading && target > 0 && (
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-bold text-success bg-success/10 px-3 py-1.5 rounded-md border border-success/20">
+                  Overachieved by +{formatGapValue(gap)}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/target-advisor?period=${targetPeriod}`)}
+                  className="text-xs h-8 gap-1"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Target Advisor
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/performance-dashboard')}
+                className="text-xs h-8 gap-1 w-full"
+              >
+                <BarChart3 className="h-3 w-3" />
+                View Performance
+              </Button>
+            </div>
+          )}
+
           {gap === 0 && !targetLoading && target > 0 && (
             <div className="flex flex-col gap-2 mt-2">
               <div className="text-sm font-bold text-success bg-success/10 px-3 py-1.5 rounded-md border border-success/20 text-center">

@@ -66,21 +66,20 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
     return formatQuantity(value, unit);
   };
 
-  const formatGapValue = (gapValue: number) => {
-    const absValue = Math.abs(gapValue);
-    const sign = gapValue > 0 ? '+' : '-';
+  const formatDeltaValue = (deltaValue: number) => {
+    const absValue = Math.abs(deltaValue);
     if (targetBasis === 'revenue') {
-      // Format with K/L/Cr suffix for compact display
-      if (absValue >= 10000000) return `${sign}₹${(absValue / 10000000).toFixed(1)}Cr`;
-      if (absValue >= 100000) return `${sign}₹${(absValue / 100000).toFixed(1)}L`;
-      if (absValue >= 1000) return `${sign}₹${(absValue / 1000).toFixed(1)}K`;
-      return `${sign}₹${Math.round(absValue)}`;
+      // Format with K/L/Cr suffix for compact display (no +/- here; label handles it)
+      if (absValue >= 10000000) return `₹${(absValue / 10000000).toFixed(1)}Cr`;
+      if (absValue >= 100000) return `₹${(absValue / 100000).toFixed(1)}L`;
+      if (absValue >= 1000) return `₹${(absValue / 1000).toFixed(1)}K`;
+      return `₹${Math.round(absValue)}`;
     }
     // For quantity - always show with unit, no K suffix
-    return `${sign}${absValue.toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${unit}`;
+    return `${absValue.toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${unit}`;
   };
 
-  const getGapLabel = () => {
+  const getDeltaLabel = () => {
     if (gap > 0) return 'Overachieved';
     if (gap < 0) return 'Gap';
     return 'On Target';
@@ -230,7 +229,12 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
                 getGapColor(),
                 getGapBgColor()
               )}>
-                {gap === 0 ? 'On Target ✓' : `${getGapLabel()}: ${formatGapValue(gap)}`}
+                {gap === 0
+                  ? 'On Target ✓'
+                  : gap > 0
+                    ? `${getDeltaLabel()}: +${formatDeltaValue(gap)}`
+                    : `${getDeltaLabel()}: ${formatDeltaValue(gap)}`}
+
               </div>
             )}
             <Button
