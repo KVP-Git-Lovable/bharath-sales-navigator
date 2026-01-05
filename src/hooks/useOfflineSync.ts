@@ -830,10 +830,21 @@ export function useOfflineSync() {
         
       case 'CREATE_ATTENDANCE':
         console.log('Syncing attendance check-in:', data);
-        const { error: attendanceError } = await supabase
+        const { data: syncedAttendance, error: attendanceError } = await supabase
           .from('attendance')
-          .insert(data);
+          .insert(data)
+          .select()
+          .single();
         if (attendanceError) throw attendanceError;
+        
+        // Update offline storage with real database ID
+        if (syncedAttendance) {
+          await offlineStorage.save(STORES.ATTENDANCE, { 
+            ...syncedAttendance, 
+            cached_at: new Date().toISOString() 
+          });
+          console.log('✅ Attendance synced and cache updated with real ID');
+        }
         break;
         
       case 'UPDATE_ATTENDANCE':
