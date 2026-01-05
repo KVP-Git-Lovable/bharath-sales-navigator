@@ -103,8 +103,24 @@ export default function InvoicePreview({
   };
 
   const subtotal = cartItems.reduce((sum, item) => {
-    const displayRate = getDisplayRate(item);
-    return sum + (item.quantity || 0) * displayRate;
+    // Use display_quantity if available (already in correct unit), otherwise use quantity
+    const qty = item.display_quantity !== undefined ? item.display_quantity : (item.quantity || 0);
+    // If display_quantity is used, we need the rate for the display unit
+    const displayUnit = item.display_unit?.toLowerCase() || '';
+    const baseUnit = normalizeUnit(item.base_unit || item.unit);
+    let rate = Number(item.rate || item.price) || 0;
+    
+    // If we have display_quantity, the rate should match the display unit
+    // If rate is per gram but display is KG, multiply rate by 1000
+    if (item.display_quantity !== undefined && (displayUnit === 'kg' || displayUnit === 'kilogram')) {
+      if (['g', 'gm', 'gram', 'grams'].includes(baseUnit)) {
+        rate = rate * 1000;
+      }
+    } else {
+      rate = getDisplayRate(item);
+    }
+    
+    return sum + qty * rate;
   }, 0);
   const cgst = subtotal * 0.025;
   const sgst = subtotal * 0.025;
@@ -234,17 +250,32 @@ export default function InvoicePreview({
           </thead>
           <tbody>
             {cartItems.map((item, index) => {
-              const displayRate = getDisplayRate(item);
-              const itemTotal = (item.quantity || 0) * displayRate;
+              // Use display values if available for proper unit representation
+              const qty = item.display_quantity !== undefined ? item.display_quantity : (item.quantity || 0);
+              const unit = item.display_unit || item.unit || "Piece";
+              const displayUnit = unit.toLowerCase();
+              const baseUnit = normalizeUnit(item.base_unit || item.unit);
+              
+              // Calculate rate for the display unit
+              let rate = Number(item.rate || item.price) || 0;
+              if (item.display_quantity !== undefined && (displayUnit === 'kg' || displayUnit === 'kilogram')) {
+                if (['g', 'gm', 'gram', 'grams'].includes(baseUnit)) {
+                  rate = rate * 1000;
+                }
+              } else {
+                rate = getDisplayRate(item);
+              }
+              
+              const itemTotal = qty * rate;
               return (
                 <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                   <td className="border border-gray-300 p-2 text-center text-xs">{index + 1}</td>
                   <td className="border border-gray-300 p-2 text-xs">{getDisplayName(item)}</td>
                   <td className="border border-gray-300 p-2 text-center text-xs">{item.hsn_code || "-"}</td>
-                  <td className="border border-gray-300 p-2 text-center text-xs">{item.unit || "Piece"}</td>
-                  <td className="border border-gray-300 p-2 text-center text-xs">{item.quantity}</td>
+                  <td className="border border-gray-300 p-2 text-center text-xs">{unit}</td>
+                  <td className="border border-gray-300 p-2 text-center text-xs">{qty}</td>
                   <td className="border border-gray-300 p-2 text-right text-xs">
-                    ₹{displayRate.toFixed(2)}
+                    ₹{rate.toFixed(2)}
                   </td>
                   <td className="border border-gray-300 p-2 text-right text-xs">
                     ₹{itemTotal.toFixed(2)}

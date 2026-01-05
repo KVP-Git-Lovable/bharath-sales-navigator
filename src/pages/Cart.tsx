@@ -68,6 +68,17 @@ const getDisplayQuantityAndUnit = (item: CartItem) => {
   return { qty: item.quantity, unit: item.unit };
 };
 
+// Helper to get quantity increment based on display unit
+const getQuantityIncrement = (item: CartItem) => {
+  const displayUnit = item.display_unit?.toLowerCase() || item.unit?.toLowerCase() || 'grams';
+  // If display unit is KG, increment by 1000 grams (1 KG)
+  if (displayUnit === 'kg' || displayUnit === 'kilogram' || displayUnit === 'kilograms') {
+    return 1000;
+  }
+  // Otherwise increment by 1 (for grams, pieces, etc.)
+  return 1;
+};
+
 // Format quantity for display (show decimals only if needed)
 const formatDisplayQuantity = (qty: number) => {
   if (Number.isInteger(qty)) return qty.toString();
@@ -382,11 +393,12 @@ export const Cart = () => {
     }
     setCartItems(prev => prev.map(item => {
       if (item.id === productId) {
-        // Calculate the ratio to update display_quantity proportionally
-        const quantityRatio = item.quantity > 0 ? newQuantity / item.quantity : 1;
-        const newDisplayQuantity = item.display_quantity !== undefined 
-          ? item.display_quantity * quantityRatio 
-          : newQuantity;
+        // Calculate display_quantity based on the display unit
+        const displayUnit = item.display_unit?.toLowerCase() || item.unit?.toLowerCase() || 'grams';
+        const isKgUnit = displayUnit === 'kg' || displayUnit === 'kilogram' || displayUnit === 'kilograms';
+        
+        // Calculate the new display quantity correctly based on the internal quantity
+        const newDisplayQuantity = isKgUnit ? newQuantity / 1000 : newQuantity;
 
         const updatedItem = {
           ...item,
@@ -1404,14 +1416,14 @@ export const Cart = () => {
                         
                         {/* Quantity Controls - Compact */}
                         <div className="flex items-center gap-1 shrink-0">
-                          <Button variant="outline" size="icon" className="h-6 w-6 text-xs" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+                          <Button variant="outline" size="icon" className="h-6 w-6 text-xs" onClick={() => updateQuantity(item.id, item.quantity - getQuantityIncrement(item))}>
                             -
                           </Button>
                           <div className="min-w-[40px] text-center">
                             <div className="text-xs font-medium leading-tight">{formatDisplayQuantity(displayQty)}</div>
                             <div className="text-[10px] text-muted-foreground leading-tight">{displayUnit}</div>
                           </div>
-                          <Button variant="outline" size="icon" className="h-6 w-6 text-xs" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
+                          <Button variant="outline" size="icon" className="h-6 w-6 text-xs" onClick={() => updateQuantity(item.id, item.quantity + getQuantityIncrement(item))}>
                             +
                           </Button>
                         </div>
