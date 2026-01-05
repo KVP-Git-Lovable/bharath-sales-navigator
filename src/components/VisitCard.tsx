@@ -2513,19 +2513,47 @@ export const VisitCard = ({
         {/* Header - Retailer info and status */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-card-foreground text-sm sm:text-base">
-                <button onClick={() => setShowRetailerOverview(true)} className="text-left hover:text-primary transition-colors cursor-pointer underline-offset-4 hover:underline" title="View retailer details">
-                  {visit.retailerName}
-                </button>
-              </h3>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                <h3 className="font-semibold text-card-foreground text-sm sm:text-base truncate">
+                  <button onClick={() => setShowRetailerOverview(true)} className="text-left hover:text-primary transition-colors cursor-pointer underline-offset-4 hover:underline" title="View retailer details">
+                    {visit.retailerName}
+                  </button>
+                </h3>
+                
+                {/* Phone Order Badge - only shown if applicable */}
+                {currentLog?.is_phone_order && (
+                  <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                    📞 Phone Order
+                  </span>
+                )}
+              </div>
               
-              {/* Phone Order Badge - only shown if applicable */}
-              {currentLog?.is_phone_order && (
-                <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
-                  📞 Phone Order
-                </span>
-              )}
+              {/* Location and Phone icons - right aligned */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${visit.retailerLat && visit.retailerLng ? `${visit.retailerLat},${visit.retailerLng}` : encodeURIComponent(visit.address || '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-primary hover:text-primary/80 cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors" 
+                  onClick={e => e.stopPropagation()} 
+                  title="Open in Google Maps"
+                >
+                  <MapPin size={16} />
+                </a>
+                <a 
+                  href={`tel:${(visit.phone || '').replace(/\s+/g, '')}`} 
+                  className="text-primary hover:text-primary/80 cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors" 
+                  onClick={e => {
+                    e.stopPropagation();
+                    const cleaned = (visit.phone || '').replace(/\s+/g, '');
+                    if (cleaned) window.location.href = `tel:${cleaned}`;
+                  }} 
+                  title="Call"
+                >
+                  <Phone size={16} />
+                </a>
+              </div>
             </div>
             
             {/* Visit Tracking Indicator - shows after first action (check-in) */}
@@ -2619,30 +2647,6 @@ export const VisitCard = ({
                 </div>
               </div>
             </div>}
-          <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground">
-            <a 
-              href={`https://www.google.com/maps/search/?api=1&query=${visit.retailerLat && visit.retailerLng ? `${visit.retailerLat},${visit.retailerLng}` : encodeURIComponent(visit.address || '')}`} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="text-primary hover:text-primary/80 cursor-pointer p-1.5 rounded-full hover:bg-primary/10 transition-colors" 
-              onClick={e => e.stopPropagation()} 
-              title="Open in Google Maps"
-            >
-              <MapPin size={16} className="sm:size-5" />
-            </a>
-            <a 
-              href={`tel:${(visit.phone || '').replace(/\s+/g, '')}`} 
-              className="text-primary hover:text-primary/80 cursor-pointer p-1.5 rounded-full hover:bg-primary/10 transition-colors" 
-              onClick={e => {
-                e.stopPropagation();
-                const cleaned = (visit.phone || '').replace(/\s+/g, '');
-                if (cleaned) window.location.href = `tel:${cleaned}`;
-              }} 
-              title="Call"
-            >
-              <Phone size={16} className="sm:size-5" />
-            </a>
-          </div>
         </div>
 
         <div className="space-y-2">
