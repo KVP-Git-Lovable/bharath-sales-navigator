@@ -17,6 +17,7 @@ import { useAndroidBackButton } from "@/hooks/useAndroidBackButton";
 import { visitStatusCache } from "@/lib/visitStatusCache";
 import { NetworkProvider } from "@/contexts/NetworkContext";
 import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 // Initialize visit status cache early to avoid flicker
 visitStatusCache.init();
@@ -233,6 +234,7 @@ const App = () => {
             <TooltipProvider>
               <BrowserRouter>
                 <SlowConnectionBanner />
+                <PWAInstallPrompt />
                 <AppContent hasError={hasError} />
               </BrowserRouter>
             </TooltipProvider>
