@@ -18,11 +18,16 @@ interface Retailer {
   beat_name?: string | null;
 }
 
+interface BeatOption {
+  beat_id: string;
+  beat_name: string;
+}
+
 interface MassEditBeatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   retailers: Retailer[];
-  beats: string[];
+  beats: BeatOption[] | string[];
   onSuccess: () => void;
 }
 
@@ -34,7 +39,7 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
   const [isNewBeat, setIsNewBeat] = useState(false);
   const [newBeatName, setNewBeatName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [availableBeats, setAvailableBeats] = useState<string[]>(beats);
+  const [availableBeats, setAvailableBeats] = useState<BeatOption[]>([]);
 
   // Load beats - always try cache first, then supplement with provided beats
   useEffect(() => {
@@ -42,31 +47,46 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
       try {
         console.log('Loading beats for dropdown...');
         
+        // Build beat map: beat_id -> beat_name
+        const beatMap = new Map<string, string>();
+        
         // ALWAYS load from cache first (works both online and offline)
         const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
         const userRetailers = cachedRetailers.filter((r: any) => r.user_id === user?.id);
         
-        // Extract unique beat_ids from cached retailers
-        const beatIdsFromCache = Array.from(new Set(
-          userRetailers
-            .map((r: any) => r.beat_id)
-            .filter((id: string) => id && id !== '')
-        )) as string[];
-        
-        // Combine cached beats with provided beats (from props)
-        const allBeats = Array.from(new Set([...beatIdsFromCache, ...(beats || [])]));
-        
-        console.log('Loaded beats:', {
-          fromCache: beatIdsFromCache.length,
-          fromProps: beats?.length || 0,
-          total: allBeats.length
+        // Extract beat_id -> beat_name from cached retailers
+        userRetailers.forEach((r: any) => {
+          if (r.beat_id && r.beat_id !== '') {
+            const currentName = beatMap.get(r.beat_id);
+            const newName = r.beat_name || r.beat_id;
+            // Prefer actual names over beat_id-style strings
+            if (!currentName || (currentName.startsWith('beat_') && !newName.startsWith('beat_'))) {
+              beatMap.set(r.beat_id, newName);
+            }
+          }
         });
         
-        setAvailableBeats(allBeats.sort());
+        // Also include beats from props (handle both formats)
+        if (Array.isArray(beats)) {
+          beats.forEach((b: any) => {
+            if (typeof b === 'string' && b && !beatMap.has(b)) {
+              beatMap.set(b, b);
+            } else if (b?.beat_id && !beatMap.has(b.beat_id)) {
+              beatMap.set(b.beat_id, b.beat_name || b.beat_id);
+            }
+          });
+        }
+        
+        // Convert to sorted array
+        const allBeats = Array.from(beatMap.entries())
+          .map(([beat_id, beat_name]) => ({ beat_id, beat_name }))
+          .sort((a, b) => a.beat_name.localeCompare(b.beat_name));
+        
+        console.log('Loaded beats:', allBeats.length);
+        setAvailableBeats(allBeats);
       } catch (error) {
         console.error('Error loading beats:', error);
-        // Fallback to provided beats if everything fails
-        setAvailableBeats(beats || []);
+        setAvailableBeats([]);
       }
     };
     
@@ -206,8 +226,8 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
                       </SelectItem>
                     )}
                     {availableBeats.map(beat => (
-                      <SelectItem key={beat} value={beat}>
-                        {beat}
+                      <SelectItem key={beat.beat_id} value={beat.beat_id}>
+                        {beat.beat_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
