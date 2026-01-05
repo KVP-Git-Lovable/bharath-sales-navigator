@@ -240,18 +240,31 @@ export function useUserTargetProgress(
           // Use a join to get quantities in one query
           const { data: ordersData } = await supabase
             .from('orders')
-            .select('id, order_items(quantity)')
+            .select('id, order_items(quantity, unit)')
             .eq('user_id', userId)
             .gte('created_at', startStr)
             .lte('created_at', endStr);
 
-          const totalQuantity = ordersData?.reduce((sum, order) => {
+          // Sum quantities and convert to KG (order_items store quantities in grams)
+          const totalQuantityInGrams = ordersData?.reduce((sum, order) => {
             const orderQty = (order.order_items as any[])?.reduce(
-              (itemSum, item) => itemSum + (Number(item.quantity) || 0), 0
+              (itemSum, item) => {
+                const qty = Number(item.quantity) || 0;
+                const itemUnit = (item.unit || '').toLowerCase();
+                // If unit is already KG, convert to grams for consistent summing
+                if (itemUnit === 'kg' || itemUnit === 'kgs') {
+                  return itemSum + (qty * 1000);
+                }
+                // Grams or default - use as-is
+                return itemSum + qty;
+              }, 0
             ) || 0;
             return sum + orderQty;
           }, 0) || 0;
-          setActual(totalQuantity);
+          
+          // Convert total grams to KG for display
+          const totalQuantityInKg = totalQuantityInGrams / 1000;
+          setActual(totalQuantityInKg);
         }
       } catch (error) {
         if ((error as any)?.name !== 'AbortError') {
