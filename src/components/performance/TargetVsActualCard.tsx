@@ -258,10 +258,14 @@ export function TargetVsActualCard({ entityType, entityId, beatTextId, userId }:
                     style={{ width: `${Math.min((targets.actualRevenue / (targets.revenueTarget || 1)) * 100, 100)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>Gap: {targets.revenueTarget > targets.actualRevenue 
-                    ? `₹${(targets.revenueTarget - targets.actualRevenue).toLocaleString('en-IN')}` 
-                    : 'Target Achieved!'}</span>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className={targets.actualRevenue >= targets.revenueTarget ? 'text-green-600 font-medium' : 'text-orange-600 font-medium'}>
+                    {targets.actualRevenue > targets.revenueTarget 
+                      ? `Overachieved: +₹${(targets.actualRevenue - targets.revenueTarget).toLocaleString('en-IN')}` 
+                      : targets.actualRevenue === targets.revenueTarget 
+                        ? 'On Target ✓'
+                        : `Gap: -₹${(targets.revenueTarget - targets.actualRevenue).toLocaleString('en-IN')}`}
+                  </span>
                 </div>
               </div>
             </div>
@@ -299,10 +303,14 @@ export function TargetVsActualCard({ entityType, entityId, beatTextId, userId }:
                     style={{ width: `${Math.min((targets.actualQuantity / (targets.quantityTarget || 1)) * 100, 100)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>Gap: {targets.quantityTarget > targets.actualQuantity 
-                    ? `${(targets.quantityTarget - targets.actualQuantity).toLocaleString('en-IN')} ${quantityUnit}` 
-                    : 'Target Achieved!'}</span>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className={targets.actualQuantity >= targets.quantityTarget ? 'text-green-600 font-medium' : 'text-orange-600 font-medium'}>
+                    {targets.actualQuantity > targets.quantityTarget 
+                      ? `Overachieved: +${(targets.actualQuantity - targets.quantityTarget).toLocaleString('en-IN')} ${quantityUnit}` 
+                      : targets.actualQuantity === targets.quantityTarget 
+                        ? 'On Target ✓'
+                        : `Gap: -${(targets.quantityTarget - targets.actualQuantity).toLocaleString('en-IN')} ${quantityUnit}`}
+                  </span>
                 </div>
               </div>
             </div>

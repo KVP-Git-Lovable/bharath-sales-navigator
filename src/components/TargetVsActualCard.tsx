@@ -55,8 +55,8 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
   };
 
   const formatQuantity = (qty: number, unitLabel: string) => {
-    if (qty >= 1000) return `${(qty / 1000).toFixed(1)}K ${unitLabel}`;
-    return `${Math.round(qty)} ${unitLabel}`;
+    // Don't use K suffix for quantity - always show actual number with unit
+    return `${qty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${unitLabel}`;
   };
 
   const formatValue = (value: number) => {
@@ -66,9 +66,9 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
     return formatQuantity(value, unit);
   };
 
-  const formatGapValue = (value: number) => {
-    const absValue = Math.abs(value);
-    const sign = value >= 0 ? '+' : '-';
+  const formatGapValue = (gapValue: number) => {
+    const absValue = Math.abs(gapValue);
+    const sign = gapValue > 0 ? '+' : '-';
     if (targetBasis === 'revenue') {
       // Format with K/L/Cr suffix for compact display
       if (absValue >= 10000000) return `${sign}₹${(absValue / 10000000).toFixed(1)}Cr`;
@@ -76,8 +76,14 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
       if (absValue >= 1000) return `${sign}₹${(absValue / 1000).toFixed(1)}K`;
       return `${sign}₹${Math.round(absValue)}`;
     }
-    if (absValue >= 1000) return `${sign}${(absValue / 1000).toFixed(1)}K ${unit}`;
-    return `${sign}${Math.round(absValue)} ${unit}`;
+    // For quantity - always show with unit, no K suffix
+    return `${sign}${absValue.toLocaleString('en-IN', { maximumFractionDigits: 1 })} ${unit}`;
+  };
+
+  const getGapLabel = () => {
+    if (gap > 0) return 'Overachieved';
+    if (gap < 0) return 'Gap';
+    return 'On Target';
   };
 
   const getGapColor = () => {
@@ -224,7 +230,7 @@ export const TargetVsActualCard = ({ userId, compact = false }: TargetVsActualCa
                 getGapColor(),
                 getGapBgColor()
               )}>
-                {gap === 0 ? 'On Target ✓' : formatGapValue(gap)}
+                {gap === 0 ? 'On Target ✓' : `${getGapLabel()}: ${formatGapValue(gap)}`}
               </div>
             )}
             <Button
