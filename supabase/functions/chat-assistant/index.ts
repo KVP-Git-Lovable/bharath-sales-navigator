@@ -1601,39 +1601,76 @@ Always use the available tools to fetch real-time data. Interpret the data meani
       ...messages.slice(-12)
     ];
     
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: aiMessages,
-        tools: TOOLS,
-        tool_choice: 'auto',
-        stream: true,
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    });
+    // Retry logic for transient errors (503, network issues)
+    const MAX_RETRIES = 3;
+    let response: Response | null = null;
+    let lastError = '';
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: aiMessages,
+            tools: TOOLS,
+            tool_choice: 'auto',
+            stream: true,
+            max_tokens: maxTokens,
+            temperature,
+          }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait a moment.' }), {
-          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        if (response.ok) {
+          break; // Success, exit retry loop
+        }
+        
+        const errorText = await response.text();
+        lastError = errorText;
+        console.error(`AI gateway error (attempt ${attempt}/${MAX_RETRIES}):`, response.status, errorText);
+        
+        // Don't retry for client errors (except 429 which we handle separately)
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait a moment.' }), {
+            status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: 'AI credits exhausted. Contact administrator.' }), {
+            status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (response.status >= 400 && response.status < 500) {
+          // Client error, don't retry
+          break;
+        }
+        
+        // For 5xx errors, retry with exponential backoff
+        if (attempt < MAX_RETRIES) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000); // 1s, 2s, 4s
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } catch (fetchError) {
+        lastError = fetchError instanceof Error ? fetchError.message : 'Network error';
+        console.error(`Fetch error (attempt ${attempt}/${MAX_RETRIES}):`, fetchError);
+        
+        if (attempt < MAX_RETRIES) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: 'AI credits exhausted. Contact administrator.' }), {
-          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(JSON.stringify({ error: 'AI service unavailable. Please retry.' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    }
+    
+    if (!response || !response.ok) {
+      console.error('All retry attempts failed:', lastError);
+      return new Response(JSON.stringify({ error: 'AI service temporarily unavailable. Please try again in a moment.' }), {
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
