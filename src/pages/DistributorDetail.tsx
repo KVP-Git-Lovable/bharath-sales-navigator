@@ -199,37 +199,37 @@ export default function DistributorDetail() {
     <Layout>
       <div className="p-4 pb-24 space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-master')}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/distributor-master')} className="shrink-0 mt-0.5">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">{distributor.name}</h1>
-              <div className="flex items-center gap-2 mt-1">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">{distributor.name}</h1>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {distributor.distribution_level && (
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="text-xs">
                     {levelLabels[distributor.distribution_level] || distributor.distribution_level}
                   </Badge>
                 )}
-                <Badge className={statusColors[distributor.status] || 'bg-gray-100'}>
+                <Badge className={`text-xs ${statusColors[distributor.status] || 'bg-gray-100'}`}>
                   {formatStatus(distributor.status)}
                 </Badge>
                 {distributor.partnership_status && (
-                  <Badge className={partnershipColors[distributor.partnership_status] || 'bg-gray-100'}>
+                  <Badge className={`text-xs ${partnershipColors[distributor.partnership_status] || 'bg-gray-100'}`}>
                     {distributor.partnership_status.charAt(0).toUpperCase() + distributor.partnership_status.slice(1)}
                   </Badge>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={() => navigate(`/edit-distributor/${distributor.id}`)}>
+          <div className="flex gap-1.5 shrink-0">
+            <Button variant="outline" size="icon" onClick={() => navigate(`/edit-distributor/${distributor.id}`)} className="h-8 w-8">
               <Edit className="h-4 w-4" />
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" size="icon" className="text-destructive">
+                <Button variant="outline" size="icon" className="text-destructive h-8 w-8">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
@@ -291,15 +291,17 @@ export default function DistributorDetail() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-7 w-full">
-            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-            <TabsTrigger value="primary-orders" className="text-xs">Primary Order</TabsTrigger>
-            <TabsTrigger value="secondary-orders" className="text-xs">Secondary</TabsTrigger>
-            <TabsTrigger value="network" className="text-xs">Network</TabsTrigger>
-            <TabsTrigger value="portal" className="text-xs">Portal</TabsTrigger>
-            <TabsTrigger value="pricing" className="text-xs">Pricing</TabsTrigger>
-            <TabsTrigger value="business" className="text-xs">FY Plan</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 pb-2">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-7 sm:w-full gap-1">
+              <TabsTrigger value="overview" className="text-xs whitespace-nowrap px-3">Overview</TabsTrigger>
+              <TabsTrigger value="primary-orders" className="text-xs whitespace-nowrap px-3">Primary</TabsTrigger>
+              <TabsTrigger value="secondary-orders" className="text-xs whitespace-nowrap px-3">Secondary</TabsTrigger>
+              <TabsTrigger value="network" className="text-xs whitespace-nowrap px-3">Network</TabsTrigger>
+              <TabsTrigger value="portal" className="text-xs whitespace-nowrap px-3">Portal</TabsTrigger>
+              <TabsTrigger value="pricing" className="text-xs whitespace-nowrap px-3">Pricing</TabsTrigger>
+              <TabsTrigger value="business" className="text-xs whitespace-nowrap px-3">FY Plan</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
             {/* About Business - First */}

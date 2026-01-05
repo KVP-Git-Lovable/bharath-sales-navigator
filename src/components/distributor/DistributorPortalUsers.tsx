@@ -21,14 +21,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -566,130 +558,118 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
             <p className="text-xs mt-1">Add users to give them access to the distributor portal</p>
           </div>
         ) : (
-          <div className="overflow-x-auto -mx-4 px-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">User</TableHead>
-                  <TableHead className="text-xs">Role</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{user.full_name}</p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {user.email}
-                        </p>
-                        {user.phone && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {user.phone}
-                          </p>
-                        )}
-                        {user.designation && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{user.designation}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Badge className={getRoleBadgeColor(user.role)}>
-                          {PORTAL_ROLES.find(r => r.value === user.role)?.label || user.role}
-                        </Badge>
-                        {user.user_level && (
-                          <p className="text-xs text-muted-foreground">
-                            {USER_LEVELS.find(l => l.value === user.user_level)?.label || user.user_level}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {getStatusBadge(user.user_status || 'initiated')}
-                        <div className="flex items-center gap-1 mt-1">
-                          {user.is_active ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
-                              Enabled
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
-                              Pending
-                            </Badge>
-                          )}
-                        </div>
-                        {user.email_sent_at && (
-                          <p className="text-xs text-muted-foreground">
-                            Email sent: {format(new Date(user.email_sent_at), 'MMM d, yyyy')}
-                          </p>
-                        )}
-                        {user.last_login_at && (
-                          <p className="text-xs text-muted-foreground">
-                            Last login: {format(new Date(user.last_login_at), 'MMM d, yyyy')}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => sendInviteEmail(user)}
-                            disabled={sendingInvite === user.id}
-                            title="Send login email"
-                          >
-                            <Send className={`h-3.5 w-3.5 ${sendingInvite === user.id ? 'animate-pulse' : ''}`} />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => loginAsUser(user)}
-                            disabled={impersonating === user.id}
-                            title="Login as this user (Admin view)"
-                          >
-                            <LogIn className={`h-3.5 w-3.5 ${impersonating === user.id ? 'animate-pulse' : ''}`} />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => handleEdit(user)}
-                            title="Edit user"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              setUserToDelete(user);
-                              setDeleteConfirmOpen(true);
-                            }}
-                            title="Delete user"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                        <Switch
-                          checked={user.is_active}
-                          onCheckedChange={() => toggleUserStatus(user.id, user.is_active)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-3">
+            {users.map((user) => (
+              <div 
+                key={user.id} 
+                className="border rounded-lg p-3 bg-card hover:shadow-sm transition-shadow"
+              >
+                {/* User Header */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm">{user.full_name}</p>
+                      <Badge className={getRoleBadgeColor(user.role)}>
+                        {PORTAL_ROLES.find(r => r.value === user.role)?.label || user.role}
+                      </Badge>
+                    </div>
+                    {user.designation && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{user.designation}</p>
+                    )}
+                  </div>
+                  <Switch
+                    checked={user.is_active}
+                    onCheckedChange={() => toggleUserStatus(user.id, user.is_active)}
+                  />
+                </div>
+
+                {/* Contact Info */}
+                <div className="space-y-1 mb-3">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{user.email}</span>
+                  </p>
+                  {user.phone && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Phone className="h-3 w-3 shrink-0" />
+                      {user.phone}
+                    </p>
+                  )}
+                </div>
+
+                {/* Status Row */}
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  {getStatusBadge(user.user_status || 'initiated')}
+                  {user.is_active ? (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs dark:bg-green-950 dark:text-green-300 dark:border-green-800">
+                      Enabled
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
+                      Pending
+                    </Badge>
+                  )}
+                  {user.user_level && (
+                    <span className="text-xs text-muted-foreground">
+                      {USER_LEVELS.find(l => l.value === user.user_level)?.label || user.user_level}
+                    </span>
+                  )}
+                </div>
+
+                {/* Meta Info */}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 flex-wrap">
+                  {user.email_sent_at && (
+                    <span>Email sent: {format(new Date(user.email_sent_at), 'MMM d')}</span>
+                  )}
+                  {user.last_login_at && (
+                    <span>Last login: {format(new Date(user.last_login_at), 'MMM d')}</span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 pt-2 border-t">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1 flex-1"
+                    onClick={() => sendInviteEmail(user)}
+                    disabled={sendingInvite === user.id}
+                  >
+                    <Send className={`h-3.5 w-3.5 ${sendingInvite === user.id ? 'animate-pulse' : ''}`} />
+                    <span className="hidden xs:inline">Send Invite</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1 flex-1"
+                    onClick={() => loginAsUser(user)}
+                    disabled={impersonating === user.id}
+                  >
+                    <LogIn className={`h-3.5 w-3.5 ${impersonating === user.id ? 'animate-pulse' : ''}`} />
+                    <span className="hidden xs:inline">Portal</span>
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => handleEdit(user)}
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={() => {
+                      setUserToDelete(user);
+                      setDeleteConfirmOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
