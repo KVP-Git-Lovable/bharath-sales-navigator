@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Layout } from "@/components/Layout";
-import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown } from "lucide-react";
+import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,29 +32,64 @@ export const AddRetailer = () => {
   const connectivityStatus = useConnectivity();
   const returnTo = location.state?.returnTo || '/my-retailers';
   const plannedBeats = location.state?.plannedBeats || [];
-  const [retailerData, setRetailerData] = useState({
-    name: "",
-    contactName: "",
-    contactTitle: "",
-    gstNumber: "",
-    phone: "",
-    address: "",
-    category: "",
-    notes: "",
-    parentType: "Distributor", // Default to Distributor
-    parentName: "BHARATH BEVERAGES",
-    selectedDistributors: [] as string[], // Array for multiple distributors
-    locationTag: "",
-    retailType: "",
-    potential: "",
-    competitor1: "",
-    competitor2: "",
-    competitor3: "",
-    latitude: "",
-    longitude: "",
-    photo_url: "",
-    manual_credit_score: "",
-    state: ""
+  
+  // Edit mode: check if retailer data is passed via location state
+  const editingRetailer = location.state?.retailer as any | null;
+  const isEditMode = !!editingRetailer;
+  
+  const [retailerData, setRetailerData] = useState(() => {
+    if (editingRetailer) {
+      // Pre-fill form with existing retailer data
+      const competitors = editingRetailer.competitors || [];
+      return {
+        name: editingRetailer.name || "",
+        contactName: editingRetailer.contact_name || "",
+        contactTitle: editingRetailer.contact_title || "",
+        gstNumber: editingRetailer.gst_number || "",
+        phone: editingRetailer.phone || "",
+        address: editingRetailer.address || "",
+        category: editingRetailer.category || "",
+        notes: editingRetailer.notes || "",
+        parentType: editingRetailer.parent_type || "Distributor",
+        parentName: editingRetailer.parent_name || "",
+        selectedDistributors: [] as string[], // Will be populated after distributors load
+        locationTag: editingRetailer.location_tag || "",
+        retailType: editingRetailer.retail_type || "",
+        potential: editingRetailer.potential ? editingRetailer.potential.charAt(0).toUpperCase() + editingRetailer.potential.slice(1) : "",
+        competitor1: competitors[0] || "",
+        competitor2: competitors[1] || "",
+        competitor3: competitors[2] || "",
+        latitude: editingRetailer.latitude?.toString() || "",
+        longitude: editingRetailer.longitude?.toString() || "",
+        photo_url: editingRetailer.photo_url || "",
+        manual_credit_score: editingRetailer.manual_credit_score?.toString() || "",
+        state: editingRetailer.state || ""
+      };
+    }
+    return {
+      name: "",
+      contactName: "",
+      contactTitle: "",
+      gstNumber: "",
+      phone: "",
+      address: "",
+      category: "",
+      notes: "",
+      parentType: "Distributor",
+      parentName: "BHARATH BEVERAGES",
+      selectedDistributors: [] as string[],
+      locationTag: "",
+      retailType: "",
+      potential: "",
+      competitor1: "",
+      competitor2: "",
+      competitor3: "",
+      latitude: "",
+      longitude: "",
+      photo_url: "",
+      manual_credit_score: "",
+      state: ""
+    };
   });
   
   // State to track the scanned board photo URL
@@ -325,14 +360,30 @@ export const AddRetailer = () => {
     return () => window.removeEventListener('beatCreated', handleBeatCreated);
   }, [user]);
 
-  // Auto-select beat if coming from My Visits with planned beat(s)
+  // Auto-select beat if coming from My Visits with planned beat(s) or editing
   useEffect(() => {
-    if (plannedBeats.length > 0 && !selectedBeat) {
+    if (isEditMode && editingRetailer?.beat_id && !selectedBeat) {
+      setSelectedBeat(editingRetailer.beat_id);
+    } else if (plannedBeats.length > 0 && !selectedBeat) {
       // If only one beat planned, auto-select it
       // If multiple beats, auto-select the first one
       setSelectedBeat(plannedBeats[0].beat_id);
     }
-  }, [plannedBeats, selectedBeat]);
+  }, [plannedBeats, selectedBeat, isEditMode, editingRetailer]);
+
+  // Set territory when in edit mode
+  useEffect(() => {
+    if (isEditMode && editingRetailer?.territory_id) {
+      setSelectedTerritoryId(editingRetailer.territory_id);
+    }
+  }, [isEditMode, editingRetailer]);
+  
+  // Set photo preview when editing
+  useEffect(() => {
+    if (isEditMode && editingRetailer?.photo_url) {
+      setCapturedPhotoPreview(editingRetailer.photo_url);
+    }
+  }, [isEditMode, editingRetailer]);
 
   const loadCreditConfig = async () => {
     try {
@@ -672,7 +723,6 @@ export const AddRetailer = () => {
     setIsSaving(true);
     
     const payload: any = {
-      user_id: user.id,
       name: retailerData.name,
       contact_name: retailerData.contactName || null,
       contact_title: retailerData.contactTitle || null,
@@ -683,7 +733,6 @@ export const AddRetailer = () => {
       beat_id: beatId,
       beat_name: beats.find(b => b.beat_id === beatId)?.beat_name || null,
       territory_id: selectedTerritoryId || null,
-      status: 'active',
       notes: retailerData.notes || null,
       parent_type: retailerData.parentType || null,
       parent_name: retailerData.parentName || null,
@@ -698,28 +747,59 @@ export const AddRetailer = () => {
       state: retailerData.state || null,
     };
 
-    const result = await createRetailer(payload);
-    setIsSaving(false);
-
-    if (result.success) {
-      const message = result.offline 
-        ? `${retailerData.name} saved offline. Will sync when online.`
-        : `${retailerData.name} saved successfully.`;
-      
-      toast({ 
-        title: result.offline ? 'Retailer Saved Offline' : 'Retailer Added', 
-        description: message,
-        action: result.offline ? <WifiOff className="h-4 w-4" /> : undefined
-      });
-      
-      // Navigate back to the return path
-      navigate(returnTo, { replace: true });
+    if (isEditMode && editingRetailer?.id) {
+      // Update existing retailer
+      try {
+        const { error } = await supabase
+          .from('retailers')
+          .update(payload)
+          .eq('id', editingRetailer.id);
+        
+        setIsSaving(false);
+        
+        if (error) throw error;
+        
+        toast({ 
+          title: 'Retailer Updated', 
+          description: `${retailerData.name} updated successfully.`
+        });
+        navigate(returnTo, { replace: true });
+      } catch (error: any) {
+        console.error('Error updating retailer:', error);
+        toast({ 
+          title: 'Failed to update', 
+          description: error.message || 'Could not update retailer', 
+          variant: 'destructive' 
+        });
+        setIsSaving(false);
+      }
     } else {
-      toast({ 
-        title: 'Failed to save', 
-        description: 'Could not save retailer', 
-        variant: 'destructive' 
-      });
+      // Create new retailer
+      payload.user_id = user.id;
+      payload.status = 'active';
+      
+      const result = await createRetailer(payload);
+      setIsSaving(false);
+
+      if (result.success) {
+        const message = result.offline 
+          ? `${retailerData.name} saved offline. Will sync when online.`
+          : `${retailerData.name} saved successfully.`;
+        
+        toast({ 
+          title: result.offline ? 'Retailer Saved Offline' : 'Retailer Added', 
+          description: message,
+          action: result.offline ? <WifiOff className="h-4 w-4" /> : undefined
+        });
+        
+        navigate(returnTo, { replace: true });
+      } else {
+        toast({ 
+          title: 'Failed to save', 
+          description: 'Could not save retailer', 
+          variant: 'destructive' 
+        });
+      }
     }
   };
 
@@ -800,11 +880,15 @@ export const AddRetailer = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div className="flex items-center gap-3">
               <div>
-                <CardTitle className="text-xl font-bold">{t('retailer.addRetailer')}</CardTitle>
-                <p className="text-primary-foreground/80">{t('retailer.subtitle')}</p>
+                <CardTitle className="text-xl font-bold">
+                  {isEditMode ? t('retailer.editRetailer', 'Edit Retailer') : t('retailer.addRetailer')}
+                </CardTitle>
+                <p className="text-primary-foreground/80">
+                  {isEditMode ? editingRetailer?.name : t('retailer.subtitle')}
+                </p>
               </div>
             </div>
-            <Plus size={24} />
+            {isEditMode ? <Pencil size={24} /> : <Plus size={24} />}
           </CardHeader>
         </Card>
 
