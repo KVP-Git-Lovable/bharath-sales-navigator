@@ -99,7 +99,6 @@ export const useRetailerVisitTracking = ({
   const [timeSpent, setTimeSpent] = useState<number>(0); // in seconds
   const [distance, setDistance] = useState<number | null>(null);
   const currentLogIdRef = useRef<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastCheckedCoordsRef = useRef<string>('');
 
   // Calculate location status when retailer has coordinates
@@ -197,15 +196,9 @@ export const useRetailerVisitTracking = ({
       setLocationStatus('location_unavailable');
     }
 
-    // Calculate time spent
-    if (!log.end_time || log.end_time === log.start_time) {
-      const startTime = new Date(log.start_time).getTime();
-      const now = Date.now();
-      const spent = Math.floor((now - startTime) / 1000);
-      setTimeSpent(spent);
-    } else if (log.time_spent_seconds) {
-      setTimeSpent(log.time_spent_seconds);
-    }
+    // Use stored time_spent_seconds directly (static, not live calculation)
+    // Time spent = end_time - start_time, only updated when actions occur
+    setTimeSpent(log.time_spent_seconds || 0);
   };
 
   // Load existing log for today - OFFLINE FIRST
@@ -271,36 +264,9 @@ export const useRetailerVisitTracking = ({
     }
   }, [userId, retailerId, selectedDate]);
 
-  // Update time spent every second ONLY for active logs (no end_time yet)
-  useEffect(() => {
-    // Only run timer if visit is still active (end_time equals start_time means active)
-    const isActive = currentLog && currentLog.start_time && 
-      (!currentLog.end_time || currentLog.end_time === currentLog.start_time);
-    
-    if (isActive) {
-      intervalRef.current = setInterval(() => {
-        const startTime = new Date(currentLog.start_time).getTime();
-        const now = Date.now();
-        const spent = Math.floor((now - startTime) / 1000);
-        setTimeSpent(spent);
-      }, 1000);
-    } else if (currentLog && currentLog.time_spent_seconds !== null) {
-      // Visit is completed - show the fixed time_spent_seconds
-      setTimeSpent(currentLog.time_spent_seconds);
-      
-      // Clear any running interval
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [currentLog]);
+  // Time spent is calculated ONLY when actions occur (not a live timer)
+  // The timeSpent state is updated directly in recordAction() and restoreStateFromLog()
+  // No interval timer needed - time spent = static difference between start_time and end_time
 
   // Update last activity time for current retailer (call this on any user interaction)
   const updateLastActivity = useCallback(() => {
