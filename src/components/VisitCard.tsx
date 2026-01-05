@@ -2619,23 +2619,29 @@ export const VisitCard = ({
                 </div>
               </div>
             </div>}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <MapPin size={12} className="sm:size-3.5 flex-shrink-0" />
-            <a href={`https://www.google.com/maps/search/?api=1&query=${visit.retailerLat && visit.retailerLng ? `${visit.retailerLat},${visit.retailerLng}` : encodeURIComponent(visit.address || '')}`} target="_blank" rel="noopener noreferrer" className="truncate text-primary hover:underline cursor-pointer" onClick={e => e.stopPropagation()} title="Open in Google Maps">
-  {visit.address}
+          <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground">
+            <a 
+              href={`https://www.google.com/maps/search/?api=1&query=${visit.retailerLat && visit.retailerLng ? `${visit.retailerLat},${visit.retailerLng}` : encodeURIComponent(visit.address || '')}`} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-primary hover:text-primary/80 cursor-pointer p-1.5 rounded-full hover:bg-primary/10 transition-colors" 
+              onClick={e => e.stopPropagation()} 
+              title="Open in Google Maps"
+            >
+              <MapPin size={16} className="sm:size-5" />
             </a>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <a href={`tel:${(visit.phone || '').replace(/\s+/g, '')}`} className="flex items-center gap-1 text-primary hover:underline cursor-pointer" onClick={e => {
-              e.stopPropagation();
-              const cleaned = (visit.phone || '').replace(/\s+/g, '');
-              if (cleaned) window.location.href = `tel:${cleaned}`;
-            }} title="Call">
-                <Phone size={12} className="sm:size-3.5" />
-                <span>{visit.contactName ? `${visit.contactName} - ` : ''}{visit.phone}</span>
-              </a>
-            </div>
+            <a 
+              href={`tel:${(visit.phone || '').replace(/\s+/g, '')}`} 
+              className="text-primary hover:text-primary/80 cursor-pointer p-1.5 rounded-full hover:bg-primary/10 transition-colors" 
+              onClick={e => {
+                e.stopPropagation();
+                const cleaned = (visit.phone || '').replace(/\s+/g, '');
+                if (cleaned) window.location.href = `tel:${cleaned}`;
+              }} 
+              title="Call"
+            >
+              <Phone size={16} className="sm:size-5" />
+            </a>
           </div>
         </div>
 
