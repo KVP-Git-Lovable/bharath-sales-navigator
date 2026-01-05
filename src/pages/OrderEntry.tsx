@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Package, Gift, ArrowLeft, Plus, Check, Grid3X3, Table, Minus, ChevronDown, ChevronRight, Search, X, XCircle, UserX, DoorClosed, Camera, RotateCcw, Star, Sparkles, Target, MessageSquare, Mic } from "lucide-react";
+import { ShoppingCart, Package, Gift, ArrowLeft, Plus, Check, Grid3X3, Table, Minus, ChevronDown, ChevronRight, Search, X, XCircle, UserX, DoorClosed, Camera, RotateCcw, Star, Sparkles, Target, MessageSquare, Mic, Clock, AlertCircle, Loader2 } from "lucide-react";
+import { hasAttendanceTodayOfflineSupport } from "@/utils/attendanceUtils";
+import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { VoiceOrderAssistant } from "@/components/VoiceOrderAssistant";
 import { SmartBasketButton } from "@/components/SmartBasketButton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -343,6 +345,11 @@ export const OrderEntry = () => {
   // Global check-in capture: track if first interaction has been recorded
   const hasRecordedFirstInteraction = useRef(false);
 
+  // Attendance gate state - block order entry until attendance is marked
+  const [attendanceChecked, setAttendanceChecked] = useState(false);
+  const [hasAttendance, setHasAttendance] = useState(false);
+  const [checkingAttendance, setCheckingAttendance] = useState(true);
+
   // Function to set retailer location from current GPS
   const setRetailerLocation = async () => {
     if (!validRetailerId) {
@@ -424,6 +431,42 @@ export const OrderEntry = () => {
     userId: userId || '',
     selectedDate: getLocalDateString()
   });
+
+  // Check attendance on mount - OFFLINE FIRST
+  useEffect(() => {
+    const checkAttendance = async () => {
+      if (!userId) {
+        setCheckingAttendance(false);
+        return;
+      }
+      
+      try {
+        // Use offline-first check - checks Supabase first, falls back to cache
+        const hasMarkedAttendance = await hasAttendanceTodayOfflineSupport(userId);
+        setHasAttendance(hasMarkedAttendance);
+        setAttendanceChecked(true);
+      } catch (error) {
+        console.error('Error checking attendance:', error);
+        // If check fails, also check offline storage directly as fallback
+        try {
+          await offlineStorage.init();
+          const cachedAttendance = await offlineStorage.getAll(STORES.ATTENDANCE);
+          const todayStr = new Date().toISOString().split('T')[0];
+          const hasLocal = cachedAttendance.some(
+            (a: any) => a.user_id === userId && a.date === todayStr
+          );
+          setHasAttendance(hasLocal);
+        } catch {
+          setHasAttendance(false);
+        }
+        setAttendanceChecked(true);
+      } finally {
+        setCheckingAttendance(false);
+      }
+    };
+    
+    checkAttendance();
+  }, [userId]);
 
   // Global click handler - ANY click/touch inside Order Entry page triggers check-in
   const handlePageInteraction = useCallback(() => {
@@ -1658,6 +1701,59 @@ export const OrderEntry = () => {
     setFilteredSchemes(productSchemes);
     setShowSchemeModal(true);
   };
+
+  // Show loading while checking attendance
+  if (checkingAttendance) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Checking attendance...</span>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show attendance required dialog if not marked
+  if (attendanceChecked && !hasAttendance) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-600">
+                <AlertCircle className="h-6 w-6" />
+                Attendance Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                You need to mark your attendance before placing orders. 
+                Please start your day first.
+              </p>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => navigate('/attendance')}
+                  className="w-full"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Mark Attendance
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate(-1)}
+                  className="w-full"
+                >
+                  Go Back
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
   return <Layout>
     <div 
       className="min-h-screen bg-background pb-20 pt-2"

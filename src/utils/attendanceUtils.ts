@@ -5,6 +5,7 @@ import { offlineStorage, STORES } from '@/lib/offlineStorage';
  * Marks attendance for today and also checks in to all planned visits
  * This ensures that either "Day Started" or "Visit Check-in" can be used interchangeably
  * Uses high-accuracy GPS for precise location tracking
+ * OFFLINE-FIRST: Saves to offline storage immediately for instant access
  */
 export const markDayStarted = async (
   userId: string,
@@ -14,8 +15,30 @@ export const markDayStarted = async (
   const today = new Date().toISOString().split('T')[0];
   const timestamp = new Date().toISOString();
 
-  // First, mark attendance
-  const { error: attendanceError } = await supabase
+  // Create attendance record
+  const attendanceRecord = {
+    id: `local_${Date.now()}`, // Local ID for immediate cache
+    user_id: userId,
+    date: today,
+    check_in_time: timestamp,
+    check_in_location: location,
+    check_in_address: `${location.latitude}, ${location.longitude}`,
+    check_in_photo_url: photoPath,
+    status: 'present',
+    cached_at: timestamp
+  };
+
+  // INSTANT: Save to offline storage first (for offline gate check)
+  try {
+    await offlineStorage.init();
+    await offlineStorage.save(STORES.ATTENDANCE, attendanceRecord);
+    console.log('📍 Attendance saved to offline storage for instant access');
+  } catch (err) {
+    console.log('Offline attendance save failed (non-critical):', err);
+  }
+
+  // Then sync to Supabase
+  const { data, error: attendanceError } = await supabase
     .from('attendance')
     .insert({
       user_id: userId,
@@ -25,9 +48,27 @@ export const markDayStarted = async (
       check_in_address: `${location.latitude}, ${location.longitude}`,
       check_in_photo_url: photoPath,
       status: 'present'
-    });
+    })
+    .select()
+    .single();
 
-  if (attendanceError) throw attendanceError;
+  if (attendanceError) {
+    // If Supabase fails, queue for sync - local cache already has the record
+    await offlineStorage.addToSyncQueue('CREATE_ATTENDANCE', {
+      user_id: userId,
+      date: today,
+      check_in_time: timestamp,
+      check_in_location: location,
+      check_in_address: `${location.latitude}, ${location.longitude}`,
+      check_in_photo_url: photoPath,
+      status: 'present'
+    });
+    console.log('📍 Attendance queued for sync');
+  } else if (data) {
+    // Update offline storage with real database ID
+    await offlineStorage.save(STORES.ATTENDANCE, { ...data, cached_at: timestamp });
+    console.log('📍 Attendance synced and cache updated with real ID');
+  }
 
   // Then, check in to all planned visits for today automatically
   const { data: plannedVisits } = await supabase
