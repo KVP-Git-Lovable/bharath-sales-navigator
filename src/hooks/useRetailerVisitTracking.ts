@@ -177,45 +177,91 @@ export const useRetailerVisitTracking = ({
     }
   }, []);
 
-  // Load existing log for today
+  // Helper to check if ID is locally-generated
+  const isLocalId = (id: string): boolean => {
+    return id.startsWith('offline_') || id.startsWith('local_') || id.startsWith('temp_');
+  };
+
+  // Helper to restore state from a log
+  const restoreStateFromLog = (log: VisitLog) => {
+    setCurrentLog(log);
+    currentLogIdRef.current = log.id;
+    
+    // Restore distance and location status
+    if (log.distance_meters !== null) {
+      setDistance(log.distance_meters);
+    }
+    if (log.location_status) {
+      setLocationStatus(log.location_status as 'at_store' | 'within_range' | 'not_at_store' | 'location_unavailable');
+    } else {
+      setLocationStatus('location_unavailable');
+    }
+
+    // Calculate time spent
+    if (!log.end_time || log.end_time === log.start_time) {
+      const startTime = new Date(log.start_time).getTime();
+      const now = Date.now();
+      const spent = Math.floor((now - startTime) / 1000);
+      setTimeSpent(spent);
+    } else if (log.time_spent_seconds) {
+      setTimeSpent(log.time_spent_seconds);
+    }
+  };
+
+  // Load existing log for today - OFFLINE FIRST
   useEffect(() => {
     const loadTodayLog = async () => {
-      const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+      const targetDate = selectedDate || getLocalTodayDate();
       
-      const { data, error } = await supabase
-        .from('retailer_visit_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('retailer_id', retailerId)
-        .eq('visit_date', targetDate)
-        .order('start_time', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
-        const log = data as VisitLog;
-        setCurrentLog(log);
-        currentLogIdRef.current = log.id;
+      // 1. INSTANT: Try offline storage first
+      try {
+        const allLocalLogs = await offlineStorage.getAll<VisitLog>(STORES.RETAILER_VISIT_LOGS);
+        const localLog = allLocalLogs
+          .filter(log => 
+            log.retailer_id === retailerId && 
+            log.user_id === userId && 
+            log.visit_date === targetDate
+          )
+          .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())[0];
         
-        // Restore distance and location status
-        if (log.distance_meters !== null) {
-          setDistance(log.distance_meters);
+        if (localLog) {
+          console.log('📍 Loaded visit log from local storage:', localLog.id);
+          restoreStateFromLog(localLog);
         }
-        if (log.location_status) {
-          setLocationStatus(log.location_status as 'at_store' | 'within_range' | 'not_at_store' | 'location_unavailable');
-        } else {
-          // Fallback to location_unavailable when status is missing
-          setLocationStatus('location_unavailable');
-        }
-
-        // Calculate time spent if still active (no end_time)
-        if (!log.end_time) {
-          const startTime = new Date(log.start_time).getTime();
-          const now = Date.now();
-          const spent = Math.floor((now - startTime) / 1000);
-          setTimeSpent(spent);
-        } else if (log.time_spent_seconds) {
-          setTimeSpent(log.time_spent_seconds);
+      } catch (err) {
+        console.log('📍 Local log load failed (non-critical):', err);
+      }
+      
+      // 2. BACKGROUND: Sync from network (don't block UI)
+      if (navigator.onLine) {
+        try {
+          const { data, error } = await supabase
+            .from('retailer_visit_logs')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('retailer_id', retailerId)
+            .eq('visit_date', targetDate)
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (!error && data) {
+            const networkLog = data as VisitLog;
+            
+            // Save to local storage for offline access
+            await offlineStorage.save(STORES.RETAILER_VISIT_LOGS, networkLog);
+            
+            // Update state if network log is newer or local log is missing
+            const currentLogTime = currentLogIdRef.current ? 
+              (await offlineStorage.getById<VisitLog>(STORES.RETAILER_VISIT_LOGS, currentLogIdRef.current))?.start_time : null;
+            
+            if (!currentLogTime || new Date(networkLog.start_time) >= new Date(currentLogTime)) {
+              restoreStateFromLog(networkLog);
+              console.log('📍 Updated from network log:', networkLog.id);
+            }
+          }
+        } catch (networkErr) {
+          console.log('📍 Network log fetch failed (non-critical):', networkErr);
         }
       }
     };
@@ -421,7 +467,7 @@ export const useRetailerVisitTracking = ({
         }
 
         // If already tracking for this retailer today, just update last activity time
-        if (currentLogIdRef.current && !currentLogIdRef.current.startsWith('offline_')) {
+        if (currentLogIdRef.current && !isLocalId(currentLogIdRef.current)) {
           // Update the end_time to current time (latest activity)
           const { data: existingLog } = await supabase
             .from('retailer_visit_logs')
@@ -511,7 +557,7 @@ export const useRetailerVisitTracking = ({
       } catch (error) {
         console.error('Failed to update activity offline:', error);
       }
-    } else if (!currentLogIdRef.current.startsWith('offline_')) {
+    } else if (!isLocalId(currentLogIdRef.current)) {
       // Update in Supabase
       try {
         const { data: existingLog } = await supabase
