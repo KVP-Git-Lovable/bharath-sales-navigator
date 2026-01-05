@@ -270,7 +270,24 @@ export const MyRetailers = () => {
   } = usePagination(filtered, { pageSize: 10 });
 
   const beats = useMemo(() => {
-    return [...new Set(retailers.map(r => r.beat_id))].filter(Boolean).sort();
+    // Create a map of beat_id -> beat_name from all retailers
+    const beatMap = new Map<string, string>();
+    retailers.forEach(r => {
+      if (r.beat_id) {
+        // Prioritize beat_name if available, otherwise use beat_id as fallback
+        const currentName = beatMap.get(r.beat_id);
+        const newName = r.beat_name || r.beat_id;
+        // Prefer actual names over beat_id-style strings
+        if (!currentName || (currentName.startsWith('beat_') && !newName.startsWith('beat_'))) {
+          beatMap.set(r.beat_id, newName);
+        }
+      }
+    });
+    
+    // Convert to array of objects sorted by display name
+    return Array.from(beatMap.entries())
+      .map(([beat_id, beat_name]) => ({ beat_id, beat_name }))
+      .sort((a, b) => a.beat_name.localeCompare(b.beat_name));
   }, [retailers]);
 
   const openEdit = (retailer: Retailer) => {
@@ -622,7 +639,7 @@ export const MyRetailers = () => {
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
                     {beats.map(b => (
-                      <SelectItem key={b} value={b}>{b}</SelectItem>
+                      <SelectItem key={b.beat_id} value={b.beat_id}>{b.beat_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
