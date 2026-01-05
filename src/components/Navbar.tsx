@@ -1,6 +1,6 @@
 import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,24 @@ export const Navbar = memo(() => {
     setIsMenuOpen(false);
   }, []);
 
+  // Handle back navigation with debounce to prevent double-click issues
+  const isNavigatingRef = useRef(false);
+  const handleBackClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Prevent double navigation
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    
+    navigate(-1);
+    
+    // Reset after navigation completes
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 300);
+  }, [navigate]);
+
   return (
     <>
       {/* Navbar - positioned below safe area top */}
@@ -107,9 +125,9 @@ export const Navbar = memo(() => {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {showBackButton && (
+            {showBackButton && (
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={handleBackClick}
                   className="p-1 rounded-lg hover:bg-white/10 transition-colors text-white"
                   title="Go back"
                 >
