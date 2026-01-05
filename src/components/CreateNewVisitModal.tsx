@@ -6,11 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Users, MapPin, UserPlus } from "lucide-react";
+import { CalendarIcon, Users, MapPin, UserPlus, WifiOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { offlineStorage, STORES } from "@/lib/offlineStorage";
+import { updateBeatPlanInSnapshot, addRetailerToSnapshot } from "@/lib/myVisitsSnapshot";
+import { useConnectivity } from "@/hooks/useConnectivity";
 
 interface Beat {
   id: string;
@@ -36,6 +39,8 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
   const [jointSalesMember, setJointSalesMember] = useState<string>("");
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string; role: string }>>([]);
   const { user } = useAuth();
+  const connectivityStatus = useConnectivity();
+  const isOnline = connectivityStatus === 'online';
 
   // Reset date and joint sales state when modal opens/closes
   useEffect(() => {
@@ -64,61 +69,95 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
     if (!user) return;
 
     try {
-      // Get all beats created by this user
-      const { data: beatsData, error: beatsError } = await supabase
-        .from('beats')
-        .select('id, beat_id, beat_name, category')
-        .eq('created_by', user.id)
-        .eq('is_active', true);
+      // Try to load from offline cache first for instant display
+      const cachedBeats = await offlineStorage.getAll<any>(STORES.BEATS);
+      if (cachedBeats && cachedBeats.length > 0) {
+        const beatsFromCache = cachedBeats
+          .filter((b: any) => b.created_by === user.id && b.is_active !== false)
+          .map((b: any) => ({
+            id: b.beat_id || b.id,
+            name: b.beat_name || b.name,
+            retailerCount: b.retailerCount || 0,
+            category: b.category || '',
+            priority: b.priority || ''
+          }));
+        if (beatsFromCache.length > 0) {
+          setAvailableBeats(beatsFromCache);
+        }
+      }
 
-      if (beatsError) throw beatsError;
+      // If online, fetch fresh data
+      if (isOnline) {
+        // Get all beats created by this user
+        const { data: beatsData, error: beatsError } = await supabase
+          .from('beats')
+          .select('id, beat_id, beat_name, category')
+          .eq('created_by', user.id)
+          .eq('is_active', true);
 
-      // Get all retailers grouped by beat
-      const { data: retailers, error } = await supabase
-        .from('retailers')
-        .select('beat_id, category, priority')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
+        if (beatsError) throw beatsError;
 
-      if (error) throw error;
+        // Get all retailers grouped by beat
+        const { data: retailers, error } = await supabase
+          .from('retailers')
+          .select('beat_id, category, priority')
+          .eq('user_id', user.id)
+          .eq('status', 'active');
 
-      // Create a map of beat_id to beat_name
-      const beatNameMap = new Map<string, string>();
-      (beatsData || []).forEach(beat => {
-        beatNameMap.set(beat.beat_id, beat.beat_name);
-      });
+        if (error) throw error;
 
-      // Group retailers by beat and create beat objects
-      const beatMap = new Map<string, { retailerCount: number; category: string; priority: string }>();
-      
-      (retailers || []).forEach(retailer => {
-        const beatId = retailer.beat_id;
-        if (!beatId || beatId === 'unassigned') return;
-        
-        const existing = beatMap.get(beatId) || { retailerCount: 0, category: '', priority: '' };
-        beatMap.set(beatId, {
-          retailerCount: existing.retailerCount + 1,
-          category: retailer.category || '',
-          priority: retailer.priority || ''
+        // Create a map of beat_id to beat_name
+        const beatNameMap = new Map<string, string>();
+        (beatsData || []).forEach(beat => {
+          beatNameMap.set(beat.beat_id, beat.beat_name);
         });
-      });
 
-      const beats: Beat[] = Array.from(beatMap.entries()).map(([beatId, data]) => ({
-        id: beatId,
-        name: beatNameMap.get(beatId) || beatId, // Use beat_name from beats table, fallback to beatId
-        retailerCount: data.retailerCount,
-        category: data.category,
-        priority: data.priority
-      }));
+        // Group retailers by beat and create beat objects
+        const beatMap = new Map<string, { retailerCount: number; category: string; priority: string }>();
+        
+        (retailers || []).forEach(retailer => {
+          const beatId = retailer.beat_id;
+          if (!beatId || beatId === 'unassigned') return;
+          
+          const existing = beatMap.get(beatId) || { retailerCount: 0, category: '', priority: '' };
+          beatMap.set(beatId, {
+            retailerCount: existing.retailerCount + 1,
+            category: retailer.category || '',
+            priority: retailer.priority || ''
+          });
+        });
 
-      setAvailableBeats(beats);
+        const beats: Beat[] = Array.from(beatMap.entries()).map(([beatId, data]) => ({
+          id: beatId,
+          name: beatNameMap.get(beatId) || beatId,
+          retailerCount: data.retailerCount,
+          category: data.category,
+          priority: data.priority
+        }));
+
+        setAvailableBeats(beats);
+
+        // Cache beats for offline use
+        for (const beat of beatsData || []) {
+          const beatWithCount = {
+            ...beat,
+            retailerCount: beatMap.get(beat.beat_id)?.retailerCount || 0,
+            priority: beatMap.get(beat.beat_id)?.priority || '',
+            created_by: user.id
+          };
+          await offlineStorage.save(STORES.BEATS, beatWithCount);
+        }
+      }
     } catch (error) {
       console.error('Error loading beats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load available beats",
-        variant: "destructive"
-      });
+      // Only show error if no cached data available
+      if (availableBeats.length === 0) {
+        toast({
+          title: "Error",
+          description: "Failed to load available beats",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -166,52 +205,123 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
     try {
       const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       
-      // Check if beat plan already exists for this date
-      const { data: existingPlan } = await supabase
-        .from('beat_plans')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('beat_id', selectedBeat)
-        .eq('plan_date', formattedDate)
-        .single();
-
-      if (existingPlan) {
-        toast({
-          title: "Beat Already Planned",
-          description: "This beat is already planned for the selected date",
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
-      }
-
       // Get beat details
       const selectedBeatData = availableBeats.find(b => b.id === selectedBeat);
       const beatDisplayName = selectedBeatData?.name || selectedBeat;
       
-      // Create beat plan
-      const { error } = await supabase
-        .from('beat_plans')
-        .insert({
-          user_id: user.id,
-          beat_id: selectedBeat,
-          beat_name: beatDisplayName,
-          plan_date: formattedDate,
-          joint_sales_manager_id: isJointSales ? jointSalesMember : null,
-          beat_data: {
-            id: selectedBeat,
-            name: beatDisplayName,
-            retailerCount: selectedBeatData?.retailerCount || 0,
-            category: selectedBeatData?.category || '',
-            priority: selectedBeatData?.priority || ''
-          }
-        });
+      const beatPlanData = {
+        user_id: user.id,
+        beat_id: selectedBeat,
+        beat_name: beatDisplayName,
+        plan_date: formattedDate,
+        joint_sales_manager_id: isJointSales ? jointSalesMember : null,
+        beat_data: {
+          id: selectedBeat,
+          name: beatDisplayName,
+          retailerCount: selectedBeatData?.retailerCount || 0,
+          category: selectedBeatData?.category || '',
+          priority: selectedBeatData?.priority || ''
+        }
+      };
 
-      if (error) throw error;
+      let createdPlan: any = null;
+
+      if (isOnline) {
+        // Check if beat plan already exists for this date (online only)
+        const { data: existingPlan } = await supabase
+          .from('beat_plans')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('beat_id', selectedBeat)
+          .eq('plan_date', formattedDate)
+          .single();
+
+        if (existingPlan) {
+          toast({
+            title: "Beat Already Planned",
+            description: "This beat is already planned for the selected date",
+            variant: "destructive"
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Create beat plan online
+        const { data, error } = await supabase
+          .from('beat_plans')
+          .insert(beatPlanData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        createdPlan = data;
+      } else {
+        // Offline mode - check local storage for duplicates
+        const cachedPlans = await offlineStorage.getAll<any>(STORES.BEAT_PLANS);
+        const existingLocal = cachedPlans?.find(
+          (p: any) => p.user_id === user.id && p.beat_id === selectedBeat && p.plan_date === formattedDate
+        );
+
+        if (existingLocal) {
+          toast({
+            title: "Beat Already Planned",
+            description: "This beat is already planned for the selected date",
+            variant: "destructive"
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Create local beat plan with temporary ID
+        createdPlan = {
+          ...beatPlanData,
+          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          _offline: true
+        };
+
+        // Add to sync queue for later sync
+        await offlineStorage.addToSyncQueue('CREATE_BEAT_PLAN', createdPlan);
+      }
+
+      // Save to offline storage for immediate access
+      if (createdPlan) {
+        await offlineStorage.save(STORES.BEAT_PLANS, createdPlan);
+        
+        // Update snapshot cache for instant UI refresh
+        await updateBeatPlanInSnapshot(user.id, formattedDate, createdPlan);
+        
+        // Fetch and cache retailers for this beat
+        if (isOnline) {
+          const { data: beatRetailers } = await supabase
+            .from('retailers')
+            .select('*')
+            .eq('beat_id', selectedBeat)
+            .eq('status', 'active');
+            
+          if (beatRetailers) {
+            for (const retailer of beatRetailers) {
+              await offlineStorage.save(STORES.RETAILERS, retailer);
+              await addRetailerToSnapshot(user.id, formattedDate, retailer);
+            }
+          }
+        } else {
+          // Try to get retailers from cache when offline
+          const cachedRetailers = await offlineStorage.getAll<any>(STORES.RETAILERS);
+          const beatRetailers = cachedRetailers?.filter((r: any) => r.beat_id === selectedBeat && r.status === 'active') || [];
+          for (const retailer of beatRetailers) {
+            await addRetailerToSnapshot(user.id, formattedDate, retailer);
+          }
+        }
+      }
+
+      // Dispatch event to trigger My Visits UI refresh
+      window.dispatchEvent(new Event('visitDataChanged'));
 
       toast({
         title: "Visit Created",
-        description: `Successfully planned ${beatDisplayName} for ${format(selectedDate, 'PPP')}`,
+        description: `Successfully planned ${beatDisplayName} for ${format(selectedDate, 'PPP')}${!isOnline ? ' (will sync when online)' : ''}`,
       });
 
       onVisitCreated?.();
@@ -235,6 +345,12 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5" />
             Create New Visit
+            {!isOnline && (
+              <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-700 border-orange-300">
+                <WifiOff className="h-3 w-3 mr-1" />
+                Offline
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -284,10 +400,11 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
             />
           </div>
 
-          <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg">
+          <div className={`flex items-center space-x-2 p-3 bg-muted/30 rounded-lg ${!isOnline ? 'opacity-50' : ''}`}>
             <Checkbox 
               id="jointSales" 
               checked={isJointSales}
+              disabled={!isOnline}
               onCheckedChange={(checked) => {
                 setIsJointSales(checked === true);
                 if (!checked) setJointSalesMember("");
@@ -298,6 +415,7 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
               Joint Sales Visit
+              {!isOnline && <span className="text-xs text-muted-foreground ml-1">(online only)</span>}
             </label>
           </div>
 
