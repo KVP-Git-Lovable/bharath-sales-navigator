@@ -6,13 +6,15 @@ import { getLocalTodayDate } from '@/utils/dateUtils';
 interface VisitLog {
   id: string;
   retailer_id: string;
+  user_id?: string;
   start_time: string;
   end_time: string | null;
   time_spent_seconds: number | null;
   distance_meters: number | null;
   location_status: 'at_store' | 'within_range' | 'not_at_store' | 'location_unavailable';
-  action_type: 'order' | 'feedback' | 'ai' | 'phone_order';
-  is_phone_order: boolean;
+  action_type: string;
+  is_phone_order?: boolean;
+  visit_date?: string;
 }
 
 interface UseRetailerVisitTrackingProps {
@@ -49,6 +51,36 @@ const getLocationStatus = (distance: number | null): 'at_store' | 'within_range'
   if (distance <= 15) return 'at_store';
   if (distance <= 50) return 'within_range';
   return 'not_at_store';
+};
+
+// Get GPS with timeout (non-blocking, max 5s)
+const getGPSWithTimeout = async (timeoutMs: number = 5000): Promise<{ lat: number; lng: number; distance: number | null; status: 'at_store' | 'within_range' | 'not_at_store' | 'location_unavailable' } | null> => {
+  if (!navigator.geolocation) return null;
+  
+  try {
+    const position = await Promise.race([
+      new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: timeoutMs,
+          maximumAge: 60000 // Allow cached position up to 1 minute
+        });
+      }),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('GPS timeout')), timeoutMs)
+      )
+    ]);
+    
+    return {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+      distance: null,
+      status: 'location_unavailable'
+    };
+  } catch (error) {
+    console.log('📍 GPS timeout or error:', error);
+    return null;
+  }
 };
 
 // Global storage for last activity time per retailer (persists across hook instances)
@@ -606,6 +638,107 @@ export const useRetailerVisitTracking = ({
     }
   }, [retailerLat, retailerLng]);
 
+  // NEW: Unified action recording - captures check-in on first action, check-out on subsequent
+  const recordAction = useCallback(async (actionType: string): Promise<void> => {
+    const targetDate = selectedDate || getLocalTodayDate();
+    const currentTime = new Date().toISOString(); // Device time only - no network
+    
+    // Update last activity time immediately
+    lastActivityTimeByRetailer.set(retailerId, currentTime);
+    
+    if (!currentLogIdRef.current) {
+      // FIRST ACTION = CHECK-IN
+      console.log('📍 First action - capturing check-in time:', currentTime);
+      
+      const logId = `local_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
+      // Get GPS in background (non-blocking, 5s timeout)
+      let gpsData: { lat: number; lng: number; distance: number | null; status: 'at_store' | 'within_range' | 'not_at_store' | 'location_unavailable' } | null = null;
+      let calculatedDistance: number | null = null;
+      let status: 'at_store' | 'within_range' | 'not_at_store' | 'location_unavailable' = 'location_unavailable';
+      
+      try {
+        gpsData = await getGPSWithTimeout(5000);
+        if (gpsData && retailerLat && retailerLng) {
+          calculatedDistance = calculateDistance(gpsData.lat, gpsData.lng, retailerLat, retailerLng);
+          status = getLocationStatus(calculatedDistance);
+          setDistance(calculatedDistance);
+          setLocationStatus(status);
+        }
+      } catch (e) {
+        console.log('📍 GPS capture failed, continuing with location_unavailable');
+      }
+      
+      const logData: VisitLog = {
+        id: logId,
+        user_id: userId,
+        retailer_id: retailerId,
+        start_time: currentTime,
+        end_time: currentTime, // Same as start initially
+        distance_meters: calculatedDistance,
+        location_status: status,
+        action_type: actionType,
+        is_phone_order: actionType === 'phone_order',
+        visit_date: targetDate,
+        time_spent_seconds: 0
+      };
+      
+      // INSTANT: Save to offline storage first (no network)
+      await offlineStorage.save(STORES.RETAILER_VISIT_LOGS, logData);
+      
+      // Update state immediately
+      setCurrentLog(logData);
+      currentLogIdRef.current = logId;
+      setTimeSpent(0);
+      
+      // BACKGROUND: Queue for sync (non-blocking)
+      offlineStorage.addToSyncQueue('CREATE_VISIT_LOG', {
+        ...logData,
+        start_latitude: gpsData?.lat || null,
+        start_longitude: gpsData?.lng || null
+      }).catch(err => console.log('Queue error (non-fatal):', err));
+      
+      console.log('✅ Check-in recorded locally:', { logId, actionType, time: currentTime });
+    } else {
+      // SUBSEQUENT ACTION = UPDATE CHECK-OUT
+      console.log('📍 Subsequent action - updating check-out time:', currentTime);
+      
+      try {
+        const existingLog = await offlineStorage.getById<VisitLog>(STORES.RETAILER_VISIT_LOGS, currentLogIdRef.current);
+        if (existingLog) {
+          const startTimeMs = new Date(existingLog.start_time).getTime();
+          const endTimeMs = new Date(currentTime).getTime();
+          const timeSpentSeconds = Math.max(0, Math.floor((endTimeMs - startTimeMs) / 1000));
+          
+          const updatedLog: VisitLog = {
+            ...existingLog,
+            end_time: currentTime,
+            time_spent_seconds: timeSpentSeconds
+          };
+          
+          // Save updated log locally
+          await offlineStorage.save(STORES.RETAILER_VISIT_LOGS, updatedLog);
+          setCurrentLog(updatedLog);
+          setTimeSpent(timeSpentSeconds);
+          
+          // Queue update for background sync
+          offlineStorage.addToSyncQueue('UPDATE_VISIT_LOG', {
+            id: currentLogIdRef.current,
+            user_id: userId,
+            retailer_id: retailerId,
+            visit_date: targetDate,
+            end_time: currentTime,
+            time_spent_seconds: timeSpentSeconds
+          }).catch(err => console.log('Queue error (non-fatal):', err));
+          
+          console.log('✅ Check-out updated locally:', { timeSpentSeconds, time: currentTime });
+        }
+      } catch (error) {
+        console.log('Failed to update check-out (non-fatal):', error);
+      }
+    }
+  }, [userId, retailerId, retailerLat, retailerLng, selectedDate]);
+
   return {
     currentLog,
     locationStatus,
@@ -616,6 +749,7 @@ export const useRetailerVisitTracking = ({
     endTracking,
     endAllActiveLogs,
     recordActivity,
+    recordAction, // NEW: Unified action recording
     updateLastActivity,
     recheckLocation
   };

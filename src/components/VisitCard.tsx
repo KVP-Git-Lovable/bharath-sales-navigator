@@ -44,6 +44,7 @@ import { RetailerDetailModal } from "./RetailerDetailModal";
 import { FeedbackListView } from "./FeedbackListView";
 import { getLocalTodayDate } from "@/utils/dateUtils";
 import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
+import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
 interface Visit {
   id: string;
   retailerId?: string;
@@ -269,7 +270,8 @@ export const VisitCard = ({
     formattedTimeSpent,
     startTracking,
     endTracking,
-    endAllActiveLogs
+    endAllActiveLogs,
+    recordAction
   } = useRetailerVisitTracking({
     retailerId: visit.retailerId || visit.id,
     retailerLat: visit.retailerLat,
@@ -2212,6 +2214,8 @@ export const VisitCard = ({
       });
     } else {
       setShowNoOrderModal(true);
+      // Record action for time tracking (offline-first, device time)
+      recordAction('no_order').catch(err => console.error('No order tracking failed:', err));
     }
   };
   const handleViewAnalytics = async (visitId: string) => {
@@ -2523,6 +2527,19 @@ export const VisitCard = ({
                 </span>
               )}
             </div>
+            
+            {/* Visit Tracking Indicator - shows after first action (check-in) */}
+            {currentLog && (
+              <div className="mt-1">
+                <VisitTrackingIndicator
+                  locationStatus={trackingLocationStatus}
+                  checkInTime={currentLog.start_time}
+                  distance={trackingDistance}
+                  onClick={() => setShowVisitDetailsModal(true)}
+                />
+              </div>
+            )}
+            
             {visit.retailerId && (
               <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <CreditScoreDisplay retailerId={visit.retailerId} variant="compact" />
@@ -2591,7 +2608,11 @@ export const VisitCard = ({
                     <MessageSquare className="w-3 h-3" />
                     Tips
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowPaymentModal(true)}>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
+                    setShowPaymentModal(true);
+                    // Record action for time tracking
+                    recordAction('payment').catch(err => console.error('Payment tracking failed:', err));
+                  }}>
                     <IndianRupee className="w-3 h-3" />
                     Pay
                   </Button>
@@ -2708,9 +2729,9 @@ export const VisitCard = ({
                     console.error('Background ensureVisit failed:', err);
                   }
 
-                  // Run tracking in background
+                  // Record action for time tracking (offline-first, device time)
                   try {
-                    await startTracking('order', skipCheckInReason === 'phone-order');
+                    await recordAction('order');
                   } catch (err) {
                     console.error('Background tracking failed:', err);
                   }
@@ -2740,8 +2761,8 @@ export const VisitCard = ({
                 // Open instantly (do not block on slow network/offline)
                 setShowFeedbackModal(true);
 
-                // Start tracking in background
-                void startTracking('feedback', skipCheckInReason === 'phone-order').catch((err) => {
+                // Record action for time tracking (offline-first, device time)
+                recordAction('feedback').catch((err) => {
                   console.error('Feedback tracking failed:', err);
                 });
               }}
@@ -2771,8 +2792,8 @@ export const VisitCard = ({
               const visitId = await ensureVisit(user.id, retailerId, today);
               setCurrentVisitId(visitId);
 
-              // Start tracking visit time and location
-              await startTracking('ai', skipCheckInReason === 'phone-order');
+              // Record action for time tracking (offline-first, device time)
+              await recordAction('ai');
               setShowAIInsights(true);
             } catch (err: any) {
               console.error('Open AI insights error', err);
