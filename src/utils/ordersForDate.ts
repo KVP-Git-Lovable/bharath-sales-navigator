@@ -32,6 +32,7 @@ export interface Order {
   created_at: string;
   order_items?: OrderItem[];
   items?: OrderItem[]; // Offline orders use 'items' instead of 'order_items'
+  idempotency_key?: string; // For deduplication across offline/DB
   _source?: 'db' | 'offline' | 'snapshot';
 }
 
@@ -63,6 +64,7 @@ export async function getOrdersForDate(
   
   const allOrders: Order[] = [];
   const seenIds = new Set<string>();
+  const seenIdempotencyKeys = new Set<string>(); // DUPLICATE FIX: Track idempotency keys
   const sourceBreakdown = { db: 0, offline: 0, snapshot: 0 };
 
   const isOfflineOrSlow = !navigator.onLine || isSlowConnection() || forceOfflineFirst;
@@ -76,8 +78,11 @@ export async function getOrdersForDate(
     );
 
     todayOfflineOrders.forEach((order: any) => {
-      if (!seenIds.has(order.id)) {
+      // DUPLICATE FIX: Check both id AND idempotency_key
+      const idemKey = order.idempotency_key;
+      if (!seenIds.has(order.id) && (!idemKey || !seenIdempotencyKeys.has(idemKey))) {
         seenIds.add(order.id);
+        if (idemKey) seenIdempotencyKeys.add(idemKey);
         allOrders.push({
           ...order,
           order_items: order.items || order.order_items || [],
@@ -98,8 +103,11 @@ export async function getOrdersForDate(
       const snapshot = await loadMyVisitsSnapshot(userId, targetDate);
       if (snapshot?.orders && snapshot.orders.length > 0) {
         snapshot.orders.forEach((order: any) => {
-          if (!seenIds.has(order.id)) {
+          // DUPLICATE FIX: Check both id AND idempotency_key
+          const idemKey = order.idempotency_key;
+          if (!seenIds.has(order.id) && (!idemKey || !seenIdempotencyKeys.has(idemKey))) {
             seenIds.add(order.id);
+            if (idemKey) seenIdempotencyKeys.add(idemKey);
             allOrders.push({
               ...order,
               order_items: order.items || order.order_items || [],
@@ -131,18 +139,26 @@ export async function getOrdersForDate(
 
       if (!error && dbOrders) {
         // DB orders take priority - remove duplicates from offline/snapshot
+        // DUPLICATE FIX: Match by BOTH id AND idempotency_key
         dbOrders.forEach((order: any) => {
-          if (seenIds.has(order.id)) {
-            // Remove the existing offline/snapshot version
-            const existingIndex = allOrders.findIndex(o => o.id === order.id);
-            if (existingIndex !== -1) {
-              const existingSource = allOrders[existingIndex]._source;
-              if (existingSource === 'offline') sourceBreakdown.offline--;
-              if (existingSource === 'snapshot') sourceBreakdown.snapshot--;
-              allOrders.splice(existingIndex, 1);
-            }
+          const idemKey = order.idempotency_key;
+          
+          // Find existing order by ID or by idempotency_key
+          let existingIndex = allOrders.findIndex(o => o.id === order.id);
+          if (existingIndex === -1 && idemKey) {
+            existingIndex = allOrders.findIndex(o => o.idempotency_key === idemKey);
           }
+          
+          if (existingIndex !== -1) {
+            // Remove the existing offline/snapshot version (DB wins)
+            const existingSource = allOrders[existingIndex]._source;
+            if (existingSource === 'offline') sourceBreakdown.offline--;
+            if (existingSource === 'snapshot') sourceBreakdown.snapshot--;
+            allOrders.splice(existingIndex, 1);
+          }
+          
           seenIds.add(order.id);
+          if (idemKey) seenIdempotencyKeys.add(idemKey);
           allOrders.push({
             ...order,
             _source: 'db' as const

@@ -7,6 +7,10 @@ import { isSlowConnection } from '@/utils/internetSpeedCheck';
 
 const SYNC_TIMEOUT_MS = 5000; // 5 second timeout for all sync operations
 
+// DUPLICATE FIX: Prevent multiple sync attempts for the same order in one session
+const syncAttemptLock = new Map<string, number>(); // orderId -> timestamp
+const LOCK_DURATION_MS = 30000; // 30 seconds lock per order
+
 /**
  * Submit an order with offline support
  * Automatically falls back to offline mode on slow connections or timeouts
@@ -98,6 +102,14 @@ export async function submitOrderWithOfflineSupport(
 
   // STEP 4: Background sync with 5-second timeout - ALWAYS non-blocking
   setTimeout(async () => {
+    // DUPLICATE FIX: Check sync attempt lock
+    const lastAttempt = syncAttemptLock.get(orderId);
+    if (lastAttempt && Date.now() - lastAttempt < LOCK_DURATION_MS) {
+      console.log('[offlineOrderUtils] Sync attempt locked for order:', orderId);
+      return;
+    }
+    syncAttemptLock.set(orderId, Date.now());
+    
     if (!navigator.onLine || options.connectivityStatus === 'offline') {
       offlineStorage.addToSyncQueue('CREATE_ORDER', {
         order: normalizedOrder,

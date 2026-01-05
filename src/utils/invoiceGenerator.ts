@@ -378,8 +378,24 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   // Calculate total discount for savings display
   let totalDiscount = 0;
   
+  // DUPLICATE FIX: Collapse duplicate line items before processing
+  // This handles cases where DB has accidental duplicate rows (same product, qty, rate, total)
+  const deduplicatedItems = cartItems.reduce((acc: any[], item: any) => {
+    const key = `${item.product_id || item.product_name}-${item.quantity}-${item.rate || item.price}-${item.unit}`;
+    const existingIndex = acc.findIndex((existing: any) => {
+      const existingKey = `${existing.product_id || existing.product_name}-${existing.quantity}-${existing.rate || existing.price}-${existing.unit}`;
+      return existingKey === key;
+    });
+    if (existingIndex === -1) {
+      acc.push(item);
+    } else {
+      console.log('[invoiceGenerator] Collapsing duplicate item:', item.product_name);
+    }
+    return acc;
+  }, []);
+  
   // Pre-process items with display normalization
-  const normalizedItems = cartItems.map(item => {
+  const normalizedItems = deduplicatedItems.map(item => {
     const normalized = normalizeItemForDisplay(item);
     return {
       ...item,

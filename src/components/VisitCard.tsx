@@ -2285,7 +2285,7 @@ export const VisitCard = ({
           
           const { data } = await supabase
             .from('orders')
-            .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, order_items(product_name, quantity, rate, original_rate, total, unit)')
+            .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, idempotency_key, order_items(product_name, quantity, rate, original_rate, total, unit)')
             .eq('user_id', user.id)
             .eq('retailer_id', retailerId)
             .eq('status', 'confirmed')
@@ -2305,14 +2305,20 @@ export const VisitCard = ({
       }
       
       // Merge orders: prioritize DB for metadata but preserve offline items
-      // If DB order exists, merge in offline items data
+      // DUPLICATE FIX: Dedupe by BOTH id AND idempotency_key
       const mergedOrders: any[] = [];
       const dbOrderMap = new Map(dbOrders.map(o => [o.id, o]));
+      const dbIdempotencyMap = new Map(dbOrders.filter(o => o.idempotency_key).map(o => [o.idempotency_key, o]));
       const offlineOrderMap = new Map(offlineOrders.map(o => [o.id, o]));
       
       // Add all DB orders, enriching with offline item data if available
       dbOrders.forEach(dbOrder => {
-        const offlineVersion = offlineOrderMap.get(dbOrder.id);
+        // Check offline by ID or by idempotency_key
+        let offlineVersion = offlineOrderMap.get(dbOrder.id);
+        if (!offlineVersion && dbOrder.idempotency_key) {
+          offlineVersion = offlineOrders.find((o: any) => o.idempotency_key === dbOrder.idempotency_key);
+        }
+        
         // If DB order has no items but offline version does, use offline items
         const hasDBItems = dbOrder.order_items && dbOrder.order_items.length > 0;
         const hasOfflineItems = offlineVersion?.items && offlineVersion.items.length > 0;
@@ -2326,9 +2332,11 @@ export const VisitCard = ({
         }
       });
       
-      // Add offline-only orders (not in DB yet)
+      // Add offline-only orders (not in DB yet) - check by both id AND idempotency_key
       offlineOrders.forEach(offlineOrder => {
-        if (!dbOrderMap.has(offlineOrder.id)) {
+        const alreadyInDB = dbOrderMap.has(offlineOrder.id) || 
+          (offlineOrder.idempotency_key && dbIdempotencyMap.has(offlineOrder.idempotency_key));
+        if (!alreadyInDB) {
           mergedOrders.push(offlineOrder);
         }
       });
