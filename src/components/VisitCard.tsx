@@ -2575,7 +2575,7 @@ export const VisitCard = ({
               </div>
             )}
           </div>
-          <div className="flex sm:flex-col items-start sm:items-end gap-1">
+          <div className="flex flex-col items-start sm:items-end gap-1">
             <div className="flex flex-wrap gap-1">
               <Badge className={`${getStatusColor(displayStatus)} text-xs px-2 py-1`}>
                 {getStatusText(displayStatus)}
