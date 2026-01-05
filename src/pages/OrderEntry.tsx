@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -340,6 +340,9 @@ export const OrderEntry = () => {
   const [hasTrackedVisit, setHasTrackedVisit] = useState(false);
   const [isSettingLocation, setIsSettingLocation] = useState(false);
 
+  // Global check-in capture: track if first interaction has been recorded
+  const hasRecordedFirstInteraction = useRef(false);
+
   // Function to set retailer location from current GPS
   const setRetailerLocation = async () => {
     if (!validRetailerId) {
@@ -421,6 +424,15 @@ export const OrderEntry = () => {
     userId: userId || '',
     selectedDate: getLocalDateString()
   });
+
+  // Global click handler - ANY click/touch inside Order Entry page triggers check-in
+  const handlePageInteraction = useCallback(() => {
+    if (!hasRecordedFirstInteraction.current && userId) {
+      hasRecordedFirstInteraction.current = true;
+      console.log('📍 First page interaction - capturing check-in');
+      recordAction('order').catch((err) => console.log('Check-in error (non-fatal):', err));
+    }
+  }, [userId, recordAction]);
   
   // Fetch retailer coordinates - CACHE FIRST, non-blocking
   useEffect(() => {
@@ -1647,7 +1659,11 @@ export const OrderEntry = () => {
     setShowSchemeModal(true);
   };
   return <Layout>
-    <div className="min-h-screen bg-background pb-20 pt-2">
+    <div 
+      className="min-h-screen bg-background pb-20 pt-2"
+      onClick={handlePageInteraction}
+      onTouchStart={handlePageInteraction}
+    >
       {/* Page Header - Fixed layout with stable positioning */}
       <div className="w-full px-2 sm:px-4 py-2 sm:py-3">
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
