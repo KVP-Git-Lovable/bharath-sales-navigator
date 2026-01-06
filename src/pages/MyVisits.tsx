@@ -433,15 +433,23 @@ export const MyVisits = () => {
     loadWeekPlans();
   }, [user, weekDays]);
   // Removed - now using useVisitsDataOptimized hook for better performance
-  const loadTimelineVisits = async (date: Date) => {
-    if (!user) return;
+  // Calculate the effective user ID for timeline queries based on selected user
+  const timelineTargetUserId = useMemo(() => {
+    if (selectedViewUserId === 'self' || !selectedViewUserId) {
+      return user?.id;
+    }
+    return selectedViewUserId;
+  }, [selectedViewUserId, user?.id]);
+
+  const loadTimelineVisits = async (date: Date, targetUserId: string) => {
+    if (!targetUserId) return;
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
 
       // Get attendance data for day start time
       const {
         data: attendance
-      } = await supabase.from('attendance').select('check_in_time').eq('user_id', user.id).eq('date', dateStr).maybeSingle();
+      } = await supabase.from('attendance').select('check_in_time').eq('user_id', targetUserId).eq('date', dateStr).maybeSingle();
       if (attendance?.check_in_time) {
         setTimelineDayStart(format(new Date(attendance.check_in_time), 'hh:mm a'));
       } else {
@@ -452,7 +460,7 @@ export const MyVisits = () => {
       const { data: beatPlan } = await supabase
         .from('beat_plans')
         .select('id, joint_sales_manager_id')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .eq('plan_date', dateStr)
         .maybeSingle();
 
@@ -485,7 +493,7 @@ export const MyVisits = () => {
           no_order_reason,
           skip_check_in_time,
           updated_at
-        `).eq('user_id', user.id).eq('planned_date', dateStr);
+        `).eq('user_id', targetUserId).eq('planned_date', dateStr);
       if (error) throw error;
 
       // Get retailer details for these visits
@@ -512,14 +520,14 @@ export const MyVisits = () => {
       const {
         data: orders,
         error: ordersError
-      } = await supabase.from('orders').select('retailer_id, total_amount, created_at, order_items(quantity)').eq('user_id', user.id).eq('status', 'confirmed').in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
+      } = await supabase.from('orders').select('retailer_id, total_amount, created_at, order_items(quantity)').eq('user_id', targetUserId).eq('status', 'confirmed').in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
       if (ordersError) throw ordersError;
 
       // Fetch retailer_visit_logs for accurate time tracking
       const { data: visitLogs } = await supabase
         .from('retailer_visit_logs')
         .select('retailer_id, start_time, end_time, time_spent_seconds')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .eq('visit_date', dateStr)
         .in('retailer_id', retailerIds);
 
@@ -554,7 +562,7 @@ export const MyVisits = () => {
       const {
         data: feedbacks,
         error: feedbackError
-      } = await supabase.from('retailer_feedback').select('retailer_id, created_at').eq('user_id', user.id).in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
+      } = await supabase.from('retailer_feedback').select('retailer_id, created_at').eq('user_id', targetUserId).in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
       
       const feedbackMap = new Map();
       (feedbacks || []).forEach(feedback => {
@@ -620,12 +628,12 @@ export const MyVisits = () => {
     }
   };
 
-  // Load timeline visits when date changes
+  // Load timeline visits when date changes or selected user changes
   useEffect(() => {
-    if (isTimelineOpen && user) {
-      loadTimelineVisits(timelineDate);
+    if (isTimelineOpen && timelineTargetUserId) {
+      loadTimelineVisits(timelineDate, timelineTargetUserId);
     }
-  }, [timelineDate, isTimelineOpen, user]);
+  }, [timelineDate, isTimelineOpen, timelineTargetUserId]);
   const loadAllVisitsForDate = async (date: string, beatPlans: any[] = optimizedBeatPlans, preserveOrder: boolean = false) => {
     if (!user) return;
     try {
@@ -1536,7 +1544,9 @@ export const MyVisits = () => {
             </DialogHeader>
             <TimelineView visits={timelineVisits} dayStart={timelineDayStart} selectedDate={timelineDate} onDateChange={date => {
             setTimelineDate(date);
-            loadTimelineVisits(date);
+            if (timelineTargetUserId) {
+              loadTimelineVisits(date, timelineTargetUserId);
+            }
           }} />
           </DialogContent>
         </Dialog>
