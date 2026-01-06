@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, ArrowRight, FileText, CheckSquare, Calculator, Sparkles, Users, ClipboardCheck } from "lucide-react";
+import { Search, Filter, ArrowRight, FileText, CheckSquare, Calculator, Sparkles, Users, ClipboardCheck, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,16 @@ import { WebsiteHeader } from "@/components/website/WebsiteHeader";
 import { WebsiteFooter } from "@/components/website/WebsiteFooter";
 
 const insightCards = [
+  {
+    id: "implementation-toolkit",
+    title: "Implementation Toolkit",
+    description: "Complete requirement analysis, project planning, estimation calculator, ROI tracker, and training management for customer implementations.",
+    icon: Briefcase,
+    category: "Tools",
+    readTime: "Interactive",
+    href: "/insights/implementation-toolkit",
+    gradient: "from-purple-500 to-indigo-500",
+  },
   {
     id: "migration-plan",
     title: "Migration Plan",
