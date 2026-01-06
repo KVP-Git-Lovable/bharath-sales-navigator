@@ -330,11 +330,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 {/* Retailer Name */}
                 <h3 className="text-base sm:text-lg font-semibold mb-2 break-words">{visit.retailer_name}</h3>
 
-                {/* Location Icon Only */}
+                {/* Location Icon - Opens in Google Maps */}
                 {visit.check_in_address && (
-                  <div className="flex items-center text-muted-foreground mb-2">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visit.check_in_address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-primary hover:text-primary/80 mb-2 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <MapPin className="w-4 h-4" />
-                  </div>
+                  </a>
                 )}
 
                 {/* Visit Timing Details */}
