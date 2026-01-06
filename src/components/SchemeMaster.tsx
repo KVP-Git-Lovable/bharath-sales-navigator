@@ -100,7 +100,12 @@ const initialSchemeForm = {
   // New applicability fields
   applicability_type: 'global' as 'global' | 'targeted' | 'hybrid',
   priority: 0,
-  exclusion_group: ''
+  exclusion_group: '',
+  // Multi-product fields
+  multi_product_mode: false,
+  target_product_ids: [] as string[],
+  discount_mode: 'same' as 'same' | 'different',
+  per_product_discounts: {} as Record<string, { discount_percentage: number }>
 };
 
 export const SchemeMaster = () => {
@@ -206,11 +211,19 @@ export const SchemeMaster = () => {
     try {
       let schemeId = schemeForm.id;
       
+      // Determine product_id and target_product_ids based on mode
+      const isMultiProduct = schemeForm.multi_product_mode && (schemeForm.target_product_ids || []).length > 0;
+      const productId = isMultiProduct ? null : (schemeForm.product_id || null);
+      const targetProductIds = isMultiProduct ? schemeForm.target_product_ids : null;
+      const perProductDiscounts = isMultiProduct && schemeForm.discount_mode === 'different' 
+        ? schemeForm.per_product_discounts 
+        : null;
+      
       if (schemeForm.id) {
         const { error } = await supabase
           .from('product_schemes')
           .update({
-            product_id: schemeForm.product_id || null,
+            product_id: productId,
             variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
             category_id: schemeForm.category_id || null,
             name: schemeForm.name,
@@ -235,7 +248,9 @@ export const SchemeMaster = () => {
             end_date: schemeForm.end_date || null,
             applicability_type: schemeForm.applicability_type,
             priority: schemeForm.priority,
-            exclusion_group: schemeForm.exclusion_group || null
+            exclusion_group: schemeForm.exclusion_group || null,
+            target_product_ids: targetProductIds,
+            per_product_discounts: perProductDiscounts
           })
           .eq('id', schemeForm.id);
         
@@ -244,7 +259,7 @@ export const SchemeMaster = () => {
         const { data, error } = await supabase
           .from('product_schemes')
           .insert({
-            product_id: schemeForm.product_id || null,
+            product_id: productId,
             variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
             category_id: schemeForm.category_id || null,
             name: schemeForm.name,
@@ -269,7 +284,9 @@ export const SchemeMaster = () => {
             end_date: schemeForm.end_date || null,
             applicability_type: schemeForm.applicability_type,
             priority: schemeForm.priority,
-            exclusion_group: schemeForm.exclusion_group || null
+            exclusion_group: schemeForm.exclusion_group || null,
+            target_product_ids: targetProductIds,
+            per_product_discounts: perProductDiscounts
           })
           .select('id')
           .single();
@@ -383,6 +400,11 @@ export const SchemeMaster = () => {
   };
 
   const openEditDialog = (scheme: ProductScheme) => {
+    // Check if this is a multi-product scheme
+    const schemeAny = scheme as any;
+    const isMultiProduct = schemeAny.target_product_ids && schemeAny.target_product_ids.length > 0;
+    const hasPerProductDiscounts = schemeAny.per_product_discounts && Object.keys(schemeAny.per_product_discounts).length > 0;
+    
     setSchemeForm({
       id: scheme.id,
       product_id: scheme.product_id || '',
@@ -408,9 +430,14 @@ export const SchemeMaster = () => {
       is_active: scheme.is_active,
       start_date: scheme.start_date || '',
       end_date: scheme.end_date || '',
-      applicability_type: ((scheme as any).applicability_type as 'global' | 'targeted' | 'hybrid') || 'global',
-      priority: (scheme as any).priority || 0,
-      exclusion_group: (scheme as any).exclusion_group || ''
+      applicability_type: (schemeAny.applicability_type as 'global' | 'targeted' | 'hybrid') || 'global',
+      priority: schemeAny.priority || 0,
+      exclusion_group: schemeAny.exclusion_group || '',
+      // Multi-product fields
+      multi_product_mode: isMultiProduct,
+      target_product_ids: schemeAny.target_product_ids || [],
+      discount_mode: hasPerProductDiscounts ? 'different' : 'same',
+      per_product_discounts: schemeAny.per_product_discounts || {}
     });
     // Load applicability rules for this scheme
     loadApplicabilityRules(scheme.id);

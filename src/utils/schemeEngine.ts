@@ -51,6 +51,9 @@ export interface ProductScheme {
   is_first_order_only?: boolean | null;
   product_name?: string;
   free_product_name?: string;
+  // Multi-product support
+  target_product_ids?: string[] | null;
+  per_product_discounts?: Record<string, { discount_percentage: number }> | null;
 }
 
 /**
@@ -139,6 +142,11 @@ export function isSchemeConditionMet(
  * Check if a scheme applies to a specific item
  */
 function schemeAppliesToItem(scheme: ProductScheme, item: SchemeItem): boolean {
+  // Check multi-product array first
+  if (scheme.target_product_ids && scheme.target_product_ids.length > 0) {
+    return scheme.target_product_ids.includes(item.product_id || item.id);
+  }
+  
   // Order-wide scheme (no product_id) applies to all items
   if (!scheme.product_id) return true;
   
@@ -152,6 +160,18 @@ function schemeAppliesToItem(scheme: ProductScheme, item: SchemeItem): boolean {
   }
   
   return false;
+}
+
+/**
+ * Get the discount percentage for a specific product (handles per-product discounts)
+ */
+function getProductDiscountPercentage(scheme: ProductScheme, productId: string): number {
+  // Check for per-product discount first
+  if (scheme.per_product_discounts && scheme.per_product_discounts[productId]) {
+    return scheme.per_product_discounts[productId].discount_percentage || 0;
+  }
+  // Fall back to scheme-level discount
+  return scheme.discount_percentage || 0;
 }
 
 /**
@@ -197,18 +217,21 @@ function calculateSchemeDiscount(
   switch (scheme.scheme_type) {
     case 'percentage_discount':
     case 'percentage': {
-      const discountPct = scheme.discount_percentage || 0;
+      const hasMultiProduct = scheme.target_product_ids && scheme.target_product_ids.length > 0;
       
-      if (!scheme.product_id) {
+      if (!scheme.product_id && !hasMultiProduct) {
         // Order-wide percentage discount
+        const discountPct = scheme.discount_percentage || 0;
         if (scheme.min_order_value && subtotal < scheme.min_order_value) {
           break;
         }
         discount = subtotal * (discountPct / 100);
       } else {
-        // Product-specific percentage discount
+        // Product-specific or multi-product percentage discount
         for (const item of applicableItems) {
           if (isQuantityConditionMet(scheme, item.quantity)) {
+            // Use per-product discount if available
+            const discountPct = getProductDiscountPercentage(scheme, item.product_id || item.id);
             const itemTotal = item.rate * item.quantity;
             const itemDiscount = itemTotal * (discountPct / 100);
             discount += itemDiscount;
@@ -389,6 +412,13 @@ export function getApplicableSchemes(
   const activeSchemes = getActiveSchemes(allSchemes);
   
   return activeSchemes.filter(scheme => {
+    // Check multi-product array first
+    if (scheme.target_product_ids && scheme.target_product_ids.length > 0) {
+      return items.some(item => 
+        scheme.target_product_ids!.includes(item.product_id || item.id)
+      );
+    }
+    
     // Order-wide schemes are always applicable
     if (!scheme.product_id) return true;
     
