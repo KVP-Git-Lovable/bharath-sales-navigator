@@ -74,6 +74,7 @@ import { AdminDashboard } from "./pages/AdminDashboard";
 import AdminControls from "./pages/AdminControls";
 import FeatureManagement from "./pages/FeatureManagement";
 import ProductManagementPage from "./pages/ProductManagementPage";
+import SchemeMasterPage from "./pages/SchemeMasterPage";
 import AttendanceManagement from "./pages/AttendanceManagement";
 import ActivitiesInfo from "./pages/ActivitiesInfo";
 import BadgesInfo from "./pages/BadgesInfo";
@@ -305,6 +306,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/user_roles" element={<ProtectedRoute><UserRoles /></ProtectedRoute>} />
         <Route path="/security-management" element={<ProtectedRoute><SecurityManagement /></ProtectedRoute>} />
         <Route path="/product-management" element={<ProtectedRoute><ProductManagementPage /></ProtectedRoute>} />
+        <Route path="/scheme-management" element={<ProtectedRoute><SchemeMasterPage /></ProtectedRoute>} />
         <Route path="/attendance-management" element={<ProtectedRoute><AttendanceManagement /></ProtectedRoute>} />
         <Route path="/feedback-management" element={<ProtectedRoute><FeedbackManagement /></ProtectedRoute>} />
         <Route path="/competition-master" element={<ProtectedRoute><CompetitionMaster /></ProtectedRoute>} />

@@ -15,12 +15,10 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Package, Tag, Gift, Search, Grid3X3, Camera, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, Tag, Search, Grid3X3, Camera, Loader2, RefreshCw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProductFormFields } from './ProductFormFields';
 import { VariantFocusedFields } from './VariantFocusedFields';
-import { SchemeFormFields } from './SchemeFormFields';
-import { SchemeDetailsDisplay } from './SchemeDetailsDisplay';
 import { migrateProducts } from '@/utils/productMigration';
 
 interface ProductCategory {
@@ -51,37 +49,6 @@ interface Product {
   qr_code?: string;
 }
 
-interface ProductScheme {
-  id: string;
-  product_id?: string;
-  product?: Product;
-  variant_id?: string;
-  category_id?: string;
-  name: string;
-  description: string;
-  scheme_type: string;
-  condition_quantity: number;
-  quantity_condition_type?: string;
-  discount_percentage: number;
-  discount_amount: number;
-  free_quantity: number;
-  buy_quantity: number;
-  free_product_id?: string;
-  bundle_product_ids: string[];
-  bundle_discount_amount: number;
-  bundle_discount_percentage: number;
-  tier_data: Array<{
-    min_qty: number;
-    max_qty: number;
-    discount_percentage: number;
-  }>;
-  is_first_order_only: boolean;
-  validity_days?: number;
-  min_order_value: number;
-  is_active: boolean;
-  start_date: string;
-  end_date: string;
-}
 
 interface ProductVariant {
   id: string;
@@ -110,7 +77,7 @@ interface Territory {
 const ProductManagement = () => {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [schemes, setSchemes] = useState<ProductScheme[]>([]);
+  
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,12 +89,12 @@ const ProductManagement = () => {
   // Dialog states
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  const [isSchemeDialogOpen, setIsSchemeDialogOpen] = useState(false);
+  
   const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
   const [isVariantsViewOpen, setIsVariantsViewOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
-    type: 'product' | 'category' | 'scheme' | 'variant' | 'all-products' | null;
+    type: 'product' | 'category' | 'variant' | 'all-products' | null;
     id: string;
     name: string;
   }>({ open: false, type: null, id: '', name: '' });
@@ -163,32 +130,6 @@ const [productForm, setProductForm] = useState({
   qr_code: '',
   hsn_code: ''
 });
-  const [schemeForm, setSchemeForm] = useState({
-    id: '',
-    product_id: '',
-    variant_id: '',
-    category_id: '',
-    name: '',
-    description: '',
-    scheme_type: 'percentage_discount',
-    condition_quantity: 0,
-    quantity_condition_type: 'more_than',
-    discount_percentage: 0,
-    discount_amount: 0,
-    free_quantity: 0,
-    buy_quantity: 0,
-    free_product_id: '',
-    bundle_product_ids: [],
-    bundle_discount_amount: 0,
-    bundle_discount_percentage: 0,
-    tier_data: [],
-    is_first_order_only: false,
-    validity_days: null,
-    min_order_value: 0,
-    is_active: true,
-    start_date: '',
-    end_date: ''
-  });
   
   const [variantForm, setVariantForm] = useState({
     id: '',
@@ -253,8 +194,6 @@ const [productForm, setProductForm] = useState({
       executeDeleteProduct(deleteConfirm.id);
     } else if (deleteConfirm.type === 'category') {
       executeDeleteCategory(deleteConfirm.id);
-    } else if (deleteConfirm.type === 'scheme') {
-      executeDeleteScheme(deleteConfirm.id);
     } else if (deleteConfirm.type === 'variant') {
       executeDeleteVariant(deleteConfirm.id);
     } else if (deleteConfirm.type === 'all-products') {
@@ -312,7 +251,7 @@ const [productForm, setProductForm] = useState({
   const fetchData = async () => {
     try {
       setLoading(true);
-      await Promise.all([fetchCategories(), fetchProducts(), fetchSchemes(), fetchVariants(), fetchTerritories()]);
+      await Promise.all([fetchCategories(), fetchProducts(), fetchVariants(), fetchTerritories()]);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to fetch data');
@@ -363,20 +302,6 @@ const [productForm, setProductForm] = useState({
     setProducts(data || []);
   };
 
-  const fetchSchemes = async () => {
-    const { data, error } = await supabase
-      .from('product_schemes')
-      .select(`
-        *,
-        product:products!product_schemes_product_id_fkey(*),
-        category:product_categories(*),
-        free_product:products!product_schemes_free_product_id_fkey(*)
-      `)
-      .order('name');
-    
-    if (error) throw error;
-    setSchemes((data as any) || []);
-  };
 
   const fetchVariants = async () => {
     const { data, error } = await supabase
@@ -706,106 +631,6 @@ const [productForm, setProductForm] = useState({
     setShowPhotoOptions(false);
   };
 
-  const handleSchemeSubmit = async () => {
-    try {
-      if (schemeForm.id) {
-        const { error } = await supabase
-          .from('product_schemes')
-          .update({
-            product_id: schemeForm.product_id || null,
-            variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
-            category_id: schemeForm.category_id || null,
-            name: schemeForm.name,
-            description: schemeForm.description,
-            scheme_type: schemeForm.scheme_type,
-            condition_quantity: schemeForm.condition_quantity,
-            quantity_condition_type: schemeForm.quantity_condition_type,
-            discount_percentage: schemeForm.discount_percentage,
-            discount_amount: schemeForm.discount_amount,
-            free_quantity: schemeForm.free_quantity,
-            buy_quantity: schemeForm.buy_quantity,
-            free_product_id: schemeForm.free_product_id || null,
-            bundle_product_ids: schemeForm.bundle_product_ids,
-            bundle_discount_amount: schemeForm.bundle_discount_amount,
-            bundle_discount_percentage: schemeForm.bundle_discount_percentage,
-            tier_data: schemeForm.tier_data,
-            is_first_order_only: schemeForm.is_first_order_only,
-            validity_days: schemeForm.validity_days,
-            min_order_value: schemeForm.min_order_value,
-            is_active: schemeForm.is_active,
-            start_date: schemeForm.start_date || null,
-            end_date: schemeForm.end_date || null
-          })
-          .eq('id', schemeForm.id);
-        
-        if (error) throw error;
-        toast.success('Scheme updated successfully');
-      } else {
-        const { error } = await supabase
-          .from('product_schemes')
-          .insert({
-            product_id: schemeForm.product_id || null,
-            variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
-            category_id: schemeForm.category_id || null,
-            name: schemeForm.name,
-            description: schemeForm.description,
-            scheme_type: schemeForm.scheme_type,
-            condition_quantity: schemeForm.condition_quantity,
-            quantity_condition_type: schemeForm.quantity_condition_type,
-            discount_percentage: schemeForm.discount_percentage,
-            discount_amount: schemeForm.discount_amount,
-            free_quantity: schemeForm.free_quantity,
-            buy_quantity: schemeForm.buy_quantity,
-            free_product_id: schemeForm.free_product_id || null,
-            bundle_product_ids: schemeForm.bundle_product_ids,
-            bundle_discount_amount: schemeForm.bundle_discount_amount,
-            bundle_discount_percentage: schemeForm.bundle_discount_percentage,
-            tier_data: schemeForm.tier_data,
-            is_first_order_only: schemeForm.is_first_order_only,
-            validity_days: schemeForm.validity_days,
-            min_order_value: schemeForm.min_order_value,
-            is_active: schemeForm.is_active,
-            start_date: schemeForm.start_date || null,
-            end_date: schemeForm.end_date || null
-          });
-        
-        if (error) throw error;
-        toast.success('Scheme created successfully');
-      }
-      
-      setIsSchemeDialogOpen(false);
-      setSchemeForm({
-        id: '',
-        product_id: '',
-        variant_id: 'all',
-        category_id: '',
-        name: '',
-        description: '',
-        scheme_type: 'percentage_discount',
-        condition_quantity: 0,
-        quantity_condition_type: 'more_than',
-        discount_percentage: 0,
-        discount_amount: 0,
-        free_quantity: 0,
-        buy_quantity: 0,
-        free_product_id: '',
-        bundle_product_ids: [],
-        bundle_discount_amount: 0,
-        bundle_discount_percentage: 0,
-        tier_data: [],
-        is_first_order_only: false,
-        validity_days: null,
-        min_order_value: 0,
-        is_active: true,
-        start_date: '',
-        end_date: ''
-      });
-      fetchSchemes();
-    } catch (error) {
-      console.error('Error saving scheme:', error);
-      toast.error('Failed to save scheme');
-    }
-  };
 
   const handleDeleteCategory = async (id: string, name: string) => {
     setDeleteConfirm({ open: true, type: 'category', id, name });
@@ -871,37 +696,6 @@ const [productForm, setProductForm] = useState({
     }
   };
 
-  const handleDeleteScheme = async (id: string, name: string) => {
-    setDeleteConfirm({ open: true, type: 'scheme', id, name });
-  };
-
-  const executeDeleteScheme = async (id: string) => {
-    try {
-      const schemeData = schemes.find(s => s.id === id);
-      if (schemeData) {
-        await moveToRecycleBin({
-          tableName: 'product_schemes',
-          recordId: id,
-          recordData: schemeData,
-          moduleName: 'Product Schemes',
-          recordName: schemeData.name
-        });
-      }
-      
-      const { error } = await supabase
-        .from('product_schemes')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      toast.success('Scheme moved to recycle bin');
-      fetchSchemes();
-      setDeleteConfirm({ open: false, type: null, id: '', name: '' });
-    } catch (error) {
-      console.error('Error deleting scheme:', error);
-      toast.error('Failed to delete scheme');
-    }
-  };
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -930,7 +724,7 @@ const [productForm, setProductForm] = useState({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="products" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="products" className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 Products & SKUs
@@ -938,10 +732,6 @@ const [productForm, setProductForm] = useState({
               <TabsTrigger value="categories" className="flex items-center gap-2">
                 <Tag className="h-4 w-4" />
                 Categories
-              </TabsTrigger>
-              <TabsTrigger value="schemes" className="flex items-center gap-2">
-                <Gift className="h-4 w-4" />
-                Schemes & Offers
               </TabsTrigger>
             </TabsList>
 
@@ -1327,146 +1117,6 @@ const [productForm, setProductForm] = useState({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="schemes" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Product Schemes & Offers</h3>
-                <Dialog open={isSchemeDialogOpen} onOpenChange={setIsSchemeDialogOpen}>
-                  <DialogTrigger asChild>
-                  <Button onClick={() => setSchemeForm({
-                    id: '',
-                    product_id: '',
-                    variant_id: 'all',
-                    category_id: '',
-                    name: '',
-                    description: '',
-                    scheme_type: 'percentage_discount',
-                    condition_quantity: 0,
-                    quantity_condition_type: 'more_than',
-                    discount_percentage: 0,
-                    discount_amount: 0,
-                    free_quantity: 0,
-                    buy_quantity: 0,
-                    free_product_id: '',
-                    bundle_product_ids: [],
-                    bundle_discount_amount: 0,
-                    bundle_discount_percentage: 0,
-                    tier_data: [],
-                    is_first_order_only: false,
-                    validity_days: null,
-                    min_order_value: 0,
-                    is_active: true,
-                    start_date: '',
-                    end_date: ''
-                  })}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Scheme
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[90vh] overflow-hidden">
-                    <DialogHeader>
-                      <DialogTitle>{schemeForm.id ? 'Edit Scheme' : 'Add New Scheme'}</DialogTitle>
-                      <DialogDescription>
-                        {schemeForm.id ? 'Update scheme details' : 'Create a new promotional scheme'}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="h-[60vh] pr-4">
-                      <SchemeFormFields 
-                        schemeForm={schemeForm} 
-                        setSchemeForm={setSchemeForm}
-                        products={products}
-                        categories={categories}
-                      />
-                    </ScrollArea>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsSchemeDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSchemeSubmit}>
-                        {schemeForm.id ? 'Update' : 'Create'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              <ScrollArea className="h-[400px] rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Scheme Name</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Details</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {schemes.map((scheme) => (
-                      <TableRow key={scheme.id}>
-                        <TableCell className="font-medium">{scheme.name}</TableCell>
-                        <TableCell>{scheme.product?.name}</TableCell>
-                        <TableCell className="capitalize">{scheme.scheme_type.replace('_', ' ')}</TableCell>
-                        <TableCell>
-                          <SchemeDetailsDisplay scheme={scheme} />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={scheme.is_active ? 'default' : 'secondary'}>
-                            {scheme.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSchemeForm({
-                                  id: scheme.id,
-                                  product_id: scheme.product_id || '',
-                                  variant_id: scheme.variant_id || 'all',
-                                  category_id: scheme.category_id || '',
-                                  name: scheme.name,
-                                  description: scheme.description || '',
-                                  scheme_type: scheme.scheme_type,
-                                  condition_quantity: scheme.condition_quantity,
-                                  quantity_condition_type: scheme.quantity_condition_type || 'more_than',
-                                  discount_percentage: scheme.discount_percentage,
-                                  discount_amount: scheme.discount_amount,
-                                  free_quantity: scheme.free_quantity,
-                                  buy_quantity: scheme.buy_quantity || 0,
-                                  free_product_id: scheme.free_product_id || '',
-                                  bundle_product_ids: scheme.bundle_product_ids || [],
-                                  bundle_discount_amount: scheme.bundle_discount_amount || 0,
-                                  bundle_discount_percentage: scheme.bundle_discount_percentage || 0,
-                                  tier_data: scheme.tier_data || [],
-                                  is_first_order_only: scheme.is_first_order_only || false,
-                                  validity_days: scheme.validity_days || null,
-                                  min_order_value: scheme.min_order_value || 0,
-                                  is_active: scheme.is_active,
-                                  start_date: scheme.start_date || '',
-                                  end_date: scheme.end_date || ''
-                                });
-                                setIsSchemeDialogOpen(true);
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteScheme(scheme.id, scheme.name)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
