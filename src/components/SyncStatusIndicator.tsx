@@ -23,9 +23,11 @@ export const SyncStatusIndicator = memo(() => {
   const { warmCacheWithProgress } = useMasterDataCache();
   const [syncQueueCount, setSyncQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncingUI, setShowSyncingUI] = useState(false); // Only show if sync takes >500ms
   const [lastSyncStatus, setLastSyncStatus] = useState<'success' | 'error' | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const mountedRef = useRef(true);
+  const syncingDisplayRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cache warming state
   const {
@@ -37,20 +39,42 @@ export const SyncStatusIndicator = memo(() => {
     completeWarming,
     dismissWarming,
   } = useCacheWarming();
+  
+  // Only show syncing UI if sync takes more than 500ms (reduces visual noise)
+  useEffect(() => {
+    if (isSyncing) {
+      syncingDisplayRef.current = setTimeout(() => {
+        if (mountedRef.current) setShowSyncingUI(true);
+      }, 500);
+    } else {
+      if (syncingDisplayRef.current) {
+        clearTimeout(syncingDisplayRef.current);
+      }
+      setShowSyncingUI(false);
+    }
+    
+    return () => {
+      if (syncingDisplayRef.current) {
+        clearTimeout(syncingDisplayRef.current);
+      }
+    };
+  }, [isSyncing]);
 
-  // ONE-TIME CLEANUP: Remove old stuck items from sync queue on app open
+  // ONE-TIME CLEANUP: Remove old stuck items from sync queue on app open - more aggressive
   useEffect(() => {
     const cleanupOldStuckItems = async () => {
       try {
         const queue = await offlineStorage.getSyncQueue();
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
+        const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000; // Changed from 1 hour to 30 mins
         
-        // Find items to remove (stuck/old)
+        // Find items to remove (stuck/old) - more aggressive cleanup
         const itemsToRemove = queue.filter((item: any) => {
-          // Remove items that have failed 5+ times
-          if (item.retryCount >= 5) return true;
-          // Remove items older than 1 hour
-          if (item.timestamp && item.timestamp < oneHourAgo) return true;
+          // Remove items that have failed 3+ times (changed from 5)
+          if (item.retryCount >= 3) return true;
+          // Remove items older than 30 minutes (changed from 1 hour)
+          if (item.timestamp && item.timestamp < thirtyMinutesAgo) return true;
+          // Remove items that were already synced
+          if (item._synced) return true;
           return false;
         });
         
@@ -134,18 +158,18 @@ export const SyncStatusIndicator = memo(() => {
   const lastSyncTimeRef = useRef<number>(0);
   const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Monitor syncing status when coming online - SILENT mode with debounce to prevent loops
+  // Monitor syncing status when coming online - SILENT mode with extended debounce to prevent loops
   useEffect(() => {
     // Skip if already syncing or offline
     if (isSyncing || !isOnline || syncQueueCount === 0) return;
     
-    // Prevent sync if we recently synced (within last 10 seconds)
+    // Prevent sync if we recently synced (within last 30 seconds) - increased from 10s
     const now = Date.now();
-    if (now - lastSyncTimeRef.current < 10000) {
+    if (now - lastSyncTimeRef.current < 30000) {
       return;
     }
     
-    // Debounce to prevent multiple rapid triggers (e.g., tab switching)
+    // Debounce to prevent multiple rapid triggers (e.g., tab switching) - increased from 2s to 5s
     if (syncDebounceRef.current) {
       clearTimeout(syncDebounceRef.current);
     }
@@ -165,10 +189,10 @@ export const SyncStatusIndicator = memo(() => {
         
         if (!mountedRef.current) return;
         
-        // Check final queue status
+        // Check final queue status - use more aggressive filtering (3 retries instead of 5)
         const queue = await offlineStorage.getSyncQueue();
         const actualPending = queue.filter((item: any) => {
-          if (item.retryCount >= 5) return false;
+          if (item.retryCount >= 3) return false;
           return true;
         });
         
@@ -189,7 +213,7 @@ export const SyncStatusIndicator = memo(() => {
       } finally {
         if (mountedRef.current) setIsSyncing(false);
       }
-    }, 2000); // 2 second debounce
+    }, 5000); // Increased from 2s to 5s debounce
     
     return () => {
       if (syncDebounceRef.current) {
@@ -220,9 +244,9 @@ export const SyncStatusIndicator = memo(() => {
     setShowSyncModal(true);
   }, []);
 
-  // Render the dropdown menu trigger
+  // Render the dropdown menu trigger - use showSyncingUI instead of isSyncing to reduce visual noise
   const renderTrigger = () => {
-    if (isSyncing) {
+    if (showSyncingUI) {
       return (
         <button
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
