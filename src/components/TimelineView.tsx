@@ -381,9 +381,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       {visit.order_quantity && visit.order_quantity > 0 && (
                         <div className="flex items-center gap-1">
                           <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
-                          <div>
-                            <div className="text-lg sm:text-2xl font-bold">{formatQuantityInKG(visit.order_quantity)}</div>
-                            <div className="text-xs text-muted-foreground">Qty</div>
+                          <div className="text-lg sm:text-2xl font-bold">
+                            Qty: {formatQuantityInKG(visit.order_quantity)}
                           </div>
                         </div>
                       )}
