@@ -752,10 +752,20 @@ export function useOfflineSync() {
         
       case 'UPDATE_VISIT_LOG':
         console.log('Syncing visit log update:', data);
+        // CRITICAL: Use the end_time from the queued data (captured when action occurred)
+        // NOT the current sync processing time
+        const queuedEndTime = data.end_time;
+        const queuedTimeSpent = data.time_spent_seconds;
+        
+        if (!queuedEndTime) {
+          console.log('⚠️ No end_time in queued data, skipping');
+          break;
+        }
+        
         // Find the existing log by user/retailer/date and update
         const { data: logsToUpdate, error: findLogError } = await supabase
           .from('retailer_visit_logs')
-          .select('id')
+          .select('id, end_time')
           .eq('user_id', data.user_id)
           .eq('retailer_id', data.retailer_id)
           .eq('visit_date', data.visit_date)
@@ -765,15 +775,23 @@ export function useOfflineSync() {
         if (findLogError) throw findLogError;
         
         if (logsToUpdate && logsToUpdate.length > 0) {
-          const { error: updateLogError } = await supabase
-            .from('retailer_visit_logs')
-            .update({
-              end_time: data.end_time,
-              time_spent_seconds: data.time_spent_seconds
-            })
-            .eq('id', logsToUpdate[0].id);
-          if (updateLogError) throw updateLogError;
-          console.log('✅ Visit log updated in database');
+          const existingEndTime = logsToUpdate[0].end_time;
+          
+          // Only update if our queued end_time is newer than what's in DB
+          // This prevents older queue items from overwriting newer data
+          if (!existingEndTime || new Date(queuedEndTime) > new Date(existingEndTime)) {
+            const { error: updateLogError } = await supabase
+              .from('retailer_visit_logs')
+              .update({
+                end_time: queuedEndTime,
+                time_spent_seconds: queuedTimeSpent
+              })
+              .eq('id', logsToUpdate[0].id);
+            if (updateLogError) throw updateLogError;
+            console.log('✅ Visit log updated in database with queued timestamp:', queuedEndTime);
+          } else {
+            console.log('⏭️ Skipping update - DB has newer end_time than queued');
+          }
         } else {
           console.log('⚠️ No existing log found to update, skipping');
         }
