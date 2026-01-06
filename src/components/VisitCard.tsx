@@ -409,11 +409,9 @@ export const VisitCard = ({
   const isTodaysVisit = selectedDate === localTodayString;
 
   // Ensure visit tracking ends when this card unmounts or user navigates away
-  useEffect(() => {
-    return () => {
-      try { endTracking?.(); } catch {}
-    };
-  }, [endTracking]);
+  // REMOVED: Do NOT call endTracking on unmount - it was incorrectly updating end_time to "now"
+  // Unmount happens for UI reasons (navigation, scroll) and must not affect visit tracking times
+  // The visit log's end_time is correctly updated only on actual user interactions via recordAction()
 
   // Load retailer data for overview modal
   useEffect(() => {
