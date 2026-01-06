@@ -13,11 +13,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Gift, Search, Loader2, AlertTriangle, TrendingUp, Calendar, Globe, MapPin, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2, Gift, Search, Loader2, AlertTriangle, TrendingUp, Calendar, Globe, MapPin, Settings, Bot, Sparkles, RefreshCw } from 'lucide-react';
 import { SchemeFormFields } from './SchemeFormFields';
 import { SchemeDetailsDisplay } from './SchemeDetailsDisplay';
 import { SchemeApplicabilitySelector, ApplicabilityRule } from './SchemeApplicabilitySelector';
 import { SchemePolicyConfig } from './SchemePolicyConfig';
+import { AISuggestionCard } from './AISuggestionCard';
+import { AISuggestionReview } from './AISuggestionReview';
+import { useAISchemeSuggestions, AISchemeSuggestion } from '@/hooks/useAISchemeSuggestions';
 
 interface ProductCategory {
   id: string;
@@ -119,6 +122,7 @@ export const SchemeMaster = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
 
   // Applicability state
   const [applicabilityRules, setApplicabilityRules] = useState<ApplicabilityRule[]>([]);
@@ -126,6 +130,26 @@ export const SchemeMaster = () => {
   // Bulk action states
   const [selectedSchemes, setSelectedSchemes] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
+  // Main tab state
+  const [mainTab, setMainTab] = useState('manual');
+
+  // AI Suggestions
+  const {
+    suggestions: aiSuggestions,
+    isLoading: aiLoading,
+    isAnalyzing,
+    triggerAnalysis,
+    approveSuggestion,
+    rejectSuggestion,
+    isApproving,
+    isRejecting
+  } = useAISchemeSuggestions();
+
+  // AI Review dialog state
+  const [reviewingSuggestion, setReviewingSuggestion] = useState<AISchemeSuggestion | null>(null);
+  const [reviewMode, setReviewMode] = useState<'preview' | 'edit'>('preview');
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -430,15 +454,22 @@ export const SchemeMaster = () => {
         statusFilter === 'all' ||
         (statusFilter === 'active' && scheme.is_active) ||
         (statusFilter === 'inactive' && !scheme.is_active);
+
+      const schemeSource = (scheme as any).source || 'manual';
+      const matchesSource = 
+        sourceFilter === 'all' ||
+        (sourceFilter === 'manual' && schemeSource === 'manual') ||
+        (sourceFilter === 'ai' && schemeSource === 'ai_suggested');
       
-      return matchesSearch && matchesType && matchesStatus;
+      return matchesSearch && matchesType && matchesStatus && matchesSource;
     });
-  }, [schemes, searchQuery, typeFilter, statusFilter]);
+  }, [schemes, searchQuery, typeFilter, statusFilter, sourceFilter]);
 
   // Statistics
   const stats = useMemo(() => {
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const aiCount = schemes.filter(s => (s as any).source === 'ai_suggested').length;
     
     return {
       total: schemes.length,
@@ -448,9 +479,11 @@ export const SchemeMaster = () => {
         if (!s.end_date || !s.is_active) return false;
         const endDate = new Date(s.end_date);
         return endDate > now && endDate <= sevenDaysFromNow;
-      }).length
+      }).length,
+      aiSuggested: aiCount,
+      pendingSuggestions: aiSuggestions.length
     };
-  }, [schemes]);
+  }, [schemes, aiSuggestions]);
 
   // Unique scheme types for filter
   const schemeTypes = useMemo(() => {
@@ -468,7 +501,7 @@ export const SchemeMaster = () => {
   return (
     <div className="space-y-6">
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -521,9 +554,41 @@ export const SchemeMaster = () => {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-purple-200 bg-purple-50/30">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Bot className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.pendingSuggestions}</p>
+                <p className="text-sm text-muted-foreground">AI Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Main Content Card */}
+      {/* Main Tabs */}
+      <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="manual" className="flex items-center gap-2">
+            <Gift className="h-4 w-4" />
+            Manual Schemes
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-2">
+            <Bot className="h-4 w-4" />
+            AI Suggestions
+            {stats.pendingSuggestions > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-700">
+                {stats.pendingSuggestions}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Manual Schemes Tab */}
+        <TabsContent value="manual" className="mt-4">
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -663,6 +728,16 @@ export const SchemeMaster = () => {
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-full md:w-[150px]">
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="ai">AI Suggested</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Bulk Actions */}
@@ -707,6 +782,7 @@ export const SchemeMaster = () => {
                     />
                   </TableHead>
                   <TableHead>Scheme Name</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Product/Category</TableHead>
                   <TableHead>Targeting</TableHead>
                   <TableHead>Type</TableHead>
@@ -718,7 +794,7 @@ export const SchemeMaster = () => {
               <TableBody>
                 {filteredSchemes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No schemes found
                     </TableCell>
                   </TableRow>
@@ -742,6 +818,18 @@ export const SchemeMaster = () => {
                           <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                             {scheme.description}
                           </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {(scheme as any).source === 'ai_suggested' ? (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                            <Bot className="h-3 w-3 mr-1" />
+                            AI
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                            Manual
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -802,6 +890,111 @@ export const SchemeMaster = () => {
           </ScrollArea>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* AI Suggestions Tab */}
+        <TabsContent value="ai" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-purple-600" />
+                    AI-Suggested Schemes
+                  </CardTitle>
+                  <CardDescription>
+                    Review and approve AI-generated scheme recommendations
+                  </CardDescription>
+                </div>
+                <Button 
+                  onClick={triggerAnalysis} 
+                  disabled={isAnalyzing}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Analyze Now
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {aiLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                </div>
+              ) : aiSuggestions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Pending Suggestions</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Click "Analyze Now" to generate AI-powered scheme recommendations based on your business data.
+                  </p>
+                  <Button 
+                    onClick={triggerAnalysis} 
+                    disabled={isAnalyzing}
+                    variant="outline"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate Suggestions
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {aiSuggestions.map((suggestion) => (
+                    <AISuggestionCard
+                      key={suggestion.id}
+                      suggestion={suggestion}
+                      onPreview={() => {
+                        setReviewingSuggestion(suggestion);
+                        setReviewMode('preview');
+                        setIsReviewOpen(true);
+                      }}
+                      onEdit={() => {
+                        setReviewingSuggestion(suggestion);
+                        setReviewMode('edit');
+                        setIsReviewOpen(true);
+                      }}
+                      onApprove={() => {
+                        approveSuggestion({ suggestion });
+                      }}
+                      onReject={() => {
+                        setReviewingSuggestion(suggestion);
+                        setReviewMode('preview');
+                        setIsReviewOpen(true);
+                      }}
+                      isApproving={isApproving}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* AI Review Dialog */}
+      <AISuggestionReview
+        suggestion={reviewingSuggestion}
+        open={isReviewOpen}
+        onOpenChange={setIsReviewOpen}
+        onApprove={(suggestion, modifications) => {
+          approveSuggestion({ suggestion, modifications });
+        }}
+        onReject={(suggestionId, reason) => {
+          rejectSuggestion({ suggestionId, reason });
+        }}
+        mode={reviewMode}
+        isApproving={isApproving}
+        isRejecting={isRejecting}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}>
