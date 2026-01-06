@@ -53,27 +53,11 @@ const TerritoryDashboard = () => {
 
   useEffect(() => {
     loadDashboardData();
-
-    // Set up real-time subscription for orders
-    const channel = supabase
-      .channel('territory-dashboard-orders')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders'
-        },
-        (payload) => {
-          console.log('Order change detected:', payload);
-          loadDashboardData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    
+    // REMOVED: Real-time subscription
+    // Per offline-first architecture: Territory Dashboard should rely on
+    // periodic refresh or manual refresh, not real-time subscriptions.
+    // Real-time updates are for manager dashboards accessed via web, not mobile.
   }, [dateRange]);
 
   const loadDashboardData = async () => {

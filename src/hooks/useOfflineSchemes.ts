@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { supabase } from '@/integrations/supabase/client';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface ProductScheme {
   id: string;
@@ -30,7 +29,6 @@ export const useOfflineSchemes = () => {
   const [schemes, setSchemes] = useState<ProductScheme[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Monitor online status
   useEffect(() => {
@@ -143,39 +141,10 @@ export const useOfflineSchemes = () => {
     }
   }, [isOnline, syncSchemesFromSupabase]);
 
-  // Set up real-time subscription
-  useEffect(() => {
-    if (!isOnline) return;
-
-    console.log('[useOfflineSchemes] Setting up real-time subscription...');
-    
-    channelRef.current = supabase
-      .channel('product_schemes_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'product_schemes'
-        },
-        (payload) => {
-          console.log('[useOfflineSchemes] Real-time update:', payload.eventType);
-          // Re-sync schemes when any change occurs
-          syncSchemesFromSupabase();
-        }
-      )
-      .subscribe((status) => {
-        console.log('[useOfflineSchemes] Subscription status:', status);
-      });
-
-    return () => {
-      if (channelRef.current) {
-        console.log('[useOfflineSchemes] Cleaning up subscription');
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [isOnline, syncSchemesFromSupabase]);
+  // REMOVED: Real-time subscription
+  // Per offline-first architecture: Schemes should NOT update mid-order
+  // Scheme changes apply on next app launch/manual refresh, not in real-time
+  // This prevents mid-order price changes and UI flickering
 
   // Initial load
   useEffect(() => {
