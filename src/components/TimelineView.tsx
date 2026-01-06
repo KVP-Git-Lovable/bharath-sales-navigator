@@ -368,15 +368,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   <Card className="p-2 sm:p-3 bg-muted/50 border-none">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1">
                           <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
-                          <div>
-                            <div className="text-lg sm:text-2xl font-bold">
-                              {visit.order_value.toLocaleString('en-IN', {
-                                maximumFractionDigits: 2,
-                              })}
-                            </div>
-                            <div className="text-xs text-muted-foreground">Rs.</div>
+                          <div className="text-lg sm:text-2xl font-bold">
+                            Rs. {visit.order_value.toLocaleString('en-IN', {
+                              maximumFractionDigits: 2,
+                            })}
                           </div>
                         </div>
                       </div>
