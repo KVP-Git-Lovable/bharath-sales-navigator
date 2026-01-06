@@ -1546,6 +1546,7 @@ export const MyVisits = () => {
               <UserSelector 
                 selectedUserId={selectedViewUserId} 
                 onUserChange={setSelectedViewUserId}
+                showAllOption={false}
                 className="w-full sm:w-auto"
               />
             )}
