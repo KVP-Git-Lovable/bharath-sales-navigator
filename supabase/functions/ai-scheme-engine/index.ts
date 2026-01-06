@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
 interface AnalysisContext {
   products: any[];
@@ -52,11 +52,11 @@ serve(async (req) => {
   }
 
   try {
-    // Check if OpenAI API key is configured
-    if (!openaiApiKey) {
-      console.error('OPENAI_API_KEY not configured');
+    // Check if Lovable API key is configured
+    if (!lovableApiKey) {
+      console.error('LOVABLE_API_KEY not configured');
       return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured. Please add OPENAI_API_KEY secret.' 
+        error: 'Lovable AI not configured. LOVABLE_API_KEY should be auto-provisioned.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -94,8 +94,8 @@ serve(async (req) => {
       // Generate suggestions using AI with timeout
       let suggestions: SchemeSuggestion[] = [];
       try {
-        console.log('Calling OpenAI...');
-        suggestions = await generateSchemeSuggestions(context);
+        console.log('Calling Lovable AI...');
+        suggestions = await generateSchemeSuggestions(context, lovableApiKey!);
         console.log('Generated suggestions:', suggestions.length);
       } catch (aiError) {
         console.error('AI generation error:', aiError);
@@ -348,7 +348,7 @@ async function gatherAnalysisContext(supabase: any): Promise<AnalysisContext> {
   };
 }
 
-async function generateSchemeSuggestions(context: AnalysisContext): Promise<SchemeSuggestion[]> {
+async function generateSchemeSuggestions(context: AnalysisContext, apiKey: string): Promise<SchemeSuggestion[]> {
   const systemPrompt = `You are an expert sales promotion strategist. Analyze data and suggest 2-3 targeted promotional schemes.
 
 Available scheme types: percentage_discount, flat_discount, buy_x_get_y_free, bundle_combo, tiered_discount, time_based_offer, first_order_discount, category_wide_discount
@@ -397,22 +397,21 @@ Suggest validity of 7-14 days.`;
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         max_tokens: 1500,
-        temperature: 0.7
       }),
       signal: controller.signal
     });
@@ -421,8 +420,14 @@ Suggest validity of 7-14 days.`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText.slice(0, 100)}`);
+      console.error('Lovable AI error:', response.status, errorText);
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+      if (response.status === 402) {
+        throw new Error('AI credits exhausted. Please add funds to your Lovable workspace.');
+      }
+      throw new Error(`Lovable AI error: ${response.status} - ${errorText.slice(0, 100)}`);
     }
 
     const data = await response.json();
@@ -464,10 +469,10 @@ Suggest validity of 7-14 days.`;
     return suggestions;
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('OpenAI request timed out');
+      console.error('Lovable AI request timed out');
       throw new Error('AI request timed out - please try again');
     }
-    console.error('Error calling OpenAI:', error);
+    console.error('Error calling Lovable AI:', error);
     throw error;
   }
 }
