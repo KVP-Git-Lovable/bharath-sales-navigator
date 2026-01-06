@@ -11,10 +11,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Gift, Search, Loader2, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Gift, Search, Loader2, AlertTriangle, TrendingUp, Calendar, Globe, MapPin, Settings } from 'lucide-react';
 import { SchemeFormFields } from './SchemeFormFields';
 import { SchemeDetailsDisplay } from './SchemeDetailsDisplay';
+import { SchemeApplicabilitySelector, ApplicabilityRule } from './SchemeApplicabilitySelector';
+import { SchemePolicyConfig } from './SchemePolicyConfig';
 
 interface ProductCategory {
   id: string;
@@ -90,7 +93,11 @@ const initialSchemeForm = {
   min_order_value: 0,
   is_active: true,
   start_date: '',
-  end_date: ''
+  end_date: '',
+  // New applicability fields
+  applicability_type: 'global' as 'global' | 'targeted' | 'hybrid',
+  priority: 0,
+  exclusion_group: ''
 };
 
 export const SchemeMaster = () => {
@@ -112,6 +119,9 @@ export const SchemeMaster = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Applicability state
+  const [applicabilityRules, setApplicabilityRules] = useState<ApplicabilityRule[]>([]);
 
   // Bulk action states
   const [selectedSchemes, setSelectedSchemes] = useState<string[]>([]);
@@ -170,6 +180,8 @@ export const SchemeMaster = () => {
 
   const handleSchemeSubmit = async () => {
     try {
+      let schemeId = schemeForm.id;
+      
       if (schemeForm.id) {
         const { error } = await supabase
           .from('product_schemes')
@@ -196,14 +208,16 @@ export const SchemeMaster = () => {
             min_order_value: schemeForm.min_order_value,
             is_active: schemeForm.is_active,
             start_date: schemeForm.start_date || null,
-            end_date: schemeForm.end_date || null
+            end_date: schemeForm.end_date || null,
+            applicability_type: schemeForm.applicability_type,
+            priority: schemeForm.priority,
+            exclusion_group: schemeForm.exclusion_group || null
           })
           .eq('id', schemeForm.id);
         
         if (error) throw error;
-        toast.success('Scheme updated successfully');
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('product_schemes')
           .insert({
             product_id: schemeForm.product_id || null,
@@ -228,15 +242,42 @@ export const SchemeMaster = () => {
             min_order_value: schemeForm.min_order_value,
             is_active: schemeForm.is_active,
             start_date: schemeForm.start_date || null,
-            end_date: schemeForm.end_date || null
-          });
+            end_date: schemeForm.end_date || null,
+            applicability_type: schemeForm.applicability_type,
+            priority: schemeForm.priority,
+            exclusion_group: schemeForm.exclusion_group || null
+          })
+          .select('id')
+          .single();
         
         if (error) throw error;
-        toast.success('Scheme created successfully');
+        schemeId = data?.id;
       }
-      
+
+      // Save applicability rules
+      if (schemeId && schemeForm.applicability_type === 'targeted' && applicabilityRules.length > 0) {
+        // Delete existing rules
+        await supabase.from('scheme_applicability').delete().eq('scheme_id', schemeId);
+        
+        // Insert new rules
+        const rulesToInsert = applicabilityRules.map(rule => ({
+          scheme_id: schemeId,
+          applicability_level: rule.level,
+          entity_id: rule.entityId || null,
+          entity_name: rule.entityName,
+          include_children: rule.includeChildren
+        }));
+        
+        await supabase.from('scheme_applicability').insert(rulesToInsert);
+      } else if (schemeId && schemeForm.applicability_type === 'global') {
+        // Clear rules if global
+        await supabase.from('scheme_applicability').delete().eq('scheme_id', schemeId);
+      }
+
+      toast.success(schemeForm.id ? 'Scheme updated successfully' : 'Scheme created successfully');
       setIsSchemeDialogOpen(false);
       setSchemeForm(initialSchemeForm);
+      setApplicabilityRules([]);
       fetchSchemes();
     } catch (error) {
       console.error('Error saving scheme:', error);
@@ -342,9 +383,37 @@ export const SchemeMaster = () => {
       min_order_value: scheme.min_order_value || 0,
       is_active: scheme.is_active,
       start_date: scheme.start_date || '',
-      end_date: scheme.end_date || ''
+      end_date: scheme.end_date || '',
+      applicability_type: ((scheme as any).applicability_type as 'global' | 'targeted' | 'hybrid') || 'global',
+      priority: (scheme as any).priority || 0,
+      exclusion_group: (scheme as any).exclusion_group || ''
     });
+    // Load applicability rules for this scheme
+    loadApplicabilityRules(scheme.id);
     setIsSchemeDialogOpen(true);
+  };
+
+  const loadApplicabilityRules = async (schemeId: string) => {
+    try {
+      const { data } = await supabase
+        .from('scheme_applicability')
+        .select('*')
+        .eq('scheme_id', schemeId);
+      
+      if (data) {
+        setApplicabilityRules(data.map(r => ({
+          level: r.applicability_level as ApplicabilityRule['level'],
+          entityId: r.entity_id || '',
+          entityName: r.entity_name || '',
+          includeChildren: r.include_children ?? true
+        })));
+      } else {
+        setApplicabilityRules([]);
+      }
+    } catch (error) {
+      console.error('Error loading applicability rules:', error);
+      setApplicabilityRules([]);
+    }
   };
 
   // Filter schemes
@@ -467,38 +536,96 @@ export const SchemeMaster = () => {
                 Manage promotional schemes, discounts, and special offers
               </CardDescription>
             </div>
-            <Dialog open={isSchemeDialogOpen} onOpenChange={setIsSchemeDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => setSchemeForm(initialSchemeForm)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Scheme
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[90vh] overflow-hidden">
-                <DialogHeader>
-                  <DialogTitle>{schemeForm.id ? 'Edit Scheme' : 'Add New Scheme'}</DialogTitle>
-                  <DialogDescription>
-                    {schemeForm.id ? 'Update scheme details' : 'Create a new promotional scheme'}
-                  </DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="h-[60vh] pr-4">
-                  <SchemeFormFields 
-                    schemeForm={schemeForm} 
-                    setSchemeForm={setSchemeForm}
-                    products={products}
-                    categories={categories}
-                  />
-                </ScrollArea>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsSchemeDialogOpen(false)}>
-                    Cancel
+            <div className="flex items-center gap-2">
+              <SchemePolicyConfig />
+              <Dialog open={isSchemeDialogOpen} onOpenChange={(open) => {
+                setIsSchemeDialogOpen(open);
+                if (!open) {
+                  setApplicabilityRules([]);
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => {
+                    setSchemeForm(initialSchemeForm);
+                    setApplicabilityRules([]);
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Scheme
                   </Button>
-                  <Button onClick={handleSchemeSubmit}>
-                    {schemeForm.id ? 'Update' : 'Create'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden">
+                  <DialogHeader>
+                    <DialogTitle>{schemeForm.id ? 'Edit Scheme' : 'Add New Scheme'}</DialogTitle>
+                    <DialogDescription>
+                      {schemeForm.id ? 'Update scheme details' : 'Create a new promotional scheme'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Tabs defaultValue="details" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="details">Scheme Details</TabsTrigger>
+                      <TabsTrigger value="applicability">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        Targeting
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="details">
+                      <ScrollArea className="h-[55vh] pr-4">
+                        <SchemeFormFields 
+                          schemeForm={schemeForm} 
+                          setSchemeForm={setSchemeForm}
+                          products={products}
+                          categories={categories}
+                        />
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="applicability">
+                      <ScrollArea className="h-[55vh] pr-4">
+                        <SchemeApplicabilitySelector
+                          applicabilityType={schemeForm.applicability_type}
+                          setApplicabilityType={(type) => setSchemeForm({ ...schemeForm, applicability_type: type })}
+                          applicabilityRules={applicabilityRules}
+                          setApplicabilityRules={setApplicabilityRules}
+                        />
+                        
+                        {/* Priority & Exclusion Group */}
+                        <div className="mt-6 space-y-4 border-t pt-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium">Priority</label>
+                              <p className="text-xs text-muted-foreground mb-2">Higher = evaluated first</p>
+                              <Input
+                                type="number"
+                                value={schemeForm.priority}
+                                onChange={(e) => setSchemeForm({ ...schemeForm, priority: parseInt(e.target.value) || 0 })}
+                                min={0}
+                                max={100}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Exclusion Group</label>
+                              <p className="text-xs text-muted-foreground mb-2">Mutually exclusive schemes</p>
+                              <Input
+                                value={schemeForm.exclusion_group}
+                                onChange={(e) => setSchemeForm({ ...schemeForm, exclusion_group: e.target.value })}
+                                placeholder="e.g., festival_offers"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsSchemeDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSchemeSubmit}>
+                      {schemeForm.id ? 'Update' : 'Create'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -581,9 +708,9 @@ export const SchemeMaster = () => {
                   </TableHead>
                   <TableHead>Scheme Name</TableHead>
                   <TableHead>Product/Category</TableHead>
+                  <TableHead>Targeting</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Details</TableHead>
-                  <TableHead>Validity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -621,20 +748,28 @@ export const SchemeMaster = () => {
                         {scheme.product?.name || scheme.category?.name || 'All Products'}
                       </TableCell>
                       <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            (scheme as any).applicability_type === 'targeted' 
+                              ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                              : 'bg-gray-50 text-gray-700 border-gray-200'
+                          }
+                        >
+                          {(scheme as any).applicability_type === 'targeted' ? (
+                            <><MapPin className="h-3 w-3 mr-1" />Targeted</>
+                          ) : (
+                            <><Globe className="h-3 w-3 mr-1" />Global</>
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="outline" className="capitalize">
                           {scheme.scheme_type.replace(/_/g, ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <SchemeDetailsDisplay scheme={scheme} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          {scheme.start_date ? new Date(scheme.start_date).toLocaleDateString() : 'No start'} 
-                          {' - '}
-                          {scheme.end_date ? new Date(scheme.end_date).toLocaleDateString() : 'No end'}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={scheme.is_active ? 'default' : 'secondary'}>

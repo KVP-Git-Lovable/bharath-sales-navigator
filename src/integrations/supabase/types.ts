@@ -6813,6 +6813,7 @@ export type Database = {
       }
       product_schemes: {
         Row: {
+          applicability_type: string | null
           bundle_discount_amount: number | null
           bundle_discount_percentage: number | null
           bundle_product_ids: string[] | null
@@ -6820,17 +6821,21 @@ export type Database = {
           category_id: string | null
           condition_quantity: number | null
           created_at: string
+          current_usage_count: number | null
           description: string | null
           discount_amount: number | null
           discount_percentage: number | null
           end_date: string | null
+          exclusion_group: string | null
           free_product_id: string | null
           free_quantity: number | null
           id: string
           is_active: boolean | null
           is_first_order_only: boolean | null
+          max_usage_count: number | null
           min_order_value: number | null
           name: string
+          priority: number | null
           product_id: string | null
           quantity_condition_type: string | null
           scheme_type: string
@@ -6841,6 +6846,7 @@ export type Database = {
           variant_id: string | null
         }
         Insert: {
+          applicability_type?: string | null
           bundle_discount_amount?: number | null
           bundle_discount_percentage?: number | null
           bundle_product_ids?: string[] | null
@@ -6848,17 +6854,21 @@ export type Database = {
           category_id?: string | null
           condition_quantity?: number | null
           created_at?: string
+          current_usage_count?: number | null
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
           end_date?: string | null
+          exclusion_group?: string | null
           free_product_id?: string | null
           free_quantity?: number | null
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
+          max_usage_count?: number | null
           min_order_value?: number | null
           name: string
+          priority?: number | null
           product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
@@ -6869,6 +6879,7 @@ export type Database = {
           variant_id?: string | null
         }
         Update: {
+          applicability_type?: string | null
           bundle_discount_amount?: number | null
           bundle_discount_percentage?: number | null
           bundle_product_ids?: string[] | null
@@ -6876,17 +6887,21 @@ export type Database = {
           category_id?: string | null
           condition_quantity?: number | null
           created_at?: string
+          current_usage_count?: number | null
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
           end_date?: string | null
+          exclusion_group?: string | null
           free_product_id?: string | null
           free_quantity?: number | null
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
+          max_usage_count?: number | null
           min_order_value?: number | null
           name?: string
+          priority?: number | null
           product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
@@ -8888,6 +8903,74 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scheme_applicability: {
+        Row: {
+          applicability_level: string
+          created_at: string | null
+          entity_id: string | null
+          entity_name: string | null
+          id: string
+          include_children: boolean | null
+          scheme_id: string
+        }
+        Insert: {
+          applicability_level: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_name?: string | null
+          id?: string
+          include_children?: boolean | null
+          scheme_id: string
+        }
+        Update: {
+          applicability_level?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_name?: string | null
+          id?: string
+          include_children?: boolean | null
+          scheme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheme_applicability_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "product_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheme_policy_config: {
+        Row: {
+          description: string | null
+          id: string
+          is_active: boolean | null
+          policy_name: string
+          policy_value: Json
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          policy_name: string
+          policy_value: Json
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          policy_name?: string
+          policy_value?: Json
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       security_profiles: {
         Row: {
