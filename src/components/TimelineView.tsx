@@ -331,10 +331,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       <Badge className="bg-purple-500 text-white text-xs">🤝 JOINT</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-                    <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {visit.activity_time ? format(new Date(visit.activity_time), 'hh:mm a') : format(new Date(visit.check_in_time), 'hh:mm a')}
-                  </div>
                 </div>
 
                 {/* Retailer Name */}
