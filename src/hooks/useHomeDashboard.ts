@@ -88,6 +88,7 @@ const getDefaultState = (): HomeDashboardData => ({
 export const useHomeDashboard = (userId: string | undefined, selectedDate: Date = new Date()) => {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const isRefreshingRef = useRef(false);
+  const lastSyncRefreshRef = useRef<number>(0);
   
   // Cache key for localStorage persistence
   const CACHE_KEY = `home_dashboard_cache_${userId}`;
@@ -519,26 +520,32 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
       }
     });
 
-    setData(prev => ({
-      ...prev,
-      todayData: {
-        ...prev.todayData,
-        beatPlan: beatPlansArray[0] || null,
-        beatName,
-        visits: todayVisits,
-        nextVisit,
-        attendance: todayAttendance,
-        beatProgress: {
-          total: totalPlannedRetailers,
-          completed: productive + unproductive,
-          remaining: notYetVisited,
-          planned: totalPlannedRetailers,
-          productive,
-          unproductive,
-        }
-      },
-      isLoading: false
-    }));
+    setData(prev => {
+      // CRITICAL: Preserve existing attendance to prevent flickering during refresh
+      // Only update attendance if we have new valid attendance data
+      const finalAttendance = todayAttendance || prev.todayData.attendance;
+      
+      return {
+        ...prev,
+        todayData: {
+          ...prev.todayData,
+          beatPlan: beatPlansArray[0] || null,
+          beatName,
+          visits: todayVisits,
+          nextVisit,
+          attendance: finalAttendance,
+          beatProgress: {
+            total: totalPlannedRetailers,
+            completed: productive + unproductive,
+            remaining: notYetVisited,
+            planned: totalPlannedRetailers,
+            productive,
+            unproductive,
+          }
+        },
+        isLoading: false
+      };
+    });
   };
 
   // Initial load
@@ -567,8 +574,16 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
       loadDashboardData();
     };
     
-    // Listen for sync complete event (offline -> online sync finished)
+    // Listen for sync complete event (offline -> online sync finished) - DEBOUNCED
     const handleSyncComplete = () => {
+      // Debounce: Skip if refreshed within last 5 seconds
+      const now = Date.now();
+      if (now - lastSyncRefreshRef.current < 5000) {
+        console.log('🔄 [HOME] Skipping sync refresh - debounced');
+        return;
+      }
+      lastSyncRefreshRef.current = now;
+      
       console.log('🔄 [HOME] Sync complete, refreshing dashboard...');
       setTimeout(() => {
         loadDashboardData();
