@@ -621,25 +621,20 @@ const isRefreshingRef = useRef(false);
     
   // Listen for explicit visit data changes
   useEffect(() => {
+    // CHANGED: visitDataChanged should NOT trigger full refresh
+    // Per offline-first architecture: Background sync updates cache,
+    // UI updates on next app resume or manual refresh
     const handleVisitDataChanged = () => {
-      console.log('📢 [HOME] visitDataChanged event received, refreshing...');
-      loadDashboardData();
+      console.log('📢 [HOME] visitDataChanged event received - local state already updated, no full refresh');
+      // NO loadDashboardData() - data was already updated locally by the action that triggered this event
     };
     
-    // Listen for sync complete event (offline -> online sync finished) - DEBOUNCED
+    // CHANGED: syncComplete should NOT trigger full refresh
+    // Per offline-first architecture: Sync only backs up to server,
+    // UI already reflects local state
     const handleSyncComplete = () => {
-      // Debounce: Skip if refreshed within last 5 seconds
-      const now = Date.now();
-      if (now - lastSyncRefreshRef.current < 5000) {
-        console.log('🔄 [HOME] Skipping sync refresh - debounced');
-        return;
-      }
-      lastSyncRefreshRef.current = now;
-      
-      console.log('🔄 [HOME] Sync complete, refreshing dashboard...');
-      setTimeout(() => {
-        loadDashboardData();
-      }, 500);
+      console.log('🔄 [HOME] Sync complete - cache synced to server, no UI refresh needed');
+      // NO loadDashboardData() - UI already shows correct local state
     };
     
     // Listen for visit status changes (immediate order updates) - includes orderValue for instant revenue update
@@ -698,8 +693,9 @@ const isRefreshingRef = useRef(false);
         }
       }
       
-      // Also trigger a background refresh to sync with latest data
-      setTimeout(() => loadDashboardData(), 1000);
+      // REMOVED: Background refresh after visitStatusChanged
+      // Per offline-first architecture: State was already updated above,
+      // no need for network refresh which can cause UI flickering
     };
     
     // Handle immediate attendance lock when marked
