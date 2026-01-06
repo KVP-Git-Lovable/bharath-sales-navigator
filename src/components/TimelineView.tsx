@@ -365,25 +365,23 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
                 {/* Order Details or Unproductive Reason */}
                 {visit.order_value && visit.order_value > 0 ? (
-                  <Card className="p-2 sm:p-3 bg-muted/50 border-none">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="flex items-center gap-1">
-                          <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
-                          <div className="text-lg sm:text-2xl font-bold">
-                            Rs. {visit.order_value.toLocaleString('en-IN', {
-                              maximumFractionDigits: 2,
-                            })}
-                          </div>
-                        </div>
+                  <Card className="p-3 sm:p-4 bg-muted/50 border-none">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <ShoppingCart className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-base sm:text-lg font-bold">
+                          Rs. {visit.order_value.toLocaleString('en-IN', {
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
                       </div>
 
                       {visit.order_quantity && visit.order_quantity > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
-                          <div className="text-lg sm:text-2xl font-bold">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-primary flex-shrink-0" />
+                          <span className="text-base sm:text-lg font-bold">
                             Qty: {formatQuantityInKG(visit.order_quantity)}
-                          </div>
+                          </span>
                         </div>
                       )}
                     </div>
