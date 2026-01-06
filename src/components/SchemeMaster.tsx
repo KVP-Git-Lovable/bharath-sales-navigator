@@ -383,17 +383,10 @@ export const SchemeMaster = () => {
     };
   }, [schemes]);
 
-  // All available scheme types for filter
-  const allSchemeTypes = [
-    { value: 'percentage_discount', label: 'Percentage Discount' },
-    { value: 'flat_discount', label: 'Flat Discount' },
-    { value: 'buy_x_get_y_free', label: 'Buy X Get Y Free (BOGO)' },
-    { value: 'bundle_combo', label: 'Bundle / Combo' },
-    { value: 'tiered_discount', label: 'Tiered Discount' },
-    { value: 'time_based_offer', label: 'Time-Based Offer' },
-    { value: 'first_order_discount', label: 'First Order Discount' },
-    { value: 'category_wide_discount', label: 'Category Wide Discount' }
-  ];
+  // Unique scheme types for filter
+  const schemeTypes = useMemo(() => {
+    return [...new Set(schemes.map(s => s.scheme_type))];
+  }, [schemes]);
 
   if (loading) {
     return (
@@ -526,9 +519,9 @@ export const SchemeMaster = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {allSchemeTypes.map(type => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
+                {schemeTypes.map(type => (
+                  <SelectItem key={type} value={type}>
+                    {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </SelectItem>
                 ))}
               </SelectContent>
