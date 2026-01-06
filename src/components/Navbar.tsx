@@ -110,7 +110,13 @@ export const Navbar = memo(() => {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
     
-    navigate(-1);
+    // Check if there's history to go back to
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // Fallback to dashboard if no history
+      navigate('/dashboard');
+    }
     
     // Reset after navigation completes
     setTimeout(() => {
