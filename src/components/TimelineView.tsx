@@ -22,6 +22,7 @@ interface Visit {
   no_order_reason?: string;
   activity_time?: string;
   is_joint_sales?: boolean;
+  time_spent_seconds?: number;
 }
 
 interface TimelineViewProps {
@@ -53,6 +54,29 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
     return `${hours}h ${mins}m`;
+  };
+
+  const formatTimeSpentFromSeconds = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return 'In Progress';
+    
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    } else if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
+
+  const formatQuantityInKG = (quantityInGrams: number): string => {
+    const kg = quantityInGrams / 1000;
+    if (kg < 1) {
+      return `${quantityInGrams} g`;
+    }
+    return kg % 1 === 0 ? `${kg} KG` : `${kg.toFixed(2)} KG`;
   };
 
   const formatNoOrderReason = (reason?: string): string => {
@@ -267,9 +291,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           ? calculateTimeDifference(sortedVisits[index - 1].check_out_time || sortedVisits[index - 1].check_in_time, visit.check_in_time)
           : '0 Min';
         
-        const timeSpent = visit.check_out_time 
-          ? calculateTimeDifference(visit.check_in_time, visit.check_out_time)
-          : 'In Progress';
+        // Use pre-calculated time_spent_seconds if available
+        const timeSpent = visit.time_spent_seconds 
+          ? formatTimeSpentFromSeconds(visit.time_spent_seconds)
+          : visit.check_out_time 
+            ? calculateTimeDifference(visit.check_in_time, visit.check_out_time)
+            : 'In Progress';
         
         return (
           <div key={visit.id} className="relative">
@@ -291,18 +318,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
               <Card className="flex-1 min-w-0 p-3 sm:p-4 bg-card hover:shadow-md transition-shadow">
                 {/* Visit Header */}
+                {/* Visit Header - Simplified badges */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                   <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                     <Badge variant="outline" className="bg-primary/10 text-xs">OUTLET</Badge>
-                    {visit.order_value && visit.order_value > 0 && (
+                    {visit.order_value && visit.order_value > 0 ? (
                       <Badge className="bg-green-500 text-xs">ORDER PLACED</Badge>
+                    ) : (
+                      getStatusBadge(visit.status)
                     )}
                     {visit.is_joint_sales && (
-                      <Badge className="bg-purple-500 text-white text-xs">
-                        🤝 JOINT SALES
-                      </Badge>
+                      <Badge className="bg-purple-500 text-white text-xs">🤝 JOINT</Badge>
                     )}
-                    {getStatusBadge(visit.status)}
                   </div>
                   <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                     <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -313,18 +340,31 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 {/* Retailer Name */}
                 <h3 className="text-base sm:text-lg font-semibold mb-2 break-words">{visit.retailer_name}</h3>
 
-                {/* Location */}
+                {/* Location Icon Only */}
                 {visit.check_in_address && (
-                  <div className="flex items-start gap-2 text-xs sm:text-sm text-muted-foreground mb-3">
-                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0" />
-                    <span className="line-clamp-2 break-words">{visit.check_in_address}</span>
+                  <div className="flex items-center text-muted-foreground mb-2">
+                    <MapPin className="w-4 h-4" />
                   </div>
                 )}
 
-                {/* Time Spent */}
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground mb-3">
-                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span>Time Spent: <strong>{timeSpent}</strong></span>
+                {/* Visit Timing Details */}
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-3">
+                  {visit.check_in_time && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-green-500" />
+                      <span>In: <strong>{format(new Date(visit.check_in_time), 'hh:mm a')}</strong></span>
+                    </div>
+                  )}
+                  {visit.check_out_time && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-red-500" />
+                      <span>Out: <strong>{format(new Date(visit.check_out_time), 'hh:mm a')}</strong></span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>Duration: <strong>{timeSpent}</strong></span>
+                  </div>
                 </div>
 
                 {/* Order Details or Unproductive Reason */}
@@ -345,12 +385,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         </div>
                       </div>
 
-                      {visit.order_quantity && (
+                      {visit.order_quantity && visit.order_quantity > 0 && (
                         <div className="flex items-center gap-1">
                           <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary flex-shrink-0" />
                           <div>
-                            <div className="text-lg sm:text-2xl font-bold">{visit.order_quantity}</div>
-                            <div className="text-xs text-muted-foreground">QTY</div>
+                            <div className="text-lg sm:text-2xl font-bold">{formatQuantityInKG(visit.order_quantity)}</div>
+                            <div className="text-xs text-muted-foreground">Qty</div>
                           </div>
                         </div>
                       )}
