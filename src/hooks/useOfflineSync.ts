@@ -178,19 +178,12 @@ export function useOfflineSync() {
         }
       }
 
-      // Dispatch sync complete event to refresh all VisitCards
+      // SILENT SYNC: Per offline-first architecture, sync should NOT dispatch UI refresh events
+      // The UI already reflects local state. Sync only backs up data to server.
+      // REMOVED: syncComplete and visitDataChanged event dispatches
+      
       if (successCount > 0) {
-        console.log('📢 Dispatching syncComplete event to refresh UI');
-        window.dispatchEvent(new Event('syncComplete'));
-        
-        // Also dispatch visitDataChanged after a short delay to catch all updates
-        // Reduced from 500ms to 200ms for faster UI refresh
-        setTimeout(() => {
-          console.log('📢 Dispatching visitDataChanged after sync');
-          window.dispatchEvent(new Event('visitDataChanged'));
-        }, 200);
-        
-        // Sync van stock after all orders are synced - run once after all items processed
+        // Only run van stock sync silently in background
         console.log('🚚 Running final van stock sync after sync complete...');
         syncOrdersToVanStock(getTodayDateString()).catch(err => {
           console.error('Error in final van stock sync:', err);
@@ -325,15 +318,10 @@ export function useOfflineSync() {
           );
           console.log('✅ Visit status cache updated for retailer:', noOrderRetailerId);
           
-          // Dispatch events to update UI
-          window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-            detail: { visitId: effectiveNoOrderVisitId, status: 'unproductive', retailerId: noOrderRetailerId, noOrderReason }
-          }));
-        
-        setTimeout(() => {
-          console.log('✅ Dispatching visitDataChanged for unproductive count update');
-          window.dispatchEvent(new Event('visitDataChanged'));
-        }, 500);
+          // REMOVED: Event dispatches after individual sync items
+          // Per offline-first architecture: UI was already updated locally when the action was queued
+          // Sync only backs up to server, no UI refresh needed
+          console.log('✅ No-order visit synced silently to database');
         
         } catch (noOrderError) {
           console.error('❌ Error in UPDATE_VISIT_NO_ORDER:', noOrderError);

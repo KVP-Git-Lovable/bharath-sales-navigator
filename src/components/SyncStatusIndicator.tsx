@@ -146,16 +146,16 @@ export const SyncStatusIndicator = memo(() => {
     };
   }, [checkQueue]);
 
-  // Use managed interval - reduced frequency from 3s to 5s
-  useManagedInterval(
-    'sync-status-check',
-    checkQueue,
-    5000, // Increased from 3s to 5s
-    { runWhenHidden: false }
-  );
+  // REMOVED: Aggressive queue polling every 5 seconds
+  // Per event-based sync architecture: Only check queue on:
+  // - Component mount (done in useEffect above)
+  // - syncQueueUpdated event (when items are actually added)
+  // - online event (when connectivity returns)
+  // This prevents constant sync indicator activity on tab switches
 
-  // Track last sync time to prevent rapid re-syncs
+  // Track last sync time and queue count to prevent rapid re-syncs and sync loops
   const lastSyncTimeRef = useRef<number>(0);
+  const lastQueueCountRef = useRef<number>(0);
   const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
   
   // Monitor syncing status when coming online - SILENT mode with extended debounce to prevent loops
@@ -163,9 +163,15 @@ export const SyncStatusIndicator = memo(() => {
     // Skip if already syncing or offline
     if (isSyncing || !isOnline || syncQueueCount === 0) return;
     
-    // Prevent sync if we recently synced (within last 30 seconds) - increased from 10s
+    // SMART SYNC: Skip if queue count hasn't changed (likely stuck items)
+    if (syncQueueCount === lastQueueCountRef.current && syncQueueCount > 0) {
+      console.log('🔄 [SyncIndicator] Same queue count as before, skipping sync loop');
+      return;
+    }
+    
+    // Prevent sync if we recently synced (within last 60 seconds) - increased from 30s
     const now = Date.now();
-    if (now - lastSyncTimeRef.current < 30000) {
+    if (now - lastSyncTimeRef.current < 60000) {
       return;
     }
     
@@ -178,6 +184,7 @@ export const SyncStatusIndicator = memo(() => {
       if (!mountedRef.current || isSyncing) return;
       
       lastSyncTimeRef.current = Date.now();
+      lastQueueCountRef.current = syncQueueCount; // Track queue count to detect stuck items
       setIsSyncing(true);
       setLastSyncStatus(null);
 
