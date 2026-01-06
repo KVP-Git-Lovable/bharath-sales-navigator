@@ -539,10 +539,11 @@ export const useRetailerVisitTracking = ({
   const recordActivity = useCallback(async () => {
     if (!currentLogIdRef.current || !userId) return;
 
+    const targetDate = selectedDate || getLocalTodayDate();
     const currentTime = new Date().toISOString();
     
-    // Update last activity time
-    lastActivityTimeByRetailer.set(retailerId, currentTime);
+    // Update last activity time with date-based key (consistent with saveLastActivityTime)
+    saveLastActivityTime(retailerId, targetDate, currentTime);
 
     const isOffline = !navigator.onLine;
 
@@ -593,13 +594,38 @@ export const useRetailerVisitTracking = ({
         console.error('Failed to update activity online:', error);
       }
     }
-  }, [userId, retailerId]);
+  }, [userId, retailerId, selectedDate]);
 
   // End tracking and calculate time spent
+  // IMPORTANT: Never sets end_time to "now" unless we have a real activity time
   const endTracking = useCallback(async () => {
     if (!currentLogIdRef.current) return;
 
-    const endTime = lastActivityTimeByRetailer.get(retailerId) || new Date().toISOString();
+    const targetDate = selectedDate || getLocalTodayDate();
+    
+    // Priority 1: Check persisted last activity time (date-based key)
+    const persistedTime = await loadLastActivityTime(retailerId, targetDate);
+    
+    // Priority 2: Check local log's existing end_time
+    let localLogEndTime: string | null = null;
+    try {
+      const localLog = await offlineStorage.getById<VisitLog>(STORES.RETAILER_VISIT_LOGS, currentLogIdRef.current);
+      if (localLog?.end_time && localLog.end_time !== localLog.start_time) {
+        localLogEndTime = localLog.end_time;
+      }
+    } catch (e) {
+      // Non-critical
+    }
+    
+    // Use persisted time first, then local log time - NEVER fall back to "now"
+    const endTime = persistedTime || localLogEndTime;
+    
+    // If no real activity time exists, do nothing - don't invent a time
+    if (!endTime) {
+      console.log('📍 endTracking: No real activity time found, skipping update');
+      return;
+    }
+
     const { data: logData } = await supabase
       .from('retailer_visit_logs')
       .select('start_time')
@@ -623,7 +649,7 @@ export const useRetailerVisitTracking = ({
     }
 
     // Don't reset currentLogIdRef so we don't create duplicate logs
-  }, [retailerId]);
+  }, [retailerId, selectedDate]);
 
   // End all active logs on logout
   const endAllActiveLogs = useCallback(async () => {
@@ -638,8 +664,11 @@ export const useRetailerVisitTracking = ({
 
     if (activeLogs && activeLogs.length > 0) {
       for (const log of activeLogs) {
-        // Use stored last activity time or current time
-        const endTime = lastActivityTimeByRetailer.get(log.retailer_id) || new Date().toISOString();
+        // Use stored last activity time with date-based key, or try loading from persistence
+        const persistedTime = await loadLastActivityTime(log.retailer_id, targetDate);
+        const memoryTime = lastActivityTimeByRetailer.get(`${log.retailer_id}_${targetDate}`);
+        const endTime = persistedTime || memoryTime || new Date().toISOString();
+        
         const startTime = new Date(log.start_time).getTime();
         const endTimeMs = new Date(endTime).getTime();
         const timeSpentSeconds = Math.floor((endTimeMs - startTime) / 1000);
