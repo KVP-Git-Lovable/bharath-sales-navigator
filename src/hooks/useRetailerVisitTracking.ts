@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { getLocalTodayDate } from '@/utils/dateUtils';
+import { Preferences } from '@capacitor/preferences';
 
 interface VisitLog {
   id: string;
@@ -83,8 +84,42 @@ const getGPSWithTimeout = async (timeoutMs: number = 5000): Promise<{ lat: numbe
   }
 };
 
-// Global storage for last activity time per retailer (persists across hook instances)
+// Global in-memory cache for last activity time per retailer
 const lastActivityTimeByRetailer: Map<string, string> = new Map();
+
+// Persistence key prefix for last activity times
+const LAST_ACTIVITY_KEY_PREFIX = 'lastActivity_';
+
+// Save last activity time to both memory and persistent storage
+const saveLastActivityTime = async (retailerId: string, date: string, time: string): Promise<void> => {
+  const key = `${LAST_ACTIVITY_KEY_PREFIX}${retailerId}_${date}`;
+  lastActivityTimeByRetailer.set(`${retailerId}_${date}`, time);
+  try {
+    await Preferences.set({ key, value: time });
+  } catch (e) {
+    // Non-critical, continue
+  }
+};
+
+// Load last activity time from persistent storage (on demand)
+const loadLastActivityTime = async (retailerId: string, date: string): Promise<string | null> => {
+  // Check memory first
+  const memoryKey = `${retailerId}_${date}`;
+  const memoryValue = lastActivityTimeByRetailer.get(memoryKey);
+  if (memoryValue) return memoryValue;
+  
+  // Check persistent storage
+  try {
+    const { value } = await Preferences.get({ key: `${LAST_ACTIVITY_KEY_PREFIX}${retailerId}_${date}` });
+    if (value) {
+      lastActivityTimeByRetailer.set(memoryKey, value);
+      return value;
+    }
+  } catch (e) {
+    // Non-critical
+  }
+  return null;
+};
 
 export const useRetailerVisitTracking = ({
   retailerId,
@@ -286,8 +321,8 @@ export const useRetailerVisitTracking = ({
     const isOffline = !navigator.onLine;
     const currentTime = new Date().toISOString();
 
-    // Update last activity time for this retailer immediately
-    lastActivityTimeByRetailer.set(retailerId, currentTime);
+    // Update last activity time for this retailer immediately (both memory and persistent)
+    saveLastActivityTime(retailerId, targetDate, currentTime);
 
     // Get current GPS location (works offline)
     let userLat: number | undefined;
@@ -406,8 +441,10 @@ export const useRetailerVisitTracking = ({
 
         if (previousActiveLogs && previousActiveLogs.length > 0) {
           for (const log of previousActiveLogs) {
-            // Use stored last activity time for this retailer, or current time as fallback
-            const lastActivityTime = lastActivityTimeByRetailer.get(log.retailer_id) || currentTime;
+            // Use stored last activity time for this retailer (check persistent storage), or current time as fallback
+            const lastActivityTime = await loadLastActivityTime(log.retailer_id, targetDate) || 
+                                     lastActivityTimeByRetailer.get(log.retailer_id) || 
+                                     currentTime;
             const startTimeMs = new Date(log.start_time).getTime();
             const endTimeMs = new Date(lastActivityTime).getTime();
             const timeSpentSeconds = Math.max(0, Math.floor((endTimeMs - startTimeMs) / 1000));
@@ -427,8 +464,13 @@ export const useRetailerVisitTracking = ({
               })
               .eq('id', log.id);
             
-            // Clear the stored activity time for that retailer
+            // Clear the stored activity time for that retailer (both memory and persistent)
             lastActivityTimeByRetailer.delete(log.retailer_id);
+            try {
+              await Preferences.remove({ key: `${LAST_ACTIVITY_KEY_PREFIX}${log.retailer_id}_${targetDate}` });
+            } catch (e) {
+              // Non-critical
+            }
           }
         }
 
@@ -662,8 +704,8 @@ export const useRetailerVisitTracking = ({
     const targetDate = selectedDate || getLocalTodayDate();
     const currentTime = new Date().toISOString(); // Device time only - no network
     
-    // Update last activity time immediately
-    lastActivityTimeByRetailer.set(retailerId, currentTime);
+    // Update last activity time immediately (both memory and persistent storage)
+    saveLastActivityTime(retailerId, targetDate, currentTime);
     
     if (!currentLogIdRef.current) {
       // FIRST ACTION = CHECK-IN
@@ -740,15 +782,38 @@ export const useRetailerVisitTracking = ({
           setCurrentLog(updatedLog);
           setTimeSpent(timeSpentSeconds);
           
-          // Queue update for background sync
-          offlineStorage.addToSyncQueue('UPDATE_VISIT_LOG', {
-            id: currentLogIdRef.current,
-            user_id: userId,
-            retailer_id: retailerId,
-            visit_date: targetDate,
-            end_time: currentTime,
-            time_spent_seconds: timeSpentSeconds
-          }).catch(err => console.log('Queue error (non-fatal):', err));
+          // DEDUPE: Check if there's already a pending UPDATE_VISIT_LOG for this retailer/date
+          // If so, update it in place instead of adding a new queue item
+          try {
+            const syncQueue = await offlineStorage.getSyncQueue();
+            const existingQueueItem = syncQueue.find(
+              (item: any) => item.action === 'UPDATE_VISIT_LOG' && 
+                        item.data?.retailer_id === retailerId && 
+                        item.data?.visit_date === targetDate &&
+                        item.status === 'pending'
+            );
+            
+            if (existingQueueItem) {
+              // Update the existing queue item with new end_time
+              existingQueueItem.data.end_time = currentTime;
+              existingQueueItem.data.time_spent_seconds = timeSpentSeconds;
+              await offlineStorage.save(STORES.SYNC_QUEUE, existingQueueItem);
+              console.log('✅ Updated existing queue item with latest check-out time:', currentTime);
+            } else {
+              // No existing queue item, create new one
+              await offlineStorage.addToSyncQueue('UPDATE_VISIT_LOG', {
+                id: currentLogIdRef.current,
+                user_id: userId,
+                retailer_id: retailerId,
+                visit_date: targetDate,
+                end_time: currentTime,
+                time_spent_seconds: timeSpentSeconds
+              });
+              console.log('✅ Check-out queued for sync:', { timeSpentSeconds, time: currentTime });
+            }
+          } catch (queueErr) {
+            console.log('Queue error (non-fatal):', queueErr);
+          }
           
           console.log('✅ Check-out updated locally:', { timeSpentSeconds, time: currentTime });
         }
