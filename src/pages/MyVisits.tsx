@@ -515,6 +515,23 @@ export const MyVisits = () => {
       } = await supabase.from('orders').select('retailer_id, total_amount, created_at, order_items(quantity)').eq('user_id', user.id).eq('status', 'confirmed').in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
       if (ordersError) throw ordersError;
 
+      // Fetch retailer_visit_logs for accurate time tracking
+      const { data: visitLogs } = await supabase
+        .from('retailer_visit_logs')
+        .select('retailer_id, start_time, end_time, time_spent_seconds')
+        .eq('user_id', user.id)
+        .eq('visit_date', dateStr)
+        .in('retailer_id', retailerIds);
+
+      // Create visit logs map (using latest log per retailer)
+      const visitLogsMap = new Map();
+      (visitLogs || []).forEach(log => {
+        const existing = visitLogsMap.get(log.retailer_id);
+        if (!existing || new Date(log.start_time) > new Date(existing.start_time)) {
+          visitLogsMap.set(log.retailer_id, log);
+        }
+      });
+
       // Create order map with created_at time
       const orderMap = new Map();
       (orders || []).forEach(order => {
@@ -553,6 +570,7 @@ export const MyVisits = () => {
         const order = orderMap.get(visit.retailer_id);
         const feedbackTime = feedbackMap.get(visit.retailer_id);
         const hasJointFeedback = jointSalesFeedbackMap.has(visit.retailer_id);
+        const visitLog = visitLogsMap.get(visit.retailer_id);
         
         // Determine activity time based on what action was taken
         let activityTime = null;
@@ -568,22 +586,24 @@ export const MyVisits = () => {
           activityTime = feedbackTime;
         }
 
-        // Use check_in_time if available, otherwise use skip_check_in_time for phone orders
-        const effectiveTime = visit.check_in_time || visit.skip_check_in_time;
+        // Use visit log times if available, otherwise fallback to visit times
+        const effectiveCheckIn = visitLog?.start_time || visit.check_in_time || visit.skip_check_in_time;
+        const effectiveCheckOut = visitLog?.end_time || visit.check_out_time;
         
         return {
           id: visit.id,
           retailer_name: retailer?.name || 'Unknown',
-          check_in_time: effectiveTime,
-          check_out_time: visit.check_out_time,
+          check_in_time: effectiveCheckIn,
+          check_out_time: effectiveCheckOut,
           check_in_address: visit.check_in_address || retailer?.address || 'Address not available',
           status: visit.status,
           order_value: order?.value || 0,
           order_quantity: order?.quantity || 0,
           no_order_reason: visit.no_order_reason,
           activity_time: activityTime,
-          is_planned: !effectiveTime, // Flag for planned visits
-          is_joint_sales: hasJointSales && hasJointFeedback
+          is_planned: !effectiveCheckIn, // Flag for planned visits
+          is_joint_sales: hasJointSales && hasJointFeedback,
+          time_spent_seconds: visitLog?.time_spent_seconds || null
         };
       })
       // Filter to only show visits with an activity (order, no_order_reason, or feedback)
