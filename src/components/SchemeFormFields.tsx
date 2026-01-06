@@ -7,7 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers } from 'lucide-react';
 
 interface SchemeFormFieldsProps {
   schemeForm: any;
@@ -61,6 +64,57 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
       bundle_product_ids: isSelected 
         ? currentIds.filter((id: string) => id !== productId)
         : [...currentIds, productId]
+    });
+  };
+
+  // Multi-product selection handlers
+  const toggleTargetProduct = (productId: string) => {
+    const currentIds = schemeForm.target_product_ids || [];
+    const isSelected = currentIds.includes(productId);
+    
+    let newIds: string[];
+    let newDiscounts = { ...(schemeForm.per_product_discounts || {}) };
+    
+    if (isSelected) {
+      newIds = currentIds.filter((id: string) => id !== productId);
+      delete newDiscounts[productId];
+    } else {
+      newIds = [...currentIds, productId];
+      // Initialize with default discount from form
+      newDiscounts[productId] = { 
+        discount_percentage: schemeForm.discount_percentage || 0 
+      };
+    }
+    
+    setSchemeForm({
+      ...schemeForm,
+      target_product_ids: newIds,
+      per_product_discounts: newDiscounts
+    });
+  };
+
+  const updateProductDiscount = (productId: string, value: number) => {
+    setSchemeForm({
+      ...schemeForm,
+      per_product_discounts: {
+        ...(schemeForm.per_product_discounts || {}),
+        [productId]: { discount_percentage: value }
+      }
+    });
+  };
+
+  const applyUniformDiscount = () => {
+    const uniformDiscount = schemeForm.discount_percentage || 0;
+    const currentIds = schemeForm.target_product_ids || [];
+    const newDiscounts: Record<string, { discount_percentage: number }> = {};
+    
+    currentIds.forEach((id: string) => {
+      newDiscounts[id] = { discount_percentage: uniformDiscount };
+    });
+    
+    setSchemeForm({
+      ...schemeForm,
+      per_product_discounts: newDiscounts
     });
   };
 
@@ -478,23 +532,153 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
 
       {/* Target Selection - Only for product-specific schemes */}
       {!['category_wide_discount', 'bundle_combo'].includes(schemeForm.scheme_type) && (
-        <div>
-          <Label htmlFor="product">Target Product</Label>
-          <Select
-            value={schemeForm.product_id}
-            onValueChange={(value) => setSchemeForm({ ...schemeForm, product_id: value, variant_id: 'all' })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select product" />
-            </SelectTrigger>
-            <SelectContent>
-              {products.map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.name} ({product.sku})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-4">
+          {/* Multi-Product Toggle */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <Layers size={16} className="text-muted-foreground" />
+              <div>
+                <Label htmlFor="multiProductMode" className="cursor-pointer">Apply to Multiple Products</Label>
+                <p className="text-xs text-muted-foreground">Select multiple products for this scheme</p>
+              </div>
+            </div>
+            <Switch
+              id="multiProductMode"
+              checked={schemeForm.multi_product_mode || false}
+              onCheckedChange={(checked) => setSchemeForm({ 
+                ...schemeForm, 
+                multi_product_mode: checked,
+                // Clear selections when toggling
+                target_product_ids: checked ? [] : [],
+                per_product_discounts: {},
+                product_id: checked ? '' : schemeForm.product_id,
+                discount_mode: 'same'
+              })}
+            />
+          </div>
+
+          {/* Single Product Selection */}
+          {!schemeForm.multi_product_mode && (
+            <div>
+              <Label htmlFor="product">Target Product</Label>
+              <Select
+                value={schemeForm.product_id}
+                onValueChange={(value) => setSchemeForm({ ...schemeForm, product_id: value, variant_id: 'all' })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select product" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name} ({product.sku})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Multi-Product Selection */}
+          {schemeForm.multi_product_mode && (
+            <div className="space-y-4">
+              <div>
+                <Label>Select Products</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Selected: {(schemeForm.target_product_ids || []).length} product(s)
+                </p>
+                <ScrollArea className="h-48 border rounded-md p-2">
+                  <div className="space-y-2">
+                    {products.map((product) => (
+                      <div key={product.id} className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded">
+                        <Checkbox
+                          id={`target-${product.id}`}
+                          checked={(schemeForm.target_product_ids || []).includes(product.id)}
+                          onCheckedChange={() => toggleTargetProduct(product.id)}
+                        />
+                        <label 
+                          htmlFor={`target-${product.id}`}
+                          className="text-sm cursor-pointer flex-1"
+                        >
+                          {product.name} <span className="text-muted-foreground">({product.sku})</span>
+                        </label>
+                        <Badge variant="outline" className="text-xs">
+                          ₹{product.rate}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* Discount Mode Selection - Only show when multiple products selected */}
+              {(schemeForm.target_product_ids || []).length > 1 && (
+                <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+                  <Label>Discount Application</Label>
+                  <RadioGroup 
+                    value={schemeForm.discount_mode || 'same'} 
+                    onValueChange={(value) => {
+                      setSchemeForm({ ...schemeForm, discount_mode: value });
+                      if (value === 'same') {
+                        applyUniformDiscount();
+                      }
+                    }}
+                    className="flex flex-col gap-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="same" id="same" />
+                      <Label htmlFor="same" className="cursor-pointer font-normal">
+                        Same discount for all products
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="different" id="different" />
+                      <Label htmlFor="different" className="cursor-pointer font-normal">
+                        Different discount per product
+                      </Label>
+                    </div>
+                  </RadioGroup>
+
+                  {/* Per-Product Discount Table */}
+                  {schemeForm.discount_mode === 'different' && (
+                    <div className="mt-3 border rounded-md overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Product</TableHead>
+                            <TableHead className="text-xs w-32">Discount %</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(schemeForm.target_product_ids || []).map((productId: string) => {
+                            const product = products.find(p => p.id === productId);
+                            const currentDiscount = schemeForm.per_product_discounts?.[productId]?.discount_percentage || 0;
+                            return (
+                              <TableRow key={productId}>
+                                <TableCell className="text-sm py-2">
+                                  {product?.name || 'Unknown'}
+                                </TableCell>
+                                <TableCell className="py-2">
+                                  <Input
+                                    type="number"
+                                    value={currentDiscount}
+                                    onChange={(e) => updateProductDiscount(productId, parseFloat(e.target.value) || 0)}
+                                    className="h-8 w-24"
+                                    max={100}
+                                    min={0}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -6953,12 +6953,14 @@ export type Database = {
           max_usage_count: number | null
           min_order_value: number | null
           name: string
+          per_product_discounts: Json | null
           priority: number | null
           product_id: string | null
           quantity_condition_type: string | null
           scheme_type: string
           source: string | null
           start_date: string | null
+          target_product_ids: string[] | null
           tier_data: Json | null
           updated_at: string
           validity_days: number | null
@@ -6988,12 +6990,14 @@ export type Database = {
           max_usage_count?: number | null
           min_order_value?: number | null
           name: string
+          per_product_discounts?: Json | null
           priority?: number | null
           product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
           source?: string | null
           start_date?: string | null
+          target_product_ids?: string[] | null
           tier_data?: Json | null
           updated_at?: string
           validity_days?: number | null
@@ -7023,12 +7027,14 @@ export type Database = {
           max_usage_count?: number | null
           min_order_value?: number | null
           name?: string
+          per_product_discounts?: Json | null
           priority?: number | null
           product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
           source?: string | null
           start_date?: string | null
+          target_product_ids?: string[] | null
           tier_data?: Json | null
           updated_at?: string
           validity_days?: number | null
