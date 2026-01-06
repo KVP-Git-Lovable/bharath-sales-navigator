@@ -300,12 +300,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         
         return (
           <div key={visit.id} className="relative">
-            {/* Travel Time Indicator */}
-            {index > 0 && (
-              <div className="absolute right-2 sm:right-4 top-0 text-xs sm:text-sm text-muted-foreground">
-                {travelTime}
-              </div>
-            )}
 
             {/* Visit Card */}
             <div className="flex items-start gap-2 sm:gap-4 w-full">
