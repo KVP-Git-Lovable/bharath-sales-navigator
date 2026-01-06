@@ -40,16 +40,16 @@ export function useOfflineSync() {
         return uuidRegex.test(id);
       };
 
-      // Clean up stale sync items (older than 1 hour OR 5+ retries)
+      // Clean up stale sync items (older than 15 mins OR 2+ retries)
       const cleanupStaleSyncItems = async (queue: any[]): Promise<any[]> => {
         const now = Date.now();
-        const oneHourAgo = now - (60 * 60 * 1000);
+        const fifteenMinutesAgo = now - (15 * 60 * 1000);
         const cleanQueue: any[] = [];
         
         for (const item of queue) {
-          const isStale = item.timestamp && item.timestamp < oneHourAgo;
-          // Keep retry behavior consistent with the main loop (max 5 attempts)
-          const tooManyRetries = (item.retryCount || 0) >= 5;
+          const isStale = item.timestamp && item.timestamp < fifteenMinutesAgo;
+          // Keep retry behavior consistent (max 2 attempts before cleanup)
+          const tooManyRetries = (item.retryCount || 0) >= 2;
           
           if (isStale || tooManyRetries) {
             console.log(`🧹 Removing stale sync item: ${item.action}, age=${Math.round((now - item.timestamp) / 60000)}min, retries=${item.retryCount || 0}`);
@@ -116,9 +116,12 @@ export function useOfflineSync() {
       let syncQueue = await offlineStorage.getSyncQueue();
       syncQueue = await cleanupStaleSyncItems(syncQueue);
       
-      // Step 2: Only rebuild queue if there's genuinely nothing pending
-      await ensureNoOrderVisitsQueued(syncQueue);
-      syncQueue = await offlineStorage.getSyncQueue();
+      // Step 2: Only rebuild queue if there are NO existing items
+      // This prevents re-adding items that are about to be processed
+      if (syncQueue.length === 0) {
+        await ensureNoOrderVisitsQueued(syncQueue);
+        syncQueue = await offlineStorage.getSyncQueue();
+      }
 
       if (syncQueue.length === 0) {
         isSyncingRef.current = false;
@@ -167,12 +170,12 @@ export function useOfflineSync() {
             lastError: errorMsg
           };
           
-          // Keep in queue for retry (max 5 attempts)
-          if (updatedItem.retryCount < 5) {
+          // Keep in queue for retry (max 2 attempts only)
+          if (updatedItem.retryCount < 2) {
             await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
           } else {
-            // After 5 failed attempts, remove from queue
-            console.error(`⛔ Removing item after 5 failed attempts:`, item.action);
+            // After 2 failed attempts, remove from queue to avoid stuck items
+            console.error(`⛔ Removing item after 2 failed attempts:`, item.action);
             await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
           }
         }
@@ -191,11 +194,15 @@ export function useOfflineSync() {
       }
 
       // SILENT sync - no toasts, no notifications
-      // Data refresh happens via syncComplete event dispatch in SyncStatusIndicator
       if (successCount > 0 && failCount === 0) {
         console.log(`✅ Silent sync complete: ${successCount} items synced`);
       } else if (failCount > 0) {
         console.log(`⚠️ Silent sync partial: ${successCount} succeeded, ${failCount} failed`);
+      }
+      
+      // Force update sync queue indicator after processing (bypass throttle)
+      if (successCount > 0 || failCount > 0) {
+        window.dispatchEvent(new Event('syncQueueUpdated'));
       }
     } catch (error) {
       console.error('❌ Error processing sync queue:', error);

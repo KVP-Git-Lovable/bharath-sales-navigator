@@ -65,14 +65,14 @@ export const SyncStatusIndicator = memo(() => {
     const cleanupOldStuckItems = async () => {
       try {
         const queue = await offlineStorage.getSyncQueue();
-        const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000; // Changed from 1 hour to 30 mins
+        const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000; // Reduced to 15 mins
         
-        // Find items to remove (stuck/old) - more aggressive cleanup
+        // Find items to remove (stuck/old) - very aggressive cleanup
         const itemsToRemove = queue.filter((item: any) => {
-          // Remove items that have failed 3+ times (changed from 5)
-          if (item.retryCount >= 3) return true;
-          // Remove items older than 30 minutes (changed from 1 hour)
-          if (item.timestamp && item.timestamp < thirtyMinutesAgo) return true;
+          // Remove items that have failed 2+ times (very aggressive)
+          if (item.retryCount >= 2) return true;
+          // Remove items older than 15 minutes
+          if (item.timestamp && item.timestamp < fifteenMinutesAgo) return true;
           // Remove items that were already synced
           if (item._synced) return true;
           return false;
@@ -81,10 +81,13 @@ export const SyncStatusIndicator = memo(() => {
         // Delete stuck items
         for (const item of itemsToRemove) {
           await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+          console.log(`🧹 [SyncStatusIndicator] Removed stuck item: ${item.action}`);
         }
         
         if (itemsToRemove.length > 0) {
           console.log(`🧹 [SyncStatusIndicator] Cleaned up ${itemsToRemove.length} old/stuck sync items`);
+          // Update the count after cleanup
+          setSyncQueueCount(prev => Math.max(0, prev - itemsToRemove.length));
         }
       } catch (error) {
         console.error('Error cleaning up old sync items:', error);
@@ -100,14 +103,16 @@ export const SyncStatusIndicator = memo(() => {
     try {
       const queue = await offlineStorage.getSyncQueue();
       
-      // Filter out old items (older than 1 hour) and items that failed 5+ times
+      // Filter out old items (older than 15 minutes) and items that failed 2+ times
       // These are stuck items that shouldn't show the sync indicator
-      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
       const actualPendingItems = queue.filter((item: any) => {
-        // Skip items that have failed 5+ times
-        if (item.retryCount >= 5) return false;
-        // Skip items older than 1 hour that haven't been synced
-        if (item.timestamp && item.timestamp < oneHourAgo && !item._syncing) return false;
+        // Skip items that have failed 2+ times
+        if (item.retryCount >= 2) return false;
+        // Skip items older than 15 minutes
+        if (item.timestamp && item.timestamp < fifteenMinutesAgo) return false;
+        // Skip items marked as synced
+        if (item._synced) return false;
         return true;
       });
       
