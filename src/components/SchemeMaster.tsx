@@ -571,7 +571,7 @@ export const SchemeMaster = () => {
 
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-xl">
           <TabsTrigger value="manual" className="flex items-center gap-2">
             <Gift className="h-4 w-4" />
             Manual Schemes
@@ -584,6 +584,10 @@ export const SchemeMaster = () => {
                 {stats.pendingSuggestions}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="policy" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Policy Settings
           </TabsTrigger>
         </TabsList>
 
@@ -602,7 +606,6 @@ export const SchemeMaster = () => {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <SchemePolicyConfig />
               <Dialog open={isSchemeDialogOpen} onOpenChange={(open) => {
                 setIsSchemeDialogOpen(open);
                 if (!open) {
@@ -975,6 +978,26 @@ export const SchemeMaster = () => {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Policy Settings Tab */}
+        <TabsContent value="policy" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Scheme Policy Settings
+                </CardTitle>
+                <CardDescription>
+                  Configure how schemes are applied and resolved for both Manual and AI Dynamic schemes
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <SchemePolicyConfig inline />
             </CardContent>
           </Card>
         </TabsContent>
