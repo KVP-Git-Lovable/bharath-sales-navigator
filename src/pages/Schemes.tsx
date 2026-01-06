@@ -428,7 +428,7 @@ export const Schemes = () => {
                     <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                     <p className="text-muted-foreground">No active schemes found</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Schemes can be added from Admin Panel → Schemes & Offers
+                      Schemes can be added from Admin Panel → Scheme Master
                     </p>
                   </CardContent>
                 </Card>
