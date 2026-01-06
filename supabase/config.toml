@@ -68,3 +68,6 @@ verify_jwt = true
 
 [functions.generate-competency-insights]
 verify_jwt = true
+
+[functions.ai-scheme-engine]
+verify_jwt = true

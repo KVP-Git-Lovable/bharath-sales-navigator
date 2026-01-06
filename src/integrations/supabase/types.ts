@@ -197,6 +197,123 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_scheme_suggestions: {
+        Row: {
+          admin_modifications: Json | null
+          analysis_type: string
+          confidence_score: number | null
+          created_at: string | null
+          created_scheme_id: string | null
+          data_signals: Json | null
+          expected_benefit: string | null
+          expires_at: string | null
+          id: string
+          reasoning: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          suggested_buy_quantity: number | null
+          suggested_category_id: string | null
+          suggested_condition_quantity: number | null
+          suggested_description: string | null
+          suggested_discount_amount: number | null
+          suggested_discount_percentage: number | null
+          suggested_end_date: string | null
+          suggested_free_quantity: number | null
+          suggested_min_order_value: number | null
+          suggested_name: string
+          suggested_product_id: string | null
+          suggested_scheme_type: string
+          suggested_start_date: string | null
+          suggested_tier_data: Json | null
+          target_ids: string[] | null
+          target_names: string[] | null
+          target_type: string
+        }
+        Insert: {
+          admin_modifications?: Json | null
+          analysis_type: string
+          confidence_score?: number | null
+          created_at?: string | null
+          created_scheme_id?: string | null
+          data_signals?: Json | null
+          expected_benefit?: string | null
+          expires_at?: string | null
+          id?: string
+          reasoning: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          suggested_buy_quantity?: number | null
+          suggested_category_id?: string | null
+          suggested_condition_quantity?: number | null
+          suggested_description?: string | null
+          suggested_discount_amount?: number | null
+          suggested_discount_percentage?: number | null
+          suggested_end_date?: string | null
+          suggested_free_quantity?: number | null
+          suggested_min_order_value?: number | null
+          suggested_name: string
+          suggested_product_id?: string | null
+          suggested_scheme_type: string
+          suggested_start_date?: string | null
+          suggested_tier_data?: Json | null
+          target_ids?: string[] | null
+          target_names?: string[] | null
+          target_type: string
+        }
+        Update: {
+          admin_modifications?: Json | null
+          analysis_type?: string
+          confidence_score?: number | null
+          created_at?: string | null
+          created_scheme_id?: string | null
+          data_signals?: Json | null
+          expected_benefit?: string | null
+          expires_at?: string | null
+          id?: string
+          reasoning?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          suggested_buy_quantity?: number | null
+          suggested_category_id?: string | null
+          suggested_condition_quantity?: number | null
+          suggested_description?: string | null
+          suggested_discount_amount?: number | null
+          suggested_discount_percentage?: number | null
+          suggested_end_date?: string | null
+          suggested_free_quantity?: number | null
+          suggested_min_order_value?: number | null
+          suggested_name?: string
+          suggested_product_id?: string | null
+          suggested_scheme_type?: string
+          suggested_start_date?: string | null
+          suggested_tier_data?: Json | null
+          target_ids?: string[] | null
+          target_names?: string[] | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_scheme_suggestions_created_scheme_id_fkey"
+            columns: ["created_scheme_id"]
+            isOneToOne: false
+            referencedRelation: "product_schemes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_scheme_suggestions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       analytics_likes: {
         Row: {
           created_at: string
@@ -6813,6 +6930,7 @@ export type Database = {
       }
       product_schemes: {
         Row: {
+          ai_suggestion_id: string | null
           applicability_type: string | null
           bundle_discount_amount: number | null
           bundle_discount_percentage: number | null
@@ -6839,6 +6957,7 @@ export type Database = {
           product_id: string | null
           quantity_condition_type: string | null
           scheme_type: string
+          source: string | null
           start_date: string | null
           tier_data: Json | null
           updated_at: string
@@ -6846,6 +6965,7 @@ export type Database = {
           variant_id: string | null
         }
         Insert: {
+          ai_suggestion_id?: string | null
           applicability_type?: string | null
           bundle_discount_amount?: number | null
           bundle_discount_percentage?: number | null
@@ -6872,6 +6992,7 @@ export type Database = {
           product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
+          source?: string | null
           start_date?: string | null
           tier_data?: Json | null
           updated_at?: string
@@ -6879,6 +7000,7 @@ export type Database = {
           variant_id?: string | null
         }
         Update: {
+          ai_suggestion_id?: string | null
           applicability_type?: string | null
           bundle_discount_amount?: number | null
           bundle_discount_percentage?: number | null
@@ -6905,6 +7027,7 @@ export type Database = {
           product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
+          source?: string | null
           start_date?: string | null
           tier_data?: Json | null
           updated_at?: string
@@ -6912,6 +7035,13 @@ export type Database = {
           variant_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "product_schemes_ai_suggestion_id_fkey"
+            columns: ["ai_suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "ai_scheme_suggestions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_schemes_category_id_fkey"
             columns: ["category_id"]
