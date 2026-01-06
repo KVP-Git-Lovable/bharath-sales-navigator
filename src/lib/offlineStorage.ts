@@ -226,6 +226,10 @@ class OfflineStorage {
     }
   }
 
+  // Throttle syncQueueUpdated event to prevent event storms
+  private lastSyncQueueEventTime = 0;
+  private static readonly SYNC_QUEUE_EVENT_THROTTLE = 5000; // 5 seconds
+
   // Sync queue operations for offline actions
   async addToSyncQueue(action: string, data: any): Promise<void> {
     const syncItem = {
@@ -238,10 +242,16 @@ class OfflineStorage {
     
     await this.save(STORES.SYNC_QUEUE, syncItem);
 
-    // Notify UI that sync queue changed (so it can trigger immediate sync while online)
+    // THROTTLED: Notify UI that sync queue changed (max once per 5 seconds)
+    // This prevents event storms when multiple items are queued rapidly
     try {
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('syncQueueUpdated'));
+        const now = Date.now();
+        if (now - this.lastSyncQueueEventTime > OfflineStorage.SYNC_QUEUE_EVENT_THROTTLE) {
+          this.lastSyncQueueEventTime = now;
+          window.dispatchEvent(new Event('syncQueueUpdated'));
+          console.log('[OfflineStorage] 📤 syncQueueUpdated event dispatched (throttled)');
+        }
       }
     } catch {
       // no-op

@@ -212,29 +212,17 @@ export const TodaySummary = () => {
     { enabled: filterType === 'today', runWhenHidden: false }
   );
 
-  // Auto-refresh event listeners
+  // SIMPLIFIED: Event listeners for immediate UI updates only (no sync event listeners)
+  // Per event-based sync architecture: syncComplete and visitDataChanged should NOT trigger refreshes
   useEffect(() => {
-    // Listen for sync complete event
-    const handleSyncComplete = () => {
-      console.log('🔄 [SUMMARY] Sync complete, refreshing...');
-      setTimeout(() => {
-        fetchTodaysData(true); // Background refresh
-      }, 500);
-    };
-    
-    const handleVisitDataChanged = () => {
-      console.log('📢 [SUMMARY] visitDataChanged, refreshing...');
-      fetchTodaysData(true); // Background refresh
-    };
-    
     // Listen for immediate order updates (visitStatusChanged includes order value)
+    // This is a SURGICAL update - only update specific counters, no full refresh
     const handleVisitStatusChanged = (event: CustomEvent) => {
       const detail = event.detail;
-      console.log('📢 [SUMMARY] visitStatusChanged, refreshing...', detail);
       
-      // If we have an order, update summary immediately
+      // If we have an order, update summary counters immediately (no full refresh)
       if (detail?.orderValue && filterType === 'today') {
-        // Update total order value immediately
+        console.log('📢 [SUMMARY] visitStatusChanged - surgical update', detail);
         setSummaryData(prev => ({
           ...prev,
           totalOrderValue: (prev.totalOrderValue || 0) + Math.round(Number(detail.orderValue) || 0),
@@ -242,21 +230,14 @@ export const TodaySummary = () => {
           productiveVisits: (prev.productiveVisits || 0) + 1,
           completedVisits: (prev.completedVisits || 0) + 1
         }));
-        
-        // Also refresh in background to get full data
-        setTimeout(() => fetchTodaysData(true), 1000);
-      } else {
-        fetchTodaysData(true);
+        // NO background refresh - this was the surgical update
       }
+      // For non-order status changes, no refresh needed - UI already reflects local state
     };
     
-    window.addEventListener('syncComplete', handleSyncComplete);
-    window.addEventListener('visitDataChanged', handleVisitDataChanged);
     window.addEventListener('visitStatusChanged', handleVisitStatusChanged as EventListener);
     
     return () => {
-      window.removeEventListener('syncComplete', handleSyncComplete);
-      window.removeEventListener('visitDataChanged', handleVisitDataChanged);
       window.removeEventListener('visitStatusChanged', handleVisitStatusChanged as EventListener);
     };
   }, [filterType]);
