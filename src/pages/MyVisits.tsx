@@ -1540,17 +1540,15 @@ export const MyVisits = () => {
         <Dialog open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <DialogTitle>{t('visits.timelineView')} - {format(timelineDate, 'MMM dd, yyyy')}</DialogTitle>
-                {isManager && (
-                  <UserSelector 
-                    selectedUserId={selectedViewUserId} 
-                    onUserChange={setSelectedViewUserId}
-                    className="w-full sm:w-auto"
-                  />
-                )}
-              </div>
+              <DialogTitle>{t('visits.timelineView')} - {format(timelineDate, 'MMM dd, yyyy')}</DialogTitle>
             </DialogHeader>
+            {isManager && (
+              <UserSelector 
+                selectedUserId={selectedViewUserId} 
+                onUserChange={setSelectedViewUserId}
+                className="w-full sm:w-auto"
+              />
+            )}
             <TimelineView visits={timelineVisits} dayStart={timelineDayStart} selectedDate={timelineDate} onDateChange={date => {
             setTimelineDate(date);
             if (timelineTargetUserId) {
