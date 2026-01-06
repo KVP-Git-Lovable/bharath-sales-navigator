@@ -33,6 +33,11 @@ export const markDayStarted = async (
     await offlineStorage.init();
     await offlineStorage.save(STORES.ATTENDANCE, attendanceRecord);
     console.log('📍 Attendance saved to offline storage for instant access');
+    
+    // Dispatch event so Home dashboard can lock attendance immediately
+    window.dispatchEvent(new CustomEvent('attendanceMarked', { 
+      detail: attendanceRecord 
+    }));
   } catch (err) {
     console.log('Offline attendance save failed (non-critical):', err);
   }
