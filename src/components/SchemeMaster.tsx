@@ -578,7 +578,7 @@ export const SchemeMaster = () => {
           </TabsTrigger>
           <TabsTrigger value="ai" className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
-            AI Suggestions
+            AI Dynamic Scheme
             {stats.pendingSuggestions > 0 && (
               <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-700">
                 {stats.pendingSuggestions}
@@ -900,7 +900,7 @@ export const SchemeMaster = () => {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Bot className="h-5 w-5 text-purple-600" />
-                    AI-Suggested Schemes
+                    AI Dynamic Schemes
                   </CardTitle>
                   <CardDescription>
                     Review and approve AI-generated scheme recommendations
@@ -933,7 +933,7 @@ export const SchemeMaster = () => {
               ) : aiSuggestions.length === 0 ? (
                 <div className="text-center py-12">
                   <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Pending Suggestions</h3>
+                  <h3 className="text-lg font-medium mb-2">No AI Dynamic Schemes Yet</h3>
                   <p className="text-muted-foreground mb-4">
                     Click "Analyze Now" to generate AI-powered scheme recommendations based on your business data.
                   </p>
