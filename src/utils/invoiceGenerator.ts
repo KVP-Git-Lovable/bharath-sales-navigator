@@ -56,6 +56,8 @@ interface InvoiceData {
   beatName?: string;
   salesmanName?: string;
   schemeDetails?: string;
+  orderDiscount?: number; // Order-level discount from orders.discount_amount
+  orderTotal?: number; // Final total from orders.total_amount (includes GST, discounts)
 }
 
 // Helper function to format amount with 2 decimal places (exact)
@@ -113,15 +115,20 @@ const numberToWords = (num: number): string => {
 
 /**
  * Normalize item for display - ALWAYS convert grams to KG for display
- * Prices shown per KG, quantities in KG, but calculations remain accurate
+ * CRITICAL: Uses stored order_items.total and discount_amount to compute final line total
+ * This ensures invoice matches exactly what was shown in cart at order time
  */
 const normalizeItemForDisplay = (item: any) => {
   const unit = (item.unit || '').toLowerCase();
   const qty = Number(item.quantity) || 0;
-  // Use high precision rates - avoid rounding
-  const rate = Number(item.rate || item.price) || 0;
-  const originalRate = Number(item.original_rate) || rate;
+  // Use stored total from order_items (this is qty × rate before item-level discount)
+  const storedTotal = Number(item.total) || 0;
+  // Item-level discount (may be 0 if discount was applied at order level)
   const discountAmt = Number(item.discount_amount) || 0;
+  // Compute actual line total after any item-level discount
+  const finalLineTotal = Math.max(0, storedTotal - discountAmt);
+  
+  const originalRate = Number(item.original_rate) || Number(item.rate || item.price) || 0;
   
   const isGramsUnit = unit === 'grams' || unit === 'gram' || unit === 'g';
   
@@ -130,26 +137,12 @@ const normalizeItemForDisplay = (item: any) => {
     // Convert quantity from grams to KG
     const displayQty = qty / 1000;
     
-    // Use precise_rate_per_kg if available (fetched from products table)
-    // This preserves full decimal precision lost in order_items.rate (numeric 10,2)
-    if (item.precise_rate_per_kg) {
-      const preciseRate = Number(item.precise_rate_per_kg);
-      return {
-        displayUnit: 'KG',
-        displayQty: displayQty,
-        displayRate: preciseRate,
-        displayOriginalRate: preciseRate,
-        displayDiscountAmount: discountAmt,
-      };
-    }
+    // Calculate per-KG original rate for display
+    const isPerGramOrigRate = originalRate > 0 && originalRate < 1;
+    const displayOriginalRate = isPerGramOrigRate ? originalRate * 1000 : originalRate;
     
-    // Convert rate to per-KG price - preserve full decimal precision
-    // If rate is small (< 1), it's per-gram rate - multiply by 1000 to get per-KG
-    // If rate is >= 1, it might already be per-KG rate (stored incorrectly), use as-is
-    const isPerGramRate = rate > 0 && rate < 1;
-    // Preserve exact decimal values - no rounding
-    const displayRate = isPerGramRate ? rate * 1000 : rate;
-    const displayOriginalRate = isPerGramRate ? originalRate * 1000 : originalRate;
+    // Calculate effective rate from final line total
+    const displayRate = displayQty > 0 ? finalLineTotal / displayQty : displayOriginalRate;
     
     return {
       displayUnit: 'KG',
@@ -157,33 +150,39 @@ const normalizeItemForDisplay = (item: any) => {
       displayRate: displayRate,
       displayOriginalRate: displayOriginalRate,
       displayDiscountAmount: discountAmt,
+      storedTotal: finalLineTotal, // Use discounted line total
     };
   }
   
   // For items with explicit display_unit/display_quantity
   if (item.display_unit && item.display_quantity) {
+    const displayQty = Number(item.display_quantity) || qty;
     const isDisplayKg = item.display_unit.toLowerCase() === 'kg';
-    const isPerGramRate = rate > 0 && rate < 1;
-    // Preserve exact decimal values - no rounding
-    const displayRate = isDisplayKg && isPerGramRate ? rate * 1000 : rate;
-    const displayOrigRate = isDisplayKg && isPerGramRate ? originalRate * 1000 : originalRate;
+    const isPerGramOrigRate = originalRate > 0 && originalRate < 1;
+    const displayOrigRate = isDisplayKg && isPerGramOrigRate ? originalRate * 1000 : originalRate;
+    
+    // Calculate effective rate from final line total
+    const displayRate = displayQty > 0 ? finalLineTotal / displayQty : displayOrigRate;
     
     return {
       displayUnit: item.display_unit,
-      displayQty: item.display_quantity,
+      displayQty: displayQty,
       displayRate: displayRate,
       displayOriginalRate: displayOrigRate,
       displayDiscountAmount: discountAmt,
+      storedTotal: finalLineTotal,
     };
   }
   
-  // Default: use as-is for non-gram units - preserve exact values
+  // Default: use as-is for non-gram units
+  const displayRate = qty > 0 ? finalLineTotal / qty : originalRate;
   return {
     displayUnit: item.unit || 'Piece',
     displayQty: qty,
-    displayRate: rate,
+    displayRate: displayRate,
     displayOriginalRate: originalRate,
     displayDiscountAmount: discountAmt,
+    storedTotal: finalLineTotal,
   };
 };
 
@@ -192,7 +191,7 @@ const normalizeItemForDisplay = (item: any) => {
  * This is the ONLY template used throughout the application
  */
 export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob> {
-  const { orderId, company, retailer, cartItems, displayInvoiceNumber, displayInvoiceDate, displayInvoiceTime, beatName, salesmanName, schemeDetails } = data;
+  const { orderId, company, retailer, cartItems, displayInvoiceNumber, displayInvoiceDate, displayInvoiceTime, beatName, salesmanName, schemeDetails, orderDiscount, orderTotal } = data;
 
   // Translate retailer address if it contains non-English characters
   const translatedRetailerAddress = await translateAddressToEnglish(retailer?.address || '');
@@ -404,42 +403,44 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
       _displayRate: normalized.displayRate,
       _displayOriginalRate: normalized.displayOriginalRate,
       _displayDiscountAmount: normalized.displayDiscountAmount,
+      _storedTotal: normalized.storedTotal, // CRITICAL: Pass through stored total from order_items
     };
   });
   
-  // Items table with green header - show MRP and Offer Price if discounts exist
-  // Check if any item has a meaningful discount (original_rate > rate OR discount_amount > 0)
-  const hasAnyDiscount = normalizedItems.some(item => {
+  // Items table with green header - show MRP and Offer Price ONLY if item-level discounts exist
+  // Order-level discount is shown in totals section, not in item rows
+  const hasAnyItemDiscount = normalizedItems.some(item => {
     const discountAmt = Number(item.discount_amount) || 0;
-    const origRate = item._displayOriginalRate;
-    const effRate = item._displayRate;
-    return discountAmt > 0 || (origRate > effRate && effRate > 0);
+    return discountAmt > 0;
   });
   
   const tableData = normalizedItems.map((item, index) => {
     const displayQty = item._displayQty;
     const displayUnit = item._displayUnit;
-    const displayRate = item._displayRate;
     const displayOriginalRate = item._displayOriginalRate;
     const itemDiscount = item._displayDiscountAmount;
+    // CRITICAL: Use stored total directly from order_items - this is finalized cart data
+    const storedTotal = item._storedTotal || 0;
 
     // If we have stored invoice values (from edited invoices), use them directly
     const hasStoredValues = item.taxable_amount != null && item.sgst_amount != null && item.cgst_amount != null;
     
-    let effectiveRate: number;
     let originalRate: number;
     let rowTotal: number;
+    let effectiveRate: number;
     
     if (hasStoredValues) {
-      // Use stored values directly
+      // Use stored values directly (edited invoice case)
       effectiveRate = Number(item.price || item.rate) || 0;
       originalRate = Number(item.original_rate) || effectiveRate;
       rowTotal = Number(item.taxable_amount) || 0;
     } else {
-      // Use normalized display values
-      effectiveRate = displayRate;
+      // CRITICAL FIX: Use stored total from order_items directly
+      // This ensures invoice shows exactly what cart showed at order time
+      rowTotal = storedTotal;
       originalRate = displayOriginalRate;
-      rowTotal = effectiveRate * displayQty;
+      // Calculate effective rate from stored total for display consistency
+      effectiveRate = displayQty > 0 ? storedTotal / displayQty : originalRate;
     }
     
     totalDiscount += itemDiscount;
@@ -447,8 +448,10 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     // Format quantity - show decimals only if needed
     const qtyStr = Number.isInteger(displayQty) ? displayQty.toString() : displayQty.toFixed(2);
     
-    // If there are discounts in the order, show MRP and Offer columns
-    if (hasAnyDiscount) {
+    // If there are item-level discounts in the order, show MRP and Offer columns
+    if (hasAnyItemDiscount) {
+      // Only show offer price if THIS item has a discount
+      const hasItemDiscount = itemDiscount > 0;
       return [
         (index + 1).toString(),
         getDisplayName(item),
@@ -456,29 +459,30 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
         displayUnit,
         qtyStr,
         `Rs.${formatExact(originalRate)}`, // MRP - exact
-        itemDiscount > 0 ? `Rs.${formatExact(effectiveRate)}` : "-", // Offer Price (or "-" if no discount) - exact
-        `Rs.${formatExact(rowTotal)}`, // Row total - exact
+        hasItemDiscount ? `Rs.${formatExact(effectiveRate)}` : "-", // Offer Price (or "-" if no discount for this item)
+        `Rs.${formatExact(rowTotal)}`, // Row total - use stored value
       ];
     } else {
+      // No discounts - show simpler table without OFFER column
       return [
         (index + 1).toString(),
         getDisplayName(item),
         item.hsn_code || "-",
         displayUnit,
         qtyStr,
-        `Rs.${formatExact(effectiveRate)}`, // Price - exact
-        `Rs.${formatExact(rowTotal)}`, // Row total - exact
+        `Rs.${formatExact(effectiveRate)}`, // Price (from stored total)
+        `Rs.${formatExact(rowTotal)}`, // Row total - use stored value
       ];
     }
   });
 
-  // Table headers based on whether discounts exist
-  const tableHeaders = hasAnyDiscount 
+  // Table headers based on whether item-level discounts exist
+  const tableHeaders = hasAnyItemDiscount 
     ? [["NO", "PRODUCT", "HSN", "UNIT", "QTY", "MRP", "OFFER", "TOTAL"]]
     : [["NO", "PRODUCT", "HSN/SAC", "UNIT", "QTY", "PRICE", "TOTAL"]];
 
-  // Column styles based on whether discounts exist
-  const columnStyles = hasAnyDiscount 
+  // Column styles based on whether item-level discounts exist
+  const columnStyles = hasAnyItemDiscount
     ? {
         0: { cellWidth: 12, halign: "center" as const },
         1: { cellWidth: 'auto' as const, halign: "left" as const },
@@ -532,20 +536,26 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     margin: { left: 15, right: 15 },
   });
 
-  // Calculate totals - prefer stored invoice values when present
+  // Calculate totals - CRITICAL: Use order-level values when available
+  // This ensures invoice totals match exactly what cart showed at order time
   const hasStoredTotals = normalizedItems.some(item => 
     item.taxable_amount != null && item.sgst_amount != null && item.cgst_amount != null
   );
 
-  const subtotal = normalizedItems.reduce((sum, item) => {
+  // Calculate item subtotal (sum of all line items before order-level discount)
+  const itemSubtotal = normalizedItems.reduce((sum, item) => {
     if (hasStoredTotals && item.taxable_amount != null) {
       return sum + Number(item.taxable_amount);
     }
-    const displayQty = item._displayQty;
-    const displayRate = item._displayRate;
-    return sum + displayQty * displayRate;
+    // Use stored total from order_items
+    return sum + (item._storedTotal || 0);
   }, 0);
 
+  // Apply order-level discount if provided (from orders.discount_amount)
+  const appliedOrderDiscount = orderDiscount || 0;
+  const subtotal = Math.max(0, itemSubtotal - appliedOrderDiscount);
+
+  // Calculate GST on discounted subtotal
   const sgst = hasStoredTotals
     ? cartItems.reduce((sum, item) => sum + (Number(item.sgst_amount) || 0), 0)
     : subtotal * 0.025;
@@ -554,9 +564,15 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     ? cartItems.reduce((sum, item) => sum + (Number(item.cgst_amount) || 0), 0)
     : subtotal * 0.025;
 
-  const total = hasStoredTotals && cartItems.some(item => item.total_amount != null)
-    ? cartItems.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0)
-    : (subtotal + sgst + cgst);
+  // CRITICAL: If orderTotal is provided, use it directly (this is the finalized amount)
+  // This ensures invoice total matches exactly what was shown in cart
+  const total = orderTotal 
+    ? orderTotal 
+    : (hasStoredTotals && cartItems.some(item => item.total_amount != null)
+        ? cartItems.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0)
+        : (subtotal + sgst + cgst));
+  
+  // Note: totalDiscount tracks item-level discounts, order-level discount is shown separately
   
   // Convert total to words (use rounded total for consistency)
   const roundedTotal = Math.round(total);
@@ -571,11 +587,12 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   const labelOffset = 3;
   const valueOffset = totalsBoxWidth - 3;
   
-  // Compact row heights
-  const hasDiscountRow = totalDiscount > 0;
+  // Compact row heights - add extra row for discount if applicable
+  const hasOrderLevelDiscount = appliedOrderDiscount > 0;
   const rowHeight = 5;
   const totalRowHeight = 7;
-  const numRows = hasDiscountRow ? 4 : 3;
+  // Rows: SUB-TOTAL, (DISCOUNT if any), SGST, CGST, then TOTAL bar
+  const numRows = 3 + (hasOrderLevelDiscount ? 1 : 0);
   const totalsBoxHeight = (numRows * rowHeight) + totalRowHeight + 4;
   
   // Draw border box
@@ -589,16 +606,17 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setFont("helvetica", "normal");
   doc.setTextColor(0, 0, 0);
   
-  // SUB-TOTAL
+  // SUB-TOTAL (sum of item totals, before order-level discount)
   doc.text("SUB-TOTAL", totalsBoxX + labelOffset, innerY);
-  doc.text(`Rs.${formatExact(subtotal)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+  doc.text(`Rs.${formatExact(itemSubtotal)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
   
-  if (totalDiscount > 0) {
+  // Show order-level discount if applicable
+  if (hasOrderLevelDiscount) {
     innerY += rowHeight;
     doc.setTextColor(22, 163, 74);
     doc.setFont("helvetica", "bold");
-    doc.text("YOU SAVED", totalsBoxX + labelOffset, innerY);
-    doc.text(`Rs.${formatExact(totalDiscount)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+    doc.text("DISCOUNT", totalsBoxX + labelOffset, innerY);
+    doc.text(`-Rs.${formatExact(appliedOrderDiscount)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
   }
@@ -1134,7 +1152,10 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
         displayInvoiceTime,
         beatName,
         salesmanName,
-        schemeDetails
+        schemeDetails,
+        // CRITICAL: Pass order-level discount and total for accurate invoice
+        orderDiscount: Number(order.discount_amount) || 0,
+        orderTotal: Number(order.total_amount) || undefined
       });
       break;
   }
