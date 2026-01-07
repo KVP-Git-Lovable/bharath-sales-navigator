@@ -14,6 +14,12 @@ export interface TeamMemberProgress {
   achievementPercentage: number;
   gap: number;
   status: 'achieved' | 'in_progress' | 'not_achieved';
+  adjustments?: {
+    holidays: number;
+    leaves: number;
+    workingDays: number;
+    totalDays: number;
+  };
 }
 
 interface UseTeamTargetProgressParams {
