@@ -175,8 +175,14 @@ const getWorkingDaysInMonth = (fyMonthNumber: number, fyYear: number): number =>
   return daysInMonth - sundays;
 };
 
-export function UserFYPlanTarget() {
+interface UserFYPlanTargetProps {
+  targetUserId?: string; // Optional: if provided, manage targets for this user instead of self
+}
+
+export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
   const { user } = useAuth();
+  // Use targetUserId if provided, otherwise use current user's id
+  const effectiveUserId = targetUserId || user?.id;
   const [plans, setPlans] = useState<BusinessPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<BusinessPlan | null>(null);
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
@@ -217,12 +223,12 @@ export function UserFYPlanTarget() {
   });
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       loadPlans();
       loadProductsWithCategories();
       loadRetailersWithCategories();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     if (selectedPlan) {
@@ -231,12 +237,12 @@ export function UserFYPlanTarget() {
   }, [selectedPlan]);
 
   const loadPlans = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
     try {
       const { data, error } = await supabase
         .from('user_business_plans')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .order('year', { ascending: false });
 
       if (error) throw error;
@@ -298,11 +304,11 @@ export function UserFYPlanTarget() {
   };
 
   const loadRetailersWithCategories = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
     const { data: retailers } = await supabase
       .from('retailers')
       .select('id, name, category')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .order('name');
 
     if (retailers) {
@@ -593,12 +599,12 @@ export function UserFYPlanTarget() {
 
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!effectiveUserId) return;
     try {
       const { data, error } = await supabase
         .from('user_business_plans')
         .insert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           year: planForm.year,
           quantity_target: parseFloat(planForm.quantity_target) || 0,
           quantity_unit: planForm.quantity_unit,

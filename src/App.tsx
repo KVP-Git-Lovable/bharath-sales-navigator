@@ -114,6 +114,7 @@ import PriceBookDetail from "./pages/admin/PriceBookDetail";
 import RecycleBin from "./pages/RecycleBin";
 import RecycleBinAdmin from "./pages/admin/RecycleBinAdmin";
 import DistributorPortalAdmin from "./pages/admin/DistributorPortalAdmin";
+import TargetVsActual from "./pages/admin/TargetVsActual";
 import MyTargets from "./pages/MyTargets";
 import MyTarget from "./pages/MyTarget";
 import TeamTargets from "./pages/TeamTargets";
@@ -331,6 +332,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/performance-dashboard" element={<ProtectedRoute><PerformanceDashboard /></ProtectedRoute>} />
         <Route path="/target-advisor" element={<ProtectedRoute><TargetAchievementAdvisor /></ProtectedRoute>} />
         <Route path="/auto-plan-rationale" element={<ProtectedRoute><AutoPlanRationale /></ProtectedRoute>} />
+        <Route path="/admin/target-vs-actual" element={<ProtectedRoute><TargetVsActual /></ProtectedRoute>} />
         
         <Route path="/create-beat" element={<ProtectedRoute><CreateBeat /></ProtectedRoute>} />
         <Route path="/beat/:id" element={<ProtectedRoute><BeatDetail /></ProtectedRoute>} />
