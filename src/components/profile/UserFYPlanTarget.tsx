@@ -1432,10 +1432,10 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
 
           {selectedPlan && (
             <>
-              {/* Plan Overview */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
+              {/* Plan Overview - Editable */}
+              <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -1444,10 +1444,6 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={openEditDialog}>
-                          <Pencil className="h-3.5 w-3.5 mr-2" />
-                          Edit Plan
-                        </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-destructive"
                           onClick={() => setDeleteDialogOpen(true)}
@@ -1458,16 +1454,70 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Quantity Target</p>
-                      <p className="text-lg font-bold">{selectedPlan.quantity_target.toLocaleString()} {quantityUnit}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                      <Label className="text-xs font-semibold whitespace-nowrap text-primary">Qty Target ({quantityUnit})</Label>
+                      <Input
+                        type="number"
+                        value={selectedPlan.quantity_target || ''}
+                        onChange={(e) => {
+                          const newQty = parseFloat(e.target.value) || 0;
+                          setSelectedPlan(prev => prev ? { ...prev, quantity_target: newQty } : null);
+                          handleProductTotalTargetChange(newQty, selectedPlan.revenue_target);
+                          handleRetailerTotalTargetChange(newQty, selectedPlan.revenue_target);
+                          handleMonthTotalTargetChange(newQty, selectedPlan.revenue_target);
+                        }}
+                        className="w-28 h-9 text-right font-bold text-lg bg-background border-primary/30 focus:border-primary"
+                      />
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Revenue Target</p>
-                      <p className="text-lg font-bold">₹{selectedPlan.revenue_target.toLocaleString()}</p>
+                    <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Revenue Target (₹)</Label>
+                      <Input
+                        type="number"
+                        value={selectedPlan.revenue_target || ''}
+                        onChange={(e) => {
+                          const newRev = parseFloat(e.target.value) || 0;
+                          setSelectedPlan(prev => prev ? { ...prev, revenue_target: newRev } : null);
+                          handleProductTotalTargetChange(selectedPlan.quantity_target, newRev);
+                          handleRetailerTotalTargetChange(selectedPlan.quantity_target, newRev);
+                          handleMonthTotalTargetChange(selectedPlan.quantity_target, newRev);
+                        }}
+                        className="w-32 h-9 text-right font-bold text-lg bg-background border-green-500/30 focus:border-green-500"
+                      />
                     </div>
                   </div>
+                  <Button 
+                    className="w-full" 
+                    onClick={async () => {
+                      if (!selectedPlan) return;
+                      try {
+                        // Save FY plan totals
+                        const { error: planError } = await supabase
+                          .from('user_business_plans')
+                          .update({
+                            quantity_target: selectedPlan.quantity_target,
+                            revenue_target: selectedPlan.revenue_target,
+                          })
+                          .eq('id', selectedPlan.id);
+                        if (planError) throw planError;
+
+                        // Save product targets
+                        await saveProductTargets();
+                        // Save retailer targets
+                        await saveRetailerTargets();
+                        // Save month targets
+                        await saveMonthTargets();
+
+                        toast.success("All targets saved successfully");
+                        loadPlans();
+                      } catch (error: any) {
+                        toast.error("Failed to save: " + error.message);
+                      }
+                    }}
+                  >
+                    <Target className="h-4 w-4 mr-2" />
+                    Save Target
+                  </Button>
                 </CardContent>
               </Card>
 
@@ -1578,12 +1628,6 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
 
                 {/* PRODUCT TARGETS TAB */}
                 <TabsContent value="products" className="mt-4 space-y-3">
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={saveProductTargets}>
-                      Save Targets
-                    </Button>
-                  </div>
-
                   {categoryTargets.length === 0 ? (
                     <Card>
                       <CardContent className="py-8 text-center">
@@ -1592,44 +1636,17 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                     </Card>
                   ) : (
                     <>
-                      {/* Total section with equal divide */}
-                      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-                        <CardContent className="p-3 sm:p-4 space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-                              <Label className="text-xs font-semibold whitespace-nowrap text-primary">Total Qty ({quantityUnit})</Label>
-                              <Input
-                                type="number"
-                                value={productTotalQuantity || ''}
-                                onChange={(e) => handleProductTotalTargetChange(parseFloat(e.target.value) || 0, productTotalRevenue)}
-                                className="w-24 sm:w-28 h-8 text-right font-semibold bg-background border-primary/30 focus:border-primary"
-                                placeholder="Quantity"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                              <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Total Revenue (₹)</Label>
-                              <Input
-                                type="number"
-                                value={productTotalRevenue || ''}
-                                onChange={(e) => handleProductTotalTargetChange(productTotalQuantity, parseFloat(e.target.value) || 0)}
-                                className="w-24 sm:w-28 h-8 text-right font-semibold bg-background border-green-500/30 focus:border-green-500"
-                                placeholder="Revenue"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-muted">
-                            <Checkbox
-                              id="product-equal-divide-all"
-                              checked={productEqualDivide}
-                              onCheckedChange={(checked) => handleProductEqualDivideChange(checked as boolean)}
-                            />
-                            <Label htmlFor="product-equal-divide-all" className="text-xs cursor-pointer">
-                              Equally divide across all products
-                            </Label>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      {/* Equal divide checkbox only */}
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-muted">
+                        <Checkbox
+                          id="product-equal-divide-all"
+                          checked={productEqualDivide}
+                          onCheckedChange={(checked) => handleProductEqualDivideChange(checked as boolean)}
+                        />
+                        <Label htmlFor="product-equal-divide-all" className="text-xs cursor-pointer">
+                          Equally divide across all products
+                        </Label>
+                      </div>
 
                       <div className="space-y-2">
                       {categoryTargets.map(cat => (
@@ -1753,12 +1770,6 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
 
                 {/* RETAILER TARGETS TAB */}
                 <TabsContent value="retailers" className="mt-4 space-y-3">
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={saveRetailerTargets}>
-                      Save Targets
-                    </Button>
-                  </div>
-
                   {retailerCategoryTargets.length === 0 ? (
                     <Card>
                       <CardContent className="py-8 text-center">
@@ -1767,44 +1778,17 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                     </Card>
                   ) : (
                     <>
-                      {/* Total section with equal divide */}
-                      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-                        <CardContent className="p-3 sm:p-4 space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-                              <Label className="text-xs font-semibold whitespace-nowrap text-primary">Total Qty ({quantityUnit})</Label>
-                              <Input
-                                type="number"
-                                value={retailerTotalQuantity || ''}
-                                onChange={(e) => handleRetailerTotalTargetChange(parseFloat(e.target.value) || 0, retailerTotalRevenue)}
-                                className="w-24 sm:w-28 h-8 text-right font-semibold bg-background border-primary/30 focus:border-primary"
-                                placeholder="Quantity"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                              <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Total Revenue (₹)</Label>
-                              <Input
-                                type="number"
-                                value={retailerTotalRevenue || ''}
-                                onChange={(e) => handleRetailerTotalTargetChange(retailerTotalQuantity, parseFloat(e.target.value) || 0)}
-                                className="w-24 sm:w-28 h-8 text-right font-semibold bg-background border-green-500/30 focus:border-green-500"
-                                placeholder="Revenue"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-muted">
-                            <Checkbox
-                              id="retailer-equal-divide-all"
-                              checked={retailerEqualDivide}
-                              onCheckedChange={(checked) => handleRetailerTotalEqualDivideChange(checked as boolean)}
-                            />
-                            <Label htmlFor="retailer-equal-divide-all" className="text-xs cursor-pointer">
-                              Equally divide across all retailers
-                            </Label>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      {/* Equal divide checkbox only */}
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-muted">
+                        <Checkbox
+                          id="retailer-equal-divide-all"
+                          checked={retailerEqualDivide}
+                          onCheckedChange={(checked) => handleRetailerTotalEqualDivideChange(checked as boolean)}
+                        />
+                        <Label htmlFor="retailer-equal-divide-all" className="text-xs cursor-pointer">
+                          Equally divide across all retailers
+                        </Label>
+                      </div>
 
                       <div className="space-y-2">
                         {retailerCategoryTargets.map(cat => (
@@ -1928,39 +1912,9 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
 
                 {/* MONTHLY TARGETS TAB */}
                 <TabsContent value="months" className="mt-4 space-y-3">
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={saveMonthTargets}>
-                      Save Targets
-                    </Button>
-                  </div>
-
                   <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
                     <CardContent className="p-3 sm:p-4 space-y-4">
-                      {/* Total target inputs - responsive */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-                          <Label className="text-xs font-semibold whitespace-nowrap text-primary">Total Qty ({quantityUnit})</Label>
-                          <Input
-                            type="number"
-                            value={monthTotalQuantity || ''}
-                            onChange={(e) => handleMonthTotalTargetChange(parseFloat(e.target.value) || 0, monthTotalRevenue)}
-                            className="w-24 sm:w-28 h-8 text-right font-semibold bg-background border-primary/30 focus:border-primary"
-                            placeholder="Quantity"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                          <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Total Revenue (₹)</Label>
-                          <Input
-                            type="number"
-                            value={monthTotalRevenue || ''}
-                            onChange={(e) => handleMonthTotalTargetChange(monthTotalQuantity, parseFloat(e.target.value) || 0)}
-                            className="w-24 sm:w-28 h-8 text-right font-semibold bg-background border-green-500/30 focus:border-green-500"
-                            placeholder="Revenue"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Equal divide checkbox */}
+                      {/* Equal divide checkbox only */}
                       <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-muted">
                         <Checkbox
                           id="month-equal-divide"
