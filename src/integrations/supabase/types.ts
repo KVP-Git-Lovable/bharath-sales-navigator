@@ -12129,6 +12129,7 @@ export type Database = {
       }
       hash_hint_answer: { Args: { answer: string }; Returns: string }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
+      is_admin_or_manager: { Args: never; Returns: boolean }
       is_manager: { Args: { user_id_param: string }; Returns: boolean }
       list_team_members: {
         Args: never
