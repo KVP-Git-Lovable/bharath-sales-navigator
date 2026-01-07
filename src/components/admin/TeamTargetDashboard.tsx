@@ -15,7 +15,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useTeamTargetProgress, PeriodType, TargetBasis } from '@/hooks/useTeamTargetProgress';
 
-export function TeamTargetDashboard() {
+interface TeamTargetDashboardProps {
+  userScope?: string;
+  effectiveUserIds?: string[];
+  fyYear?: number;
+}
+
+export function TeamTargetDashboard({
+  userScope,
+  effectiveUserIds = [],
+  fyYear,
+}: TeamTargetDashboardProps = {}) {
   const { user } = useAuth();
   const { subordinateIds, isManager } = useSubordinates();
   const [periodType, setPeriodType] = useState<PeriodType>('month');
@@ -23,8 +33,8 @@ export function TeamTargetDashboard() {
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Get all team member IDs (subordinates)
-  const teamUserIds = subordinateIds;
+  // Get all team member IDs - use effectiveUserIds if provided, else subordinates
+  const teamUserIds = effectiveUserIds.length > 0 ? effectiveUserIds : subordinateIds;
 
   const { data: teamProgress, isLoading } = useTeamTargetProgress({
     userIds: teamUserIds,
