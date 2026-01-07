@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -69,6 +69,10 @@ const BeatAllowanceManagement = () => {
   const [activeTab, setActiveTab] = useState<'expenses' | 'da' | 'additional'>('expenses');
   const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  
+  // Track current fetch version to ignore stale responses
+  const fetchVersionRef = useRef(0);
+  const isMountedRef = useRef(true);
 
   // Calculate effective user ID based on selection
   const effectiveUserId = useMemo(() => {
@@ -145,7 +149,9 @@ const BeatAllowanceManagement = () => {
       attendanceData?.forEach((record: any) => {
         leaveSet.add(record.date);
       });
-      setLeaveDates(leaveSet);
+      if (isMountedRef.current) {
+        setLeaveDates(leaveSet);
+      }
     } catch (error) {
       console.error('Error fetching leave dates:', error);
     }
@@ -314,14 +320,11 @@ const BeatAllowanceManagement = () => {
         });
       });
 
-      setExpenseRows(rows);
+      if (isMountedRef.current) {
+        setExpenseRows(rows);
+      }
     } catch (error) {
       console.error('Error fetching expense data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch expenses data",
-        variant: "destructive",
-      });
     }
   };
 
@@ -395,7 +398,9 @@ const BeatAllowanceManagement = () => {
         };
       }) || [];
 
-      setDARecords(records);
+      if (isMountedRef.current) {
+        setDARecords(records);
+      }
     } catch (error) {
       console.error('Error fetching DA data:', error);
     }
@@ -428,34 +433,65 @@ const BeatAllowanceManagement = () => {
         bill_attached: !!item.bill_url
       })) || [];
 
-      setAdditionalExpenseData(additionalExpenses);
+      if (isMountedRef.current) {
+        setAdditionalExpenseData(additionalExpenses);
+      }
     } catch (error) {
       console.error('Error fetching additional expense data:', error);
     }
   };
 
+  // Single unified effect for all data fetching with abort handling
   useEffect(() => {
-    const initializeData = async () => {
-      await fetchLeaveDates();
-      await Promise.all([
-        fetchExpenseData(),
-        fetchDAData(),
-        fetchAdditionalExpenseData()
-      ]);
-      setLoading(false);
+    isMountedRef.current = true;
+    
+    const fetchAllData = async () => {
+      if (!user?.id) return;
+      
+      // Increment version to invalidate any in-flight requests
+      const currentVersion = ++fetchVersionRef.current;
+      
+      setLoading(true);
+      
+      try {
+        // First fetch leave dates (needed for expense data)
+        await fetchLeaveDates();
+        
+        // Check if this request is still current
+        if (currentVersion !== fetchVersionRef.current || !isMountedRef.current) return;
+        
+        // Fetch all data in parallel
+        await Promise.all([
+          fetchExpenseData(),
+          fetchDAData(),
+          fetchAdditionalExpenseData()
+        ]);
+        
+        // Check again before updating loading state
+        if (currentVersion !== fetchVersionRef.current || !isMountedRef.current) return;
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        if (currentVersion === fetchVersionRef.current && isMountedRef.current) {
+          toast({
+            title: "Error",
+            description: "Failed to fetch expense data. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (currentVersion === fetchVersionRef.current && isMountedRef.current) {
+          setLoading(false);
+        }
+      }
     };
-    initializeData();
-  }, [user?.id, effectiveUserId, viewableUserIds]);
 
-  // Auto-refresh data when filter or user selection changes
-  useEffect(() => {
-    if (!loading && user?.id) {
-      fetchLeaveDates();
-      fetchExpenseData();
-      fetchDAData();
-      fetchAdditionalExpenseData();
-    }
-  }, [filterType, dateRangeStart, dateRangeEnd, effectiveUserId]);
+    fetchAllData();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [user?.id, effectiveUserId, filterType, dateRangeStart, dateRangeEnd]);
 
   const handleAdditionalExpensesClick = () => {
     // Check if any selected date is a leave date
