@@ -5615,6 +5615,30 @@ export type Database = {
           },
         ]
       }
+      invoice_document_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           cgst_amount: number | null
@@ -8764,9 +8788,12 @@ export type Database = {
       }
       retailers: {
         Row: {
+          account_holder_name: string | null
           address: string
           avg_monthly_orders_3m: number | null
           avg_order_per_visit_3m: number | null
+          bank_account: string | null
+          bank_name: string | null
           beat_id: string
           beat_name: string | null
           category: string | null
@@ -8778,11 +8805,13 @@ export type Database = {
           entity_type: string
           gst_number: string | null
           id: string
+          ifsc: string | null
           last_order_date: string | null
           last_order_value: number | null
           last_visit_date: string | null
           latitude: number | null
           location_tag: string | null
+          logo_url: string | null
           longitude: number | null
           manual_credit_score: number | null
           name: string
@@ -8796,9 +8825,11 @@ export type Database = {
           potential: string | null
           priority: string | null
           productive_visits_3m: number | null
+          qr_upi: string | null
           retail_type: string | null
           state: string | null
           status: string | null
+          terms_conditions: string | null
           territory_id: string | null
           total_visits_3m: number | null
           updated_at: string
@@ -8810,9 +8841,12 @@ export type Database = {
           verified: boolean
         }
         Insert: {
+          account_holder_name?: string | null
           address: string
           avg_monthly_orders_3m?: number | null
           avg_order_per_visit_3m?: number | null
+          bank_account?: string | null
+          bank_name?: string | null
           beat_id: string
           beat_name?: string | null
           category?: string | null
@@ -8824,11 +8858,13 @@ export type Database = {
           entity_type?: string
           gst_number?: string | null
           id?: string
+          ifsc?: string | null
           last_order_date?: string | null
           last_order_value?: number | null
           last_visit_date?: string | null
           latitude?: number | null
           location_tag?: string | null
+          logo_url?: string | null
           longitude?: number | null
           manual_credit_score?: number | null
           name: string
@@ -8842,9 +8878,11 @@ export type Database = {
           potential?: string | null
           priority?: string | null
           productive_visits_3m?: number | null
+          qr_upi?: string | null
           retail_type?: string | null
           state?: string | null
           status?: string | null
+          terms_conditions?: string | null
           territory_id?: string | null
           total_visits_3m?: number | null
           updated_at?: string
@@ -8856,9 +8894,12 @@ export type Database = {
           verified?: boolean
         }
         Update: {
+          account_holder_name?: string | null
           address?: string
           avg_monthly_orders_3m?: number | null
           avg_order_per_visit_3m?: number | null
+          bank_account?: string | null
+          bank_name?: string | null
           beat_id?: string
           beat_name?: string | null
           category?: string | null
@@ -8870,11 +8911,13 @@ export type Database = {
           entity_type?: string
           gst_number?: string | null
           id?: string
+          ifsc?: string | null
           last_order_date?: string | null
           last_order_value?: number | null
           last_visit_date?: string | null
           latitude?: number | null
           location_tag?: string | null
+          logo_url?: string | null
           longitude?: number | null
           manual_credit_score?: number | null
           name?: string
@@ -8888,9 +8931,11 @@ export type Database = {
           potential?: string | null
           priority?: string | null
           productive_visits_3m?: number | null
+          qr_upi?: string | null
           retail_type?: string | null
           state?: string | null
           status?: string | null
+          terms_conditions?: string | null
           territory_id?: string | null
           total_visits_3m?: number | null
           updated_at?: string
