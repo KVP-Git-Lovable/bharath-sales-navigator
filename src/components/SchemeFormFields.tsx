@@ -177,7 +177,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="conditionQty"
                   type="number"
-                  value={schemeForm.condition_quantity}
+                  value={schemeForm.condition_quantity || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
                   placeholder="Enter quantity"
                   className="flex-1"
@@ -204,7 +204,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
               <Input
                 id="discountPercentage"
                 type="number"
-                value={schemeForm.discount_percentage}
+                value={schemeForm.discount_percentage || ""}
                 onChange={(e) => setSchemeForm({ ...schemeForm, discount_percentage: parseFloat(e.target.value) || 0 })}
                 placeholder="Discount percentage"
                 max="100"
@@ -222,7 +222,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="conditionQty"
                   type="number"
-                  value={schemeForm.condition_quantity}
+                  value={schemeForm.condition_quantity || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
                   placeholder="Enter quantity"
                   className="flex-1"
@@ -249,7 +249,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
               <Input
                 id="discountAmount"
                 type="number"
-                value={schemeForm.discount_amount}
+                value={schemeForm.discount_amount || ""}
                 onChange={(e) => setSchemeForm({ ...schemeForm, discount_amount: parseFloat(e.target.value) || 0 })}
                 placeholder="Fixed discount amount"
               />
@@ -265,7 +265,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
               <Input
                 id="buyQuantity"
                 type="number"
-                value={schemeForm.buy_quantity}
+                value={schemeForm.buy_quantity || ""}
                 onChange={(e) => setSchemeForm({ ...schemeForm, buy_quantity: parseInt(e.target.value) || 0 })}
                 placeholder="Quantity to purchase"
               />
@@ -294,7 +294,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
               <Input
                 id="freeQuantity"
                 type="number"
-                value={schemeForm.free_quantity}
+                value={schemeForm.free_quantity || ""}
                 onChange={(e) => setSchemeForm({ ...schemeForm, free_quantity: parseInt(e.target.value) || 0 })}
                 placeholder="Free quantity"
               />
@@ -325,7 +325,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="bundleDiscountPercentage"
                   type="number"
-                  value={schemeForm.bundle_discount_percentage}
+                  value={schemeForm.bundle_discount_percentage || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, bundle_discount_percentage: parseFloat(e.target.value) || 0 })}
                   placeholder="Bundle discount %"
                   max="100"
@@ -336,7 +336,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="bundleDiscountAmount"
                   type="number"
-                  value={schemeForm.bundle_discount_amount}
+                  value={schemeForm.bundle_discount_amount || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, bundle_discount_amount: parseFloat(e.target.value) || 0 })}
                   placeholder="Fixed discount amount"
                 />
@@ -356,7 +356,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                     <Input
                       type="number"
                       placeholder="Min Qty"
-                      value={tier.min_qty}
+                      value={tier.min_qty || ""}
                       onChange={(e) => updateTier(index, 'min_qty', parseInt(e.target.value) || 0)}
                       className="w-24"
                     />
@@ -364,14 +364,14 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                     <Input
                       type="number"
                       placeholder="Max Qty"
-                      value={tier.max_qty}
+                      value={tier.max_qty || ""}
                       onChange={(e) => updateTier(index, 'max_qty', parseInt(e.target.value) || 0)}
                       className="w-24"
                     />
                     <Input
                       type="number"
                       placeholder="Discount %"
-                      value={tier.discount_percentage}
+                      value={tier.discount_percentage || ""}
                       onChange={(e) => updateTier(index, 'discount_percentage', parseFloat(e.target.value) || 0)}
                       className="w-28"
                       max="100"
@@ -404,7 +404,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="discountPercentage"
                   type="number"
-                  value={schemeForm.discount_percentage}
+                  value={schemeForm.discount_percentage || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, discount_percentage: parseFloat(e.target.value) || 0 })}
                   placeholder="Discount percentage"
                   max="100"
@@ -433,7 +433,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="discountPercentage"
                   type="number"
-                  value={schemeForm.discount_percentage}
+                  value={schemeForm.discount_percentage || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, discount_percentage: parseFloat(e.target.value) || 0 })}
                   placeholder="First order discount"
                   max="100"
@@ -488,7 +488,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="discountPercentage"
                   type="number"
-                  value={schemeForm.discount_percentage}
+                  value={schemeForm.discount_percentage || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, discount_percentage: parseFloat(e.target.value) || 0 })}
                   placeholder="Category discount %"
                   max="100"
@@ -499,7 +499,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 <Input
                   id="minOrderValue"
                   type="number"
-                  value={schemeForm.min_order_value}
+                  value={schemeForm.min_order_value || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, min_order_value: parseFloat(e.target.value) || 0 })}
                   placeholder="Minimum order amount"
                 />

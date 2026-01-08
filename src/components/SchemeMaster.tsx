@@ -746,7 +746,7 @@ export const SchemeMaster = () => {
                               <p className="text-xs text-muted-foreground mb-2">Higher = evaluated first</p>
                               <Input
                                 type="number"
-                                value={schemeForm.priority}
+                                value={schemeForm.priority || ""}
                                 onChange={(e) => setSchemeForm({ ...schemeForm, priority: parseInt(e.target.value) || 0 })}
                                 min={0}
                                 max={100}
