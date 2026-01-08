@@ -111,6 +111,8 @@ export function isSchemeConditionMet(
     return false;
   }
   
+  const hasMultiProduct = scheme.target_product_ids && scheme.target_product_ids.length > 0;
+  
   // For product-specific schemes, check product and quantity conditions
   if (scheme.product_id) {
     const matchingItem = items.find(item => 
@@ -125,9 +127,24 @@ export function isSchemeConditionMet(
     if (requiredQty && matchingItem.quantity < requiredQty) {
       return false;
     }
+  } else if (hasMultiProduct) {
+    // Multi-product scheme - check if ANY targeted product is in items and meets quantity
+    const matchingItems = items.filter(item => 
+      scheme.target_product_ids!.includes(item.product_id || item.id)
+    );
+    
+    if (matchingItems.length === 0) return false;
+    
+    // Check quantity condition against total of matching items only
+    const requiredQty = scheme.condition_quantity || scheme.buy_quantity;
+    if (requiredQty) {
+      const totalMatchingQty = matchingItems.reduce((sum, item) => sum + item.quantity, 0);
+      if (totalMatchingQty < requiredQty) {
+        return false;
+      }
+    }
   } else {
-    // Order-wide scheme - check min_order_value only (already checked above)
-    // For order-wide quantity schemes, check total quantity
+    // Order-wide scheme (no product_id and no target_product_ids)
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
     const requiredQty = scheme.condition_quantity || scheme.buy_quantity;
     if (requiredQty && totalQty < requiredQty) {
@@ -245,21 +262,30 @@ function calculateSchemeDiscount(
     case 'flat_discount':
     case 'flat': {
       const discountAmt = scheme.discount_amount || 0;
+      const hasMultiProduct = scheme.target_product_ids && scheme.target_product_ids.length > 0;
       
-      if (!scheme.product_id) {
-        // Order-wide flat discount
+      if (!scheme.product_id && !hasMultiProduct) {
+        // Order-wide flat discount (only when no product restrictions)
         if (scheme.min_order_value && subtotal < scheme.min_order_value) {
           break;
         }
         discount = Math.min(discountAmt, subtotal);
       } else {
-        // Product-specific flat discount
-        for (const item of applicableItems) {
-          if (isQuantityConditionMet(scheme, item.quantity)) {
-            const itemTotal = item.rate * item.quantity;
-            const itemDiscount = Math.min(discountAmt, itemTotal);
-            discount += itemDiscount;
-            itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+        // Product-specific or multi-product flat discount
+        // Check if total quantity of applicable items meets condition
+        const totalApplicableQty = applicableItems.reduce((sum, item) => sum + item.quantity, 0);
+        if (isQuantityConditionMet(scheme, totalApplicableQty)) {
+          // Apply flat discount once (not per item) when condition is met
+          const applicableTotal = applicableItems.reduce((sum, item) => sum + (item.rate * item.quantity), 0);
+          discount = Math.min(discountAmt, applicableTotal);
+          
+          // Distribute discount proportionally across applicable items for tracking
+          if (applicableTotal > 0) {
+            for (const item of applicableItems) {
+              const itemTotal = item.rate * item.quantity;
+              const itemProportion = itemTotal / applicableTotal;
+              itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + (discount * itemProportion);
+            }
           }
         }
       }
