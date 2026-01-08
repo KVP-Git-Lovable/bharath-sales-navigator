@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Palette } from "lucide-react";
+import { ArrowLeft, Building2, Palette, FileText } from "lucide-react";
 import CompanySettings from "@/components/invoice/CompanySettings";
 import HeaderBrandingSettings from "@/components/invoice/HeaderBrandingSettings";
+import DocumentSettings from "@/components/invoice/DocumentSettings";
 import { Layout } from "@/components/Layout";
 
 export default function CompanyProfile() {
@@ -29,7 +30,7 @@ export default function CompanyProfile() {
         </div>
 
         <Tabs defaultValue="branding" className="space-y-4">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="branding" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
               Header Branding
@@ -37,6 +38,10 @@ export default function CompanyProfile() {
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Company Details
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Document Settings
             </TabsTrigger>
           </TabsList>
 
@@ -46,6 +51,10 @@ export default function CompanyProfile() {
 
           <TabsContent value="details">
             <CompanySettings />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <DocumentSettings />
           </TabsContent>
         </Tabs>
       </div>
