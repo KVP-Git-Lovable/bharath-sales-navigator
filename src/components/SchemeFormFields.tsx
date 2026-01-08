@@ -36,6 +36,35 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [multiProductSearch, setMultiProductSearch] = useState('');
 
+  // Helper function to get unit equivalent display (like Order Entry)
+  const getUnitEquivalent = (qty: number, unit: string): string => {
+    if (!qty || qty <= 0) return '';
+    const u = (unit || '').toLowerCase();
+    if (u === 'kg') {
+      const grams = qty * 1000;
+      return `(${grams.toLocaleString()}g)`;
+    }
+    if (u === 'grams' || u === 'g') {
+      const kg = qty / 1000;
+      return `(${kg.toFixed(2)}kg)`;
+    }
+    if (u === 'liters') {
+      const ml = qty * 1000;
+      return `(${ml.toLocaleString()}ml)`;
+    }
+    if (u === 'ml') {
+      const liters = qty / 1000;
+      return `(${liters.toFixed(2)}L)`;
+    }
+    return '';
+  };
+
+  // Helper to determine step value based on unit
+  const getStepForUnit = (unit: string): string => {
+    const u = (unit || '').toLowerCase();
+    return ['kg', 'liters'].includes(u) ? '0.1' : '1';
+  };
+
   // Filtered products for multi-product selection
   const filteredProducts = useMemo(() => {
     if (!multiProductSearch.trim()) return products;
@@ -174,14 +203,21 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
             <div>
               <Label htmlFor="conditionQty">Minimum Quantity Required</Label>
               <div className="flex gap-2">
-                <Input
-                  id="conditionQty"
-                  type="number"
-                  value={schemeForm.condition_quantity || ""}
-                  onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
-                  placeholder="Enter quantity"
-                  className="flex-1"
-                />
+                <div className="flex-1">
+                  <Input
+                    id="conditionQty"
+                    type="number"
+                    value={schemeForm.condition_quantity || ""}
+                    onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseFloat(e.target.value) || 0 })}
+                    placeholder="Enter quantity"
+                    step={getStepForUnit(schemeForm.condition_unit || 'kg')}
+                  />
+                  {schemeForm.condition_quantity > 0 && (
+                    <span className="text-xs text-muted-foreground mt-1 block">
+                      {getUnitEquivalent(schemeForm.condition_quantity, schemeForm.condition_unit || 'kg')}
+                    </span>
+                  )}
+                </div>
                 <Select
                   value={schemeForm.condition_unit || 'kg'}
                   onValueChange={(value) => setSchemeForm({ ...schemeForm, condition_unit: value })}
@@ -219,14 +255,21 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
             <div>
               <Label htmlFor="conditionQty">Minimum Quantity Required</Label>
               <div className="flex gap-2">
-                <Input
-                  id="conditionQty"
-                  type="number"
-                  value={schemeForm.condition_quantity || ""}
-                  onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
-                  placeholder="Enter quantity"
-                  className="flex-1"
-                />
+                <div className="flex-1">
+                  <Input
+                    id="conditionQty"
+                    type="number"
+                    value={schemeForm.condition_quantity || ""}
+                    onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseFloat(e.target.value) || 0 })}
+                    placeholder="Enter quantity"
+                    step={getStepForUnit(schemeForm.condition_unit || 'kg')}
+                  />
+                  {schemeForm.condition_quantity > 0 && (
+                    <span className="text-xs text-muted-foreground mt-1 block">
+                      {getUnitEquivalent(schemeForm.condition_quantity, schemeForm.condition_unit || 'kg')}
+                    </span>
+                  )}
+                </div>
                 <Select
                   value={schemeForm.condition_unit || 'kg'}
                   onValueChange={(value) => setSchemeForm({ ...schemeForm, condition_unit: value })}
@@ -266,8 +309,9 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 id="buyQuantity"
                 type="number"
                 value={schemeForm.buy_quantity || ""}
-                onChange={(e) => setSchemeForm({ ...schemeForm, buy_quantity: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setSchemeForm({ ...schemeForm, buy_quantity: parseFloat(e.target.value) || 0 })}
                 placeholder="Quantity to purchase"
+                step="0.1"
               />
             </div>
             <div>
@@ -295,8 +339,9 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                 id="freeQuantity"
                 type="number"
                 value={schemeForm.free_quantity || ""}
-                onChange={(e) => setSchemeForm({ ...schemeForm, free_quantity: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setSchemeForm({ ...schemeForm, free_quantity: parseFloat(e.target.value) || 0 })}
                 placeholder="Free quantity"
+                step="0.1"
               />
             </div>
           </>
@@ -357,16 +402,18 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                       type="number"
                       placeholder="Min Qty"
                       value={tier.min_qty || ""}
-                      onChange={(e) => updateTier(index, 'min_qty', parseInt(e.target.value) || 0)}
+                      onChange={(e) => updateTier(index, 'min_qty', parseFloat(e.target.value) || 0)}
                       className="w-24"
+                      step="0.1"
                     />
                     <span className="text-sm">to</span>
                     <Input
                       type="number"
                       placeholder="Max Qty"
                       value={tier.max_qty || ""}
-                      onChange={(e) => updateTier(index, 'max_qty', parseInt(e.target.value) || 0)}
+                      onChange={(e) => updateTier(index, 'max_qty', parseFloat(e.target.value) || 0)}
                       className="w-24"
+                      step="0.1"
                     />
                     <Input
                       type="number"
