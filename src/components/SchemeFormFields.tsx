@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +10,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers, ChevronsUpDown, Check, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SchemeFormFieldsProps {
   schemeForm: any;
@@ -19,7 +22,52 @@ interface SchemeFormFieldsProps {
   categories: any[];
 }
 
+const UNIT_OPTIONS = [
+  { value: 'kg', label: 'KG' },
+  { value: 'grams', label: 'Grams' },
+  { value: 'pieces', label: 'Pieces' },
+  { value: 'liters', label: 'Liters' },
+  { value: 'ml', label: 'ML' },
+  { value: 'units', label: 'Units' },
+];
+
 export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categories }: SchemeFormFieldsProps) => {
+  // Search states
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [multiProductSearch, setMultiProductSearch] = useState('');
+
+  // Filtered products for multi-product selection
+  const filteredProducts = useMemo(() => {
+    if (!multiProductSearch.trim()) return products;
+    const search = multiProductSearch.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(search) ||
+      p.sku.toLowerCase().includes(search)
+    );
+  }, [products, multiProductSearch]);
+
+  // Select all filtered products
+  const handleSelectAll = () => {
+    const allIds = filteredProducts.map(p => p.id);
+    const newDiscounts: Record<string, { discount_percentage: number }> = {};
+    allIds.forEach(id => {
+      newDiscounts[id] = { discount_percentage: schemeForm.discount_percentage || 0 };
+    });
+    setSchemeForm({
+      ...schemeForm,
+      target_product_ids: allIds,
+      per_product_discounts: newDiscounts
+    });
+  };
+
+  // Clear all selections
+  const handleClearAll = () => {
+    setSchemeForm({
+      ...schemeForm,
+      target_product_ids: [],
+      per_product_discounts: {}
+    });
+  };
   
   const getSchemeTypeIcon = (type: string) => {
     switch (type) {
@@ -124,14 +172,32 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
         return (
           <>
             <div>
-              <Label htmlFor="conditionQty">Quantity Threshold</Label>
-              <Input
-                id="conditionQty"
-                type="number"
-                value={schemeForm.condition_quantity}
-                onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
-                placeholder="Minimum quantity required"
-              />
+              <Label htmlFor="conditionQty">Minimum Quantity Required</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="conditionQty"
+                  type="number"
+                  value={schemeForm.condition_quantity}
+                  onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
+                  placeholder="Enter quantity"
+                  className="flex-1"
+                />
+                <Select
+                  value={schemeForm.condition_unit || 'kg'}
+                  onValueChange={(value) => setSchemeForm({ ...schemeForm, condition_unit: value })}
+                >
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map(unit => (
+                      <SelectItem key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label htmlFor="discountPercentage">Discount Percentage (%)</Label>
@@ -151,14 +217,32 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
         return (
           <>
             <div>
-              <Label htmlFor="conditionQty">Quantity Threshold</Label>
-              <Input
-                id="conditionQty"
-                type="number"
-                value={schemeForm.condition_quantity}
-                onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
-                placeholder="Minimum quantity required"
-              />
+              <Label htmlFor="conditionQty">Minimum Quantity Required</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="conditionQty"
+                  type="number"
+                  value={schemeForm.condition_quantity}
+                  onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseInt(e.target.value) || 0 })}
+                  placeholder="Enter quantity"
+                  className="flex-1"
+                />
+                <Select
+                  value={schemeForm.condition_unit || 'kg'}
+                  onValueChange={(value) => setSchemeForm({ ...schemeForm, condition_unit: value })}
+                >
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map(unit => (
+                      <SelectItem key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label htmlFor="discountAmount">Discount Amount (₹)</Label>
@@ -557,39 +641,100 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
             />
           </div>
 
-          {/* Single Product Selection */}
+          {/* Single Product Selection - Searchable */}
           {!schemeForm.multi_product_mode && (
             <div>
               <Label htmlFor="product">Target Product</Label>
-              <Select
-                value={schemeForm.product_id}
-                onValueChange={(value) => setSchemeForm({ ...schemeForm, product_id: value, variant_id: 'all' })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name} ({product.sku})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={productSearchOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {schemeForm.product_id
+                      ? products.find(p => p.id === schemeForm.product_id)?.name || "Select product"
+                      : "Search and select product..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 min-w-[350px]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search products..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            value={`${product.name} ${product.sku}`}
+                            onSelect={() => {
+                              setSchemeForm({ ...schemeForm, product_id: product.id, variant_id: 'all' });
+                              setProductSearchOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                schemeForm.product_id === product.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <span className="flex-1">{product.name}</span>
+                            <span className="text-muted-foreground text-xs ml-2">({product.sku})</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
 
-          {/* Multi-Product Selection */}
+          {/* Multi-Product Selection with Search */}
           {schemeForm.multi_product_mode && (
             <div className="space-y-4">
               <div>
-                <Label>Select Products</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Select Products</Label>
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleSelectAll}
+                    >
+                      Select All
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleClearAll}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Selected: {(schemeForm.target_product_ids || []).length} product(s)
+                  Selected: {(schemeForm.target_product_ids || []).length} of {products.length} product(s)
                 </p>
-                <ScrollArea className="h-48 border rounded-md p-2">
-                  <div className="space-y-2">
-                    {products.map((product) => (
+                
+                {/* Search Input */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products..."
+                    value={multiProductSearch}
+                    onChange={(e) => setMultiProductSearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                
+                <ScrollArea className="h-52 border rounded-md p-2">
+                  <div className="space-y-1">
+                    {filteredProducts.map((product) => (
                       <div key={product.id} className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded">
                         <Checkbox
                           id={`target-${product.id}`}
@@ -607,6 +752,9 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                         </Badge>
                       </div>
                     ))}
+                    {filteredProducts.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
+                    )}
                   </div>
                 </ScrollArea>
               </div>
