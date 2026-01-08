@@ -1008,6 +1008,29 @@ export const OrderEntry = () => {
     return 0;
   };
 
+  // Helper function to get applied scheme name for a product
+  const getAppliedSchemeName = (productId: string): string => {
+    const productSchemes = schemes.filter(s => 
+      (s.product_id === productId || 
+       (s.target_product_ids && s.target_product_ids.includes(productId))) &&
+      s.is_active &&
+      (!s.start_date || new Date(s.start_date) <= new Date()) &&
+      (!s.end_date || new Date(s.end_date) >= new Date())
+    );
+    
+    if (productSchemes.length === 0) return '';
+    
+    // Return the first applicable scheme name with discount info
+    const scheme = productSchemes[0];
+    if (scheme.discount_percentage) {
+      return `${scheme.name} (${scheme.discount_percentage}% off)`;
+    }
+    if (scheme.discount_amount) {
+      return `${scheme.name} (₹${scheme.discount_amount} off)`;
+    }
+    return scheme.name;
+  };
+
   // Helper function to get scheme description
   const getSchemeDescription = (scheme: any) => {
     const conditionText = scheme.quantity_condition_type === 'more_than' ? `Buy ${scheme.condition_quantity}+ ${scheme.scheme_type === 'buy_get' ? 'items' : 'units'}` : `Buy exactly ${scheme.condition_quantity} ${scheme.scheme_type === 'buy_get' ? 'items' : 'units'}`;
@@ -2307,9 +2330,19 @@ export const OrderEntry = () => {
                         })()}
                       </p>
                       
-                      {savingsAmount > 0 && <p className="text-xs text-green-600 font-semibold">
-                          You save ₹{savingsAmount.toFixed(2)}
-                        </p>}
+                      {savingsAmount > 0 && (
+                        <>
+                          <p className="text-xs text-green-600 font-semibold">
+                            You save ₹{savingsAmount.toFixed(2)}
+                          </p>
+                          {getAppliedSchemeName(product.id) && (
+                            <div className="flex items-center gap-1 text-[10px] text-orange-600">
+                              <Gift size={10} />
+                              <span>{getAppliedSchemeName(product.id)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                     
                   </div>
