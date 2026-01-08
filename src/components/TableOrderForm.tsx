@@ -978,9 +978,33 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                         </PopoverContent>
                       </Popover>
                       {row.product && (
-                        <span className="text-[9px] text-muted-foreground mt-0.5">
-                          ₹{getPricePerUnit(row.product, row.variant, row.unit).toFixed(2)} per {row.unit}
-                        </span>
+                        <>
+                          <span className="text-[9px] text-muted-foreground mt-0.5">
+                            ₹{getPricePerUnit(row.product, row.variant, row.unit).toFixed(2)} per {row.unit}
+                          </span>
+                          {/* Show applied scheme details */}
+                          {(() => {
+                            const productId = row.product.id;
+                            const itemSchemes = orderCalculation.itemSchemeDetails?.[productId] || [];
+                            
+                            if (itemSchemes.length === 0 || row.quantity === 0) return null;
+                            
+                            return (
+                              <div className="mt-0.5 space-y-0.5">
+                                {itemSchemes.map((scheme, idx) => (
+                                  <div key={idx} className="flex items-center gap-1 text-[9px] md:text-[10px] text-green-600">
+                                    <Gift size={10} className="flex-shrink-0" />
+                                    <span className="truncate">
+                                      {scheme.schemeName}
+                                      {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
+                                      {' - '}₹{scheme.discountAmount.toFixed(2)} saved
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </>
                       )}
                     </div>
                     
