@@ -5,6 +5,7 @@ import { useConnectivity } from './useConnectivity';
 import { toast } from './use-toast';
 import { visitStatusCache } from '@/lib/visitStatusCache';
 import { getLocalTodayDate } from '@/utils/dateUtils';
+import { markVisitDataChanged } from '@/lib/visitChangeMarker';
 
 /**
  * Comprehensive offline order entry hook
@@ -248,6 +249,9 @@ export function useOfflineOrderComplete() {
           }
         }));
         window.dispatchEvent(new Event('visitDataChanged'));
+        
+        // Mark data changed for cross-page state sync
+        markVisitDataChanged();
 
         // Add delay before returning to allow events to be processed
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -320,6 +324,9 @@ export function useOfflineOrderComplete() {
           }
         }));
         window.dispatchEvent(new Event('visitDataChanged'));
+        
+        // Mark data changed for cross-page state sync
+        markVisitDataChanged();
 
         // Add delay before returning to allow events to be processed
         await new Promise(resolve => setTimeout(resolve, 300));
