@@ -1597,6 +1597,9 @@ export const OrderEntry = () => {
       description: `Cart updated with ${items.length} item(s)`
     });
 
+    // Record proceed to cart action for time tracking
+    recordAction('proceed_to_cart').catch(() => {});
+
     // Navigate to cart with current parameters
     const params = new URLSearchParams(searchParams);
     navigate(`/cart?${params.toString()}`);

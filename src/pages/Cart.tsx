@@ -1007,6 +1007,15 @@ export const Cart = () => {
           }
         }));
         
+        // Dispatch order submitted event for visit time tracking
+        window.dispatchEvent(new CustomEvent('orderSubmitted', {
+          detail: {
+            retailerId: validRetailerId,
+            visitId: actualVisitId,
+            orderValue: totalAmount
+          }
+        }));
+        
         // CRITICAL FIX: Also dispatch visitDataChanged to trigger data refreshes across the app
         window.dispatchEvent(new Event('visitDataChanged'));
       }

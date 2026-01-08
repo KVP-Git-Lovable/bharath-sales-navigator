@@ -301,6 +301,23 @@ export const VisitCard = ({
       subscription.unsubscribe();
     };
   }, [endAllActiveLogs]);
+
+  // Listen for order submission events to track checkout timing
+  useEffect(() => {
+    const handleOrderSubmitted = async (event: CustomEvent) => {
+      const { retailerId: eventRetailerId } = event.detail;
+      const currentRetailerId = visit.retailerId || visit.id;
+      if (eventRetailerId === currentRetailerId) {
+        await recordAction('order_submitted');
+      }
+    };
+    
+    window.addEventListener('orderSubmitted', handleOrderSubmitted as EventListener);
+    return () => {
+      window.removeEventListener('orderSubmitted', handleOrderSubmitted as EventListener);
+    };
+  }, [visit.retailerId, visit.id, recordAction]);
+
   const [showVisitDetailsModal, setShowVisitDetailsModal] = useState(false);
   
   // SYNC CACHE READ: Try to get status from cache OR use prop if it has authoritative status
@@ -1871,6 +1888,9 @@ export const VisitCard = ({
 
       // For check-out: skip photo and process immediately
       if (action === 'checkout') {
+        // Record checkout action for time tracking
+        await recordAction('checkout');
+        
         // Check-out process (no photo required)
         const todayStart = new Date(today);
         todayStart.setHours(0, 0, 0, 0);
@@ -2232,6 +2252,7 @@ export const VisitCard = ({
     } catch (error) {
       console.log('Analytics view recording error:', error);
     }
+    recordAction('analytics').catch(() => {});
     setShowAnalyticsModal(true);
   };
   const loadLastOrder = async () => {
@@ -2596,7 +2617,10 @@ export const VisitCard = ({
                   <UserCheck size={12} className="mr-1" />
                   Joint Visit
                 </Badge>}
-              {hasStockRecords && <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-xs px-2 py-1 cursor-pointer transition-all" variant="secondary" onClick={() => setShowStockDataModal(true)}>
+              {hasStockRecords && <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-xs px-2 py-1 cursor-pointer transition-all" variant="secondary" onClick={() => {
+                  recordAction('view_stock').catch(() => {});
+                  setShowStockDataModal(true);
+                }}>
                   <Package size={12} className="mr-1" />
                   {stockRecordCount} Stock{stockRecordCount !== 1 ? 's' : ''}
                 </Badge>}
@@ -2629,7 +2653,10 @@ export const VisitCard = ({
                     variant="ghost" 
                     size="sm" 
                     className="h-7 gap-1 text-xs text-primary"
-                    onClick={() => setShowCreditTalkingPoints(true)}
+                    onClick={() => {
+                      recordAction('collection_tips').catch(() => {});
+                      setShowCreditTalkingPoints(true);
+                    }}
                   >
                     <MessageSquare className="w-3 h-3" />
                     Tips
@@ -2815,7 +2842,8 @@ export const VisitCard = ({
                 <span className="text-sm font-medium">
                   {selectedDate ? `${new Date(selectedDate).toDateString() === new Date().toDateString() ? "Today's" : new Date(selectedDate).toLocaleDateString()} Order` : "Today's Order"}
                 </span>
-                <Button variant="ghost" size="sm" className="h-7" onClick={async () => {
+              <Button variant="ghost" size="sm" className="h-7" onClick={async () => {
+              recordAction('view_order').catch(() => {});
               const next = !orderPreviewOpen;
               setOrderPreviewOpen(next);
               if (next && lastOrderItems.length === 0) {
@@ -2908,12 +2936,16 @@ export const VisitCard = ({
                   <p className="font-medium mb-1">📍 Location & Camera Required</p>
                   <p className="text-xs">Please allow location and camera access when prompted for check-in.</p>
                 </div>}
-              {isLocationEnabled && <div className="grid grid-cols-2 gap-2">
-                <Button onClick={() => handleCheckInOut('checkin')} className={`w-full h-12 text-base font-medium ${isCheckedIn || !isTodaysVisit ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-primary hover:bg-primary/90'}`} disabled={isCheckedIn || !isTodaysVisit}>
+            {isLocationEnabled && <div className="grid grid-cols-2 gap-2">
+                <Button onClick={() => {
+                  recordAction('check_in').catch(() => {});
+                  handleCheckInOut('checkin');
+                }} className={`w-full h-12 text-base font-medium ${isCheckedIn || !isTodaysVisit ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-primary hover:bg-primary/90'}`} disabled={isCheckedIn || !isTodaysVisit}>
                   <LogIn className="mr-2 h-5 w-5" />
                   {isCheckedIn ? 'Checked In' : 'Check In'}
                 </Button>
                 <Button onClick={async () => {
+                recordAction('phone_order').catch(() => {});
                 try {
                   const {
                     data: {
