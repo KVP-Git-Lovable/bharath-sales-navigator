@@ -732,7 +732,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                   />
                 </div>
                 
-                <ScrollArea className="h-52 border rounded-md p-2">
+                <div className="h-52 border rounded-md p-2 overflow-y-auto">
                   <div className="space-y-1">
                     {filteredProducts.map((product) => (
                       <div key={product.id} className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded">
@@ -756,7 +756,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                       <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
                     )}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
 
               {/* Discount Mode Selection - Only show when multiple products selected */}
