@@ -233,7 +233,7 @@ export const SchemeMaster = () => {
     const variantProducts: Product[] = (variantsData || []).map((v: any) => ({
       id: v.id,
       sku: v.sku || '',
-      name: `${v.product?.name || 'Unknown'} - ${v.variant_name}`,
+      name: v.variant_name,
       description: '',
       category_id: v.product?.category_id || '',
       rate: v.price || 0,
