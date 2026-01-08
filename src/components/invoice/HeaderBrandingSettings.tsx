@@ -82,6 +82,9 @@ export default function HeaderBrandingSettings() {
           .from("companies")
           .update({ header_logo_url: publicUrl })
           .eq("id", companyId);
+        
+        // Notify other components of the change
+        window.dispatchEvent(new CustomEvent(HEADER_BRANDING_UPDATED_EVENT));
       }
 
       toast.success("Logo uploaded successfully");
