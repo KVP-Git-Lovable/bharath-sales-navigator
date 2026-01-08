@@ -746,6 +746,9 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                           className="text-sm cursor-pointer flex-1"
                         >
                           {product.name} <span className="text-muted-foreground">({product.sku})</span>
+                          {product.type === 'variant' && (
+                            <Badge variant="secondary" className="ml-2 text-xs">Variant</Badge>
+                          )}
                         </label>
                         <Badge variant="outline" className="text-xs">
                           ₹{product.rate}
