@@ -6,12 +6,14 @@ import InvoiceTemplateSelector from "@/components/invoice/InvoiceTemplateSelecto
 import CompanySettings from "@/components/invoice/CompanySettings";
 import AllInvoicesList from "@/components/invoice/AllInvoicesList";
 import HeaderBrandingSettings from "@/components/invoice/HeaderBrandingSettings";
+import { Layout } from "@/components/Layout";
 
 export default function InvoiceManagement() {
   const navigate = useNavigate();
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <Layout>
+      <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -49,6 +51,7 @@ export default function InvoiceManagement() {
           <AllInvoicesList />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </Layout>
   );
 }
