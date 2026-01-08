@@ -9,12 +9,48 @@ interface CompanyData {
   header_logo_url: string | null;
 }
 
+interface HeaderBrandingCache {
+  headerName: string | null;
+  headerLogo: string | null;
+  cachedAt: number;
+}
+
 // Custom event name for header branding updates
 export const HEADER_BRANDING_UPDATED_EVENT = 'header-branding-updated';
 
+// Cache key for localStorage
+const HEADER_BRANDING_CACHE_KEY = 'header_branding_cache';
+
+// Helper to get cached data synchronously
+const getCachedBranding = (): HeaderBrandingCache | null => {
+  try {
+    const cached = localStorage.getItem(HEADER_BRANDING_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.error('Error reading header branding cache:', e);
+  }
+  return null;
+};
+
+// Helper to save cache
+const setCachedBranding = (data: HeaderBrandingCache) => {
+  try {
+    localStorage.setItem(HEADER_BRANDING_CACHE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Error saving header branding cache:', e);
+  }
+};
+
 export const useCompanyData = () => {
+  // Initialize from cache synchronously - no loading flicker
+  const initialCache = getCachedBranding();
+  
   const [company, setCompany] = useState<CompanyData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [headerName, setHeaderName] = useState<string | null>(initialCache?.headerName || null);
+  const [headerLogo, setHeaderLogo] = useState<string | null>(initialCache?.headerLogo || null);
+  const [isLoading, setIsLoading] = useState(!initialCache); // Only loading if no cache
 
   const fetchCompany = useCallback(async () => {
     try {
@@ -26,9 +62,26 @@ export const useCompanyData = () => {
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching company:', error);
+        return;
       }
       
-      setCompany(data);
+      if (data) {
+        setCompany(data);
+        
+        // Update header branding state
+        const newHeaderName = data.header_name || data.name || null;
+        const newHeaderLogo = data.header_logo_url || data.logo_url || null;
+        
+        setHeaderName(newHeaderName);
+        setHeaderLogo(newHeaderLogo);
+        
+        // Update cache
+        setCachedBranding({
+          headerName: newHeaderName,
+          headerLogo: newHeaderLogo,
+          cachedAt: Date.now()
+        });
+      }
     } catch (err) {
       console.error('Error fetching company data:', err);
     } finally {
@@ -37,11 +90,17 @@ export const useCompanyData = () => {
   }, []);
 
   useEffect(() => {
-    fetchCompany();
-
-    // Listen for header branding updates
-    const handleBrandingUpdate = () => {
+    // Only fetch from network if no cache exists
+    const cached = getCachedBranding();
+    if (!cached) {
       fetchCompany();
+    } else {
+      setIsLoading(false);
+    }
+
+    // Listen for header branding updates (triggered on Save)
+    const handleBrandingUpdate = () => {
+      fetchCompany(); // Fetch fresh data and update cache
     };
 
     window.addEventListener(HEADER_BRANDING_UPDATED_EVENT, handleBrandingUpdate);
@@ -49,10 +108,6 @@ export const useCompanyData = () => {
       window.removeEventListener(HEADER_BRANDING_UPDATED_EVENT, handleBrandingUpdate);
     };
   }, [fetchCompany]);
-
-  // Return header-specific values with fallback to company details
-  const headerName = company?.header_name || company?.name || null;
-  const headerLogo = company?.header_logo_url || company?.logo_url || null;
 
   return { company, isLoading, headerName, headerLogo, refetch: fetchCompany };
 };
