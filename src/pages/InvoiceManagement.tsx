@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InvoiceTemplateSelector from "@/components/invoice/InvoiceTemplateSelector";
 import CompanySettings from "@/components/invoice/CompanySettings";
 import AllInvoicesList from "@/components/invoice/AllInvoicesList";
+import HeaderBrandingSettings from "@/components/invoice/HeaderBrandingSettings";
 
 export default function InvoiceManagement() {
   const navigate = useNavigate();
@@ -28,12 +29,16 @@ export default function InvoiceManagement() {
         </div>
       </div>
 
-      <Tabs defaultValue="template" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="template">Invoice Template Selection</TabsTrigger>
-          <TabsTrigger value="company">Company Settings</TabsTrigger>
+      <Tabs defaultValue="branding" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="branding">Header Branding</TabsTrigger>
+          <TabsTrigger value="template">Invoice Template</TabsTrigger>
+          <TabsTrigger value="company">Company Details</TabsTrigger>
           <TabsTrigger value="invoices">All Invoices</TabsTrigger>
         </TabsList>
+        <TabsContent value="branding" className="mt-6">
+          <HeaderBrandingSettings />
+        </TabsContent>
         <TabsContent value="template" className="mt-6">
           <InvoiceTemplateSelector />
         </TabsContent>
