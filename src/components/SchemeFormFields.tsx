@@ -201,7 +201,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
         return (
           <>
             <div>
-              <Label htmlFor="conditionQty">Minimum Quantity Required</Label>
+                <Label htmlFor="conditionQty">Quantity Threshold</Label>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Input
@@ -253,7 +253,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
         return (
           <>
             <div>
-              <Label htmlFor="conditionQty">Minimum Quantity Required</Label>
+              <Label htmlFor="conditionQty">Quantity Threshold</Label>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Input
