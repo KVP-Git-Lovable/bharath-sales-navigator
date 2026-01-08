@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Loader2, Upload, Building2 } from "lucide-react";
+import { HEADER_BRANDING_UPDATED_EVENT } from "@/hooks/useCompanyData";
 
 export default function HeaderBrandingSettings() {
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -118,6 +119,9 @@ export default function HeaderBrandingSettings() {
         setCompanyId(data.id);
       }
 
+      // Dispatch event to notify all useCompanyData hooks to refetch
+      window.dispatchEvent(new CustomEvent(HEADER_BRANDING_UPDATED_EVENT));
+      
       toast.success("Header branding updated successfully");
     } catch (error: any) {
       console.error("Error saving:", error);
