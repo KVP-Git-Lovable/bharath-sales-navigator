@@ -312,12 +312,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }, 1000); // Small delay to let the success toast show first
 
-      // Redirect based on role
-      if (userRole === 'admin') {
-        window.location.href = '/admin';
-      } else {
-        window.location.href = '/dashboard';
-      }
+      // Redirect to dashboard for all users
+      window.location.href = '/dashboard';
     }
   };
 
