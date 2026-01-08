@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTranslation } from 'react-i18next';
 import { useActivePerformanceModule } from "@/hooks/useActivePerformanceModule";
 import { useCompanyData } from "@/hooks/useCompanyData";
-import bharathLogo from '@/assets/bharath-logo.png';
+import { Building2 as DefaultLogoIcon } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -52,9 +52,9 @@ export const Navbar = memo(() => {
   const { isGamificationActive } = useActivePerformanceModule();
   const { headerName, headerLogo } = useCompanyData();
   
-  // Company name and logo with fallbacks
-  const companyName = headerName || 'Bharath Beverages';
-  const companyLogo = headerLogo || bharathLogo;
+  // Company name and logo - no hardcoded fallbacks, uses cache
+  const companyName = headerName || '';
+  const companyLogo = headerLogo;
   
   // Hide back button on home/dashboard
   const showBackButton = location.pathname !== '/dashboard' && location.pathname !== '/';
@@ -149,11 +149,15 @@ export const Navbar = memo(() => {
               
               <NavLink to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity text-white">
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
-                  <img 
-                    src={companyLogo} 
-                    alt={companyName} 
-                    className="w-full h-full object-contain"
-                  />
+                  {companyLogo ? (
+                    <img 
+                      src={companyLogo} 
+                      alt={companyName || 'Company'} 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <DefaultLogoIcon className="w-6 h-6 text-primary" />
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-1">
