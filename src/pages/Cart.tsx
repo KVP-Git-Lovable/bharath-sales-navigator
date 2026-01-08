@@ -32,6 +32,7 @@ import { isSlowConnection } from "@/utils/internetSpeedCheck";
 import { useOfflineSchemes } from "@/hooks/useOfflineSchemes";
 import { useAppliedSchemes } from "@/hooks/useAppliedSchemes";
 import { calculateOrderWithSchemes, SchemeItem, formatSchemeDetailsForInvoice } from "@/utils/schemeEngine";
+import { markVisitDataChanged } from "@/lib/visitChangeMarker";
 
 interface CartItem {
   id: string;
@@ -1018,6 +1019,10 @@ export const Cart = () => {
         
         // CRITICAL FIX: Also dispatch visitDataChanged to trigger data refreshes across the app
         window.dispatchEvent(new Event('visitDataChanged'));
+        
+        // CRITICAL FIX: Mark data changed for cross-page state sync
+        // This ensures My Visits will reload from snapshot when returning
+        markVisitDataChanged();
       }
 
       // Navigate to My Visits page immediately

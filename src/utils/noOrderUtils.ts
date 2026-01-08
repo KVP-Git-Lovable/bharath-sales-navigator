@@ -2,6 +2,7 @@ import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { visitStatusCache } from '@/lib/visitStatusCache';
 import { updateVisitStatusInSnapshot } from '@/lib/myVisitsSnapshot';
 import { supabase } from '@/integrations/supabase/client';
+import { markVisitDataChanged } from '@/lib/visitChangeMarker';
 
 const SYNC_TIMEOUT_MS = 5000; // 5 second timeout for all sync operations
 
@@ -62,6 +63,9 @@ export async function submitNoOrderLocalFirst(params: {
     }
   }));
   window.dispatchEvent(new Event('visitDataChanged'));
+  
+  // STEP 2.5: Mark data changed for cross-page state sync
+  markVisitDataChanged();
 
   // STEP 3: Background sync with 5-second timeout - ALWAYS non-blocking
   setTimeout(async () => {

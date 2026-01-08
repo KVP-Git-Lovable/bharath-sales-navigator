@@ -4,6 +4,7 @@ import { offlineStorage, STORES, MIN_SYNC_INTERVAL_MS } from '@/lib/offlineStora
 import { loadMyVisitsSnapshot, saveMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { isSlowConnection, getConnectionQuality, getManualSlowMode } from '@/utils/internetSpeedCheck';
+import { getLastChangeTimestamp, clearChangeMarker } from '@/lib/visitChangeMarker';
 
 interface UseVisitsDataOptimizedProps {
   userId: string | undefined;
@@ -618,6 +619,18 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     // FIX #3: Cache staleness check - for today, if cache is old, force full sync
     const MAX_CACHE_AGE_MS = 30 * 60 * 1000; // 30 minutes
     const isTodayDate = isToday(selectedDate);
+
+    // CRITICAL FIX: Check for changes made on other pages while this component was unmounted
+    // If changes were detected, invalidate the in-memory cache to force fresh snapshot load
+    const changeMarker = await getLastChangeTimestamp();
+    if (changeMarker && changeMarker.date === selectedDate) {
+      const cached = cacheRef.current.get(selectedDate);
+      if (cached && changeMarker.timestamp > (cached.timestamp || 0)) {
+        console.log('[LoadData] 🔄 Change detected while unmounted, invalidating cache for', selectedDate);
+        cacheRef.current.delete(selectedDate);
+        await clearChangeMarker();
+      }
+    }
 
     // 1. Try in-memory cache FIRST (instant)
     const cached = cacheRef.current.get(selectedDate);

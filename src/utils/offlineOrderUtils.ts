@@ -4,6 +4,7 @@ import { visitStatusCache } from '@/lib/visitStatusCache';
 import { addOrderToSnapshot } from '@/lib/myVisitsSnapshot';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { isSlowConnection } from '@/utils/internetSpeedCheck';
+import { markVisitDataChanged } from '@/lib/visitChangeMarker';
 
 const SYNC_TIMEOUT_MS = 5000; // 5 second timeout for all sync operations
 
@@ -98,6 +99,9 @@ export async function submitOrderWithOfflineSupport(
       }
     }));
     window.dispatchEvent(new Event('visitDataChanged'));
+    
+    // STEP 3.5: Mark data changed for cross-page state sync
+    markVisitDataChanged();
   }
 
   // STEP 4: Background sync with 5-second timeout - ALWAYS non-blocking
