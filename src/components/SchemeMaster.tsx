@@ -37,6 +37,8 @@ interface Product {
   rate: number;
   unit: string;
   is_active: boolean;
+  type?: 'product' | 'variant';
+  parent_product_id?: string;
 }
 
 interface ProductScheme {
@@ -189,13 +191,64 @@ export const SchemeMaster = () => {
   };
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
+    // Fetch base products
+    const { data: productsData, error: productsError } = await supabase
       .from('products')
       .select('id, sku, name, description, category_id, rate, unit, is_active')
+      .eq('is_active', true)
       .order('name');
     
-    if (error) throw error;
-    setProducts(data || []);
+    if (productsError) throw productsError;
+    
+    // Fetch product variants
+    const { data: variantsData, error: variantsError } = await supabase
+      .from('product_variants')
+      .select(`
+        id, 
+        sku, 
+        variant_name, 
+        product_id, 
+        price, 
+        is_active,
+        product:products!product_id(name, category_id, unit)
+      `)
+      .eq('is_active', true)
+      .order('variant_name');
+    
+    if (variantsError) throw variantsError;
+    
+    // Combine products and variants into unified list
+    const baseProducts: Product[] = (productsData || []).map(p => ({
+      id: p.id,
+      sku: p.sku,
+      name: p.name,
+      description: p.description || '',
+      category_id: p.category_id || '',
+      rate: p.rate,
+      unit: p.unit || '',
+      is_active: p.is_active,
+      type: 'product' as const
+    }));
+    
+    const variantProducts: Product[] = (variantsData || []).map((v: any) => ({
+      id: v.id,
+      sku: v.sku || '',
+      name: `${v.product?.name || 'Unknown'} - ${v.variant_name}`,
+      description: '',
+      category_id: v.product?.category_id || '',
+      rate: v.price || 0,
+      unit: v.product?.unit || '',
+      is_active: v.is_active,
+      type: 'variant' as const,
+      parent_product_id: v.product_id
+    }));
+    
+    // Combine and sort alphabetically
+    const allProducts = [...baseProducts, ...variantProducts].sort((a, b) => 
+      a.name.localeCompare(b.name)
+    );
+    
+    setProducts(allProducts);
   };
 
   const fetchCategories = async () => {
@@ -645,6 +698,7 @@ export const SchemeMaster = () => {
                   <Button onClick={() => {
                     setSchemeForm(initialSchemeForm);
                     setApplicabilityRules([]);
+                    fetchProducts(); // Refresh products list including any new products/variants
                   }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Scheme
