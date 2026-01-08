@@ -5,6 +5,8 @@ interface CompanyData {
   id: string;
   name: string;
   logo_url: string | null;
+  header_name: string | null;
+  header_logo_url: string | null;
 }
 
 export const useCompanyData = () => {
@@ -16,7 +18,7 @@ export const useCompanyData = () => {
       try {
         const { data, error } = await supabase
           .from('companies')
-          .select('id, name, logo_url')
+          .select('id, name, logo_url, header_name, header_logo_url')
           .limit(1)
           .single();
 
@@ -35,5 +37,9 @@ export const useCompanyData = () => {
     fetchCompany();
   }, []);
 
-  return { company, isLoading };
+  // Return header-specific values with fallback to company details
+  const headerName = company?.header_name || company?.name || null;
+  const headerLogo = company?.header_logo_url || company?.logo_url || null;
+
+  return { company, isLoading, headerName, headerLogo };
 };

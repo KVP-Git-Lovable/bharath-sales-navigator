@@ -50,11 +50,11 @@ export const Navbar = memo(() => {
   const { t } = useTranslation('common');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isGamificationActive } = useActivePerformanceModule();
-  const { company } = useCompanyData();
+  const { headerName, headerLogo } = useCompanyData();
   
   // Company name and logo with fallbacks
-  const companyName = company?.name || 'Bharath Beverages';
-  const companyLogo = company?.logo_url || bharathLogo;
+  const companyName = headerName || 'Bharath Beverages';
+  const companyLogo = headerLogo || bharathLogo;
   
   // Hide back button on home/dashboard
   const showBackButton = location.pathname !== '/dashboard' && location.pathname !== '/';

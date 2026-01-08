@@ -1596,6 +1596,8 @@ export type Database = {
           created_at: string | null
           email: string | null
           gstin: string | null
+          header_logo_url: string | null
+          header_name: string | null
           id: string
           ifsc: string | null
           invoice_template: string | null
@@ -1616,6 +1618,8 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           gstin?: string | null
+          header_logo_url?: string | null
+          header_name?: string | null
           id?: string
           ifsc?: string | null
           invoice_template?: string | null
@@ -1636,6 +1640,8 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           gstin?: string | null
+          header_logo_url?: string | null
+          header_name?: string | null
           id?: string
           ifsc?: string | null
           invoice_template?: string | null

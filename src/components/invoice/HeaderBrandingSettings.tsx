@@ -23,7 +23,7 @@ export default function HeaderBrandingSettings() {
     try {
       const { data, error } = await supabase
         .from("companies")
-        .select("id, name, logo_url")
+        .select("id, header_name, header_logo_url")
         .limit(1)
         .single();
 
@@ -33,8 +33,8 @@ export default function HeaderBrandingSettings() {
 
       if (data) {
         setCompanyId(data.id);
-        setCompanyName(data.name || "");
-        setLogoUrl(data.logo_url);
+        setCompanyName(data.header_name || "");
+        setLogoUrl(data.header_logo_url);
       }
     } catch (err) {
       console.error("Error:", err);
@@ -79,7 +79,7 @@ export default function HeaderBrandingSettings() {
       if (companyId) {
         await supabase
           .from("companies")
-          .update({ logo_url: publicUrl })
+          .update({ header_logo_url: publicUrl })
           .eq("id", companyId);
       }
 
@@ -103,14 +103,14 @@ export default function HeaderBrandingSettings() {
       if (companyId) {
         const { error } = await supabase
           .from("companies")
-          .update({ name: companyName, logo_url: logoUrl })
+          .update({ header_name: companyName, header_logo_url: logoUrl })
           .eq("id", companyId);
 
         if (error) throw error;
       } else {
         const { data, error } = await supabase
           .from("companies")
-          .insert({ name: companyName, logo_url: logoUrl })
+          .insert({ name: companyName, header_name: companyName, header_logo_url: logoUrl })
           .select("id")
           .single();
 
