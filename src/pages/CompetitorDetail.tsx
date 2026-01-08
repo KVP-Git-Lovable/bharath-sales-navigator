@@ -19,7 +19,7 @@ import { CompetitionDataList } from "@/components/competition/CompetitionDataLis
 import { CompetitionAISummary } from "@/components/competition/CompetitionAISummary";
 import { CompetitionRetailerAnalytics } from "@/components/competition/CompetitionRetailerAnalytics";
 import { SKUDetailModal } from "@/components/competition/SKUDetailModal";
-import { Navbar } from "@/components/Navbar";
+import { Layout } from "@/components/Layout";
 
 interface Competitor {
   id: string;
@@ -221,8 +221,7 @@ export default function CompetitorDetail() {
   if (!competitor) return <div className="p-4 md:p-8">Competitor not found</div>;
 
   return (
-    <>
-      <Navbar />
+    <Layout>
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
         {/* Header Section */}
         <div className="relative overflow-hidden bg-gradient-primary text-primary-foreground">
@@ -537,6 +536,6 @@ export default function CompetitorDetail() {
       />
       </div>
     </div>
-    </>
+    </Layout>
   );
 }
