@@ -31,7 +31,7 @@ import { getLocalTodayDate } from "@/utils/dateUtils";
 import { isSlowConnection } from "@/utils/internetSpeedCheck";
 import { useOfflineSchemes } from "@/hooks/useOfflineSchemes";
 import { useAppliedSchemes } from "@/hooks/useAppliedSchemes";
-import { calculateOrderWithSchemes, SchemeItem, formatSchemeDetailsForInvoice } from "@/utils/schemeEngine";
+import { calculateOrderWithSchemes, SchemeItem, formatSchemeDetailsForInvoice, ItemSchemeDetail } from "@/utils/schemeEngine";
 import { markVisitDataChanged } from "@/lib/visitChangeMarker";
 
 interface CartItem {
@@ -1405,7 +1405,7 @@ export const Cart = () => {
             </CardContent>
           </Card> : <>
             <div className="space-y-2">
-              {cartItems.map(item => {
+          {cartItems.map(item => {
             const discount = computeItemDiscount(item);
             const finalPrice = computeItemTotal(item);
             const hasDiscount = discount > 0;
@@ -1419,6 +1419,9 @@ export const Cart = () => {
               ? getDisplayRate(item) * 1000
               : getDisplayRate(item);
             
+            // Get scheme details for this item
+            const itemSchemes = orderCalculation.itemSchemeDetails?.[item.id] || [];
+            
             return <Card key={item.id} className="border-border/50">
                     <CardContent className="p-2.5">
                       <div className="flex items-center gap-1.5">
@@ -1426,6 +1429,22 @@ export const Cart = () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm truncate leading-tight">{displayName}</h3>
                           <p className="text-xs text-muted-foreground">₹{ratePerDisplayUnit.toFixed(2)}/{displayUnit}</p>
+                          
+                          {/* Show applied scheme details */}
+                          {itemSchemes.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {itemSchemes.map((scheme, idx) => (
+                                <div key={idx} className="flex items-center gap-1 text-[10px] text-green-600">
+                                  <Gift size={10} className="flex-shrink-0" />
+                                  <span className="truncate">
+                                    {scheme.schemeName}
+                                    {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
+                                    {' - '}₹{scheme.discountAmount.toFixed(2)} saved
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         
                         {/* Quantity Controls - Compact */}

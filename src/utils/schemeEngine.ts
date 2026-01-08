@@ -22,12 +22,21 @@ export interface AppliedScheme {
   free_items?: { product_name: string; quantity: number }[];
 }
 
+export interface ItemSchemeDetail {
+  schemeId: string;
+  schemeName: string;
+  schemeType: string;
+  discountAmount: number;
+  discountPercentage?: number;
+}
+
 export interface SchemeCalculationResult {
   subtotal: number;
   totalDiscount: number;
   finalTotal: number;
   appliedSchemes: AppliedScheme[];
   itemDiscounts: Record<string, number>; // product_id -> discount amount
+  itemSchemeDetails: Record<string, ItemSchemeDetail[]>; // item_id -> array of schemes applied
 }
 
 export interface ProductScheme {
@@ -220,15 +229,21 @@ function calculateSchemeDiscount(
   scheme: ProductScheme, 
   items: SchemeItem[], 
   subtotal: number
-): { discount: number; itemDiscounts: Record<string, number>; freeItems?: { product_name: string; quantity: number }[] } {
+): { 
+  discount: number; 
+  itemDiscounts: Record<string, number>; 
+  itemSchemeDetails: Record<string, ItemSchemeDetail[]>;
+  freeItems?: { product_name: string; quantity: number }[] 
+} {
   let discount = 0;
   const itemDiscounts: Record<string, number> = {};
+  const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
   let freeItems: { product_name: string; quantity: number }[] | undefined;
 
   // Get applicable items
   const applicableItems = items.filter(item => schemeAppliesToItem(scheme, item));
   
-  if (applicableItems.length === 0) return { discount: 0, itemDiscounts };
+  if (applicableItems.length === 0) return { discount: 0, itemDiscounts, itemSchemeDetails };
 
   // Calculate based on scheme type
   switch (scheme.scheme_type) {
@@ -253,6 +268,16 @@ function calculateSchemeDiscount(
             const itemDiscount = itemTotal * (discountPct / 100);
             discount += itemDiscount;
             itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+            
+            // Track scheme details per item
+            if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+            itemSchemeDetails[item.id].push({
+              schemeId: scheme.id,
+              schemeName: scheme.name,
+              schemeType: scheme.scheme_type,
+              discountAmount: itemDiscount,
+              discountPercentage: discountPct
+            });
           }
         }
       }
@@ -284,7 +309,17 @@ function calculateSchemeDiscount(
             for (const item of applicableItems) {
               const itemTotal = item.rate * item.quantity;
               const itemProportion = itemTotal / applicableTotal;
-              itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + (discount * itemProportion);
+              const itemDiscount = discount * itemProportion;
+              itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+              
+              // Track scheme details per item
+              if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+              itemSchemeDetails[item.id].push({
+                schemeId: scheme.id,
+                schemeName: scheme.name,
+                schemeType: scheme.scheme_type,
+                discountAmount: itemDiscount
+              });
             }
           }
         }
@@ -308,6 +343,15 @@ function calculateSchemeDiscount(
           discount += freeValue;
           itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + freeValue;
           
+          // Track scheme details per item
+          if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+          itemSchemeDetails[item.id].push({
+            schemeId: scheme.id,
+            schemeName: scheme.name,
+            schemeType: scheme.scheme_type,
+            discountAmount: freeValue
+          });
+          
           freeItems = freeItems || [];
           freeItems.push({
             product_name: scheme.free_product_name || item.name || 'Free Item',
@@ -326,6 +370,25 @@ function calculateSchemeDiscount(
         const discountPct = scheme.discount_percentage || 0;
         const bundleTotal = applicableItems.reduce((sum, item) => sum + (item.rate * item.quantity), 0);
         discount = bundleTotal * (discountPct / 100);
+        
+        // Distribute discount proportionally for tracking
+        if (bundleTotal > 0) {
+          for (const item of applicableItems) {
+            const itemTotal = item.rate * item.quantity;
+            const itemProportion = itemTotal / bundleTotal;
+            const itemDiscount = discount * itemProportion;
+            itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+            
+            if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+            itemSchemeDetails[item.id].push({
+              schemeId: scheme.id,
+              schemeName: scheme.name,
+              schemeType: scheme.scheme_type,
+              discountAmount: itemDiscount,
+              discountPercentage: discountPct
+            });
+          }
+        }
       }
       break;
     }
@@ -340,6 +403,16 @@ function calculateSchemeDiscount(
           const itemDiscount = itemTotal * (discountPct / 100);
           discount += itemDiscount;
           itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+          
+          // Track scheme details per item
+          if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+          itemSchemeDetails[item.id].push({
+            schemeId: scheme.id,
+            schemeName: scheme.name,
+            schemeType: scheme.scheme_type,
+            discountAmount: itemDiscount,
+            discountPercentage: discountPct
+          });
         }
       }
       break;
@@ -358,6 +431,16 @@ function calculateSchemeDiscount(
               const itemDiscount = itemTotal * (discountPct / 100);
               discount += itemDiscount;
               itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+              
+              // Track scheme details per item
+              if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+              itemSchemeDetails[item.id].push({
+                schemeId: scheme.id,
+                schemeName: scheme.name,
+                schemeType: scheme.scheme_type,
+                discountAmount: itemDiscount,
+                discountPercentage: discountPct
+              });
             }
           }
         }
@@ -365,7 +448,7 @@ function calculateSchemeDiscount(
       break;
   }
 
-  return { discount, itemDiscounts, freeItems };
+  return { discount, itemDiscounts, itemSchemeDetails, freeItems };
 }
 
 /**
@@ -388,9 +471,10 @@ export function calculateOrderWithSchemes(
   let totalDiscount = 0;
   const appliedSchemes: AppliedScheme[] = [];
   const itemDiscounts: Record<string, number> = {};
+  const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
   
   for (const scheme of schemesToApply) {
-    const { discount, itemDiscounts: schemeItemDiscounts, freeItems } = calculateSchemeDiscount(
+    const { discount, itemDiscounts: schemeItemDiscounts, itemSchemeDetails: schemeItemDetails, freeItems } = calculateSchemeDiscount(
       scheme, 
       items, 
       subtotal
@@ -402,6 +486,12 @@ export function calculateOrderWithSchemes(
       // Merge item discounts
       for (const [itemId, discountAmt] of Object.entries(schemeItemDiscounts)) {
         itemDiscounts[itemId] = (itemDiscounts[itemId] || 0) + discountAmt;
+      }
+      
+      // Merge item scheme details
+      for (const [itemId, details] of Object.entries(schemeItemDetails)) {
+        if (!itemSchemeDetails[itemId]) itemSchemeDetails[itemId] = [];
+        itemSchemeDetails[itemId].push(...details);
       }
       
       appliedSchemes.push({
@@ -424,7 +514,8 @@ export function calculateOrderWithSchemes(
     totalDiscount,
     finalTotal: subtotal - totalDiscount,
     appliedSchemes,
-    itemDiscounts
+    itemDiscounts,
+    itemSchemeDetails
   };
 }
 
