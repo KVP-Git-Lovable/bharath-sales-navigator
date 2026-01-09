@@ -10236,6 +10236,51 @@ export type Database = {
           },
         ]
       }
+      user_business_plan_distributors: {
+        Row: {
+          business_plan_id: string
+          created_at: string
+          distributor_id: string
+          distributor_name: string
+          id: string
+          quantity_target: number | null
+          revenue_target: number | null
+        }
+        Insert: {
+          business_plan_id: string
+          created_at?: string
+          distributor_id: string
+          distributor_name: string
+          id?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+        }
+        Update: {
+          business_plan_id?: string
+          created_at?: string
+          distributor_id?: string
+          distributor_name?: string
+          id?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_business_plan_distributors_business_plan_id_fkey"
+            columns: ["business_plan_id"]
+            isOneToOne: false
+            referencedRelation: "user_business_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_business_plan_distributors_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_business_plan_month_products: {
         Row: {
           business_plan_id: string

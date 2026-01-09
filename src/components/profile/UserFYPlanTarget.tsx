@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, CalendarDays, MapPin, Users, Info } from "lucide-react";
+import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, CalendarDays, MapPin, Users, Info, Truck } from "lucide-react";
 import { TerritoryTargets } from "./TerritoryTargets";
 import {
   DropdownMenu,
@@ -113,6 +113,19 @@ interface RetailerCategoryTarget {
 interface RetailerTargetItem {
   retailerId: string;
   retailerName: string;
+  percentage: number;
+  quantityTarget: number;
+  revenueTarget: number;
+}
+
+interface Distributor {
+  id: string;
+  name: string;
+}
+
+interface DistributorTarget {
+  distributorId: string;
+  distributorName: string;
   percentage: number;
   quantityTarget: number;
   revenueTarget: number;
@@ -229,6 +242,13 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
   const [monthBreakdownView, setMonthBreakdownView] = useState<MonthBreakdownView>('products');
 
+  // Distributor targets state
+  const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [distributorTargets, setDistributorTargets] = useState<DistributorTarget[]>([]);
+  const [distributorEqualDivide, setDistributorEqualDivide] = useState(true);
+  const [distributorTotalQuantity, setDistributorTotalQuantity] = useState(0);
+  const [distributorTotalRevenue, setDistributorTotalRevenue] = useState(0);
+
   const [planForm, setPlanForm] = useState({
     year: new Date().getFullYear() + 1,
     quantity_target: "",
@@ -242,6 +262,7 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
       loadPlans();
       loadProductsWithCategories();
       loadRetailersWithCategories();
+      loadDistributorsViaBeats();
     }
   }, [effectiveUserId]);
 
@@ -347,6 +368,32 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
       });
       
       setRetailerCategories(Array.from(categoryMap.values()).sort((a, b) => a.category.localeCompare(b.category)));
+    }
+  };
+
+  const loadDistributorsViaBeats = async () => {
+    if (!effectiveUserId) return;
+    
+    // Get beats created by the user
+    const { data: beats } = await supabase
+      .from('beats')
+      .select('distributor_id, distributors(id, name)')
+      .eq('created_by', effectiveUserId)
+      .not('distributor_id', 'is', null);
+
+    if (beats) {
+      const distributorMap = new Map<string, Distributor>();
+      
+      beats.forEach((b: any) => {
+        if (b.distributors && b.distributors.id) {
+          distributorMap.set(b.distributors.id, {
+            id: b.distributors.id,
+            name: b.distributors.name
+          });
+        }
+      });
+      
+      setDistributors(Array.from(distributorMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
     }
   };
 
@@ -604,13 +651,64 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
     setMonthTotalQuantity(totalMonthlyQty);
     setMonthTotalRevenue(totalMonthlyRev);
     setMonthTargets(newMonthTargets);
+
+    // Load distributor targets
+    const { data: distributorData } = await supabase
+      .from('user_business_plan_distributors')
+      .select('*')
+      .eq('business_plan_id', selectedPlan.id);
+
+    // Initialize distributor targets
+    const hasExistingDistributorData = distributorData && distributorData.length > 0;
+    
+    const newDistributorTargets: DistributorTarget[] = distributors.map(d => {
+      const existing = distributorData?.find(dd => dd.distributor_id === d.id);
+      return {
+        distributorId: d.id,
+        distributorName: d.name,
+        percentage: distributors.length > 0 ? 100 / distributors.length : 0,
+        quantityTarget: existing?.quantity_target || 0,
+        revenueTarget: existing?.revenue_target || 0
+      };
+    });
+
+    const existingDistQtyTotal = newDistributorTargets.reduce((sum, d) => sum + d.quantityTarget, 0);
+    const existingDistRevTotal = newDistributorTargets.reduce((sum, d) => sum + d.revenueTarget, 0);
+
+    if (hasExistingDistributorData && existingDistRevTotal > 0) {
+      // Use existing data
+      if (existingDistRevTotal > 0) {
+        newDistributorTargets.forEach(d => {
+          d.percentage = (d.revenueTarget / existingDistRevTotal) * 100;
+        });
+      }
+      setDistributorTotalQuantity(existingDistQtyTotal);
+      setDistributorTotalRevenue(existingDistRevTotal);
+      setDistributorEqualDivide(false);
+    } else {
+      // Auto-populate from plan targets with equal divide
+      const numDistributors = distributors.length;
+      const perDistQty = numDistributors > 0 ? planQty / numDistributors : 0;
+      const perDistRev = numDistributors > 0 ? planRev / numDistributors : 0;
+      
+      newDistributorTargets.forEach(d => {
+        d.quantityTarget = perDistQty;
+        d.revenueTarget = perDistRev;
+        d.percentage = numDistributors > 0 ? 100 / numDistributors : 0;
+      });
+      setDistributorTotalQuantity(planQty);
+      setDistributorTotalRevenue(planRev);
+      setDistributorEqualDivide(true);
+    }
+
+    setDistributorTargets(newDistributorTargets);
   };
 
   useEffect(() => {
     if (productCategories.length > 0 && selectedPlan) {
       loadExistingTargets();
     }
-  }, [productCategories, retailerCategories, selectedPlan]);
+  }, [productCategories, retailerCategories, distributors, selectedPlan]);
 
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1010,6 +1108,120 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
     }));
   };
 
+  // Distributor handlers
+  const handleDistributorTotalTargetChange = (quantityValue: number, revenueValue: number) => {
+    setDistributorTotalQuantity(quantityValue);
+    setDistributorTotalRevenue(revenueValue);
+    
+    const numDistributors = distributorTargets.length;
+    if (numDistributors > 0) {
+      if (distributorEqualDivide) {
+        const perDistQty = quantityValue / numDistributors;
+        const perDistRev = revenueValue / numDistributors;
+        setDistributorTargets(prev => prev.map(d => ({
+          ...d,
+          quantityTarget: perDistQty,
+          revenueTarget: perDistRev,
+          percentage: 100 / numDistributors
+        })));
+      } else {
+        setDistributorTargets(prev => prev.map(d => ({
+          ...d,
+          quantityTarget: (d.percentage / 100) * quantityValue,
+          revenueTarget: (d.percentage / 100) * revenueValue
+        })));
+      }
+    }
+  };
+
+  const handleDistributorEqualDivideChange = (checked: boolean) => {
+    setDistributorEqualDivide(checked);
+    if (checked && distributorTargets.length > 0) {
+      const numDistributors = distributorTargets.length;
+      const perDistQty = numDistributors > 0 ? distributorTotalQuantity / numDistributors : 0;
+      const perDistRev = numDistributors > 0 ? distributorTotalRevenue / numDistributors : 0;
+      
+      setDistributorTargets(prev => prev.map(d => ({
+        ...d,
+        quantityTarget: perDistQty,
+        revenueTarget: perDistRev,
+        percentage: 100 / numDistributors
+      })));
+    }
+  };
+
+  const handleDistributorTargetChange = (distributorId: string, quantityTarget: number, revenueTarget: number) => {
+    setDistributorEqualDivide(false);
+    setDistributorTargets(prev => {
+      const newTargets = prev.map(d => {
+        if (d.distributorId !== distributorId) return d;
+        return { ...d, quantityTarget, revenueTarget };
+      });
+      
+      const newTotalQty = newTargets.reduce((sum, d) => sum + d.quantityTarget, 0);
+      const newTotalRev = newTargets.reduce((sum, d) => sum + d.revenueTarget, 0);
+      setDistributorTotalQuantity(newTotalQty);
+      setDistributorTotalRevenue(newTotalRev);
+      
+      if (newTotalRev > 0) {
+        return newTargets.map(d => ({
+          ...d,
+          percentage: (d.revenueTarget / newTotalRev) * 100
+        }));
+      }
+      return newTargets;
+    });
+  };
+
+  const handleDistributorPercentageChange = (distributorId: string, percentage: number) => {
+    setDistributorEqualDivide(false);
+    setDistributorTargets(prev => prev.map(d => {
+      if (d.distributorId !== distributorId) return d;
+      return {
+        ...d,
+        percentage,
+        quantityTarget: (percentage / 100) * distributorTotalQuantity,
+        revenueTarget: (percentage / 100) * distributorTotalRevenue
+      };
+    }));
+  };
+
+  const removeDistributor = (distributorId: string) => {
+    setDistributorTargets(prev => prev.filter(d => d.distributorId !== distributorId));
+  };
+
+  const saveDistributorTargets = async () => {
+    if (!selectedPlan) return;
+    
+    try {
+      // Delete existing
+      await supabase
+        .from('user_business_plan_distributors')
+        .delete()
+        .eq('business_plan_id', selectedPlan.id);
+
+      // Insert new
+      const distributorsToInsert = distributorTargets.filter(d => d.quantityTarget > 0 || d.revenueTarget > 0).map(d => ({
+        business_plan_id: selectedPlan.id,
+        distributor_id: d.distributorId,
+        distributor_name: d.distributorName,
+        quantity_target: Math.round(d.quantityTarget),
+        revenue_target: Math.round(d.revenueTarget)
+      }));
+
+      if (distributorsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('user_business_plan_distributors')
+          .insert(distributorsToInsert);
+        if (error) throw error;
+      }
+
+      toast.success("Distributor targets saved");
+    } catch (error: any) {
+      toast.error("Failed to save: " + error.message);
+    }
+  };
+
   const saveProductTargets = async () => {
     if (!selectedPlan) return;
     
@@ -1339,6 +1551,16 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
     [monthTargets]
   );
 
+  const totalDistributorQuantity = useMemo(() => 
+    distributorTargets.reduce((sum, d) => sum + d.quantityTarget, 0), 
+    [distributorTargets]
+  );
+
+  const totalDistributorRevenue = useMemo(() => 
+    distributorTargets.reduce((sum, d) => sum + d.revenueTarget, 0), 
+    [distributorTargets]
+  );
+
   const quantityUnit = selectedPlan?.quantity_unit || 'Units';
 
   return (
@@ -1522,6 +1744,8 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                         await saveRetailerTargets();
                         // Save month targets
                         await saveMonthTargets();
+                        // Save distributor targets
+                        await saveDistributorTargets();
 
                         toast.success("All targets saved successfully");
                         loadPlans();
@@ -1620,9 +1844,9 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                 </AlertDialogContent>
               </AlertDialog>
 
-              {/* Tabs for Product, Retailer, Month and Territory Targets */}
+              {/* Tabs for Product, Retailer, Month, Territory and Distributor Targets */}
               <Tabs defaultValue="products">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="products" className="text-xs gap-1 px-1 sm:px-3">
                     <Package className="h-3 w-3" />
                     <span className="hidden xs:inline">Products</span>
@@ -1630,6 +1854,10 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                   <TabsTrigger value="retailers" className="text-xs gap-1 px-1 sm:px-3">
                     <Store className="h-3 w-3" />
                     <span className="hidden xs:inline">Retailers</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="distributors" className="text-xs gap-1 px-1 sm:px-3">
+                    <Truck className="h-3 w-3" />
+                    <span className="hidden xs:inline">Distributors</span>
                   </TabsTrigger>
                   <TabsTrigger value="months" className="text-xs gap-1 px-1 sm:px-3">
                     <Calendar className="h-3 w-3" />
@@ -1919,6 +2147,99 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                           <span className="text-sm font-bold">{Math.round(totalRetailerQuantity).toLocaleString()} {quantityUnit}</span>
                           <span className="mx-2 text-muted-foreground">|</span>
                           <span className="text-sm font-bold">₹{Math.round(totalRetailerRevenue).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* DISTRIBUTOR TARGETS TAB */}
+                <TabsContent value="distributors" className="mt-4 space-y-3">
+                  {distributorTargets.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center">
+                        <Truck className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No distributors mapped to you via beats</p>
+                        <p className="text-xs text-muted-foreground mt-1">Distributors are linked through the beats you create</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <>
+                      {/* Equal divide checkbox */}
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg border border-muted">
+                        <Checkbox
+                          id="distributor-equal-divide-all"
+                          checked={distributorEqualDivide}
+                          onCheckedChange={(checked) => handleDistributorEqualDivideChange(checked as boolean)}
+                        />
+                        <Label htmlFor="distributor-equal-divide-all" className="text-xs cursor-pointer">
+                          Equally divide across all distributors
+                        </Label>
+                      </div>
+
+                      <div className="space-y-2">
+                        {distributorTargets.map(d => (
+                          <Card key={d.distributorId}>
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Truck className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium text-sm truncate max-w-[140px]">{d.distributorName}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {!distributorEqualDivide && (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        value={d.percentage.toFixed(1)}
+                                        onChange={(e) => handleDistributorPercentageChange(d.distributorId, parseFloat(e.target.value) || 0)}
+                                        className="w-14 h-7 text-right text-xs"
+                                        min={0}
+                                        max={100}
+                                      />
+                                      <span className="text-xs text-muted-foreground">%</span>
+                                    </div>
+                                  )}
+                                  <Input
+                                    type="number"
+                                    value={Math.round(d.quantityTarget) || ''}
+                                    onChange={(e) => handleDistributorTargetChange(d.distributorId, parseFloat(e.target.value) || 0, d.revenueTarget)}
+                                    className="w-20 h-8 text-right text-sm"
+                                    placeholder="Qty"
+                                  />
+                                  <Input
+                                    type="number"
+                                    value={Math.round(d.revenueTarget) || ''}
+                                    onChange={(e) => handleDistributorTargetChange(d.distributorId, d.quantityTarget, parseFloat(e.target.value) || 0)}
+                                    className="w-24 h-8 text-right text-sm"
+                                    placeholder="₹"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive"
+                                    onClick={() => removeDistributor(d.distributorId)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Distributor Total Footer */}
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Total Distributors Target</span>
+                        <div className="text-right">
+                          <span className="text-sm font-bold">{Math.round(totalDistributorQuantity).toLocaleString()} {quantityUnit}</span>
+                          <span className="mx-2 text-muted-foreground">|</span>
+                          <span className="text-sm font-bold">₹{Math.round(totalDistributorRevenue).toLocaleString()}</span>
                         </div>
                       </div>
                     </CardContent>
