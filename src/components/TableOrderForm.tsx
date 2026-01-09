@@ -1071,9 +1071,15 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                                   <div key={idx} className="flex items-center gap-1 text-[9px] md:text-[10px] text-green-600">
                                     <Gift size={10} className="flex-shrink-0" />
                                     <span className="truncate">
-                                      {scheme.schemeName}
-                                      {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
-                                      {' - '}₹{scheme.discountAmount.toFixed(2)} saved
+                                      {scheme.schemeType === 'buy_x_get_y_free' || scheme.schemeType === 'buy_get_free' ? (
+                                        <>🎁 {scheme.schemeName}: Get {scheme.freeItemQty} {scheme.freeItemName} FREE</>
+                                      ) : (
+                                        <>
+                                          {scheme.schemeName}
+                                          {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
+                                          {scheme.discountAmount > 0 && ` - ₹${scheme.discountAmount.toFixed(2)} saved`}
+                                        </>
+                                      )}
                                     </span>
                                   </div>
                                 ))}
@@ -1190,6 +1196,20 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
               >
                 <Trash2 size={12} />
               </button>
+            </div>
+          )}
+          
+          {/* Free Items from BOGO Schemes */}
+          {orderCalculation.appliedSchemes.some(s => s.free_items && s.free_items.length > 0) && (
+            <div className="flex justify-end items-center gap-2 text-green-600">
+              <Gift size={12} />
+              <p className="text-sm">
+                Free: {orderCalculation.appliedSchemes
+                  .filter(s => s.free_items && s.free_items.length > 0)
+                  .flatMap(s => s.free_items!)
+                  .map(f => `${f.product_name} x ${f.quantity}`)
+                  .join(', ')}
+              </p>
             </div>
           )}
           

@@ -28,6 +28,9 @@ export interface ItemSchemeDetail {
   schemeType: string;
   discountAmount: number;
   discountPercentage?: number;
+  // BOGO specific fields
+  freeItemName?: string;
+  freeItemQty?: number;
 }
 
 export interface SchemeCalculationResult {
@@ -338,23 +341,29 @@ function calculateSchemeDiscount(
         if (item.quantity >= buyQty) {
           const setsQualified = Math.floor(item.quantity / buyQty);
           const freeItemsCount = setsQualified * freeQty;
-          const freeValue = freeItemsCount * item.rate;
           
-          discount += freeValue;
-          itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + freeValue;
+          // Get free product name - use scheme's free_product_name if available
+          const freeProductName = scheme.free_product_name || item.name || 'Free Item';
           
-          // Track scheme details per item
+          // BOGO: Don't apply monetary discount to buy product
+          // Instead, just track that free items are earned
+          // The free items will be displayed separately at ₹0
+          
+          // Track scheme details per item (for display purposes, no discount on buy item)
           if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
           itemSchemeDetails[item.id].push({
             schemeId: scheme.id,
             schemeName: scheme.name,
             schemeType: scheme.scheme_type,
-            discountAmount: freeValue
+            discountAmount: 0, // No monetary discount on buy product
+            freeItemName: freeProductName,
+            freeItemQty: freeItemsCount
           });
           
+          // Track free items to display in order
           freeItems = freeItems || [];
           freeItems.push({
-            product_name: scheme.free_product_name || item.name || 'Free Item',
+            product_name: freeProductName,
             quantity: freeItemsCount
           });
         }
