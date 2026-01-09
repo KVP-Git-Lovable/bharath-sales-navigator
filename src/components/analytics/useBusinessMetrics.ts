@@ -132,12 +132,15 @@ export const useBusinessMetrics = () => {
       const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
       const pendingPayments = orders?.reduce((sum, o) => sum + Number(o.credit_pending_amount || 0), 0) || 0;
       
-      // Calculate total KG using the same logic as SQL Report - Product and Revenue Performance
+      // Calculate total KG and Revenue using the same logic as SQL Report - Product and Revenue Performance
       let totalKg = 0;
       let totalPieces = 0;
+      let rpcTotalRevenue = 0;
+      let useRpcRevenue = false;
       
       // If user names are provided, use the RPC to get product revenue data
       if (userNames && userNames.length > 0) {
+        useRpcRevenue = true;
         for (const userName of userNames) {
           const { data: productData } = await supabase.rpc('get_product_revenue_performance', {
             user_full_name: userName,
@@ -155,6 +158,8 @@ export const useBusinessMetrics = () => {
               } else {
                 totalKg += qty;
               }
+              // Sum revenue from RPC
+              rpcTotalRevenue += Number(row.total_revenue || 0);
             });
           }
         }
@@ -175,6 +180,9 @@ export const useBusinessMetrics = () => {
           });
         });
       }
+      
+      // Use RPC revenue when available, otherwise use orders sum
+      const finalRevenue = useRpcRevenue ? rpcTotalRevenue : totalRevenue;
 
       setSummary({
         totalBeats: totalBeatsCount,
@@ -182,7 +190,7 @@ export const useBusinessMetrics = () => {
         totalOrders,
         totalKg,
         totalPieces,
-        totalRevenue,
+        totalRevenue: finalRevenue,
         pendingPayments
       });
     } catch (error) {
