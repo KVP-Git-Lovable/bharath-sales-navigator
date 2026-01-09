@@ -1243,6 +1243,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         orderRows={orderRows}
         products={products}
         appliedSchemeIds={appliedSchemeIds}
+        schemePolicies={schemePolicies}
         onApplyScheme={handleApplyScheme}
         onRemoveScheme={(schemeId) => {
           removeScheme(schemeId);

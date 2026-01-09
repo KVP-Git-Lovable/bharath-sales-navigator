@@ -28,7 +28,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductScheme } from "@/hooks/useOfflineSchemes";
-import { isSchemeConditionMet, schemeHasConditions, SchemeItem } from "@/utils/schemeEngine";
+import { isSchemeConditionMet, schemeHasConditions, SchemeItem, calculateSchemeDiscountForComparison } from "@/utils/schemeEngine";
+import { SchemePolicies } from "@/hooks/useSchemePolicies";
 
 interface Product {
   id: string;
@@ -53,6 +54,7 @@ interface OrderEntrySchemesModalProps {
   orderRows: OrderRow[];
   products: Product[];
   appliedSchemeIds: string[];
+  schemePolicies?: SchemePolicies;
   onApplyScheme: (scheme: ProductScheme, product?: Product, quantity?: number) => void;
   onRemoveScheme: (schemeId: string) => void;
 }
@@ -154,10 +156,46 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
   orderRows,
   products,
   appliedSchemeIds,
+  schemePolicies,
   onApplyScheme,
   onRemoveScheme
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
+
+  // Check if more schemes can be applied based on policies
+  const canApplyMore = useMemo(() => {
+    if (!schemePolicies) return true;
+    
+    // Check max schemes limit
+    if (appliedSchemeIds.length >= schemePolicies.maxSchemesPerOrder) {
+      return false;
+    }
+    
+    // If stacking is off and we have any scheme applied, can't add more
+    if (!schemePolicies.allowSchemeStacking && appliedSchemeIds.length > 0) {
+      return false;
+    }
+    
+    return true;
+  }, [schemePolicies, appliedSchemeIds]);
+
+  // Function to check if a specific scheme can be applied
+  const canApplyScheme = (scheme: ProductScheme): boolean => {
+    if (!canApplyMore) return false;
+    
+    // Check same-type stacking if stacking is allowed but same-type is not
+    if (schemePolicies && schemePolicies.allowSchemeStacking && !schemePolicies.sameTypeStacking) {
+      const appliedTypes = appliedSchemeIds.map(id => 
+        schemes.find(s => s.id === id)?.scheme_type
+      ).filter(Boolean);
+      
+      if (appliedTypes.includes(scheme.scheme_type)) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
 
   const activeSchemes = useMemo(() => 
     schemes.filter(s => isSchemeActive(s)), [schemes]);
@@ -338,19 +376,25 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                 Condition not met
               </Badge>
             ) : !isOrderWide && !productInCart ? (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">Add product first</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs px-2.5"
-                  onClick={() => handleApply(scheme)}
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add & Apply
-                </Button>
-              </div>
-            ) : isPurePercentage ? (
+              canApplyScheme(scheme) ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">Add product first</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => handleApply(scheme)}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add & Apply
+                  </Button>
+                </div>
+              ) : (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                  {!schemePolicies?.allowSchemeStacking ? 'Stacking off' : 'Max offers reached'}
+                </Badge>
+              )
+            ) : canApplyScheme(scheme) ? (
               <Button
                 size="sm"
                 variant="default"
@@ -361,9 +405,8 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                 Apply
               </Button>
             ) : (
-              <Badge variant="default" className="bg-green-600 text-[10px] px-1.5">
-                <Check className="w-2.5 h-2.5 mr-0.5" />
-                Auto-Applied
+              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                {!schemePolicies?.allowSchemeStacking ? 'Stacking off' : 'Max offers reached'}
               </Badge>
             )}
           </div>
