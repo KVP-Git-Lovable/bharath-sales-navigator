@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Layout } from "@/components/Layout";
-import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft } from "lucide-react";
+import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -116,6 +116,12 @@ export const AddRetailer = () => {
   const [creditConfig, setCreditConfig] = useState<{is_enabled: boolean, scoring_mode: string} | null>(null);
   const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
   const [stateComboOpen, setStateComboOpen] = useState(false);
+  
+  // Owner field states
+  const [allUsers, setAllUsers] = useState<{id: string, full_name: string}[]>([]);
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null);
+  const [selectedOwnerName, setSelectedOwnerName] = useState<string>('');
+  const [ownerComboOpen, setOwnerComboOpen] = useState(false);
 
   const categories = ["Category A", "Category B", "Category C"];
   const parentTypes = ["Company", "Super Stockist", "Distributor"];
@@ -338,12 +344,29 @@ export const AddRetailer = () => {
     }
   };
 
+  // Load all users for owner dropdown
+  const loadAllUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .order('full_name');
+      
+      if (error) throw error;
+      setAllUsers((data || []).filter(u => u.full_name));
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setAllUsers([]);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       loadDistributors();
       loadBeats();
       loadTerritories();
       loadCreditConfig();
+      loadAllUsers();
     }
   }, [user, connectivityStatus]); // Re-run when connectivity changes
 
@@ -377,6 +400,21 @@ export const AddRetailer = () => {
       setSelectedTerritoryId(editingRetailer.territory_id);
     }
   }, [isEditMode, editingRetailer]);
+
+  // Set owner when in edit mode, or auto-fill with current user for new retailers
+  useEffect(() => {
+    if (isEditMode && editingRetailer?.owner_id) {
+      setSelectedOwnerId(editingRetailer.owner_id);
+      setSelectedOwnerName(editingRetailer.owner_name || '');
+    } else if (!isEditMode && user && allUsers.length > 0 && !selectedOwnerId) {
+      // Auto-fill owner with current user when creating new retailer
+      const currentUserProfile = allUsers.find(u => u.id === user.id);
+      if (currentUserProfile) {
+        setSelectedOwnerId(user.id);
+        setSelectedOwnerName(currentUserProfile.full_name || '');
+      }
+    }
+  }, [isEditMode, editingRetailer, user, allUsers, selectedOwnerId]);
   
   // Set photo preview when editing
   useEffect(() => {
@@ -760,6 +798,8 @@ export const AddRetailer = () => {
       longitude: retailerData.longitude ? parseFloat(retailerData.longitude) : null,
       manual_credit_score: retailerData.manual_credit_score ? parseFloat(retailerData.manual_credit_score) : null,
       state: retailerData.state || null,
+      owner_id: selectedOwnerId || null,
+      owner_name: selectedOwnerName || null,
     };
 
     if (isEditMode && editingRetailer?.id) {
@@ -984,6 +1024,59 @@ export const AddRetailer = () => {
                     </Button>
                   </div>
                 </div>
+              </div>
+
+              {/* Owner Field - Searchable Dropdown */}
+              <div className="space-y-2">
+                <Label>Owner</Label>
+                <Popover open={ownerComboOpen} onOpenChange={setOwnerComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={ownerComboOpen}
+                      className="w-full justify-between bg-background"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <User size={16} className="text-muted-foreground flex-shrink-0" />
+                        <span className="truncate">
+                          {selectedOwnerName || "Select owner..."}
+                        </span>
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0 z-50" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search users..." />
+                      <CommandList>
+                        <CommandEmpty>No user found.</CommandEmpty>
+                        <CommandGroup className="max-h-60 overflow-auto">
+                          {allUsers.map((u) => (
+                            <CommandItem
+                              key={u.id}
+                              value={u.full_name}
+                              onSelect={() => {
+                                setSelectedOwnerId(u.id);
+                                setSelectedOwnerName(u.full_name);
+                                setOwnerComboOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedOwnerId === u.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {u.full_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">Auto-filled with current user. Change if needed.</p>
               </div>
 
               {/* Retailer Name */}

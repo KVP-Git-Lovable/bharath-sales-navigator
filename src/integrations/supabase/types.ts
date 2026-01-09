@@ -9006,6 +9006,8 @@ export type Database = {
           name: string
           notes: string | null
           order_value: number | null
+          owner_id: string | null
+          owner_name: string | null
           parent_name: string | null
           parent_type: string | null
           pending_amount: number | null
@@ -9059,6 +9061,8 @@ export type Database = {
           name: string
           notes?: string | null
           order_value?: number | null
+          owner_id?: string | null
+          owner_name?: string | null
           parent_name?: string | null
           parent_type?: string | null
           pending_amount?: number | null
@@ -9112,6 +9116,8 @@ export type Database = {
           name?: string
           notes?: string | null
           order_value?: number | null
+          owner_id?: string | null
+          owner_name?: string | null
           parent_name?: string | null
           parent_type?: string | null
           pending_amount?: number | null
@@ -9141,6 +9147,13 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailers_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
