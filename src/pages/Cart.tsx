@@ -875,9 +875,30 @@ export const Cart = () => {
         };
       });
 
+      // Add free items from BOGO schemes as separate order items with ₹0 price
+      const freeOrderItems = orderCalculation.appliedSchemes
+        .filter(s => s.free_items && s.free_items.length > 0)
+        .flatMap(s => s.free_items!.map(freeItem => ({
+          product_id: freeItem.product_id || 'FREE_ITEM',
+          product_name: `${freeItem.product_name} (FREE)`,
+          category: 'Free Item',
+          rate: 0,
+          original_rate: freeItem.original_rate || 0,
+          discount_amount: 0,
+          unit: freeItem.unit || 'pcs',
+          quantity: freeItem.quantity,
+          total: 0,
+          hsn_code: null,
+          sgst_amount: 0,
+          cgst_amount: 0
+        })));
+
+      // Combine regular items with free items
+      const allOrderItems = [...orderItems, ...freeOrderItems];
+
       // Submit order using offline-capable utility with improved feedback
       let orderSubmissionFailed = false;
-      const result = await submitOrderWithOfflineSupport(orderData, orderItems, {
+      const result = await submitOrderWithOfflineSupport(orderData, allOrderItems, {
         connectivityStatus,
         onOffline: () => {
           toast({
@@ -1491,29 +1512,32 @@ export const Cart = () => {
           })}
             </div>
 
-            {/* Free Items from BOGO Schemes */}
-            {orderCalculation.appliedSchemes.some(s => s.free_items && s.free_items.length > 0) && (
-              <Card className="border-green-200 bg-green-50">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Gift size={14} className="text-green-600" />
-                    <span className="text-sm font-medium text-green-700">Free Items</span>
-                  </div>
-                  <div className="space-y-1">
-                    {orderCalculation.appliedSchemes
-                      .filter(s => s.free_items && s.free_items.length > 0)
-                      .flatMap(s => s.free_items!)
-                      .map((freeItem, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm">
-                          <span className="text-green-700">🎁 {freeItem.product_name} x {freeItem.quantity}</span>
-                          <span className="font-medium text-green-600">FREE</span>
+            {/* Free Items from BOGO Schemes - Display as product cards */}
+            {orderCalculation.appliedSchemes
+              .filter(s => s.free_items && s.free_items.length > 0)
+              .flatMap(s => s.free_items!)
+              .map((freeItem, idx) => (
+                <Card key={`free-${idx}`} className="border-green-200 bg-green-50/50">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
+                        <Gift size={20} className="text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm truncate">{freeItem.product_name}</span>
+                          <Badge className="bg-green-500 text-white text-xs shrink-0">FREE</Badge>
                         </div>
-                      ))
-                    }
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                        <span className="text-xs text-muted-foreground">Qty: {freeItem.quantity} {freeItem.unit || 'pcs'}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-lg font-bold text-green-600">₹0</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            }
 
             {/* Order Summary */}
             <Card>
