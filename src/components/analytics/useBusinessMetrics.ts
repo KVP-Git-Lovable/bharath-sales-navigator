@@ -7,6 +7,7 @@ interface BusinessSummary {
   totalRetailers: number;
   totalOrders: number;
   totalKg: number;
+  totalPieces: number;
   totalRevenue: number;
   pendingPayments: number;
 }
@@ -55,6 +56,7 @@ export const useBusinessMetrics = () => {
     totalRetailers: 0,
     totalOrders: 0,
     totalKg: 0,
+    totalPieces: 0,
     totalRevenue: 0,
     pendingPayments: 0
   });
@@ -116,24 +118,32 @@ export const useBusinessMetrics = () => {
       const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
       const pendingPayments = orders?.reduce((sum, o) => sum + Number(o.credit_pending_amount || 0), 0) || 0;
       
-      // Calculate total KG - sum quantity from order items
-      const totalKg = orders?.reduce((sum, order) => {
-        const orderQty = (order.order_items as any[])?.reduce((s, item) => {
-          // Only count if unit is kg or kg-related
-          const unit = (item.unit || '').toLowerCase();
-          if (unit.includes('kg') || unit.includes('kilo')) {
-            return s + Number(item.quantity || 0);
+      // Calculate total KG and pieces with proper unit conversion
+      let totalKg = 0;
+      let totalPieces = 0;
+      
+      orders?.forEach(order => {
+        (order.order_items as any[])?.forEach((item: any) => {
+          const unit = (item.unit || '').toLowerCase().trim();
+          const qty = Number(item.quantity || 0);
+          
+          if (unit === 'kg' || unit.includes('kilo')) {
+            totalKg += qty;
+          } else if (unit === 'grams' || unit === 'g' || unit === 'gram') {
+            totalKg += qty / 1000; // Convert grams to KG
+          } else {
+            // Pieces, pcs, or any other unit
+            totalPieces += qty;
           }
-          return s + Number(item.quantity || 0); // Include all quantities for now
-        }, 0) || 0;
-        return sum + orderQty;
-      }, 0) || 0;
+        });
+      });
 
       setSummary({
         totalBeats: uniqueBeats.size,
         totalRetailers: uniqueRetailers.size,
         totalOrders,
         totalKg,
+        totalPieces,
         totalRevenue,
         pendingPayments
       });

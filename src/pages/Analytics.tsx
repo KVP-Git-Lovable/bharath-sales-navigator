@@ -1537,7 +1537,7 @@ const Analytics = () => {
                 />
                 <BusinessSummaryCard
                   title="Total Qty"
-                  value={`${Math.round(businessSummary.totalKg).toLocaleString()}`}
+                  value={`${businessSummary.totalKg.toFixed(1)} KG${businessSummary.totalPieces > 0 ? ` + ${businessSummary.totalPieces} pcs` : ''}`}
                   icon={<Package size={18} className="text-orange-600" />}
                   iconBgClass="bg-orange-500/10"
                   onClick={() => { fetchProductDetails(selectedUserIds, dashboardDateRange); setShowProductBreakdown(true); }}
