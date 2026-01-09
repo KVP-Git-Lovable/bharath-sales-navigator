@@ -1437,9 +1437,15 @@ export const Cart = () => {
                                 <div key={idx} className="flex items-center gap-1 text-[10px] text-green-600">
                                   <Gift size={10} className="flex-shrink-0" />
                                   <span className="truncate">
-                                    {scheme.schemeName}
-                                    {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
-                                    {' - '}₹{scheme.discountAmount.toFixed(2)} saved
+                                    {scheme.schemeType === 'buy_x_get_y_free' || scheme.schemeType === 'buy_get_free' ? (
+                                      <>🎁 {scheme.schemeName}: Get {scheme.freeItemQty} {scheme.freeItemName} FREE</>
+                                    ) : (
+                                      <>
+                                        {scheme.schemeName}
+                                        {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
+                                        {scheme.discountAmount > 0 && ` - ₹${scheme.discountAmount.toFixed(2)} saved`}
+                                      </>
+                                    )}
                                   </span>
                                 </div>
                               ))}
@@ -1484,6 +1490,30 @@ export const Cart = () => {
                   </Card>;
           })}
             </div>
+
+            {/* Free Items from BOGO Schemes */}
+            {orderCalculation.appliedSchemes.some(s => s.free_items && s.free_items.length > 0) && (
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Gift size={14} className="text-green-600" />
+                    <span className="text-sm font-medium text-green-700">Free Items</span>
+                  </div>
+                  <div className="space-y-1">
+                    {orderCalculation.appliedSchemes
+                      .filter(s => s.free_items && s.free_items.length > 0)
+                      .flatMap(s => s.free_items!)
+                      .map((freeItem, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm">
+                          <span className="text-green-700">🎁 {freeItem.product_name} x {freeItem.quantity}</span>
+                          <span className="font-medium text-green-600">FREE</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Order Summary */}
             <Card>
