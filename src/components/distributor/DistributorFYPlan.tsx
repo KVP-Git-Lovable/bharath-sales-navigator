@@ -1339,6 +1339,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
                           <DropdownMenuItem onClick={async () => {
                             if (!selectedPlan || !userAllocation) return;
                             try {
+                              // Update main plan
                               const { error } = await supabase
                                 .from('distributor_business_plans')
                                 .update({
@@ -1348,8 +1349,73 @@ export function DistributorFYPlan({ distributorId }: Props) {
                                 })
                                 .eq('id', selectedPlan.id);
                               if (error) throw error;
-                              toast.success("Synced targets from My Target");
+
+                              // Calculate scale factor for proportional distribution
+                              const oldQty = selectedPlan.quantity_target || 1;
+                              const oldRev = selectedPlan.revenue_target || 1;
+                              const qtyScale = userAllocation.quantity_target / oldQty;
+                              const revScale = userAllocation.revenue_target / oldRev;
+
+                              // Auto-calculate Products - distribute proportionally to all products
+                              if (productCategories.length > 0) {
+                                // Delete existing product targets
+                                await supabase
+                                  .from('distributor_business_plan_products')
+                                  .delete()
+                                  .eq('business_plan_id', selectedPlan.id);
+
+                                // Get total products count for equal distribution
+                                const allProducts = productCategories.flatMap(cat => cat.products);
+                                if (allProducts.length > 0) {
+                                  const qtyPerProduct = userAllocation.quantity_target / allProducts.length;
+                                  const revPerProduct = userAllocation.revenue_target / allProducts.length;
+
+                                  const productsToInsert = allProducts.map(p => ({
+                                    business_plan_id: selectedPlan.id,
+                                    product_id: p.id,
+                                    product_name: p.name,
+                                    quantity_target: Math.round(qtyPerProduct),
+                                    revenue_target: Math.round(revPerProduct)
+                                  }));
+
+                                  await supabase
+                                    .from('distributor_business_plan_products')
+                                    .insert(productsToInsert);
+                                }
+                              }
+
+                              // Auto-calculate Retailers - distribute proportionally to all retailers
+                              if (retailerCategories.length > 0) {
+                                // Delete existing retailer targets
+                                await supabase
+                                  .from('distributor_business_plan_retailers')
+                                  .delete()
+                                  .eq('business_plan_id', selectedPlan.id);
+
+                                // Get total retailers count for equal distribution
+                                const allRetailers = retailerCategories.flatMap(cat => cat.retailers);
+                                if (allRetailers.length > 0) {
+                                  const qtyPerRetailer = userAllocation.quantity_target / allRetailers.length;
+                                  const revPerRetailer = userAllocation.revenue_target / allRetailers.length;
+
+                                  const retailersToInsert = allRetailers.map(r => ({
+                                    business_plan_id: selectedPlan.id,
+                                    retailer_id: r.id,
+                                    retailer_name: r.name,
+                                    quantity_target: Math.round(qtyPerRetailer),
+                                    target_revenue: Math.round(revPerRetailer)
+                                  }));
+
+                                  await supabase
+                                    .from('distributor_business_plan_retailers')
+                                    .insert(retailersToInsert);
+                                }
+                              }
+
+                              toast.success("Synced targets from My Target (including Products & Retailers)");
                               loadPlans();
+                              // Reload existing targets to refresh the UI
+                              setTimeout(() => loadExistingTargets(), 500);
                             } catch (error: any) {
                               toast.error("Failed to sync: " + error.message);
                             }
