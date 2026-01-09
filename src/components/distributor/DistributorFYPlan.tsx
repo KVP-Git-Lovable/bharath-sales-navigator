@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, Info, Users } from "lucide-react";
+import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, Info, Users, CalendarDays } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -135,6 +135,7 @@ interface MonthTarget {
   revenueTarget: number;
   useProductPercentages: boolean;
   products: MonthProductTarget[];
+  workingDays: number;
 }
 
 const FY_MONTHS = [
@@ -151,6 +152,29 @@ const FY_MONTHS = [
   { number: 11, name: 'February' },
   { number: 12, name: 'March' },
 ];
+
+// Helper function to get working days in a month (excluding Sundays)
+const getWorkingDaysInMonth = (fyMonthNumber: number, fyYear: number): number => {
+  // Convert FY month to calendar month and year
+  let calendarYear = fyYear - 1;
+  let calendarMonth = fyMonthNumber + 3; // April is month 4
+  if (calendarMonth > 12) {
+    calendarMonth -= 12;
+    calendarYear += 1;
+  }
+  
+  const daysInMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+  let workingDays = 0;
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(calendarYear, calendarMonth - 1, day);
+    if (date.getDay() !== 0) { // 0 = Sunday
+      workingDays++;
+    }
+  }
+  
+  return workingDays;
+};
 
 interface Props {
   distributorId: string;
@@ -180,6 +204,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
   const [monthTotalQuantity, setMonthTotalQuantity] = useState(0);
   const [monthTotalRevenue, setMonthTotalRevenue] = useState(0);
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
+  const [monthBreakdownView, setMonthBreakdownView] = useState<'products' | 'daily'>('products');
 
   // User allocation state - targets set via My Target
   const [userAllocation, setUserAllocation] = useState<{
@@ -331,7 +356,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
         setSelectedPlan(plansData[0]);
       }
     } catch (error: any) {
-      toast.error("Failed to load FY plans: " + error.message);
+      toast.error("Failed to load distributor targets: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -567,7 +592,8 @@ export function DistributorFYPlan({ distributorId }: Props) {
         quantityTarget: monthQty,
         revenueTarget: monthRev,
         useProductPercentages: !hasExistingMonthProductData,
-        products: monthProducts
+        products: monthProducts,
+        workingDays: getWorkingDaysInMonth(m.number, selectedPlan.year)
       };
     });
 
@@ -612,7 +638,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
         .single();
 
       if (error) throw error;
-      toast.success("FY Plan created");
+      toast.success("Distributor Target created");
       setDialogOpen(false);
       setPlanForm({
         year: new Date().getFullYear() + 1,
@@ -652,7 +678,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
         .eq('id', selectedPlan.id);
 
       if (error) throw error;
-      toast.success("FY Plan updated");
+      toast.success("Distributor Target updated");
       setEditDialogOpen(false);
       loadPlans();
     } catch (error: any) {
@@ -674,7 +700,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
         .eq('id', selectedPlan.id);
 
       if (error) throw error;
-      toast.success("FY Plan deleted");
+      toast.success("Distributor Target deleted");
       setDeleteDialogOpen(false);
       setSelectedPlan(null);
       loadPlans();
@@ -1173,7 +1199,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
       <div className="flex items-center justify-between">
         <h3 className="font-semibold flex items-center gap-2">
           <Target className="h-4 w-4" />
-          FY Plans
+          Distributor Target
         </h3>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -1184,7 +1210,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create FY Plan</DialogTitle>
+              <DialogTitle>Create Distributor Target</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreatePlan} className="space-y-4">
               <div>
@@ -1253,7 +1279,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
         <Card>
           <CardContent className="py-8 text-center">
             <Target className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">No FY plans yet</p>
+            <p className="text-sm text-muted-foreground">No targets yet</p>
           </CardContent>
         </Card>
       ) : (
@@ -1377,7 +1403,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
               <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Edit FY Plan</DialogTitle>
+                    <DialogTitle>Edit Distributor Target</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleEditPlan} className="space-y-4">
                     <div>
@@ -1443,9 +1469,9 @@ export function DistributorFYPlan({ distributorId }: Props) {
               <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete FY Plan</AlertDialogTitle>
+                    <AlertDialogTitle>Delete Distributor Target</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete FY {selectedPlan.year} plan? This will also delete all product, retailer, and monthly targets associated with this plan. This action cannot be undone.
+                      Are you sure you want to delete FY {selectedPlan.year} target? This will also delete all product, retailer, and monthly targets associated with this plan. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -1857,18 +1883,107 @@ export function DistributorFYPlan({ distributorId }: Props) {
                               </CollapsibleTrigger>
                               <CollapsibleContent>
                                 <div className="px-3 pb-3 pt-0 border-t bg-muted/20">
-                                  {/* Apply from Products tab button */}
+                                  {/* View toggle: Products / Daily Avg */}
                                   <div className="flex items-center justify-between py-2 mb-2">
-                                    <span className="text-xs text-muted-foreground">Product-wise breakdown by category</span>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-6 text-xs"
-                                      onClick={() => handleApplyProductPercentagesFromProductsTab(m.monthNumber)}
-                                    >
-                                      Apply % from Products Tab
-                                    </Button>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant={monthBreakdownView === 'products' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="h-7 text-xs gap-1"
+                                        onClick={() => setMonthBreakdownView('products')}
+                                      >
+                                        <Package className="h-3 w-3" />
+                                        Products
+                                      </Button>
+                                      <Button
+                                        variant={monthBreakdownView === 'daily' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="h-7 text-xs gap-1"
+                                        onClick={() => setMonthBreakdownView('daily')}
+                                      >
+                                        <CalendarDays className="h-3 w-3" />
+                                        Daily Avg
+                                      </Button>
+                                    </div>
                                   </div>
+
+                                  {/* Daily Average View */}
+                                  {monthBreakdownView === 'daily' && (() => {
+                                    const avgQtyPerDay = m.workingDays > 0 ? m.quantityTarget / m.workingDays : 0;
+                                    const avgRevPerDay = m.workingDays > 0 ? m.revenueTarget / m.workingDays : 0;
+                                    
+                                    return (
+                                      <div className="space-y-3">
+                                        <div className="grid grid-cols-1 gap-3">
+                                          <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                                            <div className="flex items-center gap-2">
+                                              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                                              <span className="text-sm font-medium"># Working Days</span>
+                                            </div>
+                                            <Input
+                                              type="number"
+                                              min={1}
+                                              max={31}
+                                              value={m.workingDays}
+                                              onChange={(e) => {
+                                                const newValue = parseInt(e.target.value) || getWorkingDaysInMonth(m.monthNumber, selectedPlan?.year || new Date().getFullYear() + 1);
+                                                setMonthTargets(prev => prev.map(mt => 
+                                                  mt.monthNumber === m.monthNumber 
+                                                    ? { ...mt, workingDays: Math.min(31, Math.max(1, newValue)) }
+                                                    : mt
+                                                ));
+                                              }}
+                                              className="w-16 h-8 text-center text-lg font-bold text-primary"
+                                            />
+                                          </div>
+                                          
+                                          <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                                            <div>
+                                              <span className="text-sm font-medium">Avg Qty / Day</span>
+                                              <p className="text-xs text-muted-foreground">
+                                                {Math.round(m.quantityTarget).toLocaleString()} ÷ {m.workingDays} days
+                                              </p>
+                                            </div>
+                                            <span className="text-lg font-bold text-primary">
+                                              {avgQtyPerDay.toFixed(1)} {quantityUnit}
+                                            </span>
+                                          </div>
+                                          
+                                          <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                                            <div>
+                                              <span className="text-sm font-medium">Avg Revenue / Day</span>
+                                              <p className="text-xs text-muted-foreground">
+                                                ₹{Math.round(m.revenueTarget).toLocaleString()} ÷ {m.workingDays} days
+                                              </p>
+                                            </div>
+                                            <span className="text-lg font-bold text-primary">
+                                              ₹{Math.round(avgRevPerDay).toLocaleString()}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        
+                                        <p className="text-xs text-muted-foreground text-center">
+                                          Based on 6-day work week (Sundays excluded)
+                                        </p>
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {/* Products View */}
+                                  {monthBreakdownView === 'products' && (
+                                    <>
+                                      {/* Apply from Products tab button */}
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs text-muted-foreground">Product-wise breakdown by category</span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-6 text-xs"
+                                          onClick={() => handleApplyProductPercentagesFromProductsTab(m.monthNumber)}
+                                        >
+                                          Apply % from Products Tab
+                                        </Button>
+                                      </div>
                                   
                                   {/* Product list grouped by category */}
                                   <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -1955,7 +2070,9 @@ export function DistributorFYPlan({ distributorId }: Props) {
                                         ₹{Math.round(m.products.reduce((sum, p) => sum + p.revenueTarget, 0)).toLocaleString()}
                                       </span>
                                     </div>
-                                  </div>
+                                    </div>
+                                    </>
+                                  )}
                                 </div>
                               </CollapsibleContent>
                             </Collapsible>
