@@ -58,7 +58,9 @@ export interface ProductScheme {
   discount_percentage?: number | null;
   discount_amount?: number | null;
   buy_quantity?: number | null;
+  buy_quantity_unit?: string | null;
   free_quantity?: number | null;
+  free_quantity_unit?: string | null;
   free_product_id?: string | null;
   condition_quantity?: number | null;
   quantity_condition_type?: string | null;
@@ -340,44 +342,45 @@ function calculateSchemeDiscount(
     case 'buy_get_free': {
       const buyQty = scheme.buy_quantity || 0;
       const freeQty = scheme.free_quantity || 0;
+      const freeUnit = scheme.free_quantity_unit || 'kg';
       
       if (buyQty <= 0 || freeQty <= 0) break;
       
+      // Check if ANY applicable item meets the buy quantity threshold
+      let thresholdMet = false;
       for (const item of applicableItems) {
         if (item.quantity >= buyQty) {
-          const setsQualified = Math.floor(item.quantity / buyQty);
-          // Free quantity is the scheme's free_quantity multiplied by sets qualified
-          const freeItemsCount = setsQualified * freeQty;
+          thresholdMet = true;
           
-          // Use scheme's FREE product details (different from buy product)
-          // free_product_name and free_product_id are set when creating the BOGO scheme
+          // THRESHOLD-BASED: Get free quantity ONCE when threshold is met (not per set)
+          const freeItemsCount = freeQty;
+          
+          // Use scheme's FREE product details
           const freeProductName = scheme.free_product_name || 'Free Item';
           const freeProductId = scheme.free_product_id || undefined;
           
-          // BOGO: Don't apply monetary discount to buy product
-          // Instead, just track that free items are earned
-          // The free items will be displayed separately as actual product rows with ₹0
-          
-          // Track scheme details per item (for display purposes, no discount on buy item)
+          // Track scheme details per item
           if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
           itemSchemeDetails[item.id].push({
             schemeId: scheme.id,
             schemeName: scheme.name,
             schemeType: scheme.scheme_type,
-            discountAmount: 0, // No monetary discount on buy product
+            discountAmount: 0,
             freeItemName: freeProductName,
             freeItemQty: freeItemsCount
           });
           
-          // Track free items with full product details for order/invoice
+          // Track free items with correct unit from scheme
           freeItems = freeItems || [];
           freeItems.push({
             product_name: freeProductName,
             quantity: freeItemsCount,
             product_id: freeProductId,
-            original_rate: 0, // Free item - will be shown as ₹0
-            unit: 'pcs' // Default unit for free items
+            original_rate: 0,
+            unit: freeUnit
           });
+          
+          break; // Only apply once per order when threshold is met
         }
       }
       break;

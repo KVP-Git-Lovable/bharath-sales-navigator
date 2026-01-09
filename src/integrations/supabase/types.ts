@@ -7149,6 +7149,7 @@ export type Database = {
           bundle_discount_percentage: number | null
           bundle_product_ids: string[] | null
           buy_quantity: number | null
+          buy_quantity_unit: string | null
           category_id: string | null
           condition_quantity: number | null
           created_at: string
@@ -7160,6 +7161,7 @@ export type Database = {
           exclusion_group: string | null
           free_product_id: string | null
           free_quantity: number | null
+          free_quantity_unit: string | null
           id: string
           is_active: boolean | null
           is_first_order_only: boolean | null
@@ -7186,6 +7188,7 @@ export type Database = {
           bundle_discount_percentage?: number | null
           bundle_product_ids?: string[] | null
           buy_quantity?: number | null
+          buy_quantity_unit?: string | null
           category_id?: string | null
           condition_quantity?: number | null
           created_at?: string
@@ -7197,6 +7200,7 @@ export type Database = {
           exclusion_group?: string | null
           free_product_id?: string | null
           free_quantity?: number | null
+          free_quantity_unit?: string | null
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
@@ -7223,6 +7227,7 @@ export type Database = {
           bundle_discount_percentage?: number | null
           bundle_product_ids?: string[] | null
           buy_quantity?: number | null
+          buy_quantity_unit?: string | null
           category_id?: string | null
           condition_quantity?: number | null
           created_at?: string
@@ -7234,6 +7239,7 @@ export type Database = {
           exclusion_group?: string | null
           free_product_id?: string | null
           free_quantity?: number | null
+          free_quantity_unit?: string | null
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
