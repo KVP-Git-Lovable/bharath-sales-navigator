@@ -16,7 +16,8 @@ import { ApplyOfferSection } from "@/components/ApplyOfferSection";
 import { OrderEntrySchemesModal } from "@/components/OrderEntrySchemesModal";
 import { useOfflineSchemes, ProductScheme } from "@/hooks/useOfflineSchemes";
 import { useAppliedSchemes } from "@/hooks/useAppliedSchemes";
-import { calculateOrderWithSchemes, SchemeItem, isSchemeActive, isSchemeConditionMet, schemeHasConditions } from "@/utils/schemeEngine";
+import { useSchemePolicies } from "@/hooks/useSchemePolicies";
+import { calculateOrderWithSchemes, calculateSchemeDiscountForComparison, SchemeItem, isSchemeActive, isSchemeConditionMet, schemeHasConditions } from "@/utils/schemeEngine";
 interface Product {
   id: string;
   sku: string;
@@ -147,8 +148,11 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   // Load schemes with offline support
   const { schemes, loading: schemesLoading, isOnline } = useOfflineSchemes();
   
+  // Load scheme policies for enforcement
+  const { policies: schemePolicies, loading: policiesLoading } = useSchemePolicies();
+  
   // Applied schemes persistence
-  const { appliedSchemeIds, applyScheme, removeScheme, clearSchemes } = useAppliedSchemes(visitId, retailerId);
+  const { appliedSchemeIds, applyScheme, removeScheme, clearSchemes, setOnlyScheme } = useAppliedSchemes(visitId, retailerId);
   
   // Track auto-applied schemes to prevent infinite loops
   const autoAppliedSchemesRef = useRef<Set<string>>(new Set());
@@ -438,9 +442,12 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     }
   }, [orderRows, tableFormStorageKey, hasInitialized]);
 
-  // Auto-apply schemes when conditions are met
+  // Auto-apply schemes when conditions are met (respects policy settings)
   useEffect(() => {
-    if (!hasInitialized || orderRows.length === 0 || schemes.length === 0) return;
+    if (!hasInitialized || orderRows.length === 0 || schemes.length === 0 || policiesLoading) return;
+    
+    // If auto-apply is disabled, don't auto-apply anything
+    if (!schemePolicies.autoApplyBestScheme) return;
     
     // Build items for scheme calculation
     const items: SchemeItem[] = orderRows
@@ -459,32 +466,38 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     const subtotal = items.reduce((sum, item) => sum + (item.rate * item.quantity), 0);
     const activeSchemes = schemes.filter(s => isSchemeActive(s));
     
+    // Get qualifying schemes (meet conditions and not suppressed)
+    const qualifyingSchemes = activeSchemes
+      .filter(scheme => {
+        // Skip pure percentage offers with no conditions - these require manual apply
+        if (scheme.scheme_type === 'percentage_discount' && !schemeHasConditions(scheme)) {
+          return false;
+        }
+        // Skip suppressed schemes
+        if (suppressedSchemesRef.current.has(scheme.id)) {
+          return false;
+        }
+        return isSchemeConditionMet(scheme, items, subtotal);
+      })
+      .map(scheme => ({
+        scheme,
+        discount: calculateSchemeDiscountForComparison(scheme, items, subtotal)
+      }))
+      .filter(s => s.discount > 0);
+    
+    // Handle auto-removal of schemes that no longer qualify
     activeSchemes.forEach(scheme => {
-      // Skip pure percentage offers with no conditions - these require manual apply
-      if (scheme.scheme_type === 'percentage_discount' && !schemeHasConditions(scheme)) {
-        return;
-      }
-
       const conditionMet = isSchemeConditionMet(scheme, items, subtotal);
       const isApplied = appliedSchemeIds.includes(scheme.id);
       const wasAutoApplied = autoAppliedSchemesRef.current.has(scheme.id);
-
-      // If the user no longer qualifies, clear suppression so it can auto-apply next time they qualify
+      
+      // If the user no longer qualifies, clear suppression
       if (!conditionMet) {
         suppressedSchemesRef.current.delete(scheme.id);
       }
-
-      // If user manually removed it, don't auto-apply again while the condition remains met
-      if (suppressedSchemesRef.current.has(scheme.id)) {
-        return;
-      }
-
-      if (conditionMet && !isApplied) {
-        // Auto-apply when condition is met
-        autoAppliedSchemesRef.current.add(scheme.id);
-        applyScheme(scheme.id);
-      } else if (!conditionMet && isApplied && wasAutoApplied) {
-        // Auto-remove only if it was auto-applied (not manually)
+      
+      // Auto-remove only if it was auto-applied and condition no longer met
+      if (!conditionMet && isApplied && wasAutoApplied) {
         autoAppliedSchemesRef.current.delete(scheme.id);
         removeScheme(scheme.id);
         toast({
@@ -494,7 +507,70 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         });
       }
     });
-  }, [orderRows, schemes, hasInitialized, appliedSchemeIds, applyScheme, removeScheme]);
+    
+    // If stacking not allowed OR max is 1, only apply the BEST scheme
+    if (!schemePolicies.allowSchemeStacking || schemePolicies.maxSchemesPerOrder === 1) {
+      if (qualifyingSchemes.length === 0) return;
+      
+      // Sort by discount and get the best one based on priority resolution
+      let bestScheme;
+      if (schemePolicies.priorityResolution === 'highest_discount') {
+        bestScheme = qualifyingSchemes.sort((a, b) => b.discount - a.discount)[0];
+      } else if (schemePolicies.priorityResolution === 'priority') {
+        // Use created_at or name as fallback since priority field may not exist
+        bestScheme = qualifyingSchemes.sort((a, b) => 
+          ((a.scheme as any).priority || 999) - ((b.scheme as any).priority || 999)
+        )[0];
+      } else {
+        bestScheme = qualifyingSchemes[0];
+      }
+      
+      const bestSchemeId = bestScheme.scheme.id;
+      const currentAutoApplied = Array.from(autoAppliedSchemesRef.current);
+      
+      // If the best scheme is already applied, we're good
+      if (appliedSchemeIds.includes(bestSchemeId) && appliedSchemeIds.length === 1) {
+        return;
+      }
+      
+      // Remove any other auto-applied schemes and set only the best one
+      currentAutoApplied.forEach(id => {
+        if (id !== bestSchemeId) {
+          autoAppliedSchemesRef.current.delete(id);
+        }
+      });
+      
+      // Set only the best scheme
+      if (!appliedSchemeIds.includes(bestSchemeId) || appliedSchemeIds.length > 1) {
+        autoAppliedSchemesRef.current.add(bestSchemeId);
+        setOnlyScheme(bestSchemeId);
+        console.log('[TableOrderForm] Policy: Applied best scheme only:', bestScheme.scheme.name, 'Discount:', bestScheme.discount);
+      }
+      
+      return;
+    }
+    
+    // Normal multi-scheme behavior with maxSchemesPerOrder limit
+    qualifyingSchemes.forEach(({ scheme }) => {
+      const isApplied = appliedSchemeIds.includes(scheme.id);
+      
+      if (!isApplied && appliedSchemeIds.length < schemePolicies.maxSchemesPerOrder) {
+        // Check same-type stacking rule
+        if (!schemePolicies.sameTypeStacking) {
+          const appliedTypes = appliedSchemeIds.map(id => 
+            schemes.find(s => s.id === id)?.scheme_type
+          ).filter(Boolean);
+          
+          if (appliedTypes.includes(scheme.scheme_type)) {
+            return; // Skip - same type already applied
+          }
+        }
+        
+        autoAppliedSchemesRef.current.add(scheme.id);
+        applyScheme(scheme.id, scheme, schemePolicies, schemes);
+      }
+    });
+  }, [orderRows, schemes, hasInitialized, appliedSchemeIds, schemePolicies, policiesLoading, applyScheme, removeScheme, setOnlyScheme]);
 
   const findProductByCode = (code: string): { product: Product; variant?: any } | undefined => {
     // First check base products

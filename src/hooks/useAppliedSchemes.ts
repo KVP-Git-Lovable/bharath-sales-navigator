@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { SchemePolicies } from './useSchemePolicies';
 
 const STORAGE_KEY_PREFIX = 'applied_schemes:';
+
+export interface ProductSchemeBasic {
+  id: string;
+  scheme_type: string;
+}
 
 /**
  * Hook to manage applied schemes for an order
@@ -50,9 +56,42 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
     }
   }, [appliedSchemeIds, storageKey]);
 
-  const applyScheme = useCallback((schemeId: string) => {
+  /**
+   * Apply a scheme with optional policy enforcement
+   */
+  const applyScheme = useCallback((
+    schemeId: string,
+    scheme?: ProductSchemeBasic,
+    policies?: SchemePolicies,
+    allSchemes?: ProductSchemeBasic[]
+  ) => {
     setAppliedSchemeIds(prev => {
       if (prev.includes(schemeId)) return prev;
+      
+      // Enforce max schemes per order
+      if (policies && prev.length >= policies.maxSchemesPerOrder) {
+        console.log('[useAppliedSchemes] Max schemes reached:', policies.maxSchemesPerOrder);
+        return prev;
+      }
+      
+      // Enforce stacking rules - if stacking not allowed and already have schemes
+      if (policies && !policies.allowSchemeStacking && prev.length > 0) {
+        console.log('[useAppliedSchemes] Stacking not allowed, already have:', prev.length);
+        return prev;
+      }
+      
+      // Enforce same-type stacking
+      if (policies && scheme && allSchemes && !policies.sameTypeStacking && policies.allowSchemeStacking) {
+        const appliedTypes = prev.map(id => 
+          allSchemes.find(s => s.id === id)?.scheme_type
+        ).filter(Boolean);
+        
+        if (appliedTypes.includes(scheme.scheme_type)) {
+          console.log('[useAppliedSchemes] Same-type stacking not allowed for:', scheme.scheme_type);
+          return prev;
+        }
+      }
+      
       const updated = [...prev, schemeId];
       console.log('[useAppliedSchemes] Applied scheme:', schemeId, 'Total:', updated.length);
       return updated;
@@ -81,11 +120,21 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
     return appliedSchemeIds.includes(schemeId);
   }, [appliedSchemeIds]);
 
+  /**
+   * Replace all applied schemes with a single best scheme
+   * Used when stacking is not allowed
+   */
+  const setOnlyScheme = useCallback((schemeId: string) => {
+    setAppliedSchemeIds([schemeId]);
+    console.log('[useAppliedSchemes] Set only scheme:', schemeId);
+  }, []);
+
   return {
     appliedSchemeIds,
     applyScheme,
     removeScheme,
     clearSchemes,
-    isSchemeApplied
+    isSchemeApplied,
+    setOnlyScheme
   };
 }

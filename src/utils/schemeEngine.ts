@@ -569,3 +569,24 @@ export function formatSchemeDetailsForInvoice(appliedSchemes: AppliedScheme[]): 
     return detail;
   }).join('\n');
 }
+
+/**
+ * Calculate potential discount for a scheme (for comparison purposes)
+ * Used by policy logic to determine the "best" scheme
+ */
+export function calculateSchemeDiscountForComparison(
+  scheme: ProductScheme, 
+  items: SchemeItem[], 
+  subtotal: number
+): number {
+  // Build a temporary calculation to get the discount value
+  const activeSchemes = [scheme].filter(s => isSchemeActive(s));
+  if (activeSchemes.length === 0) return 0;
+  
+  // Check if conditions are met
+  if (!isSchemeConditionMet(scheme, items, subtotal)) return 0;
+  
+  // Calculate using the main function with just this one scheme
+  const result = calculateOrderWithSchemes(items, [scheme], [scheme.id]);
+  return result.totalDiscount;
+}
