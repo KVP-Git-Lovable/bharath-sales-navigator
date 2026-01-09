@@ -308,14 +308,38 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
           <>
             <div>
               <Label htmlFor="buyQuantity">Buy Quantity (X)</Label>
-              <Input
-                id="buyQuantity"
-                type="number"
-                value={schemeForm.buy_quantity || ""}
-                onChange={(e) => setSchemeForm({ ...schemeForm, buy_quantity: parseFloat(e.target.value) || 0 })}
-                placeholder="Quantity to purchase"
-                step="0.1"
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    id="buyQuantity"
+                    type="number"
+                    value={schemeForm.buy_quantity || ""}
+                    onChange={(e) => setSchemeForm({ ...schemeForm, buy_quantity: parseFloat(e.target.value) || 0 })}
+                    placeholder="Quantity to purchase"
+                    step={getStepForUnit(schemeForm.buy_quantity_unit || 'kg')}
+                  />
+                  {schemeForm.buy_quantity > 0 && (
+                    <span className="text-xs text-muted-foreground mt-1 block">
+                      {getUnitEquivalent(schemeForm.buy_quantity, schemeForm.buy_quantity_unit || 'kg')}
+                    </span>
+                  )}
+                </div>
+                <Select
+                  value={schemeForm.buy_quantity_unit || 'kg'}
+                  onValueChange={(value) => setSchemeForm({ ...schemeForm, buy_quantity_unit: value })}
+                >
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map(unit => (
+                      <SelectItem key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label htmlFor="freeProduct">Free Product (Y)</Label>
@@ -330,7 +354,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                   <SelectItem value="same">Same Product (Free)</SelectItem>
                   {products.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
-                      {product.name} ({product.sku})
+                      {product.name} - ₹{product.rate}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -338,14 +362,38 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
             </div>
             <div>
               <Label htmlFor="freeQuantity">Free Quantity</Label>
-              <Input
-                id="freeQuantity"
-                type="number"
-                value={schemeForm.free_quantity || ""}
-                onChange={(e) => setSchemeForm({ ...schemeForm, free_quantity: parseFloat(e.target.value) || 0 })}
-                placeholder="Free quantity"
-                step="0.1"
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    id="freeQuantity"
+                    type="number"
+                    value={schemeForm.free_quantity || ""}
+                    onChange={(e) => setSchemeForm({ ...schemeForm, free_quantity: parseFloat(e.target.value) || 0 })}
+                    placeholder="Free quantity"
+                    step={getStepForUnit(schemeForm.free_quantity_unit || 'kg')}
+                  />
+                  {schemeForm.free_quantity > 0 && (
+                    <span className="text-xs text-muted-foreground mt-1 block">
+                      {getUnitEquivalent(schemeForm.free_quantity, schemeForm.free_quantity_unit || 'kg')}
+                    </span>
+                  )}
+                </div>
+                <Select
+                  value={schemeForm.free_quantity_unit || 'kg'}
+                  onValueChange={(value) => setSchemeForm({ ...schemeForm, free_quantity_unit: value })}
+                >
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map(unit => (
+                      <SelectItem key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </>
         );
