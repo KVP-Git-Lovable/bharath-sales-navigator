@@ -109,6 +109,7 @@ export const useBusinessMetrics = () => {
       }
 
       const { data: beats, error: beatsError } = await beatsQuery;
+      console.log('Beats query params:', { fromDate, toDate, userIds, beatsCount: beats?.length, beats });
       if (beatsError) throw beatsError;
 
       const totalBeatsCount = beats?.length || 0;
