@@ -170,12 +170,15 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
     });
   };
 
-  const updateProductDiscount = (productId: string, value: number) => {
+  const updateProductDiscount = (productId: string, value: number, field: 'discount_percentage' | 'discount_amount' = 'discount_percentage') => {
     setSchemeForm({
       ...schemeForm,
       per_product_discounts: {
         ...(schemeForm.per_product_discounts || {}),
-        [productId]: { discount_percentage: value }
+        [productId]: { 
+          ...(schemeForm.per_product_discounts?.[productId] || {}),
+          [field]: value 
+        }
       }
     });
   };
@@ -728,7 +731,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                               )}
                             />
                             <span className="flex-1">{product.name}</span>
-                            <span className="text-muted-foreground text-xs ml-2">({product.sku})</span>
+                            <span className="text-muted-foreground text-xs ml-2">₹{product.rate}</span>
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -844,25 +847,38 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-xs">Product</TableHead>
-                            <TableHead className="text-xs w-32">Discount %</TableHead>
+                            <TableHead className="text-xs w-24">Price</TableHead>
+                            <TableHead className="text-xs w-32">
+                              {schemeForm.scheme_type === 'flat_discount' ? 'Discount Amount (₹)' : 'Discount %'}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {(schemeForm.target_product_ids || []).map((productId: string) => {
                             const product = products.find(p => p.id === productId);
-                            const currentDiscount = schemeForm.per_product_discounts?.[productId]?.discount_percentage || 0;
+                            const isFlatDiscount = schemeForm.scheme_type === 'flat_discount';
+                            const currentValue = isFlatDiscount 
+                              ? (schemeForm.per_product_discounts?.[productId]?.discount_amount || 0)
+                              : (schemeForm.per_product_discounts?.[productId]?.discount_percentage || 0);
                             return (
                               <TableRow key={productId}>
                                 <TableCell className="text-sm py-2">
                                   {product?.name || 'Unknown'}
                                 </TableCell>
+                                <TableCell className="text-sm py-2 text-muted-foreground">
+                                  ₹{product?.rate || 0}
+                                </TableCell>
                                 <TableCell className="py-2">
                                   <Input
                                     type="number"
-                                    value={currentDiscount}
-                                    onChange={(e) => updateProductDiscount(productId, parseFloat(e.target.value) || 0)}
+                                    value={currentValue || ""}
+                                    onChange={(e) => updateProductDiscount(
+                                      productId, 
+                                      parseFloat(e.target.value) || 0,
+                                      isFlatDiscount ? 'discount_amount' : 'discount_percentage'
+                                    )}
                                     className="h-8 w-24"
-                                    max={100}
+                                    max={isFlatDiscount ? undefined : 100}
                                     min={0}
                                   />
                                 </TableCell>
