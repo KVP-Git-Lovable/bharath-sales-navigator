@@ -483,26 +483,32 @@ export function calculateOrderWithSchemes(
   const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
   
   for (const scheme of schemesToApply) {
-    const { discount, itemDiscounts: schemeItemDiscounts, itemSchemeDetails: schemeItemDetails, freeItems } = calculateSchemeDiscount(
-      scheme, 
-      items, 
-      subtotal
-    );
-    
-    if (discount > 0) {
-      totalDiscount += discount;
-      
-      // Merge item discounts
-      for (const [itemId, discountAmt] of Object.entries(schemeItemDiscounts)) {
-        itemDiscounts[itemId] = (itemDiscounts[itemId] || 0) + discountAmt;
+    const {
+      discount,
+      itemDiscounts: schemeItemDiscounts,
+      itemSchemeDetails: schemeItemDetails,
+      freeItems
+    } = calculateSchemeDiscount(scheme, items, subtotal);
+
+    const hasFreeItems = !!(freeItems && freeItems.length > 0);
+
+    // Apply scheme if it yields a monetary discount OR it yields free items (BOGO)
+    if (discount > 0 || hasFreeItems) {
+      if (discount > 0) {
+        totalDiscount += discount;
+
+        // Merge item discounts
+        for (const [itemId, discountAmt] of Object.entries(schemeItemDiscounts)) {
+          itemDiscounts[itemId] = (itemDiscounts[itemId] || 0) + discountAmt;
+        }
       }
-      
-      // Merge item scheme details
+
+      // Merge item scheme details (also for BOGO where discount can be 0)
       for (const [itemId, details] of Object.entries(schemeItemDetails)) {
         if (!itemSchemeDetails[itemId]) itemSchemeDetails[itemId] = [];
         itemSchemeDetails[itemId].push(...details);
       }
-      
+
       appliedSchemes.push({
         id: scheme.id,
         name: scheme.name,
