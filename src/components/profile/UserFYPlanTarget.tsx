@@ -24,7 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, CalendarDays, MapPin } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, CalendarDays, MapPin, Users, Info } from "lucide-react";
 import { TerritoryTargets } from "./TerritoryTargets";
 import {
   DropdownMenu,
@@ -45,6 +47,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useHierarchyTargetAllocation } from "@/hooks/useHierarchyTargetAllocation";
 
 const QUANTITY_UNITS = ['Units', 'Kg', 'Liters', 'Pcs', 'Boxes', 'Cartons', 'Tonnes', 'Quintals'];
 
@@ -191,6 +194,18 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Check if target comes from hierarchy
+  const currentFY = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    return month >= 3 ? now.getFullYear() + 1 : now.getFullYear();
+  }, []);
+  
+  const { allocation: hierarchyAllocation, hasHierarchyTarget } = useHierarchyTargetAllocation(
+    effectiveUserId,
+    selectedPlan?.year || currentFY
+  );
   
   // Product targets state
   const [categoryTargets, setCategoryTargets] = useState<CategoryTarget[]>([]);
