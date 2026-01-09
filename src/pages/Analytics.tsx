@@ -57,6 +57,9 @@ const Analytics = () => {
   });
   const [dashboardDateOpen, setDashboardDateOpen] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
+
+  const normalizeName = (name: string | null | undefined) => (name ?? '').trim().toUpperCase();
+
   const [kpiPeriod, setKpiPeriod] = useState<string>('current_month');
   const [kpiDateRange, setKpiDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
@@ -94,6 +97,12 @@ const Analytics = () => {
     fetchProductDetails,
     fetchPendingPaymentDetails
   } = useBusinessMetrics();
+
+  // Auto-refresh business metrics when filters change
+  useEffect(() => {
+    fetchBusinessSummary(selectedUserIds, dashboardDateRange);
+  }, [selectedUserIds, dashboardDateRange, fetchBusinessSummary]);
+
   const [kpiData, setKpiData] = useState({
     plannedCalls: 0,
     productiveCalls: 0,
@@ -1145,11 +1154,16 @@ const Analytics = () => {
                             key={user.id}
                             className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer"
                             onClick={() => {
-                              setSelectedUserIds(prev => 
-                                prev.includes(user.id)
-                                  ? prev.filter(id => id !== user.id)
-                                  : [...prev, user.id]
-                              );
+                              const groupIds = users
+                                .filter(u => normalizeName(u.full_name) === normalizeName(user.full_name))
+                                .map(u => u.id);
+
+                              setSelectedUserIds(prev => {
+                                const hasAll = groupIds.every(id => prev.includes(id));
+                                return hasAll
+                                  ? prev.filter(id => !groupIds.includes(id))
+                                  : Array.from(new Set([...prev, ...groupIds]));
+                              });
                             }}
                           >
                             <Checkbox 
