@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Camera, ScanLine, Store, ChevronsUpDown, Check, MapPin } from "lucide-react";
+import { X, Camera, ScanLine, Store, ChevronsUpDown, Check, MapPin, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,12 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
   const [territoryComboOpen, setTerritoryComboOpen] = useState(false);
   const [creditConfig, setCreditConfig] = useState<{is_enabled: boolean, scoring_mode: string} | null>(null);
   
+  // Owner field states
+  const [allUsers, setAllUsers] = useState<{id: string, full_name: string}[]>([]);
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null);
+  const [selectedOwnerName, setSelectedOwnerName] = useState<string>('');
+  const [ownerComboOpen, setOwnerComboOpen] = useState(false);
+  
   // NEW OFFLINE FEATURE: States for beat selection
   const [availableBeats, setAvailableBeats] = useState<{id: string, beat_id: string, beat_name: string}[]>([]);
   const [selectedBeatId, setSelectedBeatId] = useState<string>('');
@@ -75,8 +81,34 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
   const potentials = ["High", "Medium", "Low"];
   const [customRetailType, setCustomRetailType] = useState("");
 
+  // Load all users for owner dropdown
+  const loadAllUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .order('full_name');
+      
+      if (error) throw error;
+      setAllUsers((data || []).filter(u => u.full_name));
+      
+      // Auto-fill owner with current user
+      if (user) {
+        const currentUserProfile = (data || []).find(u => u.id === user.id);
+        if (currentUserProfile && !selectedOwnerId) {
+          setSelectedOwnerId(user.id);
+          setSelectedOwnerName(currentUserProfile.full_name || '');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setAllUsers([]);
+    }
+  };
+
   useEffect(() => {
     if (user && open) {
+      loadAllUsers();
       if (isOffline) {
         // OFFLINE: Load from cache
         loadOfflineData();
@@ -452,6 +484,8 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
       latitude: retailerData.latitude ? parseFloat(retailerData.latitude) : null,
       longitude: retailerData.longitude ? parseFloat(retailerData.longitude) : null,
       manual_credit_score: retailerData.manual_credit_score ? parseFloat(retailerData.manual_credit_score) : null,
+      owner_id: selectedOwnerId || user.id,
+      owner_name: selectedOwnerName || null,
     };
 
     // NEW OFFLINE FEATURE: Save offline or online based on connectivity
@@ -796,6 +830,59 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
 
           {/* Basic Information */}
           <div className="space-y-4">
+            {/* Owner Field - Searchable Dropdown */}
+            <div className="space-y-2">
+              <Label>Owner</Label>
+              <Popover open={ownerComboOpen} onOpenChange={setOwnerComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={ownerComboOpen}
+                    className="w-full justify-between"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <User size={16} className="text-muted-foreground flex-shrink-0" />
+                      <span className="truncate">
+                        {selectedOwnerName || "Select owner..."}
+                      </span>
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 z-50" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search users..." />
+                    <CommandList>
+                      <CommandEmpty>No user found.</CommandEmpty>
+                      <CommandGroup className="max-h-60 overflow-auto">
+                        {allUsers.map((u) => (
+                          <CommandItem
+                            key={u.id}
+                            value={u.full_name}
+                            onSelect={() => {
+                              setSelectedOwnerId(u.id);
+                              setSelectedOwnerName(u.full_name);
+                              setOwnerComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedOwnerId === u.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {u.full_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">Auto-filled with current user</p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Retailer Name *</Label>
               <Input
