@@ -24,7 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical } from "lucide-react";
+import { Plus, Target, Package, Store, Trash2, ChevronDown, ChevronRight, X, Calendar, Pencil, MoreVertical, Info, Users } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -179,6 +181,14 @@ export function DistributorFYPlan({ distributorId }: Props) {
   const [monthTotalRevenue, setMonthTotalRevenue] = useState(0);
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
 
+  // User allocation state - targets set via My Target
+  const [userAllocation, setUserAllocation] = useState<{
+    quantity_target: number;
+    revenue_target: number;
+    quantity_unit: string;
+    user_name: string;
+  } | null>(null);
+
   const [planForm, setPlanForm] = useState({
     year: new Date().getFullYear() + 1,
     quantity_target: "",
@@ -189,6 +199,70 @@ export function DistributorFYPlan({ distributorId }: Props) {
     notes: "",
   });
 
+  // Current FY calculation
+  const currentFY = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    return month >= 3 ? now.getFullYear() + 1 : now.getFullYear();
+  }, []);
+
+  // Load user allocation for this distributor
+  const loadUserAllocation = async (fyYear: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_business_plan_distributors')
+        .select(`
+          quantity_target,
+          revenue_target,
+          distributor_name,
+          business_plan_id
+        `)
+        .eq('distributor_id', distributorId);
+
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setUserAllocation(null);
+        return;
+      }
+
+      // Get the business plan details for the matching year
+      const businessPlanIds = data.map(d => d.business_plan_id);
+      const { data: plansData } = await supabase
+        .from('user_business_plans')
+        .select('id, year, quantity_unit, user_id')
+        .in('id', businessPlanIds)
+        .eq('year', fyYear);
+
+      if (plansData && plansData.length > 0) {
+        const matchingPlan = plansData[0];
+        const allocation = data.find(d => d.business_plan_id === matchingPlan.id);
+        
+        if (allocation) {
+          // Get user name
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', matchingPlan.user_id)
+            .single();
+
+          setUserAllocation({
+            quantity_target: allocation.quantity_target || 0,
+            revenue_target: allocation.revenue_target || 0,
+            quantity_unit: matchingPlan.quantity_unit || 'Units',
+            user_name: profile?.full_name || 'Sales Rep'
+          });
+          return;
+        }
+      }
+      
+      setUserAllocation(null);
+    } catch (error) {
+      console.error('Error loading user allocation:', error);
+      setUserAllocation(null);
+    }
+  };
+
   useEffect(() => {
     loadPlans();
     loadProductsWithCategories();
@@ -198,8 +272,45 @@ export function DistributorFYPlan({ distributorId }: Props) {
   useEffect(() => {
     if (selectedPlan) {
       loadExistingTargets();
+      loadUserAllocation(selectedPlan.year);
     }
   }, [selectedPlan]);
+
+  // Also load allocation when dialog form year changes
+  useEffect(() => {
+    if (dialogOpen && planForm.year) {
+      loadUserAllocationForDialog(planForm.year);
+    }
+  }, [dialogOpen, planForm.year]);
+
+  const loadUserAllocationForDialog = async (fyYear: number) => {
+    try {
+      const { data } = await supabase
+        .from('user_business_plan_distributors')
+        .select(`
+          quantity_target,
+          revenue_target,
+          business_plan:user_business_plans!user_business_plan_distributors_business_plan_id_fkey(
+            year,
+            quantity_unit
+          )
+        `)
+        .eq('distributor_id', distributorId);
+
+      const fyAllocation = data?.find((d: any) => d.business_plan?.year === fyYear);
+      
+      if (fyAllocation && fyAllocation.business_plan) {
+        setPlanForm(prev => ({
+          ...prev,
+          quantity_target: fyAllocation.quantity_target?.toString() || prev.quantity_target,
+          quantity_unit: fyAllocation.business_plan.quantity_unit || prev.quantity_unit,
+          revenue_target: fyAllocation.revenue_target?.toString() || prev.revenue_target,
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading allocation for dialog:', error);
+    }
+  };
 
   const loadPlans = async () => {
     try {
@@ -1163,11 +1274,31 @@ export function DistributorFYPlan({ distributorId }: Props) {
 
           {selectedPlan && (
             <>
+              {/* User Allocation Banner */}
+              {userAllocation && (
+                <Alert className="border-blue-500/50 bg-blue-500/10">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-xs">
+                    <span className="font-medium">Target from {userAllocation.user_name}'s My Target:</span>{" "}
+                    {Math.round(userAllocation.quantity_target).toLocaleString()} {userAllocation.quantity_unit} | 
+                    ₹{Math.round(userAllocation.revenue_target).toLocaleString()}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Plan Overview */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
+                      {userAllocation && (
+                        <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-600">
+                          <Users className="h-3 w-3 mr-1" />
+                          From My Target
+                        </Badge>
+                      )}
+                    </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -1175,6 +1306,32 @@ export function DistributorFYPlan({ distributorId }: Props) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {userAllocation && (
+                          selectedPlan.quantity_target !== userAllocation.quantity_target ||
+                          selectedPlan.revenue_target !== userAllocation.revenue_target
+                        ) && (
+                          <DropdownMenuItem onClick={async () => {
+                            if (!selectedPlan || !userAllocation) return;
+                            try {
+                              const { error } = await supabase
+                                .from('distributor_business_plans')
+                                .update({
+                                  quantity_target: userAllocation.quantity_target,
+                                  quantity_unit: userAllocation.quantity_unit,
+                                  revenue_target: userAllocation.revenue_target,
+                                })
+                                .eq('id', selectedPlan.id);
+                              if (error) throw error;
+                              toast.success("Synced targets from My Target");
+                              loadPlans();
+                            } catch (error: any) {
+                              toast.error("Failed to sync: " + error.message);
+                            }
+                          }}>
+                            <Users className="h-3.5 w-3.5 mr-2" />
+                            Sync from My Target
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={openEditDialog}>
                           <Pencil className="h-3.5 w-3.5 mr-2" />
                           Edit Plan
@@ -1189,6 +1346,20 @@ export function DistributorFYPlan({ distributorId }: Props) {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                  
+                  {/* Show mismatch warning */}
+                  {userAllocation && (
+                    selectedPlan.quantity_target !== userAllocation.quantity_target ||
+                    selectedPlan.revenue_target !== userAllocation.revenue_target
+                  ) && (
+                    <Alert className="mb-3 border-amber-500/50 bg-amber-500/10">
+                      <Info className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-xs text-amber-700">
+                        Current targets differ from My Target allocation. Use the menu to sync.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Quantity Target</p>
