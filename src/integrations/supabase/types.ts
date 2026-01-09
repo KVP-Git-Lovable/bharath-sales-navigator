@@ -4642,6 +4642,189 @@ export type Database = {
         }
         Relationships: []
       }
+      hierarchy_target_allocations: {
+        Row: {
+          allocation_method: string | null
+          allocation_percentage: number
+          created_at: string | null
+          effective_from: string
+          effective_to: string | null
+          hierarchy_target_id: string
+          id: string
+          is_synced_to_my_target: boolean | null
+          level: number
+          manager_id: string | null
+          notes: string | null
+          quantity_target: number
+          revenue_target: number
+          synced_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          allocation_method?: string | null
+          allocation_percentage?: number
+          created_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          hierarchy_target_id: string
+          id?: string
+          is_synced_to_my_target?: boolean | null
+          level?: number
+          manager_id?: string | null
+          notes?: string | null
+          quantity_target?: number
+          revenue_target?: number
+          synced_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          allocation_method?: string | null
+          allocation_percentage?: number
+          created_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          hierarchy_target_id?: string
+          id?: string
+          is_synced_to_my_target?: boolean | null
+          level?: number
+          manager_id?: string | null
+          notes?: string | null
+          quantity_target?: number
+          revenue_target?: number
+          synced_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hierarchy_target_allocations_hierarchy_target_id_fkey"
+            columns: ["hierarchy_target_id"]
+            isOneToOne: false
+            referencedRelation: "hierarchy_targets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hierarchy_target_allocations_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hierarchy_target_allocations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hierarchy_target_history: {
+        Row: {
+          affected_users: string[] | null
+          change_type: string
+          changed_by: string | null
+          created_at: string | null
+          hierarchy_target_id: string | null
+          id: string
+          new_target: Json | null
+          previous_target: Json | null
+          reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          affected_users?: string[] | null
+          change_type: string
+          changed_by?: string | null
+          created_at?: string | null
+          hierarchy_target_id?: string | null
+          id?: string
+          new_target?: Json | null
+          previous_target?: Json | null
+          reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          affected_users?: string[] | null
+          change_type?: string
+          changed_by?: string | null
+          created_at?: string | null
+          hierarchy_target_id?: string | null
+          id?: string
+          new_target?: Json | null
+          previous_target?: Json | null
+          reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hierarchy_target_history_hierarchy_target_id_fkey"
+            columns: ["hierarchy_target_id"]
+            isOneToOne: false
+            referencedRelation: "hierarchy_targets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hierarchy_target_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hierarchy_targets: {
+        Row: {
+          allocation_method: string
+          created_at: string | null
+          created_by: string | null
+          fy_year: number
+          id: string
+          quantity_unit: string | null
+          root_user_id: string
+          status: string | null
+          total_quantity_target: number
+          total_revenue_target: number
+          updated_at: string | null
+        }
+        Insert: {
+          allocation_method?: string
+          created_at?: string | null
+          created_by?: string | null
+          fy_year: number
+          id?: string
+          quantity_unit?: string | null
+          root_user_id: string
+          status?: string | null
+          total_quantity_target?: number
+          total_revenue_target?: number
+          updated_at?: string | null
+        }
+        Update: {
+          allocation_method?: string
+          created_at?: string | null
+          created_by?: string | null
+          fy_year?: number
+          id?: string
+          quantity_unit?: string | null
+          root_user_id?: string
+          status?: string | null
+          total_quantity_target?: number
+          total_revenue_target?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hierarchy_targets_root_user_id_fkey"
+            columns: ["root_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           created_at: string
@@ -10353,38 +10536,52 @@ export type Database = {
       user_business_plans: {
         Row: {
           created_at: string
+          hierarchy_allocation_id: string | null
           id: string
           notes: string | null
           quantity_target: number | null
           quantity_unit: string | null
           revenue_target: number | null
+          source: string | null
           updated_at: string
           user_id: string
           year: number
         }
         Insert: {
           created_at?: string
+          hierarchy_allocation_id?: string | null
           id?: string
           notes?: string | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
+          source?: string | null
           updated_at?: string
           user_id: string
           year: number
         }
         Update: {
           created_at?: string
+          hierarchy_allocation_id?: string | null
           id?: string
           notes?: string | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
+          source?: string | null
           updated_at?: string
           user_id?: string
           year?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_business_plans_hierarchy_allocation_id_fkey"
+            columns: ["hierarchy_allocation_id"]
+            isOneToOne: false
+            referencedRelation: "hierarchy_target_allocations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_competency_monthly_scores: {
         Row: {
