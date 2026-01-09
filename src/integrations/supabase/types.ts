@@ -626,6 +626,8 @@ export type Database = {
           distributor_id: string | null
           id: string
           is_active: boolean | null
+          owner_id: string | null
+          owner_name: string | null
           territory_id: string | null
           travel_allowance: number | null
           updated_at: string
@@ -641,6 +643,8 @@ export type Database = {
           distributor_id?: string | null
           id?: string
           is_active?: boolean | null
+          owner_id?: string | null
+          owner_name?: string | null
           territory_id?: string | null
           travel_allowance?: number | null
           updated_at?: string
@@ -656,6 +660,8 @@ export type Database = {
           distributor_id?: string | null
           id?: string
           is_active?: boolean | null
+          owner_id?: string | null
+          owner_name?: string | null
           territory_id?: string | null
           travel_allowance?: number | null
           updated_at?: string
@@ -666,6 +672,13 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beats_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

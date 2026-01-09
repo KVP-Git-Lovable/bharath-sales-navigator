@@ -97,21 +97,21 @@ export const useBusinessMetrics = () => {
       const { data: orders, error: ordersError } = await ordersQuery;
       if (ordersError) throw ordersError;
 
-      // Fetch beat plans
-       let beatsQuery = supabase
-         .from('beat_plans')
-         .select('beat_id, beat_name')
-         .gte('plan_date', fromDate)
-         .lte('plan_date', toDate);
+      // Fetch beats created by selected users within date range
+      let beatsQuery = supabase
+        .from('beats')
+        .select('id, created_by')
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lte('created_at', `${toDate}T23:59:59`);
 
       if (userIds.length > 0) {
-        beatsQuery = beatsQuery.in('user_id', userIds);
+        beatsQuery = beatsQuery.in('created_by', userIds);
       }
 
       const { data: beats, error: beatsError } = await beatsQuery;
       if (beatsError) throw beatsError;
 
-      const uniqueBeats = new Set((beats || []).map(b => (b as any).beat_id || (b as any).beat_name).filter(Boolean));
+      const totalBeatsCount = beats?.length || 0;
       const uniqueRetailers = new Set(orders?.map(o => o.retailer_id).filter(Boolean) || []);
       const totalOrders = orders?.length || 0;
       const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
@@ -138,7 +138,7 @@ export const useBusinessMetrics = () => {
       });
 
       setSummary({
-        totalBeats: uniqueBeats.size,
+        totalBeats: totalBeatsCount,
         totalRetailers: uniqueRetailers.size,
         totalOrders,
         totalKg,
