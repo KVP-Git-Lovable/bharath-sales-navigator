@@ -972,9 +972,19 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
               
               {/* Table Rows - Responsive */}
               <div className="divide-y divide-border">
-                {orderRows.map((row, index) => (
+                {orderRows.map((row, index) => {
+                  // Get the item ID for matching free items (variant ID or product ID)
+                  const rowItemId = row.variant?.id || row.product?.id;
+                  
+                  // Get free items that belong to this product row
+                  const freeItemsForRow = rowItemId ? orderCalculation.appliedSchemes
+                    .filter(s => s.free_items && s.free_items.length > 0)
+                    .flatMap(s => s.free_items!)
+                    .filter(freeItem => (freeItem as any).triggering_item_id === rowItemId) : [];
+                  
+                  return (
+                  <React.Fragment key={row.id}>
                   <div 
-                  key={row.id} 
                   className={cn(
                     "grid grid-cols-[1.5fr_0.8fr_0.6fr_0.6fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 md:gap-4 px-2 md:px-4 py-2 md:py-3 items-start",
                     index % 2 === 0 ? "bg-background" : "bg-muted/20"
@@ -1163,7 +1173,27 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                       </Button>
                     </div>
                   </div>
-              ))}
+                  
+                  {/* Free Items for this product - render directly under the product row */}
+                  {freeItemsForRow.map((freeItem, freeIdx) => (
+                    <div 
+                      key={`free-${row.id}-${freeIdx}`} 
+                      className="grid grid-cols-[1.5fr_0.8fr_0.6fr_0.6fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 md:gap-4 px-2 md:px-4 py-2 md:py-3 items-center bg-green-50 border-l-4 border-l-green-500"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Gift size={16} className="text-green-600 shrink-0" />
+                        <span className="text-sm font-medium text-green-700 truncate">{freeItem.product_name}</span>
+                        <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs shrink-0">FREE</Badge>
+                      </div>
+                      <div className="text-xs md:text-sm text-muted-foreground">{freeItem.unit || 'pcs'}</div>
+                      <div className="text-center text-sm font-medium text-green-700">{freeItem.quantity}</div>
+                      <div className="text-center text-sm text-muted-foreground">-</div>
+                      <div className="text-center text-sm font-bold text-green-600">₹0.00</div>
+                    </div>
+                  ))}
+                  </React.Fragment>
+                );
+                })}
               </div>
             </div>
         </CardContent>
@@ -1206,26 +1236,6 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
               </button>
             </div>
           )}
-          
-          {/* Free Items from BOGO Schemes - Display as product rows */}
-          {orderCalculation.appliedSchemes
-            .filter(s => s.free_items && s.free_items.length > 0)
-            .flatMap(s => s.free_items!)
-            .map((freeItem, idx) => (
-              <div key={`free-row-${idx}`} className="grid grid-cols-7 gap-1 p-2 bg-green-50 border border-green-200 rounded items-center">
-                <div className="col-span-2 flex items-center gap-1">
-                  <Gift size={14} className="text-green-600 shrink-0" />
-                  <span className="text-sm font-medium text-green-700 truncate">{freeItem.product_name}</span>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs shrink-0">FREE</Badge>
-                </div>
-                <div className="text-center text-sm text-muted-foreground">{freeItem.unit || 'pcs'}</div>
-                <div className="text-center text-sm font-medium text-green-700">{freeItem.quantity}</div>
-                <div className="text-center text-sm text-muted-foreground">-</div>
-                <div className="text-center text-sm text-green-600">₹0.00</div>
-                <div className="text-right text-sm font-bold text-green-600">₹0.00</div>
-              </div>
-            ))
-          }
           
           <div className="flex justify-end items-center gap-2 pt-1 border-t border-border">
             <p className="text-sm font-semibold">Total:</p>

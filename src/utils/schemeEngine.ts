@@ -244,12 +244,12 @@ function calculateSchemeDiscount(
   discount: number; 
   itemDiscounts: Record<string, number>; 
   itemSchemeDetails: Record<string, ItemSchemeDetail[]>;
-  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string }[] 
+  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] 
 } {
   let discount = 0;
   const itemDiscounts: Record<string, number> = {};
   const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
-  let freeItems: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string }[] | undefined;
+  let freeItems: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] | undefined;
 
   // Get applicable items
   const applicableItems = items.filter(item => schemeAppliesToItem(scheme, item));
@@ -370,14 +370,15 @@ function calculateSchemeDiscount(
             freeItemQty: freeItemsCount
           });
           
-          // Track free items with correct unit from scheme
+          // Track free items with correct unit from scheme and triggering item ID
           freeItems = freeItems || [];
           freeItems.push({
             product_name: freeProductName,
             quantity: freeItemsCount,
             product_id: freeProductId,
             original_rate: 0,
-            unit: freeUnit
+            unit: freeUnit,
+            triggering_item_id: item.id
           });
           
           break; // Only apply once per order when threshold is met
