@@ -159,7 +159,7 @@ export const useBusinessMetrics = () => {
                 totalKg += qty;
               }
               // Sum revenue from RPC
-              rpcTotalRevenue += Number(row.total_revenue || 0);
+              rpcTotalRevenue += Number(row.revenue || 0);
             });
           }
         }
