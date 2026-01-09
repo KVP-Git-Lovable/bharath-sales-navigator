@@ -12,9 +12,12 @@ export interface ProductScheme {
   discount_percentage: number | null;
   discount_amount: number | null;
   buy_quantity: number | null;
+  buy_quantity_unit?: string | null;
   free_quantity: number | null;
+  free_quantity_unit?: string | null;
   free_product_id: string | null;
   condition_quantity: number | null;
+  condition_unit?: string | null;
   quantity_condition_type: string | null;
   min_order_value: number | null;
   start_date: string | null;
