@@ -653,6 +653,19 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
 
   // Unit conversion helpers - unified across UI and totals
   const normalizeUnit = (u?: string) => (u || "").toLowerCase().replace(/\./g, "").trim();
+
+  const formatQtyUnit = (u?: string) => {
+    const unit = normalizeUnit(u);
+    if (!unit) return "";
+    if (["g", "gm", "gram", "grams"].includes(unit)) return "grams";
+    if (["kg", "kilogram", "kilograms"].includes(unit)) return "kg";
+    if (["ml", "milliliter", "milliliters"].includes(unit)) return "ml";
+    if (["l", "ltr", "liter", "liters", "litre", "litres"].includes(unit)) return "liters";
+    if (["pc", "pcs", "piece", "pieces"].includes(unit)) return "pcs";
+    if (["unit", "units"].includes(unit)) return "units";
+    return u || "";
+  };
+
   const getPricePerUnit = (prod: Product, variant?: any, unit?: string) => {
     const baseRate = Number(variant ? variant.price : prod.rate) || 0;
     const baseUnit = normalizeUnit(prod.base_unit || prod.unit);
@@ -1089,9 +1102,12 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                                   <div key={idx} className="flex items-center gap-1 text-[9px] md:text-[10px] text-green-600">
                                     <Gift size={10} className="flex-shrink-0" />
                                     <span className="truncate">
-                                      {scheme.schemeType === 'buy_x_get_y_free' || scheme.schemeType === 'buy_get_free' ? (
-                                        <>🎁 {scheme.schemeName}: Get {scheme.freeItemQty} {scheme.freeItemName} FREE</>
-                                      ) : (
+                                      {scheme.schemeType === 'buy_x_get_y_free' || scheme.schemeType === 'buy_get_free' ? (() => {
+                                        const freeUnit = schemes.find(s => s.id === scheme.schemeId)?.free_quantity_unit;
+                                        const unitLabel = formatQtyUnit(freeUnit);
+                                        const unitPart = unitLabel ? `${unitLabel} ` : '';
+                                        return <>🎁 {scheme.schemeName}: Get {scheme.freeItemQty} {unitPart}{scheme.freeItemName} FREE</>;
+                                      })() : (
                                         <>
                                           {scheme.schemeName}
                                           {scheme.discountPercentage && ` (${scheme.discountPercentage}% off)`}
@@ -1185,7 +1201,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                         <span className="text-sm font-medium text-green-700 truncate">{freeItem.product_name}</span>
                         <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs shrink-0">FREE</Badge>
                       </div>
-                      <div className="text-xs md:text-sm text-muted-foreground">{freeItem.unit || 'pcs'}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">{formatQtyUnit(freeItem.unit) || 'pcs'}</div>
                       <div className="text-center text-sm font-medium text-green-700">{freeItem.quantity}</div>
                       <div className="text-center text-sm text-muted-foreground">-</div>
                       <div className="text-center text-sm font-bold text-green-600">₹0.00</div>
