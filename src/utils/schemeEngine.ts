@@ -600,6 +600,7 @@ export function formatSchemeDetailsForInvoice(appliedSchemes: AppliedScheme[]): 
 /**
  * Calculate potential discount for a scheme (for comparison purposes)
  * Used by policy logic to determine the "best" scheme
+ * Returns discount amount for monetary schemes, or a positive value for BOGO schemes
  */
 export function calculateSchemeDiscountForComparison(
   scheme: ProductScheme, 
@@ -615,5 +616,19 @@ export function calculateSchemeDiscountForComparison(
   
   // Calculate using the main function with just this one scheme
   const result = calculateOrderWithSchemes(items, [scheme], [scheme.id]);
+  
+  // For BOGO schemes, return a positive value if they yield free items
+  // This ensures BOGO schemes are included in auto-apply logic
+  const hasFreeItems = result.appliedSchemes.some(s => s.free_items && s.free_items.length > 0);
+  if (hasFreeItems && result.totalDiscount === 0) {
+    // Return a nominal positive value to indicate scheme is valid for auto-apply
+    // Use the estimated value of free items (quantity * average rate) if available
+    const freeItemsValue = result.appliedSchemes
+      .filter(s => s.free_items && s.free_items.length > 0)
+      .flatMap(s => s.free_items!)
+      .reduce((sum, f) => sum + f.quantity, 0);
+    return freeItemsValue > 0 ? freeItemsValue : 0.01; // Return free item count as "value" indicator
+  }
+  
   return result.totalDiscount;
 }
