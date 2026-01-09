@@ -215,7 +215,8 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
     return month >= 3 ? now.getFullYear() + 1 : now.getFullYear();
   }, []);
   
-  const { allocation: hierarchyAllocation, hasHierarchyTarget } = useHierarchyTargetAllocation(
+  // Check hierarchy allocation for the selected plan's FY
+  const { allocation: hierarchyAllocation, hasHierarchyTarget, isLoading: hierarchyLoading } = useHierarchyTargetAllocation(
     effectiveUserId,
     selectedPlan?.year || currentFY
   );
@@ -256,6 +257,24 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
     revenue_target: "",
     notes: "",
   });
+
+  // Also check hierarchy for the FY being created (in dialog) - must be after planForm is defined
+  const { allocation: dialogHierarchyAllocation, hasHierarchyTarget: hasDialogHierarchyTarget } = useHierarchyTargetAllocation(
+    effectiveUserId,
+    planForm.year
+  );
+  
+  // Auto-fill dialog form when hierarchy allocation is available for that year
+  useEffect(() => {
+    if (dialogHierarchyAllocation && hasDialogHierarchyTarget) {
+      setPlanForm(prev => ({
+        ...prev,
+        quantity_target: dialogHierarchyAllocation.quantity_target?.toString() || prev.quantity_target,
+        quantity_unit: dialogHierarchyAllocation.hierarchy_target?.quantity_unit || prev.quantity_unit,
+        revenue_target: dialogHierarchyAllocation.revenue_target?.toString() || prev.revenue_target,
+      }));
+    }
+  }, [dialogHierarchyAllocation, hasDialogHierarchyTarget]);
 
   useEffect(() => {
     if (effectiveUserId) {
@@ -1592,6 +1611,22 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
                   max={2050}
                 />
               </div>
+              
+              {/* Hierarchy allocation hint */}
+              {hasDialogHierarchyTarget && dialogHierarchyAllocation && (
+                <Alert className="border-blue-500/50 bg-blue-500/10">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-xs">
+                    Hierarchy target available for FY {planForm.year}: {' '}
+                    <span className="font-medium">
+                      {Math.round(dialogHierarchyAllocation.quantity_target).toLocaleString()} {dialogHierarchyAllocation.hierarchy_target?.quantity_unit || 'Units'} | 
+                      ₹{Math.round(dialogHierarchyAllocation.revenue_target).toLocaleString()}
+                    </span>
+                    {' '}(auto-filled below)
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Quantity Target</Label>
@@ -1669,11 +1704,34 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
 
           {selectedPlan && (
             <>
+              {/* Hierarchy Target Banner */}
+              {hasHierarchyTarget && hierarchyAllocation && (
+                <Alert className="border-blue-500/50 bg-blue-500/10">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-xs">
+                    <span className="font-medium">Targets set via Hierarchy:</span>{" "}
+                    {Math.round(hierarchyAllocation.quantity_target).toLocaleString()} {hierarchyAllocation.hierarchy_target?.quantity_unit || 'Units'} | 
+                    ₹{Math.round(hierarchyAllocation.revenue_target).toLocaleString()} 
+                    <span className="text-muted-foreground ml-1">
+                      ({hierarchyAllocation.allocation_percentage?.toFixed(1)}% allocation)
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Plan Overview - Editable */}
               <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
+                      {hasHierarchyTarget && (
+                        <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-600">
+                          <Users className="h-3 w-3 mr-1" />
+                          From Hierarchy
+                        </Badge>
+                      )}
+                    </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
