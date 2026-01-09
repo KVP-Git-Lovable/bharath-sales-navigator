@@ -1,0 +1,223 @@
+import React, { useState } from 'react';
+import { Layout } from '@/components/Layout';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Target, Users, History, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useSubordinates } from '@/hooks/useSubordinates';
+import { useHierarchyTargets } from '@/hooks/useHierarchyTargets';
+import { HierarchyTargetBuilder } from '@/components/admin/HierarchyTargetBuilder';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+
+const getCurrentFY = () => {
+  const now = new Date();
+  const month = now.getMonth();
+  return month >= 3 ? now.getFullYear() + 1 : now.getFullYear();
+};
+
+const HierarchyTargets = () => {
+  const navigate = useNavigate();
+  const { user, userRole } = useAuth();
+  const { subordinates, isManager } = useSubordinates();
+  const [fyYear, setFyYear] = useState(getCurrentFY());
+  const [selectedRootUserId, setSelectedRootUserId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('set-targets');
+
+  const { hierarchyTargets, isLoading, refetch } = useHierarchyTargets(fyYear);
+
+  // Fetch managers who can be root users
+  const { data: managers = [] } = useQuery({
+    queryKey: ['hierarchy-managers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          user_id,
+          profiles!employees_user_id_fkey(id, full_name, profile_picture_url)
+        `)
+        .not('user_id', 'is', null);
+
+      if (error) throw error;
+
+      // Filter to only managers (those who have subordinates)
+      const managerIds = new Set<string>();
+      data?.forEach((e: any) => {
+        if (e.user_id) managerIds.add(e.user_id);
+      });
+
+      // Get unique managers
+      const uniqueManagers = data?.filter((e: any, index: number, self: any[]) =>
+        e.profiles && index === self.findIndex((t: any) => t.user_id === e.user_id)
+      ).map((e: any) => ({
+        id: e.user_id,
+        full_name: e.profiles?.full_name || 'Unknown',
+        profile_picture_url: e.profiles?.profile_picture_url,
+      })) || [];
+
+      return uniqueManagers;
+    },
+  });
+
+  const existingTarget = hierarchyTargets.find(
+    (t) => t.root_user_id === selectedRootUserId && t.fy_year === fyYear
+  );
+
+  const fyYears = Array.from({ length: 5 }, (_, i) => getCurrentFY() - 2 + i);
+
+  if (userRole !== 'admin' && !isManager) {
+    return (
+      <Layout>
+        <div className="p-4 text-center">
+          <p className="text-muted-foreground">You don't have access to this page.</p>
+          <Button onClick={() => navigate('/dashboard')} className="mt-4">
+            Go to Dashboard
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="min-h-screen bg-gradient-subtle p-4">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="p-2">
+              <ArrowLeft size={20} />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-foreground">Hierarchy-wise Targets</h1>
+              <p className="text-muted-foreground">Set targets from top and cascade to all team members</p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">FY Year:</span>
+                  <Select value={fyYear.toString()} onValueChange={(v) => setFyYear(parseInt(v))}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fyYears.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          FY {year - 1}-{year.toString().slice(-2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Root User:</span>
+                  <Select value={selectedRootUserId || ''} onValueChange={setSelectedRootUserId}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Select hierarchy root" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {managers.map((manager: any) => (
+                        <SelectItem key={manager.id} value={manager.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage src={manager.profile_picture_url} />
+                              <AvatarFallback>{manager.full_name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            {manager.full_name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {existingTarget && (
+                  <Badge variant={existingTarget.status === 'published' ? 'default' : 'secondary'}>
+                    {existingTarget.status}
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main Content */}
+          {selectedRootUserId ? (
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="set-targets" className="gap-2">
+                  <Target className="h-4 w-4" />
+                  Set Targets
+                </TabsTrigger>
+                <TabsTrigger value="allocations" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  Allocations
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2">
+                  <History className="h-4 w-4" />
+                  History
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="set-targets" className="mt-4">
+                <HierarchyTargetBuilder
+                  rootUserId={selectedRootUserId}
+                  fyYear={fyYear}
+                  existingTarget={existingTarget}
+                  onSave={() => refetch()}
+                  onPublish={() => refetch()}
+                />
+              </TabsContent>
+
+              <TabsContent value="allocations" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Allocation Summary</CardTitle>
+                    <CardDescription>View all user allocations for FY {fyYear - 1}-{fyYear.toString().slice(-2)}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground text-sm">
+                      {existingTarget ? 'Allocations are shown in the Set Targets tab.' : 'No allocations yet. Set targets first.'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Change History</CardTitle>
+                    <CardDescription>Track all changes made to hierarchy targets</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground text-sm">No history yet.</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Select a Root User</h3>
+                <p className="text-muted-foreground">
+                  Choose a user from the dropdown above to start setting hierarchy targets
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </Layout>
+  );
+};
+
+export default HierarchyTargets;
