@@ -19,7 +19,13 @@ export interface AppliedScheme {
   discount_amount: number;
   discount_percentage?: number;
   product_id?: string | null;
-  free_items?: { product_name: string; quantity: number }[];
+  free_items?: { 
+    product_name: string; 
+    quantity: number;
+    product_id?: string;
+    original_rate?: number;
+    unit?: string;
+  }[];
 }
 
 export interface ItemSchemeDetail {
@@ -236,12 +242,12 @@ function calculateSchemeDiscount(
   discount: number; 
   itemDiscounts: Record<string, number>; 
   itemSchemeDetails: Record<string, ItemSchemeDetail[]>;
-  freeItems?: { product_name: string; quantity: number }[] 
+  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string }[] 
 } {
   let discount = 0;
   const itemDiscounts: Record<string, number> = {};
   const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
-  let freeItems: { product_name: string; quantity: number }[] | undefined;
+  let freeItems: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string }[] | undefined;
 
   // Get applicable items
   const applicableItems = items.filter(item => schemeAppliesToItem(scheme, item));
@@ -340,14 +346,17 @@ function calculateSchemeDiscount(
       for (const item of applicableItems) {
         if (item.quantity >= buyQty) {
           const setsQualified = Math.floor(item.quantity / buyQty);
+          // Free quantity is the scheme's free_quantity multiplied by sets qualified
           const freeItemsCount = setsQualified * freeQty;
           
-          // Get free product name - use scheme's free_product_name if available
-          const freeProductName = scheme.free_product_name || item.name || 'Free Item';
+          // Use scheme's FREE product details (different from buy product)
+          // free_product_name and free_product_id are set when creating the BOGO scheme
+          const freeProductName = scheme.free_product_name || 'Free Item';
+          const freeProductId = scheme.free_product_id || undefined;
           
           // BOGO: Don't apply monetary discount to buy product
           // Instead, just track that free items are earned
-          // The free items will be displayed separately at ₹0
+          // The free items will be displayed separately as actual product rows with ₹0
           
           // Track scheme details per item (for display purposes, no discount on buy item)
           if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
@@ -360,11 +369,14 @@ function calculateSchemeDiscount(
             freeItemQty: freeItemsCount
           });
           
-          // Track free items to display in order
+          // Track free items with full product details for order/invoice
           freeItems = freeItems || [];
           freeItems.push({
             product_name: freeProductName,
-            quantity: freeItemsCount
+            quantity: freeItemsCount,
+            product_id: freeProductId,
+            original_rate: 0, // Free item - will be shown as ₹0
+            unit: 'pcs' // Default unit for free items
           });
         }
       }

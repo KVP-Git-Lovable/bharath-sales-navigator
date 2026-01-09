@@ -1207,19 +1207,25 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
             </div>
           )}
           
-          {/* Free Items from BOGO Schemes */}
-          {orderCalculation.appliedSchemes.some(s => s.free_items && s.free_items.length > 0) && (
-            <div className="flex justify-end items-center gap-2 text-green-600">
-              <Gift size={12} />
-              <p className="text-sm">
-                Free: {orderCalculation.appliedSchemes
-                  .filter(s => s.free_items && s.free_items.length > 0)
-                  .flatMap(s => s.free_items!)
-                  .map(f => `${f.product_name} x ${f.quantity}`)
-                  .join(', ')}
-              </p>
-            </div>
-          )}
+          {/* Free Items from BOGO Schemes - Display as product rows */}
+          {orderCalculation.appliedSchemes
+            .filter(s => s.free_items && s.free_items.length > 0)
+            .flatMap(s => s.free_items!)
+            .map((freeItem, idx) => (
+              <div key={`free-row-${idx}`} className="grid grid-cols-7 gap-1 p-2 bg-green-50 border border-green-200 rounded items-center">
+                <div className="col-span-2 flex items-center gap-1">
+                  <Gift size={14} className="text-green-600 shrink-0" />
+                  <span className="text-sm font-medium text-green-700 truncate">{freeItem.product_name}</span>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs shrink-0">FREE</Badge>
+                </div>
+                <div className="text-center text-sm text-muted-foreground">{freeItem.unit || 'pcs'}</div>
+                <div className="text-center text-sm font-medium text-green-700">{freeItem.quantity}</div>
+                <div className="text-center text-sm text-muted-foreground">-</div>
+                <div className="text-center text-sm text-green-600">₹0.00</div>
+                <div className="text-right text-sm font-bold text-green-600">₹0.00</div>
+              </div>
+            ))
+          }
           
           <div className="flex justify-end items-center gap-2 pt-1 border-t border-border">
             <p className="text-sm font-semibold">Total:</p>
