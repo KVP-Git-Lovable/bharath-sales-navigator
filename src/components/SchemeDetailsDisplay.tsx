@@ -41,14 +41,29 @@ export const SchemeDetailsDisplay = ({ scheme }: SchemeDetailsDisplayProps) => {
     return new Date(date).toLocaleDateString();
   };
 
+  const formatUnit = (unit: string | undefined) => {
+    if (!unit) return '';
+    const unitMap: Record<string, string> = {
+      'kg': 'KG',
+      'grams': 'g',
+      'pieces': 'pcs',
+      'liters': 'L',
+      'ml': 'ml',
+      'units': 'units'
+    };
+    return unitMap[unit?.toLowerCase()] || unit?.toUpperCase() || '';
+  };
+
   const getConditionText = () => {
     switch (scheme.scheme_type) {
       case 'percentage_discount':
       case 'flat_discount':
-        return `Min quantity: ${scheme.condition_quantity}`;
+        const condUnit = formatUnit(scheme.condition_unit);
+        return `Min quantity: ${scheme.condition_quantity}${condUnit ? ` ${condUnit}` : ''}`;
       
       case 'buy_x_get_y_free':
-        return `Buy ${scheme.buy_quantity}, get ${scheme.free_quantity} free`;
+        const buyUnit = formatUnit(scheme.buy_quantity_unit);
+        return `Buy ${scheme.buy_quantity}${buyUnit ? ` ${buyUnit}` : ''}`;
       
       case 'bundle_combo':
         const bundleCount = scheme.bundle_product_ids?.length || 0;
@@ -86,7 +101,9 @@ export const SchemeDetailsDisplay = ({ scheme }: SchemeDetailsDisplayProps) => {
         return `₹${scheme.discount_amount} off`;
       
       case 'buy_x_get_y_free':
-        return `${scheme.free_quantity} free items`;
+        const freeUnit = formatUnit(scheme.free_quantity_unit);
+        const freeProductName = scheme.free_product?.name || scheme.free_product_name || 'item(s)';
+        return `Get ${scheme.free_quantity}${freeUnit ? ` ${freeUnit}` : ''} ${freeProductName} free`;
       
       case 'bundle_combo':
         if (scheme.bundle_discount_percentage > 0) {
