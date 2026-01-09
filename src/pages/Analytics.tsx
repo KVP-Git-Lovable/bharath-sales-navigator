@@ -100,8 +100,13 @@ const Analytics = () => {
 
   // Auto-refresh business metrics when filters change
   useEffect(() => {
-    fetchBusinessSummary(selectedUserIds, dashboardDateRange);
-  }, [selectedUserIds, dashboardDateRange, fetchBusinessSummary]);
+    // Get user names for selected user IDs to use with RPC
+    const selectedUserNames = selectedUserIds
+      .map(id => users.find(u => u.id === id)?.full_name)
+      .filter((name): name is string => !!name);
+    
+    fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
+  }, [selectedUserIds, dashboardDateRange, fetchBusinessSummary, users]);
 
   const [kpiData, setKpiData] = useState({
     plannedCalls: 0,
@@ -1217,7 +1222,10 @@ const Analytics = () => {
                   size="sm" 
                   onClick={() => {
                     fetchDashboardData();
-                    fetchBusinessSummary(selectedUserIds, dashboardDateRange);
+                    const selectedUserNames = selectedUserIds
+                      .map(id => users.find(u => u.id === id)?.full_name)
+                      .filter((name): name is string => !!name);
+                    fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
                   }}
                 >
                   <RefreshCw size={16} className="mr-2" />
