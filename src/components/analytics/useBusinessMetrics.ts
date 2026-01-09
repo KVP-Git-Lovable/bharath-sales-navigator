@@ -70,7 +70,7 @@ export const useBusinessMetrics = () => {
   const [pendingPaymentDetails, setPendingPaymentDetails] = useState<PendingPaymentDetail[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
-  const fetchSummary = useCallback(async (userIds: string[], dateRange: { from: Date; to: Date }) => {
+  const fetchSummary = useCallback(async (userIds: string[], dateRange: { from: Date; to: Date }, userNames?: string[]) => {
     setIsLoading(true);
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -132,25 +132,49 @@ export const useBusinessMetrics = () => {
       const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
       const pendingPayments = orders?.reduce((sum, o) => sum + Number(o.credit_pending_amount || 0), 0) || 0;
       
-      // Calculate total KG and pieces with proper unit conversion
+      // Calculate total KG using the same logic as SQL Report - Product and Revenue Performance
       let totalKg = 0;
       let totalPieces = 0;
       
-      orders?.forEach(order => {
-        (order.order_items as any[])?.forEach((item: any) => {
-          const unit = (item.unit || '').toLowerCase().trim();
-          const qty = Number(item.quantity || 0);
+      // If user names are provided, use the RPC to get product revenue data
+      if (userNames && userNames.length > 0) {
+        for (const userName of userNames) {
+          const { data: productData } = await supabase.rpc('get_product_revenue_performance', {
+            user_full_name: userName,
+            start_date: fromDate,
+            end_date: toDate
+          });
           
-          if (unit === 'kg' || unit.includes('kilo')) {
-            totalKg += qty;
-          } else if (unit === 'grams' || unit === 'g' || unit === 'gram') {
-            totalKg += qty / 1000; // Convert grams to KG
-          } else {
-            // Pieces, pcs, or any other unit
-            totalPieces += qty;
+          if (productData) {
+            productData.forEach((row: any) => {
+              const qty = Number(row.quantity_sold || 0);
+              const unit = (row.unit || '').toLowerCase();
+              // Same logic as SQL Report: grams converted to KG, others treated as KG directly
+              if (unit === 'grams') {
+                totalKg += qty / 1000;
+              } else {
+                totalKg += qty;
+              }
+            });
           }
+        }
+      } else {
+        // Fallback: use order_items directly
+        orders?.forEach(order => {
+          (order.order_items as any[])?.forEach((item: any) => {
+            const unit = (item.unit || '').toLowerCase().trim();
+            const qty = Number(item.quantity || 0);
+            
+            if (unit === 'kg' || unit.includes('kilo')) {
+              totalKg += qty;
+            } else if (unit === 'grams' || unit === 'g' || unit === 'gram') {
+              totalKg += qty / 1000;
+            } else {
+              totalPieces += qty;
+            }
+          });
         });
-      });
+      }
 
       setSummary({
         totalBeats: totalBeatsCount,
