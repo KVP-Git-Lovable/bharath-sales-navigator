@@ -109,11 +109,24 @@ export const useBusinessMetrics = () => {
       }
 
       const { data: beats, error: beatsError } = await beatsQuery;
-      console.log('Beats query params:', { fromDate, toDate, userIds, beatsCount: beats?.length, beats });
       if (beatsError) throw beatsError;
 
+      // Fetch retailers created by selected users within date range
+      let retailersQuery = supabase
+        .from('retailers')
+        .select('id, user_id')
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lte('created_at', `${toDate}T23:59:59`);
+
+      if (userIds.length > 0) {
+        retailersQuery = retailersQuery.in('user_id', userIds);
+      }
+
+      const { data: retailers, error: retailersError } = await retailersQuery;
+      if (retailersError) throw retailersError;
+
       const totalBeatsCount = beats?.length || 0;
-      const uniqueRetailers = new Set(orders?.map(o => o.retailer_id).filter(Boolean) || []);
+      const totalRetailersCount = retailers?.length || 0;
       const totalOrders = orders?.length || 0;
       const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
       const pendingPayments = orders?.reduce((sum, o) => sum + Number(o.credit_pending_amount || 0), 0) || 0;
@@ -140,7 +153,7 @@ export const useBusinessMetrics = () => {
 
       setSummary({
         totalBeats: totalBeatsCount,
-        totalRetailers: uniqueRetailers.size,
+        totalRetailers: totalRetailersCount,
         totalOrders,
         totalKg,
         totalPieces,
