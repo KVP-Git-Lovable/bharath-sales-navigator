@@ -76,7 +76,7 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch orders with items
+      // Fetch confirmed orders with items
       let ordersQuery = supabase
         .from('orders')
         .select(`
@@ -87,6 +87,7 @@ export const useBusinessMetrics = () => {
           user_id,
           order_items(quantity, unit)
         `)
+        .eq('status', 'confirmed')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
 
