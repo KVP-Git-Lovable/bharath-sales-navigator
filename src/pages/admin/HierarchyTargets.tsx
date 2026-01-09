@@ -39,36 +39,60 @@ const HierarchyTargets = () => {
 
   const { hierarchyTargets, isLoading, refetch } = useHierarchyTargets(fyYear);
 
-  // Fetch managers who can be root users
+  // Fetch users at the top of the reporting hierarchy (managers with no manager, or top-level managers)
   const { data: managers = [] } = useQuery({
-    queryKey: ['hierarchy-managers'],
+    queryKey: ['hierarchy-root-users'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all employees with their manager info
+      const { data: employees, error } = await supabase
         .from('employees')
         .select(`
           user_id,
+          manager_id,
           profiles!employees_user_id_fkey(id, full_name, profile_picture_url)
         `)
         .not('user_id', 'is', null);
 
       if (error) throw error;
 
-      // Filter to only managers (those who have subordinates)
-      const managerIds = new Set<string>();
-      data?.forEach((e: any) => {
-        if (e.user_id) managerIds.add(e.user_id);
+      // Find users who have subordinates (are managers of others)
+      const managerIdsSet = new Set<string>();
+      employees?.forEach((e: any) => {
+        if (e.manager_id) {
+          managerIdsSet.add(e.manager_id);
+        }
       });
 
-      // Get unique managers
-      const uniqueManagers = data?.filter((e: any, index: number, self: any[]) =>
-        e.profiles && index === self.findIndex((t: any) => t.user_id === e.user_id)
-      ).map((e: any) => ({
-        id: e.user_id,
-        full_name: e.profiles?.full_name || 'Unknown',
-        profile_picture_url: e.profiles?.profile_picture_url,
-      })) || [];
+      // Users at the TOP of hierarchy:
+      // 1. Have NO manager (manager_id is null) AND have subordinates, OR
+      // 2. Have NO manager at all (top level users)
+      const topLevelUsers = employees?.filter((e: any) => {
+        const hasNoManager = !e.manager_id;
+        const hasSubordinates = managerIdsSet.has(e.user_id);
+        
+        // Include if: has no manager (top-level) OR is a manager of others
+        return hasNoManager || hasSubordinates;
+      });
 
-      return uniqueManagers;
+      // Get unique users and sort by those with no manager first (true top-level)
+      const uniqueUsers = topLevelUsers
+        ?.filter((e: any, index: number, self: any[]) =>
+          e.profiles && index === self.findIndex((t: any) => t.user_id === e.user_id)
+        )
+        .sort((a: any, b: any) => {
+          // Users with no manager come first
+          if (!a.manager_id && b.manager_id) return -1;
+          if (a.manager_id && !b.manager_id) return 1;
+          return (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || '');
+        })
+        .map((e: any) => ({
+          id: e.user_id,
+          full_name: e.profiles?.full_name || 'Unknown',
+          profile_picture_url: e.profiles?.profile_picture_url,
+          hasManager: !!e.manager_id,
+        })) || [];
+
+      return uniqueUsers;
     },
   });
 
@@ -163,7 +187,12 @@ const HierarchyTargets = () => {
                               <AvatarImage src={manager.profile_picture_url} />
                               <AvatarFallback>{manager.full_name?.charAt(0)}</AvatarFallback>
                             </Avatar>
-                            {manager.full_name}
+                            <span>{manager.full_name}</span>
+                            {!manager.hasManager && (
+                              <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                                Top Level
+                              </Badge>
+                            )}
                           </div>
                         </SelectItem>
                       ))}
