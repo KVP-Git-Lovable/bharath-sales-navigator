@@ -449,17 +449,20 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     // If auto-apply is disabled, don't auto-apply anything
     if (!schemePolicies.autoApplyBestScheme) return;
     
-    // Build items for scheme calculation
+    // Build items for scheme calculation - use variant ID if available for unique identification
     const items: SchemeItem[] = orderRows
       .filter(row => row.product && row.quantity > 0)
-      .map(row => ({
-        id: row.product!.id,
-        product_id: row.product!.id,
-        variant_id: row.variant?.id,
-        quantity: row.quantity,
-        rate: getPricePerUnit(row.product!, row.variant, row.unit),
-        name: row.variant?.variant_name || row.product!.name
-      }));
+      .map(row => {
+        const itemId = row.variant?.id || row.product!.id;
+        return {
+          id: itemId,
+          product_id: itemId,
+          variant_id: row.variant?.id,
+          quantity: row.quantity,
+          rate: getPricePerUnit(row.product!, row.variant, row.unit),
+          name: row.variant?.variant_name || row.product!.name
+        };
+      });
     
     if (items.length === 0) return;
     
@@ -872,14 +875,18 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   const orderCalculation = useMemo(() => {
     const schemeItems: SchemeItem[] = orderRows
       .filter(row => row.product && row.quantity > 0)
-      .map(row => ({
-        id: row.product!.id,
-        product_id: row.product!.id,
-        variant_id: row.variant?.id,
-        quantity: row.quantity,
-        rate: getPricePerUnit(row.product!, row.variant, row.unit),
-        name: row.variant?.variant_name || row.product!.name
-      }));
+      .map(row => {
+        // Use variant ID if available for unique identification - each variant is a separate product
+        const itemId = row.variant?.id || row.product!.id;
+        return {
+          id: itemId,
+          product_id: itemId,
+          variant_id: row.variant?.id,
+          quantity: row.quantity,
+          rate: getPricePerUnit(row.product!, row.variant, row.unit),
+          name: row.variant?.variant_name || row.product!.name
+        };
+      });
     
     return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds);
   }, [orderRows, schemes, appliedSchemeIds]);
@@ -1060,8 +1067,9 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                           </span>
                           {/* Show applied scheme details */}
                           {(() => {
-                            const productId = row.product.id;
-                            const itemSchemes = orderCalculation.itemSchemeDetails?.[productId] || [];
+                            // Use variant ID if available for correct lookup
+                            const itemId = row.variant?.id || row.product.id;
+                            const itemSchemes = orderCalculation.itemSchemeDetails?.[itemId] || [];
                             
                             if (itemSchemes.length === 0 || row.quantity === 0) return null;
                             
