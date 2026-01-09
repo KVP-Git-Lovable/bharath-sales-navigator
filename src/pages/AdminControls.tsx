@@ -53,6 +53,7 @@ const AdminControls = () => {
     { title: "Recycle Bin Master", description: "Configure recycle bin settings and view permanent deletion logs", icon: Trash2, color: "rose", path: "/admin/recycle-bin" },
     { title: "Distributor Portal Admin", description: "Manage distributor portal users, orders, claims, support, and ideas", icon: Building2, color: "cyan", path: "/admin/distributor-portal" },
     { title: "Target vs Actual", description: "Set targets for team members and track their achievement", icon: Target, color: "blue", path: "/admin/target-vs-actual" },
+    { title: "Hierarchy Targets", description: "Set targets from top and cascade down to all team members", icon: Users, color: "violet", path: "/admin/hierarchy-targets" },
   ];
 
   const filteredModules = adminModules.filter(module => 

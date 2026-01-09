@@ -5,15 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Target, Users, History, Plus } from 'lucide-react';
+import { ArrowLeft, Target, Users, History, Plus, UserPlus, UserMinus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
-import { useHierarchyTargets } from '@/hooks/useHierarchyTargets';
+import { useHierarchyTargets, useHierarchyTargetAllocations, useHierarchyTargetHistory } from '@/hooks/useHierarchyTargets';
 import { HierarchyTargetBuilder } from '@/components/admin/HierarchyTargetBuilder';
+import { AllocationSummaryTable } from '@/components/admin/AllocationSummaryTable';
+import { MidwayAdjustmentDialog, AdjustmentType } from '@/components/admin/MidwayAdjustmentDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 const getCurrentFY = () => {
   const now = new Date();
@@ -28,6 +31,11 @@ const HierarchyTargets = () => {
   const [fyYear, setFyYear] = useState(getCurrentFY());
   const [selectedRootUserId, setSelectedRootUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('set-targets');
+  
+  // Midway adjustment dialog state
+  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
+  const [adjustmentType, setAdjustmentType] = useState<AdjustmentType>('leave');
+  const [selectedUserForAdjustment, setSelectedUserForAdjustment] = useState<string | null>(null);
 
   const { hierarchyTargets, isLoading, refetch } = useHierarchyTargets(fyYear);
 
@@ -67,6 +75,29 @@ const HierarchyTargets = () => {
   const existingTarget = hierarchyTargets.find(
     (t) => t.root_user_id === selectedRootUserId && t.fy_year === fyYear
   );
+
+  // Fetch allocations for the allocations tab
+  const { allocations, refetch: refetchAllocations } = useHierarchyTargetAllocations(existingTarget?.id);
+  
+  // Fetch history
+  const { history } = useHierarchyTargetHistory(existingTarget?.id);
+
+  const handleAdjustUser = (userId: string, type: AdjustmentType) => {
+    setSelectedUserForAdjustment(userId);
+    setAdjustmentType(type);
+    setAdjustmentDialogOpen(true);
+  };
+
+  // Convert allocations to team members format for adjustment dialog
+  const teamMembers = allocations.map(a => ({
+    userId: a.user_id,
+    fullName: a.user?.full_name || 'Unknown',
+    profilePictureUrl: a.user?.profile_picture_url,
+    currentQuantityTarget: a.quantity_target,
+    currentRevenueTarget: a.revenue_target,
+  }));
+
+  const selectedUserInfo = teamMembers.find(m => m.userId === selectedUserForAdjustment);
 
   const fyYears = Array.from({ length: 5 }, (_, i) => getCurrentFY() - 2 + i);
 
@@ -184,9 +215,18 @@ const HierarchyTargets = () => {
                     <CardDescription>View all user allocations for FY {fyYear - 1}-{fyYear.toString().slice(-2)}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground text-sm">
-                      {existingTarget ? 'Allocations are shown in the Set Targets tab.' : 'No allocations yet. Set targets first.'}
-                    </p>
+                    {existingTarget && allocations.length > 0 ? (
+                      <AllocationSummaryTable
+                        allocations={allocations}
+                        quantityUnit={existingTarget.quantity_unit}
+                        onAdjustUser={handleAdjustUser}
+                        isReadOnly={existingTarget.status === 'locked'}
+                      />
+                    ) : (
+                      <p className="text-muted-foreground text-sm">
+                        No allocations yet. Set targets first.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -198,7 +238,27 @@ const HierarchyTargets = () => {
                     <CardDescription>Track all changes made to hierarchy targets</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground text-sm">No history yet.</p>
+                    {history.length > 0 ? (
+                      <div className="space-y-3">
+                        {history.map((h) => (
+                          <div key={h.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{h.change_type}</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(h.created_at), 'MMM d, yyyy h:mm a')}
+                                </span>
+                              </div>
+                              {h.reason && (
+                                <p className="text-sm mt-1">{h.reason}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">No history yet.</p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -216,6 +276,23 @@ const HierarchyTargets = () => {
           )}
         </div>
       </div>
+
+      {/* Midway Adjustment Dialog */}
+      {existingTarget && (
+        <MidwayAdjustmentDialog
+          open={adjustmentDialogOpen}
+          onOpenChange={setAdjustmentDialogOpen}
+          hierarchyTargetId={existingTarget.id}
+          fyYear={fyYear}
+          adjustmentType={adjustmentType}
+          affectedUser={selectedUserInfo}
+          teamMembers={teamMembers}
+          onComplete={() => {
+            refetch();
+            refetchAllocations();
+          }}
+        />
+      )}
     </Layout>
   );
 };
