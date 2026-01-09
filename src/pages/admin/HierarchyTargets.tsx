@@ -39,58 +39,65 @@ const HierarchyTargets = () => {
 
   const { hierarchyTargets, isLoading, refetch } = useHierarchyTargets(fyYear);
 
-  // Fetch users at the top of the reporting hierarchy (managers with no manager, or top-level managers)
+  // Fetch users at the top of the reporting hierarchy (root users / managers)
   const { data: managers = [] } = useQuery({
     queryKey: ['hierarchy-root-users'],
     queryFn: async () => {
-      // First get all employees with their manager info
-      const { data: employees, error } = await supabase
+      // Note: There is NO FK relationship between employees.user_id and profiles.id in PostgREST,
+      // so we fetch employees first, then fetch profiles in a second query.
+      const { data: employees, error: employeesError } = await supabase
         .from('employees')
-        .select(`
-          user_id,
-          manager_id,
-          profiles!employees_user_id_fkey(id, full_name, profile_picture_url)
-        `)
+        .select('user_id, manager_id')
         .not('user_id', 'is', null);
 
-      if (error) throw error;
+      if (employeesError) throw employeesError;
 
       // Find users who have subordinates (are managers of others)
       const managerIdsSet = new Set<string>();
       employees?.forEach((e: any) => {
-        if (e.manager_id) {
-          managerIdsSet.add(e.manager_id);
-        }
+        if (e.manager_id) managerIdsSet.add(e.manager_id);
       });
 
-      // Users at the TOP of hierarchy:
-      // 1. Have NO manager (manager_id is null) AND have subordinates, OR
-      // 2. Have NO manager at all (top level users)
-      const topLevelUsers = employees?.filter((e: any) => {
+      const topLevelUsers = (employees || []).filter((e: any) => {
         const hasNoManager = !e.manager_id;
         const hasSubordinates = managerIdsSet.has(e.user_id);
-        
-        // Include if: has no manager (top-level) OR is a manager of others
         return hasNoManager || hasSubordinates;
       });
 
-      // Get unique users and sort by those with no manager first (true top-level)
+      const userIds = Array.from(
+        new Set(topLevelUsers.map((e: any) => e.user_id).filter(Boolean))
+      );
+
+      if (userIds.length === 0) return [];
+
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, profile_picture_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      const profilesById = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
+
       const uniqueUsers = topLevelUsers
-        ?.filter((e: any, index: number, self: any[]) =>
-          e.profiles && index === self.findIndex((t: any) => t.user_id === e.user_id)
+        .filter((e: any, index: number, self: any[]) =>
+          index === self.findIndex((t: any) => t.user_id === e.user_id)
         )
-        .sort((a: any, b: any) => {
-          // Users with no manager come first
-          if (!a.manager_id && b.manager_id) return -1;
-          if (a.manager_id && !b.manager_id) return 1;
-          return (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || '');
+        .map((e: any) => {
+          const p = profilesById.get(e.user_id);
+          return {
+            id: e.user_id,
+            full_name: p?.full_name || 'Unknown',
+            profile_picture_url: p?.profile_picture_url,
+            hasManager: !!e.manager_id,
+          };
         })
-        .map((e: any) => ({
-          id: e.user_id,
-          full_name: e.profiles?.full_name || 'Unknown',
-          profile_picture_url: e.profiles?.profile_picture_url,
-          hasManager: !!e.manager_id,
-        })) || [];
+        .sort((a: any, b: any) => {
+          // True top-level first
+          if (!a.hasManager && b.hasManager) return -1;
+          if (a.hasManager && !b.hasManager) return 1;
+          return (a.full_name || '').localeCompare(b.full_name || '');
+        });
 
       return uniqueUsers;
     },
