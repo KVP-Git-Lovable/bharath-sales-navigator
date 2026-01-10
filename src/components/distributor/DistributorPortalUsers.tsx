@@ -323,6 +323,9 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       
       localStorage.setItem('pending_impersonation', JSON.stringify(impersonationData));
 
+      // Wait for localStorage to be written before opening new tab
+      await new Promise(resolve => setTimeout(resolve, 150));
+
       // Open distributor portal dashboard directly
       window.open('/distributor-portal/dashboard?impersonate=true', '_blank');
       
