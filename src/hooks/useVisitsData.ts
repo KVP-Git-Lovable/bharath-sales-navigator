@@ -68,15 +68,31 @@ export const useVisitsData = ({ userId, selectedDate }: UseVisitsDataProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<any>(null);
   
+  // FIX: Store progress stats from snapshot for immediate display (no network needed)
+  const [snapshotStats, setSnapshotStats] = useState<ProgressStats | null>(null);
+  
   const lastDateRef = useRef<string>('');
   const cacheRef = useRef<Map<string, any>>(new Map());
   const isFetchingRef = useRef(false);
 
-  // Memoized progress stats
-  const progressStats = useMemo(() => 
+  // Use snapshot stats if available (instant), otherwise calculate from current data
+  const calculatedStats = useMemo(() => 
     calculateStats(visits, orders, retailers),
     [visits, orders, retailers]
   );
+  
+  // FIX: Prefer snapshot stats when data hasn't loaded yet, prevents ₹0 flicker
+  const progressStats = useMemo(() => {
+    // If we have calculated stats with actual data, use those
+    if (calculatedStats.totalOrders > 0 || calculatedStats.productive > 0 || calculatedStats.unproductive > 0) {
+      return calculatedStats;
+    }
+    // Otherwise use snapshot stats if available (prevents ₹0 on slow/no network)
+    if (snapshotStats && (snapshotStats.totalOrders > 0 || snapshotStats.totalOrderValue > 0)) {
+      return snapshotStats;
+    }
+    return calculatedStats;
+  }, [calculatedStats, snapshotStats]);
 
   // Load data from cache instantly, then sync in background
   const loadData = useCallback(async () => {
@@ -107,6 +123,11 @@ export const useVisitsData = ({ userId, selectedDate }: UseVisitsDataProps) => {
     try {
       const snapshot = await loadMyVisitsSnapshot(userId, selectedDate);
       if (snapshot) {
+        // FIX: Always load progress stats from snapshot immediately (no network needed)
+        if (snapshot.progressStats) {
+          setSnapshotStats(snapshot.progressStats);
+        }
+        
         // FIX: If snapshot has no beat plans, clear everything (beats were cleared)
         if (snapshot.beatPlans?.length === 0) {
           setBeatPlans([]);
