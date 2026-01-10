@@ -4,6 +4,7 @@ import { Navbar } from "./Navbar";
 import { ChatWidget } from "./chat/ChatWidget";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { useStartupCleanup } from "@/hooks/useStartupCleanup";
 import { periodicMemoryCleanup, initMemoryPressureHandler } from "@/utils/memoryManager";
 
 interface LayoutProps {
@@ -19,6 +20,9 @@ export const Layout = memo(({ children }: LayoutProps) => {
   const location = useLocation();
   const hasCachedRef = useRef(false);
   const wasOfflineRef = useRef(false);
+  
+  // Run startup cleanup routines (orphan orders, stale cache, etc.)
+  useStartupCleanup();
 
   // Initialize memory pressure handlers once per app lifecycle
   useEffect(() => {

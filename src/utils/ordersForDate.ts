@@ -5,7 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
-import { loadMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
+import { loadMyVisitsSnapshot, saveMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
 import { isSlowConnection } from '@/utils/internetSpeedCheck';
 
 export interface OrderItem {
@@ -138,6 +138,12 @@ export async function getOrdersForDate(
         .eq('order_date', targetDate);
 
       if (!error && dbOrders) {
+        // Create sets for cleanup
+        const dbOrderIds = new Set(dbOrders.map(o => o.id));
+        const dbIdempotencyKeysMap = new Map(
+          dbOrders.filter(o => o.idempotency_key).map(o => [o.idempotency_key, o.id])
+        );
+        
         // DB orders take priority - remove duplicates from offline/snapshot
         // DUPLICATE FIX: Match by BOTH id AND idempotency_key
         dbOrders.forEach((order: any) => {
@@ -166,6 +172,13 @@ export async function getOrdersForDate(
           sourceBreakdown.db++;
         });
         console.log(`📡 [ordersForDate] Loaded ${dbOrders.length} orders from DB`);
+        
+        // CLEANUP: Actively remove synced orders from local storage
+        // This prevents duplicates on next load
+        if (dbOrders.length > 0) {
+          cleanupSyncedOrdersFromLocal(dbOrderIds, dbIdempotencyKeysMap, userId, targetDate)
+            .catch(err => console.warn('[ordersForDate] Cleanup error (non-fatal):', err));
+        }
       }
     } catch (e) {
       console.warn('[ordersForDate] Error fetching from DB:', e);
@@ -230,4 +243,81 @@ export function calculateOrderedQuantitiesByProduct(orders: Order[]): Record<str
   });
   
   return quantities;
+}
+
+/**
+ * Clean up synced orders from local storage
+ * Called after successfully fetching from DB
+ */
+async function cleanupSyncedOrdersFromLocal(
+  dbOrderIds: Set<string>,
+  dbIdempotencyKeysMap: Map<string, string>,
+  userId: string,
+  targetDate: string
+): Promise<void> {
+  try {
+    // Get local orders
+    const localOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+    const localOrdersForDate = localOrders.filter((o: any) => 
+      o.user_id === userId && 
+      (o.order_date === targetDate || (o.created_at && o.created_at.startsWith(targetDate)))
+    );
+    
+    let cleanedCount = 0;
+    
+    for (const localOrder of localOrdersForDate) {
+      // Check if this local order exists in DB (by ID or idempotency_key)
+      const existsById = dbOrderIds.has(localOrder.id);
+      const existsByKey = localOrder.idempotency_key && dbIdempotencyKeysMap.has(localOrder.idempotency_key);
+      
+      if (existsById || existsByKey) {
+        await offlineStorage.delete(STORES.ORDERS, localOrder.id);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`🧹 [ordersForDate] Cleaned ${cleanedCount} synced orders from local storage`);
+    }
+    
+    // Also clean snapshot duplicates
+    if (dbOrderIds.size > 0) {
+      const snapshot = await loadMyVisitsSnapshot(userId, targetDate);
+      if (snapshot && snapshot.orders && snapshot.orders.length > 0) {
+        const originalCount = snapshot.orders.length;
+        
+        // Remove orders that exist in DB
+        snapshot.orders = snapshot.orders.filter(o => 
+          !dbOrderIds.has(o.id) && 
+          !(o.idempotency_key && dbIdempotencyKeysMap.has(o.idempotency_key))
+        );
+        
+        const removedCount = originalCount - snapshot.orders.length;
+        
+        if (removedCount > 0) {
+          // Recalculate stats
+          snapshot.progressStats.totalOrders = snapshot.orders.length;
+          snapshot.progressStats.totalOrderValue = Math.round(
+            snapshot.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+          );
+          
+          // Save updated snapshot
+          await saveMyVisitsSnapshot(userId, targetDate, {
+            beatPlans: snapshot.beatPlans,
+            visits: snapshot.visits,
+            retailers: snapshot.retailers,
+            orders: snapshot.orders,
+            progressStats: snapshot.progressStats,
+            currentBeatName: snapshot.currentBeatName,
+            pointsTotal: snapshot.pointsTotal,
+            pointsByRetailer: snapshot.pointsByRetailer
+          });
+          
+          console.log(`🧹 [ordersForDate] Removed ${removedCount} duplicate orders from snapshot`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[ordersForDate] Error in cleanupSyncedOrdersFromLocal:', error);
+  }
 }
