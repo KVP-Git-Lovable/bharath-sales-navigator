@@ -36,28 +36,37 @@
   <body>
     <div id="root"></div>
 
-    <!-- PWA blank-screen recovery (only in standalone mode) -->
+    <!-- Blank-screen recovery (PWA + normal browser) -->
     <script>
       (function () {
         try {
-          var isStandalone =
-            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-            (typeof navigator !== 'undefined' && navigator.standalone === true);
-
-          if (!isStandalone) return;
-
-          var KEY = 'pwa_recovery_attempted_v1';
           var TIMEOUT_MS = 8000;
+          var KEY = 'app_recovery_attempted_v2';
 
-          window.setTimeout(function () {
+          function isStandaloneMode() {
+            return (
+              (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+              (typeof navigator !== 'undefined' && navigator.standalone === true)
+            );
+          }
+
+          function rootHasContent() {
             var root = document.getElementById('root');
-            var hasContent = !!(root && root.childNodes && root.childNodes.length);
-            if (hasContent) return;
+            return !!(root && root.childNodes && root.childNodes.length);
+          }
 
-            if (sessionStorage.getItem(KEY) === '1') return;
-            sessionStorage.setItem(KEY, '1');
-
-            Promise.resolve()
+          function clearCachesAndSW() {
+            return Promise.resolve()
+              .then(function () {
+                // Ask SW to clear caches too (best effort)
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                  try {
+                    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_ALL_CACHES' });
+                  } catch {
+                    // ignore
+                  }
+                }
+              })
               .then(function () {
                 if (!('caches' in window)) return;
                 return caches.keys().then(function (names) {
@@ -69,10 +78,90 @@
                 return navigator.serviceWorker.getRegistrations().then(function (regs) {
                   return Promise.all(regs.map(function (r) { return r.unregister(); }));
                 });
-              })
-              .finally(function () {
-                window.location.reload();
               });
+          }
+
+          function showRecoveryOverlay() {
+            if (document.getElementById('app-recovery-overlay')) return;
+
+            var overlay = document.createElement('div');
+            overlay.id = 'app-recovery-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-label', 'App recovery');
+            overlay.style.cssText =
+              'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#fff;color:#111;padding:24px;font-family:system-ui,-apple-system,sans-serif;';
+
+            var card = document.createElement('div');
+            card.style.cssText =
+              'width:100%;max-width:420px;border:1px solid rgba(0,0,0,.08);border-radius:16px;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.12);';
+
+            var title = document.createElement('div');
+            title.style.cssText = 'font-weight:700;font-size:18px;margin:0 0 6px;';
+            title.textContent = 'This page didn’t load';
+
+            var desc = document.createElement('div');
+            desc.style.cssText = 'font-size:14px;line-height:1.5;opacity:.75;margin:0 0 14px;';
+            desc.textContent =
+              'Sometimes an old cache causes a blank screen after updates. Tap Fix & Reload to clear caches and try again.';
+
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:10px;';
+
+            var reloadBtn = document.createElement('button');
+            reloadBtn.type = 'button';
+            reloadBtn.textContent = 'Reload';
+            reloadBtn.style.cssText =
+              'flex:1;border:1px solid rgba(0,0,0,.14);background:#fff;border-radius:12px;padding:10px 12px;font-weight:600;';
+            reloadBtn.onclick = function () {
+              window.location.reload();
+            };
+
+            var fixBtn = document.createElement('button');
+            fixBtn.type = 'button';
+            fixBtn.textContent = 'Fix & Reload';
+            fixBtn.style.cssText =
+              'flex:1;border:0;background:#111;color:#fff;border-radius:12px;padding:10px 12px;font-weight:700;';
+            fixBtn.onclick = function () {
+              fixBtn.disabled = true;
+              fixBtn.textContent = 'Fixing…';
+              clearCachesAndSW()
+                .catch(function () {
+                  // ignore
+                })
+                .finally(function () {
+                  window.location.reload();
+                });
+            };
+
+            row.appendChild(fixBtn);
+            row.appendChild(reloadBtn);
+
+            card.appendChild(title);
+            card.appendChild(desc);
+            card.appendChild(row);
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+          }
+
+          window.setTimeout(function () {
+            if (rootHasContent()) return;
+            if (sessionStorage.getItem(KEY) === '1') return;
+            sessionStorage.setItem(KEY, '1');
+
+            // In installed/standalone, auto-recover to avoid permanent white screen.
+            if (isStandaloneMode()) {
+              clearCachesAndSW()
+                .catch(function () {
+                  // ignore
+                })
+                .finally(function () {
+                  window.location.reload();
+                });
+              return;
+            }
+
+            // In normal browser, show a user-controlled recovery prompt.
+            showRecoveryOverlay();
           }, TIMEOUT_MS);
         } catch {
           // ignore
