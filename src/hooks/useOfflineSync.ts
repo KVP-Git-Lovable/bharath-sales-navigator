@@ -455,30 +455,33 @@ export function useOfflineSync() {
             console.log('✅ Order items synced for order:', actualOrderId);
           }
           
-          // DUPLICATE FIX: Reconcile offline cache - if offline order had different ID, update cache
-          if (offlineOrderId && actualOrderId && offlineOrderId !== actualOrderId) {
-            try {
-              console.log('🔄 Reconciling offline cache: mapping', offlineOrderId, '->', actualOrderId);
-              const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
-              const offlineCachedOrder = cachedOrders.find((o: any) => o.id === offlineOrderId);
-              if (offlineCachedOrder) {
-                // Delete old cached order with offline ID
-                await offlineStorage.delete(STORES.ORDERS, offlineOrderId);
-                // Save with DB ID so future merges don't create duplicates
-                const reconciledOrder = {
-                  ...offlineCachedOrder,
-                  id: actualOrderId,
-                  items: (offlineCachedOrder.items || []).map((item: any) => ({
-                    ...item,
-                    order_id: actualOrderId
-                  }))
-                };
-                await offlineStorage.save(STORES.ORDERS, reconciledOrder);
-                console.log('✅ Offline cache reconciled for order:', actualOrderId);
-              }
-            } catch (cacheErr) {
-              console.warn('⚠️ Cache reconciliation failed (non-fatal):', cacheErr);
+          // POST-SYNC CLEANUP: Remove synced order from local storage to prevent duplicates
+          // Since the order now exists in DB, we don't need to keep it locally
+          try {
+            // Delete the offline order by its original ID
+            if (offlineOrderId) {
+              await offlineStorage.delete(STORES.ORDERS, offlineOrderId);
+              console.log('🧹 [orderCleanup] Removed synced order from local storage:', offlineOrderId);
             }
+            
+            // Also try to delete by actualOrderId in case it was saved with DB ID
+            if (actualOrderId && actualOrderId !== offlineOrderId) {
+              await offlineStorage.delete(STORES.ORDERS, actualOrderId);
+            }
+            
+            // Clean by idempotency_key as well
+            if (data.order?.idempotency_key) {
+              const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+              const matchingOrders = cachedOrders.filter((o: any) => 
+                o.idempotency_key === data.order.idempotency_key
+              );
+              for (const matchingOrder of matchingOrders) {
+                await offlineStorage.delete(STORES.ORDERS, matchingOrder.id);
+                console.log('🧹 [orderCleanup] Removed order by idempotency_key:', matchingOrder.id);
+              }
+            }
+          } catch (cacheErr) {
+            console.warn('⚠️ Post-sync cleanup failed (non-fatal):', cacheErr);
           }
 
           // Update retailer's pending_amount and last_order_date
