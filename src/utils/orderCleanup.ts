@@ -184,87 +184,135 @@ export async function verifyAndCleanLocalOrders(userId: string): Promise<number>
 }
 
 /**
- * Clean up duplicate orders from snapshot
- * Removes orders from snapshot that already exist in database
+ * Sync snapshot orders with database orders
+ * IMPORTANT: This function now SYNCS (not removes) - it updates snapshot to match DB
+ * This ensures Today's Progress always shows accurate order values
  */
-export async function cleanupSnapshotDuplicates(
+export async function syncSnapshotWithDbOrders(
   userId: string,
   targetDate: string,
-  dbOrderIds: string[]
+  dbOrders: Array<{ id: string; total_amount?: number; retailer_id?: string; order_date?: string; status?: string; user_id?: string }>
 ): Promise<number> {
   try {
     const snapshot = await loadMyVisitsSnapshot(userId, targetDate);
-    if (!snapshot || !snapshot.orders || snapshot.orders.length === 0) {
+    if (!snapshot) {
       return 0;
     }
     
-    const dbIdSet = new Set(dbOrderIds);
-    const originalCount = snapshot.orders.length;
+    // Replace snapshot orders with DB orders (DB is source of truth)
+    const originalCount = snapshot.orders?.length || 0;
     
-    // Filter out orders that exist in DB
-    snapshot.orders = snapshot.orders.filter(o => !dbIdSet.has(o.id));
+    // Map DB orders with required fields
+    snapshot.orders = dbOrders.map(o => ({
+      id: o.id,
+      total_amount: Math.round(Number(o.total_amount || 0)),
+      retailer_id: o.retailer_id,
+      order_date: o.order_date || targetDate,
+      status: o.status || 'confirmed',
+      user_id: o.user_id || userId
+    }));
     
-    const removedCount = originalCount - snapshot.orders.length;
+    // Recalculate stats from synced orders
+    snapshot.progressStats.totalOrders = snapshot.orders.length;
+    snapshot.progressStats.totalOrderValue = Math.round(
+      snapshot.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+    );
     
-    if (removedCount > 0) {
-      // Recalculate stats
-      snapshot.progressStats.totalOrders = snapshot.orders.length;
-      snapshot.progressStats.totalOrderValue = Math.round(
-        snapshot.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
-      );
-      
-      // Save updated snapshot
-      await saveMyVisitsSnapshot(userId, targetDate, {
-        beatPlans: snapshot.beatPlans,
-        visits: snapshot.visits,
-        retailers: snapshot.retailers,
-        orders: snapshot.orders,
-        progressStats: snapshot.progressStats,
-        currentBeatName: snapshot.currentBeatName,
-        pointsTotal: snapshot.pointsTotal,
-        pointsByRetailer: snapshot.pointsByRetailer
-      });
-      
-      console.log(`🧹 [orderCleanup] Removed ${removedCount} duplicate orders from snapshot`);
+    // Update productive count based on unique retailers with orders
+    const retailersWithOrders = new Set(snapshot.orders.map(o => o.retailer_id));
+    
+    // Recalculate productive/unproductive based on visits and orders
+    const visitsByRetailer = new Map<string, any[]>();
+    (snapshot.visits || []).forEach((v: any) => {
+      if (!v?.retailer_id) return;
+      const list = visitsByRetailer.get(v.retailer_id) || [];
+      list.push(v);
+      visitsByRetailer.set(v.retailer_id, list);
+    });
+    
+    let productive = 0, unproductive = 0, planned = 0;
+    const countedRetailers = new Set<string>();
+    
+    visitsByRetailer.forEach((group, retailerId) => {
+      countedRetailers.add(retailerId);
+      if (retailersWithOrders.has(retailerId)) productive++;
+      else if (group.some((v: any) => v.status === 'productive')) productive++;
+      else if (group.some((v: any) => v.status === 'unproductive' || !!v.no_order_reason)) unproductive++;
+      else planned++;
+    });
+    
+    retailersWithOrders.forEach(rid => {
+      if (!countedRetailers.has(rid)) {
+        productive++;
+        countedRetailers.add(rid);
+      }
+    });
+    
+    // Retailers without visits or orders are planned
+    (snapshot.retailers || []).forEach((r: any) => {
+      if (!countedRetailers.has(r.id)) planned++;
+    });
+    
+    snapshot.progressStats.productive = productive;
+    snapshot.progressStats.unproductive = unproductive;
+    snapshot.progressStats.planned = planned;
+    
+    // Save updated snapshot
+    await saveMyVisitsSnapshot(userId, targetDate, {
+      beatPlans: snapshot.beatPlans,
+      visits: snapshot.visits,
+      retailers: snapshot.retailers,
+      orders: snapshot.orders,
+      progressStats: snapshot.progressStats,
+      currentBeatName: snapshot.currentBeatName,
+      pointsTotal: snapshot.pointsTotal,
+      pointsByRetailer: snapshot.pointsByRetailer
+    });
+    
+    const syncedCount = dbOrders.length;
+    if (syncedCount !== originalCount) {
+      console.log(`🧹 [orderCleanup] Synced snapshot orders: ${originalCount} → ${syncedCount}, value: ₹${snapshot.progressStats.totalOrderValue}`);
     }
     
-    return removedCount;
+    return syncedCount;
   } catch (error) {
-    console.error('🧹 [orderCleanup] Error in cleanupSnapshotDuplicates:', error);
+    console.error('🧹 [orderCleanup] Error in syncSnapshotWithDbOrders:', error);
     return 0;
   }
 }
 
 /**
  * Run full cleanup routine
- * Cleans both local storage and snapshot
+ * Cleans local storage orphans and SYNCS snapshot with DB orders
+ * IMPORTANT: This syncs (not removes) snapshot orders to ensure Today's Progress is accurate
  */
 export async function runFullOrderCleanup(userId: string, targetDate: string): Promise<void> {
   try {
     console.log('🧹 [orderCleanup] Running full cleanup for', userId, targetDate);
     
-    // Step 1: Clean orphan orders from local storage
+    // Step 1: Clean orphan orders from local storage (these are duplicates already in DB)
     const { cleaned: orphansCleaned } = await cleanupOrphanOrders(userId, targetDate);
     
-    // Step 2: Clean stale synced orders
+    // Step 2: Clean stale synced orders (older than 24h)
     const staleCleaned = await cleanupStaleSyncedOrders();
     
     // Step 3: Verify remaining local orders against DB
     const verifiedCleaned = await verifyAndCleanLocalOrders(userId);
     
-    // Step 4: Get DB order IDs for snapshot cleanup
+    // Step 4: SYNC snapshot with DB orders (not remove them!)
+    // This ensures Today's Progress shows the correct order value
     const { data: dbOrders } = await supabase
       .from('orders')
-      .select('id')
+      .select('id, total_amount, retailer_id, order_date, status, user_id')
       .eq('user_id', userId)
-      .eq('order_date', targetDate);
+      .eq('order_date', targetDate)
+      .eq('status', 'confirmed');
     
     if (dbOrders && dbOrders.length > 0) {
-      const dbOrderIds = dbOrders.map(o => o.id);
-      await cleanupSnapshotDuplicates(userId, targetDate, dbOrderIds);
+      await syncSnapshotWithDbOrders(userId, targetDate, dbOrders);
     }
     
-    console.log(`🧹 [orderCleanup] Full cleanup complete: orphans=${orphansCleaned}, stale=${staleCleaned}, verified=${verifiedCleaned}`);
+    console.log(`🧹 [orderCleanup] Full cleanup complete: orphans=${orphansCleaned}, stale=${staleCleaned}, verified=${verifiedCleaned}, dbOrders=${dbOrders?.length || 0}`);
   } catch (error) {
     console.error('🧹 [orderCleanup] Error in runFullOrderCleanup:', error);
   }

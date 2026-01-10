@@ -51,20 +51,25 @@ export function useStartupCleanup() {
       try {
         const today = getTodayDate();
         
-        // Run cleanup in parallel
+        // Run cleanup in parallel but with lower priority for order cleanup
+        // Order cleanup syncs snapshot with DB, so it should refresh UI afterwards
         await Promise.all([
-          // Clean orphan orders for today
-          runFullOrderCleanup(user.id, today),
-          
-          // Clean old snapshots (older than 7 days)
+          // Clean old snapshots (older than 7 days) - safe, doesn't affect today
           cleanupOldSnapshots(user.id),
           
-          // Clean stale synced orders globally
+          // Clean stale synced orders globally - safe
           cleanupStaleSyncedOrders(),
           
-          // Clean old sync queue items
+          // Clean old sync queue items - safe
           cleanupOldSyncQueue()
         ]);
+        
+        // Run order cleanup separately - this SYNCS snapshot with DB
+        // This ensures Today's Progress shows accurate values after cleanup
+        await runFullOrderCleanup(user.id, today);
+        
+        // Dispatch event to refresh UI with synced data
+        window.dispatchEvent(new Event('visitDataChanged'));
         
         console.log('🧹 [startupCleanup] Cleanup routines completed');
       } catch (error) {
@@ -72,10 +77,10 @@ export function useStartupCleanup() {
       }
     };
     
-    // Delay cleanup to not block app startup
+    // Delay cleanup to not block app startup - give time for initial UI to render
     const timeoutId = setTimeout(() => {
       runStartupCleanup();
-    }, 3000); // Wait 3 seconds after mount
+    }, 5000); // Wait 5 seconds after mount (increased from 3s)
     
     return () => clearTimeout(timeoutId);
   }, []);
@@ -92,10 +97,13 @@ export function useStartupCleanup() {
       if (!user) return;
       
       const today = getTodayDate();
-      console.log('🧹 [startupCleanup] Online restored - running cleanup');
+      console.log('🧹 [startupCleanup] Online restored - running cleanup and sync');
       
-      // Run lighter cleanup on reconnection
+      // Run order cleanup which syncs snapshot with DB
       await runFullOrderCleanup(user.id, today);
+      
+      // Dispatch event to refresh UI with synced data
+      window.dispatchEvent(new Event('visitDataChanged'));
     };
     
     window.addEventListener('online', handleOnline);
