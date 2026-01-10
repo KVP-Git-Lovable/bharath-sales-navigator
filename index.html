@@ -148,7 +148,8 @@
             if (sessionStorage.getItem(KEY) === '1') return;
             sessionStorage.setItem(KEY, '1');
 
-            // In installed/standalone, auto-recover to avoid permanent white screen.
+            // ONLY auto-recover in standalone PWA mode (installed app)
+            // Do NOT show recovery overlay in normal browser - it causes false positives
             if (isStandaloneMode()) {
               clearCachesAndSW()
                 .catch(function () {
@@ -157,11 +158,9 @@
                 .finally(function () {
                   window.location.reload();
                 });
-              return;
             }
-
-            // In normal browser, show a user-controlled recovery prompt.
-            showRecoveryOverlay();
+            // In normal browser mode, do nothing - let the app load naturally
+            // Users can manually refresh if needed
           }, TIMEOUT_MS);
         } catch {
           // ignore
