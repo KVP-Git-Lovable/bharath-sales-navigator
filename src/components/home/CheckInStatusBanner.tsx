@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { format, differenceInMinutes } from "date-fns";
+import { useState, useEffect, useRef } from "react";
 
 interface CheckInStatusBannerProps {
   attendance: any | null;
@@ -10,21 +11,58 @@ interface CheckInStatusBannerProps {
   onEndDay?: () => void;
 }
 
+// Live timer hook that updates every minute
+const useMarketHoursTimer = (checkInTime: string | null, checkOutTime: string | null) => {
+  const [marketHours, setMarketHours] = useState<string | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (!checkInTime) {
+      setMarketHours(null);
+      return;
+    }
+    
+    const calculateHours = () => {
+      const checkIn = new Date(checkInTime);
+      const endTime = checkOutTime ? new Date(checkOutTime) : new Date();
+      const minutes = differenceInMinutes(endTime, checkIn);
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours}h ${mins}m`;
+    };
+    
+    // Calculate immediately
+    setMarketHours(calculateHours());
+    
+    // Only set up live timer if not checked out
+    if (!checkOutTime) {
+      intervalRef.current = setInterval(() => {
+        setMarketHours(calculateHours());
+      }, 60000); // Update every minute
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [checkInTime, checkOutTime]);
+  
+  return marketHours;
+};
+
 export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckInStatusBannerProps) => {
   const navigate = useNavigate();
   const isCheckedIn = attendance?.check_in_time;
   const isCheckedOut = attendance?.check_out_time;
   const isOnLeave = attendance?.on_leave;
 
-  // Calculate market hours if checked in
-  const marketHours = isCheckedIn && attendance.check_in_time ? (() => {
-    const checkInTime = new Date(attendance.check_in_time);
-    const endTime = isCheckedOut ? new Date(attendance.check_out_time) : new Date();
-    const minutes = differenceInMinutes(endTime, checkInTime);
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
-  })() : null;
+  // Use live timer for market hours (auto-updates every minute when connected)
+  const marketHours = useMarketHoursTimer(
+    attendance?.check_in_time || null,
+    attendance?.check_out_time || null
+  );
 
   if (isOnLeave) {
     return (

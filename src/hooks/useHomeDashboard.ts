@@ -87,15 +87,69 @@ const getDefaultState = (): HomeDashboardData => ({
 
 export const useHomeDashboard = (userId: string | undefined, selectedDate: Date = new Date()) => {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
-const isRefreshingRef = useRef(false);
+  const isRefreshingRef = useRef(false);
   const lastSyncRefreshRef = useRef<number>(0);
-  
-  // ATTENDANCE LOCK: Once attendance is marked for the day, never re-fetch it
-  const attendanceLockedRef = useRef(false);
-  const lockedAttendanceRef = useRef<any>(null);
   
   // Cache key for localStorage persistence
   const CACHE_KEY = `home_dashboard_cache_${userId}`;
+  const ATTENDANCE_LOCK_KEY = `attendance_lock_${userId}`;
+  
+  // ATTENDANCE LOCK: Persist to localStorage so it survives tab switches
+  // This prevents the "Start Your Day" flicker when navigating between tabs
+  const getLockedAttendance = useCallback((): any | null => {
+    if (!userId) return null;
+    try {
+      const locked = localStorage.getItem(ATTENDANCE_LOCK_KEY);
+      if (locked) {
+        const parsed = JSON.parse(locked);
+        // Check if the lock is for today
+        const todayStr = getLocalTodayDate();
+        if (parsed.date === todayStr && parsed.attendance?.check_in_time) {
+          return parsed.attendance;
+        }
+      }
+    } catch (e) {
+      console.error('[useHomeDashboard] Error reading attendance lock:', e);
+    }
+    return null;
+  }, [userId, ATTENDANCE_LOCK_KEY]);
+  
+  const setLockedAttendance = useCallback((attendance: any) => {
+    if (!userId || !attendance?.check_in_time) return;
+    try {
+      const todayStr = getLocalTodayDate();
+      localStorage.setItem(ATTENDANCE_LOCK_KEY, JSON.stringify({
+        date: todayStr,
+        attendance
+      }));
+      console.log('[useHomeDashboard] 🔒 Attendance locked to localStorage');
+    } catch (e) {
+      console.error('[useHomeDashboard] Error saving attendance lock:', e);
+    }
+  }, [userId, ATTENDANCE_LOCK_KEY]);
+  
+  const clearLockedAttendance = useCallback(() => {
+    try {
+      localStorage.removeItem(ATTENDANCE_LOCK_KEY);
+      console.log('[useHomeDashboard] 🔓 Attendance lock cleared');
+    } catch (e) {
+      // Ignore
+    }
+  }, [ATTENDANCE_LOCK_KEY]);
+  
+  // ATTENDANCE LOCK: Use refs for in-memory fast access, backed by localStorage
+  const attendanceLockedRef = useRef(false);
+  const lockedAttendanceRef = useRef<any>(null);
+  
+  // Initialize lock from localStorage on mount
+  useEffect(() => {
+    const locked = getLockedAttendance();
+    if (locked) {
+      attendanceLockedRef.current = true;
+      lockedAttendanceRef.current = locked;
+      console.log('[useHomeDashboard] 🔒 Attendance lock restored from localStorage');
+    }
+  }, [getLockedAttendance]);
   
   // Load initial state from localStorage cache for instant display
   const getInitialState = (): HomeDashboardData => {
@@ -103,15 +157,27 @@ const isRefreshingRef = useRef(false);
     
     if (!userId) return { ...defaultState, isLoading: false };
     
+    // FIRST: Check attendance lock from localStorage (survives tab switches)
+    const lockedAttendance = getLockedAttendance();
+    if (lockedAttendance) {
+      attendanceLockedRef.current = true;
+      lockedAttendanceRef.current = lockedAttendance;
+    }
+    
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const parsedCache = JSON.parse(cached);
         console.log('[useHomeDashboard] Loaded from localStorage cache, lastUpdated:', parsedCache.lastUpdated);
-        // Lock attendance if already marked
-        if (parsedCache.todayData?.attendance?.check_in_time) {
+        
+        // Use locked attendance if available (more reliable than cache)
+        if (lockedAttendance) {
+          parsedCache.todayData.attendance = lockedAttendance;
+        } else if (parsedCache.todayData?.attendance?.check_in_time) {
+          // Lock from cache if not already locked
           attendanceLockedRef.current = true;
           lockedAttendanceRef.current = parsedCache.todayData.attendance;
+          setLockedAttendance(parsedCache.todayData.attendance);
           console.log('[useHomeDashboard] 🔒 Attendance locked from initial cache');
         }
         
@@ -124,6 +190,15 @@ const isRefreshingRef = useRef(false);
       }
     } catch (e) {
       console.error('[useHomeDashboard] Error loading cache:', e);
+    }
+    
+    // If no cache but we have locked attendance, use it
+    if (lockedAttendance) {
+      return { 
+        ...defaultState, 
+        todayData: { ...defaultState.todayData, attendance: lockedAttendance },
+        isLoading: false 
+      };
     }
     
     // If no cache, show loading briefly (will try to load)
@@ -197,11 +272,10 @@ const isRefreshingRef = useRef(false);
           if (todayAttendance?.check_in_time) {
             attendanceLockedRef.current = true;
             lockedAttendanceRef.current = todayAttendance;
+            setLockedAttendance(todayAttendance);
             console.log('[useHomeDashboard] 🔒 Attendance locked after cache load');
           }
         }
-
-        // Always show cached data, even if empty - better than stuck loading
         const completed = todayVisits.filter((v: any) => v.status === 'completed' || v.status === 'productive').length;
         
         updateDashboardState({
@@ -270,6 +344,7 @@ const isRefreshingRef = useRef(false);
         if (!attendanceLockedRef.current && attendance?.check_in_time) {
           attendanceLockedRef.current = true;
           lockedAttendanceRef.current = attendance;
+          setLockedAttendance(attendance);
           console.log('[useHomeDashboard] 🔒 Attendance locked after network fetch');
         }
         
@@ -595,10 +670,22 @@ const isRefreshingRef = useRef(false);
 
   // Reset attendance lock when date changes (midnight rollover)
   useEffect(() => {
-    attendanceLockedRef.current = false;
-    lockedAttendanceRef.current = null;
-    console.log('[useHomeDashboard] 🔓 Attendance lock reset - date changed to:', dateStr);
-  }, [dateStr]);
+    const todayStr = getLocalTodayDate();
+    if (dateStr !== todayStr) {
+      // Different day selected - clear lock for this session only
+      attendanceLockedRef.current = false;
+      lockedAttendanceRef.current = null;
+    } else {
+      // Same day - check if we need to clear stale locks from yesterday
+      const locked = getLockedAttendance();
+      if (!locked) {
+        attendanceLockedRef.current = false;
+        lockedAttendanceRef.current = null;
+        clearLockedAttendance();
+      }
+    }
+    console.log('[useHomeDashboard] 🔓 Attendance lock check for date:', dateStr);
+  }, [dateStr, getLockedAttendance, clearLockedAttendance]);
 
   // Initial load
   useEffect(() => {
@@ -695,6 +782,7 @@ const isRefreshingRef = useRef(false);
       if (attendanceRecord?.check_in_time) {
         attendanceLockedRef.current = true;
         lockedAttendanceRef.current = attendanceRecord;
+        setLockedAttendance(attendanceRecord);
         
         // Update state immediately with the new attendance
         setData(prev => ({
@@ -705,7 +793,16 @@ const isRefreshingRef = useRef(false);
           }
         }));
         
-        console.log('[useHomeDashboard] 🔒 Attendance immediately locked after marking');
+        // Also update the cache
+        saveToCache({
+          ...data,
+          todayData: {
+            ...data.todayData,
+            attendance: attendanceRecord
+          }
+        });
+        
+        console.log('[useHomeDashboard] 🔒 Attendance immediately locked after marking (persisted to localStorage)');
       }
     };
     
@@ -720,7 +817,7 @@ const isRefreshingRef = useRef(false);
       window.removeEventListener('visitStatusChanged', handleVisitStatusChanged as EventListener);
       window.removeEventListener('attendanceMarked', handleAttendanceMarked as EventListener);
     };
-  }, [loadDashboardData, userId, CACHE_KEY]);
+  }, [loadDashboardData, userId, CACHE_KEY, setLockedAttendance, saveToCache, data]);
 
   return { ...data, refresh: loadDashboardData };
 };
