@@ -423,7 +423,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/institutional-sales" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
         <Route path="/institutional-sales/leads" element={<ProtectedRoute><LeadManagement /></ProtectedRoute>} />
         <Route path="/institutional-sales/accounts" element={<ProtectedRoute><AccountManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/account/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
         <Route path="/institutional-sales/contacts" element={<ProtectedRoute><ContactManagement /></ProtectedRoute>} />
         <Route path="/institutional-sales/contact/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
         <Route path="/institutional-sales/opportunities" element={<ProtectedRoute><OpportunityManagement /></ProtectedRoute>} />
