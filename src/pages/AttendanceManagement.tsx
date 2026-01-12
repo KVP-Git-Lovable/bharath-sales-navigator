@@ -241,13 +241,6 @@ const AttendanceManagement = () => {
   return (
     <Layout>
     <div className="space-y-6 p-4 md:p-6">
-      {/* Back Button */}
-      <div className="flex items-center space-x-4">
-        <Link to="/admin" className="flex items-center text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Admin Panel
-        </Link>
-      </div>
 
       {/* Page Header */}
       <div className="space-y-2">
