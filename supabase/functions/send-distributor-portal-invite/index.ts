@@ -93,11 +93,21 @@ serve(async (req) => {
     // Generate a random temporary password
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + '!';
 
-    // Check if auth user already exists
+    // Check if auth user already exists (either linked or by email)
     let authUserId = distributorUser.auth_user_id;
     
+    // If no auth_user_id linked, check if a user with this email already exists
     if (!authUserId) {
-      // Create auth user for the distributor portal user
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(u => u.email === distributorUser.email);
+      if (existingUser) {
+        authUserId = existingUser.id;
+        console.log('Found existing auth user by email:', authUserId);
+      }
+    }
+    
+    if (!authUserId) {
+      // Create new auth user for the distributor portal user
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: distributorUser.email,
         password: tempPassword,
@@ -135,10 +145,17 @@ serve(async (req) => {
         })
         .eq('id', distributorUserId);
     } else {
-      // User already exists, reset their password
+      // User already exists, reset their password and update metadata
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         authUserId,
-        { password: tempPassword }
+        { 
+          password: tempPassword,
+          user_metadata: {
+            full_name: distributorUser.full_name,
+            distributor_user_id: distributorUserId,
+            is_distributor_portal_user: true,
+          }
+        }
       );
 
       if (updateError) {
@@ -149,12 +166,16 @@ serve(async (req) => {
         );
       }
 
-      // Update email_sent_at
+      // Update distributor_users with auth_user_id and status
       await supabaseAdmin
         .from('distributor_users')
         .update({ 
+          auth_user_id: authUserId,
           email_sent_at: new Date().toISOString(),
-          user_status: 'initiated'
+          user_status: 'initiated',
+          is_active: true,
+          approved_at: distributorUser.approved_at || new Date().toISOString(),
+          approved_by: distributorUser.approved_by || user.id
         })
         .eq('id', distributorUserId);
     }
