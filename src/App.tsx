@@ -425,11 +425,11 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/institutional-sales/accounts" element={<ProtectedRoute><AccountManagement /></ProtectedRoute>} />
         <Route path="/institutional-sales/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
         <Route path="/institutional-sales/contacts" element={<ProtectedRoute><ContactManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/contact/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/contacts/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
         <Route path="/institutional-sales/opportunities" element={<ProtectedRoute><OpportunityManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/opportunity/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/opportunities/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
         <Route path="/institutional-sales/quotes" element={<ProtectedRoute><QuoteManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/quote/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/quotes/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
         <Route path="/institutional-sales/products" element={<ProtectedRoute><InstitutionalProducts /></ProtectedRoute>} />
         <Route path="/institutional-sales/order-commitments" element={<ProtectedRoute><OrderCommitments /></ProtectedRoute>} />
         <Route path="/institutional-sales/invoices" element={<ProtectedRoute><InstitutionalInvoices /></ProtectedRoute>} />
