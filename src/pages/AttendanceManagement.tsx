@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +6,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, X, Clock, User, UserCheck, Calendar, Users, ClipboardList, ArrowLeft } from 'lucide-react';
+import { Check, X, Clock, User, UserCheck, Calendar, Users, ClipboardList, ArrowLeft, Settings, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import LiveAttendanceMonitoring from '@/components/LiveAttendanceMonitoring';
+import HolidayManagement from '@/components/HolidayManagement';
+import LeaveBalancesManager from '@/components/attendance/LeaveBalancesManager';
+import AttendancePolicyConfig from '@/components/attendance/AttendancePolicyConfig';
+import WorkingDaysConfig from '@/components/attendance/WorkingDaysConfig';
+import { Layout } from '@/components/Layout';
 
 interface LeaveApplication {
   id: string;
@@ -235,7 +239,8 @@ const AttendanceManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Layout>
+    <div className="space-y-6 p-4 md:p-6">
       {/* Back Button */}
       <div className="flex items-center space-x-4">
         <Link to="/admin" className="flex items-center text-muted-foreground hover:text-foreground transition-colors">
@@ -248,18 +253,18 @@ const AttendanceManagement = () => {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Attendance Management</h1>
         <p className="text-muted-foreground">
-          Monitor attendance, manage leaves, and configure holidays
+          Monitor attendance, manage leaves, configure policies and holidays
         </p>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex space-x-4 border-b">
+      <div className="flex flex-wrap gap-2 border-b pb-2">
         <button
           onClick={() => setActiveTab('live')}
-          className={`py-2 px-4 border-b-2 transition-colors flex items-center ${
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
             activeTab === 'live'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
           }`}
         >
           <User className="w-4 h-4 mr-2" />
@@ -267,10 +272,10 @@ const AttendanceManagement = () => {
         </button>
         <button
           onClick={() => setActiveTab('leave')}
-          className={`py-2 px-4 border-b-2 transition-colors flex items-center ${
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
             activeTab === 'leave'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
           }`}
         >
           <Calendar className="w-4 h-4 mr-2" />
@@ -278,21 +283,21 @@ const AttendanceManagement = () => {
         </button>
         <button
           onClick={() => setActiveTab('regularization')}
-          className={`py-2 px-4 border-b-2 transition-colors flex items-center ${
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
             activeTab === 'regularization'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
           }`}
         >
           <Users className="w-4 h-4 mr-2" />
-          Pending Regularization
+          Regularization
         </button>
         <button
           onClick={() => setActiveTab('leave-balances')}
-          className={`py-2 px-4 border-b-2 transition-colors flex items-center ${
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
             activeTab === 'leave-balances'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
           }`}
         >
           <ClipboardList className="w-4 h-4 mr-2" />
@@ -300,14 +305,36 @@ const AttendanceManagement = () => {
         </button>
         <button
           onClick={() => setActiveTab('holidays')}
-          className={`py-2 px-4 border-b-2 transition-colors flex items-center ${
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
             activeTab === 'holidays'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+          }`}
+        >
+          <CalendarDays className="w-4 h-4 mr-2" />
+          Holidays
+        </button>
+        <button
+          onClick={() => setActiveTab('working-days')}
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
+            activeTab === 'working-days'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
           }`}
         >
           <Calendar className="w-4 h-4 mr-2" />
-          Holidays
+          Working Days
+        </button>
+        <button
+          onClick={() => setActiveTab('policy')}
+          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
+            activeTab === 'policy'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+          }`}
+        >
+          <Settings className="w-4 h-4 mr-2" />
+          Attendance Policy
         </button>
       </div>
 
@@ -528,38 +555,15 @@ const AttendanceManagement = () => {
         </Card>
       )}
 
-      {activeTab === 'leave-balances' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Leave Balances</CardTitle>
-            <CardDescription>
-              View employee leave balances and entitlements
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              Leave balances functionality will be implemented here.
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {activeTab === 'leave-balances' && <LeaveBalancesManager />}
 
-      {activeTab === 'holidays' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Holidays</CardTitle>
-            <CardDescription>
-              Manage company holidays and calendar
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              Holiday management functionality will be implemented here.
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {activeTab === 'holidays' && <HolidayManagement />}
+
+      {activeTab === 'working-days' && <WorkingDaysConfig />}
+
+      {activeTab === 'policy' && <AttendancePolicyConfig />}
     </div>
+    </Layout>
   );
 };
 
