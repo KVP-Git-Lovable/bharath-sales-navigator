@@ -420,21 +420,21 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         </Route>
 
         {/* Institutional Sales Routes */}
-        <Route path="/institutional" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
-        <Route path="/institutional/leads" element={<ProtectedRoute><LeadManagement /></ProtectedRoute>} />
-        <Route path="/institutional/accounts" element={<ProtectedRoute><AccountManagement /></ProtectedRoute>} />
-        <Route path="/institutional/account/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
-        <Route path="/institutional/contacts" element={<ProtectedRoute><ContactManagement /></ProtectedRoute>} />
-        <Route path="/institutional/contact/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
-        <Route path="/institutional/opportunities" element={<ProtectedRoute><OpportunityManagement /></ProtectedRoute>} />
-        <Route path="/institutional/opportunity/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
-        <Route path="/institutional/quotes" element={<ProtectedRoute><QuoteManagement /></ProtectedRoute>} />
-        <Route path="/institutional/quote/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
-        <Route path="/institutional/products" element={<ProtectedRoute><InstitutionalProducts /></ProtectedRoute>} />
-        <Route path="/institutional/order-commitments" element={<ProtectedRoute><OrderCommitments /></ProtectedRoute>} />
-        <Route path="/institutional/invoices" element={<ProtectedRoute><InstitutionalInvoices /></ProtectedRoute>} />
-        <Route path="/institutional/price-books" element={<ProtectedRoute><PriceBooks /></ProtectedRoute>} />
-        <Route path="/institutional/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
+        <Route path="/institutional-sales" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
+        <Route path="/institutional-sales/leads" element={<ProtectedRoute><LeadManagement /></ProtectedRoute>} />
+        <Route path="/institutional-sales/accounts" element={<ProtectedRoute><AccountManagement /></ProtectedRoute>} />
+        <Route path="/institutional-sales/account/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/contacts" element={<ProtectedRoute><ContactManagement /></ProtectedRoute>} />
+        <Route path="/institutional-sales/contact/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/opportunities" element={<ProtectedRoute><OpportunityManagement /></ProtectedRoute>} />
+        <Route path="/institutional-sales/opportunity/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/quotes" element={<ProtectedRoute><QuoteManagement /></ProtectedRoute>} />
+        <Route path="/institutional-sales/quote/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
+        <Route path="/institutional-sales/products" element={<ProtectedRoute><InstitutionalProducts /></ProtectedRoute>} />
+        <Route path="/institutional-sales/order-commitments" element={<ProtectedRoute><OrderCommitments /></ProtectedRoute>} />
+        <Route path="/institutional-sales/invoices" element={<ProtectedRoute><InstitutionalInvoices /></ProtectedRoute>} />
+        <Route path="/institutional-sales/price-books" element={<ProtectedRoute><PriceBooks /></ProtectedRoute>} />
+        <Route path="/institutional-sales/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
