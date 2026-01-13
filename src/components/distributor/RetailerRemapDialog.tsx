@@ -154,8 +154,8 @@ export function RetailerRemapDialog({ open, onOpenChange, sourceDistributorId, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="flex-shrink-0 p-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <Store className="h-5 w-5" />
             Remap Retailers to Distributor
@@ -165,8 +165,8 @@ export function RetailerRemapDialog({ open, onOpenChange, sourceDistributorId, o
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start pb-4">
+        <div className="flex-1 overflow-y-auto px-6 pb-4">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
             {/* Retailer Selection */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -187,7 +187,7 @@ export function RetailerRemapDialog({ open, onOpenChange, sourceDistributorId, o
                   className="pl-9 h-9"
                 />
               </div>
-              <div className="h-[200px] md:h-[280px] border rounded-md bg-muted/20 overflow-y-auto">
+              <div className="h-[180px] md:h-[250px] border rounded-md bg-muted/20 overflow-y-auto">
                 {loading ? (
                   <div className="p-4 text-center text-muted-foreground">Loading...</div>
                 ) : filteredRetailers.length === 0 ? (
@@ -258,7 +258,7 @@ export function RetailerRemapDialog({ open, onOpenChange, sourceDistributorId, o
                   className="pl-9 h-9"
                 />
               </div>
-              <div className="h-[200px] md:h-[280px] border rounded-md bg-muted/20 overflow-y-auto">
+              <div className="h-[180px] md:h-[250px] border rounded-md bg-muted/20 overflow-y-auto">
                 <div className="p-2 space-y-1">
                   {filteredDistributors.length === 0 ? (
                     <div className="p-4 text-center text-muted-foreground">No distributors found</div>
@@ -291,15 +291,16 @@ export function RetailerRemapDialog({ open, onOpenChange, sourceDistributorId, o
               )}
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="flex-shrink-0 mt-4 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-shrink-0 p-6 pt-4 border-t flex-col-reverse sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Cancel
           </Button>
           <Button 
             onClick={handleRemap} 
             disabled={submitting || selectedRetailers.length === 0 || !targetDistributorId}
+            className="w-full sm:w-auto"
           >
             {submitting ? "Remapping..." : `Remap ${selectedRetailers.length} Retailer(s)`}
           </Button>
