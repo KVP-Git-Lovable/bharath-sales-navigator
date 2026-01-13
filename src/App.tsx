@@ -351,6 +351,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
         
         <Route path="/competency-dashboard" element={<ProtectedRoute><CompetencyDashboard /></ProtectedRoute>} />
+        <Route path="/competency/:competencyId" element={<ProtectedRoute><CompetencyDetail /></ProtectedRoute>} />
         <Route path="/team-competency" element={<ProtectedRoute><TeamCompetency /></ProtectedRoute>} />
         <Route path="/competency-admin" element={<ProtectedRoute><CompetencyAdmin /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
