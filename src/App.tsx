@@ -68,6 +68,7 @@ import Performance from "./pages/Performance";
 import CompetencyDashboard from "./pages/CompetencyDashboard";
 import TeamCompetency from "./pages/TeamCompetency";
 import CompetencyAdmin from "./pages/CompetencyAdmin";
+import CompetencyDetail from "./pages/CompetencyDetail";
 import Analytics from "./pages/Analytics";
 import { Schemes } from "./pages/Schemes";
 import { AdminDashboard } from "./pages/AdminDashboard";
