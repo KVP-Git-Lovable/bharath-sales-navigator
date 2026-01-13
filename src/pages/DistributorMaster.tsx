@@ -161,8 +161,8 @@ export default function DistributorMaster() {
           
           <div className="flex gap-2">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="flex-1">
-                <Filter className="h-4 w-4 mr-2" />
+              <SelectTrigger className="flex-1 h-9 text-xs sm:text-sm">
+                <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -179,7 +179,7 @@ export default function DistributorMaster() {
             </Select>
 
             <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="flex-1">
+              <SelectTrigger className="flex-1 h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Level" />
               </SelectTrigger>
               <SelectContent>
