@@ -260,19 +260,19 @@ export default function DistributorMaster() {
                 onClick={() => navigate(`/distributor/${distributor.id}`)}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-foreground">{distributor.name}</h3>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground truncate">{distributor.name}</h3>
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
                         {distributor.partnership_status && (
-                          <Badge className={`text-xs ${partnershipColors[distributor.partnership_status] || 'bg-gray-100'}`}>
+                          <Badge className={`text-xs flex-shrink-0 ${partnershipColors[distributor.partnership_status] || 'bg-gray-100'}`}>
                             {distributor.partnership_status.charAt(0).toUpperCase() + distributor.partnership_status.slice(1)}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{distributor.contact_person}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{distributor.contact_person}</p>
                     </div>
-                    <Badge className={`${statusColors[distributor.status] || 'bg-gray-100 text-gray-800'}`}>
+                    <Badge className={`flex-shrink-0 ${statusColors[distributor.status] || 'bg-gray-100 text-gray-800'}`}>
                       {formatStatus(distributor.status)}
                     </Badge>
                   </div>
