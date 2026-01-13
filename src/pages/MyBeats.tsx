@@ -828,11 +828,11 @@ export const MyBeats = () => {
         });
       }
 
-      // Update retailers to remove beat assignment - set to null (not 'unassigned')
+      // Update retailers to remove beat assignment (retailers.beat_id is NOT NULL, use 'unassigned')
       const { error: retailerError } = await supabase
         .from('retailers')
         .update({ 
-          beat_id: null,
+          beat_id: 'unassigned',
           beat_name: null
         })
         .eq('beat_id', deleteItemId)
@@ -886,7 +886,7 @@ export const MyBeats = () => {
         const retailerData = retailer as any;
         await offlineStorage.save(STORES.RETAILERS, {
           ...retailerData,
-          beat_id: null,
+          beat_id: 'unassigned',
           beat_name: null
         });
       }
