@@ -44,8 +44,20 @@ export const TodaySummary = () => {
   const isAdmin = userRole === 'admin';
   
   // Hierarchical user filter (for managers)
-  const { isManager, subordinateIds } = useSubordinates();
+  const { isManager, subordinateIds, subordinates } = useSubordinates();
   const [managerSelectedUserId, setManagerSelectedUserId] = useState<string>('self');
+  
+  // Get selected user's name for report generation
+  const selectedUserName = useMemo(() => {
+    if (managerSelectedUserId === 'self' || managerSelectedUserId === user?.id) {
+      return 'My Data';
+    }
+    if (managerSelectedUserId === 'all') {
+      return 'All Team';
+    }
+    const sub = subordinates.find(s => s.subordinate_user_id === managerSelectedUserId);
+    return sub?.full_name || 'Unknown';
+  }, [managerSelectedUserId, user?.id, subordinates]);
   
   // Date filtering state
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -339,6 +351,10 @@ export const TodaySummary = () => {
       // Determine which user IDs to fetch data for
       let targetUserIds: string[];
       
+      console.log('[FETCH DEBUG] managerSelectedUserId:', managerSelectedUserId);
+      console.log('[FETCH DEBUG] isManager:', isManager);
+      console.log('[FETCH DEBUG] subordinateIds:', subordinateIds);
+      
       if (isManager) {
         // Manager (including admin managers) using hierarchy filter
         if (managerSelectedUserId === 'all') {
@@ -355,6 +371,8 @@ export const TodaySummary = () => {
         // Regular user - only self
         targetUserIds = [authUser.id];
       }
+      
+      console.log('[FETCH DEBUG] targetUserIds (final):', targetUserIds);
 
       // Check for slow/offline - load from unified orders source
       const isTodayFilter = filterType === 'today';
@@ -1327,7 +1345,11 @@ export const TodaySummary = () => {
         }
       }
       
-      console.log('Final report data:', retailerReportDataArray);
+      console.log('[REPORT DATA] targetUserIds:', targetUserIds);
+      console.log('[REPORT DATA] managerSelectedUserId:', managerSelectedUserId);
+      console.log('[REPORT DATA] isManager:', isManager);
+      console.log('[REPORT DATA] retailerReportDataArray count:', retailerReportDataArray.length);
+      console.log('[REPORT DATA] Final report data:', retailerReportDataArray);
       setRetailerReportData(retailerReportDataArray);
 
       // Generate General Report Data (day-by-day summary)
@@ -1929,6 +1951,7 @@ export const TodaySummary = () => {
           <ReportGenerator 
             data={retailerReportData}
             generalReportData={generalReportData}
+            selectedUserName={isManager ? selectedUserName : undefined}
             dateRange={
               filterType === 'today' ? format(selectedDate, 'MMM dd, yyyy') :
               filterType === 'week' ? `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}` :

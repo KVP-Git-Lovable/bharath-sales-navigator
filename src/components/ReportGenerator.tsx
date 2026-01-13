@@ -43,9 +43,10 @@ interface ReportGeneratorProps {
   data: RetailerReportData[];
   dateRange: string;
   generalReportData?: GeneralReportData[];
+  selectedUserName?: string; // Add selected user name for export filename
 }
 
-export const ReportGenerator = ({ data, dateRange, generalReportData = [] }: ReportGeneratorProps) => {
+export const ReportGenerator = ({ data, dateRange, generalReportData = [], selectedUserName }: ReportGeneratorProps) => {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   
@@ -167,9 +168,10 @@ export const ReportGenerator = ({ data, dateRange, generalReportData = [] }: Rep
       // Create workbook and worksheet
       const workbook = XLSX.utils.book_new();
       
-      // Add date header row at the top
+      // Add date header row at the top with user info if provided
       const reportTitle = isGeneralReport ? "General Report" : "Retailer Report";
-      const headerRow = [`${reportTitle} - Date: ${dateRange}`, '', '', ''];
+      const userInfo = selectedUserName ? ` - User: ${selectedUserName}` : '';
+      const headerRow = [`${reportTitle} - Date: ${dateRange}${userInfo}`, '', '', ''];
       const emptyRow = [''];
       
       // Convert data to array of arrays for more control
@@ -201,15 +203,17 @@ export const ReportGenerator = ({ data, dateRange, generalReportData = [] }: Rep
       
       XLSX.utils.book_append_sheet(workbook, worksheet, isGeneralReport ? "General Report" : "Retailer Report");
 
+      // Include user name in filename if provided
+      const userSuffix = selectedUserName ? `_${selectedUserName.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
       const fileName = isGeneralReport 
-        ? `General_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`
-        : `Retailer_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+        ? `General_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}${userSuffix}.xlsx`
+        : `Retailer_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}${userSuffix}.xlsx`;
       
       XLSX.writeFile(workbook, fileName);
       
       toast({
         title: "Excel Export Successful",
-        description: `${reportTitle} exported successfully for ${dateRange}`,
+        description: `${reportTitle} exported successfully for ${dateRange}${selectedUserName ? ` (${selectedUserName})` : ''}`,
       });
       
       setOpen(false);
@@ -247,7 +251,10 @@ export const ReportGenerator = ({ data, dateRange, generalReportData = [] }: Rep
       
       doc.setFontSize(14);
       doc.setTextColor(60, 60, 60);
-      doc.text(`Date: ${dateRange}`, 14, 24);
+      const dateText = selectedUserName 
+        ? `Date: ${dateRange} | User: ${selectedUserName}`
+        : `Date: ${dateRange}`;
+      doc.text(dateText, 14, 24);
       
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
@@ -270,16 +277,18 @@ export const ReportGenerator = ({ data, dateRange, generalReportData = [] }: Rep
         tableWidth: 'auto'
       });
 
+      // Include user name in filename if provided
+      const userSuffix = selectedUserName ? `_${selectedUserName.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
       const fileName = isGeneralReport 
-        ? `General_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
-        : `Retailer_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+        ? `General_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}${userSuffix}.pdf`
+        : `Retailer_Report_${dateRange.replace(/[^a-zA-Z0-9]/g, '_')}${userSuffix}.pdf`;
 
       const pdfBlob = doc.output('blob');
       await downloadPDF(pdfBlob, fileName);
       
       toast({
         title: "PDF Export Successful",
-        description: `${reportTitle} exported successfully for ${dateRange}`,
+        description: `${reportTitle} exported successfully for ${dateRange}${selectedUserName ? ` (${selectedUserName})` : ''}`,
       });
       
       setOpen(false);
