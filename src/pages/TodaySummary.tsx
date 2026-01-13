@@ -1370,11 +1370,23 @@ export const TodaySummary = () => {
 
       // Generate dates between from and to
       const datesInRange: Date[] = [];
-      let currentDate = new Date(dateRange.from);
-      while (currentDate <= dateRange.to) {
+      const rangeFromDate = new Date(dateRange.from);
+      rangeFromDate.setHours(0, 0, 0, 0);
+      const rangeToDate = new Date(dateRange.to);
+      rangeToDate.setHours(23, 59, 59, 999);
+      
+      let currentDate = new Date(rangeFromDate);
+      while (currentDate <= rangeToDate) {
         datesInRange.push(new Date(currentDate));
         currentDate.setDate(currentDate.getDate() + 1);
       }
+      
+      console.log('[GENERAL REPORT] Date range:', {
+        from: format(dateRange.from, 'yyyy-MM-dd'),
+        to: format(dateRange.to, 'yyyy-MM-dd'),
+        datesInRangeCount: datesInRange.length,
+        dates: datesInRange.map(d => format(d, 'yyyy-MM-dd'))
+      });
 
       // Process each date for general report
       for (const reportDate of datesInRange) {
