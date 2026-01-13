@@ -12,6 +12,7 @@ import { OverallScoreCard } from "@/components/competency/OverallScoreCard";
 import { CompetencyRadarChart } from "@/components/competency/CompetencyRadarChart";
 import { CompetencyScoreCard } from "@/components/competency/CompetencyScoreCard";
 import { ImprovementPlanCard } from "@/components/competency/ImprovementPlanCard";
+import { CompetencyFrameworkDialog } from "@/components/competency/CompetencyFrameworkDialog";
 import { Layout } from "@/components/Layout";
 import { Sparkles, RefreshCw, Users, Loader2 } from "lucide-react";
 import { format, subMonths, startOfMonth } from "date-fns";
@@ -91,9 +92,12 @@ export default function CompetencyDashboard() {
       <div className="p-4 space-y-6 pb-24">
         {/* Page Title with Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold">My Competency Dashboard</h1>
-            <p className="text-sm text-muted-foreground">AI-driven performance insights</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-xl font-bold">My Competency Dashboard</h1>
+              <p className="text-sm text-muted-foreground">AI-driven performance insights</p>
+            </div>
+            <CompetencyFrameworkDialog />
           </div>
           <div className="flex items-center gap-2">
             {isManager && (
