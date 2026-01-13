@@ -1301,10 +1301,79 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       }
     };
 
+    // Handle beat deletion - remove retailers whose beat was deleted
+    const handleBeatDeleted = (event: CustomEvent) => {
+      const { beatId } = event.detail || {};
+      if (!beatId) return;
+      
+      console.log('[LocalEvent] beatDeleted - removing retailers for beat:', beatId);
+      
+      // Remove retailers that belong to the deleted beat
+      setRetailers(prev => {
+        const filtered = prev.filter(r => r.beat_id !== beatId);
+        console.log('[LocalEvent] Removed', prev.length - filtered.length, 'retailers from deleted beat');
+        return filtered;
+      });
+      
+      // Remove beat plans for deleted beat
+      setBeatPlans(prev => prev.filter(bp => bp.beat_id !== beatId));
+      
+      // Clear cache for current date to force fresh load
+      const currentDate = selectedDateRef.current;
+      cacheRef.current.delete(currentDate);
+    };
+
+    // Force full refresh - clear all caches and reload from network
+    const handleForceRefresh = async () => {
+      const currentDate = selectedDateRef.current;
+      const currentUserId = userIdRef.current;
+      
+      if (!currentUserId) return;
+      
+      console.log('[LocalEvent] forceVisitsRefresh - clearing all caches and reloading');
+      
+      // Clear all in-memory caches
+      cacheRef.current.clear();
+      lastSyncTimeRef.current.clear();
+      
+      // Clear offline storage for beat plans
+      try {
+        const cachedPlans = await offlineStorage.getAll(STORES.BEAT_PLANS);
+        for (const plan of cachedPlans) {
+          if ((plan as any).plan_date === currentDate && (plan as any).user_id === currentUserId) {
+            await offlineStorage.delete(STORES.BEAT_PLANS, (plan as any).id);
+          }
+        }
+      } catch (e) {
+        console.error('[LocalEvent] Failed to clear beat plan cache:', e);
+      }
+      
+      // Force fresh network load
+      if (navigator.onLine) {
+        setIsLoading(true);
+        try {
+          await doFullInitialLoad(currentUserId, currentDate);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // Offline - just reload from storage
+        const offlineData = await loadFromOfflineStorage(currentUserId, currentDate);
+        if (offlineData) {
+          setBeatPlans(offlineData.beatPlans);
+          setVisits(offlineData.visits);
+          setRetailers(offlineData.retailers);
+          setOrders(offlineData.orders);
+        }
+      }
+    };
+
     window.addEventListener('visitStatusChanged', handleStatusChange as EventListener);
     window.addEventListener('retailerAdded', handleRetailerAdded as EventListener);
     window.addEventListener('visitDataChanged', handleVisitDataChanged);
     window.addEventListener('syncComplete', handleSyncComplete);
+    window.addEventListener('beatDeleted', handleBeatDeleted as EventListener);
+    window.addEventListener('forceVisitsRefresh', handleForceRefresh);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
@@ -1312,9 +1381,11 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       window.removeEventListener('retailerAdded', handleRetailerAdded as EventListener);
       window.removeEventListener('visitDataChanged', handleVisitDataChanged);
       window.removeEventListener('syncComplete', handleSyncComplete);
+      window.removeEventListener('beatDeleted', handleBeatDeleted as EventListener);
+      window.removeEventListener('forceVisitsRefresh', handleForceRefresh);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [selectedDate, isToday, userId, smartDeltaSync, shouldSyncNow, loadFromOfflineStorage]);
+  }, [selectedDate, isToday, userId, smartDeltaSync, shouldSyncNow, loadFromOfflineStorage, doFullInitialLoad]);
 
   return {
     beatPlans,

@@ -891,11 +891,22 @@ export const MyBeats = () => {
         });
       }
 
+      // Clear My Visits snapshots for today and upcoming days (beat plans may span multiple dates)
+      const today = new Date();
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split('T')[0];
+        const { clearMyVisitsSnapshot } = await import('@/lib/myVisitsSnapshot');
+        await clearMyVisitsSnapshot(user.id, dateStr);
+      }
+
       toast.success(`Beat "${deleteItemName}" deleted successfully`);
       
-      // Dispatch events to refresh other components
+      // Dispatch events to refresh other components - force full reload
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       window.dispatchEvent(new CustomEvent('beatDeleted', { detail: { beatId: deleteItemId } }));
+      window.dispatchEvent(new CustomEvent('forceVisitsRefresh'));
       
       // Reload retailers to update unassigned count
       loadAllRetailers();
