@@ -31,6 +31,7 @@ const getMonthOptions = () => {
 
 export default function CompetencyDashboard() {
   const { user, userProfile } = useAuth();
+  const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   
