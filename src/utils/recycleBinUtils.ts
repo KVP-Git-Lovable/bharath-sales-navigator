@@ -46,15 +46,27 @@ export const restoreFromRecycleBin = async (
 ): Promise<boolean> => {
   try {
     // Remove metadata fields that shouldn't be restored
-    const { created_at, updated_at, ...dataToRestore } = recordData;
-    
-    // Insert back to original table with original ID
+    const { created_at, updated_at, ...dataToRestoreUnsafe } = recordData;
+    // Never attempt to restore a raw `id` from record_data (tables differ)
+    const { id: _id, ...dataToRestore } = dataToRestoreUnsafe;
+
+    // Some entities (like beats) use non-UUID identifiers in the app (beat_id).
+    // In that case, restore without forcing the primary key `id`.
+    const insertPayload =
+      originalTable === 'beats'
+        ? {
+            ...dataToRestore,
+            beat_id: dataToRestore.beat_id ?? originalId,
+          }
+        : {
+            ...dataToRestore,
+            id: originalId,
+          };
+
+    // Insert back to original table
     const { error: insertError } = await supabase
       .from(originalTable as any)
-      .insert({
-        ...dataToRestore,
-        id: originalId
-      });
+      .insert(insertPayload as any);
 
     if (insertError) throw insertError;
 

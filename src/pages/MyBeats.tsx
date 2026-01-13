@@ -861,7 +861,8 @@ export const MyBeats = () => {
       const { error: beatError } = await supabase
         .from('beats')
         .update({ is_active: false })
-        .eq('id', deleteItemId);
+        .eq('beat_id', deleteItemId)
+        .eq('created_by', user.id);
 
       if (beatError) throw beatError;
 
