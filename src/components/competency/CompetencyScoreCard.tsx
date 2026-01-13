@@ -7,6 +7,7 @@ import type { CompetencyScore } from "@/hooks/useCompetencyScores";
 interface CompetencyScoreCardProps {
   score: CompetencyScore;
   compact?: boolean;
+  onClick?: () => void;
 }
 
 const iconMap: Record<string, any> = {
@@ -34,7 +35,7 @@ function getProgressColor(score: number): string {
   return 'bg-red-500';
 }
 
-export function CompetencyScoreCard({ score, compact = false }: CompetencyScoreCardProps) {
+export function CompetencyScoreCard({ score, compact = false, onClick }: CompetencyScoreCardProps) {
   const template = score.competency_templates;
   if (!template) return null;
 
@@ -60,7 +61,7 @@ export function CompetencyScoreCard({ score, compact = false }: CompetencyScoreC
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={cn("overflow-hidden", onClick && "cursor-pointer hover:shadow-lg transition-shadow")} onClick={onClick}>
       <CardHeader className={cn("pb-2", categoryStyle.bg)}>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">

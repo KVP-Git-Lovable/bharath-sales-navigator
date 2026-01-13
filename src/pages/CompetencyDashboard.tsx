@@ -179,7 +179,7 @@ export default function CompetencyDashboard() {
               <h2 className="text-base font-semibold mb-3">Competency Breakdown</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {scores.map(score => (
-                  <CompetencyScoreCard key={score.id} score={score} />
+                  <CompetencyScoreCard key={score.id} score={score} onClick={() => navigate(`/competency/${score.competency_templates?.id}`)} />
                 ))}
               </div>
             </div>
