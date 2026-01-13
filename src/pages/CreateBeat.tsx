@@ -259,6 +259,7 @@ export const CreateBeat = () => {
         .select('id, beat_name')
         .ilike('beat_name', name.trim())
         .eq('is_active', true)
+        .eq('created_by', user.id)
         .limit(1);
       
       if (error) throw error;
