@@ -3,6 +3,7 @@ import { CreditManagementConfig } from "@/components/CreditManagementConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function CreditManagement() {
   const { userRole, loading } = useAuth();
@@ -23,13 +24,11 @@ export default function CreditManagement() {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 max-w-5xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Credit Management Configuration</h1>
-          <p className="text-muted-foreground mt-2">
-            Configure retailer credit scoring system and parameters
-          </p>
-        </div>
+      <div className="container mx-auto p-6 max-w-5xl space-y-6">
+        <AdminPageHeader 
+          title="Credit Management Configuration"
+          subtitle="Configure retailer credit scoring system and parameters"
+        />
         <CreditManagementConfig />
       </div>
     </Layout>
