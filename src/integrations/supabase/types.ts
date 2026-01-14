@@ -5811,6 +5811,39 @@ export type Database = {
           },
         ]
       }
+      invoice_display_settings: {
+        Row: {
+          created_at: string
+          display_label: string
+          enabled: boolean
+          id: string
+          setting_category: string
+          setting_key: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_label: string
+          enabled?: boolean
+          id?: string
+          setting_category: string
+          setting_key: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_label?: string
+          enabled?: boolean
+          id?: string
+          setting_category?: string
+          setting_key?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoice_document_settings: {
         Row: {
           created_at: string | null
