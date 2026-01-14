@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InvoicePreview from "./InvoicePreview";
 import { useAuth } from "@/hooks/useAuth";
+import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
 
 interface InvoiceTemplateRendererProps {
   orderId: string;
@@ -22,11 +23,18 @@ export default function InvoiceTemplateRenderer({
   const [salesmanName, setSalesmanName] = useState<string>("");
   const [invoiceTime, setInvoiceTime] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettingsMap>({});
   const { user } = useAuth();
 
   useEffect(() => {
     fetchData();
+    fetchDisplaySettings();
   }, [orderId, retailerId, user]);
+
+  const fetchDisplaySettings = async () => {
+    const settings = await getInvoiceDisplaySettingsMap();
+    setDisplaySettings(settings);
+  };
 
   const fetchData = async () => {
     try {
@@ -139,6 +147,7 @@ export default function InvoiceTemplateRenderer({
           salesmanName={salesmanName}
           invoiceTime={invoiceTime}
           schemeDetails=""
+          displaySettings={displaySettings}
         />
       ) : (
         <div className="border rounded-lg overflow-hidden">

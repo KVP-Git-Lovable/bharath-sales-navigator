@@ -1,3 +1,5 @@
+import { DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
+
 // Number to words helper
 const numberToWords = (num: number): string => {
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -51,6 +53,7 @@ interface InvoicePreviewProps {
   salesmanName?: string;
   invoiceTime?: string;
   schemeDetails?: string;
+  displaySettings?: DisplaySettingsMap;
 }
 
 export default function InvoicePreview({
@@ -62,7 +65,8 @@ export default function InvoicePreview({
   beatName = "",
   salesmanName = "",
   invoiceTime = "",
-  schemeDetails = ""
+  schemeDetails = "",
+  displaySettings = {}
 }: InvoicePreviewProps) {
   // Unit conversion helper
   const normalizeUnit = (u?: string) => (u || "").toLowerCase().replace(/\./g, "").trim();
@@ -174,19 +178,36 @@ export default function InvoicePreview({
   const companyGstin = company.gstin || "XXXXXXXX";
   const retailerGstin = retailer.gst_number || "XXXXXXXX";
 
+  // Helper function to check if a setting is enabled (defaults to true if not set)
+  const isEnabled = (key: string) => displaySettings[key] !== false;
+
   return (
     <div className={`p-6 rounded-lg ${styles.container} max-w-4xl mx-auto text-sm`}>
       {/* Header */}
       <div className={`${styles.header} p-4 rounded-t-lg flex justify-between items-center mb-6`}>
         <div className="flex items-center gap-4">
-          {company.logo_url && <img src={company.logo_url} alt="Company Logo" className="w-28 h-28 object-contain" />}
+          {isEnabled('header_company_logo') && company.logo_url && (
+            <img src={company.logo_url} alt="Company Logo" className="w-28 h-28 object-contain" />
+          )}
           <div>
-            <h1 className="text-lg font-bold">{company.name || "COMPANY NAME"}</h1>
-            <p className="text-xs opacity-90 max-w-md leading-tight">{company.address}</p>
-            {company.state && <p className="text-xs">State: {company.state}</p>}
-            {company.contact_phone && <p className="text-xs">Tel: {company.contact_phone}</p>}
-            {company.email && <p className="text-xs">Email: {company.email}</p>}
-            <p className="text-xs">GSTIN: {companyGstin}</p>
+            {isEnabled('header_company_name') && (
+              <h1 className="text-lg font-bold">{company.name || "COMPANY NAME"}</h1>
+            )}
+            {isEnabled('header_company_address') && company.address && (
+              <p className="text-xs opacity-90 max-w-md leading-tight">{company.address}</p>
+            )}
+            {isEnabled('header_company_state') && company.state && (
+              <p className="text-xs">State: {company.state}</p>
+            )}
+            {isEnabled('header_company_phone') && company.contact_phone && (
+              <p className="text-xs">Tel: {company.contact_phone}</p>
+            )}
+            {isEnabled('header_company_email') && company.email && (
+              <p className="text-xs">Email: {company.email}</p>
+            )}
+            {isEnabled('header_company_gstin') && (
+              <p className="text-xs">GSTIN: {companyGstin}</p>
+            )}
           </div>
         </div>
         <div className="text-right">
@@ -198,34 +219,48 @@ export default function InvoicePreview({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
           <h3 className="font-bold text-xs mb-2">BILL TO</h3>
-          <p className="text-blue-600 font-semibold">{retailer.name || "Customer Name"}</p>
-          <p className="text-xs">{retailer.address}</p>
-          {retailer.state && <p className="text-xs">State: {retailer.state}</p>}
-          {retailer.phone && <p className="text-xs">Phone: {retailer.phone}</p>}
-          <p className="text-xs">GSTIN: {retailerGstin}</p>
+          {isEnabled('billto_retailer_name') && (
+            <p className="text-blue-600 font-semibold">{retailer.name || "Customer Name"}</p>
+          )}
+          {isEnabled('billto_retailer_address') && retailer.address && (
+            <p className="text-xs">{retailer.address}</p>
+          )}
+          {isEnabled('billto_retailer_state') && retailer.state && (
+            <p className="text-xs">State: {retailer.state}</p>
+          )}
+          {isEnabled('billto_retailer_phone') && retailer.phone && (
+            <p className="text-xs">Phone: {retailer.phone}</p>
+          )}
+          {isEnabled('billto_retailer_gstin') && (
+            <p className="text-xs">GSTIN: {retailerGstin}</p>
+          )}
         </div>
         <div className="text-right">
-          <div className="mb-2">
-            <span className="font-bold text-xs">INVOICE #:</span>{" "}
-            <span className="text-xs">{orderId.slice(0, 8).toUpperCase()}</span>
-          </div>
-          <div className="mb-2">
-            <span className="font-bold text-xs">DATE:</span>{" "}
-            <span className="text-xs">{new Date().toLocaleDateString("en-GB")}</span>
-          </div>
-          {invoiceTime && (
+          {isEnabled('details_invoice_number') && (
+            <div className="mb-2">
+              <span className="font-bold text-xs">INVOICE #:</span>{" "}
+              <span className="text-xs">{orderId.slice(0, 8).toUpperCase()}</span>
+            </div>
+          )}
+          {isEnabled('details_invoice_date') && (
+            <div className="mb-2">
+              <span className="font-bold text-xs">DATE:</span>{" "}
+              <span className="text-xs">{new Date().toLocaleDateString("en-GB")}</span>
+            </div>
+          )}
+          {isEnabled('details_invoice_time') && invoiceTime && (
             <div className="mb-2">
               <span className="font-bold text-xs">TIME:</span>{" "}
               <span className="text-xs">{invoiceTime}</span>
             </div>
           )}
-          {salesmanName && (
+          {isEnabled('details_salesman_name') && salesmanName && (
             <div className="mb-2">
               <span className="font-bold text-xs">SALESMAN:</span>{" "}
               <span className="text-xs">{salesmanName}</span>
             </div>
           )}
-          {beatName && (
+          {isEnabled('details_beat_name') && beatName && (
             <div className="mb-2">
               <span className="font-bold text-xs">BEAT:</span>{" "}
               <span className="text-xs">{beatName}</span>
@@ -241,8 +276,12 @@ export default function InvoicePreview({
             <tr className={styles.tableHeader}>
               <th className="border border-gray-300 p-2 text-center text-xs">NO</th>
               <th className="border border-gray-300 p-2 text-left text-xs">PRODUCT</th>
-              <th className="border border-gray-300 p-2 text-center text-xs">HSN/SAC</th>
-              <th className="border border-gray-300 p-2 text-center text-xs">UNIT</th>
+              {isEnabled('table_hsn_code') && (
+                <th className="border border-gray-300 p-2 text-center text-xs">HSN/SAC</th>
+              )}
+              {isEnabled('table_unit_column') && (
+                <th className="border border-gray-300 p-2 text-center text-xs">UNIT</th>
+              )}
               <th className="border border-gray-300 p-2 text-center text-xs">QTY</th>
               <th className="border border-gray-300 p-2 text-right text-xs">PRICE</th>
               <th className="border border-gray-300 p-2 text-right text-xs">TOTAL</th>
@@ -271,8 +310,12 @@ export default function InvoicePreview({
                 <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                   <td className="border border-gray-300 p-2 text-center text-xs">{index + 1}</td>
                   <td className="border border-gray-300 p-2 text-xs">{getDisplayName(item)}</td>
-                  <td className="border border-gray-300 p-2 text-center text-xs">{item.hsn_code || "-"}</td>
-                  <td className="border border-gray-300 p-2 text-center text-xs">{unit}</td>
+                  {isEnabled('table_hsn_code') && (
+                    <td className="border border-gray-300 p-2 text-center text-xs">{item.hsn_code || "-"}</td>
+                  )}
+                  {isEnabled('table_unit_column') && (
+                    <td className="border border-gray-300 p-2 text-center text-xs">{unit}</td>
+                  )}
                   <td className="border border-gray-300 p-2 text-center text-xs">{qty}</td>
                   <td className="border border-gray-300 p-2 text-right text-xs">
                     ₹{rate.toFixed(2)}
@@ -298,18 +341,24 @@ export default function InvoicePreview({
       {/* Totals Section */}
       <div className="flex justify-end mb-4">
         <div className="w-64">
-          <div className="flex justify-between mb-2">
-            <span className="font-bold text-xs">SUB-TOTAL</span>
-            <span className="text-xs">₹{subtotal.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between mb-2">
-            <span className="font-bold text-xs">SGST (2.5%)</span>
-            <span className="text-xs">₹{sgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between mb-3">
-            <span className="font-bold text-xs">CGST (2.5%)</span>
-            <span className="text-xs">₹{cgst.toFixed(2)}</span>
-          </div>
+          {isEnabled('totals_subtotal') && (
+            <div className="flex justify-between mb-2">
+              <span className="font-bold text-xs">SUB-TOTAL</span>
+              <span className="text-xs">₹{subtotal.toFixed(2)}</span>
+            </div>
+          )}
+          {isEnabled('totals_tax_breakdown') && (
+            <>
+              <div className="flex justify-between mb-2">
+                <span className="font-bold text-xs">SGST (2.5%)</span>
+                <span className="text-xs">₹{sgst.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mb-3">
+                <span className="font-bold text-xs">CGST (2.5%)</span>
+                <span className="text-xs">₹{cgst.toFixed(2)}</span>
+              </div>
+            </>
+          )}
           <div className={`${styles.totalBox} p-2 rounded flex justify-center items-center`}>
             <span className="font-bold text-sm">Total amount: ₹{Math.round(total)}</span>
           </div>
@@ -317,54 +366,62 @@ export default function InvoicePreview({
       </div>
 
       {/* Amount in Words */}
-      <div className="mb-6 p-3 bg-gray-100 rounded">
-        <p className="text-xs">
-          <span className="font-bold">Amount in Words:</span> {totalInWords}
-        </p>
-      </div>
+      {isEnabled('totals_amount_in_words') && (
+        <div className="mb-6 p-3 bg-gray-100 rounded">
+          <p className="text-xs">
+            <span className="font-bold">Amount in Words:</span> {totalInWords}
+          </p>
+        </div>
+      )}
 
       {/* Bank Details and QR Code */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Bank Details */}
-        <div>
-          <h3 className="font-bold text-xs mb-2">BANK DETAILS</h3>
-          <div className="text-xs space-y-1">
-            {company.bank_name && <p>Bank: {company.bank_name}</p>}
-            {company.account_holder_name && <p>Account Holder: {company.account_holder_name}</p>}
-            {company.bank_account && <p>Account Number: {company.bank_account}</p>}
-            {company.ifsc && <p>IFSC: {company.ifsc}</p>}
-            {company.qr_upi && <p>UPI ID: {company.qr_upi}</p>}
-          </div>
+      {(isEnabled('payment_bank_details') || isEnabled('payment_qr_code')) && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Bank Details */}
+          {isEnabled('payment_bank_details') && (
+            <div>
+              <h3 className="font-bold text-xs mb-2">BANK DETAILS</h3>
+              <div className="text-xs space-y-1">
+                {company.bank_name && <p>Bank: {company.bank_name}</p>}
+                {company.account_holder_name && <p>Account Holder: {company.account_holder_name}</p>}
+                {company.bank_account && <p>Account Number: {company.bank_account}</p>}
+                {company.ifsc && <p>IFSC: {company.ifsc}</p>}
+                {isEnabled('payment_upi_id') && company.qr_upi && <p>UPI ID: {company.qr_upi}</p>}
+              </div>
+            </div>
+          )}
+          
+          {/* QR Code for Payment */}
+          {isEnabled('payment_qr_code') && company.qr_code_url && (
+            <div className="flex flex-col items-center justify-center border-2 border-primary/20 rounded-lg p-4 bg-primary/5">
+              <p className="text-sm font-bold mb-3 text-primary">Scan QR for Payment</p>
+              <img 
+                src={company.qr_code_url} 
+                alt="Payment QR Code" 
+                className="w-32 h-32 object-contain border-2 border-primary rounded-lg shadow-md" 
+              />
+              {isEnabled('payment_upi_id') && company.qr_upi && (
+                <p className="text-xs text-muted-foreground mt-2">UPI: {company.qr_upi}</p>
+              )}
+            </div>
+          )}
         </div>
-        
-        {/* QR Code for Payment */}
-        {company.qr_code_url && (
-          <div className="flex flex-col items-center justify-center border-2 border-primary/20 rounded-lg p-4 bg-primary/5">
-            <p className="text-sm font-bold mb-3 text-primary">Scan QR for Payment</p>
-            <img 
-              src={company.qr_code_url} 
-              alt="Payment QR Code" 
-              className="w-32 h-32 object-contain border-2 border-primary rounded-lg shadow-md" 
-            />
-            {company.qr_upi && (
-              <p className="text-xs text-muted-foreground mt-2">UPI: {company.qr_upi}</p>
-            )}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Signature */}
-      <div className="flex justify-end mb-6">
-        <div className="text-right">
-          <p className="text-xs font-bold mb-1">For {company.name || "Company"}</p>
-          <div className="mt-8 pt-4 border-t border-gray-400">
-            <p className="text-xs italic">Authorized Signatory</p>
+      {isEnabled('footer_signature_area') && (
+        <div className="flex justify-end mb-6">
+          <div className="text-right">
+            <p className="text-xs font-bold mb-1">For {company.name || "Company"}</p>
+            <div className="mt-8 pt-4 border-t border-gray-400">
+              <p className="text-xs italic">Authorized Signatory</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Terms */}
-      {company.terms_conditions && company.terms_conditions.trim() && (
+      {isEnabled('footer_terms_conditions') && company.terms_conditions && company.terms_conditions.trim() && (
         <div className="mb-4">
           <h3 className="font-bold text-xs mb-2">TERMS AND CONDITIONS</h3>
           <p className="text-xs text-blue-600">
@@ -374,9 +431,11 @@ export default function InvoicePreview({
       )}
 
       {/* Footer */}
-      <div className={`${styles.header} p-3 rounded-b-lg text-center mt-6`}>
-        <p className="text-xl font-bold mb-2">THANK YOU FOR YOUR BUSINESS</p>
-      </div>
+      {isEnabled('footer_thank_you') && (
+        <div className={`${styles.header} p-3 rounded-b-lg text-center mt-6`}>
+          <p className="text-xl font-bold mb-2">THANK YOU FOR YOUR BUSINESS</p>
+        </div>
+      )}
     </div>
   );
 }

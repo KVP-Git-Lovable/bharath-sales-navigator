@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
+import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
 
 // Helper function to check if text contains non-English characters (Indian languages)
 const containsNonEnglishChars = (text: string): boolean => {
@@ -58,6 +59,7 @@ interface InvoiceData {
   schemeDetails?: string;
   orderDiscount?: number; // Order-level discount from orders.discount_amount
   orderTotal?: number; // Final total from orders.total_amount (includes GST, discounts)
+  displaySettings?: DisplaySettingsMap; // Display settings from Invoice Management
 }
 
 // Helper function to format amount with 2 decimal places (exact)
@@ -192,6 +194,12 @@ const normalizeItemForDisplay = (item: any) => {
  */
 export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob> {
   const { orderId, company, retailer, cartItems, displayInvoiceNumber, displayInvoiceDate, displayInvoiceTime, beatName, salesmanName, schemeDetails, orderDiscount, orderTotal } = data;
+  
+  // Fetch display settings if not provided
+  const displaySettings = data.displaySettings || await getInvoiceDisplaySettingsMap();
+  
+  // Helper to check if a setting is enabled (defaults to true if not set)
+  const isEnabled = (key: string) => displaySettings[key] !== false;
 
   // Translate retailer address if it contains non-English characters
   const translatedRetailerAddress = await translateAddressToEnglish(retailer?.address || '');
@@ -225,7 +233,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
 
   // Logo image - maintain aspect ratio with max height
   let companyNameX = 15;
-  if (company.logo_url) {
+  if (isEnabled('header_company_logo') && company.logo_url) {
     try {
       const response = await fetch(company.logo_url);
       const blob = await response.blob();
@@ -270,28 +278,32 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text((company.name || "COMPANY NAME").toUpperCase(), companyNameX, 16);
+  let headerY = 16;
+  if (isEnabled('header_company_name')) {
+    doc.text((company.name || "COMPANY NAME").toUpperCase(), companyNameX, headerY);
+  }
   
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
-  let headerY = 21;
-  if (company.address) {
+  headerY = 21;
+  if (isEnabled('header_company_address') && company.address) {
     const addressLines = doc.splitTextToSize(company.address, 90);
     doc.text(addressLines.slice(0, 2), companyNameX, headerY);
     headerY += addressLines.slice(0, 2).length * 3.5;
   }
-  if (company.contact_phone) {
+  if (isEnabled('header_company_phone') && company.contact_phone) {
     doc.text(`Tel: ${company.contact_phone}`, companyNameX, headerY);
     headerY += 3.5;
   }
-  if (company.email) {
+  if (isEnabled('header_company_email') && company.email) {
     doc.text(`Email: ${company.email}`, companyNameX, headerY);
     headerY += 3.5;
   }
-  // GST must always be shown - use XXXXXXXX if not available
-  doc.text(`GSTIN: ${company.gstin || "XXXXXXXX"}`, companyNameX, headerY);
-  headerY += 3.5;
-  if (company.state) {
+  if (isEnabled('header_company_gstin')) {
+    doc.text(`GSTIN: ${company.gstin || "XXXXXXXX"}`, companyNameX, headerY);
+    headerY += 3.5;
+  }
+  if (isEnabled('header_company_state') && company.state) {
     doc.text(`State: ${company.state}`, companyNameX, headerY);
   }
 
