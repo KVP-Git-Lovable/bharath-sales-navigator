@@ -11,6 +11,7 @@ import { Check, Eye, Upload, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import InvoicePreview from "./InvoicePreview";
 import { generateTemplate4Invoice } from "@/utils/invoiceGenerator";
+import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
 
 export default function InvoiceTemplateSelector() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("template1");
@@ -27,10 +28,18 @@ export default function InvoiceTemplateSelector() {
     file: null as File | null
   });
   const [companyData, setCompanyData] = useState<any | null>(null);
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettingsMap>({});
+  
   useEffect(() => {
     fetchCurrentTemplate();
     fetchCustomTemplates();
+    fetchDisplaySettings();
   }, []);
+  
+  const fetchDisplaySettings = async () => {
+    const settings = await getInvoiceDisplaySettingsMap();
+    setDisplaySettings(settings);
+  };
 
   const fetchCurrentTemplate = async () => {
     const { data } = await supabase
@@ -134,7 +143,9 @@ export default function InvoiceTemplateSelector() {
     }
   ];
 
-  const handlePreview = (templateId: string) => {
+  const handlePreview = async (templateId: string) => {
+    // Refresh display settings before showing preview
+    await fetchDisplaySettings();
     setPreviewTemplate(templateId);
     setShowPreview(true);
   };
@@ -359,6 +370,7 @@ export default function InvoiceTemplateSelector() {
                 cartItems={sampleCart}
                 orderId="INV12345678"
                 templateStyle={previewTemplate as "template1" | "template2" | "template3" | "template4"}
+                displaySettings={displaySettings}
               />
             )}
           </div>
