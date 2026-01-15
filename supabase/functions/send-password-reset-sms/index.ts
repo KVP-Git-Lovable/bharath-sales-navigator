@@ -54,10 +54,12 @@ serve(async (req) => {
 
     if (profileError || !profile) {
       console.log('No user found with phone number:', phone_number);
-      // Don't reveal if phone exists for security
       return new Response(
-        JSON.stringify({ success: true, message: 'If a user exists with this phone number, they will receive a reset link.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: 'This phone number is not linked to any account in the organization',
+          notFound: true 
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
