@@ -39,10 +39,10 @@ export const NavSearch = ({ items, onItemClick }: NavSearchProps) => {
     return (
       <button
         onClick={() => setIsSearching(true)}
-        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground transition-colors text-sm"
+        className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+        title="Search modules"
       >
-        <Search className="h-4 w-4" />
-        <span>Search modules...</span>
+        <Search className="h-4 w-4 text-muted-foreground" />
       </button>
     );
   }

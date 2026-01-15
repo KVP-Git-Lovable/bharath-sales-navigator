@@ -297,22 +297,22 @@ export const Navbar = memo(() => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-muted-foreground px-1">Navigation</h3>
-              <NavCustomizeDialog
-                defaultItems={navigationItems}
-                customization={customization}
-                onCreateGroup={createGroup}
-                onDeleteGroup={deleteGroup}
-                onRenameGroup={renameGroup}
-                onMoveItemToGroup={moveItemToGroup}
-                onReorderItems={reorderItems}
-                onReorderGroups={reorderGroups}
-                onResetToDefault={resetToDefault}
-                getOrganizedItems={getOrganizedItems}
-              />
+              <div className="flex items-center gap-1">
+                <NavSearch items={navigationItems} onItemClick={handleMenuItemClick} />
+                <NavCustomizeDialog
+                  defaultItems={navigationItems}
+                  customization={customization}
+                  onCreateGroup={createGroup}
+                  onDeleteGroup={deleteGroup}
+                  onRenameGroup={renameGroup}
+                  onMoveItemToGroup={moveItemToGroup}
+                  onReorderItems={reorderItems}
+                  onReorderGroups={reorderGroups}
+                  onResetToDefault={resetToDefault}
+                  getOrganizedItems={getOrganizedItems}
+                />
+              </div>
             </div>
-
-            {/* Search */}
-            <NavSearch items={navigationItems} onItemClick={handleMenuItemClick} />
 
             {/* Custom Groups */}
             {getOrganizedItems().groups.map((group) => (
