@@ -166,13 +166,21 @@ const PrimaryOrders = () => {
           : item.quantity;
         if (receivedQty <= 0) continue;
 
-        const { data: existingInventory, error: existingError } = await supabase
+        // Build query with proper null handling for variant_id
+        let inventoryQuery = supabase
           .from('distributor_inventory')
           .select('*')
           .eq('distributor_id', distributorId)
-          .eq('product_id', item.product_id)
-          .eq('variant_id', item.variant_id || null)
-          .maybeSingle();
+          .eq('product_id', item.product_id);
+
+        // Use .is() for null, .eq() for actual values
+        if (item.variant_id) {
+          inventoryQuery = inventoryQuery.eq('variant_id', item.variant_id);
+        } else {
+          inventoryQuery = inventoryQuery.is('variant_id', null);
+        }
+
+        const { data: existingInventory, error: existingError } = await inventoryQuery.maybeSingle();
 
         if (existingError) throw existingError;
 
