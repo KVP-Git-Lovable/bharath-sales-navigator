@@ -12,43 +12,60 @@ interface CheckInStatusBannerProps {
 }
 
 // Live timer hook that updates every minute
-const useMarketHoursTimer = (checkInTime: string | null, checkOutTime: string | null) => {
+const useMarketHoursTimer = (
+  attendanceDate: string | null,
+  checkInTime: string | null,
+  checkOutTime: string | null
+) => {
   const [marketHours, setMarketHours] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   useEffect(() => {
     if (!checkInTime) {
       setMarketHours(null);
       return;
     }
-    
+
+    const normalizeToAttendanceDate = (isoTime: string, dateStr: string | null): Date => {
+      const dt = new Date(isoTime);
+      if (!dateStr) return dt;
+
+      // Build a local Date at attendance date, but keep the time (hh:mm:ss) from the timestamp.
+      const base = new Date(dateStr + 'T00:00:00');
+      base.setHours(dt.getHours(), dt.getMinutes(), dt.getSeconds(), dt.getMilliseconds());
+      return base;
+    };
+
     const calculateHours = () => {
-      const checkIn = new Date(checkInTime);
-      const endTime = checkOutTime ? new Date(checkOutTime) : new Date();
-      const minutes = differenceInMinutes(endTime, checkIn);
+      const checkIn = normalizeToAttendanceDate(checkInTime, attendanceDate);
+      const endTime = checkOutTime
+        ? normalizeToAttendanceDate(checkOutTime, attendanceDate)
+        : new Date();
+
+      const minutes = Math.max(0, differenceInMinutes(endTime, checkIn));
       const hours = Math.floor(minutes / 60);
       const mins = minutes % 60;
       return `${hours}h ${mins}m`;
     };
-    
+
     // Calculate immediately
     setMarketHours(calculateHours());
-    
+
     // Only set up live timer if not checked out
     if (!checkOutTime) {
       intervalRef.current = setInterval(() => {
         setMarketHours(calculateHours());
       }, 60000); // Update every minute
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [checkInTime, checkOutTime]);
-  
+  }, [attendanceDate, checkInTime, checkOutTime]);
+
   return marketHours;
 };
 
@@ -60,6 +77,7 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
 
   // Use live timer for market hours (auto-updates every minute when connected)
   const marketHours = useMarketHoursTimer(
+    attendance?.date || null,
     attendance?.check_in_time || null,
     attendance?.check_out_time || null
   );
