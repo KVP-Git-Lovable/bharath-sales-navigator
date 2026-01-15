@@ -147,21 +147,24 @@ const PrimaryOrders = () => {
       if (!orderItems || orderItems.length === 0) return;
 
       // Fetch order details for reference
-      const { data: orderData } = await supabase
+      const { data: orderData, error: orderError } = await supabase
         .from('primary_orders')
         .select('order_number')
         .eq('id', orderId)
         .single();
 
+      if (orderError) throw orderError;
+
       const orderNumber = orderData?.order_number || orderId;
 
-      // Update inventory for each item
+      // NOTE: distributor_inventory.available_quantity and distributor_inventory.total_value
+      // are GENERATED ALWAYS columns in DB. Do not write to them directly.
+
       for (const item of orderItems) {
-        const receivedQty = item.received_quantity || item.quantity;
+        const receivedQty = (item.received_quantity ?? 0) > 0 ? item.received_quantity : item.quantity;
         if (receivedQty <= 0) continue;
 
-        // Check if inventory record exists
-        const { data: existingInventory } = await supabase
+        const { data: existingInventory, error: existingError } = await supabase
           .from('distributor_inventory')
           .select('*')
           .eq('distributor_id', distributorId)
@@ -169,27 +172,24 @@ const PrimaryOrders = () => {
           .eq('variant_id', item.variant_id || null)
           .maybeSingle();
 
-        if (existingInventory) {
-          // Update existing inventory
-          const newQty = existingInventory.quantity + receivedQty;
-          const newAvailable = (existingInventory.available_quantity || 0) + receivedQty;
-          const newValue = newQty * (existingInventory.unit_cost || item.unit_price);
+        if (existingError) throw existingError;
 
-          await supabase
+        if (existingInventory) {
+          const { error: updateError } = await supabase
             .from('distributor_inventory')
             .update({
-              quantity: newQty,
-              available_quantity: newAvailable,
-              total_value: newValue,
+              quantity: (existingInventory.quantity || 0) + receivedQty,
+              unit_cost: existingInventory.unit_cost || item.unit_price,
               last_received_date: new Date().toISOString().split('T')[0],
               batch_number: item.batch_number || existingInventory.batch_number,
               expiry_date: item.expiry_date || existingInventory.expiry_date,
               updated_at: new Date().toISOString(),
             })
             .eq('id', existingInventory.id);
+
+          if (updateError) throw updateError;
         } else {
-          // Create new inventory record
-          await supabase
+          const { error: insertError } = await supabase
             .from('distributor_inventory')
             .insert({
               distributor_id: distributorId,
@@ -200,20 +200,19 @@ const PrimaryOrders = () => {
               sku: item.sku,
               quantity: receivedQty,
               reserved_quantity: 0,
-              available_quantity: receivedQty,
               reorder_level: 10,
               max_stock_level: 1000,
               unit: item.unit,
               unit_cost: item.unit_price,
-              total_value: receivedQty * item.unit_price,
               batch_number: item.batch_number || null,
               expiry_date: item.expiry_date || null,
               last_received_date: new Date().toISOString().split('T')[0],
             });
+
+          if (insertError) throw insertError;
         }
 
-        // Log inventory transaction
-        await supabase
+        const { error: txnError } = await supabase
           .from('distributor_inventory_transactions')
           .insert({
             distributor_id: distributorId,
@@ -229,6 +228,8 @@ const PrimaryOrders = () => {
             unit_cost: item.unit_price,
             notes: `Auto GRN from primary order ${orderNumber} (Admin Delivery)`,
           });
+
+        if (txnError) throw txnError;
       }
 
       console.log('Distributor inventory updated successfully');
