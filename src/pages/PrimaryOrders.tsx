@@ -87,6 +87,7 @@ const PrimaryOrders = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [syncingInventory, setSyncingInventory] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -297,6 +298,38 @@ const PrimaryOrders = () => {
     }
   };
 
+  const checkInventorySynced = async (orderId: string) => {
+    const { count, error } = await supabase
+      .from('distributor_inventory_transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('reference_type', 'primary_order')
+      .eq('reference_id', orderId)
+      .eq('transaction_type', 'inward');
+
+    if (error) throw error;
+    return (count || 0) > 0;
+  };
+
+  const syncInventoryForOrder = async (order: PrimaryOrder) => {
+    if (!order?.id || !order?.distributor_id) return;
+
+    setSyncingInventory(true);
+    try {
+      const alreadySynced = await checkInventorySynced(order.id);
+      if (alreadySynced) {
+        toast.message('Inventory already synced for this order');
+        return;
+      }
+
+      await updateDistributorInventory(order.id, order.distributor_id);
+      toast.success('Inventory synced successfully');
+    } catch (e) {
+      console.error('Error syncing inventory:', e);
+      toast.error('Failed to sync inventory');
+    } finally {
+      setSyncingInventory(false);
+    }
+  };
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       draft: 'bg-muted text-muted-foreground',
@@ -508,8 +541,8 @@ const PrimaryOrders = () => {
               </div>
 
               {/* Status Actions */}
-              {getNextStatuses(selectedOrder.status).length > 0 && (
-                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+              {getNextStatuses(selectedOrder.status).length > 0 ? (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg items-center">
                   <span className="text-sm text-muted-foreground mr-2">Update Status:</span>
                   {getNextStatuses(selectedOrder.status).map(status => (
                     <Button
@@ -522,7 +555,45 @@ const PrimaryOrders = () => {
                       {status.replace('_', ' ')}
                     </Button>
                   ))}
+
+                  {['delivered', 'partially_delivered'].includes(selectedOrder.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      disabled={syncingInventory}
+                      onClick={() => syncInventoryForOrder(selectedOrder)}
+                      title="Sync inventory if this order was delivered earlier but stock was not updated"
+                    >
+                      {syncingInventory ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync Inventory
+                    </Button>
+                  )}
                 </div>
+              ) : (
+                ['delivered', 'partially_delivered'].includes(selectedOrder.status) ? (
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg items-center">
+                    <span className="text-sm text-muted-foreground">Inventory not updated? You can resync.</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      disabled={syncingInventory}
+                      onClick={() => syncInventoryForOrder(selectedOrder)}
+                    >
+                      {syncingInventory ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync Inventory
+                    </Button>
+                  </div>
+                ) : null
               )}
 
               {/* Order Items */}
