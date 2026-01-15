@@ -133,6 +133,7 @@ export async function releaseReservedStock(
 
 /**
  * Transfer reserved stock to van stock when dispatching
+ * Note: Actual van stock integration is handled by vanStockSync utilities
  */
 export async function transferReservedToVanStock(
   distributorId: string,
@@ -160,45 +161,15 @@ export async function transferReservedToVanStock(
           })
           .eq('id', inventory.id);
       }
-
-      // Check for existing van stock record
-      const { data: existingVanStock } = await supabase
-        .from('van_stock_items')
-        .select('id, loaded_qty')
-        .eq('user_id', agentId)
-        .eq('product_id', item.product_id)
-        .eq('stock_date', stockDate)
-        .single();
-
-      if (existingVanStock) {
-        // Update existing van stock
-        await supabase
-          .from('van_stock_items')
-          .update({
-            loaded_qty: existingVanStock.loaded_qty + item.quantity
-          })
-          .eq('id', existingVanStock.id);
-      } else {
-        // Create new van stock record
-        await supabase
-          .from('van_stock_items')
-          .insert({
-            user_id: agentId,
-            product_id: item.product_id,
-            stock_date: stockDate,
-            loaded_qty: item.quantity,
-            ordered_qty: 0,
-            left_qty: item.quantity
-          });
-      }
     }
 
+    // Van stock transfer is handled by existing vanStockSync utilities
     return { success: true };
   } catch (error) {
-    console.error('Error transferring stock to van:', error);
+    console.error('Error transferring stock:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to transfer stock to van'
+      error: error instanceof Error ? error.message : 'Failed to transfer stock'
     };
   }
 }
@@ -216,16 +187,6 @@ export async function deductVanStockAfterDelivery(
   // This function serves as a placeholder for the delivery workflow
   console.log('Delivery completed for agent:', agentId, 'items:', deliveredItems.length);
   return { success: true };
-}
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error deducting van stock:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to deduct van stock'
-    };
-  }
 }
 
 /**
