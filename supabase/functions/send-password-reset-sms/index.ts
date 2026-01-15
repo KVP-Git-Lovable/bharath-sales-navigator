@@ -22,7 +22,23 @@ serve(async (req) => {
       );
     }
 
-    console.log('Processing password reset for phone:', phone_number);
+    // Format phone number to E.164 format for Twilio
+    let formattedPhone = phone_number.toString().replace(/\D/g, ''); // Remove non-digits
+    
+    // If number doesn't start with +, assume India (+91) for 10-digit numbers
+    if (!phone_number.startsWith('+')) {
+      if (formattedPhone.length === 10) {
+        formattedPhone = '+91' + formattedPhone;
+      } else if (formattedPhone.length === 12 && formattedPhone.startsWith('91')) {
+        formattedPhone = '+' + formattedPhone;
+      } else {
+        formattedPhone = '+' + formattedPhone;
+      }
+    } else {
+      formattedPhone = phone_number;
+    }
+
+    console.log('Processing password reset for phone:', phone_number, '-> formatted:', formattedPhone);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -90,7 +106,7 @@ serve(async (req) => {
     const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
     
     const formData = new URLSearchParams();
-    formData.append('To', phone_number);
+    formData.append('To', formattedPhone);
     formData.append('From', twilioPhoneNumber);
     formData.append('Body', message);
 
