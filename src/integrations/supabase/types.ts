@@ -6630,10 +6630,18 @@ export type Database = {
       }
       orders: {
         Row: {
+          assigned_agent_id: string | null
+          assigned_van_id: string | null
           created_at: string
           credit_paid_amount: number | null
           credit_pending_amount: number | null
+          delivered_at: string | null
+          delivery_date: string | null
+          delivery_notes: string | null
+          delivery_proof_url: string | null
+          delivery_status: string | null
           discount_amount: number | null
+          dispatched_at: string | null
           distributor_id: string | null
           distributor_name: string | null
           id: string
@@ -6641,11 +6649,14 @@ export type Database = {
           invoice_number: string | null
           is_credit_order: boolean | null
           order_date: string | null
+          packing_list_id: string | null
           payment_method: string | null
           payment_proof_url: string | null
+          picked_at: string | null
           previous_pending_cleared: number | null
           retailer_id: string | null
           retailer_name: string
+          short_items: Json | null
           status: string
           subtotal: number
           total_amount: number
@@ -6655,10 +6666,18 @@ export type Database = {
           visit_id: string | null
         }
         Insert: {
+          assigned_agent_id?: string | null
+          assigned_van_id?: string | null
           created_at?: string
           credit_paid_amount?: number | null
           credit_pending_amount?: number | null
+          delivered_at?: string | null
+          delivery_date?: string | null
+          delivery_notes?: string | null
+          delivery_proof_url?: string | null
+          delivery_status?: string | null
           discount_amount?: number | null
+          dispatched_at?: string | null
           distributor_id?: string | null
           distributor_name?: string | null
           id?: string
@@ -6666,11 +6685,14 @@ export type Database = {
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
+          packing_list_id?: string | null
           payment_method?: string | null
           payment_proof_url?: string | null
+          picked_at?: string | null
           previous_pending_cleared?: number | null
           retailer_id?: string | null
           retailer_name: string
+          short_items?: Json | null
           status?: string
           subtotal: number
           total_amount: number
@@ -6680,10 +6702,18 @@ export type Database = {
           visit_id?: string | null
         }
         Update: {
+          assigned_agent_id?: string | null
+          assigned_van_id?: string | null
           created_at?: string
           credit_paid_amount?: number | null
           credit_pending_amount?: number | null
+          delivered_at?: string | null
+          delivery_date?: string | null
+          delivery_notes?: string | null
+          delivery_proof_url?: string | null
+          delivery_status?: string | null
           discount_amount?: number | null
+          dispatched_at?: string | null
           distributor_id?: string | null
           distributor_name?: string | null
           id?: string
@@ -6691,11 +6721,14 @@ export type Database = {
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
+          packing_list_id?: string | null
           payment_method?: string | null
           payment_proof_url?: string | null
+          picked_at?: string | null
           previous_pending_cleared?: number | null
           retailer_id?: string | null
           retailer_name?: string
+          short_items?: Json | null
           status?: string
           subtotal?: number
           total_amount?: number
@@ -6710,6 +6743,165 @@ export type Database = {
             columns: ["retailer_id"]
             isOneToOne: false
             referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packing_list_assignments: {
+        Row: {
+          agent_id: string | null
+          beat_ids: string[] | null
+          completed_at: string | null
+          created_at: string | null
+          dispatched_at: string | null
+          id: string
+          order_count: number | null
+          packing_list_id: string | null
+          status: string | null
+          territory_ids: string[] | null
+          total_load_qty: number | null
+          total_load_value: number | null
+          van_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          beat_ids?: string[] | null
+          completed_at?: string | null
+          created_at?: string | null
+          dispatched_at?: string | null
+          id?: string
+          order_count?: number | null
+          packing_list_id?: string | null
+          status?: string | null
+          territory_ids?: string[] | null
+          total_load_qty?: number | null
+          total_load_value?: number | null
+          van_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          beat_ids?: string[] | null
+          completed_at?: string | null
+          created_at?: string | null
+          dispatched_at?: string | null
+          id?: string
+          order_count?: number | null
+          packing_list_id?: string | null
+          status?: string | null
+          territory_ids?: string[] | null
+          total_load_qty?: number | null
+          total_load_value?: number | null
+          van_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_list_assignments_packing_list_id_fkey"
+            columns: ["packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "packing_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packing_list_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string | null
+          expiry_date: string | null
+          id: string
+          ordered_qty: number | null
+          packing_list_id: string | null
+          picked_qty: number | null
+          product_id: string
+          product_name: string
+          short_qty: number | null
+          unit: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          ordered_qty?: number | null
+          packing_list_id?: string | null
+          picked_qty?: number | null
+          product_id: string
+          product_name: string
+          short_qty?: number | null
+          unit?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          ordered_qty?: number | null
+          packing_list_id?: string | null
+          picked_qty?: number | null
+          product_id?: string
+          product_name?: string
+          short_qty?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_list_items_packing_list_id_fkey"
+            columns: ["packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "packing_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packing_lists: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          delivery_date: string
+          distributor_id: string | null
+          id: string
+          notes: string | null
+          packing_list_number: string
+          status: string
+          total_items: number | null
+          total_orders: number | null
+          total_value: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_date: string
+          distributor_id?: string | null
+          id?: string
+          notes?: string | null
+          packing_list_number?: string
+          status?: string
+          total_items?: number | null
+          total_orders?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_date?: string
+          distributor_id?: string | null
+          id?: string
+          notes?: string | null
+          packing_list_number?: string
+          status?: string
+          total_items?: number | null
+          total_orders?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_lists_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
             referencedColumns: ["id"]
           },
         ]
