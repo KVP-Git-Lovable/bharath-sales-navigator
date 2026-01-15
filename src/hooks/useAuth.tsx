@@ -291,6 +291,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const profile = await fetchUserProfile(data.user.id);
       setUserProfile(profile);
       
+      // Check if user must change password
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('must_change_password')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      
+      if (profileData?.must_change_password) {
+        toast.info('Please change your password to continue');
+        window.location.href = '/change-password';
+        return;
+      }
+      
       toast.success('Signed in successfully!');
       
       // Request permissions after successful sign-in (both web and native)
