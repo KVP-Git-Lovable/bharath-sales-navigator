@@ -10,6 +10,7 @@ import { useConnectivity } from "@/hooks/useConnectivity";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTranslation } from 'react-i18next';
 import { useActivePerformanceModule } from "@/hooks/useActivePerformanceModule";
+import { usePackingListModule, useDeliveryAgentApp } from "@/hooks/useD1Delivery";
 import { useCompanyData } from "@/hooks/useCompanyData";
 import { Building2 as DefaultLogoIcon } from "lucide-react";
 import {
@@ -39,6 +40,8 @@ import {
   Trash2,
   ShoppingCart,
   BarChart3,
+  ClipboardList,
+  Truck,
 } from "lucide-react";
 
 // Memoized Navbar component for better performance
@@ -50,6 +53,8 @@ export const Navbar = memo(() => {
   const { t } = useTranslation('common');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isGamificationActive } = useActivePerformanceModule();
+  const { isEnabled: isPackingListEnabled } = usePackingListModule();
+  const { isEnabled: isDeliveryAgentEnabled } = useDeliveryAgentApp();
   const { headerName, headerLogo } = useCompanyData();
   
   // Company name and logo - no hardcoded fallbacks, uses cache
@@ -84,6 +89,16 @@ export const Navbar = memo(() => {
       baseItems.push({ icon: Trophy, label: "Leader board", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
     }
 
+    // Add Packing List Management if enabled
+    if (isPackingListEnabled) {
+      baseItems.push({ icon: ClipboardList, label: "Packing List", href: "/distributor-portal/packing-list-management", color: "from-teal-500 to-teal-600" });
+    }
+
+    // Add Delivery Run if enabled
+    if (isDeliveryAgentEnabled) {
+      baseItems.push({ icon: Truck, label: "Delivery Run", href: "/delivery-run", color: "from-orange-500 to-orange-600" });
+    }
+
     // Add remaining items
     baseItems.push(
       { icon: Target, label: "My Competency", href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
@@ -91,7 +106,7 @@ export const Navbar = memo(() => {
     );
 
     return baseItems;
-  }, [t, isGamificationActive]);
+  }, [t, isGamificationActive, isPackingListEnabled, isDeliveryAgentEnabled]);
 
   // Admin-only navigation items
   const adminNavigationItems = [
