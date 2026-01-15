@@ -147,6 +147,7 @@ import PackingList from "./pages/distributor-portal/PackingList";
 import PackingListManagement from "./pages/distributor-portal/PackingListManagement";
 import PackingListDetail from "./pages/distributor-portal/PackingListDetail";
 import GoodsReceipt from "./pages/distributor-portal/GoodsReceipt";
+import GoodsReceiptList from "./pages/distributor-portal/GoodsReceiptList";
 import DistributorClaims from "./pages/distributor-portal/DistributorClaims";
 import DistributorSupport from "./pages/distributor-portal/DistributorSupport";
 import DistributorIdeas from "./pages/distributor-portal/DistributorIdeas";
@@ -415,7 +416,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="packing-list-management" element={<PackingListManagement />} />
           <Route path="packing-list/:id" element={<PackingListDetail />} />
           <Route path="goods-receipt/:orderId" element={<GoodsReceipt />} />
-          <Route path="goods-receipt" element={<GoodsReceipt />} />
+          <Route path="goods-receipt" element={<GoodsReceiptList />} />
           <Route path="claims" element={<DistributorClaims />} />
           <Route path="support" element={<DistributorSupport />} />
           <Route path="ideas" element={<DistributorIdeas />} />
