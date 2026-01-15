@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import InvoiceTemplateRenderer from "@/components/invoice/InvoiceTemplateRenderer";
-import { Trash2, Gift, ShoppingCart, Eye, Camera, FileText, Tag, Sparkles } from "lucide-react";
+import { Trash2, Gift, ShoppingCart, Eye, Camera, FileText, Tag, Sparkles, Truck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { CartItemDetail } from "@/components/CartItemDetail";
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { usePaymentProofMandatory } from '@/hooks/usePaymentProofMandatory';
 import { awardPointsForOrder, updateRetailerSequence } from "@/utils/gamificationPointsAwarder";
 import { awardLoyaltyPointsForOrder } from "@/utils/retailerLoyaltyPointsAwarder";
@@ -33,6 +33,7 @@ import { useOfflineSchemes } from "@/hooks/useOfflineSchemes";
 import { useAppliedSchemes } from "@/hooks/useAppliedSchemes";
 import { calculateOrderWithSchemes, SchemeItem, formatSchemeDetailsForInvoice, ItemSchemeDetail } from "@/utils/schemeEngine";
 import { markVisitDataChanged } from "@/lib/visitChangeMarker";
+import { useD1Delivery } from "@/hooks/useD1Delivery";
 
 interface CartItem {
   id: string;
@@ -113,6 +114,7 @@ export const Cart = () => {
   const isPhoneOrder = searchParams.get("phoneOrder") === "true";
   const { isPaymentProofMandatory } = usePaymentProofMandatory();
   const connectivityStatus = useConnectivity();
+  const { isEnabled: isD1DeliveryEnabled } = useD1Delivery();
   const [companyQrCode, setCompanyQrCode] = React.useState<string | null>(null);
 
   // Fix retailerId validation - don't use "." as a valid retailerId  
@@ -1378,6 +1380,357 @@ export const Cart = () => {
     }
   };
 
+  // D-1 Order Confirmation Handler - New workflow for Next Day Delivery
+  // This is a SEPARATE flow from handleSubmitOrder - orders go into packing list queue
+  const handleConfirmD1Order = async () => {
+    // Same validation as handleSubmitOrder
+    if (!canSubmitOrder()) {
+      toast({
+        title: "Order Scheduled",
+        description: `This order will be submitted on ${new Date(visitDate!).toLocaleDateString()}. Items will remain in your cart until then.`,
+        variant: "default"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      const currentUserId = user?.id || userId;
+      
+      if (!currentUserId) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to submit orders",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const subtotal = getSubtotal();
+      const discountAmount = getDiscount();
+      const cgstAmount = getCGST();
+      const sgstAmount = getSGST();
+      const totalAmount = Math.round(getFinalTotal());
+      
+      const validRetailerId = retailerId && /^[0-9a-fA-F-]{36}$/.test(retailerId) ? retailerId : null;
+      const validVisitId = visitId && /^[0-9a-fA-F-]{36}$/.test(visitId) ? visitId : null;
+
+      // Fetch retailer to get beat_id and territory_id
+      let retailerBeatId: string | null = null;
+      let retailerTerritoryId: string | null = null;
+      
+      if (validRetailerId && navigator.onLine) {
+        const { data: retailerDetails } = await supabase
+          .from('retailers')
+          .select('beat_id, territory_id')
+          .eq('id', validRetailerId)
+          .single();
+        
+        if (retailerDetails) {
+          retailerBeatId = retailerDetails.beat_id;
+          retailerTerritoryId = retailerDetails.territory_id;
+        }
+      }
+
+      // Calculate credit amounts (same logic as handleSubmitOrder)
+      const totalDue = pendingAmountFromPrevious + totalAmount;
+      let newTotalPending = 0;
+      let creditPending = 0;
+      let creditPaid = 0;
+      let previousPendingCleared = 0;
+      let isCreditOrder = false;
+      let orderPaymentMethod = "";
+      let paymentProofUrl = "";
+
+      if (paymentType === "credit") {
+        isCreditOrder = true;
+        newTotalPending = totalDue;
+        creditPending = totalAmount;
+        creditPaid = 0;
+        previousPendingCleared = 0;
+        orderPaymentMethod = "credit";
+      } else if (paymentType === "full") {
+        isCreditOrder = false;
+        newTotalPending = 0;
+        previousPendingCleared = pendingAmountFromPrevious;
+        creditPaid = totalAmount;
+        creditPending = 0;
+        orderPaymentMethod = paymentMethod;
+        paymentProofUrl = paymentMethod === "cheque" ? chequePhotoUrl : paymentMethod === "upi" ? upiPhotoUrl : paymentMethod === "neft" ? neftPhotoUrl : "";
+      } else if (paymentType === "partial") {
+        isCreditOrder = true;
+        const paidAmount = parseFloat(partialAmount);
+        previousPendingCleared = Math.min(pendingAmountFromPrevious, paidAmount);
+        creditPaid = paidAmount;
+        newTotalPending = totalDue - paidAmount;
+        creditPending = newTotalPending;
+        orderPaymentMethod = paymentMethod;
+        paymentProofUrl = paymentMethod === "cheque" ? chequePhotoUrl : paymentMethod === "upi" ? upiPhotoUrl : paymentMethod === "neft" ? neftPhotoUrl : "";
+      }
+
+      // Ensure visit exists (same logic as handleSubmitOrder)
+      let actualVisitId = validVisitId;
+      const today = getLocalTodayDate();
+      const isOnline = connectivityStatus === 'online' && navigator.onLine;
+      
+      if (!actualVisitId && validRetailerId && currentUserId) {
+        if (isOnline) {
+          const { data: existingVisit } = await supabase
+            .from('visits')
+            .select('id')
+            .eq('user_id', currentUserId)
+            .eq('retailer_id', validRetailerId)
+            .eq('planned_date', today)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (existingVisit) {
+            actualVisitId = existingVisit.id;
+          } else {
+            const { data: newVisit } = await supabase
+              .from('visits')
+              .insert({
+                user_id: currentUserId,
+                retailer_id: validRetailerId,
+                planned_date: today,
+                status: 'productive',
+                skip_check_in_reason: isPhoneOrder ? 'phone-order' : 'direct-order',
+                skip_check_in_time: new Date().toISOString()
+              })
+              .select()
+              .single();
+            
+            if (newVisit) {
+              actualVisitId = newVisit.id;
+            }
+          }
+        }
+        
+        if (!actualVisitId) {
+          actualVisitId = crypto.randomUUID();
+          const offlineVisit = {
+            id: actualVisitId,
+            user_id: currentUserId,
+            retailer_id: validRetailerId,
+            planned_date: today,
+            status: 'productive',
+            skip_check_in_reason: isPhoneOrder ? 'phone-order' : 'direct-order',
+            skip_check_in_time: new Date().toISOString(),
+            created_at: new Date().toISOString()
+          };
+          await offlineStorage.addToSyncQueue('CREATE_VISIT', offlineVisit);
+          await offlineStorage.save(STORES.VISITS, offlineVisit);
+        }
+      }
+
+      // Generate idempotency key
+      const idempotencyKey = `${currentUserId}_${validRetailerId}_${getLocalTodayDate()}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      
+      // Calculate delivery date as tomorrow
+      const deliveryDate = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+
+      // D-1 ORDER DATA - Key differences from regular order:
+      // - delivery_status: 'in_packing_list' (ready for packing list inclusion)
+      // - delivery_date: tomorrow (next day delivery)
+      // - packing_list_id: null (not yet assigned to a packing list)
+      const orderData = {
+        user_id: currentUserId,
+        visit_id: actualVisitId,
+        retailer_id: validRetailerId,
+        retailer_name: retailerName,
+        distributor_id: distributorInfo.id || null,
+        distributor_name: distributorInfo.name || null,
+        order_date: getLocalTodayDate(),
+        subtotal,
+        discount_amount: discountAmount,
+        total_amount: totalAmount,
+        status: 'confirmed',
+        is_credit_order: isCreditOrder,
+        credit_pending_amount: creditPending,
+        credit_paid_amount: creditPaid,
+        previous_pending_cleared: previousPendingCleared,
+        payment_method: orderPaymentMethod,
+        payment_proof_url: paymentProofUrl || null,
+        upi_last_four_code: paymentMethod === 'upi' ? upiLastFourCode : null,
+        idempotency_key: idempotencyKey,
+        // D-1 SPECIFIC FIELDS
+        delivery_status: 'in_packing_list',
+        delivery_date: deliveryDate,
+        packing_list_id: null
+      };
+
+      const orderItems = cartItems.map(item => {
+        const itemDiscount = orderCalculation.itemDiscounts[item.id] || 0;
+        const currentRate = getDisplayRate(item);
+        const originalRate = (item as any).original_rate || currentRate;
+        const discountPerItem = item.quantity > 0 ? itemDiscount / item.quantity : 0;
+        const itemTotal = computeItemTotal(item);
+        const sgstAmount = itemTotal * 0.025;
+        const cgstAmount = itemTotal * 0.025;
+        
+        let productId = item.id;
+        if (item.id.includes('_variant_')) {
+          const parts = item.id.split('_variant_');
+          productId = parts[1];
+        }
+        
+        return {
+          product_id: productId,
+          product_name: item.name,
+          category: item.category,
+          rate: currentRate - discountPerItem,
+          original_rate: originalRate,
+          discount_amount: itemDiscount,
+          unit: item.unit,
+          quantity: item.quantity,
+          total: itemTotal,
+          hsn_code: (item as any).hsn_code || null,
+          sgst_amount: sgstAmount,
+          cgst_amount: cgstAmount
+        };
+      });
+
+      // Add free items from BOGO schemes
+      const freeOrderItems = orderCalculation.appliedSchemes
+        .filter(s => s.free_items && s.free_items.length > 0)
+        .flatMap(s => s.free_items!.map(freeItem => ({
+          product_id: freeItem.product_id || 'FREE_ITEM',
+          product_name: `${freeItem.product_name} (FREE)`,
+          category: 'Free Item',
+          rate: 0,
+          original_rate: freeItem.original_rate || 0,
+          discount_amount: 0,
+          unit: freeItem.unit || 'pcs',
+          quantity: freeItem.quantity,
+          total: 0,
+          hsn_code: null,
+          sgst_amount: 0,
+          cgst_amount: 0
+        })));
+
+      const allOrderItems = [...orderItems, ...freeOrderItems];
+
+      // Submit order using offline-capable utility
+      const result = await submitOrderWithOfflineSupport(orderData, allOrderItems, {
+        connectivityStatus,
+        onOffline: () => {
+          toast({
+            title: "📵 D-1 Order Saved Offline",
+            description: "Order will be available for packing when you're back online.",
+          });
+        },
+        onOnline: () => {
+          toast({
+            title: "✅ D-1 Order Confirmed",
+            description: `Order for ${retailerName} is ready for next-day delivery packing.`,
+          });
+        }
+      });
+
+      // Update retailer's pending_amount
+      if (validRetailerId && !result.offline) {
+        await supabase
+          .from('retailers')
+          .update({ 
+            pending_amount: newTotalPending,
+            last_order_date: new Date().toISOString().split('T')[0]
+          })
+          .eq('id', validRetailerId);
+      }
+
+      // Clear cart storage
+      localStorage.removeItem(activeStorageKey);
+      localStorage.removeItem(tableFormStorageKey);
+      clearSchemes();
+      
+      // Reset all states
+      setCartItems([]);
+      setPaymentType("");
+      setPaymentMethod("");
+      setPartialAmount("");
+      setChequePhotoUrl("");
+      setUpiPhotoUrl("");
+      setUpiLastFourCode("");
+      setNeftPhotoUrl("");
+      setIsCameraOpen(false);
+      setShowInvoicePreview(false);
+      setSelectedItem(null);
+      setShowItemDetail(false);
+      setPendingAmountFromPrevious(0);
+
+      // Update visit status cache
+      if (actualVisitId && validRetailerId && currentUserId) {
+        retailerStatusRegistry.markForRefresh(validRetailerId);
+        const orderDate = getLocalTodayDate();
+        await visitStatusCache.set(
+          actualVisitId,
+          validRetailerId,
+          currentUserId,
+          orderDate,
+          'productive',
+          totalAmount
+        );
+        
+        const orderForEvent = {
+          id: result.order?.id || `offline_${Date.now()}`,
+          retailer_id: validRetailerId,
+          user_id: currentUserId,
+          total_amount: totalAmount,
+          order_date: orderDate,
+          status: 'confirmed',
+          delivery_status: 'in_packing_list',
+          delivery_date: deliveryDate,
+          visit_id: actualVisitId,
+          created_at: new Date().toISOString()
+        };
+        
+        try {
+          await addOrderToSnapshot(currentUserId, orderDate, orderForEvent);
+        } catch (snapshotErr) {
+          console.warn('[Cart] Could not update snapshot:', snapshotErr);
+        }
+        
+        window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+          detail: { 
+            visitId: actualVisitId, 
+            status: 'productive', 
+            retailerId: validRetailerId,
+            orderValue: totalAmount,
+            order: orderForEvent
+          }
+        }));
+        
+        window.dispatchEvent(new CustomEvent('orderSubmitted', {
+          detail: {
+            retailerId: validRetailerId,
+            visitId: actualVisitId,
+            orderValue: totalAmount
+          }
+        }));
+        
+        window.dispatchEvent(new Event('visitDataChanged'));
+        markVisitDataChanged();
+      }
+
+      // Navigate back to My Visits
+      navigate('/visits/retailers');
+
+    } catch (error: any) {
+      console.error('Error submitting D-1 order:', error);
+      toast({
+        title: "Error Submitting Order",
+        description: error.message || "Failed to submit D-1 order. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="min-h-screen bg-background pb-20">
@@ -1759,6 +2112,31 @@ export const Cart = () => {
                     getSubmitButtonText()
                   )}
                 </Button>
+
+                {/* D-1 Next Day Delivery Button */}
+                {isD1DeliveryEnabled && (
+                  <Button 
+                    onClick={handleConfirmD1Order} 
+                    className="w-full h-9 text-sm border-2 border-primary" 
+                    variant="outline" 
+                    disabled={!canSubmitOrder() || !paymentType || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Confirming...
+                      </>
+                    ) : (
+                      <>
+                        <Truck className="mr-2 h-4 w-4" />
+                        Confirm Order (Next Day Delivery)
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </>}

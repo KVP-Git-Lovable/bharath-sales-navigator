@@ -49,6 +49,8 @@ export interface PackingListAssignment {
 export interface OrderForPacking {
   id: string;
   order_date: string;
+  delivery_date?: string;
+  delivery_status?: string;
   retailer_id: string;
   retailer_name?: string;
   beat_id?: string;
@@ -148,7 +150,7 @@ export function usePackingList() {
     }
   }, [toast]);
 
-  // Fetch orders available for packing (confirmed orders without packing list)
+  // Fetch orders available for packing (confirmed D-1 orders without packing list)
   const fetchOrdersForPacking = useCallback(async (filters: {
     distributorId?: string;
     orderDate?: string;
@@ -156,6 +158,8 @@ export function usePackingList() {
     dateTo?: string;
     beatIds?: string[];
     territoryIds?: string[];
+    deliveryStatus?: string;  // Filter by delivery_status
+    deliveryDate?: string;    // Filter by delivery_date
   }) => {
     setLoading(true);
     try {
@@ -167,6 +171,8 @@ export function usePackingList() {
           retailer_id,
           total_amount,
           items,
+          delivery_date,
+          delivery_status,
           retailers!inner(
             id,
             name,
@@ -179,6 +185,18 @@ export function usePackingList() {
         .eq('status', 'confirmed')
         .order('order_date', { ascending: false });
 
+      // D-1 Filter: Only show orders with delivery_status = 'in_packing_list'
+      // This ensures only D-1 orders appear in packing list management
+      if (filters.deliveryStatus) {
+        query = query.eq('delivery_status', filters.deliveryStatus);
+      } else {
+        // Default: Only show D-1 orders ready for packing
+        query = query.eq('delivery_status', 'in_packing_list');
+      }
+
+      if (filters.deliveryDate) {
+        query = query.eq('delivery_date', filters.deliveryDate);
+      }
       if (filters.orderDate) {
         query = query.eq('order_date', filters.orderDate);
       }
@@ -200,6 +218,8 @@ export function usePackingList() {
       const ordersWithRetailer = (data || []).map((order: any) => ({
         id: order.id,
         order_date: order.order_date,
+        delivery_date: order.delivery_date,
+        delivery_status: order.delivery_status,
         retailer_id: order.retailer_id,
         retailer_name: order.retailers?.name,
         beat_id: order.retailers?.beat_id,
