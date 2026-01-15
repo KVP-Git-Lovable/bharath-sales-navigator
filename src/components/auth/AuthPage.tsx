@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { SignInForm } from './SignInForm';
-import { SignUpForm } from './SignUpForm';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, User } from 'lucide-react';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
-type AuthMode = 'signin' | 'signup' | 'forgot' | 'admin-signin' | 'user-signin';
+type AuthMode = 'signin' | 'forgot' | 'admin-signin' | 'user-signin';
 
 export const AuthPage = () => {
   const { user, loading } = useAuth();
@@ -94,27 +93,6 @@ export const AuthPage = () => {
               >
                 Forgot your password?
               </button>
-              <button
-                onClick={() => setAuthMode('signup')}
-                className="text-sm text-muted-foreground hover:underline"
-              >
-                Don't have an account? Sign up
-              </button>
-            </div>
-          </>
-        );
-      
-      case 'signup':
-        return (
-          <>
-            <SignUpForm />
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setAuthMode('user-signin')}
-                className="text-sm text-muted-foreground hover:underline"
-              >
-                Already have an account? Sign in
-              </button>
             </div>
           </>
         );
@@ -140,16 +118,6 @@ export const AuthPage = () => {
                 <User className="h-6 w-6" />
                 <span>User Sign In</span>
               </Button>
-            </div>
-            
-            <div className="text-center mt-6">
-              <p className="text-sm text-muted-foreground mb-2">Don't have an account?</p>
-              <button
-                onClick={() => setAuthMode('signup')}
-                className="text-sm text-primary hover:underline"
-              >
-                Sign up here
-              </button>
             </div>
           </div>
         );

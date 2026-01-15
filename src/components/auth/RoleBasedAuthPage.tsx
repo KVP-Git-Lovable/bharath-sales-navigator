@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { SignInForm } from './SignInForm';
-import { SignUpForm } from './SignUpForm';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Shield, User } from 'lucide-react';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
-type AuthMode = 'role-selection' | 'admin-signin' | 'user-signin' | 'signup' | 'forgot';
+type AuthMode = 'role-selection' | 'admin-signin' | 'user-signin' | 'forgot';
 type UserType = 'admin' | 'user';
 
 export const RoleBasedAuthPage = () => {
@@ -107,14 +105,6 @@ export const RoleBasedAuthPage = () => {
                 </Button>
               </div>
               
-              <div className="text-center">
-                <button
-                  onClick={() => setAuthMode('signup')}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Don't have an account? Sign up
-                </button>
-              </div>
             </div>
           )}
 
@@ -147,12 +137,6 @@ export const RoleBasedAuthPage = () => {
                 >
                   Forgot your password?
                 </button>
-                <button
-                  onClick={() => setAuthMode('signup')}
-                  className="text-muted-foreground hover:underline"
-                >
-                  Don't have an account? Sign up
-                </button>
                 {selectedUserType === 'admin' && (
                   <button
                     onClick={() => {
@@ -164,31 +148,6 @@ export const RoleBasedAuthPage = () => {
                     Back to user login
                   </button>
                 )}
-              </div>
-            </div>
-          )}
-
-          {authMode === 'signup' && (
-            <div className="space-y-4">
-              <div className="text-center space-y-2">
-                <h1 className="text-xl font-semibold">Create Account</h1>
-                <p className="text-muted-foreground text-sm">
-                  Create a new user account
-                </p>
-              </div>
-              
-              <SignUpForm />
-              
-              <div className="text-center">
-                <button
-                  onClick={() => {
-                    setAuthMode('user-signin');
-                    setSelectedUserType('user');
-                  }}
-                  className="text-sm text-muted-foreground hover:underline"
-                >
-                  Back to sign in
-                </button>
               </div>
             </div>
           )}
