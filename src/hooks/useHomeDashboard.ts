@@ -106,10 +106,16 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
         const todayStr = getLocalTodayDate();
         if (parsed.date === todayStr && parsed.attendance?.check_in_time) {
           return parsed.attendance;
+        } else {
+          // Lock is stale (from a previous day) - clear it
+          console.log('[useHomeDashboard] 🗑️ Clearing stale attendance lock from', parsed.date);
+          localStorage.removeItem(ATTENDANCE_LOCK_KEY);
         }
       }
     } catch (e) {
       console.error('[useHomeDashboard] Error reading attendance lock:', e);
+      // Clear corrupted lock
+      localStorage.removeItem(ATTENDANCE_LOCK_KEY);
     }
     return null;
   }, [userId, ATTENDANCE_LOCK_KEY]);
