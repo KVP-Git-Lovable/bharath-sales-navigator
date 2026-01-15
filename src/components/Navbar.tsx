@@ -13,6 +13,10 @@ import { useActivePerformanceModule } from "@/hooks/useActivePerformanceModule";
 import { usePackingListModule, useDeliveryAgentApp } from "@/hooks/useD1Delivery";
 import { useCompanyData } from "@/hooks/useCompanyData";
 import { Building2 as DefaultLogoIcon } from "lucide-react";
+import { useNavCustomization, NavItem } from "@/hooks/useNavCustomization";
+import { NavSearch } from "@/components/navigation/NavSearch";
+import { NavCustomizeDialog } from "@/components/navigation/NavCustomizeDialog";
+import { NavGroupSection } from "@/components/navigation/NavGroupSection";
 import {
   Sheet,
   SheetContent,
@@ -64,49 +68,64 @@ export const Navbar = memo(() => {
   // Hide back button on home/dashboard
   const showBackButton = location.pathname !== '/dashboard' && location.pathname !== '/';
 
-  // Build navigation items dynamically based on active module
-  const navigationItems = useMemo(() => {
-    const baseItems = [
-      { icon: UserCheck, label: t('nav.attendance'), href: "/attendance", color: "from-blue-500 to-blue-600" },
-      { icon: Car, label: t('nav.myVisit'), href: "/visits/retailers", color: "from-green-500 to-green-600" },
-      { icon: Store, label: t('nav.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
-      { icon: Target, label: "My Target", href: "/my-target", color: "from-cyan-500 to-cyan-600" },
-      { icon: TrendingUp, label: "Performance", href: "/performance-dashboard", color: "from-emerald-500 to-emerald-600" },
-      { icon: BarChart3, label: t('nav.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600" },
-      { icon: Building2, label: "Institutional Sales", href: "/institutional-sales", color: "from-indigo-500 to-indigo-600" },
-      { icon: Factory, label: "Distributor Master", href: "/distributor-master", color: "from-cyan-500 to-cyan-600" },
-      { icon: ShoppingCart, label: "Primary Orders", href: "/primary-orders", color: "from-rose-500 to-rose-600" },
-      { icon: MapPin, label: t('nav.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },
-      { icon: Navigation2, label: t('nav.gpsTrack'), href: "/gps-track", color: "from-purple-500 to-purple-600" },
-      { icon: Users, label: t('nav.myBeats'), href: "/my-beats", color: "from-orange-500 to-orange-600" },
-      { icon: Trophy, label: "Competition Master", href: "/competition-master", color: "from-slate-500 to-slate-600" },
-      { icon: Gift, label: t('nav.schemes'), href: "/schemes", color: "from-pink-500 to-pink-600" },
-      { icon: CreditCard, label: t('nav.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600" },
+  // Build navigation items dynamically based on active module - now with IDs for customization
+  const navigationItems: NavItem[] = useMemo(() => {
+    const baseItems: NavItem[] = [
+      { id: 'attendance', icon: UserCheck, label: t('nav.attendance'), href: "/attendance", color: "from-blue-500 to-blue-600" },
+      { id: 'my-visit', icon: Car, label: t('nav.myVisit'), href: "/visits/retailers", color: "from-green-500 to-green-600" },
+      { id: 'all-retailers', icon: Store, label: t('nav.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
+      { id: 'my-target', icon: Target, label: "My Target", href: "/my-target", color: "from-cyan-500 to-cyan-600" },
+      { id: 'performance', icon: TrendingUp, label: "Performance", href: "/performance-dashboard", color: "from-emerald-500 to-emerald-600" },
+      { id: 'analytics', icon: BarChart3, label: t('nav.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600" },
+      { id: 'institutional-sales', icon: Building2, label: "Institutional Sales", href: "/institutional-sales", color: "from-indigo-500 to-indigo-600" },
+      { id: 'distributor-master', icon: Factory, label: "Distributor Master", href: "/distributor-master", color: "from-cyan-500 to-cyan-600" },
+      { id: 'primary-orders', icon: ShoppingCart, label: "Primary Orders", href: "/primary-orders", color: "from-rose-500 to-rose-600" },
+      { id: 'territories', icon: MapPin, label: t('nav.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },
+      { id: 'gps-track', icon: Navigation2, label: t('nav.gpsTrack'), href: "/gps-track", color: "from-purple-500 to-purple-600" },
+      { id: 'my-beats', icon: Users, label: t('nav.myBeats'), href: "/my-beats", color: "from-orange-500 to-orange-600" },
+      { id: 'competition-master', icon: Trophy, label: "Competition Master", href: "/competition-master", color: "from-slate-500 to-slate-600" },
+      { id: 'schemes', icon: Gift, label: t('nav.schemes'), href: "/schemes", color: "from-pink-500 to-pink-600" },
+      { id: 'expenses', icon: CreditCard, label: t('nav.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600" },
     ];
 
     // Add Leaderboard only if gamification is active
     if (isGamificationActive) {
-      baseItems.push({ icon: Trophy, label: "Leader board", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
+      baseItems.push({ id: 'leaderboard', icon: Trophy, label: "Leader board", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
     }
 
     // Add Packing List Management if enabled
     if (isPackingListEnabled) {
-      baseItems.push({ icon: ClipboardList, label: "Packing List", href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
+      baseItems.push({ id: 'packing-list', icon: ClipboardList, label: "Packing List", href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
     }
 
     // Add Delivery Run if enabled
     if (isDeliveryAgentEnabled) {
-      baseItems.push({ icon: Truck, label: "Delivery Run", href: "/delivery-run", color: "from-orange-500 to-orange-600" });
+      baseItems.push({ id: 'delivery-run', icon: Truck, label: "Delivery Run", href: "/delivery-run", color: "from-orange-500 to-orange-600" });
     }
 
     // Add remaining items
     baseItems.push(
-      { icon: Target, label: "My Competency", href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
-      { icon: Trash2, label: "Recycle Bin", href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
+      { id: 'my-competency', icon: Target, label: "My Competency", href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
+      { id: 'recycle-bin', icon: Trash2, label: "Recycle Bin", href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
     );
 
     return baseItems;
   }, [t, isGamificationActive, isPackingListEnabled, isDeliveryAgentEnabled]);
+
+  // Nav customization hook
+  const {
+    customization,
+    isCustomized,
+    createGroup,
+    deleteGroup,
+    renameGroup,
+    toggleGroupExpansion,
+    moveItemToGroup,
+    reorderItems,
+    reorderGroups,
+    resetToDefault,
+    getOrganizedItems,
+  } = useNavCustomization(navigationItems);
 
   // Admin-only navigation items
   const adminNavigationItems = [
@@ -274,10 +293,40 @@ export const Navbar = memo(() => {
           )}
 
           {/* Navigation Section */}
-          <div>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Navigation</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-muted-foreground px-1">Navigation</h3>
+              <NavCustomizeDialog
+                defaultItems={navigationItems}
+                customization={customization}
+                onCreateGroup={createGroup}
+                onDeleteGroup={deleteGroup}
+                onRenameGroup={renameGroup}
+                onMoveItemToGroup={moveItemToGroup}
+                onReorderItems={reorderItems}
+                onReorderGroups={reorderGroups}
+                onResetToDefault={resetToDefault}
+                getOrganizedItems={getOrganizedItems}
+              />
+            </div>
+
+            {/* Search */}
+            <NavSearch items={navigationItems} onItemClick={handleMenuItemClick} />
+
+            {/* Custom Groups */}
+            {getOrganizedItems().groups.map((group) => (
+              <NavGroupSection
+                key={group.id}
+                name={group.name}
+                items={group.items}
+                isExpanded={group.isExpanded}
+                onItemClick={handleMenuItemClick}
+              />
+            ))}
+
+            {/* Ungrouped Items */}
             <div className="grid grid-cols-3 gap-3">
-              {navigationItems.map((item) => (
+              {getOrganizedItems().ungroupedItems.map((item) => (
                 <NavLink 
                   key={item.href}
                   to={item.href}
