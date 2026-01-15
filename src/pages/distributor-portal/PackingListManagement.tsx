@@ -99,12 +99,14 @@ export default function PackingListManagement() {
   // Load orders when create dialog opens
   useEffect(() => {
     const loadOrders = async () => {
-      if (!showCreateDialog || !distributorId) return;
+      if (!showCreateDialog) return;
       
       setLoadingOrders(true);
+      // Fetch D-1 orders ready for packing (delivery_status = 'in_packing_list')
       const orders = await fetchOrdersForPacking({
-        distributorId,
-        orderDate: orderDateFilter
+        distributorId: distributorId || undefined,
+        orderDate: orderDateFilter,
+        deliveryStatus: 'in_packing_list'  // Only D-1 orders
       });
       setOrdersForPacking(orders);
       setLoadingOrders(false);
@@ -114,16 +116,17 @@ export default function PackingListManagement() {
   }, [showCreateDialog, orderDateFilter, distributorId, fetchOrdersForPacking]);
 
   const handleCreatePackingList = async () => {
-    if (selectedOrderIds.length === 0 || !distributorId) return;
+    if (selectedOrderIds.length === 0) return;
 
     const selectedOrders = ordersForPacking.filter(o => selectedOrderIds.includes(o.id));
+    // Use distributorId if available, otherwise pass null (for direct sales)
     const result = await createPackingList(deliveryDate, distributorId, selectedOrderIds, selectedOrders);
     
     if (result) {
       setShowCreateDialog(false);
       setSelectedOrderIds([]);
       // Reload packing lists
-      const lists = await fetchPackingLists({ distributorId });
+      const lists = await fetchPackingLists({ distributorId: distributorId || undefined });
       setPackingLists(lists);
     }
   };
@@ -435,6 +438,11 @@ export default function PackingListManagement() {
                       <p className="font-medium text-sm">{order.retailer_name || 'Unknown Retailer'}</p>
                       <p className="text-xs text-muted-foreground">
                         {order.beat_name || 'No Beat'} • {order.items?.length || 0} items
+                        {order.delivery_date && (
+                          <span className="ml-2 text-primary font-medium">
+                            • Delivery: {format(new Date(order.delivery_date), 'dd MMM')}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <p className="font-semibold text-sm">₹{order.total_amount?.toLocaleString()}</p>
