@@ -89,13 +89,19 @@ export default function PackingListDetail() {
   // Load agents for assignment
   useEffect(() => {
     const loadAgents = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('is_active', true);
-      
-      if (data) {
-        setAgents(data);
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name');
+        
+        if (data) {
+          const agentList: Agent[] = data
+            .filter((p: any) => p.full_name)
+            .map((p: any) => ({ id: p.id, full_name: p.full_name || '' }));
+          setAgents(agentList);
+        }
+      } catch (err) {
+        console.error('Error loading agents:', err);
       }
     };
 

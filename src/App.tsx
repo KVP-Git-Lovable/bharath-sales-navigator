@@ -144,6 +144,8 @@ import PrimaryOrderDetail from "./pages/distributor-portal/PrimaryOrderDetail";
 import DistributorInventory from "./pages/distributor-portal/DistributorInventory";
 import SecondarySales from "./pages/distributor-portal/SecondarySales";
 import PackingList from "./pages/distributor-portal/PackingList";
+import PackingListManagement from "./pages/distributor-portal/PackingListManagement";
+import PackingListDetail from "./pages/distributor-portal/PackingListDetail";
 import GoodsReceipt from "./pages/distributor-portal/GoodsReceipt";
 import DistributorClaims from "./pages/distributor-portal/DistributorClaims";
 import DistributorSupport from "./pages/distributor-portal/DistributorSupport";
@@ -155,6 +157,7 @@ import RetailerReturns from "./pages/distributor-portal/RetailerReturns";
 import CompanyReturns from "./pages/distributor-portal/CompanyReturns";
 import InventoryLedger from "./pages/distributor-portal/InventoryLedger";
 import StockAdjustments from "./pages/distributor-portal/StockAdjustments";
+import DeliveryRun from "./pages/DeliveryRun";
 
 // Institutional Sales pages
 import InstitutionalSalesDashboard from "./pages/institutional/InstitutionalSalesDashboard";
@@ -407,6 +410,8 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="inventory" element={<DistributorInventory />} />
           <Route path="secondary-sales" element={<SecondarySales />} />
           <Route path="packing-list" element={<PackingList />} />
+          <Route path="packing-list-management" element={<PackingListManagement />} />
+          <Route path="packing-list/:id" element={<PackingListDetail />} />
           <Route path="goods-receipt/:orderId" element={<GoodsReceipt />} />
           <Route path="goods-receipt" element={<GoodsReceipt />} />
           <Route path="claims" element={<DistributorClaims />} />
@@ -420,6 +425,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="inventory-ledger" element={<InventoryLedger />} />
           <Route path="stock-adjustments" element={<StockAdjustments />} />
         </Route>
+
+        {/* Delivery Agent Route */}
+        <Route path="/delivery-run" element={<ProtectedRoute><DeliveryRun /></ProtectedRoute>} />
 
         {/* Institutional Sales Routes */}
         <Route path="/institutional-sales" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
