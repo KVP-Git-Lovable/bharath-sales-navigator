@@ -17,6 +17,7 @@ import { useNavCustomization, NavItem } from "@/hooks/useNavCustomization";
 import { NavSearch } from "@/components/navigation/NavSearch";
 import { NavCustomizeDialog } from "@/components/navigation/NavCustomizeDialog";
 import { NavGroupSection } from "@/components/navigation/NavGroupSection";
+import { DraggableNavGrid } from "@/components/navigation/DraggableNavGrid";
 import {
   Sheet,
   SheetContent,
@@ -324,22 +325,12 @@ export const Navbar = memo(() => {
               />
             ))}
 
-            {/* Ungrouped Items */}
-            <div className="grid grid-cols-3 gap-3">
-              {getOrganizedItems().ungroupedItems.map((item) => (
-                <NavLink 
-                  key={item.href}
-                  to={item.href}
-                  onClick={handleMenuItemClick}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-muted/50 transition-colors"
-                >
-                  <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-r ${item.color} shadow-md`}>
-                    <item.icon className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-center leading-tight">{item.label}</span>
-                </NavLink>
-              ))}
-            </div>
+            {/* Ungrouped Items - Draggable */}
+            <DraggableNavGrid
+              items={getOrganizedItems().ungroupedItems}
+              onReorder={(newItemIds) => reorderItems(null, newItemIds)}
+              onItemClick={handleMenuItemClick}
+            />
           </div>
         </SheetContent>
       </Sheet>
