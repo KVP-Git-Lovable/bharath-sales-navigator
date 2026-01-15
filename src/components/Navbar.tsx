@@ -91,7 +91,7 @@ export const Navbar = memo(() => {
 
     // Add Packing List Management if enabled
     if (isPackingListEnabled) {
-      baseItems.push({ icon: ClipboardList, label: "Packing List", href: "/distributor-portal/packing-list-management", color: "from-teal-500 to-teal-600" });
+      baseItems.push({ icon: ClipboardList, label: "Packing List", href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
     }
 
     // Add Delivery Run if enabled

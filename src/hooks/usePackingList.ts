@@ -226,7 +226,7 @@ export function usePackingList() {
   // Create packing list from selected orders
   const createPackingList = useCallback(async (
     deliveryDate: string,
-    distributorId: string,
+    distributorId: string | null,
     orderIds: string[],
     orders: OrderForPacking[]
   ) => {
@@ -285,24 +285,26 @@ export function usePackingList() {
 
       if (updateError) throw updateError;
 
-      // Reserve stock
-      const reservationItems = aggregatedItems.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity
-      }));
+      // Reserve stock only if distributor exists
+      if (distributorId) {
+        const reservationItems = aggregatedItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity
+        }));
 
-      const reservationResult = await reserveStockForPackingList(
-        distributorId,
-        packingList.id,
-        reservationItems
-      );
+        const reservationResult = await reserveStockForPackingList(
+          distributorId,
+          packingList.id,
+          reservationItems
+        );
 
-      if (reservationResult.shortItems && reservationResult.shortItems.length > 0) {
-        toast({
-          title: "Warning",
-          description: `${reservationResult.shortItems.length} items have insufficient stock`,
-          variant: "destructive"
-        });
+        if (reservationResult.shortItems && reservationResult.shortItems.length > 0) {
+          toast({
+            title: "Warning",
+            description: `${reservationResult.shortItems.length} items have insufficient stock`,
+            variant: "destructive"
+          });
+        }
       }
 
       toast({
@@ -439,7 +441,7 @@ export function usePackingList() {
   }, [toast]);
 
   // Delete packing list (only draft)
-  const deletePackingList = useCallback(async (packingListId: string, distributorId: string) => {
+  const deletePackingList = useCallback(async (packingListId: string, distributorId: string | null) => {
     setLoading(true);
     try {
       // Get items for releasing stock
@@ -448,8 +450,8 @@ export function usePackingList() {
         .select('product_id, ordered_qty')
         .eq('packing_list_id', packingListId);
 
-      // Release reserved stock
-      if (items && items.length > 0) {
+      // Release reserved stock only if distributor exists
+      if (distributorId && items && items.length > 0) {
         await releaseReservedStock(
           distributorId,
           packingListId,
