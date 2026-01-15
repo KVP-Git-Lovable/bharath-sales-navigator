@@ -1436,6 +1436,7 @@ export const Cart = () => {
       }
 
       // Calculate credit amounts (same logic as handleSubmitOrder)
+      // D-1 DIFFERENCE: If no payment type selected, treat as "collect_on_delivery"
       const totalDue = pendingAmountFromPrevious + totalAmount;
       let newTotalPending = 0;
       let creditPending = 0;
@@ -1445,7 +1446,15 @@ export const Cart = () => {
       let orderPaymentMethod = "";
       let paymentProofUrl = "";
 
-      if (paymentType === "credit") {
+      if (!paymentType) {
+        // D-1 SPECIFIC: No payment selected = Collect on Delivery
+        isCreditOrder = true;
+        newTotalPending = totalDue;
+        creditPending = totalAmount;
+        creditPaid = 0;
+        previousPendingCleared = 0;
+        orderPaymentMethod = "collect_on_delivery";
+      } else if (paymentType === "credit") {
         isCreditOrder = true;
         newTotalPending = totalDue;
         creditPending = totalAmount;
@@ -1537,6 +1546,9 @@ export const Cart = () => {
       // - delivery_status: 'in_packing_list' (ready for packing list inclusion)
       // - delivery_date: tomorrow (next day delivery)
       // - packing_list_id: null (not yet assigned to a packing list)
+      // Payment status is determined by: is_credit_order + payment_method
+      // - Paid: is_credit_order=false, payment_method=cash/upi/cheque/neft
+      // - Collect on Delivery: is_credit_order=true, payment_method='collect_on_delivery'
       const orderData = {
         user_id: currentUserId,
         visit_id: actualVisitId,
@@ -2113,13 +2125,13 @@ export const Cart = () => {
                   )}
                 </Button>
 
-                {/* D-1 Next Day Delivery Button */}
+                {/* D-1 Next Day Delivery Button - Works with or without payment selection */}
                 {isD1DeliveryEnabled && (
                   <Button 
                     onClick={handleConfirmD1Order} 
                     className="w-full h-9 text-sm border-2 border-primary" 
                     variant="outline" 
-                    disabled={!canSubmitOrder() || !paymentType || isSubmitting}
+                    disabled={!canSubmitOrder() || isSubmitting}
                   >
                     {isSubmitting ? (
                       <>
@@ -2132,7 +2144,7 @@ export const Cart = () => {
                     ) : (
                       <>
                         <Truck className="mr-2 h-4 w-4" />
-                        Confirm Order (Next Day Delivery)
+                        {paymentType ? 'Confirm Order (Next Day Delivery)' : 'Confirm Order (Collect on Delivery)'}
                       </>
                     )}
                   </Button>

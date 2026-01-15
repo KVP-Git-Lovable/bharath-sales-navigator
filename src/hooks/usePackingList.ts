@@ -57,6 +57,11 @@ export interface OrderForPacking {
   beat_name?: string;
   territory_id?: string;
   total_amount: number;
+  // Payment info for delivery agent
+  is_credit_order?: boolean;
+  payment_method?: string;
+  credit_paid_amount?: number;
+  credit_pending_amount?: number;
   items: Array<{
     product_id: string;
     product_name: string;
@@ -173,6 +178,10 @@ export function usePackingList() {
           items,
           delivery_date,
           delivery_status,
+          is_credit_order,
+          payment_method,
+          credit_paid_amount,
+          credit_pending_amount,
           retailers!inner(
             id,
             name,
@@ -214,7 +223,7 @@ export function usePackingList() {
 
       if (error) throw error;
 
-      // Transform data to include retailer info
+      // Transform data to include retailer info and payment status
       const ordersWithRetailer = (data || []).map((order: any) => ({
         id: order.id,
         order_date: order.order_date,
@@ -226,6 +235,11 @@ export function usePackingList() {
         beat_name: order.retailers?.beats?.beat_name,
         territory_id: order.retailers?.territory_id,
         total_amount: order.total_amount,
+        // Payment info for delivery agent
+        is_credit_order: order.is_credit_order,
+        payment_method: order.payment_method,
+        credit_paid_amount: order.credit_paid_amount,
+        credit_pending_amount: order.credit_pending_amount,
         items: order.items || []
       }));
 
