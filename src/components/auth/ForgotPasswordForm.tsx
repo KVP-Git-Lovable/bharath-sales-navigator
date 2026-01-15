@@ -66,6 +66,22 @@ export const ForgotPasswordForm = () => {
   const onEmailSubmit = async (data: EmailFormData) => {
     setIsLoading(true);
     try {
+      // First validate if email exists in the system
+      const { data: validation, error: validationError } = await supabase.functions.invoke('validate-reset-email', {
+        body: { email: data.email }
+      });
+
+      if (validationError) {
+        toast.error('Failed to validate email. Please try again.');
+        return;
+      }
+
+      if (!validation?.exists) {
+        toast.error('This email is not registered in the organization');
+        return;
+      }
+
+      // Email exists, proceed with reset
       const redirectUrl = `${window.location.origin}/reset-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo: redirectUrl,
@@ -97,6 +113,8 @@ export const ForgotPasswordForm = () => {
 
       if (error) {
         toast.error('Failed to send reset SMS. Please try again.');
+      } else if (result?.notFound) {
+        toast.error('This phone number is not linked to any account in the organization');
       } else if (result?.error) {
         toast.error(result.error);
       } else {
