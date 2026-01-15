@@ -135,6 +135,109 @@ const PrimaryOrders = () => {
     loadOrderItems(order.id);
   };
 
+  const updateDistributorInventory = async (orderId: string, distributorId: string) => {
+    try {
+      // Fetch order items
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('primary_order_items')
+        .select('*')
+        .eq('order_id', orderId);
+
+      if (itemsError) throw itemsError;
+      if (!orderItems || orderItems.length === 0) return;
+
+      // Fetch order details for reference
+      const { data: orderData } = await supabase
+        .from('primary_orders')
+        .select('order_number')
+        .eq('id', orderId)
+        .single();
+
+      const orderNumber = orderData?.order_number || orderId;
+
+      // Update inventory for each item
+      for (const item of orderItems) {
+        const receivedQty = item.received_quantity || item.quantity;
+        if (receivedQty <= 0) continue;
+
+        // Check if inventory record exists
+        const { data: existingInventory } = await supabase
+          .from('distributor_inventory')
+          .select('*')
+          .eq('distributor_id', distributorId)
+          .eq('product_id', item.product_id)
+          .eq('variant_id', item.variant_id || null)
+          .maybeSingle();
+
+        if (existingInventory) {
+          // Update existing inventory
+          const newQty = existingInventory.quantity + receivedQty;
+          const newAvailable = (existingInventory.available_quantity || 0) + receivedQty;
+          const newValue = newQty * (existingInventory.unit_cost || item.unit_price);
+
+          await supabase
+            .from('distributor_inventory')
+            .update({
+              quantity: newQty,
+              available_quantity: newAvailable,
+              total_value: newValue,
+              last_received_date: new Date().toISOString().split('T')[0],
+              batch_number: item.batch_number || existingInventory.batch_number,
+              expiry_date: item.expiry_date || existingInventory.expiry_date,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingInventory.id);
+        } else {
+          // Create new inventory record
+          await supabase
+            .from('distributor_inventory')
+            .insert({
+              distributor_id: distributorId,
+              product_id: item.product_id,
+              variant_id: item.variant_id || null,
+              product_name: item.product_name,
+              variant_name: item.variant_name || null,
+              sku: item.sku,
+              quantity: receivedQty,
+              reserved_quantity: 0,
+              available_quantity: receivedQty,
+              reorder_level: 10,
+              max_stock_level: 1000,
+              unit: item.unit,
+              unit_cost: item.unit_price,
+              total_value: receivedQty * item.unit_price,
+              batch_number: item.batch_number || null,
+              expiry_date: item.expiry_date || null,
+              last_received_date: new Date().toISOString().split('T')[0],
+            });
+        }
+
+        // Log inventory transaction
+        await supabase
+          .from('distributor_inventory_transactions')
+          .insert({
+            distributor_id: distributorId,
+            product_id: item.product_id,
+            variant_id: item.variant_id || null,
+            transaction_type: 'inward',
+            quantity: receivedQty,
+            reference_type: 'primary_order',
+            reference_id: orderId,
+            reference_number: orderNumber,
+            batch_number: item.batch_number || null,
+            unit: item.unit,
+            unit_cost: item.unit_price,
+            notes: `Auto GRN from primary order ${orderNumber} (Admin Delivery)`,
+          });
+      }
+
+      console.log('Distributor inventory updated successfully');
+    } catch (error) {
+      console.error('Error updating distributor inventory:', error);
+      throw error;
+    }
+  };
+
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setUpdatingStatus(true);
     try {
@@ -144,7 +247,12 @@ const PrimaryOrders = () => {
         updateData.dispatched_at = new Date().toISOString();
       } else if (newStatus === 'delivered') {
         updateData.actual_delivery_date = new Date().toISOString().split('T')[0];
+        updateData.received_at = new Date().toISOString();
       }
+
+      // Get the order's distributor_id for inventory update
+      const order = orders.find(o => o.id === orderId) || selectedOrder;
+      const distributorId = order?.distributor_id;
 
       const { error } = await supabase
         .from('primary_orders')
@@ -153,7 +261,19 @@ const PrimaryOrders = () => {
 
       if (error) throw error;
 
-      toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
+      // If marking as delivered, update distributor inventory
+      if (newStatus === 'delivered' && distributorId) {
+        try {
+          await updateDistributorInventory(orderId, distributorId);
+          toast.success('Order delivered and inventory updated successfully');
+        } catch (invError) {
+          console.error('Inventory update failed:', invError);
+          toast.warning('Order marked delivered but inventory update failed. Please update inventory manually.');
+        }
+      } else {
+        toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
+      }
+
       loadOrders();
       
       if (selectedOrder?.id === orderId) {
