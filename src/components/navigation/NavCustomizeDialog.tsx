@@ -159,125 +159,124 @@ export const NavCustomizeDialog = ({
           <Settings className="h-4 w-4 text-muted-foreground" />
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-md h-[80vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Customize Navigation
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4">
-          {/* Create Group Section */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Create New Group</label>
-            <div className="flex gap-2">
-              <Input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Group name..."
-                className="flex-1"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
-              />
-              <Button
-                onClick={handleCreateGroup}
-                disabled={!newGroupName.trim()}
-                size="sm"
-                className="gap-1"
-              >
-                <FolderPlus className="h-4 w-4" />
-                Create
-              </Button>
-            </div>
-            {selectedItems.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {selectedItems.length} item(s) selected - will be added to new group
-              </p>
-            )}
+        {/* Create Group Section - Fixed at top */}
+        <div className="px-6 pb-4 flex-shrink-0 space-y-2 border-b">
+          <label className="text-sm font-medium">Create New Group</label>
+          <div className="flex gap-2">
+            <Input
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="Group name..."
+              className="flex-1"
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+            />
+            <Button
+              onClick={handleCreateGroup}
+              disabled={!newGroupName.trim()}
+              size="sm"
+              className="gap-1"
+            >
+              <FolderPlus className="h-4 w-4" />
+              Create
+            </Button>
           </div>
-
-          {/* Groups and Items */}
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-4">
-              {/* Custom Groups */}
-              {organized.groups.map((group) => (
-                <div
-                  key={group.id}
-                  className="border rounded-lg overflow-hidden"
-                  onDragOver={handleDragOver}
-                  onDrop={() => handleDropOnGroup(group.id)}
-                >
-                  <div className="flex items-center gap-2 p-2 bg-muted/50">
-                    <ChevronRight className={`h-4 w-4 transition-transform ${group.isExpanded ? 'rotate-90' : ''}`} />
-                    {editingGroupId === group.id ? (
-                      <div className="flex items-center gap-1 flex-1">
-                        <Input
-                          value={editingGroupName}
-                          onChange={(e) => setEditingGroupName(e.target.value)}
-                          className="h-7 text-sm"
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
-                          autoFocus
-                        />
-                        <button onClick={handleSaveEdit} className="p-1 hover:bg-muted rounded">
-                          <Check className="h-4 w-4 text-green-600" />
-                        </button>
-                        <button onClick={() => setEditingGroupId(null)} className="p-1 hover:bg-muted rounded">
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-sm font-medium flex-1">{group.name}</span>
-                        <span className="text-xs text-muted-foreground">{group.items.length} items</span>
-                        <button
-                          onClick={() => handleStartEdit(group.id, group.name)}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <Edit2 className="h-3 w-3 text-muted-foreground" />
-                        </button>
-                        <button
-                          onClick={() => onDeleteGroup(group.id)}
-                          className="p-1 hover:bg-muted rounded text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {group.isExpanded && group.items.length > 0 && (
-                    <div className="p-2 space-y-1">
-                      {group.items.map((item, index) => renderItem(item, group.id, index, group.items))}
-                    </div>
-                  )}
-                  {group.isExpanded && group.items.length === 0 && (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                      Drag items here to add them to this group
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Ungrouped Items */}
-              <div
-                className="border rounded-lg overflow-hidden"
-                onDragOver={handleDragOver}
-                onDrop={() => handleDropOnGroup(null)}
-              >
-                <div className="flex items-center gap-2 p-2 bg-muted/50">
-                  <span className="text-sm font-medium flex-1">Ungrouped</span>
-                  <span className="text-xs text-muted-foreground">{organized.ungroupedItems.length} items</span>
-                </div>
-                <div className="p-2 space-y-1">
-                  {organized.ungroupedItems.map((item, index) => 
-                    renderItem(item, null, index, organized.ungroupedItems)
-                  )}
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
+          {selectedItems.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {selectedItems.length} item(s) selected - will be added to new group
+            </p>
+          )}
         </div>
 
-        <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2">
+        {/* Scrollable Groups and Items */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-4">
+            {/* Custom Groups */}
+            {organized.groups.map((group) => (
+              <div
+                key={group.id}
+                className="border rounded-lg overflow-hidden bg-background"
+                onDragOver={handleDragOver}
+                onDrop={() => handleDropOnGroup(group.id)}
+              >
+                <div className="flex items-center gap-2 p-2 bg-muted/50">
+                  <ChevronRight className={`h-4 w-4 transition-transform ${group.isExpanded ? 'rotate-90' : ''}`} />
+                  {editingGroupId === group.id ? (
+                    <div className="flex items-center gap-1 flex-1">
+                      <Input
+                        value={editingGroupName}
+                        onChange={(e) => setEditingGroupName(e.target.value)}
+                        className="h-7 text-sm"
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                        autoFocus
+                      />
+                      <button onClick={handleSaveEdit} className="p-1 hover:bg-muted rounded">
+                        <Check className="h-4 w-4 text-green-600" />
+                      </button>
+                      <button onClick={() => setEditingGroupId(null)} className="p-1 hover:bg-muted rounded">
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-sm font-medium flex-1">{group.name}</span>
+                      <span className="text-xs text-muted-foreground">{group.items.length} items</span>
+                      <button
+                        onClick={() => handleStartEdit(group.id, group.name)}
+                        className="p-1 hover:bg-muted rounded"
+                      >
+                        <Edit2 className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteGroup(group.id)}
+                        className="p-1 hover:bg-muted rounded text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
+                {group.isExpanded && group.items.length > 0 && (
+                  <div className="p-2 space-y-1">
+                    {group.items.map((item, index) => renderItem(item, group.id, index, group.items))}
+                  </div>
+                )}
+                {group.isExpanded && group.items.length === 0 && (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    Drag items here to add them to this group
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Ungrouped Items */}
+            <div
+              className="border rounded-lg overflow-hidden bg-background"
+              onDragOver={handleDragOver}
+              onDrop={() => handleDropOnGroup(null)}
+            >
+              <div className="flex items-center gap-2 p-2 bg-muted/50">
+                <span className="text-sm font-medium flex-1">Ungrouped</span>
+                <span className="text-xs text-muted-foreground">{organized.ungroupedItems.length} items</span>
+              </div>
+              <div className="p-2 space-y-1">
+                {organized.ungroupedItems.map((item, index) => 
+                  renderItem(item, null, index, organized.ungroupedItems)
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer - Fixed at bottom */}
+        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t bg-background gap-2 sm:gap-2">
           <Button
             variant="outline"
             onClick={onResetToDefault}
