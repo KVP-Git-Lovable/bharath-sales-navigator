@@ -158,6 +158,8 @@ import CompanyReturns from "./pages/distributor-portal/CompanyReturns";
 import InventoryLedger from "./pages/distributor-portal/InventoryLedger";
 import StockAdjustments from "./pages/distributor-portal/StockAdjustments";
 import DeliveryRun from "./pages/DeliveryRun";
+import PackingListManagementPage from "./pages/PackingListManagement";
+import PackingListDetailPage from "./pages/PackingListDetail";
 
 // Institutional Sales pages
 import InstitutionalSalesDashboard from "./pages/institutional/InstitutionalSalesDashboard";
@@ -426,7 +428,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="stock-adjustments" element={<StockAdjustments />} />
         </Route>
 
-        {/* Delivery Agent Route */}
+        {/* D-1 Delivery Module Routes - Main App */}
+        <Route path="/packing-list-management" element={<ProtectedRoute><PackingListManagementPage /></ProtectedRoute>} />
+        <Route path="/packing-list/:id" element={<ProtectedRoute><PackingListDetailPage /></ProtectedRoute>} />
         <Route path="/delivery-run" element={<ProtectedRoute><DeliveryRun /></ProtectedRoute>} />
 
         {/* Institutional Sales Routes */}
