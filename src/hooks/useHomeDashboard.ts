@@ -93,6 +93,19 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
   // Cache key for localStorage persistence
   const CACHE_KEY = `home_dashboard_cache_${userId}`;
   const ATTENDANCE_LOCK_KEY = `attendance_lock_${userId}`;
+
+  const isAttendanceForDate = (attendance: any, targetDate: string): boolean => {
+    if (!attendance) return false;
+    if (attendance.date && attendance.date === targetDate) return true;
+    if (attendance.check_in_time) {
+      try {
+        return toLocalISODate(new Date(attendance.check_in_time)) === targetDate;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  };
   
   // ATTENDANCE LOCK: Persist to localStorage so it survives tab switches
   // This prevents the "Start Your Day" flicker when navigating between tabs
@@ -102,12 +115,22 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
       const locked = localStorage.getItem(ATTENDANCE_LOCK_KEY);
       if (locked) {
         const parsed = JSON.parse(locked);
-        // Check if the lock is for today
         const todayStr = getLocalTodayDate();
+
+        // Lock wrapper must be for today AND the underlying attendance must also be for today.
         if (parsed.date === todayStr && parsed.attendance?.check_in_time) {
-          return parsed.attendance;
-        } else {
-          // Lock is stale (from a previous day) - clear it
+          if (isAttendanceForDate(parsed.attendance, todayStr)) {
+            return parsed.attendance;
+          }
+
+          // Underlying attendance is stale (e.g. cached yesterday's record but wrapped as today)
+          console.log('[useHomeDashboard] 🗑️ Clearing invalid attendance lock (stale attendance record)');
+          localStorage.removeItem(ATTENDANCE_LOCK_KEY);
+          return null;
+        }
+
+        // Lock is stale (from a previous day) - clear it
+        if (parsed.date !== todayStr) {
           console.log('[useHomeDashboard] 🗑️ Clearing stale attendance lock from', parsed.date);
           localStorage.removeItem(ATTENDANCE_LOCK_KEY);
         }
@@ -175,11 +198,17 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
       if (cached) {
         const parsedCache = JSON.parse(cached);
         console.log('[useHomeDashboard] Loaded from localStorage cache, lastUpdated:', parsedCache.lastUpdated);
+
+        // Never reuse stale attendance from cache (cache is not date-scoped)
+        const todayStr = getLocalTodayDate();
+        if (parsedCache.todayData?.attendance && !isAttendanceForDate(parsedCache.todayData.attendance, todayStr)) {
+          parsedCache.todayData.attendance = null;
+        }
         
         // Use locked attendance if available (more reliable than cache)
         if (lockedAttendance) {
           parsedCache.todayData.attendance = lockedAttendance;
-        } else if (parsedCache.todayData?.attendance?.check_in_time) {
+        } else if (parsedCache.todayData?.attendance?.check_in_time && isAttendanceForDate(parsedCache.todayData.attendance, todayStr)) {
           // Lock from cache if not already locked
           attendanceLockedRef.current = true;
           lockedAttendanceRef.current = parsedCache.todayData.attendance;
