@@ -15,7 +15,9 @@ import {
   MoreVertical,
   Trash2,
   Eye,
-  Send
+  Send,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -424,30 +426,61 @@ export default function PackingListManagement() {
                   </span>
                 </div>
                 
-                {ordersForPacking.map(order => (
-                  <div 
-                    key={order.id} 
-                    className="p-3 flex items-center gap-3 hover:bg-muted/30 cursor-pointer"
-                    onClick={() => toggleOrderSelection(order.id)}
-                  >
-                    <Checkbox
-                      checked={selectedOrderIds.includes(order.id)}
-                      onCheckedChange={() => toggleOrderSelection(order.id)}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{order.retailer_name || 'Unknown Retailer'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {order.beat_name || 'No Beat'} • {order.items?.length || 0} items
-                        {order.delivery_date && (
-                          <span className="ml-2 text-primary font-medium">
-                            • Delivery: {format(new Date(order.delivery_date), 'dd MMM')}
-                          </span>
+                {ordersForPacking.map(order => {
+                  // Determine payment status for display
+                  const isPaid = !order.is_credit_order && 
+                    order.payment_method && 
+                    order.payment_method !== 'credit' && 
+                    order.payment_method !== 'collect_on_delivery';
+                  const isCollectOnDelivery = order.payment_method === 'collect_on_delivery' || 
+                    (!order.payment_method && order.is_credit_order);
+                  
+                  return (
+                    <div 
+                      key={order.id} 
+                      className="p-3 flex items-center gap-3 hover:bg-muted/30 cursor-pointer"
+                      onClick={() => toggleOrderSelection(order.id)}
+                    >
+                      <Checkbox
+                        checked={selectedOrderIds.includes(order.id)}
+                        onCheckedChange={() => toggleOrderSelection(order.id)}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{order.retailer_name || 'Unknown Retailer'}</p>
+                          {/* Payment Status Badge */}
+                          {isPaid ? (
+                            <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              Paid
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0">
+                              <Banknote className="h-3 w-3 mr-1" />
+                              Collect
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {order.beat_name || 'No Beat'} • {order.items?.length || 0} items
+                          {order.delivery_date && (
+                            <span className="ml-2 text-primary font-medium">
+                              • Delivery: {format(new Date(order.delivery_date), 'dd MMM')}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-sm">₹{order.total_amount?.toLocaleString()}</p>
+                        {!isPaid && order.credit_pending_amount && order.credit_pending_amount > 0 && (
+                          <p className="text-[10px] text-amber-600">
+                            To collect: ₹{order.credit_pending_amount?.toLocaleString()}
+                          </p>
                         )}
-                      </p>
+                      </div>
                     </div>
-                    <p className="font-semibold text-sm">₹{order.total_amount?.toLocaleString()}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
