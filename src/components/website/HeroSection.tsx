@@ -101,10 +101,10 @@ export const HeroSection = () => {
         >
           <Button
             size="lg"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/auth")}
             className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-semibold px-10 py-6 text-lg rounded-lg shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300"
           >
-            Start Free Trial
+            Get Started
           </Button>
           <Button
             size="lg"
