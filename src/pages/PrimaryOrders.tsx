@@ -161,7 +161,9 @@ const PrimaryOrders = () => {
       // are GENERATED ALWAYS columns in DB. Do not write to them directly.
 
       for (const item of orderItems) {
-        const receivedQty = (item.received_quantity ?? 0) > 0 ? item.received_quantity : item.quantity;
+        const receivedQty = item.received_quantity && item.received_quantity > 0 
+          ? item.received_quantity 
+          : item.quantity;
         if (receivedQty <= 0) continue;
 
         const { data: existingInventory, error: existingError } = await supabase
@@ -248,7 +250,6 @@ const PrimaryOrders = () => {
         updateData.dispatched_at = new Date().toISOString();
       } else if (newStatus === 'delivered') {
         updateData.actual_delivery_date = new Date().toISOString().split('T')[0];
-        updateData.received_at = new Date().toISOString();
       }
 
       // Get the order's distributor_id for inventory update
