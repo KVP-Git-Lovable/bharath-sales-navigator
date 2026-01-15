@@ -298,16 +298,27 @@ const PrimaryOrders = () => {
     }
   };
 
-  const checkInventorySynced = async (orderId: string) => {
-    const { count, error } = await supabase
+  const checkInventorySynced = async (orderId: string, distributorId: string) => {
+    // Check if transaction logs exist
+    const { count: txCount, error: txError } = await supabase
       .from('distributor_inventory_transactions')
       .select('id', { count: 'exact', head: true })
       .eq('reference_type', 'primary_order')
       .eq('reference_id', orderId)
       .eq('transaction_type', 'inward');
 
-    if (error) throw error;
-    return (count || 0) > 0;
+    if (txError) throw txError;
+
+    // Also verify that actual inventory records exist for this distributor
+    const { count: invCount, error: invError } = await supabase
+      .from('distributor_inventory')
+      .select('id', { count: 'exact', head: true })
+      .eq('distributor_id', distributorId);
+
+    if (invError) throw invError;
+
+    // Only consider synced if BOTH transactions AND inventory records exist
+    return (txCount || 0) > 0 && (invCount || 0) > 0;
   };
 
   const syncInventoryForOrder = async (order: PrimaryOrder) => {
@@ -315,7 +326,7 @@ const PrimaryOrders = () => {
 
     setSyncingInventory(true);
     try {
-      const alreadySynced = await checkInventorySynced(order.id);
+      const alreadySynced = await checkInventorySynced(order.id, order.distributor_id);
       if (alreadySynced) {
         toast.message('Inventory already synced for this order');
         return;
