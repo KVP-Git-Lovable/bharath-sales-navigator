@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus, Camera, Mic, Square, Edit, Check, ChevronsUpDown, FileText } from "lucide-react";
+import { Trash2, Plus, Camera, Mic, Square, Edit, Check, ChevronsUpDown, FileText, Play, X, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -47,8 +47,11 @@ export const CompetitionDataForm = ({ retailerId, visitId, onSave }: Competition
   const [savedData, setSavedData] = useState<CompetitionRow[]>([]);
   const [notes, setNotes] = useState("");
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [pendingVoiceNote, setPendingVoiceNote] = useState<{ rowId: string; blob: Blob; url: string } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     fetchCompetitors();
@@ -215,10 +218,16 @@ export const CompetitionDataForm = ({ retailerId, visitId, onSave }: Competition
         }
       };
 
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        await uploadVoiceNote(id, blob);
+        const url = URL.createObjectURL(blob);
+        setPendingVoiceNote({ rowId: id, blob, url });
         stream.getTracks().forEach(track => track.stop());
+        
+        toast({
+          title: "Recording Complete",
+          description: "Play to preview, then submit or discard"
+        });
       };
 
       mediaRecorder.start();
@@ -242,6 +251,42 @@ export const CompetitionDataForm = ({ retailerId, visitId, onSave }: Competition
     if (mediaRecorderRef.current && recording) {
       mediaRecorderRef.current.stop();
       setRecording(null);
+    }
+  };
+
+  const playPendingVoiceNote = () => {
+    if (pendingVoiceNote) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      audioRef.current = new Audio(pendingVoiceNote.url);
+      audioRef.current.onended = () => setIsPlaying(false);
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const discardPendingVoiceNote = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (pendingVoiceNote) {
+      URL.revokeObjectURL(pendingVoiceNote.url);
+    }
+    setPendingVoiceNote(null);
+    setIsPlaying(false);
+    toast({
+      title: "Discarded",
+      description: "Voice recording discarded"
+    });
+  };
+
+  const submitPendingVoiceNote = async () => {
+    if (pendingVoiceNote) {
+      await uploadVoiceNote(pendingVoiceNote.rowId, pendingVoiceNote.blob);
+      URL.revokeObjectURL(pendingVoiceNote.url);
+      setPendingVoiceNote(null);
+      setIsPlaying(false);
     }
   };
 
@@ -585,21 +630,53 @@ export const CompetitionDataForm = ({ retailerId, visitId, onSave }: Competition
                           )}
                         </Button>
 
-                        <Button
-                          onClick={() => recording === row.id ? stopRecording() : startRecording(row.id)}
-                          variant={recording === row.id ? "destructive" : "outline"}
-                          size="sm"
-                          className="h-8"
-                        >
-                          {recording === row.id ? (
-                            <Square className="h-4 w-4" />
-                          ) : (
-                            <Mic className="h-4 w-4" />
-                          )}
-                          {!recording && row.voiceNoteUrls.length > 0 && (
-                            <span className="ml-1 text-xs">({row.voiceNoteUrls.length})</span>
-                          )}
-                        </Button>
+                        {/* Voice Recording Button */}
+                        {pendingVoiceNote?.rowId === row.id ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              onClick={playPendingVoiceNote}
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              disabled={isPlaying}
+                            >
+                              <Play className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              onClick={submitPendingVoiceNote}
+                              variant="default"
+                              size="sm"
+                              className="h-8 bg-green-600 hover:bg-green-700"
+                            >
+                              <Upload className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              onClick={discardPendingVoiceNote}
+                              variant="destructive"
+                              size="sm"
+                              className="h-8"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => recording === row.id ? stopRecording() : startRecording(row.id)}
+                            variant={recording === row.id ? "destructive" : "outline"}
+                            size="sm"
+                            className="h-8"
+                            disabled={pendingVoiceNote !== null}
+                          >
+                            {recording === row.id ? (
+                              <Square className="h-4 w-4" />
+                            ) : (
+                              <Mic className="h-4 w-4" />
+                            )}
+                            {!recording && row.voiceNoteUrls.length > 0 && (
+                              <span className="ml-1 text-xs">({row.voiceNoteUrls.length})</span>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
