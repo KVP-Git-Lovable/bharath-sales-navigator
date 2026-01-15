@@ -7863,6 +7863,7 @@ export type Database = {
           invitation_token: string | null
           learning_goals: string[] | null
           linkedin_url: string | null
+          must_change_password: boolean | null
           onboarding_completed: boolean | null
           onboarding_step: number | null
           permanent_address: string | null
@@ -7897,6 +7898,7 @@ export type Database = {
           invitation_token?: string | null
           learning_goals?: string[] | null
           linkedin_url?: string | null
+          must_change_password?: boolean | null
           onboarding_completed?: boolean | null
           onboarding_step?: number | null
           permanent_address?: string | null
@@ -7931,6 +7933,7 @@ export type Database = {
           invitation_token?: string | null
           learning_goals?: string[] | null
           linkedin_url?: string | null
+          must_change_password?: boolean | null
           onboarding_completed?: boolean | null
           onboarding_step?: number | null
           permanent_address?: string | null

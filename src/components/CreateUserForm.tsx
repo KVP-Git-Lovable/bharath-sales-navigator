@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, X } from 'lucide-react';
+import { Loader2, Upload, X, Eye, EyeOff, Key, Copy, Check } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Manager {
   id: string;
@@ -32,6 +33,9 @@ const CreateUserForm = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [securityProfiles, setSecurityProfiles] = useState<SecurityProfile[]>([]);
   const [files, setFiles] = useState<FileUpload[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [requirePasswordChange, setRequirePasswordChange] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -78,6 +82,46 @@ const CreateUserForm = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const generateTemporaryPassword = () => {
+    // Generate a strong random password
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const specialChars = '!@#$%&*';
+    let password = '';
+    
+    // Add 8 random chars
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    // Add a special char
+    password += specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+    // Add 3 more random chars
+    for (let i = 0; i < 3; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    setFormData(prev => ({ ...prev, password }));
+    setShowPassword(true);
+    setRequirePasswordChange(true);
+  };
+
+  const copyPasswordToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(formData.password);
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+      toast({
+        title: "Copied!",
+        description: "Password copied to clipboard"
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to copy password",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleFileUpload = (type: 'address_proof' | 'id_proof' | 'photo') => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,7 +178,10 @@ const CreateUserForm = () => {
     try {
       // Create user via edge function
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
-        body: formData
+        body: {
+          ...formData,
+          is_temporary_password: requirePasswordChange
+        }
       });
 
       if (error) {
@@ -201,6 +248,8 @@ const CreateUserForm = () => {
         band: ''
       });
       setFiles([]);
+      setRequirePasswordChange(false);
+      setShowPassword(false);
 
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -236,13 +285,59 @@ const CreateUserForm = () => {
             
             <div className="space-y-2">
               <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                required
-              />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="pr-20"
+                    required
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                    {formData.password && (
+                      <button
+                        type="button"
+                        onClick={copyPasswordToClipboard}
+                        className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                        title="Copy password"
+                      >
+                        {copiedPassword ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={generateTemporaryPassword}
+                  title="Generate temporary password"
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2 mt-2">
+                <Checkbox
+                  id="requirePasswordChange"
+                  checked={requirePasswordChange}
+                  onCheckedChange={(checked) => setRequirePasswordChange(checked === true)}
+                />
+                <label
+                  htmlFor="requirePasswordChange"
+                  className="text-sm text-muted-foreground cursor-pointer"
+                >
+                  Require password change on first login
+                </label>
+              </div>
             </div>
 
             <div className="space-y-2">

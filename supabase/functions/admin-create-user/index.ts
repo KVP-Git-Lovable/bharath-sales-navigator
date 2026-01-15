@@ -93,7 +93,8 @@ serve(async (req) => {
       address,
       education,
       emergency_contact_number,
-      band
+      band,
+      is_temporary_password
     } = await req.json()
 
     console.log('Creating user with email:', email)
@@ -169,6 +170,18 @@ serve(async (req) => {
         
         if (empUpdateError) {
           console.error('Employee update error:', empUpdateError)
+        }
+        
+        // Update must_change_password flag if using temporary password
+        if (is_temporary_password) {
+          const { error: profileUpdateError } = await supabaseAdmin
+            .from('profiles')
+            .update({ must_change_password: true })
+            .eq('id', existingUser.id)
+          
+          if (profileUpdateError) {
+            console.error('Profile update error:', profileUpdateError)
+          }
         }
         
         return new Response(
@@ -259,6 +272,18 @@ serve(async (req) => {
     }
 
     console.log('Employee record created successfully')
+
+    // Set must_change_password flag if using temporary password
+    if (is_temporary_password) {
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ must_change_password: true })
+        .eq('id', authUserId)
+      
+      if (profileUpdateError) {
+        console.error('Profile update error for must_change_password:', profileUpdateError)
+      }
+    }
 
     return new Response(
       JSON.stringify({ 
