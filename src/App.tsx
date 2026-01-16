@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { RoleBasedAuthPage } from "@/components/auth/RoleBasedAuthPage";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
@@ -18,6 +18,7 @@ import { visitStatusCache } from "@/lib/visitStatusCache";
 import { NetworkProvider } from "@/contexts/NetworkContext";
 import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import ForcedPasswordChangeDialog from "@/components/auth/ForcedPasswordChangeDialog";
 
 // Initialize visit status cache early to avoid flicker
 visitStatusCache.init();
@@ -260,6 +261,7 @@ const App = () => {
 
 const AppContent = ({ hasError }: { hasError: boolean }) => {
   useAndroidBackButton();
+  const { user, mustChangePassword, onPasswordChanged } = useAuth();
 
   if (hasError) {
     return (
@@ -283,6 +285,15 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
       <MasterDataCacheInitializer />
       <Toaster />
       <Sonner />
+      
+      {/* Forced password change dialog - shows as modal overlay */}
+      {user && mustChangePassword && (
+        <ForcedPasswordChangeDialog 
+          open={mustChangePassword} 
+          userId={user.id}
+          onPasswordChanged={onPasswordChanged}
+        />
+      )}
       
       <Routes>
         {/* All routes - direct imports, no lazy loading for instant APK page loads */}
