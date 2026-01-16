@@ -455,6 +455,7 @@ export type Database = {
           face_verification_status_out: string | null
           id: string
           notes: string | null
+          regularized_request_id: string | null
           status: string
           total_hours: number | null
           updated_at: string
@@ -477,6 +478,7 @@ export type Database = {
           face_verification_status_out?: string | null
           id?: string
           notes?: string | null
+          regularized_request_id?: string | null
           status?: string
           total_hours?: number | null
           updated_at?: string
@@ -499,12 +501,21 @@ export type Database = {
           face_verification_status_out?: string | null
           id?: string
           notes?: string | null
+          regularized_request_id?: string | null
           status?: string
           total_hours?: number | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "attendance_regularized_request_id_fkey"
+            columns: ["regularized_request_id"]
+            isOneToOne: false
+            referencedRelation: "regularization_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       badges: {
         Row: {

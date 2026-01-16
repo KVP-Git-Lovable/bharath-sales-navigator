@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Layout } from '@/components/Layout';
-import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
@@ -26,6 +26,7 @@ import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { shouldSuppressError } from '@/utils/offlineErrorHandler';
 import { useVanSales } from '@/hooks/useVanSales';
 import { getLocalTodayDate, toLocalISODate } from '@/utils/dateUtils';
+import RegularizationRequestModal from '@/components/RegularizationRequestModal';
 
 // Processing steps for attendance
 type ProcessingStep = 'location' | 'photo' | 'face' | 'saving' | 'complete';
@@ -91,6 +92,11 @@ const Attendance = () => {
   });
   const { compareImages, getMatchStatusIcon, getMatchStatusText } = useFaceMatching();
   const { isVanSalesEnabled } = useVanSales();
+
+  // Regularization request states
+  const [regularizationRequests, setRegularizationRequests] = useState<Map<string, any>>(new Map());
+  const [showRegularizationModal, setShowRegularizationModal] = useState(false);
+  const [selectedRecordForRegularization, setSelectedRecordForRegularization] = useState<any>(null);
 
   // GPS Tracking for today
   const today = new Date();
@@ -167,7 +173,46 @@ const Attendance = () => {
     fetchAttendanceData();
     fetchTodaysVisits();
     getCurrentLocation();
+    fetchUserRegularizationRequests();
   }, [dateFilter]);
+
+  // Fetch user's regularization requests for the current period
+  const fetchUserRegularizationRequests = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      const { start, end } = getDateRange();
+
+      const { data, error } = await supabase
+        .from('regularization_requests')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .gte('attendance_date', start)
+        .lte('attendance_date', end);
+
+      if (error) throw error;
+
+      // Map by date for quick lookup
+      const requestsMap = new Map();
+      data?.forEach(req => {
+        requestsMap.set(req.attendance_date, req);
+      });
+      setRegularizationRequests(requestsMap);
+    } catch (error) {
+      console.error('Error fetching regularization requests:', error);
+    }
+  };
+
+  const handleOpenRegularizationModal = (record: any) => {
+    setSelectedRecordForRegularization(record);
+    setShowRegularizationModal(true);
+  };
+
+  const handleRegularizationSubmitted = () => {
+    fetchUserRegularizationRequests();
+    fetchAttendanceData();
+  };
 
   const getCurrentLocation = async () => {
     // Request location permission first
@@ -1281,19 +1326,31 @@ const Attendance = () => {
                       attendanceData.slice(0, 15).map((record) => {
                         const recordDate = format(new Date(record.date), 'yyyy-MM-dd');
                         const isAbsent = record.status === 'absent' || record.isAbsentPlaceholder;
+                        const isRegularized = record.status === 'regularized';
+                        const existingRequest = regularizationRequests.get(recordDate);
+                        const hasPendingRequest = existingRequest?.status === 'pending';
+                        const hasApprovedRequest = existingRequest?.status === 'approved';
+                        const hasRejectedRequest = existingRequest?.status === 'rejected';
+                        
+                        // Show regularization button for absent, missing punch-in/out, or if rejected (allow resubmit)
+                        const showRegularizationButton = (isAbsent || !record.check_in_time || !record.check_out_time || hasRejectedRequest) && 
+                          !hasPendingRequest && !hasApprovedRequest && !isRegularized;
                         
                         return (
                           <div 
                             key={record.id} 
                             className={cn(
                               "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all",
-                              isAbsent && "bg-red-50/50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                              isAbsent && "bg-red-50/50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
+                              isRegularized && "bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800"
                             )}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">
                                 {isAbsent ? (
                                   <XCircle className="h-5 w-5 text-red-600" />
+                                ) : isRegularized ? (
+                                  <CheckCircle className="h-5 w-5 text-purple-600" />
                                 ) : (
                                   <CheckCircle className="h-5 w-5 text-green-600" />
                                 )}
@@ -1318,106 +1375,138 @@ const Attendance = () => {
                                     </>
                                   )}
                                 </div>
-                                {!isAbsent && record.face_match_confidence !== null && (
-                                  <Badge 
-                                    variant={
-                                      record.face_match_confidence >= 70 ? 'default' : 
-                                      record.face_match_confidence >= 40 ? 'secondary' : 
-                                      'destructive'
-                                    }
-                                    className={cn(
-                                      "ml-2",
-                                      record.face_match_confidence >= 70 && "bg-green-500 hover:bg-green-600",
-                                      record.face_match_confidence >= 40 && record.face_match_confidence < 70 && "bg-amber-500 hover:bg-amber-600"
-                                    )}
-                                  >
-                                    {record.face_match_confidence >= 70 ? '✅' : 
-                                     record.face_match_confidence >= 40 ? '⚠️' : '❌'}
-                                    {' '}
-                                    {Math.round(record.face_match_confidence)}%
-                                  </Badge>
-                                )}
-                                {isAbsent && (
-                                  <Badge variant="destructive" className="ml-2">
-                                    Absent
-                                  </Badge>
-                                )}
+                                
+                                {/* Status Badges */}
+                                <div className="flex flex-col gap-1 items-end">
+                                  {!isAbsent && record.face_match_confidence !== null && (
+                                    <Badge 
+                                      variant={
+                                        record.face_match_confidence >= 70 ? 'default' : 
+                                        record.face_match_confidence >= 40 ? 'secondary' : 
+                                        'destructive'
+                                      }
+                                      className={cn(
+                                        record.face_match_confidence >= 70 && "bg-green-500 hover:bg-green-600",
+                                        record.face_match_confidence >= 40 && record.face_match_confidence < 70 && "bg-amber-500 hover:bg-amber-600"
+                                      )}
+                                    >
+                                      {record.face_match_confidence >= 70 ? '✅' : 
+                                       record.face_match_confidence >= 40 ? '⚠️' : '❌'}
+                                      {' '}
+                                      {Math.round(record.face_match_confidence)}%
+                                    </Badge>
+                                  )}
+                                  
+                                  {isAbsent && !hasPendingRequest && !hasRejectedRequest && (
+                                    <Badge variant="destructive">Absent</Badge>
+                                  )}
+                                  
+                                  {isRegularized && (
+                                    <Badge className="bg-purple-500 hover:bg-purple-600">Regularized</Badge>
+                                  )}
+                                  
+                                  {hasPendingRequest && (
+                                    <Badge className="bg-yellow-500 hover:bg-yellow-600">Pending Approval</Badge>
+                                  )}
+                                  
+                                  {hasRejectedRequest && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Rejected - Resubmit
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Action Buttons - Only show for present days */}
-                            {!isAbsent && (
-                              <div className="flex flex-wrap gap-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-2"
-                                      onClick={async () => {
-                                        setSelectedDateForMap(new Date(record.date));
-                                        await loadGPSPositionsForDate(recordDate);
-                                      }}
-                                    >
-                                      <Route className="h-4 w-4" />
-                                      Travel Heat Map
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                                    <DialogHeader>
-                                      <DialogTitle>
-                                        Journey Heat Map - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                      </DialogTitle>
-                                    </DialogHeader>
-                                    <div className="mt-4">
-                                      <JourneyMap 
-                                        positions={gpsPositionsByDate.get(recordDate) || []} 
-                                        height="500px"
-                                      />
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-2"
-                                      onClick={async () => {
-                                        await fetchVisitsForDate(recordDate);
-                                      }}
-                                    >
-                                      <CalendarDays className="h-4 w-4" />
-                                      Timeline View
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                                    <DialogHeader>
-                                      <DialogTitle>
-                                        Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                      </DialogTitle>
-                                    </DialogHeader>
-                                    <div className="mt-4">
-                                      <TimelineView 
-                                        visits={selectedDateVisits}
-                                        dayStart={formatTime(record.check_in_time)}
-                                      />
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap gap-2">
+                              {/* Regularization Button */}
+                              {showRegularizationButton && (
                                 <Button
                                   size="sm"
-                                  variant={record.status === 'present' ? 'default' : 'destructive'}
-                                  className="gap-2"
-                                  onClick={() => navigate(`/today-summary?date=${recordDate}`)}
+                                  variant="outline"
+                                  className="gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
+                                  onClick={() => handleOpenRegularizationModal(record)}
                                 >
-                                  <FileText className="h-4 w-4" />
-                                  Productivity Report
+                                  <Edit3 className="h-4 w-4" />
+                                  {hasRejectedRequest ? 'Resubmit Regularization' : 'Request Regularization'}
                                 </Button>
-                              </div>
-                            )}
+                              )}
+                              
+                              {/* Other action buttons - Only show for present/regularized days */}
+                              {!isAbsent && (
+                                <>
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="gap-2"
+                                        onClick={async () => {
+                                          setSelectedDateForMap(new Date(record.date));
+                                          await loadGPSPositionsForDate(recordDate);
+                                        }}
+                                      >
+                                        <Route className="h-4 w-4" />
+                                        Travel Heat Map
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+                                      <DialogHeader>
+                                        <DialogTitle>
+                                          Journey Heat Map - {format(new Date(record.date), 'MMM dd, yyyy')}
+                                        </DialogTitle>
+                                      </DialogHeader>
+                                      <div className="mt-4">
+                                        <JourneyMap 
+                                          positions={gpsPositionsByDate.get(recordDate) || []} 
+                                          height="500px"
+                                        />
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="gap-2"
+                                        onClick={async () => {
+                                          await fetchVisitsForDate(recordDate);
+                                        }}
+                                      >
+                                        <CalendarDays className="h-4 w-4" />
+                                        Timeline View
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+                                      <DialogHeader>
+                                        <DialogTitle>
+                                          Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
+                                        </DialogTitle>
+                                      </DialogHeader>
+                                      <div className="mt-4">
+                                        <TimelineView 
+                                          visits={selectedDateVisits}
+                                          dayStart={formatTime(record.check_in_time)}
+                                        />
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+
+                                  <Button
+                                    size="sm"
+                                    variant={record.status === 'present' || isRegularized ? 'default' : 'destructive'}
+                                    className="gap-2"
+                                    onClick={() => navigate(`/today-summary?date=${recordDate}`)}
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                    Productivity Report
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         );
                       })
@@ -1470,6 +1559,19 @@ const Attendance = () => {
         onCapture={handleCameraCapture}
         title="Capture Photo for Attendance"
         description="Position yourself in the frame and capture your photo"
+      />
+
+      {/* Regularization Request Modal */}
+      <RegularizationRequestModal
+        isOpen={showRegularizationModal}
+        onClose={() => {
+          setShowRegularizationModal(false);
+          setSelectedRecordForRegularization(null);
+        }}
+        attendanceRecord={selectedRecordForRegularization}
+        existingRequest={selectedRecordForRegularization ? regularizationRequests.get(selectedRecordForRegularization.date) : null}
+        onSubmit={handleRegularizationSubmitted}
+        userId={user?.id || ''}
       />
     </Layout>
   );

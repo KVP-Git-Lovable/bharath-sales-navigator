@@ -15,6 +15,7 @@ import LeaveBalancesManager from '@/components/attendance/LeaveBalancesManager';
 import AttendancePolicyConfig from '@/components/attendance/AttendancePolicyConfig';
 import WorkingDaysConfig from '@/components/attendance/WorkingDaysConfig';
 import { Layout } from '@/components/Layout';
+import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 
 interface LeaveApplication {
   id: string;
@@ -58,6 +59,8 @@ const AttendanceManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [allUsers, setAllUsers] = useState<Array<{id: string, full_name: string}>>([]);
+  const [showRejectionDialog, setShowRejectionDialog] = useState(false);
+  const [selectedRequestForRejection, setSelectedRequestForRejection] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === 'leave') {
@@ -195,14 +198,58 @@ const AttendanceManagement = () => {
     }
   };
 
-  const handleRegularizationStatusUpdate = async (requestId: string, newStatus: string) => {
+  const handleRegularizationStatusUpdate = async (requestId: string, newStatus: string, rejectionReason?: string) => {
     try {
-      const updateData: any = {
-        status: newStatus,
-        approved_at: newStatus === 'approved' ? new Date().toISOString() : null
-      };
+      // First get the request details
+      const { data: request, error: fetchError } = await supabase
+        .from('regularization_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (fetchError) throw fetchError;
 
       const { data: { user } } = await supabase.auth.getUser();
+
+      // If approved, update the attendance table
+      if (newStatus === 'approved' && request) {
+        // Calculate total hours
+        let totalHours = null;
+        if (request.requested_check_in_time && request.requested_check_out_time) {
+          const checkIn = new Date(request.requested_check_in_time);
+          const checkOut = new Date(request.requested_check_out_time);
+          totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+        }
+
+        // Upsert attendance record with approved times
+        const { error: attendanceError } = await supabase
+          .from('attendance')
+          .upsert({
+            user_id: request.user_id,
+            date: request.attendance_date,
+            check_in_time: request.requested_check_in_time,
+            check_out_time: request.requested_check_out_time,
+            status: 'regularized',
+            total_hours: totalHours,
+            notes: `Regularized via request #${requestId.slice(0, 8)}`,
+            regularized_request_id: requestId
+          }, { 
+            onConflict: 'user_id,date'
+          });
+
+        if (attendanceError) {
+          console.error('Error updating attendance:', attendanceError);
+          throw attendanceError;
+        }
+      }
+
+      // Update the regularization request status
+      const updateData: any = {
+        status: newStatus,
+        approved_at: newStatus === 'approved' ? new Date().toISOString() : null,
+        rejection_reason: rejectionReason || null
+      };
+
       if (user) {
         updateData.approved_by = user.id;
       }
@@ -219,6 +266,18 @@ const AttendanceManagement = () => {
     } catch (error) {
       console.error('Error updating regularization request:', error);
       toast.error('Failed to update regularization request');
+    }
+  };
+
+  const handleRejectClick = (requestId: string) => {
+    setSelectedRequestForRejection(requestId);
+    setShowRejectionDialog(true);
+  };
+
+  const handleConfirmRejection = async (reason: string) => {
+    if (selectedRequestForRejection) {
+      await handleRegularizationStatusUpdate(selectedRequestForRejection, 'rejected', reason);
+      setSelectedRequestForRejection(null);
     }
   };
 
