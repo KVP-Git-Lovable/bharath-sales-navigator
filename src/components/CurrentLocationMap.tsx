@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Switch } from './ui/switch';
+
 
 // Fix default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -38,10 +38,57 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy?: number; timestamp?: Date } | null>(null);
+  const [isAttendanceActive, setIsAttendanceActive] = useState(false);
 
   const isCurrentUser = userId === user?.id;
+
+  // Check if attendance is active (checked in but not checked out)
+  useEffect(() => {
+    if (!user?.id || !isCurrentUser || isViewingOther) {
+      setIsAttendanceActive(false);
+      return;
+    }
+
+    const checkAttendanceStatus = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('check_in_time, check_out_time')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .maybeSingle();
+
+      if (!error && data?.check_in_time && !data?.check_out_time) {
+        setIsAttendanceActive(true);
+      } else {
+        setIsAttendanceActive(false);
+      }
+    };
+
+    checkAttendanceStatus();
+
+    // Subscribe to attendance changes
+    const channel = supabase
+      .channel('attendance-tracking')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'attendance',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          checkAttendanceStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, isCurrentUser, isViewingOther]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -260,22 +307,22 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
     if (isCurrentUser && !isViewingOther) {
       // For current user, get live location from device
       getLiveLocation();
-      if (autoRefresh) {
+      if (isAttendanceActive) {
         startWatchingLocation();
       }
     } else {
       // For viewing other users, fetch from database
       fetchUserLocation();
     }
-  }, [userId, isCurrentUser, isViewingOther, getLiveLocation, fetchUserLocation, autoRefresh, startWatchingLocation]);
+  }, [userId, isCurrentUser, isViewingOther, getLiveLocation, fetchUserLocation, isAttendanceActive, startWatchingLocation]);
 
-  // Handle auto-refresh toggle
+  // Handle automatic GPS tracking based on attendance status
   useEffect(() => {
     if (!userId) return;
 
     if (isCurrentUser && !isViewingOther) {
-      // For current user, use geolocation watch
-      if (autoRefresh) {
+      // For current user, use geolocation watch only when attendance is active
+      if (isAttendanceActive) {
         startWatchingLocation();
       } else if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
@@ -283,14 +330,9 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       }
     } else {
       // For other users, use polling
-      if (autoRefresh) {
-        refreshIntervalRef.current = setInterval(() => {
-          fetchUserLocation();
-        }, 15000);
-      } else if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
+      refreshIntervalRef.current = setInterval(() => {
+        fetchUserLocation();
+      }, 15000);
     }
 
     return () => {
@@ -299,7 +341,7 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
         refreshIntervalRef.current = null;
       }
     };
-  }, [autoRefresh, userId, isCurrentUser, isViewingOther, startWatchingLocation, fetchUserLocation]);
+  }, [isAttendanceActive, userId, isCurrentUser, isViewingOther, startWatchingLocation, fetchUserLocation]);
 
   const handleManualRefresh = () => {
     if (isCurrentUser && !isViewingOther) {
@@ -383,21 +425,19 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
           className="absolute inset-0"
         />
 
-        {/* Floating Controls - Bottom Left */}
-        <div className="absolute bottom-3 left-3 z-[1000]">
-          <Card className="bg-background border shadow-md">
-            <div className="p-2 flex items-center gap-2">
-              <Switch
-                checked={autoRefresh}
-                onCheckedChange={setAutoRefresh}
-                className="scale-75"
-              />
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {isCurrentUser && !isViewingOther ? 'Live Tracking' : 'Auto (15s)'}
-              </span>
-            </div>
-          </Card>
-        </div>
+        {/* Floating Status - Bottom Left */}
+        {isCurrentUser && !isViewingOther && (
+          <div className="absolute bottom-3 left-3 z-[1000]">
+            <Card className="bg-background border shadow-md">
+              <div className="p-2 flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${isAttendanceActive ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/50'}`} />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {isAttendanceActive ? 'Tracking Active' : 'Start day to track'}
+                </span>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* No Location State */}
         {!location && !loading && userId && (
