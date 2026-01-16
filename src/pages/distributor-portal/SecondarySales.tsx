@@ -75,6 +75,7 @@ interface SecondaryOrder {
 
 interface OrderItem {
   id: string;
+  product_id?: string;
   product_name: string;
   quantity: number;
   rate: number;
@@ -401,34 +402,96 @@ const SecondarySales = () => {
     setExpandedDates(newExpanded);
   };
 
-  const deductInventory = async (orderItems: OrderItem[]) => {
+  const deductInventoryWithLedger = async (
+    orderItems: OrderItem[], 
+    orderId: string,
+    orderNumber: string,
+    retailerName: string
+  ) => {
     const distributorId = user?.distributor_id;
     if (!distributorId || !orderItems.length) return;
 
+    // Get current user ID for audit trail
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const currentUserId = authUser?.id || user?.id;
+
     for (const item of orderItems) {
-      // Find matching inventory by product name
-      const { data: inventoryItems } = await supabase
-        .from('distributor_inventory')
-        .select('*')
-        .eq('distributor_id', distributorId)
-        .ilike('product_name', item.product_name);
-
-      if (inventoryItems && inventoryItems.length > 0) {
-        const inv = inventoryItems[0];
-        const newQty = Math.max(0, inv.quantity - item.quantity);
-        const newAvailable = Math.max(0, (inv.available_quantity || 0) - item.quantity);
-        const newValue = newQty * (inv.unit_cost || 0);
-
-        await supabase
+      let inventoryItem = null;
+      
+      // Step 1: Find inventory - prefer product_id, fallback to name
+      if (item.product_id) {
+        const { data } = await supabase
           .from('distributor_inventory')
-          .update({
-            quantity: newQty,
-            available_quantity: newAvailable,
-            total_value: newValue,
-            last_issued_date: new Date().toISOString().split('T')[0],
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', inv.id);
+          .select('*')
+          .eq('distributor_id', distributorId)
+          .eq('product_id', item.product_id)
+          .maybeSingle();
+        inventoryItem = data;
+      }
+      
+      // Fallback to product name matching
+      if (!inventoryItem) {
+        const { data } = await supabase
+          .from('distributor_inventory')
+          .select('*')
+          .eq('distributor_id', distributorId)
+          .ilike('product_name', item.product_name)
+          .maybeSingle();
+        inventoryItem = data;
+      }
+
+      if (!inventoryItem) {
+        console.warn(`Inventory not found for ${item.product_name}`);
+        continue;
+      }
+
+      // Step 2: Capture BEFORE state for audit
+      const stockBefore = inventoryItem.quantity;
+      const stockAfter = Math.max(0, stockBefore - item.quantity);
+      const newAvailable = Math.max(0, (inventoryItem.available_quantity || 0) - item.quantity);
+      const newValue = stockAfter * (inventoryItem.unit_cost || 0);
+
+      // Step 3: Update inventory
+      const { error: updateError } = await supabase
+        .from('distributor_inventory')
+        .update({
+          quantity: stockAfter,
+          available_quantity: newAvailable,
+          total_value: newValue,
+          last_issued_date: new Date().toISOString().split('T')[0],
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', inventoryItem.id);
+
+      if (updateError) {
+        console.error('Inventory update failed:', updateError);
+        throw updateError;
+      }
+
+      // Step 4: Create transaction/ledger entry for audit trail
+      const { error: txError } = await supabase
+        .from('distributor_inventory_transactions')
+        .insert({
+          distributor_id: distributorId,
+          product_id: inventoryItem.product_id,
+          variant_id: inventoryItem.variant_id || null,
+          transaction_type: 'sale',
+          quantity: -item.quantity,           // Negative for stock OUT
+          running_balance: stockAfter,        // Stock AFTER deduction
+          reference_type: 'secondary_order',
+          reference_id: orderId,
+          reference_number: orderNumber,
+          batch_number: inventoryItem.batch_number || null,
+          expiry_date: inventoryItem.expiry_date || null,
+          unit: item.unit || inventoryItem.unit,
+          unit_cost: item.rate || inventoryItem.unit_cost,
+          notes: `Secondary sale to ${retailerName} | Before: ${stockBefore} → After: ${stockAfter}`,
+          created_by: currentUserId,
+        });
+
+      if (txError) {
+        console.error('Transaction ledger creation failed:', txError);
+        // In production, consider rollback - for now continue to ensure inventory is deducted
       }
     }
   };
@@ -451,10 +514,15 @@ const SecondarySales = () => {
 
       if (error) throw error;
 
-      // Deduct inventory when delivered (not for cancelled)
+      // Deduct inventory AND create ledger entry when delivered (not for cancelled)
       if ((deliveryStatus === 'delivered' || deliveryStatus === 'partial_delivery') && 
           selectedOrder.status === 'confirmed' && selectedOrder.items) {
-        await deductInventory(selectedOrder.items);
+        await deductInventoryWithLedger(
+          selectedOrder.items,
+          selectedOrder.id,
+          selectedOrder.id.substring(0, 8).toUpperCase(),
+          selectedOrder.retailer_name
+        );
       }
 
       // Update local state
@@ -464,7 +532,7 @@ const SecondarySales = () => {
           : o
       ));
 
-      toast.success('Delivery status updated & inventory adjusted');
+      toast.success('Delivery confirmed, inventory deducted & ledger updated');
       setShowDeliveryDialog(false);
       resetDeliveryForm();
     } catch (error) {
