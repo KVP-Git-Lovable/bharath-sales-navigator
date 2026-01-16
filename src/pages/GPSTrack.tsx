@@ -528,6 +528,7 @@ export default function GPSTrack() {
                     positions={gpsData} 
                     retailers={filteredRetailers} 
                     height="500px"
+                    totalGpsDistance={totalKmTraveled}
                   />
                 </Card>
               )}
