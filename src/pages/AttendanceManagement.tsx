@@ -251,84 +251,86 @@ const AttendanceManagement = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 border-b pb-2">
-        <button
-          onClick={() => setActiveTab('live')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'live'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <User className="w-4 h-4 mr-2" />
-          Live Attendance
-        </button>
-        <button
-          onClick={() => setActiveTab('leave')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'leave'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <Calendar className="w-4 h-4 mr-2" />
-          Leave Management
-        </button>
-        <button
-          onClick={() => setActiveTab('regularization')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'regularization'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <Users className="w-4 h-4 mr-2" />
-          Regularization
-        </button>
-        <button
-          onClick={() => setActiveTab('leave-balances')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'leave-balances'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4 mr-2" />
-          Leave Balances
-        </button>
-        <button
-          onClick={() => setActiveTab('holidays')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'holidays'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <CalendarDays className="w-4 h-4 mr-2" />
-          Holidays
-        </button>
-        <button
-          onClick={() => setActiveTab('working-days')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'working-days'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <Calendar className="w-4 h-4 mr-2" />
-          Working Days
-        </button>
-        <button
-          onClick={() => setActiveTab('policy')}
-          className={`py-2 px-4 rounded-t-lg transition-colors flex items-center ${
-            activeTab === 'policy'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
-        >
-          <Settings className="w-4 h-4 mr-2" />
-          Attendance Policy
-        </button>
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 border-b pb-2 min-w-max">
+          <button
+            onClick={() => setActiveTab('live')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'live'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <User className="w-4 h-4 mr-1.5" />
+            Live Attendance
+          </button>
+          <button
+            onClick={() => setActiveTab('leave')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'leave'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Calendar className="w-4 h-4 mr-1.5" />
+            Leave Management
+          </button>
+          <button
+            onClick={() => setActiveTab('regularization')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'regularization'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Users className="w-4 h-4 mr-1.5" />
+            Regularization
+          </button>
+          <button
+            onClick={() => setActiveTab('leave-balances')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'leave-balances'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4 mr-1.5" />
+            Leave Balances
+          </button>
+          <button
+            onClick={() => setActiveTab('holidays')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'holidays'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4 mr-1.5" />
+            Holidays
+          </button>
+          <button
+            onClick={() => setActiveTab('working-days')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'working-days'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Calendar className="w-4 h-4 mr-1.5" />
+            Working Days
+          </button>
+          <button
+            onClick={() => setActiveTab('policy')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'policy'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Settings className="w-4 h-4 mr-1.5" />
+            Attendance Policy
+          </button>
+        </div>
       </div>
 
       {/* Tab Content */}
