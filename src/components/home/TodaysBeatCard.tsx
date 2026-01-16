@@ -130,13 +130,25 @@ export const TodaysBeatCard = ({
     return formatQuantity(absValue, unit);
   };
 
-  const displayBeatName = beatName || beatPlan?.beat_name || 'Not Planned';
-
   // Get display label for current period
   const getPeriodLabel = (period: TargetPeriod) => {
     const allOptions = [...PAST_PERIOD_OPTIONS, ...FUTURE_PERIOD_OPTIONS];
     return allOptions.find(opt => opt.value === period)?.label || period;
   };
+
+  // Determine beat name display based on period
+  const getDisplayBeatName = () => {
+    if (isToday) {
+      return beatName || beatPlan?.beat_name || 'Not Planned';
+    }
+    // For week/month/quarter/year periods, show a summary label
+    if (periodStats && periodStats.planned > 0) {
+      return `${getPeriodLabel(targetPeriod)} Schedule`;
+    }
+    return beatName || beatPlan?.beat_name || 'No Schedule';
+  };
+
+  const displayBeatName = getDisplayBeatName();
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-lg overflow-hidden">
