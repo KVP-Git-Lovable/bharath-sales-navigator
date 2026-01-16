@@ -206,6 +206,7 @@ export const Cart = () => {
   const [cameraMode, setCameraMode] = React.useState<"cheque" | "upi" | "neft">("cheque");
   const [showInvoicePreview, setShowInvoicePreview] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmittingD1, setIsSubmittingD1] = React.useState(false);
   const [companyData, setCompanyData] = React.useState<any>(null);
   const [retailerData, setRetailerData] = React.useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = React.useState<any>(null);
@@ -1393,7 +1394,7 @@ export const Cart = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmittingD1(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1739,7 +1740,7 @@ export const Cart = () => {
         variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingD1(false);
     }
   };
 
@@ -2131,9 +2132,9 @@ export const Cart = () => {
                     onClick={handleConfirmD1Order} 
                     className="w-full h-9 text-sm border-2 border-primary" 
                     variant="outline" 
-                    disabled={!canSubmitOrder() || isSubmitting}
+                    disabled={!canSubmitOrder() || isSubmittingD1}
                   >
-                    {isSubmitting ? (
+                    {isSubmittingD1 ? (
                       <>
                         <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
