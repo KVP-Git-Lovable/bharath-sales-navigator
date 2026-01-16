@@ -433,7 +433,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       const [bpRes, vRes, oRes, pointsFetched] = await Promise.all([
         supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date),
         supabase.from('visits').select('*').eq('user_id', uid).eq('planned_date', date),
-        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).eq('status', 'confirmed'),
+        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).in('status', ['confirmed', 'delivered']),
         fetchPointsForDate(uid, date)
       ]);
       clearTimeout(timeoutId);
@@ -854,7 +854,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       const [bpRes, vRes, oRes, pointsFetched] = await Promise.all([
         supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date),
         supabase.from('visits').select('*').eq('user_id', uid).eq('planned_date', date),
-        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).eq('status', 'confirmed'),
+        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).in('status', ['confirmed', 'delivered']),
         fetchPointsForDate(uid, date)
       ]);
       clearTimeout(timeoutId);
