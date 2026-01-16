@@ -139,9 +139,9 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
 
   if (loading) {
     return (
-      <div className={`flex flex-wrap gap-3 ${className}`}>
+      <div className={`flex flex-wrap gap-2 ${className}`}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-20 w-40 rounded-xl" />
+          <Skeleton key={i} className="h-14 w-28 rounded-lg" />
         ))}
       </div>
     );
@@ -149,15 +149,13 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
 
   return (
     <>
-      <div className={`flex flex-wrap gap-3 ${className}`}>
+      <div className={`flex flex-wrap gap-2 ${className}`}>
         {/* Total Users Box */}
-        <div className="p-4 rounded-xl border-2 bg-primary/10 text-primary border-primary/20 min-w-[140px]">
-          <div className="flex flex-col h-full">
-            <h3 className="font-semibold text-sm mb-1">Total Users</h3>
-            <div className="mt-auto flex items-center gap-1 text-lg font-bold">
-              <Users className="h-4 w-4" />
-              <span>{totalUsers}</span>
-            </div>
+        <div className="px-3 py-2 rounded-lg border bg-muted/50 text-foreground border-border min-w-[100px]">
+          <h3 className="font-medium text-xs text-muted-foreground">Total Users</h3>
+          <div className="flex items-center gap-1 text-base font-bold mt-0.5">
+            <Users className="h-3.5 w-3.5" />
+            <span>{totalUsers}</span>
           </div>
         </div>
 
@@ -166,14 +164,12 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
           <div
             key={role.id}
             onClick={() => fetchUsersForRole(role)}
-            className={`p-4 rounded-xl border-2 transition-all cursor-pointer min-w-[140px] ${getRoleColor(role.name)}`}
+            className={`px-3 py-2 rounded-lg border transition-all cursor-pointer min-w-[100px] ${getRoleColor(role.name)}`}
           >
-            <div className="flex flex-col h-full">
-              <h3 className="font-semibold text-sm mb-1 line-clamp-2">{role.name}</h3>
-              <div className="mt-auto flex items-center gap-1 text-lg font-bold">
-                <Users className="h-4 w-4" />
-                <span>{role.user_count}</span>
-              </div>
+            <h3 className="font-medium text-xs line-clamp-1">{role.name}</h3>
+            <div className="flex items-center gap-1 text-base font-bold mt-0.5">
+              <Users className="h-3.5 w-3.5" />
+              <span>{role.user_count}</span>
             </div>
           </div>
         ))}
