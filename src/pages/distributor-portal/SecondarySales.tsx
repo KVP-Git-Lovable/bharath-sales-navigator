@@ -41,7 +41,8 @@ import {
   ShieldCheck,
   X,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
@@ -402,18 +403,71 @@ const SecondarySales = () => {
     setExpandedDates(newExpanded);
   };
 
+  // Helper function to convert quantity between units
+  const convertQuantity = (quantity: number, fromUnit: string, toUnit: string): number => {
+    const from = (fromUnit || '').toLowerCase().trim();
+    const to = (toUnit || '').toLowerCase().trim();
+    
+    // Same unit, no conversion needed
+    if (from === to) return quantity;
+    
+    // Convert to grams first (base unit for weight)
+    let inGrams = quantity;
+    
+    if (from === 'kg' || from === 'kilogram' || from === 'kilograms') {
+      inGrams = quantity * 1000;
+    } else if (from === 'g' || from === 'gram' || from === 'grams') {
+      inGrams = quantity;
+    } else if (from === 'l' || from === 'liter' || from === 'liters' || from === 'litre' || from === 'litres') {
+      inGrams = quantity * 1000;
+    } else if (from === 'ml' || from === 'milliliter' || from === 'milliliters') {
+      inGrams = quantity;
+    } else {
+      // pieces or unknown - no conversion
+      return quantity;
+    }
+    
+    // Now convert from grams to target unit
+    if (to === 'kg' || to === 'kilogram' || to === 'kilograms') {
+      return inGrams / 1000;
+    } else if (to === 'g' || to === 'gram' || to === 'grams') {
+      return inGrams;
+    } else if (to === 'l' || to === 'liter' || to === 'liters' || to === 'litre' || to === 'litres') {
+      return inGrams / 1000;
+    } else if (to === 'ml' || to === 'milliliter' || to === 'milliliters') {
+      return inGrams;
+    }
+    
+    return quantity;
+  };
+
+  // Check if a ledger entry already exists for an order
+  const checkLedgerExists = async (orderId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from('distributor_inventory_transactions')
+      .select('id')
+      .eq('reference_id', orderId)
+      .eq('transaction_type', 'sale')
+      .limit(1);
+    
+    return (data && data.length > 0);
+  };
+
   const deductInventoryWithLedger = async (
     orderItems: OrderItem[], 
     orderId: string,
     orderNumber: string,
-    retailerName: string
-  ) => {
+    retailerName: string,
+    skipInventoryDeduction: boolean = false // For backfill - only create ledger, don't deduct again
+  ): Promise<{ success: boolean; itemsProcessed: number }> => {
     const distributorId = user?.distributor_id;
-    if (!distributorId || !orderItems.length) return;
+    if (!distributorId || !orderItems.length) return { success: false, itemsProcessed: 0 };
 
     // Get current user ID for audit trail
     const { data: { user: authUser } } = await supabase.auth.getUser();
     const currentUserId = authUser?.id || user?.id;
+
+    let itemsProcessed = 0;
 
     for (const item of orderItems) {
       let inventoryItem = null;
@@ -445,30 +499,41 @@ const SecondarySales = () => {
         continue;
       }
 
-      // Step 2: Capture BEFORE state for audit
+      // Step 2: Convert order quantity to inventory unit
+      const inventoryUnit = (inventoryItem.unit || 'kg').toLowerCase();
+      const orderUnit = (item.unit || 'g').toLowerCase();
+      const convertedQty = convertQuantity(item.quantity, orderUnit, inventoryUnit);
+      
+      console.log(`Unit conversion: ${item.quantity} ${orderUnit} → ${convertedQty} ${inventoryUnit}`);
+
+      // Step 3: Capture BEFORE state for audit
       const stockBefore = inventoryItem.quantity;
-      const stockAfter = Math.max(0, stockBefore - item.quantity);
-      const newAvailable = Math.max(0, (inventoryItem.available_quantity || 0) - item.quantity);
+      const stockAfter = skipInventoryDeduction ? stockBefore : Math.max(0, stockBefore - convertedQty);
+      const newAvailable = skipInventoryDeduction 
+        ? (inventoryItem.available_quantity || 0) 
+        : Math.max(0, (inventoryItem.available_quantity || 0) - convertedQty);
       const newValue = stockAfter * (inventoryItem.unit_cost || 0);
 
-      // Step 3: Update inventory
-      const { error: updateError } = await supabase
-        .from('distributor_inventory')
-        .update({
-          quantity: stockAfter,
-          available_quantity: newAvailable,
-          total_value: newValue,
-          last_issued_date: new Date().toISOString().split('T')[0],
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', inventoryItem.id);
+      // Step 4: Update inventory (skip if backfilling)
+      if (!skipInventoryDeduction) {
+        const { error: updateError } = await supabase
+          .from('distributor_inventory')
+          .update({
+            quantity: stockAfter,
+            available_quantity: newAvailable,
+            total_value: newValue,
+            last_issued_date: new Date().toISOString().split('T')[0],
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', inventoryItem.id);
 
-      if (updateError) {
-        console.error('Inventory update failed:', updateError);
-        throw updateError;
+        if (updateError) {
+          console.error('Inventory update failed:', updateError);
+          throw updateError;
+        }
       }
 
-      // Step 4: Create transaction/ledger entry for audit trail
+      // Step 5: Create transaction/ledger entry for audit trail
       const { error: txError } = await supabase
         .from('distributor_inventory_transactions')
         .insert({
@@ -476,23 +541,62 @@ const SecondarySales = () => {
           product_id: inventoryItem.product_id,
           variant_id: inventoryItem.variant_id || null,
           transaction_type: 'sale',
-          quantity: -item.quantity,           // Negative for stock OUT
+          quantity: -convertedQty,            // Negative for stock OUT, in inventory unit
           running_balance: stockAfter,        // Stock AFTER deduction
           reference_type: 'secondary_order',
           reference_id: orderId,
           reference_number: orderNumber,
           batch_number: inventoryItem.batch_number || null,
           expiry_date: inventoryItem.expiry_date || null,
-          unit: item.unit || inventoryItem.unit,
+          unit: inventoryUnit,                // Use inventory unit for consistency
           unit_cost: item.rate || inventoryItem.unit_cost,
-          notes: `Secondary sale to ${retailerName} | Before: ${stockBefore} → After: ${stockAfter}`,
+          notes: `Secondary sale to ${retailerName} | Before: ${stockBefore} ${inventoryUnit} → After: ${stockAfter} ${inventoryUnit}`,
           created_by: currentUserId,
         });
 
       if (txError) {
         console.error('Transaction ledger creation failed:', txError);
-        // In production, consider rollback - for now continue to ensure inventory is deducted
+      } else {
+        itemsProcessed++;
       }
+    }
+
+    return { success: itemsProcessed > 0, itemsProcessed };
+  };
+
+  // Sync ledger for already-delivered orders that are missing ledger entries
+  const syncLedgerForOrder = async (order: SecondaryOrder) => {
+    if (!order.items || order.items.length === 0) {
+      toast.error('No items found for this order');
+      return;
+    }
+
+    const ledgerExists = await checkLedgerExists(order.id);
+    if (ledgerExists) {
+      toast.info('Ledger entries already exist for this order');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const result = await deductInventoryWithLedger(
+        order.items,
+        order.id,
+        order.id.substring(0, 8).toUpperCase(),
+        order.retailer_name,
+        true // Skip inventory deduction, only create ledger entries
+      );
+
+      if (result.success) {
+        toast.success(`Ledger synced: ${result.itemsProcessed} items recorded`);
+      } else {
+        toast.error('No ledger entries could be created');
+      }
+    } catch (error) {
+      console.error('Error syncing ledger:', error);
+      toast.error('Failed to sync ledger');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -796,6 +900,18 @@ const SecondarySales = () => {
                                       >
                                         <Truck className="w-3 h-3 mr-1" />
                                         Deliver
+                                      </Button>
+                                    )}
+                                    {(retailer.orders[0]?.status === 'delivered' || retailer.orders[0]?.status === 'partial_delivery') && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        onClick={() => syncLedgerForOrder(retailer.orders[0])}
+                                        disabled={updating}
+                                      >
+                                        <RefreshCw className={`w-3 h-3 mr-1 ${updating ? 'animate-spin' : ''}`} />
+                                        Sync Ledger
                                       </Button>
                                     )}
                                     {retailer.orders[0]?.status !== 'confirmed' && (
