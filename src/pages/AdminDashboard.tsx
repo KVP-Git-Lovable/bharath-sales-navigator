@@ -341,18 +341,44 @@ export const AdminDashboard = () => {
   const toggleUserActiveStatus = async (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
     
-    const { error } = await supabase
+    // Optimistically update local state for immediate UI feedback
+    setUsers(prev => prev.map(u => 
+      u.id === userId 
+        ? { ...u, profile: { ...u.profile, user_status: newStatus } as any }
+        : u
+    ));
+    
+    const { data, error } = await supabase
       .from('profiles')
       .update({ user_status: newStatus })
-      .eq('id', userId);
+      .eq('id', userId)
+      .select('user_status')
+      .single();
       
-    if (error) {
-      toast.error('Failed to update user status');
+    if (error || !data) {
+      // Revert optimistic update on failure
+      setUsers(prev => prev.map(u => 
+        u.id === userId 
+          ? { ...u, profile: { ...u.profile, user_status: currentStatus } as any }
+          : u
+      ));
+      toast.error('Failed to update user status: ' + (error?.message || 'Update failed'));
+      return;
+    }
+    
+    // Verify the update actually happened
+    if (data.user_status !== newStatus) {
+      // Revert if DB didn't update
+      setUsers(prev => prev.map(u => 
+        u.id === userId 
+          ? { ...u, profile: { ...u.profile, user_status: currentStatus } as any }
+          : u
+      ));
+      toast.error('Failed to update user status - permission denied');
       return;
     }
     
     toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
-    fetchUsers();
   };
 
   if (loading) {
