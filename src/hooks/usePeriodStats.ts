@@ -126,21 +126,20 @@ export const usePeriodStats = (userId: string | undefined, period: TargetPeriod)
       const allOrders = allRetailersRes.data || [];
 
       // Extract unique planned retailer IDs from all beat plans in period
+      // Track beats with/without retailer data separately for proper fallback
       const plannedRetailerIds = new Set<string>();
-      const beatIdsInPeriod = new Set<string>();
+      const beatsWithRetailerData = new Set<string>();
+      const beatsWithoutRetailerData = new Set<string>();
 
       for (const bp of beatPlans) {
         const beatData = bp.beat_data as any;
-        
-        // Collect beat IDs for fallback query
-        if (bp.beat_id) {
-          beatIdsInPeriod.add(bp.beat_id);
-        }
+        let hasRetailerData = false;
         
         if (beatData) {
           // Format 1: Direct retailer_ids array
           if (Array.isArray(beatData.retailer_ids) && beatData.retailer_ids.length > 0) {
             beatData.retailer_ids.forEach((id: string) => plannedRetailerIds.add(id));
+            hasRetailerData = true;
           }
           
           // Format 2: retailers array of objects (auto-generated plans)
@@ -148,17 +147,31 @@ export const usePeriodStats = (userId: string | undefined, period: TargetPeriod)
             beatData.retailers.forEach((r: any) => {
               if (r?.id) plannedRetailerIds.add(r.id);
             });
+            hasRetailerData = true;
+          }
+        }
+        
+        // Track which beats need fallback query
+        if (bp.beat_id) {
+          if (hasRetailerData) {
+            beatsWithRetailerData.add(bp.beat_id);
+          } else {
+            beatsWithoutRetailerData.add(bp.beat_id);
           }
         }
       }
 
-      // Fallback: If no retailer IDs found in beat_data, query retailers by beat_id
-      if (plannedRetailerIds.size === 0 && beatIdsInPeriod.size > 0) {
+      // Query retailers for beats that don't have retailer data in beat_data
+      // Exclude beats that already have data to avoid duplicates
+      const beatsNeedingFallback = Array.from(beatsWithoutRetailerData)
+        .filter(beatId => !beatsWithRetailerData.has(beatId));
+
+      if (beatsNeedingFallback.length > 0) {
         const { data: retailersByBeat } = await supabase
           .from('retailers')
           .select('id')
           .eq('user_id', userId)
-          .in('beat_id', Array.from(beatIdsInPeriod));
+          .in('beat_id', beatsNeedingFallback);
         
         if (retailersByBeat) {
           retailersByBeat.forEach(r => plannedRetailerIds.add(r.id));
