@@ -127,10 +127,41 @@ export const usePeriodStats = (userId: string | undefined, period: TargetPeriod)
 
       // Extract unique planned retailer IDs from all beat plans in period
       const plannedRetailerIds = new Set<string>();
+      const beatIdsInPeriod = new Set<string>();
+
       for (const bp of beatPlans) {
         const beatData = bp.beat_data as any;
-        if (beatData && Array.isArray(beatData.retailer_ids)) {
-          beatData.retailer_ids.forEach((id: string) => plannedRetailerIds.add(id));
+        
+        // Collect beat IDs for fallback query
+        if (bp.beat_id) {
+          beatIdsInPeriod.add(bp.beat_id);
+        }
+        
+        if (beatData) {
+          // Format 1: Direct retailer_ids array
+          if (Array.isArray(beatData.retailer_ids) && beatData.retailer_ids.length > 0) {
+            beatData.retailer_ids.forEach((id: string) => plannedRetailerIds.add(id));
+          }
+          
+          // Format 2: retailers array of objects (auto-generated plans)
+          if (Array.isArray(beatData.retailers) && beatData.retailers.length > 0) {
+            beatData.retailers.forEach((r: any) => {
+              if (r?.id) plannedRetailerIds.add(r.id);
+            });
+          }
+        }
+      }
+
+      // Fallback: If no retailer IDs found in beat_data, query retailers by beat_id
+      if (plannedRetailerIds.size === 0 && beatIdsInPeriod.size > 0) {
+        const { data: retailersByBeat } = await supabase
+          .from('retailers')
+          .select('id')
+          .eq('user_id', userId)
+          .in('beat_id', Array.from(beatIdsInPeriod));
+        
+        if (retailersByBeat) {
+          retailersByBeat.forEach(r => plannedRetailerIds.add(r.id));
         }
       }
 
