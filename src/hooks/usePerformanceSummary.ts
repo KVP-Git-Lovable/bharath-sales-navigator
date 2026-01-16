@@ -206,26 +206,43 @@ export function usePerformanceSummary(
           .gte('created_at', startStr)
           .lte('created_at', endStr);
 
-        // Get order items for quantity
+        // Get order items for quantity with unit info
         const orderIds = ordersData?.map(o => o.id) || [];
         let orderItems: any[] = [];
         if (orderIds.length > 0) {
           const { data: itemsData } = await supabase
             .from('order_items')
-            .select('order_id, quantity')
+            .select('order_id, quantity, unit')
             .in('order_id', orderIds);
           orderItems = itemsData || [];
         }
 
-        // Calculate order quantities by order_id
+        // Calculate order quantities by order_id, normalizing to KG
         const orderQuantities: Record<string, number> = {};
+        let totalQuantityInGrams = 0;
+        
         orderItems.forEach(item => {
-          orderQuantities[item.order_id] = (orderQuantities[item.order_id] || 0) + Number(item.quantity || 0);
+          const qty = Number(item.quantity) || 0;
+          const itemUnit = (item.unit || '').toLowerCase();
+          
+          // Convert all quantities to grams for consistent summing
+          let qtyInGrams = qty;
+          if (itemUnit === 'kg' || itemUnit === 'kgs' || itemUnit === 'kilo') {
+            qtyInGrams = qty * 1000;
+          } else if (itemUnit === 'g' || itemUnit === 'grams' || itemUnit === 'gram') {
+            qtyInGrams = qty;
+          } else {
+            // For pieces/units, treat as-is (will be converted to KG later)
+            qtyInGrams = qty;
+          }
+          
+          orderQuantities[item.order_id] = (orderQuantities[item.order_id] || 0) + qtyInGrams;
+          totalQuantityInGrams += qtyInGrams;
         });
 
-        // Calculate overall actuals
+        // Calculate overall actuals - convert total quantity to KG
         const overallRevenueActual = ordersData?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
-        const overallQuantityActual = Object.values(orderQuantities).reduce((sum, q) => sum + q, 0);
+        const overallQuantityActual = totalQuantityInGrams / 1000; // Convert to KG
 
         // Calculate progress
         const revenueProgress = overallRevenueTarget > 0 ? Math.round((overallRevenueActual / overallRevenueTarget) * 100) : 0;
@@ -243,7 +260,7 @@ export function usePerformanceSummary(
           quantityUnit,
         });
 
-        // Calculate territory performance
+        // Calculate territory performance (quantities already in grams, convert to KG)
         const territoryActuals: Record<string, { revenue: number; quantity: number }> = {};
         ordersData?.forEach(order => {
           const retailer = order.retailers as any;
@@ -252,7 +269,9 @@ export function usePerformanceSummary(
               territoryActuals[retailer.territory_id] = { revenue: 0, quantity: 0 };
             }
             territoryActuals[retailer.territory_id].revenue += Number(order.total_amount || 0);
-            territoryActuals[retailer.territory_id].quantity += orderQuantities[order.id] || 0;
+            // Convert order quantities (in grams) to KG
+            const orderQtyInGrams = orderQuantities[order.id] || 0;
+            territoryActuals[retailer.territory_id].quantity += orderQtyInGrams / 1000;
           }
         });
 
@@ -277,7 +296,7 @@ export function usePerformanceSummary(
         });
         setTerritories(territoryPerformance);
 
-        // Calculate beat performance
+        // Calculate beat performance (quantities in grams, convert to KG)
         const beatActuals: Record<string, { revenue: number; quantity: number; name: string }> = {};
         ordersData?.forEach(order => {
           const retailer = order.retailers as any;
@@ -286,7 +305,9 @@ export function usePerformanceSummary(
               beatActuals[retailer.beat_id] = { revenue: 0, quantity: 0, name: '' };
             }
             beatActuals[retailer.beat_id].revenue += Number(order.total_amount || 0);
-            beatActuals[retailer.beat_id].quantity += orderQuantities[order.id] || 0;
+            // Convert order quantities (in grams) to KG
+            const orderQtyInGrams = orderQuantities[order.id] || 0;
+            beatActuals[retailer.beat_id].quantity += orderQtyInGrams / 1000;
           }
         });
 
@@ -319,7 +340,7 @@ export function usePerformanceSummary(
         }));
         setBeats(beatPerformance);
 
-        // Calculate retailer performance
+        // Calculate retailer performance (quantities in grams, convert to KG)
         const retailerActuals: Record<string, { revenue: number; quantity: number }> = {};
         ordersData?.forEach(order => {
           if (order.retailer_id) {
@@ -327,7 +348,9 @@ export function usePerformanceSummary(
               retailerActuals[order.retailer_id] = { revenue: 0, quantity: 0 };
             }
             retailerActuals[order.retailer_id].revenue += Number(order.total_amount || 0);
-            retailerActuals[order.retailer_id].quantity += orderQuantities[order.id] || 0;
+            // Convert order quantities (in grams) to KG
+            const orderQtyInGrams = orderQuantities[order.id] || 0;
+            retailerActuals[order.retailer_id].quantity += orderQtyInGrams / 1000;
           }
         });
 

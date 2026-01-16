@@ -19,8 +19,9 @@ const formatCurrency = (amount: number): string => {
 };
 
 const formatQuantity = (qty: number, unit: string): string => {
-  if (qty >= 1000) return `${(qty / 1000).toFixed(1)}K ${unit}`;
-  return `${qty.toFixed(0)} ${unit}`;
+  // For Kg quantities, show decimal precision without K suffix to avoid confusion
+  if (qty >= 1000) return `${(qty / 1000).toFixed(2)}K`;
+  return `${qty.toFixed(1)}`;
 };
 
 const getProgressColor = (progress: number): string => {
@@ -113,24 +114,24 @@ export function OverallPerformanceHeader({ performance, isLoading, period = 'thi
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                <span className="font-semibold">Quantity ({performance.quantityUnit})</span>
+                <span className="font-semibold">Quantity (Kg)</span>
               </div>
               <div className="flex items-center gap-1">
                 {quantityOnTrack ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                <span className="text-sm font-medium">{performance.quantityProgress}%</span>
+                <span className="text-sm font-medium">{Math.min(performance.quantityProgress, 999)}%</span>
               </div>
             </div>
             <div className="text-2xl font-bold">
-              {formatQuantity(performance.quantityActual, '')}
+              {formatQuantity(performance.quantityActual, '')} Kg
             </div>
             <div className="text-sm opacity-90">
-              of {formatQuantity(performance.quantityTarget, '')} target
+              of {formatQuantity(performance.quantityTarget, '')} Kg target
             </div>
           </div>
           <div className="p-4 bg-card">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">Gap: {formatQuantity(performance.quantityGap, performance.quantityUnit)}</span>
+              <span className="font-medium">Gap: {formatQuantity(performance.quantityGap, '')} Kg</span>
             </div>
             <div className={cn("h-2 rounded-full overflow-hidden", getProgressBg(performance.quantityProgress))}>
               <div 
