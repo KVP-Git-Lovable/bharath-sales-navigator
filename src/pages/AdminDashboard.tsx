@@ -13,10 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Pencil, Search, Columns3, X } from 'lucide-react';
+import { Users, UserPlus, Shield, BarChart3, Settings, Database, ArrowLeft, Pencil, Search, Columns3, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Navigate, useNavigate } from 'react-router-dom';
-import HolidayManagement from '@/components/HolidayManagement';
+
 import { CreateUserWizard } from '@/components/admin/create-user';
 import UserInvitationForm from '@/components/UserInvitationForm';
 import ApproverManagement from '@/components/ApproverManagement';
@@ -394,7 +394,7 @@ export const AdminDashboard = () => {
 
         {/* Admin Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Overview
@@ -414,10 +414,6 @@ export const AdminDashboard = () => {
             <TabsTrigger value="approvers" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Approvers
-            </TabsTrigger>
-            <TabsTrigger value="holidays" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Holiday Calendar
             </TabsTrigger>
           </TabsList>
 
@@ -792,9 +788,6 @@ export const AdminDashboard = () => {
             <ApproverManagement />
           </TabsContent>
 
-          <TabsContent value="holidays" className="space-y-4">
-            <HolidayManagement />
-          </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">
             <Card>
