@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Pencil, Search, Columns3 } from 'lucide-react';
@@ -23,6 +23,7 @@ import UserHierarchy from '@/components/admin/UserHierarchy';
 import SecurityRolesDisplay from '@/components/admin/SecurityRolesDisplay';
 import EditUserDialog from '@/components/admin/EditUserDialog';
 import UserPhotoDialog from '@/components/admin/UserPhotoDialog';
+import UserDetailSheet from '@/components/admin/UserDetailSheet';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -424,18 +425,18 @@ export const AdminDashboard = () => {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          {visibleColumns.includes('photo') && <TableHead>Photo</TableHead>}
-                          {visibleColumns.includes('username') && <TableHead>User Name</TableHead>}
-                          {visibleColumns.includes('email') && <TableHead>Email</TableHead>}
-                          {visibleColumns.includes('full_name') && <TableHead>Full Name</TableHead>}
-                          {visibleColumns.includes('phone') && <TableHead>Phone</TableHead>}
-                          {visibleColumns.includes('role') && <TableHead>Role</TableHead>}
-                          {visibleColumns.includes('manager') && <TableHead>Reporting Manager</TableHead>}
-                          {visibleColumns.includes('joined') && <TableHead>Joined</TableHead>}
-                          {visibleColumns.includes('last_login') && <TableHead>Last Login</TableHead>}
-                          {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
-                          {visibleColumns.includes('action') && <TableHead>Actions</TableHead>}
+                        <TableRow className="hover:bg-transparent">
+                          {visibleColumns.includes('photo') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Photo</TableHead>}
+                          {visibleColumns.includes('username') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">User Name</TableHead>}
+                          {visibleColumns.includes('email') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Email</TableHead>}
+                          {visibleColumns.includes('full_name') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Full Name</TableHead>}
+                          {visibleColumns.includes('phone') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Phone</TableHead>}
+                          {visibleColumns.includes('role') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Role</TableHead>}
+                          {visibleColumns.includes('manager') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Reporting Manager</TableHead>}
+                          {visibleColumns.includes('joined') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Joined</TableHead>}
+                          {visibleColumns.includes('last_login') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Last Login</TableHead>}
+                          {visibleColumns.includes('status') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Status</TableHead>}
+                          {visibleColumns.includes('action') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Actions</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -452,11 +453,11 @@ export const AdminDashboard = () => {
                             );
                           })
                           .map((user) => (
-                          <TableRow key={user.id}>
+                          <TableRow key={user.id} className="hover:bg-muted/30">
                             {visibleColumns.includes('photo') && (
-                              <TableCell>
+                              <TableCell className="py-1.5">
                                 <Avatar 
-                                  className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                                  className="w-7 h-7 cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                                   onClick={() => {
                                     setSelectedPhotoUser({
                                       photoUrl: user.profile?.profile_picture_url,
@@ -466,13 +467,13 @@ export const AdminDashboard = () => {
                                   }}
                                 >
                                   <AvatarImage src={user.profile?.profile_picture_url} />
-                                  <AvatarFallback>{user.profile?.full_name?.charAt(0) || 'U'}</AvatarFallback>
+                                  <AvatarFallback className="text-[10px]">{user.profile?.full_name?.charAt(0) || 'U'}</AvatarFallback>
                                 </Avatar>
                               </TableCell>
                             )}
                             {visibleColumns.includes('username') && (
                               <TableCell
-                                className="font-medium text-primary cursor-pointer hover:underline"
+                                className="text-xs font-medium text-primary cursor-pointer hover:underline py-1.5"
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setIsUserDetailOpen(true);
@@ -482,35 +483,35 @@ export const AdminDashboard = () => {
                               </TableCell>
                             )}
                             {visibleColumns.includes('email') && (
-                              <TableCell>{user.email}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground py-1.5 max-w-[180px] truncate">
+                                {user.email}
+                              </TableCell>
                             )}
                             {visibleColumns.includes('full_name') && (
-                              <TableCell>{user.full_name || user.profile?.full_name || '-'}</TableCell>
+                              <TableCell className="text-xs py-1.5">{user.full_name || user.profile?.full_name || '-'}</TableCell>
                             )}
                             {visibleColumns.includes('phone') && (
-                              <TableCell>{user.phone_number || '-'}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground py-1.5">{user.phone_number || '-'}</TableCell>
                             )}
                             {visibleColumns.includes('role') && (
-                              <TableCell>
-                                <Badge variant={user.securityProfile ? 'default' : 'secondary'}>
-                                  {user.securityProfile?.name || 'Not Assigned'}
-                                </Badge>
+                              <TableCell className="text-xs py-1.5">
+                                {user.securityProfile?.name || 'Not Assigned'}
                               </TableCell>
                             )}
                             {visibleColumns.includes('manager') && (
-                              <TableCell>
+                              <TableCell className="text-xs text-muted-foreground py-1.5">
                                 {managers[user.id] 
                                   ? (managers[user.id].full_name || managers[user.id].username || '-') 
                                   : '-'}
                               </TableCell>
                             )}
                             {visibleColumns.includes('joined') && (
-                              <TableCell>
+                              <TableCell className="text-xs text-muted-foreground py-1.5">
                                 {new Date(user.created_at).toLocaleDateString()}
                               </TableCell>
                             )}
                             {visibleColumns.includes('last_login') && (
-                              <TableCell>
+                              <TableCell className="text-xs text-muted-foreground py-1.5">
                                 {user.last_sign_in_at 
                                   ? new Date(user.last_sign_in_at).toLocaleDateString()
                                   : 'Never'
@@ -518,23 +519,24 @@ export const AdminDashboard = () => {
                               </TableCell>
                             )}
                             {visibleColumns.includes('status') && (
-                              <TableCell>
-                                <Badge variant={user.email_confirmed_at ? 'default' : 'secondary'}>
+                              <TableCell className="text-xs py-1.5">
+                                <span className={user.email_confirmed_at ? 'text-green-600' : 'text-muted-foreground'}>
                                   {user.email_confirmed_at ? 'Verified' : 'Pending'}
-                                </Badge>
+                                </span>
                               </TableCell>
                             )}
                             {visibleColumns.includes('action') && (
-                              <TableCell>
+                              <TableCell className="py-1.5">
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
                                   size="sm"
+                                  className="h-7 text-xs px-2"
                                   onClick={() => {
                                     setSelectedUser(user);
                                     setIsEditDialogOpen(true);
                                   }}
                                 >
-                                  <Pencil className="h-4 w-4 mr-1" />
+                                  <Pencil className="h-3 w-3 mr-1" />
                                   Edit
                                 </Button>
                               </TableCell>
@@ -655,104 +657,14 @@ export const AdminDashboard = () => {
           onSuccess={fetchUsers}
         />
 
-        {/* User Detail View Dialog */}
-        <Dialog open={isUserDetailOpen} onOpenChange={setIsUserDetailOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>User Details</DialogTitle>
-              <DialogDescription>
-                Complete information for {selectedUser?.profile?.full_name || selectedUser?.username}
-              </DialogDescription>
-            </DialogHeader>
-            {selectedUser && (
-              <div className="space-y-6">
-                {/* Profile Section */}
-                <div className="flex items-start gap-4">
-                  <Avatar className="w-20 h-20">
-                    <AvatarImage src={selectedUser.profile?.profile_picture_url} />
-                    <AvatarFallback className="text-2xl">
-                      {selectedUser.profile?.full_name?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-semibold">
-                      {selectedUser.profile?.full_name || selectedUser.full_name || 'Unknown'}
-                    </h3>
-                    <p className="text-muted-foreground">@{selectedUser.username || selectedUser.profile?.username}</p>
-                    <Badge variant={selectedUser.securityProfile ? 'default' : 'secondary'}>
-                      {selectedUser.securityProfile?.name || 'No Role Assigned'}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Email</Label>
-                    <p className="font-medium">{selectedUser.email}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Phone</Label>
-                    <p className="font-medium">{selectedUser.phone_number || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Reporting Manager</Label>
-                    <p className="font-medium">
-                      {managers[selectedUser.id] 
-                        ? (managers[selectedUser.id].full_name || managers[selectedUser.id].username) 
-                        : '-'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Status</Label>
-                    <Badge variant={selectedUser.email_confirmed_at ? 'default' : 'secondary'}>
-                      {selectedUser.email_confirmed_at ? 'Verified' : 'Pending Verification'}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Joined</Label>
-                    <p className="font-medium">
-                      {new Date(selectedUser.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Last Login</Label>
-                    <p className="font-medium">
-                      {selectedUser.last_sign_in_at 
-                        ? new Date(selectedUser.last_sign_in_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : 'Never'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            <DialogFooter className="mt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setIsUserDetailOpen(false);
-                  setIsEditDialogOpen(true);
-                }}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit User
-              </Button>
-              <Button variant="secondary" onClick={() => setIsUserDetailOpen(false)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* User Detail Sheet */}
+        <UserDetailSheet
+          user={selectedUser}
+          open={isUserDetailOpen}
+          onOpenChange={setIsUserDetailOpen}
+          onEditClick={() => setIsEditDialogOpen(true)}
+          managers={managers}
+        />
 
         {/* Photo Full View Dialog */}
         <UserPhotoDialog
