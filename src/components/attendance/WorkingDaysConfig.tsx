@@ -6,8 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Calendar, RefreshCw, Save, Calculator } from 'lucide-react';
+import { Calendar, Save, Calculator } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const patternOptions = [
+  { value: 'none', label: 'Working Day' },
+  { value: 'all', label: 'All Week-Offs' },
+  { value: '1st_3rd', label: '1st & 3rd' },
+  { value: '2nd_4th', label: '2nd & 4th' },
+];
 
 interface WorkingDaysEntry {
   id?: string;
@@ -209,6 +218,58 @@ const WorkingDaysConfig = () => {
   const totalWeekOffs = workingDaysData.reduce((sum, d) => sum + d.week_offs, 0);
   const totalHolidays = workingDaysData.reduce((sum, d) => sum + d.holidays, 0);
 
+  const handleWeekOffChange = async (dayOfWeek: number, pattern: string) => {
+    try {
+      const isOff = pattern !== 'none';
+      const existingConfig = weekOffConfig.find(c => c.day_of_week === dayOfWeek);
+
+      if (existingConfig) {
+        await supabase
+          .from('week_off_config')
+          .update({ is_off: isOff, alternate_pattern: isOff ? pattern : null })
+          .eq('day_of_week', dayOfWeek);
+      } else {
+        await supabase
+          .from('week_off_config')
+          .insert({ day_of_week: dayOfWeek, is_off: isOff, alternate_pattern: isOff ? pattern : null });
+      }
+
+      // Update local state
+      setWeekOffConfig(prev => {
+        const updated = prev.filter(c => c.day_of_week !== dayOfWeek);
+        updated.push({ day_of_week: dayOfWeek, is_off: isOff, alternate_pattern: isOff ? pattern : null });
+        return updated.sort((a, b) => a.day_of_week - b.day_of_week);
+      });
+
+      toast.success(`${dayNames[dayOfWeek]} updated to ${patternOptions.find(p => p.value === pattern)?.label}`);
+      
+      // Auto-recalculate after a short delay to let state update
+      setTimeout(() => calculateWorkingDays(), 100);
+    } catch (error) {
+      console.error('Error updating week-off config:', error);
+      toast.error('Failed to update week-off configuration');
+    }
+  };
+
+  const getPatternForDay = (dayOfWeek: number): string => {
+    const config = weekOffConfig.find(c => c.day_of_week === dayOfWeek);
+    if (!config || !config.is_off) return 'none';
+    return config.alternate_pattern || 'all';
+  };
+
+  const getPatternBadge = (pattern: string) => {
+    switch (pattern) {
+      case 'all':
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">All Off</Badge>;
+      case '1st_3rd':
+        return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">1st & 3rd</Badge>;
+      case '2nd_4th':
+        return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">2nd & 4th</Badge>;
+      default:
+        return <Badge variant="outline" className="text-muted-foreground">Working</Badge>;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -254,6 +315,52 @@ const WorkingDaysConfig = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Week-Off Day Selector */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium mb-3">Weekly Off Configuration</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Select which days are off for all users. Changes auto-save and recalculate working days.
+            </p>
+            <div className="grid grid-cols-7 gap-2">
+              {dayNames.map((day, index) => {
+                const pattern = getPatternForDay(index);
+                const isOff = pattern !== 'none';
+                return (
+                  <div key={day} className="flex flex-col items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-full py-3 px-2 rounded-lg text-center font-medium transition-colors",
+                        isOff 
+                          ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200 border-2 border-red-300" 
+                          : "bg-muted/50 text-foreground border border-border"
+                      )}
+                    >
+                      {day}
+                    </div>
+                    <Select
+                      value={pattern}
+                      onValueChange={(value) => handleWeekOffChange(index, value)}
+                    >
+                      <SelectTrigger className="w-full text-xs h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {patternOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value} className="text-xs">
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="h-5">
+                      {getPatternBadge(pattern)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-primary/10 rounded-lg p-4">
