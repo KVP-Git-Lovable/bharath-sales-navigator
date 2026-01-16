@@ -1,10 +1,12 @@
 import { MapPin, Users, CheckCircle, Clock, TrendingUp, UserPlus, Zap, Sparkles, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { useUserTargetProgress, TargetPeriod, TargetBasis } from "@/hooks/useUserTargetProgress";
+import { usePeriodStats } from "@/hooks/usePeriodStats";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 
@@ -71,6 +73,18 @@ export const TodaysBeatCard = ({
     targetPeriod,
     targetBasis
   );
+
+  // Fetch period-based stats
+  const { data: periodStats, isLoading: statsLoading } = usePeriodStats(user?.id, targetPeriod);
+
+  // Use period stats when not 'today', otherwise use props
+  const isToday = targetPeriod === 'today';
+  const displayPlanned = isToday ? beatProgress.planned : (periodStats?.planned ?? 0);
+  const displayProductive = isToday ? beatProgress.productive : (periodStats?.productive ?? 0);
+  const displayRemaining = isToday ? beatProgress.remaining : (periodStats?.remaining ?? 0);
+  const displayNewRetailers = isToday ? newRetailers : (periodStats?.newRetailers ?? 0);
+  const displayPotentialRevenue = isToday ? potentialRevenue : (periodStats?.potentialRevenue ?? 0);
+  const displayPoints = isToday ? points : (periodStats?.points ?? 0);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -325,7 +339,11 @@ export const TodaysBeatCard = ({
               <div className="flex items-center justify-center gap-1 mb-1.5">
                 <Users className="h-4 w-4 text-primary" />
               </div>
-              <p className="text-xl font-bold text-foreground">{beatProgress.planned}</p>
+              {!isToday && statsLoading ? (
+                <Skeleton className="h-7 w-8 mx-auto mb-1" />
+              ) : (
+                <p className="text-xl font-bold text-foreground">{displayPlanned}</p>
+              )}
               <p className="text-[10px] text-muted-foreground mt-0.5">Planned</p>
           </div>
 
@@ -333,7 +351,11 @@ export const TodaysBeatCard = ({
             <div className="flex items-center justify-center gap-1 mb-1.5">
               <CheckCircle className="h-4 w-4 text-success" />
             </div>
-            <p className="text-xl font-bold text-foreground">{beatProgress.productive}</p>
+            {!isToday && statsLoading ? (
+              <Skeleton className="h-7 w-8 mx-auto mb-1" />
+            ) : (
+              <p className="text-xl font-bold text-foreground">{displayProductive}</p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-0.5">Productive</p>
           </div>
 
@@ -341,7 +363,11 @@ export const TodaysBeatCard = ({
             <div className="flex items-center justify-center gap-1 mb-1.5">
               <Clock className="h-4 w-4 text-warning" />
             </div>
-            <p className="text-xl font-bold text-foreground">{beatProgress.remaining}</p>
+            {!isToday && statsLoading ? (
+              <Skeleton className="h-7 w-8 mx-auto mb-1" />
+            ) : (
+              <p className="text-xl font-bold text-foreground">{displayRemaining}</p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-0.5">Remaining</p>
           </div>
         </div>
@@ -352,7 +378,11 @@ export const TodaysBeatCard = ({
             <div className="flex items-center justify-center gap-1 mb-1">
               <UserPlus className="h-3.5 w-3.5 text-blue-500" />
             </div>
-            <p className="text-base font-bold text-foreground">{newRetailers}</p>
+            {!isToday && statsLoading ? (
+              <Skeleton className="h-6 w-8 mx-auto mb-1" />
+            ) : (
+              <p className="text-base font-bold text-foreground">{displayNewRetailers}</p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-0.5">New Added</p>
           </div>
 
@@ -360,7 +390,11 @@ export const TodaysBeatCard = ({
             <div className="flex items-center justify-center gap-1 mb-1">
               <TrendingUp className="h-3.5 w-3.5 text-purple-500" />
             </div>
-            <p className="text-base font-bold text-foreground">{formatCurrencyShort(potentialRevenue)}</p>
+            {!isToday && statsLoading ? (
+              <Skeleton className="h-6 w-12 mx-auto mb-1" />
+            ) : (
+              <p className="text-base font-bold text-foreground">{formatCurrencyShort(displayPotentialRevenue)}</p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-0.5">Potential</p>
           </div>
 
@@ -368,7 +402,11 @@ export const TodaysBeatCard = ({
             <div className="flex items-center justify-center gap-1 mb-1">
               <Zap className="h-3.5 w-3.5 text-amber-500" />
             </div>
-            <p className="text-base font-bold text-foreground">{points}</p>
+            {!isToday && statsLoading ? (
+              <Skeleton className="h-6 w-8 mx-auto mb-1" />
+            ) : (
+              <p className="text-base font-bold text-foreground">{displayPoints}</p>
+            )}
             <p className="text-[10px] text-muted-foreground mt-0.5">Points</p>
           </div>
         </div>
