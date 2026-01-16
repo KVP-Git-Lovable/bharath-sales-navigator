@@ -14,6 +14,7 @@ interface JourneyMapProps {
   positions: Position[];
   retailers?: EnhancedRetailerLocation[];
   height?: string;
+  totalGpsDistance?: number; // Actual distance traveled from GPS tracking
 }
 
 // Fix for default marker icons
@@ -80,7 +81,8 @@ const optimizeRoute = (retailers: EnhancedRetailerLocation[], startLat?: number,
 export const JourneyMap: React.FC<JourneyMapProps> = ({ 
   positions, 
   retailers = [], 
-  height = '500px'
+  height = '500px',
+  totalGpsDistance
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -237,18 +239,25 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
         markersRef.current.set(retailer.id, marker);
       });
 
-      // Add route distance label
-      if (totalRouteDistance > 0) {
+      // Add distance label - prefer GPS distance if available
+      const distanceToShow = totalGpsDistance !== undefined && totalGpsDistance > 0 
+        ? totalGpsDistance 
+        : totalRouteDistance;
+      const distanceLabel = totalGpsDistance !== undefined && totalGpsDistance > 0 
+        ? 'Traveled' 
+        : 'Route';
+      
+      if (distanceToShow > 0) {
         const midIdx = Math.floor(optimizedRetailers.length / 2);
         const midPoint = optimizedRetailers[midIdx];
         L.marker([midPoint.latitude, midPoint.longitude], {
           icon: L.divIcon({
             className: 'route-distance-label',
             html: `<div style="background: #8b5cf6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-              Route: ${totalRouteDistance.toFixed(1)} km
+              ${distanceLabel}: ${distanceToShow.toFixed(1)} km
             </div>`,
-            iconSize: [80, 24],
-            iconAnchor: [40, 12],
+            iconSize: [100, 24],
+            iconAnchor: [50, 12],
           })
         }).addTo(mapRef.current);
       }
@@ -350,11 +359,15 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
           <div className="w-3 h-3 rounded-full bg-orange-500"></div>
           <span>Pending</span>
         </div>
-        {totalRouteDistance > 0 && (
+        {(totalGpsDistance !== undefined && totalGpsDistance > 0) ? (
+          <div className="flex items-center gap-1 ml-auto">
+            <span className="text-purple-600 font-medium">Traveled: {totalGpsDistance.toFixed(1)} km</span>
+          </div>
+        ) : totalRouteDistance > 0 ? (
           <div className="flex items-center gap-1 ml-auto">
             <span className="text-purple-600 font-medium">Route: {totalRouteDistance.toFixed(1)} km</span>
           </div>
-        )}
+        ) : null}
       </div>
       
       <div
