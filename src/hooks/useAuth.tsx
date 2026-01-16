@@ -14,6 +14,8 @@ interface AuthContextType {
   userRole: 'admin' | 'user' | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  mustChangePassword: boolean;
+  onPasswordChanged: () => void;
   signUp: (data: SignUpData) => Promise<void>;
   signIn: (email: string, password: string, role?: 'admin' | 'user') => Promise<void>;
   signOut: () => Promise<void>;
@@ -56,6 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+
+  const onPasswordChanged = () => {
+    setMustChangePassword(false);
+  };
 
   const fetchUserRole = async (userId: string): Promise<'admin' | 'user' | null> => {
     try {
@@ -214,6 +221,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const profile = await fetchUserProfile(session.user.id);
           setUserProfile(profile);
           if (profile) localStorage.setItem('cached_profile', JSON.stringify(profile));
+          
+          // Check if user must change password
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('must_change_password')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          
+          if (profileData?.must_change_password) {
+            setMustChangePassword(true);
+          }
         } catch (err) {
           devError('Error loading user data:', err);
           // Set basic profile from user metadata
@@ -312,8 +330,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
       
       if (profileData?.must_change_password) {
+        setMustChangePassword(true);
         toast.info('Please change your password to continue');
-        window.location.href = '/change-password';
+        // Still redirect to dashboard, but the modal will show
+        window.location.href = '/dashboard';
         return;
       }
       
@@ -416,6 +436,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       userRole,
       userProfile,
       loading,
+      mustChangePassword,
+      onPasswordChanged,
       signUp,
       signIn,
       signOut,
