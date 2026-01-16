@@ -161,10 +161,11 @@ export const usePeriodStats = (userId: string | undefined, period: TargetPeriod)
         }
       }
 
-      // Query retailers for beats that don't have retailer data in beat_data
-      // Exclude beats that already have data to avoid duplicates
-      const beatsNeedingFallback = Array.from(beatsWithoutRetailerData)
-        .filter(beatId => !beatsWithRetailerData.has(beatId));
+      // Query retailers for beats that don't have retailer data in beat_data.
+      // Even if the same beat has other plans with explicit retailer IDs, we still fetch here
+      // because metadata-only plans (e.g. only retailerCount) can represent a larger set.
+      // Using a Set ensures we don't double-count retailer IDs.
+      const beatsNeedingFallback = Array.from(beatsWithoutRetailerData);
 
       if (beatsNeedingFallback.length > 0) {
         const { data: retailersByBeat } = await supabase
