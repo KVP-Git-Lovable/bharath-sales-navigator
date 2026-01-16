@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Pencil, Search, Columns3 } from 'lucide-react';
+import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Pencil, Search, Columns3, X } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import HolidayManagement from '@/components/HolidayManagement';
 import { CreateUserWizard } from '@/components/admin/create-user';
@@ -24,6 +24,7 @@ import SecurityRolesDisplay from '@/components/admin/SecurityRolesDisplay';
 import EditUserDialog from '@/components/admin/EditUserDialog';
 import UserPhotoDialog from '@/components/admin/UserPhotoDialog';
 import UserDetailSheet from '@/components/admin/UserDetailSheet';
+import { SortableTableHeader, useTableSort, useTableFilters } from '@/components/admin/SortableTableHeader';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -69,6 +70,61 @@ const allColumns = [
   { key: 'last_login', label: 'Last Login', default: false },
 ];
 
+// Helper functions for sorting and filtering
+const getUserColumnValue = (
+  user: User, 
+  key: string, 
+  managers: Record<string, { full_name: string; username: string }>
+): string => {
+  switch (key) {
+    case 'username':
+      return user.username || user.profile?.username || '';
+    case 'email':
+      return user.email || '';
+    case 'full_name':
+      return user.full_name || user.profile?.full_name || '';
+    case 'phone':
+      return user.phone_number || '';
+    case 'role':
+      return user.securityProfile?.name || 'Not Assigned';
+    case 'manager':
+      return managers[user.id]?.full_name || managers[user.id]?.username || '';
+    case 'status':
+      return user.email_confirmed_at ? 'Verified' : 'Pending';
+    default:
+      return '';
+  }
+};
+
+const getSortValue = (
+  user: User, 
+  key: string, 
+  managers: Record<string, { full_name: string; username: string }>
+): string | Date | null => {
+  switch (key) {
+    case 'username':
+      return user.username || user.profile?.username || '';
+    case 'email':
+      return user.email || '';
+    case 'full_name':
+      return user.full_name || user.profile?.full_name || '';
+    case 'phone':
+      return user.phone_number || '';
+    case 'role':
+      return user.securityProfile?.name || '';
+    case 'manager':
+      return managers[user.id]?.full_name || managers[user.id]?.username || '';
+    case 'joined':
+      return user.created_at ? new Date(user.created_at) : null;
+    case 'last_login':
+      return user.last_sign_in_at ? new Date(user.last_sign_in_at) : null;
+    case 'status':
+      return user.email_confirmed_at ? 'Verified' : 'Pending';
+    default:
+      return '';
+  }
+};
+
 export const AdminDashboard = () => {
   const { userRole, loading } = useAuth();
   const navigate = useNavigate();
@@ -86,6 +142,10 @@ export const AdminDashboard = () => {
     allColumns.filter(c => c.default).map(c => c.key)
   );
   const [managers, setManagers] = useState<Record<string, { full_name: string; username: string }>>({});
+  
+  // Sort and filter hooks
+  const { sortKey, sortDirection, handleSort, sortData } = useTableSort<User>();
+  const { filters, handleFilter, hasActiveFilters, clearAllFilters } = useTableFilters();
 
   // Form states
   const [newUser, setNewUser] = useState({
@@ -405,6 +465,12 @@ export const AdminDashboard = () => {
                       <Button onClick={fetchUsers} variant="outline" size="sm">
                         Refresh
                       </Button>
+                      {hasActiveFilters && (
+                        <Button onClick={clearAllFilters} variant="ghost" size="sm" className="text-destructive">
+                          <X className="h-4 w-4 mr-1" />
+                          Clear Filters
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="relative">
@@ -426,33 +492,144 @@ export const AdminDashboard = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          {visibleColumns.includes('photo') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Photo</TableHead>}
-                          {visibleColumns.includes('username') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">User Name</TableHead>}
-                          {visibleColumns.includes('email') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Email</TableHead>}
-                          {visibleColumns.includes('full_name') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Full Name</TableHead>}
-                          {visibleColumns.includes('phone') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Phone</TableHead>}
-                          {visibleColumns.includes('role') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Role</TableHead>}
-                          {visibleColumns.includes('manager') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Reporting Manager</TableHead>}
-                          {visibleColumns.includes('joined') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Joined</TableHead>}
-                          {visibleColumns.includes('last_login') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Last Login</TableHead>}
-                          {visibleColumns.includes('status') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Status</TableHead>}
-                          {visibleColumns.includes('action') && <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Actions</TableHead>}
+                          {visibleColumns.includes('photo') && (
+                            <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Photo</TableHead>
+                          )}
+                          {visibleColumns.includes('username') && (
+                            <SortableTableHeader
+                              label="User Name"
+                              columnKey="username"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['username'] || ''}
+                              onFilter={handleFilter}
+                            />
+                          )}
+                          {visibleColumns.includes('email') && (
+                            <SortableTableHeader
+                              label="Email"
+                              columnKey="email"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['email'] || ''}
+                              onFilter={handleFilter}
+                            />
+                          )}
+                          {visibleColumns.includes('full_name') && (
+                            <SortableTableHeader
+                              label="Full Name"
+                              columnKey="full_name"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['full_name'] || ''}
+                              onFilter={handleFilter}
+                            />
+                          )}
+                          {visibleColumns.includes('phone') && (
+                            <SortableTableHeader
+                              label="Phone"
+                              columnKey="phone"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['phone'] || ''}
+                              onFilter={handleFilter}
+                            />
+                          )}
+                          {visibleColumns.includes('role') && (
+                            <SortableTableHeader
+                              label="Role"
+                              columnKey="role"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['role'] || ''}
+                              onFilter={handleFilter}
+                              filterType="select"
+                              filterOptions={[...new Set(users.map(u => u.securityProfile?.name).filter(Boolean) as string[])]}
+                            />
+                          )}
+                          {visibleColumns.includes('manager') && (
+                            <SortableTableHeader
+                              label="Reporting Manager"
+                              columnKey="manager"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['manager'] || ''}
+                              onFilter={handleFilter}
+                              filterType="select"
+                              filterOptions={[...new Set(Object.values(managers).map(m => m.full_name || m.username).filter(Boolean))]}
+                            />
+                          )}
+                          {visibleColumns.includes('joined') && (
+                            <SortableTableHeader
+                              label="Joined"
+                              columnKey="joined"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterable={false}
+                            />
+                          )}
+                          {visibleColumns.includes('last_login') && (
+                            <SortableTableHeader
+                              label="Last Login"
+                              columnKey="last_login"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterable={false}
+                            />
+                          )}
+                          {visibleColumns.includes('status') && (
+                            <SortableTableHeader
+                              label="Status"
+                              columnKey="status"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['status'] || ''}
+                              onFilter={handleFilter}
+                              filterType="select"
+                              filterOptions={['Verified', 'Pending']}
+                            />
+                          )}
+                          {visibleColumns.includes('action') && (
+                            <TableHead className="text-[11px] font-medium text-muted-foreground py-2 h-8">Actions</TableHead>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users
-                          .filter(user => {
-                            if (!userSearchQuery.trim()) return true;
-                            const query = userSearchQuery.toLowerCase();
-                            return (
-                              user.email?.toLowerCase().includes(query) ||
-                              user.username?.toLowerCase().includes(query) ||
-                              user.full_name?.toLowerCase().includes(query) ||
-                              user.phone_number?.toLowerCase().includes(query) ||
-                              user.securityProfile?.name?.toLowerCase().includes(query)
-                            );
-                          })
-                          .map((user) => (
+                        {sortData(
+                          users.filter(user => {
+                            // Global search
+                            if (userSearchQuery.trim()) {
+                              const query = userSearchQuery.toLowerCase();
+                              const matchesSearch = 
+                                user.email?.toLowerCase().includes(query) ||
+                                user.username?.toLowerCase().includes(query) ||
+                                user.full_name?.toLowerCase().includes(query) ||
+                                user.phone_number?.toLowerCase().includes(query) ||
+                                user.securityProfile?.name?.toLowerCase().includes(query);
+                              if (!matchesSearch) return false;
+                            }
+                            
+                            // Column filters
+                            for (const [key, value] of Object.entries(filters)) {
+                              if (!value) continue;
+                              const userValue = getUserColumnValue(user, key, managers);
+                              if (!userValue.toLowerCase().includes(value.toLowerCase())) {
+                                return false;
+                              }
+                            }
+                            return true;
+                          }),
+                          (user, key) => getSortValue(user, key, managers)
+                        ).map((user) => (
                           <TableRow key={user.id} className="hover:bg-muted/30">
                             {visibleColumns.includes('photo') && (
                               <TableCell className="py-1.5">
