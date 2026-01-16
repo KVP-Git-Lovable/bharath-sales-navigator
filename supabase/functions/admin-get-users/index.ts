@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     // Get profiles data
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, username, full_name, phone_number, recovery_email, created_at')
+      .select('id, username, full_name, phone_number, recovery_email, created_at, profile_picture_url, user_status')
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError)
@@ -110,7 +110,15 @@ Deno.serve(async (req) => {
         confirmed_at: authUser.confirmed_at,
         phone: authUser.phone,
         app_metadata: authUser.app_metadata,
-        user_metadata: authUser.user_metadata
+        user_metadata: authUser.user_metadata,
+        profile: {
+          id: profile?.id || authUser.id,
+          username: profile?.username || 'N/A',
+          full_name: profile?.full_name || 'N/A',
+          created_at: profile?.created_at || authUser.created_at,
+          profile_picture_url: profile?.profile_picture_url,
+          user_status: profile?.user_status || 'active'
+        }
       }
     })
 

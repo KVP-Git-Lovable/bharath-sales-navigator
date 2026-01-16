@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Pencil, Search, Columns3, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Navigate, useNavigate } from 'react-router-dom';
 import HolidayManagement from '@/components/HolidayManagement';
 import { CreateUserWizard } from '@/components/admin/create-user';
@@ -62,7 +63,8 @@ const allColumns = [
   { key: 'email', label: 'Email', default: true },
   { key: 'role', label: 'Role', default: true },
   { key: 'manager', label: 'Reporting Manager', default: true },
-  { key: 'status', label: 'Status', default: true },
+  { key: 'active', label: 'Active', default: true },
+  { key: 'status', label: 'Email Status', default: false },
   { key: 'action', label: 'Action', default: true },
   { key: 'full_name', label: 'Full Name', default: false },
   { key: 'phone', label: 'Phone', default: false },
@@ -91,6 +93,9 @@ const getUserColumnValue = (
       return managers[user.id]?.full_name || managers[user.id]?.username || '';
     case 'status':
       return user.email_confirmed_at ? 'Verified' : 'Pending';
+    case 'active':
+      const userStatus = user.profile?.user_status || 'active';
+      return userStatus === 'inactive' ? 'Inactive' : 'Active';
     default:
       return '';
   }
@@ -333,6 +338,23 @@ export const AdminDashboard = () => {
     }
   };
 
+  const toggleUserActiveStatus = async (userId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ user_status: newStatus })
+      .eq('id', userId);
+      
+    if (error) {
+      toast.error('Failed to update user status');
+      return;
+    }
+    
+    toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+    fetchUsers();
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -565,6 +587,19 @@ export const AdminDashboard = () => {
                               filterOptions={[...new Set(Object.values(managers).map(m => m.full_name || m.username).filter(Boolean))]}
                             />
                           )}
+                          {visibleColumns.includes('active') && (
+                            <SortableTableHeader
+                              label="Active"
+                              columnKey="active"
+                              sortKey={sortKey}
+                              sortDirection={sortDirection}
+                              onSort={handleSort}
+                              filterValue={filters['active'] || ''}
+                              onFilter={handleFilter}
+                              filterType="select"
+                              filterOptions={['Active', 'Inactive']}
+                            />
+                          )}
                           {visibleColumns.includes('joined') && (
                             <SortableTableHeader
                               label="Joined"
@@ -680,6 +715,23 @@ export const AdminDashboard = () => {
                                 {managers[user.id] 
                                   ? (managers[user.id].full_name || managers[user.id].username || '-') 
                                   : '-'}
+                              </TableCell>
+                            )}
+                            {visibleColumns.includes('active') && (
+                              <TableCell className="text-xs py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={user.profile?.user_status !== 'inactive'}
+                                    onCheckedChange={() => toggleUserActiveStatus(
+                                      user.id, 
+                                      user.profile?.user_status || 'active'
+                                    )}
+                                    className="scale-75"
+                                  />
+                                  <span className={user.profile?.user_status === 'inactive' ? 'text-destructive' : 'text-green-600'}>
+                                    {user.profile?.user_status === 'inactive' ? 'Inactive' : 'Active'}
+                                  </span>
+                                </div>
                               </TableCell>
                             )}
                             {visibleColumns.includes('joined') && (

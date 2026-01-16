@@ -288,6 +288,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(`Access denied. This account does not have admin privileges.`);
       }
       
+      // Check if user is active
+      const { data: statusCheck } = await supabase
+        .from('profiles')
+        .select('user_status')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      
+      if (statusCheck?.user_status === 'inactive') {
+        await supabase.auth.signOut();
+        toast.error('Your account has been deactivated. Please contact your administrator.');
+        throw new Error('Account is inactive');
+      }
+      
       const profile = await fetchUserProfile(data.user.id);
       setUserProfile(profile);
       
