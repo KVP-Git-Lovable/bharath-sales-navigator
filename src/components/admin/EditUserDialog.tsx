@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, Eye, EyeOff, Copy, Key, Check, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { moveToRecycleBin } from '@/utils/recycleBinUtils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface User {
   id: string;
@@ -77,9 +79,21 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
     secondary_manager_id: '',
   });
 
+  // Password reset state
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [requirePasswordChange, setRequirePasswordChange] = useState(true);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+
   useEffect(() => {
     if (open && user) {
       fetchData();
+      // Reset password state when dialog opens
+      setNewPassword('');
+      setShowPassword(false);
+      setRequirePasswordChange(true);
+      setCopiedPassword(false);
     }
   }, [open, user]);
 
@@ -140,6 +154,77 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
       });
     } catch (error) {
       console.error('Error fetching user data:', error);
+    }
+  };
+
+  const generateTemporaryPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const specialChars = '!@#$%&*';
+    let password = '';
+    
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    password += specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+    for (let i = 0; i < 3; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    setNewPassword(password);
+    setShowPassword(true);
+    setCopiedPassword(false);
+  };
+
+  const copyPasswordToClipboard = async () => {
+    if (!newPassword) return;
+    try {
+      await navigator.clipboard.writeText(newPassword);
+      setCopiedPassword(true);
+      toast.success('Password copied to clipboard');
+      setTimeout(() => setCopiedPassword(false), 3000);
+    } catch (error) {
+      toast.error('Failed to copy password');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!user || !newPassword) {
+      toast.error('Please enter or generate a password');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          new_password: newPassword,
+          require_password_change: requirePasswordChange,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+
+      toast.success('Password reset successfully! Share the new password with the user.');
+      setNewPassword('');
+      setShowPassword(false);
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast.error(error.message || 'Failed to reset password');
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -324,10 +409,11 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
             <TabsTrigger value="managers">Managers</TabsTrigger>
+            <TabsTrigger value="password">Reset Password</TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4 mt-4">
@@ -488,6 +574,86 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
                 </Select>
                 <p className="text-xs text-muted-foreground">Optional dotted-line reporting relationship</p>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="password" className="space-y-4 mt-4">
+            <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertDescription className="text-amber-600">
+                This will replace the user's current password. Make sure to share the new password with them securely.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setCopiedPassword(false);
+                      }}
+                      placeholder="Enter new password or generate one"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={copyPasswordToClipboard}
+                    disabled={!newPassword}
+                    title="Copy password"
+                  >
+                    {copiedPassword ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={generateTemporaryPassword}
+                    title="Generate password"
+                  >
+                    <Key className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Password must be at least 6 characters long
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="requirePasswordChange"
+                  checked={requirePasswordChange}
+                  onCheckedChange={(checked) => setRequirePasswordChange(checked === true)}
+                />
+                <Label htmlFor="requirePasswordChange" className="text-sm font-normal cursor-pointer">
+                  Require password change on first login
+                </Label>
+              </div>
+
+              <Button 
+                onClick={handleResetPassword}
+                disabled={resettingPassword || !newPassword}
+                className="w-full"
+              >
+                {resettingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Reset Password
+              </Button>
             </div>
           </TabsContent>
         </Tabs>
