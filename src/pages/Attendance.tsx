@@ -255,31 +255,74 @@ const Attendance = () => {
 
       const presentDays = attendanceRecords?.filter(record => record.status === 'present').length || 0;
       
-      // Fetch working days from working_days_config table
+      // Calculate working days ELAPSED up to today (not the entire month)
       let totalWorkingDays = 20; // Default fallback
+      let elapsedWorkingDays = 0; // Working days that have passed up to today
+      
+      const currentDate = new Date();
+      const todayDate = currentDate.getDate();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1; // 1-indexed for DB
       
       if (dateFilter === 'current-week') {
-        // For week view, calculate proportionally or use 5 as default
-        totalWorkingDays = 5;
+        // For week view, calculate working days in the week up to today
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        // Assume Mon-Sat are working days (6 days), Sunday is off
+        elapsedWorkingDays = dayOfWeek === 0 ? 6 : dayOfWeek; // If Sunday, count full week
+        totalWorkingDays = 6; // Week has 6 working days (Mon-Sat)
       } else {
-        // For month view, fetch from working_days_config
-        const currentDate = new Date();
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth() + 1; // 1-indexed for DB
+        // For month view, fetch week-off config and holidays to calculate elapsed working days
+        const { data: weekOffConfig } = await supabase
+          .from('week_off_config')
+          .select('day_of_week, is_off');
         
-        const { data: workingDaysConfig } = await supabase
-          .from('working_days_config')
-          .select('working_days')
-          .eq('year', year)
-          .eq('month', month)
-          .single();
+        // Build array of week-off days (0=Sunday, 1=Monday, etc.)
+        const weekOffDays: number[] = weekOffConfig
+          ?.filter(config => config.is_off)
+          .map(config => config.day_of_week) || [0]; // Default Sunday off
         
-        if (workingDaysConfig?.working_days) {
-          totalWorkingDays = workingDaysConfig.working_days;
+        // Fetch holidays for this month
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+        const monthEnd = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+        
+        const { data: holidays } = await supabase
+          .from('holidays')
+          .select('date')
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+        
+        const holidayDates = new Set(holidays?.map(h => h.date) || []);
+        
+        // Calculate elapsed working days (from 1st to today)
+        for (let day = 1; day <= todayDate; day++) {
+          const date = new Date(year, month - 1, day);
+          const dayOfWeek = date.getDay();
+          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          
+          // Check if it's not a week-off day and not a holiday
+          if (!weekOffDays.includes(dayOfWeek) && !holidayDates.has(dateStr)) {
+            elapsedWorkingDays++;
+          }
         }
+        
+        // Calculate total working days for the entire month (for display purposes)
+        const daysInMonth = new Date(year, month, 0).getDate();
+        let monthTotalWorkingDays = 0;
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(year, month - 1, day);
+          const dayOfWeek = date.getDay();
+          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          
+          if (!weekOffDays.includes(dayOfWeek) && !holidayDates.has(dateStr)) {
+            monthTotalWorkingDays++;
+          }
+        }
+        
+        totalWorkingDays = monthTotalWorkingDays;
       }
       
-      const absentDays = Math.max(0, totalWorkingDays - presentDays);
+      // Absent days = elapsed working days - present days (only count days that have passed)
+      const absentDays = Math.max(0, elapsedWorkingDays - presentDays);
       const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDays / totalWorkingDays) * 100) : 0;
 
       setStats({
@@ -292,8 +335,8 @@ const Attendance = () => {
       setAttendanceData(attendanceRecords || []);
 
       // Check today's attendance
-      const today = getLocalTodayDate();
-      const todayRecord = attendanceRecords?.find(record => record.date === today);
+      const todayStr = getLocalTodayDate();
+      const todayRecord = attendanceRecords?.find(record => record.date === todayStr);
       setTodaysAttendance(todayRecord);
 
     } catch (error) {
