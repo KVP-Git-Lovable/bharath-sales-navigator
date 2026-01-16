@@ -68,6 +68,10 @@ const Attendance = () => {
     absentDays: 0,
     attendance: 0
   });
+  const [presentDatesList, setPresentDatesList] = useState<string[]>([]);
+  const [absentDatesList, setAbsentDatesList] = useState<string[]>([]);
+  const [showPresentDaysDialog, setShowPresentDaysDialog] = useState(false);
+  const [showAbsentDaysDialog, setShowAbsentDaysDialog] = useState(false);
   const [isMarkingAttendance, setIsMarkingAttendance] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [location, setLocation] = useState(null);
@@ -253,11 +257,14 @@ const Attendance = () => {
 
       if (error) throw error;
 
-      const presentDays = attendanceRecords?.filter(record => record.status === 'present').length || 0;
+      const presentDaysCount = attendanceRecords?.filter(record => record.status === 'present').length || 0;
+      const presentDates = attendanceRecords?.filter(record => record.status === 'present').map(r => r.date) || [];
+      const presentDatesSet = new Set(presentDates);
       
       // Calculate working days ELAPSED up to today (not the entire month)
       let totalWorkingDays = 20; // Default fallback
       let elapsedWorkingDays = 0; // Working days that have passed up to today
+      const elapsedWorkingDates: string[] = []; // Track specific working dates
       
       const currentDate = new Date();
       const todayDate = currentDate.getDate();
@@ -270,6 +277,15 @@ const Attendance = () => {
         // Assume Mon-Sat are working days (6 days), Sunday is off
         elapsedWorkingDays = dayOfWeek === 0 ? 6 : dayOfWeek; // If Sunday, count full week
         totalWorkingDays = 6; // Week has 6 working days (Mon-Sat)
+        
+        // Get working dates for the week
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+        for (let i = 0; i < 6 && i < dayOfWeek; i++) {
+          const date = new Date(weekStart);
+          date.setDate(weekStart.getDate() + i);
+          const dateStr = format(date, 'yyyy-MM-dd');
+          elapsedWorkingDates.push(dateStr);
+        }
       } else {
         // For month view, fetch week-off config and holidays to calculate elapsed working days
         const { data: weekOffConfig } = await supabase
@@ -302,6 +318,7 @@ const Attendance = () => {
           // Check if it's not a week-off day and not a holiday
           if (!weekOffDays.includes(dayOfWeek) && !holidayDates.has(dateStr)) {
             elapsedWorkingDays++;
+            elapsedWorkingDates.push(dateStr);
           }
         }
         
@@ -321,18 +338,41 @@ const Attendance = () => {
         totalWorkingDays = monthTotalWorkingDays;
       }
       
+      // Calculate absent dates (working days where user was not present)
+      const absentDates = elapsedWorkingDates.filter(date => !presentDatesSet.has(date));
+      
       // Absent days = elapsed working days - present days (only count days that have passed)
-      const absentDays = Math.max(0, elapsedWorkingDays - presentDays);
-      const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDays / totalWorkingDays) * 100) : 0;
+      const absentDays = absentDates.length;
+      const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDaysCount / totalWorkingDays) * 100) : 0;
+
+      // Store date lists for dialog display
+      setPresentDatesList(presentDates.sort());
+      setAbsentDatesList(absentDates.sort());
 
       setStats({
         totalDays: totalWorkingDays,
-        presentDays,
+        presentDays: presentDaysCount,
         absentDays,
         attendance: attendancePercentage
       });
 
-      setAttendanceData(attendanceRecords || []);
+      // Merge attendance records with absent day placeholders for Recent Attendance display
+      const absentRecords = absentDates.map(date => ({
+        id: `absent-${date}`,
+        date,
+        status: 'absent',
+        check_in_time: null,
+        check_out_time: null,
+        total_hours: null,
+        face_match_confidence: null,
+        isAbsentPlaceholder: true
+      }));
+      
+      const mergedRecords = [...(attendanceRecords || []), ...absentRecords]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setAttendanceData(mergedRecords);
+
 
       // Check today's attendance
       const todayStr = getLocalTodayDate();
@@ -1042,24 +1082,80 @@ const Attendance = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Present/Absent Cards */}
+            {/* Present/Absent Cards - Clickable */}
             <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-              <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+              <Card 
+                className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setShowPresentDaysDialog(true)}
+              >
                 <CardContent className="p-4 text-center">
                   <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.presentDays}</div>
                   <div className="text-sm text-green-600 dark:text-green-400">Present Days</div>
+                  <div className="text-xs text-green-500 mt-1">Tap to view dates</div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800">
+              <Card 
+                className="bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setShowAbsentDaysDialog(true)}
+              >
                 <CardContent className="p-4 text-center">
                   <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.absentDays}</div>
                   <div className="text-sm text-red-600 dark:text-red-400">Absent Days</div>
+                  <div className="text-xs text-red-500 mt-1">Tap to view dates</div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Present Days Dialog */}
+            <Dialog open={showPresentDaysDialog} onOpenChange={setShowPresentDaysDialog}>
+              <DialogContent className="max-w-md max-h-[70vh] overflow-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Present Days ({presentDatesList.length})
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2 mt-4">
+                  {presentDatesList.length > 0 ? (
+                    presentDatesList.map((date) => (
+                      <div key={date} className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="font-medium">{format(new Date(date), 'EEE, MMM dd, yyyy')}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-4">No present days recorded</div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Absent Days Dialog */}
+            <Dialog open={showAbsentDaysDialog} onOpenChange={setShowAbsentDaysDialog}>
+              <DialogContent className="max-w-md max-h-[70vh] overflow-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                    Absent Days ({absentDatesList.length})
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2 mt-4">
+                  {absentDatesList.length > 0 ? (
+                    absentDatesList.map((date) => (
+                      <div key={date} className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span className="font-medium">{format(new Date(date), 'EEE, MMM dd, yyyy')}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-4">No absent days recorded</div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Market Hours Module */}
@@ -1184,32 +1280,45 @@ const Attendance = () => {
                     {attendanceData.length > 0 ? (
                       attendanceData.slice(0, 15).map((record) => {
                         const recordDate = format(new Date(record.date), 'yyyy-MM-dd');
+                        const isAbsent = record.status === 'absent' || record.isAbsentPlaceholder;
+                        
                         return (
                           <div 
                             key={record.id} 
-                            className="flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all"
+                            className={cn(
+                              "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all",
+                              isAbsent && "bg-red-50/50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                            )}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">
-                                {record.status === 'present' ? (
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
-                                ) : (
+                                {isAbsent ? (
                                   <XCircle className="h-5 w-5 text-red-600" />
+                                ) : (
+                                  <CheckCircle className="h-5 w-5 text-green-600" />
                                 )}
                                 <div className="flex-1">
                                   <div className="font-medium">
                                     {format(new Date(record.date), 'EEE, MMM dd, yyyy')}
                                   </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    In: {formatTime(record.check_in_time)} | Out: {formatTime(record.check_out_time)}
-                                  </div>
-                                  {record.total_hours && (
-                                    <div className="text-xs text-blue-600">
-                                      Total: {record.total_hours.toFixed(1)} hours
+                                  {isAbsent ? (
+                                    <div className="text-sm text-red-600 dark:text-red-400">
+                                      Absent - No attendance recorded
                                     </div>
+                                  ) : (
+                                    <>
+                                      <div className="text-sm text-muted-foreground">
+                                        In: {formatTime(record.check_in_time)} | Out: {formatTime(record.check_out_time)}
+                                      </div>
+                                      {record.total_hours && (
+                                        <div className="text-xs text-blue-600">
+                                          Total: {record.total_hours.toFixed(1)} hours
+                                        </div>
+                                      )}
+                                    </>
                                   )}
                                 </div>
-                                {record.face_match_confidence !== null && (
+                                {!isAbsent && record.face_match_confidence !== null && (
                                   <Badge 
                                     variant={
                                       record.face_match_confidence >= 70 ? 'default' : 
@@ -1228,80 +1337,87 @@ const Attendance = () => {
                                     {Math.round(record.face_match_confidence)}%
                                   </Badge>
                                 )}
+                                {isAbsent && (
+                                  <Badge variant="destructive" className="ml-2">
+                                    Absent
+                                  </Badge>
+                                )}
                               </div>
                             </div>
 
-                            {/* Action Buttons */}
-                            <div className="flex flex-wrap gap-2">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={async () => {
-                                      setSelectedDateForMap(new Date(record.date));
-                                      await loadGPSPositionsForDate(recordDate);
-                                    }}
-                                  >
-                                    <Route className="h-4 w-4" />
-                                    Travel Heat Map
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                                  <DialogHeader>
-                                    <DialogTitle>
-                                      Journey Heat Map - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                    </DialogTitle>
-                                  </DialogHeader>
-                                  <div className="mt-4">
-                                    <JourneyMap 
-                                      positions={gpsPositionsByDate.get(recordDate) || []} 
-                                      height="500px"
-                                    />
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
+                            {/* Action Buttons - Only show for present days */}
+                            {!isAbsent && (
+                              <div className="flex flex-wrap gap-2">
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={async () => {
+                                        setSelectedDateForMap(new Date(record.date));
+                                        await loadGPSPositionsForDate(recordDate);
+                                      }}
+                                    >
+                                      <Route className="h-4 w-4" />
+                                      Travel Heat Map
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>
+                                        Journey Heat Map - {format(new Date(record.date), 'MMM dd, yyyy')}
+                                      </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="mt-4">
+                                      <JourneyMap 
+                                        positions={gpsPositionsByDate.get(recordDate) || []} 
+                                        height="500px"
+                                      />
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
 
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={async () => {
-                                      await fetchVisitsForDate(recordDate);
-                                    }}
-                                  >
-                                    <CalendarDays className="h-4 w-4" />
-                                    Timeline View
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                                  <DialogHeader>
-                                    <DialogTitle>
-                                      Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                    </DialogTitle>
-                                  </DialogHeader>
-                                  <div className="mt-4">
-                                    <TimelineView 
-                                      visits={selectedDateVisits}
-                                      dayStart={formatTime(record.check_in_time)}
-                                    />
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={async () => {
+                                        await fetchVisitsForDate(recordDate);
+                                      }}
+                                    >
+                                      <CalendarDays className="h-4 w-4" />
+                                      Timeline View
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>
+                                        Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
+                                      </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="mt-4">
+                                      <TimelineView 
+                                        visits={selectedDateVisits}
+                                        dayStart={formatTime(record.check_in_time)}
+                                      />
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
 
-                              <Button
-                                size="sm"
-                                variant={record.status === 'present' ? 'default' : 'destructive'}
-                                className="gap-2"
-                                onClick={() => navigate(`/today-summary?date=${recordDate}`)}
-                              >
-                                <FileText className="h-4 w-4" />
-                                Productivity Report
-                              </Button>
-                            </div>
+                                <Button
+                                  size="sm"
+                                  variant={record.status === 'present' ? 'default' : 'destructive'}
+                                  className="gap-2"
+                                  onClick={() => navigate(`/today-summary?date=${recordDate}`)}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  Productivity Report
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         );
                       })
