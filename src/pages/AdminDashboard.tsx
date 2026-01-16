@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { Users, UserPlus, Shield, BarChart3, Settings, Database, Calendar, ArrowLeft, Pencil, Search, Columns3 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import HolidayManagement from '@/components/HolidayManagement';
-import CreateUserForm from '@/components/CreateUserForm';
+import { CreateUserWizard } from '@/components/admin/create-user';
 import UserInvitationForm from '@/components/UserInvitationForm';
 import ApproverManagement from '@/components/ApproverManagement';
 import UserHierarchy from '@/components/admin/UserHierarchy';
@@ -550,7 +550,7 @@ export const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="create-user" className="space-y-6">
-            <CreateUserForm />
+            <CreateUserWizard />
           </TabsContent>
 
           <TabsContent value="invite-user" className="space-y-6">
