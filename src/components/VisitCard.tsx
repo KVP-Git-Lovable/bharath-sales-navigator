@@ -2314,7 +2314,7 @@ export const VisitCard = ({
             .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, idempotency_key, order_items(product_name, quantity, rate, original_rate, total, unit)')
             .eq('user_id', user.id)
             .eq('retailer_id', retailerId)
-            .eq('status', 'confirmed')
+            .in('status', ['confirmed', 'delivered'])
             .gte('created_at', dayStart.toISOString())
             .lte('created_at', dayEnd.toISOString())
             .abortSignal(controller.signal);
