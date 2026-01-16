@@ -136,30 +136,33 @@ export const VisitCard = ({
   };
 
   // Initialize from cache or props - will be set after getInitialStatusData is called
+  // FIX: Use selectedDate prop instead of getLocalTodayDate() for proper date-specific cache lookup
   const [hasOrderToday, setHasOrderToday] = useState<boolean>(() => {
-    // Check cache first for order value
+    // Check cache first for order value - use selectedDate if available
     const retailerId = visit.retailerId || visit.id;
     const cachedUserId = typeof window !== 'undefined' ? localStorage.getItem('cached_user_id') : null;
-    const targetDate = getLocalTodayDate();
+    const targetDate = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
     if (cachedUserId && visitStatusCache.isReady()) {
       const cached = visitStatusCache.getSync(retailerId, cachedUserId, targetDate);
       if (cached?.orderValue && cached.orderValue > 0) {
         return true;
       }
     }
-    return !!visit.hasOrder;
+    // FIX: Also check prop values directly (these come from parent with DB data)
+    return !!visit.hasOrder || (visit.orderValue !== undefined && visit.orderValue > 0);
   });
   const [actualOrderValue, setActualOrderValue] = useState<number>(() => {
-    // Check cache first for order value
+    // Check cache first for order value - use selectedDate if available
     const retailerId = visit.retailerId || visit.id;
     const cachedUserId = typeof window !== 'undefined' ? localStorage.getItem('cached_user_id') : null;
-    const targetDate = getLocalTodayDate();
+    const targetDate = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
     if (cachedUserId && visitStatusCache.isReady()) {
       const cached = visitStatusCache.getSync(retailerId, cachedUserId, targetDate);
       if (cached?.orderValue && cached.orderValue > 0) {
         return cached.orderValue;
       }
     }
+    // FIX: Ensure we use prop value directly - it comes from parent's DB fetch
     return visit.orderValue || 0;
   });
 
