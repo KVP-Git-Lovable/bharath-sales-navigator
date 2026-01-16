@@ -2,18 +2,47 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, getDay } from 'date-fns';
 
+interface WeekOffConfig {
+  day_of_week: number;
+  is_off: boolean;
+  alternate_pattern: string | null;
+}
+
 export interface WorkingDaysResult {
   totalDaysInMonth: number;
-  sundays: number;
+  weekOffs: number;
   holidays: number;
   approvedLeaves: number;
   effectiveWorkingDays: number;
   holidayDates: string[];
   leaveDates: string[];
+  weekOffDates: string[];
 }
 
 export interface MonthlyWorkingDays {
   [monthKey: string]: WorkingDaysResult;
+}
+
+// Helper: Check if a specific date is a week-off based on config
+function isDateWeekOff(date: Date, weekOffConfig: WeekOffConfig[]): boolean {
+  const dayOfWeek = getDay(date);
+  const config = weekOffConfig.find(c => c.day_of_week === dayOfWeek);
+  
+  if (!config || !config.is_off) return false;
+  
+  const dayOfMonth = date.getDate();
+  const weekOfMonth = Math.ceil(dayOfMonth / 7);
+  
+  switch (config.alternate_pattern) {
+    case 'all':
+      return true;
+    case '1st_3rd':
+      return weekOfMonth === 1 || weekOfMonth === 3;
+    case '2nd_4th':
+      return weekOfMonth === 2 || weekOfMonth === 4;
+    default:
+      return false;
+  }
 }
 
 // Calculate working days for a specific month and user
@@ -30,12 +59,24 @@ export function useWorkingDaysCalculator(
       const startStr = format(startDate, 'yyyy-MM-dd');
       const endStr = format(endDate, 'yyyy-MM-dd');
 
+      // Fetch week-off configuration
+      const { data: weekOffData } = await supabase
+        .from('week_off_config')
+        .select('day_of_week, is_off, alternate_pattern');
+      
+      const weekOffConfig: WeekOffConfig[] = weekOffData || [];
+
       // Get all days in the month
       const allDays = eachDayOfInterval({ start: startDate, end: endDate });
       const totalDaysInMonth = allDays.length;
 
-      // Count Sundays
-      const sundays = allDays.filter(day => getDay(day) === 0).length;
+      // Count week-offs based on configuration
+      const weekOffDates: string[] = [];
+      allDays.forEach(day => {
+        if (isDateWeekOff(day, weekOffConfig)) {
+          weekOffDates.push(format(day, 'yyyy-MM-dd'));
+        }
+      });
 
       // Fetch holidays for this month
       const { data: holidays } = await supabase
@@ -46,11 +87,8 @@ export function useWorkingDaysCalculator(
 
       const holidayDates = holidays?.map(h => h.date) || [];
       
-      // Filter out holidays that fall on Sundays to avoid double counting
-      const nonSundayHolidays = holidayDates.filter(date => {
-        const d = new Date(date);
-        return getDay(d) !== 0;
-      });
+      // Filter out holidays that fall on week-offs to avoid double counting
+      const nonWeekOffHolidays = holidayDates.filter(date => !weekOffDates.includes(date));
 
       // Fetch approved leaves for this user in this month
       let leaveDates: string[] = [];
@@ -69,8 +107,8 @@ export function useWorkingDaysCalculator(
             const leaveDays = eachDayOfInterval({ start: leaveStart, end: leaveEnd });
             leaveDays.forEach(day => {
               const dayStr = format(day, 'yyyy-MM-dd');
-              // Don't count leaves on Sundays or holidays
-              if (getDay(day) !== 0 && !holidayDates.includes(dayStr)) {
+              // Don't count leaves on week-offs or holidays
+              if (!weekOffDates.includes(dayStr) && !holidayDates.includes(dayStr)) {
                 leaveDates.push(dayStr);
               }
             });
@@ -81,16 +119,17 @@ export function useWorkingDaysCalculator(
       // Remove duplicates
       leaveDates = [...new Set(leaveDates)];
 
-      const effectiveWorkingDays = totalDaysInMonth - sundays - nonSundayHolidays.length - leaveDates.length;
+      const effectiveWorkingDays = totalDaysInMonth - weekOffDates.length - nonWeekOffHolidays.length - leaveDates.length;
 
       return {
         totalDaysInMonth,
-        sundays,
-        holidays: nonSundayHolidays.length,
+        weekOffs: weekOffDates.length,
+        holidays: nonWeekOffHolidays.length,
         approvedLeaves: leaveDates.length,
         effectiveWorkingDays: Math.max(0, effectiveWorkingDays),
-        holidayDates: nonSundayHolidays,
+        holidayDates: nonWeekOffHolidays,
         leaveDates,
+        weekOffDates,
       };
     },
     enabled: !!year,
@@ -124,6 +163,13 @@ export function useFYWorkingDays(userId: string | undefined, fyYear: number) {
       const startDate = `${fyYear - 1}-04-01`;
       const endDate = `${fyYear}-03-31`;
 
+      // Fetch week-off configuration
+      const { data: weekOffData } = await supabase
+        .from('week_off_config')
+        .select('day_of_week, is_off, alternate_pattern');
+      
+      const weekOffConfig: WeekOffConfig[] = weekOffData || [];
+
       // Fetch all holidays for the FY
       const { data: holidays } = await supabase
         .from('holidays')
@@ -132,6 +178,17 @@ export function useFYWorkingDays(userId: string | undefined, fyYear: number) {
         .lte('date', endDate);
 
       const holidayDates = holidays?.map(h => h.date) || [];
+
+      // Calculate all week-off dates for the FY
+      const fyStart = new Date(fyYear - 1, 3, 1); // April 1
+      const fyEnd = new Date(fyYear, 2, 31); // March 31
+      const allFYDays = eachDayOfInterval({ start: fyStart, end: fyEnd });
+      const allWeekOffDates: string[] = [];
+      allFYDays.forEach(day => {
+        if (isDateWeekOff(day, weekOffConfig)) {
+          allWeekOffDates.push(format(day, 'yyyy-MM-dd'));
+        }
+      });
 
       // Fetch all approved leaves for this user in this FY
       let allLeaveDates: string[] = [];
@@ -150,7 +207,8 @@ export function useFYWorkingDays(userId: string | undefined, fyYear: number) {
             const leaveDays = eachDayOfInterval({ start: leaveStart, end: leaveEnd });
             leaveDays.forEach(day => {
               const dayStr = format(day, 'yyyy-MM-dd');
-              if (getDay(day) !== 0 && !holidayDates.includes(dayStr)) {
+              // Don't count leaves on week-offs or holidays
+              if (!allWeekOffDates.includes(dayStr) && !holidayDates.includes(dayStr)) {
                 allLeaveDates.push(dayStr);
               }
             });
@@ -165,11 +223,17 @@ export function useFYWorkingDays(userId: string | undefined, fyYear: number) {
         const monthEnd = endOfMonth(new Date(year, month));
         const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
         const totalDaysInMonth = allDays.length;
-        const sundays = allDays.filter(day => getDay(day) === 0).length;
 
+        // Count week-offs for this month
+        const monthWeekOffDates = allWeekOffDates.filter(date => {
+          const d = new Date(date);
+          return d.getMonth() === month && d.getFullYear() === year;
+        });
+
+        // Count holidays (excluding those on week-offs)
         const monthHolidays = holidayDates.filter(date => {
           const d = new Date(date);
-          return d.getMonth() === month && d.getFullYear() === year && getDay(d) !== 0;
+          return d.getMonth() === month && d.getFullYear() === year && !monthWeekOffDates.includes(date);
         });
 
         const monthLeaves = allLeaveDates.filter(date => {
@@ -177,17 +241,18 @@ export function useFYWorkingDays(userId: string | undefined, fyYear: number) {
           return d.getMonth() === month && d.getFullYear() === year;
         });
 
-        const effectiveWorkingDays = totalDaysInMonth - sundays - monthHolidays.length - monthLeaves.length;
+        const effectiveWorkingDays = totalDaysInMonth - monthWeekOffDates.length - monthHolidays.length - monthLeaves.length;
 
         const monthKey = `${index + 1}`; // FY month number (1-12)
         results[monthKey] = {
           totalDaysInMonth,
-          sundays,
+          weekOffs: monthWeekOffDates.length,
           holidays: monthHolidays.length,
           approvedLeaves: monthLeaves.length,
           effectiveWorkingDays: Math.max(0, effectiveWorkingDays),
           holidayDates: monthHolidays,
           leaveDates: monthLeaves,
+          weekOffDates: monthWeekOffDates,
         };
       });
 
