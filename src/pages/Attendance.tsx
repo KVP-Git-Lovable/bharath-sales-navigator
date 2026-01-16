@@ -254,11 +254,31 @@ const Attendance = () => {
       if (error) throw error;
 
       const presentDays = attendanceRecords?.filter(record => record.status === 'present').length || 0;
-      // Calculate working days based on filter
-      let totalWorkingDays = 20; // Default for month
+      
+      // Fetch working days from working_days_config table
+      let totalWorkingDays = 20; // Default fallback
+      
       if (dateFilter === 'current-week') {
-        totalWorkingDays = 5; // 5 working days in a week
+        // For week view, calculate proportionally or use 5 as default
+        totalWorkingDays = 5;
+      } else {
+        // For month view, fetch from working_days_config
+        const currentDate = new Date();
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth() + 1; // 1-indexed for DB
+        
+        const { data: workingDaysConfig } = await supabase
+          .from('working_days_config')
+          .select('working_days')
+          .eq('year', year)
+          .eq('month', month)
+          .single();
+        
+        if (workingDaysConfig?.working_days) {
+          totalWorkingDays = workingDaysConfig.working_days;
+        }
       }
+      
       const absentDays = Math.max(0, totalWorkingDays - presentDays);
       const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDays / totalWorkingDays) * 100) : 0;
 
@@ -829,7 +849,7 @@ const Attendance = () => {
                 <div className="text-sm text-muted-foreground">This Month</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{stats.presentDays}/20</div>
+                <div className="text-3xl font-bold text-foreground">{stats.presentDays}/{stats.totalDays}</div>
                 <div className="text-sm text-muted-foreground">Present Days</div>
               </div>
             </div>
