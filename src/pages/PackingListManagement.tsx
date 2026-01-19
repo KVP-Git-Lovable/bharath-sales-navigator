@@ -127,22 +127,24 @@ export default function PackingListManagement() {
     loadPackingLists();
   }, [distributorFilter, statusFilter, fetchPackingLists]);
 
-  // Load orders when create dialog opens
+  // Load orders when create dialog opens - filter by DELIVERY DATE (D-1 workflow)
   useEffect(() => {
     const loadOrders = async () => {
       if (!showCreateDialog) return;
       
       setLoadingOrders(true);
+      // Primary filter is deliveryDate (tomorrow for D-1 orders)
+      // This ensures orders placed today for delivery tomorrow are shown
       const orders = await fetchOrdersForPacking({
         distributorId: selectedDistributorForCreate !== 'none' ? selectedDistributorForCreate : undefined,
-        orderDate: orderDateFilter
+        deliveryDate: deliveryDate  // Use delivery date as primary filter
       });
       setOrdersForPacking(orders);
       setLoadingOrders(false);
     };
 
     loadOrders();
-  }, [showCreateDialog, orderDateFilter, selectedDistributorForCreate, fetchOrdersForPacking]);
+  }, [showCreateDialog, deliveryDate, selectedDistributorForCreate, fetchOrdersForPacking]);
 
   const handleCreatePackingList = async () => {
     if (selectedOrderIds.length === 0) return;
@@ -444,22 +446,14 @@ export default function PackingListManagement() {
 
             <div className="flex flex-wrap gap-4 py-4">
               <div className="flex-1 min-w-[150px]">
-                <label className="text-sm font-medium">Order Date</label>
-                <Input
-                  type="date"
-                  value={orderDateFilter}
-                  onChange={(e) => setOrderDateFilter(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div className="flex-1 min-w-[150px]">
-                <label className="text-sm font-medium">Delivery Date</label>
+                <label className="text-sm font-medium">Delivery Date <span className="text-muted-foreground">(Primary Filter)</span></label>
                 <Input
                   type="date"
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
                   className="mt-1"
                 />
+                <p className="text-xs text-muted-foreground mt-1">Shows D-1 orders scheduled for this date</p>
               </div>
               <div className="flex-1 min-w-[150px]">
                 <label className="text-sm font-medium">Distributor (Optional)</label>
