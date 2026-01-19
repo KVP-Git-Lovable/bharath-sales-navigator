@@ -40,7 +40,7 @@ const PrimaryOrdersList = () => {
     try {
       const { data, error } = await supabase
         .from('primary_orders')
-        .select('*, primary_order_items(count)')
+        .select('id, order_number, order_date, expected_delivery_date, status, total_amount, created_at, primary_order_items(count)')
         .eq('distributor_id', distributorId)
         .order('created_at', { ascending: false });
 

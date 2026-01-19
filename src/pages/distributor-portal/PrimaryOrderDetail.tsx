@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,38 +37,76 @@ const PrimaryOrderDetail = () => {
   const [order, setOrder] = useState<any>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (orderId) {
-      loadOrderDetails();
+      loadOrderDetails(orderId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
-  const loadOrderDetails = async () => {
+  const loadOrderDetails = async (id: string) => {
+    setLoading(true);
+
+    const startedAt = performance.now();
     try {
-      const { data: orderData, error: orderError } = await supabase
+      // Single round-trip: fetch header + items via FK relation
+      const { data, error } = await supabase
         .from('primary_orders')
-        .select('*')
-        .eq('id', orderId)
+        .select(
+          `
+          id,
+          order_number,
+          order_date,
+          expected_delivery_date,
+          actual_delivery_date,
+          status,
+          subtotal,
+          discount_amount,
+          tax_amount,
+          total_amount,
+          payment_terms,
+          payment_status,
+          notes,
+          dispatch_reference,
+          transporter_name,
+          vehicle_number,
+          dispatched_at,
+          primary_order_items(
+            id,
+            product_name,
+            variant_name,
+            quantity,
+            received_quantity,
+            unit,
+            unit_price,
+            line_total
+          )
+        `
+        )
+        .eq('id', id)
         .single();
 
-      if (orderError) throw orderError;
+      if (error) throw error;
 
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('primary_order_items')
-        .select('*')
-        .eq('order_id', orderId);
-
-      if (itemsError) throw itemsError;
-
-      setOrder(orderData);
-      setItems(itemsData || []);
+      if (!isMountedRef.current) return;
+      setOrder(data);
+      setItems(((data as any)?.primary_order_items || []) as OrderItem[]);
     } catch (error) {
       console.error('Error loading order:', error);
       toast.error('Failed to load order details');
       navigate('/distributor-portal/primary-orders');
     } finally {
-      setLoading(false);
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      console.debug(`[PrimaryOrderDetail] loadOrderDetails in ${elapsedMs}ms`);
+      if (isMountedRef.current) setLoading(false);
     }
   };
 
@@ -103,7 +141,7 @@ const PrimaryOrderDetail = () => {
 
       if (error) throw error;
       toast.success('Order submitted successfully');
-      loadOrderDetails();
+      if (orderId) await loadOrderDetails(orderId);
     } catch (error) {
       console.error('Error submitting order:', error);
       toast.error('Failed to submit order');

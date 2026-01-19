@@ -80,7 +80,7 @@ export const DistributorPrimaryOrders = ({ distributorId }: DistributorPrimaryOr
     try {
       const { data, error } = await supabase
         .from('primary_orders')
-        .select('*')
+        .select('id, order_number, order_date, expected_delivery_date, actual_delivery_date, status, subtotal, discount_amount, tax_amount, total_amount, payment_terms, notes, dispatch_reference, transporter_name, vehicle_number, created_at')
         .eq('distributor_id', distributorId)
         .order('created_at', { ascending: false });
 
@@ -99,7 +99,7 @@ export const DistributorPrimaryOrders = ({ distributorId }: DistributorPrimaryOr
     try {
       const { data, error } = await supabase
         .from('primary_order_items')
-        .select('*')
+        .select('id, product_name, variant_name, sku, quantity, unit, unit_price, discount_percent, tax_percent, line_total')
         .eq('order_id', orderId);
 
       if (error) throw error;
