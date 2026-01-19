@@ -1013,15 +1013,8 @@ export const Cart = () => {
           created_at: new Date().toISOString()
         };
         
-        // CRITICAL FIX: Update snapshot for ONLINE orders too (offline orders already update via offlineOrderUtils)
-        // This ensures My Visits shows correct order values instantly even when loading from snapshot
-        try {
-          await addOrderToSnapshot(currentUserId, orderDate, orderForEvent);
-          console.log('📸 [Cart] Updated snapshot with order:', orderForEvent.id);
-        } catch (snapshotErr) {
-          console.warn('[Cart] Could not update snapshot:', snapshotErr);
-        }
-        
+        // CRITICAL FIX: Dispatch events FIRST (synchronously) so React can start updating immediately
+        // This ensures Today's Progress updates BEFORE the navigation completes
         window.dispatchEvent(new CustomEvent('visitStatusChanged', {
           detail: { 
             visitId: actualVisitId, 
@@ -1041,12 +1034,17 @@ export const Cart = () => {
           }
         }));
         
-        // CRITICAL FIX: Also dispatch visitDataChanged to trigger data refreshes across the app
-        window.dispatchEvent(new Event('visitDataChanged'));
-        
-        // CRITICAL FIX: Mark data changed for cross-page state sync
-        // This ensures My Visits will reload from snapshot when returning
+        // Mark data changed for cross-page state sync (synchronous - fast)
         markVisitDataChanged();
+        
+        // BACKGROUND: Update snapshot for persistence (don't await - no delay)
+        // This ensures data persists across app restarts without blocking the UI
+        addOrderToSnapshot(currentUserId, orderDate, orderForEvent)
+          .then(() => console.log('📸 [Cart] Updated snapshot with order:', orderForEvent.id))
+          .catch(err => console.warn('[Cart] Could not update snapshot:', err));
+        
+        // Note: Removed visitDataChanged event - visitStatusChanged already handles immediate UI updates
+        // visitDataChanged was causing redundant snapshot loads
       }
 
       // Navigate to My Visits page immediately
