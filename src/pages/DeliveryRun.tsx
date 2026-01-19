@@ -105,12 +105,12 @@ export default function DeliveryRun() {
             delivery_status,
             delivery_notes,
             delivery_proof_url,
-            retailers!inner(
+            retailers(
               id,
               name,
               address,
               contact_phone,
-              beats(beat_name)
+              beat_name
             )
           `)
           .eq('assigned_agent_id', userId)
@@ -126,7 +126,7 @@ export default function DeliveryRun() {
           retailer_name: order.retailers?.name || 'Unknown',
           retailer_address: order.retailers?.address || '',
           retailer_phone: order.retailers?.contact_phone || '',
-          beat_name: order.retailers?.beats?.beat_name || '',
+          beat_name: order.retailers?.beat_name || '',
           total_amount: order.total_amount,
           items: order.items || [],
           delivery_status: order.delivery_status,
