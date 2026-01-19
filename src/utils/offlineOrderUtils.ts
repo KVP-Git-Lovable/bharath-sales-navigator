@@ -98,7 +98,9 @@ export async function submitOrderWithOfflineSupport(
         }
       }
     }));
-    window.dispatchEvent(new Event('visitDataChanged'));
+    
+    // Note: Removed visitDataChanged event - visitStatusChanged already handles immediate UI updates
+    // visitDataChanged was causing redundant snapshot loads and potential delays
     
     // STEP 3.5: Mark data changed for cross-page state sync
     markVisitDataChanged();
