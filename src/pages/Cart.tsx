@@ -1013,19 +1013,30 @@ export const Cart = () => {
           created_at: new Date().toISOString()
         };
         
-        // CRITICAL FIX: Dispatch events FIRST (synchronously) so React can start updating immediately
-        // This ensures Today's Progress updates BEFORE the navigation completes
+        // CRITICAL FIX: Update snapshot FIRST (must complete before navigation)
+        // This ensures My Visits loads the updated data immediately from snapshot
+        // The await is necessary because navigation will unmount this component
+        try {
+          await addOrderToSnapshot(currentUserId, orderDate, orderForEvent);
+          console.log('📸 [Cart] Updated snapshot with order:', orderForEvent.id);
+        } catch (snapshotErr) {
+          console.warn('[Cart] Could not update snapshot:', snapshotErr);
+        }
+        
+        // Mark data changed for cross-page cache invalidation (await to ensure it's set before nav)
+        await markVisitDataChanged();
+        
+        // Dispatch events for any components that are still mounted
         window.dispatchEvent(new CustomEvent('visitStatusChanged', {
           detail: { 
             visitId: actualVisitId, 
             status: 'productive', 
             retailerId: validRetailerId,
             orderValue: totalAmount,
-            order: orderForEvent  // Include complete order object for progress stats
+            order: orderForEvent
           }
         }));
         
-        // Dispatch order submitted event for visit time tracking
         window.dispatchEvent(new CustomEvent('orderSubmitted', {
           detail: {
             retailerId: validRetailerId,
@@ -1033,21 +1044,9 @@ export const Cart = () => {
             orderValue: totalAmount
           }
         }));
-        
-        // Mark data changed for cross-page state sync (synchronous - fast)
-        markVisitDataChanged();
-        
-        // BACKGROUND: Update snapshot for persistence (don't await - no delay)
-        // This ensures data persists across app restarts without blocking the UI
-        addOrderToSnapshot(currentUserId, orderDate, orderForEvent)
-          .then(() => console.log('📸 [Cart] Updated snapshot with order:', orderForEvent.id))
-          .catch(err => console.warn('[Cart] Could not update snapshot:', err));
-        
-        // Note: Removed visitDataChanged event - visitStatusChanged already handles immediate UI updates
-        // visitDataChanged was causing redundant snapshot loads
       }
 
-      // Navigate to My Visits page immediately
+      // Navigate to My Visits page - snapshot is already updated
       console.log('✅ Navigating to My Visits');
       navigate('/visits/retailers');
 
