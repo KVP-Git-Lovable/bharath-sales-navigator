@@ -407,10 +407,10 @@ export default function PackingListDetail() {
                 <Card key={order.id}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
-                      <div>
+                    <div>
                         <p className="font-medium">{order.retailers?.name || 'Unknown Retailer'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {order.retailers?.beats?.beat_name || 'No Beat'}
+                          {order.retailers?.beat_name || 'No Beat'}
                         </p>
                       </div>
                       <Badge variant="outline">{order.delivery_status || 'pending'}</Badge>

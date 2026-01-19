@@ -134,7 +134,10 @@ export function usePackingList() {
         supabase.from('packing_lists').select('*').eq('id', packingListId).single(),
         supabase.from('packing_list_items').select('*').eq('packing_list_id', packingListId),
         supabase.from('packing_list_assignments').select('*').eq('packing_list_id', packingListId),
-        supabase.from('orders').select('*').eq('packing_list_id', packingListId)
+        supabase.from('orders').select(`
+          id, items, total_amount, delivery_status,
+          retailers(id, name, beat_id, beat_name, territory_id)
+        `).eq('packing_list_id', packingListId)
       ]);
 
       if (packingListRes.error) throw packingListRes.error;
@@ -185,12 +188,12 @@ export function usePackingList() {
           payment_method,
           credit_paid_amount,
           credit_pending_amount,
-          retailers!inner(
+          retailers(
             id,
             name,
             beat_id,
-            territory_id,
-            beats(id, beat_name)
+            beat_name,
+            territory_id
           )
         `)
         .is('packing_list_id', null)
@@ -233,9 +236,9 @@ export function usePackingList() {
         delivery_date: order.delivery_date,
         delivery_status: order.delivery_status,
         retailer_id: order.retailer_id,
-        retailer_name: order.retailers?.name,
+        retailer_name: order.retailers?.name || 'Unknown Retailer',
         beat_id: order.retailers?.beat_id,
-        beat_name: order.retailers?.beats?.beat_name,
+        beat_name: order.retailers?.beat_name || 'No Beat',
         territory_id: order.retailers?.territory_id,
         total_amount: order.total_amount,
         // Payment info for delivery agent
