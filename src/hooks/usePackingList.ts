@@ -135,18 +135,31 @@ export function usePackingList() {
         supabase.from('packing_list_items').select('*').eq('packing_list_id', packingListId),
         supabase.from('packing_list_assignments').select('*').eq('packing_list_id', packingListId),
         supabase.from('orders').select(`
-          id, items, total_amount, delivery_status,
-          retailers(id, name, beat_id, beat_name, territory_id)
+          id, total_amount, delivery_status,
+          retailers(id, name, beat_id, beat_name, territory_id),
+          order_items(id, product_id, product_name, quantity, unit, unit_price)
         `).eq('packing_list_id', packingListId)
       ]);
 
       if (packingListRes.error) throw packingListRes.error;
 
+      // Transform orders to include items in expected format
+      const transformedOrders = (ordersRes.data || []).map((order: any) => ({
+        ...order,
+        items: (order.order_items || []).map((item: any) => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit: item.unit,
+          price: item.unit_price
+        }))
+      }));
+
       return {
         packingList: packingListRes.data as PackingList,
         items: (itemsRes.data || []) as PackingListItem[],
         assignments: (assignmentsRes.data || []) as PackingListAssignment[],
-        orders: ordersRes.data || []
+        orders: transformedOrders
       };
     } catch (error) {
       console.error('Error fetching packing list detail:', error);
@@ -181,7 +194,6 @@ export function usePackingList() {
           order_date,
           retailer_id,
           total_amount,
-          items,
           delivery_date,
           delivery_status,
           is_credit_order,
@@ -194,6 +206,14 @@ export function usePackingList() {
             beat_id,
             beat_name,
             territory_id
+          ),
+          order_items(
+            id,
+            product_id,
+            product_name,
+            quantity,
+            unit,
+            unit_price
           )
         `)
         .is('packing_list_id', null)
@@ -246,7 +266,14 @@ export function usePackingList() {
         payment_method: order.payment_method,
         credit_paid_amount: order.credit_paid_amount,
         credit_pending_amount: order.credit_pending_amount,
-        items: order.items || []
+        // Transform order_items to expected items format
+        items: (order.order_items || []).map((item: any) => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit: item.unit,
+          price: item.unit_price
+        }))
       }));
 
       return ordersWithRetailer as OrderForPacking[];
