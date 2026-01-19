@@ -90,7 +90,10 @@ export function usePackingList() {
         .select('*')
         .order('delivery_date', { ascending: false });
 
-      if (filters?.distributorId) {
+      // Handle distributor filtering: 'direct' means null distributor_id
+      if (filters?.distributorId === 'direct') {
+        query = query.is('distributor_id', null);
+      } else if (filters?.distributorId) {
         query = query.eq('distributor_id', filters.distributorId);
       }
       if (filters?.status) {
