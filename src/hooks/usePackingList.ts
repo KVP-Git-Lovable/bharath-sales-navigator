@@ -137,7 +137,7 @@ export function usePackingList() {
         supabase.from('orders').select(`
           id, total_amount, delivery_status,
           retailers(id, name, beat_id, beat_name, territory_id),
-          order_items(id, product_id, product_name, quantity, unit, unit_price)
+          order_items(id, product_id, product_name, quantity, unit, rate)
         `).eq('packing_list_id', packingListId)
       ]);
 
@@ -151,7 +151,7 @@ export function usePackingList() {
           product_name: item.product_name,
           quantity: item.quantity,
           unit: item.unit,
-          price: item.unit_price
+          price: item.rate
         }))
       }));
 
@@ -208,7 +208,7 @@ export function usePackingList() {
             product_name,
             quantity,
             unit,
-            unit_price
+            rate
           )
         `)
         .is('packing_list_id', null)
@@ -285,7 +285,7 @@ export function usePackingList() {
             product_name: item.product_name,
             quantity: item.quantity,
             unit: item.unit,
-            price: item.unit_price
+            price: item.rate
           }))
         };
       });
