@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import HolidayList from '@/components/HolidayList';
 import LeaveApplicationModal from '@/components/LeaveApplicationModal';
 import MyLeaveApplications from '@/components/MyLeaveApplications';
-import { useGPSTracking } from '@/hooks/useGPSTracking';
+import { useGPSTrackingOptimized } from '@/hooks/useGPSTrackingOptimized';
 import { JourneyMap } from '@/components/JourneyMap';
 import { TimelineView } from '@/components/TimelineView';
 import { cn } from '@/lib/utils';
@@ -98,37 +98,28 @@ const Attendance = () => {
   const [showRegularizationModal, setShowRegularizationModal] = useState(false);
   const [selectedRecordForRegularization, setSelectedRecordForRegularization] = useState<any>(null);
 
-  // GPS Tracking for today
+  // GPS Tracking for today - using optimized hook with React Query caching
   const today = new Date();
-  const { isTracking, positions, startTracking, stopTracking, isWithinWorkingHours } = useGPSTracking(userProfile?.id, today);
+  const { 
+    isTracking, 
+    positions, 
+    startTracking, 
+    stopTracking, 
+    isWithinWorkingHours,
+    loadPositionsForDate 
+  } = useGPSTrackingOptimized(userProfile?.id, today);
 
-  // Load GPS positions for a specific date
+  // Load GPS positions for a specific date - uses cached data from optimized hook
   const loadGPSPositionsForDate = async (date: string) => {
+    // Check local cache first
     if (gpsPositionsByDate.has(date)) return gpsPositionsByDate.get(date);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-
-      const { data, error } = await supabase
-        .from('gps_tracking')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', date)
-        .order('timestamp', { ascending: true });
-
-      if (error) throw error;
-
-      const positions = data?.map((d) => ({
-        latitude: parseFloat(d.latitude as unknown as string),
-        longitude: parseFloat(d.longitude as unknown as string),
-        accuracy: d.accuracy ? parseFloat(d.accuracy as unknown as string) : 0,
-        timestamp: new Date(d.timestamp),
-        speed: d.speed ? parseFloat(d.speed as unknown as string) : undefined,
-        heading: d.heading ? parseFloat(d.heading as unknown as string) : undefined,
-      })) || [];
-
-      setGpsPositionsByDate(new Map(gpsPositionsByDate.set(date, positions)));
+      // Use the optimized hook's method which has deduplication and caching
+      const positions = await loadPositionsForDate(date);
+      
+      // Update local state for backward compatibility with JourneyMap
+      setGpsPositionsByDate(prev => new Map(prev.set(date, positions)));
       return positions;
     } catch (error) {
       console.error('Error loading GPS positions:', error);
