@@ -6641,6 +6641,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          amount_collected: number | null
           assigned_agent_id: string | null
           assigned_van_id: string | null
           created_at: string
@@ -6649,6 +6650,7 @@ export type Database = {
           delivered_at: string | null
           delivery_date: string | null
           delivery_notes: string | null
+          delivery_payment_method: string | null
           delivery_proof_url: string | null
           delivery_status: string | null
           discount_amount: number | null
@@ -6657,12 +6659,14 @@ export type Database = {
           distributor_name: string | null
           id: string
           idempotency_key: string | null
+          invoice_generated_at: string | null
           invoice_number: string | null
           is_credit_order: boolean | null
           order_date: string | null
           packing_list_id: string | null
           payment_method: string | null
           payment_proof_url: string | null
+          payment_status: string | null
           picked_at: string | null
           previous_pending_cleared: number | null
           retailer_id: string | null
@@ -6677,6 +6681,7 @@ export type Database = {
           visit_id: string | null
         }
         Insert: {
+          amount_collected?: number | null
           assigned_agent_id?: string | null
           assigned_van_id?: string | null
           created_at?: string
@@ -6685,6 +6690,7 @@ export type Database = {
           delivered_at?: string | null
           delivery_date?: string | null
           delivery_notes?: string | null
+          delivery_payment_method?: string | null
           delivery_proof_url?: string | null
           delivery_status?: string | null
           discount_amount?: number | null
@@ -6693,12 +6699,14 @@ export type Database = {
           distributor_name?: string | null
           id?: string
           idempotency_key?: string | null
+          invoice_generated_at?: string | null
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
           packing_list_id?: string | null
           payment_method?: string | null
           payment_proof_url?: string | null
+          payment_status?: string | null
           picked_at?: string | null
           previous_pending_cleared?: number | null
           retailer_id?: string | null
@@ -6713,6 +6721,7 @@ export type Database = {
           visit_id?: string | null
         }
         Update: {
+          amount_collected?: number | null
           assigned_agent_id?: string | null
           assigned_van_id?: string | null
           created_at?: string
@@ -6721,6 +6730,7 @@ export type Database = {
           delivered_at?: string | null
           delivery_date?: string | null
           delivery_notes?: string | null
+          delivery_payment_method?: string | null
           delivery_proof_url?: string | null
           delivery_status?: string | null
           discount_amount?: number | null
@@ -6729,12 +6739,14 @@ export type Database = {
           distributor_name?: string | null
           id?: string
           idempotency_key?: string | null
+          invoice_generated_at?: string | null
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
           packing_list_id?: string | null
           payment_method?: string | null
           payment_proof_url?: string | null
+          payment_status?: string | null
           picked_at?: string | null
           previous_pending_cleared?: number | null
           retailer_id?: string | null
