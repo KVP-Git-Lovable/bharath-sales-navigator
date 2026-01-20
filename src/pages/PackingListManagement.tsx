@@ -66,12 +66,16 @@ export default function PackingListManagement() {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('create');
+  const [hasDeliveryAssignments, setHasDeliveryAssignments] = useState<boolean>(false);
 
   // Role-based visibility - treat empty/null roles as admin (default view)
   const isAdminOrManager = !userRole || ['admin', 'manager', 'asm', 'rsm', 'user'].includes(userRole);
   const isDeliveryAgent = ['delivery_agent', 'driver', 'salesman'].includes(userRole);
+  
+  // Show "My Deliveries" if user is a delivery agent OR has active assignments
+  const showMyDeliveries = isDeliveryAgent || hasDeliveryAssignments;
 
-  // Load user role and distributors
+  // Load user role, distributors, and check for delivery assignments
   useEffect(() => {
     const loadInitialData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -90,6 +94,17 @@ export default function PackingListManagement() {
         if (['delivery_agent', 'driver', 'salesman'].includes(roleData.role)) {
           setActiveTab('my-deliveries');
         }
+      }
+
+      // Check if user has any packing list assignments (regardless of role)
+      const { data: assignments } = await supabase
+        .from('packing_list_assignments')
+        .select('id')
+        .eq('agent_id', user.id)
+        .limit(1);
+      
+      if (assignments && assignments.length > 0) {
+        setHasDeliveryAssignments(true);
       }
 
       // Load distributors for filter
@@ -204,8 +219,8 @@ export default function PackingListManagement() {
 
         {/* Tabs - Role-based visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Delivery Agents see ONLY My Deliveries tab */}
-          {isDeliveryAgent ? (
+          {/* Pure Delivery Agents see ONLY My Deliveries tab */}
+          {isDeliveryAgent && !isAdminOrManager ? (
             <div className="px-4 pt-4">
               <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
@@ -215,9 +230,9 @@ export default function PackingListManagement() {
               </TabsList>
             </div>
           ) : (
-            /* Admin/Manager see management tabs only */
+            /* Admin/Manager see management tabs + My Deliveries if they have assignments */
             <div className="px-4 pt-4">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className={`grid w-full ${showMyDeliveries ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <TabsTrigger value="create" className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Create</span>
@@ -228,8 +243,14 @@ export default function PackingListManagement() {
                 </TabsTrigger>
                 <TabsTrigger value="delivery-run" className="flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  <span className="hidden sm:inline">Delivery Runs</span>
+                  <span className="hidden sm:inline">Runs</span>
                 </TabsTrigger>
+                {showMyDeliveries && (
+                  <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    <span className="hidden sm:inline">My Deliveries</span>
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
           )}
