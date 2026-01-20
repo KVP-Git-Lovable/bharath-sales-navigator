@@ -94,14 +94,9 @@ export const Navbar = memo(() => {
       baseItems.push({ id: 'leaderboard', icon: Trophy, label: "Leader board", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
     }
 
-    // Add Packing List Management if enabled
-    if (isPackingListEnabled) {
+    // Add Packing List Management if enabled (includes My Deliveries tab for delivery agents)
+    if (isPackingListEnabled || isDeliveryAgentEnabled) {
       baseItems.push({ id: 'packing-list', icon: ClipboardList, label: "Packing List", href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
-    }
-
-    // Add Delivery Run if enabled
-    if (isDeliveryAgentEnabled) {
-      baseItems.push({ id: 'delivery-run', icon: Truck, label: "Delivery Run", href: "/delivery-run", color: "from-orange-500 to-orange-600" });
     }
 
     // Add remaining items

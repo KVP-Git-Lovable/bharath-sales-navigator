@@ -490,6 +490,20 @@ export function usePackingList() {
 
       if (error) throw error;
 
+      // CRITICAL FIX: Update all orders in this packing list with the assigned agent
+      // This allows delivery agents to see their assigned orders via assigned_agent_id
+      const { error: updateOrdersError } = await supabase
+        .from('orders')
+        .update({ 
+          assigned_agent_id: agentId
+        })
+        .eq('packing_list_id', packingListId);
+
+      if (updateOrdersError) {
+        console.error('Error updating orders with agent:', updateOrdersError);
+        // Don't fail the assignment, just log the error
+      }
+
       toast({
         title: "Success",
         description: "Agent assigned successfully"

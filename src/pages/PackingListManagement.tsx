@@ -16,7 +16,8 @@ import {
   Trash2,
   Eye,
   Send,
-  Building2
+  Building2,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,10 +44,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePackingList, PackingList, OrderForPacking } from '@/hooks/usePackingList';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
+import MyDeliveriesTab from '@/components/packing/MyDeliveriesTab';
 
 interface Distributor {
   id: string;
@@ -70,6 +73,7 @@ export default function PackingListManagement() {
   const [distributorFilter, setDistributorFilter] = useState<string>('all');
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [userRole, setUserRole] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>('all');
   
   // Create packing list dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -79,6 +83,10 @@ export default function PackingListManagement() {
   const [orderDateFilter, setOrderDateFilter] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [selectedDistributorForCreate, setSelectedDistributorForCreate] = useState<string>('none');
+
+  // Role-based visibility
+  const isAdminOrManager = ['admin', 'manager', 'asm', 'rsm'].includes(userRole);
+  const isDeliveryAgent = ['delivery_agent', 'driver', 'salesman'].includes(userRole);
 
   // Load user role and distributors
   useEffect(() => {
@@ -95,6 +103,10 @@ export default function PackingListManagement() {
       
       if (roleData) {
         setUserRole(roleData.role);
+        // Default tab based on role
+        if (['delivery_agent', 'driver', 'salesman'].includes(roleData.role)) {
+          setActiveTab('my-deliveries');
+        }
       }
 
       // Load distributors for filter
@@ -253,186 +265,216 @@ export default function PackingListManagement() {
                 <p className="text-sm text-muted-foreground">Manage delivery packing lists</p>
               </div>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create
-            </Button>
+            {isAdminOrManager && activeTab === 'all' && (
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Card className="bg-card">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-muted-foreground">{stats.draft}</p>
-              <p className="text-xs text-muted-foreground">Draft</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-blue-600">{stats.packed}</p>
-              <p className="text-xs text-muted-foreground">Packed</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-amber-600">{stats.dispatched}</p>
-              <p className="text-xs text-muted-foreground">Dispatched</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-              <p className="text-xs text-muted-foreground">Completed</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <div className="px-4 pb-4 flex flex-wrap gap-3">
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search packing lists..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="px-4 pt-4">
+            <TabsList className={`grid w-full ${isAdminOrManager ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {isAdminOrManager && (
+                <TabsTrigger value="all" className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4" />
+                  All Packing Lists
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                My Deliveries
+              </TabsTrigger>
+            </TabsList>
           </div>
-          
-          {/* Distributor Filter - show for all users */}
-          <Select value={distributorFilter} onValueChange={setDistributorFilter}>
-            <SelectTrigger className="w-40">
-              <Building2 className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Distributor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Sources</SelectItem>
-              <SelectItem value="direct">Direct Sales</SelectItem>
-              {distributors.map(d => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="packed">Packed</SelectItem>
-              <SelectItem value="dispatched">Dispatched</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          {/* All Packing Lists Tab - Admin/Manager Only */}
+          {isAdminOrManager && (
+            <TabsContent value="all" className="mt-0">
+              {/* Summary Cards */}
+              <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold">{stats.total}</p>
+                    <p className="text-xs text-muted-foreground">Total</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-muted-foreground">{stats.draft}</p>
+                    <p className="text-xs text-muted-foreground">Draft</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-blue-600">{stats.packed}</p>
+                    <p className="text-xs text-muted-foreground">Packed</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-amber-600">{stats.dispatched}</p>
+                    <p className="text-xs text-muted-foreground">Dispatched</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+                    <p className="text-xs text-muted-foreground">Completed</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-        {/* Packing Lists */}
-        <div className="px-4 pb-6 space-y-3">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredPackingLists.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No packing lists found</p>
-                <Button 
-                  variant="outline" 
-                  className="mt-4"
-                  onClick={() => setShowCreateDialog(true)}
-                >
-                  Create Your First Packing List
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredPackingLists.map(packingList => (
-              <Card key={packingList.id} className="overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-muted rounded-lg">
-                        {getStatusIcon(packingList.status)}
-                      </div>
-                      <div>
-                        <p className="font-medium">{packingList.packing_list_number}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
-                            Delivery: {format(new Date(packingList.delivery_date), 'dd MMM yyyy')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Building2 className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            {getDistributorName(packingList.distributor_id)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(packingList.status)}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/packing-list/${packingList.id}`)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          {packingList.status === 'packed' && (
-                            <DropdownMenuItem onClick={() => handleDispatch(packingList.id)}>
-                              <Send className="h-4 w-4 mr-2" />
-                              Dispatch
-                            </DropdownMenuItem>
-                          )}
-                          {packingList.status === 'draft' && (
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleDeletePackingList(packingList.id, packingList.distributor_id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+              {/* Filters */}
+              <div className="px-4 pb-4 flex flex-wrap gap-3">
+                <div className="flex-1 min-w-[200px] relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search packing lists..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
+                {/* Distributor Filter */}
+                <Select value={distributorFilter} onValueChange={setDistributorFilter}>
+                  <SelectTrigger className="w-40">
+                    <Building2 className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Distributor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    <SelectItem value="direct">Direct Sales</SelectItem>
+                    {distributors.map(d => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="packed">Packed</SelectItem>
+                    <SelectItem value="dispatched">Dispatched</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Packing Lists */}
+              <div className="px-4 pb-6 space-y-3">
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
+                ) : filteredPackingLists.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No packing lists found</p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        onClick={() => setShowCreateDialog(true)}
+                      >
+                        Create Your First Packing List
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filteredPackingLists.map(packingList => (
+                    <Card key={packingList.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-muted rounded-lg">
+                              {getStatusIcon(packingList.status)}
+                            </div>
+                            <div>
+                              <p className="font-medium">{packingList.packing_list_number}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Calendar className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                  Delivery: {format(new Date(packingList.delivery_date), 'dd MMM yyyy')}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Building2 className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">
+                                  {getDistributorName(packingList.distributor_id)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(packingList.status)}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => navigate(`/packing-list/${packingList.id}`)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                {packingList.status === 'packed' && (
+                                  <DropdownMenuItem onClick={() => handleDispatch(packingList.id)}>
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Dispatch
+                                  </DropdownMenuItem>
+                                )}
+                                {packingList.status === 'draft' && (
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={() => handleDeletePackingList(packingList.id, packingList.distributor_id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
 
-                  <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Orders</p>
-                      <p className="font-semibold">{packingList.total_orders}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Items</p>
-                      <p className="font-semibold">{packingList.total_items}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Value</p>
-                      <p className="font-semibold">₹{packingList.total_value.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Orders</p>
+                            <p className="font-semibold">{packingList.total_orders}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Items</p>
+                            <p className="font-semibold">{packingList.total_items}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Value</p>
+                            <p className="font-semibold">₹{packingList.total_value.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
           )}
-        </div>
+
+          {/* My Deliveries Tab - For Delivery Agents */}
+          <TabsContent value="my-deliveries" className="mt-0 p-4">
+            <MyDeliveriesTab />
+          </TabsContent>
+        </Tabs>
 
         {/* Create Packing List Dialog */}
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
