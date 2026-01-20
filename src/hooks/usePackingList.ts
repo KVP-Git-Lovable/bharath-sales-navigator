@@ -187,12 +187,14 @@ export function usePackingList() {
   }) => {
     setLoading(true);
     try {
+      // Fetch orders first - use retailer_name from orders table directly
       let query = supabase
         .from('orders')
         .select(`
           id,
           order_date,
           retailer_id,
+          retailer_name,
           total_amount,
           delivery_date,
           delivery_status,
@@ -200,13 +202,6 @@ export function usePackingList() {
           payment_method,
           credit_paid_amount,
           credit_pending_amount,
-          retailers(
-            id,
-            name,
-            beat_id,
-            beat_name,
-            territory_id
-          ),
           order_items(
             id,
             product_id,
@@ -241,40 +236,66 @@ export function usePackingList() {
       if (filters.dateTo) {
         query = query.lte('order_date', filters.dateTo);
       }
-      if (filters.beatIds && filters.beatIds.length > 0) {
-        query = query.in('retailers.beat_id', filters.beatIds);
-      }
 
       const { data, error } = await query;
+      
+      // If we have orders, fetch retailer details for beat filtering
+      let retailerMap: Record<string, { beat_id?: string; beat_name?: string; territory_id?: string }> = {};
+      if (data && data.length > 0) {
+        const retailerIds = [...new Set(data.map((o: any) => o.retailer_id).filter(Boolean))];
+        if (retailerIds.length > 0) {
+          const { data: retailers } = await supabase
+            .from('retailers')
+            .select('id, beat_id, beat_name, territory_id')
+            .in('id', retailerIds);
+          
+          if (retailers) {
+            retailerMap = retailers.reduce((acc, r) => {
+              acc[r.id] = { beat_id: r.beat_id, beat_name: r.beat_name, territory_id: r.territory_id };
+              return acc;
+            }, {} as Record<string, { beat_id?: string; beat_name?: string; territory_id?: string }>);
+          }
+        }
+      }
 
       if (error) throw error;
 
       // Transform data to include retailer info and payment status
-      const ordersWithRetailer = (data || []).map((order: any) => ({
-        id: order.id,
-        order_date: order.order_date,
-        delivery_date: order.delivery_date,
-        delivery_status: order.delivery_status,
-        retailer_id: order.retailer_id,
-        retailer_name: order.retailers?.name || 'Unknown Retailer',
-        beat_id: order.retailers?.beat_id,
-        beat_name: order.retailers?.beat_name || 'No Beat',
-        territory_id: order.retailers?.territory_id,
-        total_amount: order.total_amount,
-        // Payment info for delivery agent
-        is_credit_order: order.is_credit_order,
-        payment_method: order.payment_method,
-        credit_paid_amount: order.credit_paid_amount,
-        credit_pending_amount: order.credit_pending_amount,
-        // Transform order_items to expected items format
-        items: (order.order_items || []).map((item: any) => ({
-          product_id: item.product_id,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit: item.unit,
-          price: item.unit_price
-        }))
-      }));
+      let ordersWithRetailer = (data || []).map((order: any) => {
+        const retailerInfo = retailerMap[order.retailer_id] || {};
+        return {
+          id: order.id,
+          order_date: order.order_date,
+          delivery_date: order.delivery_date,
+          delivery_status: order.delivery_status,
+          retailer_id: order.retailer_id,
+          retailer_name: order.retailer_name || 'Unknown Retailer',
+          beat_id: retailerInfo.beat_id,
+          beat_name: retailerInfo.beat_name || 'No Beat',
+          territory_id: retailerInfo.territory_id,
+          total_amount: order.total_amount,
+          // Payment info for delivery agent
+          is_credit_order: order.is_credit_order,
+          payment_method: order.payment_method,
+          credit_paid_amount: order.credit_paid_amount,
+          credit_pending_amount: order.credit_pending_amount,
+          // Transform order_items to expected items format
+          items: (order.order_items || []).map((item: any) => ({
+            product_id: item.product_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit: item.unit,
+            price: item.unit_price
+          }))
+        };
+      });
+
+      // Apply beat filter if specified
+      if (filters.beatIds && filters.beatIds.length > 0) {
+        ordersWithRetailer = ordersWithRetailer.filter(o => 
+          o.beat_id && filters.beatIds!.includes(o.beat_id)
+        );
+      }
 
       return ordersWithRetailer as OrderForPacking[];
     } catch (error) {
