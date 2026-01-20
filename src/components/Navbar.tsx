@@ -94,9 +94,14 @@ export const Navbar = memo(() => {
       baseItems.push({ id: 'leaderboard', icon: Trophy, label: "Leader board", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
     }
 
-    // Add Packing List Management if enabled (includes My Deliveries tab for delivery agents)
-    if (isPackingListEnabled || isDeliveryAgentEnabled) {
+    // Add Packing List Management if enabled (admin module for creating/managing packing lists)
+    if (isPackingListEnabled) {
       baseItems.push({ id: 'packing-list', icon: ClipboardList, label: "Packing List", href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
+    }
+
+    // Add My Deliveries as separate module (visible when delivery agent app is enabled)
+    if (isDeliveryAgentEnabled || isPackingListEnabled) {
+      baseItems.push({ id: 'my-deliveries', icon: Truck, label: "My Deliveries", href: "/my-deliveries", color: "from-orange-500 to-orange-600" });
     }
 
     // Add remaining items
