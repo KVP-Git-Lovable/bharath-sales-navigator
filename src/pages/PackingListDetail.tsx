@@ -289,8 +289,8 @@ export default function PackingListDetail() {
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{packingList.total_items}</p>
-              <p className="text-xs text-muted-foreground">Total Items</p>
+              <p className="text-2xl font-bold">{(packingList.total_items / 1000).toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">Total Items (KG)</p>
             </CardContent>
           </Card>
           <Card>
@@ -315,7 +315,7 @@ export default function PackingListDetail() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Picking Progress</span>
                   <span className="text-sm text-muted-foreground">
-                    {totalPicked} / {totalOrdered} items
+                    {(totalPicked / 1000).toFixed(2)} / {(totalOrdered / 1000).toFixed(2)} KG
                   </span>
                 </div>
                 <Progress value={pickingProgress} className="h-2" />
@@ -350,32 +350,32 @@ export default function PackingListDetail() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-muted-foreground">{item.unit || 'units'}</p>
+                        <p className="text-sm text-muted-foreground">KG</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">Ordered</p>
-                        <p className="font-semibold">{item.ordered_qty}</p>
+                        <p className="font-semibold">{(item.ordered_qty / 1000).toFixed(2)}</p>
                       </div>
                     </div>
                     
                     {packingList.status === 'draft' && (
                       <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
                         <div>
-                          <label className="text-xs text-muted-foreground">Picked Qty</label>
+                          <label className="text-xs text-muted-foreground">Picked Qty (KG)</label>
                           <Input
                             type="number"
                             min={0}
-                            max={item.ordered_qty}
-                            value={item.picked_qty}
-                            onChange={(e) => handlePickedQtyChange(item.id, parseInt(e.target.value) || 0)}
+                            step={0.01}
+                            value={(item.picked_qty / 1000).toFixed(2)}
+                            onChange={(e) => handlePickedQtyChange(item.id, Math.round(parseFloat(e.target.value) * 1000) || 0)}
                             className="mt-1"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-muted-foreground">Short Qty</label>
+                          <label className="text-xs text-muted-foreground">Short Qty (KG)</label>
                           <div className="mt-1 h-10 flex items-center px-3 bg-muted rounded-md">
                             <span className={item.short_qty > 0 ? 'text-destructive font-medium' : ''}>
-                              {item.short_qty}
+                              {(item.short_qty / 1000).toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -385,13 +385,13 @@ export default function PackingListDetail() {
                     {packingList.status !== 'draft' && (
                       <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
                         <div>
-                          <p className="text-xs text-muted-foreground">Picked</p>
-                          <p className="font-semibold text-green-600">{item.picked_qty}</p>
+                          <p className="text-xs text-muted-foreground">Picked (KG)</p>
+                          <p className="font-semibold text-green-600">{(item.picked_qty / 1000).toFixed(2)}</p>
                         </div>
                         {item.short_qty > 0 && (
                           <div>
-                            <p className="text-xs text-muted-foreground">Short</p>
-                            <p className="font-semibold text-destructive">{item.short_qty}</p>
+                            <p className="text-xs text-muted-foreground">Short (KG)</p>
+                            <p className="font-semibold text-destructive">{(item.short_qty / 1000).toFixed(2)}</p>
                           </div>
                         )}
                       </div>
@@ -483,18 +483,18 @@ export default function PackingListDetail() {
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2">Product</th>
-                <th className="text-right py-2">Ordered</th>
-                <th className="text-right py-2">Picked</th>
-                <th className="text-right py-2">Short</th>
+                <th className="text-right py-2">Ordered (KG)</th>
+                <th className="text-right py-2">Picked (KG)</th>
+                <th className="text-right py-2">Short (KG)</th>
               </tr>
             </thead>
             <tbody>
               {items.map(item => (
                 <tr key={item.id} className="border-b">
                   <td className="py-2">{item.product_name}</td>
-                  <td className="text-right py-2">{item.ordered_qty}</td>
-                  <td className="text-right py-2">{item.picked_qty}</td>
-                  <td className="text-right py-2">{item.short_qty}</td>
+                  <td className="text-right py-2">{(item.ordered_qty / 1000).toFixed(2)}</td>
+                  <td className="text-right py-2">{(item.picked_qty / 1000).toFixed(2)}</td>
+                  <td className="text-right py-2">{(item.short_qty / 1000).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
