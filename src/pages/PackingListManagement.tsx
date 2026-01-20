@@ -17,7 +17,8 @@ import {
   Eye,
   Send,
   Building2,
-  ClipboardList
+  ClipboardList,
+  MapPin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,19 +37,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { usePackingList, PackingList, OrderForPacking } from '@/hooks/usePackingList';
-import { Checkbox } from '@/components/ui/checkbox';
+import { usePackingList, PackingList } from '@/hooks/usePackingList';
 import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
+import CreatePackingListTab from '@/components/packing/CreatePackingListTab';
+import DeliveryRunTab from '@/components/packing/DeliveryRunTab';
 import MyDeliveriesTab from '@/components/packing/MyDeliveriesTab';
 
 interface Distributor {
@@ -61,8 +55,6 @@ export default function PackingListManagement() {
   const { 
     loading, 
     fetchPackingLists, 
-    fetchOrdersForPacking, 
-    createPackingList,
     updatePackingListStatus,
     deletePackingList 
   } = usePackingList();
@@ -73,16 +65,7 @@ export default function PackingListManagement() {
   const [distributorFilter, setDistributorFilter] = useState<string>('all');
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [userRole, setUserRole] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<string>('all');
-  
-  // Create packing list dialog
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [ordersForPacking, setOrdersForPacking] = useState<OrderForPacking[]>([]);
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
-  const [deliveryDate, setDeliveryDate] = useState(format(addDays(new Date(), 1), 'yyyy-MM-dd'));
-  const [orderDateFilter, setOrderDateFilter] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [selectedDistributorForCreate, setSelectedDistributorForCreate] = useState<string>('none');
+  const [activeTab, setActiveTab] = useState<string>('create');
 
   // Role-based visibility - treat empty/null roles as admin (default view)
   const isAdminOrManager = !userRole || ['admin', 'manager', 'asm', 'rsm', 'user'].includes(userRole);
@@ -139,45 +122,6 @@ export default function PackingListManagement() {
     loadPackingLists();
   }, [distributorFilter, statusFilter, fetchPackingLists]);
 
-  // Load orders when create dialog opens - filter by DELIVERY DATE (D-1 workflow)
-  useEffect(() => {
-    const loadOrders = async () => {
-      if (!showCreateDialog) return;
-      
-      setLoadingOrders(true);
-      // Primary filter is deliveryDate (tomorrow for D-1 orders)
-      // This ensures orders placed today for delivery tomorrow are shown
-      const orders = await fetchOrdersForPacking({
-        distributorId: selectedDistributorForCreate !== 'none' ? selectedDistributorForCreate : undefined,
-        deliveryDate: deliveryDate  // Use delivery date as primary filter
-      });
-      setOrdersForPacking(orders);
-      setLoadingOrders(false);
-    };
-
-    loadOrders();
-  }, [showCreateDialog, deliveryDate, selectedDistributorForCreate, fetchOrdersForPacking]);
-
-  const handleCreatePackingList = async () => {
-    if (selectedOrderIds.length === 0) return;
-
-    const selectedOrders = ordersForPacking.filter(o => selectedOrderIds.includes(o.id));
-    // Use selected distributor or null for direct sales
-    const distributorId = selectedDistributorForCreate !== 'none' ? selectedDistributorForCreate : null;
-    
-    const result = await createPackingList(deliveryDate, distributorId, selectedOrderIds, selectedOrders);
-    
-    if (result) {
-      setShowCreateDialog(false);
-      setSelectedOrderIds([]);
-      // Reload packing lists
-      const filters: any = {};
-      if (distributorFilter !== 'all') filters.distributorId = distributorFilter;
-      const lists = await fetchPackingLists(filters);
-      setPackingLists(lists);
-    }
-  };
-
   const handleDeletePackingList = async (packingListId: string, distId: string | null) => {
     const success = await deletePackingList(packingListId, distId);
     if (success) {
@@ -197,9 +141,9 @@ export default function PackingListManagement() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       draft: 'bg-muted text-muted-foreground',
-      packed: 'bg-blue-100 text-blue-800',
-      dispatched: 'bg-amber-100 text-amber-800',
-      completed: 'bg-green-100 text-green-800'
+      packed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      dispatched: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+      completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
     };
     return <Badge className={styles[status] || styles.draft}>{status.toUpperCase()}</Badge>;
   };
@@ -228,22 +172,6 @@ export default function PackingListManagement() {
     completed: packingLists.filter(pl => pl.status === 'completed').length
   };
 
-  const toggleOrderSelection = (orderId: string) => {
-    setSelectedOrderIds(prev => 
-      prev.includes(orderId) 
-        ? prev.filter(id => id !== orderId)
-        : [...prev, orderId]
-    );
-  };
-
-  const toggleAllOrders = () => {
-    if (selectedOrderIds.length === ordersForPacking.length) {
-      setSelectedOrderIds([]);
-    } else {
-      setSelectedOrderIds(ordersForPacking.map(o => o.id));
-    }
-  };
-
   const getDistributorName = (distributorId: string | null) => {
     if (!distributorId) return 'Direct Sales';
     const dist = distributors.find(d => d.id === distributorId);
@@ -265,31 +193,42 @@ export default function PackingListManagement() {
                 <p className="text-sm text-muted-foreground">Manage delivery packing lists</p>
               </div>
             </div>
-            {isAdminOrManager && activeTab === 'all' && (
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create
-              </Button>
-            )}
           </div>
         </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="px-4 pt-4">
-            <TabsList className={`grid w-full ${isAdminOrManager ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <TabsList className={`grid w-full ${isAdminOrManager ? 'grid-cols-4' : 'grid-cols-1'}`}>
               {isAdminOrManager && (
-                <TabsTrigger value="all" className="flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4" />
-                  All Packing Lists
-                </TabsTrigger>
+                <>
+                  <TabsTrigger value="create" className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Create</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    <span className="hidden sm:inline">All Lists</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="delivery-run" className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    <span className="hidden sm:inline">Delivery Runs</span>
+                  </TabsTrigger>
+                </>
               )}
               <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
                 <Truck className="h-4 w-4" />
-                My Deliveries
+                <span className="hidden sm:inline">My Deliveries</span>
               </TabsTrigger>
             </TabsList>
           </div>
+
+          {/* Create Packing List Tab - Admin/Manager Only */}
+          {isAdminOrManager && (
+            <TabsContent value="create" className="mt-0">
+              <CreatePackingListTab />
+            </TabsContent>
+          )}
 
           {/* All Packing Lists Tab - Admin/Manager Only */}
           {isAdminOrManager && (
@@ -384,7 +323,7 @@ export default function PackingListManagement() {
                       <Button 
                         variant="outline" 
                         className="mt-4"
-                        onClick={() => setShowCreateDialog(true)}
+                        onClick={() => setActiveTab('create')}
                       >
                         Create Your First Packing List
                       </Button>
@@ -454,8 +393,8 @@ export default function PackingListManagement() {
                             <p className="font-semibold">{packingList.total_orders}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">Items</p>
-                            <p className="font-semibold">{packingList.total_items}</p>
+                            <p className="text-xs text-muted-foreground">Items (KG)</p>
+                            <p className="font-semibold">{(packingList.total_items / 1000).toFixed(2)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Value</p>
@@ -470,114 +409,18 @@ export default function PackingListManagement() {
             </TabsContent>
           )}
 
+          {/* Delivery Run Details Tab - Admin/Manager Only */}
+          {isAdminOrManager && (
+            <TabsContent value="delivery-run" className="mt-0">
+              <DeliveryRunTab />
+            </TabsContent>
+          )}
+
           {/* My Deliveries Tab - For Delivery Agents */}
           <TabsContent value="my-deliveries" className="mt-0 p-4">
             <MyDeliveriesTab />
           </TabsContent>
         </Tabs>
-
-        {/* Create Packing List Dialog */}
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Create Packing List</DialogTitle>
-              <DialogDescription>
-                Select orders to add to the packing list for delivery
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex flex-wrap gap-4 py-4">
-              <div className="flex-1 min-w-[150px]">
-                <label className="text-sm font-medium">Delivery Date <span className="text-muted-foreground">(Primary Filter)</span></label>
-                <Input
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Shows D-1 orders scheduled for this date</p>
-              </div>
-              <div className="flex-1 min-w-[150px]">
-                <label className="text-sm font-medium">Distributor (Optional)</label>
-                <Select value={selectedDistributorForCreate} onValueChange={setSelectedDistributorForCreate}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="All / Direct Sales" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">All / Direct Sales</SelectItem>
-                    {distributors.map(d => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-auto border rounded-lg">
-              {loadingOrders ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : ordersForPacking.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  No confirmed orders available for packing
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {/* Select All Header */}
-                  <div className="p-3 bg-muted/50 flex items-center gap-3">
-                    <Checkbox
-                      checked={selectedOrderIds.length === ordersForPacking.length && ordersForPacking.length > 0}
-                      onCheckedChange={toggleAllOrders}
-                    />
-                    <span className="text-sm font-medium">
-                      Select All ({ordersForPacking.length} orders)
-                    </span>
-                  </div>
-                  
-                  {ordersForPacking.map(order => (
-                    <div 
-                      key={order.id} 
-                      className="p-3 flex items-center gap-3 hover:bg-muted/30 cursor-pointer"
-                      onClick={() => toggleOrderSelection(order.id)}
-                    >
-                      <Checkbox
-                        checked={selectedOrderIds.includes(order.id)}
-                        onCheckedChange={() => toggleOrderSelection(order.id)}
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{order.retailer_name || 'Unknown Retailer'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {order.beat_name || 'No Beat'} • {order.items?.length || 0} items
-                        </p>
-                      </div>
-                      <p className="font-semibold text-sm">₹{order.total_amount?.toLocaleString()}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="border-t pt-4">
-              <div className="flex items-center justify-between w-full">
-                <p className="text-sm text-muted-foreground">
-                  {selectedOrderIds.length} orders selected
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleCreatePackingList}
-                    disabled={selectedOrderIds.length === 0}
-                  >
-                    Create Packing List
-                  </Button>
-                </div>
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   );
