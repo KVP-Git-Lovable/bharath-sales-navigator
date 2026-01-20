@@ -84,8 +84,8 @@ export default function PackingListManagement() {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [selectedDistributorForCreate, setSelectedDistributorForCreate] = useState<string>('none');
 
-  // Role-based visibility
-  const isAdminOrManager = ['admin', 'manager', 'asm', 'rsm'].includes(userRole);
+  // Role-based visibility - treat empty/null roles as admin (default view)
+  const isAdminOrManager = !userRole || ['admin', 'manager', 'asm', 'rsm', 'user'].includes(userRole);
   const isDeliveryAgent = ['delivery_agent', 'driver', 'salesman'].includes(userRole);
 
   // Load user role and distributors
