@@ -181,7 +181,7 @@ export default function PackingListManagement() {
   return (
     <Layout>
       <div className="min-h-screen bg-background pb-20">
-        {/* Header */}
+        {/* Header - Dynamic based on role */}
         <div className="bg-card border-b sticky top-0 z-10">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
@@ -189,39 +189,50 @@ export default function PackingListManagement() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-semibold">Packing Lists</h1>
-                <p className="text-sm text-muted-foreground">Manage delivery packing lists</p>
+                <h1 className="text-xl font-semibold">
+                  {isDeliveryAgent ? 'My Delivery Run' : 'Packing Lists'}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {isDeliveryAgent 
+                    ? 'View and complete your assigned deliveries' 
+                    : 'Manage delivery packing lists'}
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs - Role-based visibility */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="px-4 pt-4">
-            <TabsList className={`grid w-full ${isAdminOrManager ? 'grid-cols-4' : 'grid-cols-1'}`}>
-              {isAdminOrManager && (
-                <>
-                  <TabsTrigger value="create" className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Create</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="all" className="flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4" />
-                    <span className="hidden sm:inline">All Lists</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="delivery-run" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span className="hidden sm:inline">Delivery Runs</span>
-                  </TabsTrigger>
-                </>
-              )}
-              <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                <span className="hidden sm:inline">My Deliveries</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          {/* Delivery Agents see ONLY My Deliveries tab */}
+          {isDeliveryAgent ? (
+            <div className="px-4 pt-4">
+              <TabsList className="grid w-full grid-cols-1">
+                <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  My Deliveries
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          ) : (
+            /* Admin/Manager see management tabs only */
+            <div className="px-4 pt-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="create" className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create</span>
+                </TabsTrigger>
+                <TabsTrigger value="all" className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4" />
+                  <span className="hidden sm:inline">All Lists</span>
+                </TabsTrigger>
+                <TabsTrigger value="delivery-run" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span className="hidden sm:inline">Delivery Runs</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          )}
 
           {/* Create Packing List Tab - Admin/Manager Only */}
           {isAdminOrManager && (
