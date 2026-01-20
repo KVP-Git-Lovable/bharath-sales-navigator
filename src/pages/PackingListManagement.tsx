@@ -6,7 +6,6 @@ import {
   Plus, 
   Filter, 
   Calendar, 
-  Truck, 
   CheckCircle2, 
   Clock, 
   PackageCheck,
@@ -18,7 +17,8 @@ import {
   Send,
   Building2,
   ClipboardList,
-  MapPin
+  MapPin,
+  Truck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,7 +43,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
 import CreatePackingListTab from '@/components/packing/CreatePackingListTab';
 import DeliveryRunTab from '@/components/packing/DeliveryRunTab';
-import MyDeliveriesTab from '@/components/packing/MyDeliveriesTab';
 
 interface Distributor {
   id: string;
@@ -66,14 +65,9 @@ export default function PackingListManagement() {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('create');
-  const [hasDeliveryAssignments, setHasDeliveryAssignments] = useState<boolean>(false);
 
   // Role-based visibility - treat empty/null roles as admin (default view)
   const isAdminOrManager = !userRole || ['admin', 'manager', 'asm', 'rsm', 'user'].includes(userRole);
-  const isDeliveryAgent = ['delivery_agent', 'driver', 'salesman'].includes(userRole);
-  
-  // Show "My Deliveries" if user is a delivery agent OR has active assignments
-  const showMyDeliveries = isDeliveryAgent || hasDeliveryAssignments;
 
   // Load user role, distributors, and check for delivery assignments
   useEffect(() => {
@@ -90,21 +84,6 @@ export default function PackingListManagement() {
       
       if (roleData) {
         setUserRole(roleData.role);
-        // Default tab based on role
-        if (['delivery_agent', 'driver', 'salesman'].includes(roleData.role)) {
-          setActiveTab('my-deliveries');
-        }
-      }
-
-      // Check if user has any packing list assignments (regardless of role)
-      const { data: assignments } = await supabase
-        .from('packing_list_assignments')
-        .select('id')
-        .eq('agent_id', user.id)
-        .limit(1);
-      
-      if (assignments && assignments.length > 0) {
-        setHasDeliveryAssignments(true);
       }
 
       // Load distributors for filter
@@ -204,56 +183,33 @@ export default function PackingListManagement() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-semibold">
-                  {isDeliveryAgent ? 'My Delivery Run' : 'Packing Lists'}
-                </h1>
+                <h1 className="text-xl font-semibold">Packing Lists</h1>
                 <p className="text-sm text-muted-foreground">
-                  {isDeliveryAgent 
-                    ? 'View and complete your assigned deliveries' 
-                    : 'Manage delivery packing lists'}
+                  Manage delivery packing lists
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs - Role-based visibility */}
+        {/* Tabs - Admin/Manager management tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Pure Delivery Agents see ONLY My Deliveries tab */}
-          {isDeliveryAgent && !isAdminOrManager ? (
-            <div className="px-4 pt-4">
-              <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  My Deliveries
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          ) : (
-            /* Admin/Manager see management tabs + My Deliveries if they have assignments */
-            <div className="px-4 pt-4">
-              <TabsList className={`grid w-full ${showMyDeliveries ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                <TabsTrigger value="create" className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Create</span>
-                </TabsTrigger>
-                <TabsTrigger value="all" className="flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4" />
-                  <span className="hidden sm:inline">All Lists</span>
-                </TabsTrigger>
-                <TabsTrigger value="delivery-run" className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span className="hidden sm:inline">Runs</span>
-                </TabsTrigger>
-                {showMyDeliveries && (
-                  <TabsTrigger value="my-deliveries" className="flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
-                    <span className="hidden sm:inline">My Deliveries</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </div>
-          )}
+          <div className="px-4 pt-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="create" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create</span>
+              </TabsTrigger>
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4" />
+                <span className="hidden sm:inline">All Lists</span>
+              </TabsTrigger>
+              <TabsTrigger value="delivery-run" className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                <span className="hidden sm:inline">Runs</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Create Packing List Tab - Admin/Manager Only */}
           {isAdminOrManager && (
@@ -447,11 +403,6 @@ export default function PackingListManagement() {
               <DeliveryRunTab />
             </TabsContent>
           )}
-
-          {/* My Deliveries Tab - For Delivery Agents */}
-          <TabsContent value="my-deliveries" className="mt-0 p-4">
-            <MyDeliveriesTab />
-          </TabsContent>
         </Tabs>
       </div>
     </Layout>

@@ -162,6 +162,7 @@ import InventoryLedger from "./pages/distributor-portal/InventoryLedger";
 import StockAdjustments from "./pages/distributor-portal/StockAdjustments";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
+import MyDeliveriesPage from "./pages/MyDeliveries";
 import PackingListDetailPage from "./pages/PackingListDetail";
 
 // Institutional Sales pages
@@ -412,6 +413,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/distributor/:id" element={<ProtectedRoute><DistributorDetail /></ProtectedRoute>} />
         <Route path="/edit-distributor/:id" element={<ProtectedRoute><EditDistributor /></ProtectedRoute>} />
         <Route path="/primary-orders" element={<ProtectedRoute><PrimaryOrders /></ProtectedRoute>} />
+        <Route path="/my-deliveries" element={<ProtectedRoute><MyDeliveriesPage /></ProtectedRoute>} />
 
         {/* Distributor Portal Routes */}
         <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
