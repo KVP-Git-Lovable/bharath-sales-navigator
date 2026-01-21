@@ -381,7 +381,7 @@ export const CameraCapture = ({
               <canvas ref={canvasRef} className="hidden" />
               
               {/* Modern face guide overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none pt-14 pb-28">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 {/* Dark vignette overlay */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40" />
@@ -394,9 +394,9 @@ export const CameraCapture = ({
                     <div className="absolute -inset-2 rounded-full border-2 border-white/20 animate-pulse" 
                          style={{ width: 'calc(100% + 16px)', height: 'calc(100% + 16px)' }} />
                     
-                    {/* Main guide circle - smaller size */}
+                    {/* Main guide circle */}
                     <div className={cn(
-                      "w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] transition-all duration-300",
+                      "w-52 h-52 sm:w-60 sm:h-60 rounded-full border-[3px] transition-all duration-300",
                       stream ? "border-white/60" : "border-white/30"
                     )}>
                       {/* Corner markers for professional look */}
@@ -426,8 +426,8 @@ export const CameraCapture = ({
                 className="w-full h-full object-cover"
               />
               {/* Success overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none pt-14 pb-28">
-                <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-green-500/10">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-52 h-52 sm:w-60 sm:h-60 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-green-500/10">
                   <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center">
                     <Check className="h-7 w-7 text-white" />
                   </div>
