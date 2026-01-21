@@ -110,6 +110,8 @@ export default function MyDeliveriesTab() {
       setLoading(true);
       try {
         const today = format(new Date(), 'yyyy-MM-dd');
+        console.log('[MyDeliveries] Loading for user:', userId);
+        console.log('[MyDeliveries] Today date:', today);
 
         // Get packing lists assigned to this agent
         const { data: assignments, error: assignmentError } = await supabase
@@ -129,21 +131,47 @@ export default function MyDeliveriesTab() {
           `)
           .eq('agent_id', userId);
 
+        console.log('[MyDeliveries] Raw assignments:', assignments);
+        console.log('[MyDeliveries] Assignment error:', assignmentError);
+
         if (assignmentError) throw assignmentError;
 
         // Filter to today's or future packing lists
+        // Handle both object and array formats for nested data
         const relevantAssignments = (assignments || []).filter((a: any) => {
-          const packingList = a.packing_lists;
-          return packingList && 
-            (packingList.status === 'dispatched' || packingList.status === 'packed') &&
-            packingList.delivery_date >= today;
+          // Supabase can return nested data as object or array
+          const packingList = Array.isArray(a.packing_lists) 
+            ? a.packing_lists[0] 
+            : a.packing_lists;
+          
+          if (!packingList) {
+            console.log('[MyDeliveries] Skipping assignment - no packing list data:', a);
+            return false;
+          }
+
+          // Proper date comparison
+          const deliveryDate = new Date(packingList.delivery_date + 'T00:00:00');
+          const todayDate = new Date(today + 'T00:00:00');
+          const isValidDate = deliveryDate >= todayDate;
+          const isValidStatus = packingList.status === 'dispatched' || packingList.status === 'packed';
+          
+          console.log('[MyDeliveries] Checking PL:', packingList.packing_list_number,
+            '| Status:', packingList.status, '(valid:', isValidStatus, ')',
+            '| Date:', packingList.delivery_date, '(valid:', isValidDate, ')');
+
+          return isValidStatus && isValidDate;
         });
+
+        console.log('[MyDeliveries] Relevant assignments count:', relevantAssignments.length);
 
         // For each packing list, get the orders
         const packingListsWithOrders: AssignedPackingList[] = [];
 
         for (const assignment of relevantAssignments) {
-          const packingList = (assignment as any).packing_lists;
+          // Handle both object and array formats
+          const packingList = Array.isArray((assignment as any).packing_lists) 
+            ? (assignment as any).packing_lists[0] 
+            : (assignment as any).packing_lists;
           if (!packingList) continue;
 
           const { data: orders, error: ordersError } = await supabase
