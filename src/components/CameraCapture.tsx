@@ -339,20 +339,20 @@ export const CameraCapture = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg p-0 overflow-hidden bg-black border-0 sm:rounded-2xl [&>button]:hidden">
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 via-black/50 to-transparent p-4 pt-6">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1 flex-1 pr-4">
-              <h2 className="text-lg font-bold text-white drop-shadow-lg">{title}</h2>
-              <p className="text-sm text-white/90 drop-shadow-md leading-relaxed">{description}</p>
+        {/* Header - compact to avoid overlapping circle */}
+        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-bold text-white drop-shadow-lg truncate">{title}</h2>
+              <p className="text-xs text-white/80 drop-shadow-md truncate">{description}</p>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              className="h-10 w-10 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm flex-shrink-0"
+              className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm flex-shrink-0"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -381,37 +381,40 @@ export const CameraCapture = ({
               <canvas ref={canvasRef} className="hidden" />
               
               {/* Modern face guide overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none pt-14 pb-28">
                 {/* Dark vignette overlay */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40" />
                 
-                {/* Animated face guide */}
-                <div className="relative">
-                  {/* Outer glow ring */}
-                  <div className="absolute -inset-2 rounded-full border-2 border-white/20 animate-pulse" 
-                       style={{ width: 'calc(100% + 16px)', height: 'calc(100% + 16px)' }} />
-                  
-                  {/* Main guide circle */}
-                  <div className={cn(
-                    "w-56 h-56 sm:w-64 sm:h-64 rounded-full border-[3px] transition-all duration-300",
-                    stream ? "border-white/60" : "border-white/30"
-                  )}>
-                    {/* Corner markers for professional look */}
-                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
-                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
-                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 h-8 w-1 bg-primary rounded-full" />
-                    <div className="absolute top-1/2 -right-1 -translate-y-1/2 h-8 w-1 bg-primary rounded-full" />
+                {/* Face guide container */}
+                <div className="relative flex flex-col items-center">
+                  {/* Animated face guide */}
+                  <div className="relative">
+                    {/* Outer glow ring */}
+                    <div className="absolute -inset-2 rounded-full border-2 border-white/20 animate-pulse" 
+                         style={{ width: 'calc(100% + 16px)', height: 'calc(100% + 16px)' }} />
+                    
+                    {/* Main guide circle - smaller size */}
+                    <div className={cn(
+                      "w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] transition-all duration-300",
+                      stream ? "border-white/60" : "border-white/30"
+                    )}>
+                      {/* Corner markers for professional look */}
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-6 h-1 bg-primary rounded-full" />
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-1 bg-primary rounded-full" />
+                      <div className="absolute top-1/2 -left-1 -translate-y-1/2 h-6 w-1 bg-primary rounded-full" />
+                      <div className="absolute top-1/2 -right-1 -translate-y-1/2 h-6 w-1 bg-primary rounded-full" />
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Instructions badge */}
-              <div className="absolute bottom-32 left-0 right-0 flex justify-center pointer-events-none">
-                <div className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full">
-                  <p className="text-white/90 text-xs font-medium">
-                    {stream ? "Position face in circle" : "Starting camera..."}
-                  </p>
+                  
+                  {/* Instructions badge - positioned below circle */}
+                  <div className="mt-4">
+                    <div className="bg-black/70 backdrop-blur-sm px-4 py-1.5 rounded-full">
+                      <p className="text-white text-xs font-medium">
+                        {stream ? "Position face in circle" : "Starting camera..."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
@@ -423,10 +426,10 @@ export const CameraCapture = ({
                 className="w-full h-full object-cover"
               />
               {/* Success overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-56 h-56 sm:w-64 sm:h-64 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-green-500/10">
-                  <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center">
-                    <Check className="h-8 w-8 text-white" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none pt-14 pb-28">
+                <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-green-500/10">
+                  <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </div>
