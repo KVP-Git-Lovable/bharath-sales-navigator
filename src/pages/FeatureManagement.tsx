@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Search, Shield, Check, X } from 'lucide-react';
+import { ArrowLeft, Search, Shield, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const FeatureManagement = () => {
   const { userRole, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   // Fetch feature flags
   const { data: features, isLoading } = useQuery({
@@ -65,21 +65,54 @@ const FeatureManagement = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const categories = ['all', ...Array.from(new Set(features?.map(f => f.category) || []))];
-  
-  const filteredFeatures = features?.filter(feature => {
-    const matchesSearch = feature.feature_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         feature.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || feature.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Group features by category/module
+  const groupedFeatures = features?.reduce((acc, feature) => {
+    const category = feature.category || 'Other';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(feature);
+    return acc;
+  }, {} as Record<string, typeof features>);
+
+  // Filter features based on search
+  const filteredGroupedFeatures = Object.entries(groupedFeatures || {}).reduce((acc, [category, categoryFeatures]) => {
+    const filtered = categoryFeatures?.filter(feature => 
+      feature.feature_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      feature.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (filtered && filtered.length > 0) {
+      acc[category] = filtered;
+    }
+    return acc;
+  }, {} as Record<string, typeof features>);
+
+  const toggleModule = (category: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedModules(new Set(Object.keys(filteredGroupedFeatures)));
+  };
+
+  const collapseAll = () => {
+    setExpandedModules(new Set());
+  };
 
   const activeCount = features?.filter(f => f.is_enabled).length || 0;
   const totalCount = features?.length || 0;
 
   return (
     <div className="min-h-screen bg-gradient-subtle p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button 
@@ -91,104 +124,132 @@ const FeatureManagement = () => {
             <ArrowLeft size={20} />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground">Feature Management</h1>
-            <p className="text-muted-foreground">Control which features are visible to users</p>
+            <h1 className="text-2xl font-bold text-foreground">Feature Management</h1>
+            <p className="text-muted-foreground text-sm">Enable or disable features by module</p>
           </div>
           <div className="flex gap-2">
-            <Badge variant="outline" className="text-sm">
+            <Badge variant="outline" className="text-xs">
               <Check className="mr-1 h-3 w-3" />
               {activeCount} Active
             </Badge>
-            <Badge variant="outline" className="text-sm">
+            <Badge variant="outline" className="text-xs">
               <X className="mr-1 h-3 w-3" />
               {totalCount - activeCount} Disabled
             </Badge>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search features..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search and Actions */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search features..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={expandAll}>
+            Expand All
+          </Button>
+          <Button variant="outline" size="sm" onClick={collapseAll}>
+            Collapse All
+          </Button>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-          <TabsList className="w-full justify-start overflow-x-auto">
-            {categories.map(category => (
-              <TabsTrigger key={category} value={category} className="capitalize">
-                {category}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {/* Module-wise Feature List */}
+        <div className="space-y-3">
+          {Object.entries(filteredGroupedFeatures).map(([category, categoryFeatures]) => {
+            const isExpanded = expandedModules.has(category);
+            const enabledCount = categoryFeatures?.filter(f => f.is_enabled).length || 0;
+            const totalInCategory = categoryFeatures?.length || 0;
 
-          <TabsContent value={selectedCategory} className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredFeatures?.map((feature) => (
-                <Card key={feature.id} className="relative">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {feature.category}
-                          </Badge>
-                          {feature.is_enabled ? (
-                            <Badge variant="default" className="text-xs bg-green-600">
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" className="text-xs">
-                              Disabled
-                            </Badge>
-                          )}
-                        </div>
-                        <CardTitle className="text-lg">{feature.feature_name}</CardTitle>
-                        <CardDescription className="text-sm mt-2">
-                          {feature.description}
-                        </CardDescription>
+            return (
+              <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleModule(category)}>
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between p-4 bg-card border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <h3 className="font-semibold text-foreground capitalize">{category}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {enabledCount} of {totalInCategory} features enabled
+                        </p>
                       </div>
-                      <Switch
-                        checked={feature.is_enabled}
-                        onCheckedChange={(checked) => {
-                          toggleFeatureMutation.mutate({
-                            id: feature.id,
-                            isEnabled: checked,
-                          });
-                        }}
-                      />
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xs text-muted-foreground">
-                      Key: <code className="bg-muted px-1 py-0.5 rounded">{feature.feature_key}</code>
-                    </div>
-                    {feature.updated_at && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Last updated: {new Date(feature.updated_at).toLocaleDateString()}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <Badge variant={enabledCount === totalInCategory ? "default" : "secondary"} className="text-xs">
+                      {enabledCount}/{totalInCategory}
+                    </Badge>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="border border-t-0 rounded-b-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[40%]">Feature</TableHead>
+                          <TableHead className="w-[35%]">Description</TableHead>
+                          <TableHead className="w-[15%]">Status</TableHead>
+                          <TableHead className="w-[10%] text-right">Toggle</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categoryFeatures?.map((feature) => (
+                          <TableRow key={feature.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-sm">{feature.feature_name}</p>
+                                <code className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
+                                  {feature.feature_key}
+                                </code>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {feature.description || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {feature.is_enabled ? (
+                                <Badge variant="default" className="text-xs">Active</Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs">Disabled</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Switch
+                                checked={feature.is_enabled}
+                                onCheckedChange={(checked) => {
+                                  toggleFeatureMutation.mutate({
+                                    id: feature.id,
+                                    isEnabled: checked,
+                                  });
+                                }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </div>
 
-            {filteredFeatures?.length === 0 && (
-              <div className="text-center py-12">
-                <Shield className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No features found</h3>
-                <p className="text-muted-foreground">
-                  Try adjusting your search or filter criteria
-                </p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+        {Object.keys(filteredGroupedFeatures).length === 0 && (
+          <div className="text-center py-12">
+            <Shield className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No features found</h3>
+            <p className="text-muted-foreground">
+              Try adjusting your search criteria
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
