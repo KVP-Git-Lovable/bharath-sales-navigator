@@ -340,17 +340,17 @@ export const CameraCapture = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg p-0 overflow-hidden bg-black border-0 sm:rounded-2xl">
         {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-4 pt-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-white">{title}</h2>
-              <p className="text-xs text-white/70">{description}</p>
+        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 via-black/50 to-transparent p-4 pt-6">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1 flex-1 pr-4">
+              <h2 className="text-lg font-bold text-white drop-shadow-lg">{title}</h2>
+              <p className="text-sm text-white/90 drop-shadow-md leading-relaxed">{description}</p>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white"
+              className="h-10 w-10 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm flex-shrink-0"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -437,7 +437,7 @@ export const CameraCapture = ({
         {/* Bottom Controls */}
         <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 pb-8">
           {!capturedImage ? (
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-8">
               {/* Switch Camera Button */}
               <Button
                 type="button"
@@ -445,7 +445,7 @@ export const CameraCapture = ({
                 size="icon"
                 onClick={toggleCamera}
                 disabled={!stream}
-                className="h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-50"
+                className="h-14 w-14 rounded-full bg-white/15 hover:bg-white/25 text-white disabled:opacity-50 backdrop-blur-sm"
               >
                 <RotateCw className="h-6 w-6" />
               </Button>
@@ -475,16 +475,8 @@ export const CameraCapture = ({
                 )}
               </button>
 
-              {/* Cancel Button */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={handleClose}
-                className="h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 text-white"
-              >
-                <X className="h-6 w-6" />
-              </Button>
+              {/* Empty placeholder to balance layout */}
+              <div className="h-14 w-14" />
             </div>
           ) : (
             <div className="flex items-center justify-center gap-4">
