@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface CompactProfilePhotoProps {
   userId: string;
@@ -13,6 +14,7 @@ interface CompactProfilePhotoProps {
 export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhotoProps) {
   const [currentPhoto, setCurrentPhoto] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
     }
 
     setIsUploading(true);
+    setUploadSuccess(false);
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -62,7 +65,11 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
       if (updateError) throw updateError;
 
       setCurrentPhoto(urlData.publicUrl);
+      setUploadSuccess(true);
       toast.success("Profile picture updated!");
+      
+      // Reset success state after animation
+      setTimeout(() => setUploadSuccess(false), 2000);
     } catch (error: any) {
       toast.error("Failed to upload photo: " + error.message);
     } finally {
@@ -71,10 +78,23 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
   };
 
   return (
-    <div className="relative inline-block">
-      <Avatar className="w-20 h-20 border-4 border-background shadow-lg">
-        <AvatarImage src={currentPhoto || undefined} alt="Profile" />
-        <AvatarFallback className="text-xl bg-primary text-primary-foreground">
+    <div className="relative inline-block group">
+      {/* Decorative glow on hover */}
+      <div className={cn(
+        "absolute -inset-1 rounded-full transition-all duration-300",
+        "bg-gradient-to-br from-primary/20 to-primary/5 opacity-0 group-hover:opacity-100 blur-sm"
+      )} />
+      
+      <Avatar className={cn(
+        "relative w-20 h-20 ring-4 ring-background shadow-lg transition-transform duration-200",
+        "group-hover:scale-105"
+      )}>
+        <AvatarImage 
+          src={currentPhoto || undefined} 
+          alt="Profile" 
+          className="object-cover"
+        />
+        <AvatarFallback className="text-xl bg-primary/10 text-primary font-semibold">
           {userProfile?.full_name?.charAt(0) || 'U'}
         </AvatarFallback>
       </Avatar>
@@ -91,12 +111,19 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
       <Button
         size="icon"
         variant="secondary"
-        className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full shadow-md"
+        className={cn(
+          "absolute -bottom-1 -right-1 h-8 w-8 rounded-full shadow-lg transition-all duration-200",
+          "bg-background hover:bg-primary hover:text-primary-foreground",
+          "ring-2 ring-background",
+          uploadSuccess && "bg-green-500 hover:bg-green-500 text-white"
+        )}
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploading}
       >
         {isUploading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
+        ) : uploadSuccess ? (
+          <Check className="h-4 w-4" />
         ) : (
           <Camera className="h-4 w-4" />
         )}

@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Camera, X, RotateCw, Settings, AlertCircle } from 'lucide-react';
+import { Camera, X, RotateCw, Settings, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { requestCameraPermissionWithDetails, openAppSettings, checkCameraPermission } from '@/utils/permissions';
 import { Capacitor } from '@capacitor/core';
+import { cn } from '@/lib/utils';
 
 interface CameraCaptureProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const CameraCapture = ({
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isCheckingPermission, setIsCheckingPermission] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -44,7 +46,6 @@ export const CameraCapture = ({
     };
   }, [isOpen, facingMode]);
 
-  // Connect stream to video element when both are available
   useEffect(() => {
     if (stream && videoRef.current && !isCheckingPermission) {
       console.log('Connecting stream to video element...');
@@ -60,7 +61,6 @@ export const CameraCapture = ({
     setPermissionDenied(false);
     
     try {
-      // Check if mediaDevices API is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.error('MediaDevices API not available');
         toast.error('Camera not supported on this device/browser.');
@@ -69,7 +69,6 @@ export const CameraCapture = ({
         return;
       }
 
-      // For PWA/Web: Directly try to get camera access which will trigger browser permission dialog
       if (!Capacitor.isNativePlatform()) {
         console.log('PWA mode: Requesting camera access directly with facingMode:', facingMode);
         try {
@@ -82,12 +81,8 @@ export const CameraCapture = ({
           });
           
           console.log('PWA camera permission: granted, stream obtained with tracks:', mediaStream.getVideoTracks().length);
-          
-          // First clear the checking state so video element renders
           setIsCheckingPermission(false);
           setPermissionDenied(false);
-          
-          // Then set the stream - useEffect will connect it to video
           setStream(mediaStream);
           return;
         } catch (error: any) {
@@ -103,7 +98,6 @@ export const CameraCapture = ({
             toast.error('Camera is in use by another application.');
             onClose();
           } else if (error?.name === 'OverconstrainedError') {
-            // Try again with less constraints
             console.log('Retrying with basic video constraints...');
             try {
               const basicStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -125,39 +119,32 @@ export const CameraCapture = ({
         }
       }
       
-      // Native app: Check current permission status first
       const currentStatus = await checkCameraPermission();
       
       if (currentStatus.granted) {
-        // Permission already granted, start camera
         await startCamera();
         return;
       }
       
       if (currentStatus.denied && !currentStatus.canAskAgain) {
-        // Permanently denied - show settings redirect
         setPermissionDenied(true);
         setIsCheckingPermission(false);
         return;
       }
       
-      // Request permission - this will show native Android/iOS dialog
       const result = await requestCameraPermissionWithDetails();
       
       if (result.granted) {
         await startCamera();
       } else if (result.denied && !result.canAskAgain) {
-        // Permission permanently denied
         setPermissionDenied(true);
         toast.error('Camera permission denied. Please enable it in app settings.');
       } else {
-        // Permission denied but can ask again
         toast.error('Camera permission is required to take photos');
         onClose();
       }
     } catch (error) {
       console.error('Error checking camera permission:', error);
-      // Try to start camera anyway
       await startCamera();
     } finally {
       setIsCheckingPermission(false);
@@ -176,17 +163,12 @@ export const CameraCapture = ({
       });
       
       console.log('Camera stream obtained with', mediaStream.getVideoTracks().length, 'video tracks');
-      
-      // Clear checking state first so video element renders
       setIsCheckingPermission(false);
       setPermissionDenied(false);
-      
-      // Then set stream - useEffect will connect it to video
       setStream(mediaStream);
     } catch (error: any) {
       console.error('Error accessing camera:', error);
       
-      // Check if it's a permission error
       if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
         setPermissionDenied(true);
         toast.error('Camera access denied. Please enable camera permission in settings.');
@@ -224,10 +206,11 @@ export const CameraCapture = ({
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
+      setIsCapturing(true);
+      
       const canvas = canvasRef.current;
       const video = videoRef.current;
       
-      // Ensure dimensions are set
       const vw = video.videoWidth || 1280;
       const vh = video.videoHeight || 720;
       canvas.width = vw;
@@ -243,7 +226,6 @@ export const CameraCapture = ({
             const imageUrl = URL.createObjectURL(blob);
             setCapturedImage(imageUrl);
           } else {
-            // Fallback via dataURL
             try {
               const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
               const resp = await fetch(dataUrl);
@@ -256,6 +238,7 @@ export const CameraCapture = ({
               toast.error('Failed to capture photo. Please try again.');
             }
           }
+          setIsCapturing(false);
         }, 'image/jpeg', 0.95);
       }
     }
@@ -300,61 +283,53 @@ export const CameraCapture = ({
     onClose();
   };
 
-  // Render permission denied view
+  // Permission denied view
   if (permissionDenied) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              Camera Permission Required
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-md bg-background border-border">
+          <div className="flex flex-col items-center py-6 space-y-6">
+            <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertCircle className="h-10 w-10 text-destructive" />
+            </div>
+            
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-semibold text-foreground">Camera Access Required</h3>
+              <p className="text-muted-foreground text-sm max-w-xs">
+                To capture photos, please grant camera access in your device settings.
+              </p>
+            </div>
 
-          <div className="space-y-4">
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Permission Denied</AlertTitle>
-              <AlertDescription>
-                Camera access has been denied. To use this feature, please enable camera permission in your device settings.
-              </AlertDescription>
-            </Alert>
-
-            <div className="space-y-3">
+            <div className="w-full space-y-3 px-4">
               {Capacitor.isNativePlatform() && (
                 <Button 
                   onClick={handleOpenSettings}
-                  className="w-full gap-2"
+                  className="w-full gap-2 h-12"
+                  size="lg"
                 >
-                  <Settings className="h-4 w-4" />
-                  Open App Settings
+                  <Settings className="h-5 w-5" />
+                  Open Settings
                 </Button>
               )}
               
               <Button 
                 variant="outline"
                 onClick={handleRetryPermission}
-                className="w-full gap-2"
+                className="w-full gap-2 h-12"
+                size="lg"
               >
-                <Camera className="h-4 w-4" />
+                <RefreshCw className="h-5 w-5" />
                 Try Again
               </Button>
               
               <Button 
                 variant="ghost"
                 onClick={handleClose}
-                className="w-full"
+                className="w-full h-10"
               >
                 Cancel
               </Button>
             </div>
-
-            <p className="text-xs text-muted-foreground text-center">
-              {Capacitor.isNativePlatform() 
-                ? 'Tap "Open App Settings" to go to settings and enable camera permission for this app.'
-                : 'Please check your browser settings to enable camera access for this website.'}
-            </p>
           </div>
         </DialogContent>
       </Dialog>
@@ -363,97 +338,176 @@ export const CameraCapture = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {isCheckingPermission ? (
-            <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Checking camera permission...</p>
-              </div>
+      <DialogContent className="max-w-lg p-0 overflow-hidden bg-black border-0 sm:rounded-2xl">
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-4 pt-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-white">{title}</h2>
+              <p className="text-xs text-white/70">{description}</p>
             </div>
-          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Camera Area */}
+        <div className="relative w-full aspect-[3/4] sm:aspect-video bg-black">
+          {isCheckingPermission ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-primary/30 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Camera className="h-6 w-6 text-white animate-pulse" />
+                </div>
+              </div>
+              <p className="text-white/70 text-sm mt-4">Initializing camera...</p>
+            </div>
+          ) : !capturedImage ? (
             <>
-              {/* Camera View */}
-              <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                {!capturedImage ? (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                    <canvas ref={canvasRef} className="hidden" />
-                    
-                    {/* Camera overlay guide */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-64 h-64 border-4 border-primary/50 rounded-full" />
-                    </div>
-                  </>
-                ) : (
-                  <img 
-                    src={capturedImage} 
-                    alt="Captured" 
-                    className="w-full h-full object-cover"
-                  />
-                )}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+              
+              {/* Modern face guide overlay */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                {/* Dark vignette overlay */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
+                
+                {/* Animated face guide */}
+                <div className="relative">
+                  {/* Outer glow ring */}
+                  <div className="absolute -inset-2 rounded-full border-2 border-white/20 animate-pulse" 
+                       style={{ width: 'calc(100% + 16px)', height: 'calc(100% + 16px)' }} />
+                  
+                  {/* Main guide circle */}
+                  <div className={cn(
+                    "w-56 h-56 sm:w-64 sm:h-64 rounded-full border-[3px] transition-all duration-300",
+                    stream ? "border-white/60" : "border-white/30"
+                  )}>
+                    {/* Corner markers for professional look */}
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
+                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 h-8 w-1 bg-primary rounded-full" />
+                    <div className="absolute top-1/2 -right-1 -translate-y-1/2 h-8 w-1 bg-primary rounded-full" />
+                  </div>
+                </div>
               </div>
 
-              {/* Controls */}
-              <div className="flex justify-center gap-2">
-                {!capturedImage ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={toggleCamera}
-                    >
-                      <RotateCw className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={capturePhoto}
-                      className="gap-2"
-                      disabled={!stream}
-                    >
-                      <Camera className="h-4 w-4" />
-                      Capture Photo
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleClose}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={retake}
-                    >
-                      Retake
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={confirmCapture}
-                    >
-                      Use This Photo
-                    </Button>
-                  </>
-                )}
+              {/* Instructions badge */}
+              <div className="absolute bottom-32 left-0 right-0 flex justify-center pointer-events-none">
+                <div className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full">
+                  <p className="text-white/90 text-xs font-medium">
+                    {stream ? "Position face in circle" : "Starting camera..."}
+                  </p>
+                </div>
               </div>
             </>
+          ) : (
+            <>
+              <img 
+                src={capturedImage} 
+                alt="Captured" 
+                className="w-full h-full object-cover"
+              />
+              {/* Success overlay */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-56 h-56 sm:w-64 sm:h-64 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-green-500/10">
+                  <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="h-8 w-8 text-white" />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Bottom Controls */}
+        <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 pb-8">
+          {!capturedImage ? (
+            <div className="flex items-center justify-center gap-6">
+              {/* Switch Camera Button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={toggleCamera}
+                disabled={!stream}
+                className="h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-50"
+              >
+                <RotateCw className="h-6 w-6" />
+              </Button>
+
+              {/* Main Capture Button */}
+              <button
+                type="button"
+                onClick={capturePhoto}
+                disabled={!stream || isCapturing}
+                className={cn(
+                  "relative h-20 w-20 rounded-full transition-all duration-200",
+                  "focus:outline-none focus:ring-4 focus:ring-primary/50",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  !stream && "animate-pulse"
+                )}
+              >
+                {/* Outer ring */}
+                <div className="absolute inset-0 rounded-full border-4 border-white" />
+                {/* Inner button */}
+                <div className={cn(
+                  "absolute inset-2 rounded-full bg-white transition-transform duration-150",
+                  "hover:scale-95 active:scale-90",
+                  isCapturing && "scale-90 bg-primary"
+                )} />
+                {isCapturing && (
+                  <div className="absolute inset-0 rounded-full border-4 border-primary animate-ping" />
+                )}
+              </button>
+
+              {/* Cancel Button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleClose}
+                className="h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 text-white"
+              >
+                <X className="h-6 w-6" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={retake}
+                size="lg"
+                className="h-14 px-8 rounded-full bg-white/10 hover:bg-white/20 border-white/30 text-white"
+              >
+                <RefreshCw className="h-5 w-5 mr-2" />
+                Retake
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmCapture}
+                size="lg"
+                className="h-14 px-8 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <Check className="h-5 w-5 mr-2" />
+                Use Photo
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>
