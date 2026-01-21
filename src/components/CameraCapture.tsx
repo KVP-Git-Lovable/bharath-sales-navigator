@@ -425,12 +425,6 @@ export const CameraCapture = ({
                 alt="Captured" 
                 className="w-full h-full object-cover"
               />
-              {/* Success overlay - just checkmark, no circle */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg">
-                  <Check className="h-8 w-8 text-white" />
-                </div>
-              </div>
             </>
           )}
         </div>
