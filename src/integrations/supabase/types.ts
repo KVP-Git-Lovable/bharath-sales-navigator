@@ -12616,6 +12616,12 @@ export type Database = {
           },
         ]
       }
+      retailers_created_2025_12_09: {
+        Row: {
+          total_retailers_created: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_beat_adherence: {
