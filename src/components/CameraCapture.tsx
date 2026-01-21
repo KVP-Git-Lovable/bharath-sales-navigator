@@ -338,7 +338,7 @@ export const CameraCapture = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden bg-black border-0 sm:rounded-2xl">
+      <DialogContent className="max-w-lg p-0 overflow-hidden bg-black border-0 sm:rounded-2xl [&>button]:hidden">
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 via-black/50 to-transparent p-4 pt-6">
           <div className="flex items-start justify-between">
