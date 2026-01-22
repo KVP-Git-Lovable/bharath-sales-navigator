@@ -69,14 +69,25 @@ export const SupervisorReport = () => {
   // Fetch users on mount
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .not('full_name', 'is', null)
-        .order('full_name');
+      // Try admin function first (bypasses RLS)
+      const { data: adminData, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
       
-      if (!error && data) {
-        setUsers(data);
+      if (!adminError && adminData) {
+        const filteredUsers = adminData
+          .filter((u: any) => u.full_name)
+          .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
+        setUsers(filteredUsers);
+      } else {
+        // Fallback to direct query
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .not('full_name', 'is', null)
+          .order('full_name');
+        
+        if (!error && data) {
+          setUsers(data);
+        }
       }
     };
     fetchUsers();
@@ -112,17 +123,25 @@ export const SupervisorReport = () => {
       // Get unique user IDs
       const userIds = [...new Set(ordersData.map(o => o.user_id))];
 
-      // Fetch profiles for these users
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        setSummaryData([]);
-        setLoading(false);
-        return;
+      // Fetch profiles for these users - try admin function first, fallback to direct query
+      let profilesData: { id: string; full_name: string | null }[] = [];
+      
+      // Try using the admin function (bypasses RLS)
+      const { data: adminProfiles, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
+      
+      if (!adminError && adminProfiles) {
+        // Filter to only the user IDs we need
+        profilesData = adminProfiles.filter((p: any) => userIds.includes(p.id));
+      } else {
+        // Fallback to direct query if admin function fails
+        const { data: directProfiles, error: directError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        
+        if (!directError && directProfiles) {
+          profilesData = directProfiles;
+        }
       }
 
       // Create a map of user_id to full_name
