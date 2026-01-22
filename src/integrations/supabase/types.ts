@@ -11154,6 +11154,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_object_permissions: {
+        Row: {
+          can_create: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_modify_all: boolean | null
+          can_read: boolean | null
+          can_view_all: boolean | null
+          created_at: string | null
+          id: string
+          object_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_modify_all?: boolean | null
+          can_read?: boolean | null
+          can_view_all?: boolean | null
+          created_at?: string | null
+          id?: string
+          object_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_modify_all?: boolean | null
+          can_read?: boolean | null
+          can_view_all?: boolean | null
+          created_at?: string | null
+          id?: string
+          object_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_onboarding_progress: {
         Row: {
           attachment_url: string | null
