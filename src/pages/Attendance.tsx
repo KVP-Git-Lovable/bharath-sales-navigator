@@ -1414,13 +1414,13 @@ const Attendance = () => {
                               {/* Regularization Button */}
                               {showRegularizationButton && (
                                 <Button
-                                  size="sm"
+                                  size="icon"
                                   variant="outline"
-                                  className="gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
+                                  className="h-8 w-8 border-orange-300 text-orange-700 hover:bg-orange-50"
                                   onClick={() => handleOpenRegularizationModal(record)}
+                                  title={hasRejectedRequest ? 'Resubmit Regularization' : 'Request Regularization'}
                                 >
                                   <Edit3 className="h-4 w-4" />
-                                  {hasRejectedRequest ? 'Resubmit Regularization' : 'Request Regularization'}
                                 </Button>
                               )}
                               
@@ -1430,16 +1430,16 @@ const Attendance = () => {
                                   <Dialog>
                                     <DialogTrigger asChild>
                                       <Button
-                                        size="sm"
+                                        size="icon"
                                         variant="outline"
-                                        className="gap-2"
+                                        className="h-8 w-8"
                                         onClick={async () => {
                                           setSelectedDateForMap(new Date(record.date));
                                           await loadGPSPositionsForDate(recordDate);
                                         }}
+                                        title="Travel Heat Map"
                                       >
                                         <Route className="h-4 w-4" />
-                                        Travel Heat Map
                                       </Button>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
@@ -1460,15 +1460,15 @@ const Attendance = () => {
                                   <Dialog>
                                     <DialogTrigger asChild>
                                       <Button
-                                        size="sm"
+                                        size="icon"
                                         variant="outline"
-                                        className="gap-2"
+                                        className="h-8 w-8"
                                         onClick={async () => {
                                           await fetchVisitsForDate(recordDate);
                                         }}
+                                        title="Timeline View"
                                       >
                                         <CalendarDays className="h-4 w-4" />
-                                        Timeline View
                                       </Button>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
@@ -1487,13 +1487,13 @@ const Attendance = () => {
                                   </Dialog>
 
                                   <Button
-                                    size="sm"
+                                    size="icon"
                                     variant={record.status === 'present' || isRegularized ? 'default' : 'destructive'}
-                                    className="gap-2"
+                                    className="h-8 w-8"
                                     onClick={() => navigate(`/today-summary?date=${recordDate}`)}
+                                    title="Productivity Report"
                                   >
                                     <FileText className="h-4 w-4" />
-                                    Productivity Report
                                   </Button>
                                 </>
                               )}
