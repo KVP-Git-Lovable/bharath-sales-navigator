@@ -652,6 +652,9 @@ export const SupervisorReport = () => {
         return;
       }
 
+      // Calculate next day for date range query (matches SQL: created_at < date + 1 day)
+      const nextDay = format(new Date(new Date(rawDate).getTime() + 86400000), 'yyyy-MM-dd');
+
       // Fetch orders for that specific date
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
@@ -659,7 +662,7 @@ export const SupervisorReport = () => {
         .eq('user_id', userProfile.id)
         .eq('status', 'confirmed')
         .gte('created_at', `${rawDate}T00:00:00`)
-        .lt('created_at', `${rawDate}T23:59:59.999`);
+        .lt('created_at', `${nextDay}T00:00:00`);
 
       if (ordersError || !orders || orders.length === 0) {
         setProductDayDetails([]);
@@ -669,10 +672,10 @@ export const SupervisorReport = () => {
 
       const orderIds = orders.map(o => o.id);
 
-      // Fetch order items with product details
+      // Fetch order items - use product_name directly from order_items table
       const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
-        .select('product_id, quantity, unit, total, products(name)')
+        .select('product_name, quantity, unit, total')
         .in('order_id', orderIds);
 
       if (itemsError || !orderItems) {
@@ -681,7 +684,7 @@ export const SupervisorReport = () => {
         return;
       }
 
-      // Group by product
+      // Group by product_name and convert to KG (matching SQL query)
       const productGroups: Record<string, { 
         product_name: string; 
         quantity: number; 
@@ -690,24 +693,38 @@ export const SupervisorReport = () => {
       }> = {};
 
       orderItems.forEach((item: any) => {
-        const productName = item.products?.name || 'Unknown Product';
-        const unit = item.unit || 'KG';
-        const key = `${productName}-${unit}`;
-
-        if (!productGroups[key]) {
-          productGroups[key] = {
+        const productName = item.product_name || 'Unknown Product';
+        
+        if (!productGroups[productName]) {
+          productGroups[productName] = {
             product_name: productName,
             quantity: 0,
-            unit: unit,
+            unit: 'KG',
             total: 0
           };
         }
 
-        productGroups[key].quantity += Number(item.quantity || 0);
-        productGroups[key].total += Number(item.total || 0);
+        // Convert Grams to KG, otherwise use quantity directly (matching SQL: CASE WHEN unit = 'Grams' THEN quantity / 1000.0 ELSE quantity END)
+        const qty = Number(item.quantity || 0);
+        const unit = (item.unit || '').toLowerCase();
+        let kgQty = 0;
+        
+        if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+          kgQty = qty / 1000;
+        } else {
+          kgQty = qty;
+        }
+
+        productGroups[productName].quantity += kgQty;
+        productGroups[productName].total += Number(item.total || 0);
       });
 
+      // Round to 2 decimal places and sort by revenue DESC
       const productArray = Object.values(productGroups)
+        .map(p => ({
+          ...p,
+          quantity: Math.round(p.quantity * 100) / 100
+        }))
         .sort((a, b) => b.total - a.total);
 
       setProductDayDetails(productArray);
