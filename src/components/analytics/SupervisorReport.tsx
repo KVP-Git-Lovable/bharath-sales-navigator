@@ -1261,9 +1261,15 @@ export const SupervisorReport = () => {
               <p className="text-muted-foreground">Loading data...</p>
             </div>
           ) : summaryData.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Chart Section */}
-              <div className="space-y-2">
+            <div className={cn(
+              "grid grid-cols-1 gap-6 transition-all duration-300",
+              selectedSummaryUser ? "lg:grid-cols-5" : "lg:grid-cols-2"
+            )}>
+              {/* Chart Section - shrinks when beat split is open */}
+              <div className={cn(
+                "space-y-2 transition-all duration-300",
+                selectedSummaryUser ? "lg:col-span-2" : "lg:col-span-1"
+              )}>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">Click on a segment or row to view details</p>
                   <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
@@ -1275,7 +1281,7 @@ export const SupervisorReport = () => {
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={selectedSummaryUser ? 280 : 350}>
                   {chartType === 'pie' ? (
                     <PieChart>
                       <Pie
@@ -1284,9 +1290,9 @@ export const SupervisorReport = () => {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={120}
-                        label={({ name, percentage }) => `${name} (${percentage}%)`}
-                        labelLine={{ stroke: '#888', strokeWidth: 1 }}
+                        outerRadius={selectedSummaryUser ? 90 : 120}
+                        label={selectedSummaryUser ? false : ({ name, percentage }) => `${name} (${percentage}%)`}
+                        labelLine={selectedSummaryUser ? false : { stroke: '#888', strokeWidth: 1 }}
                         onClick={handlePieClick}
                         style={{ cursor: 'pointer' }}
                       >
@@ -1302,13 +1308,13 @@ export const SupervisorReport = () => {
                       <Tooltip 
                         formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{ fontSize: selectedSummaryUser ? '10px' : '12px' }} />
                     </PieChart>
                   ) : (
                     <BarChart data={pieChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                       <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" width={selectedSummaryUser ? 60 : 80} tick={{ fontSize: selectedSummaryUser ? 10 : 12 }} />
                       <Tooltip 
                         formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
                       />
@@ -1331,8 +1337,11 @@ export const SupervisorReport = () => {
                 </ResponsiveContainer>
               </div>
 
-              {/* Summary Table with Beat-wise Split View */}
-              <div>
+              {/* Summary Table with Beat-wise Split View - expands when beat split is open */}
+              <div className={cn(
+                "transition-all duration-300",
+                selectedSummaryUser ? "lg:col-span-3" : "lg:col-span-1"
+              )}>
                 <h3 className="font-semibold mb-2">User Order Summary</h3>
                 <p className="text-xs text-muted-foreground mb-3">Click a row to see beat-wise breakdown</p>
                 <div className={cn(
