@@ -38,7 +38,7 @@ import {
   PendingPaymentsDialog,
   useBusinessMetrics
 } from "@/components/analytics";
-
+import { SupervisorReport } from "@/components/analytics/SupervisorReport";
 interface UserProfile {
   id: string;
   full_name: string | null;
@@ -1267,7 +1267,7 @@ const Analytics = () => {
           </Card>
 
           <Tabs defaultValue="progress" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="kpi">KPI</TabsTrigger>
               <TabsTrigger value="progress">Dashboard</TabsTrigger>
               <TabsTrigger value="products">Products</TabsTrigger>
@@ -1275,6 +1275,7 @@ const Analytics = () => {
               <TabsTrigger value="predictions">Predictions</TabsTrigger>
               <TabsTrigger value="calendar">Calendar</TabsTrigger>
               <TabsTrigger value="sql-report">SQL Report</TabsTrigger>
+              <TabsTrigger value="supervisor-report">Supervisor Report</TabsTrigger>
             </TabsList>
 
             {/* KPI Dashboard */}
@@ -2464,6 +2465,11 @@ const Analytics = () => {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Supervisor Report Tab */}
+            <TabsContent value="supervisor-report" className="space-y-4">
+              <SupervisorReport />
             </TabsContent>
           </Tabs>
 
