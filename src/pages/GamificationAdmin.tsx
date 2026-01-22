@@ -1,12 +1,12 @@
 import { Layout } from "@/components/Layout";
 import { GamificationManagement } from "@/components/GamificationManagement";
-import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function GamificationAdmin() {
-  const { userRole, loading } = useAuth();
+  const { hasAdminAccess, loading } = useAdminAccess();
 
   if (loading) {
     return (
@@ -18,7 +18,7 @@ export default function GamificationAdmin() {
     );
   }
 
-  if (userRole !== "admin") {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

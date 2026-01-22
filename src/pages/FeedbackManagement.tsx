@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, MessageSquare, Trophy, Image, Users, Calendar, Filter, RefreshCw, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -22,7 +22,8 @@ type DetailModalType = 'retailer' | 'branding' | 'competition' | 'jointsales' | 
 
 export default function FeedbackManagement() {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  const { hasAdminAccess } = useAdminAccess();
+  
   const [retailerFeedback, setRetailerFeedback] = useState<any[]>([]);
   const [competitionData, setCompetitionData] = useState<any[]>([]);
   const [brandingRequests, setBrandingRequests] = useState<any[]>([]);
@@ -49,18 +50,18 @@ export default function FeedbackManagement() {
   };
 
   useEffect(() => {
-    if (userRole !== 'admin') {
+    if (!hasAdminAccess) {
       navigate('/');
       return;
     }
     fetchAllFeedback();
-  }, [userRole, navigate]);
+  }, [hasAdminAccess, navigate]);
 
   useEffect(() => {
-    if (userRole === 'admin') {
+    if (hasAdminAccess) {
       fetchAllFeedback();
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, hasAdminAccess]);
 
   const handleDateRangeChange = (value: string) => {
     setDateRange(value);

@@ -15,6 +15,7 @@ import { moveToRecycleBin } from '@/utils/recycleBinUtils';
 import { Truck, Plus, Edit, Trash2, Package, RotateCcw, ChevronDown, ChevronRight, ShoppingCart, TrendingDown, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { UserSelector } from '@/components/UserSelector';
 import { useSubordinates } from '@/hooks/useSubordinates';
 
@@ -90,6 +91,7 @@ interface OpeningGRNEdit {
 
 export default function VanSalesManagement() {
   const navigate = useNavigate();
+  const { hasAdminAccess } = useAdminAccess();
   const { userRole, user } = useAuth();
   const [vans, setVans] = useState<Van[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -136,7 +138,7 @@ export default function VanSalesManagement() {
   });
 
   useEffect(() => {
-    if (userRole !== 'admin') {
+    if (!hasAdminAccess) {
       navigate('/');
       return;
     }
@@ -144,7 +146,7 @@ export default function VanSalesManagement() {
     loadUsers();
     loadVanStockSummaries();
     loadOpeningGRNEdits();
-  }, [userRole, navigate]);
+  }, [hasAdminAccess, navigate]);
 
   // Real-time subscription for van_stock and van_stock_items changes
   useEffect(() => {

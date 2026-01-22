@@ -4,7 +4,7 @@ import { ModuleSelector } from "@/components/targets/ModuleSelector";
 import { KPIConfigTable } from "@/components/targets/KPIConfigTable";
 import { RoleTargetForm } from "@/components/targets/RoleTargetForm";
 import { useActivePerformanceModule } from "@/hooks/useActivePerformanceModule";
-import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function PerformanceModuleAdmin() {
-  const { userRole, loading: authLoading } = useAuth();
+  const { hasAdminAccess, loading: authLoading } = useAdminAccess();
   const { activeModule, isLoading: configLoading } = useActivePerformanceModule();
   const navigate = useNavigate();
 
@@ -26,7 +26,7 @@ export default function PerformanceModuleAdmin() {
     );
   }
 
-  if (userRole !== "admin") {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

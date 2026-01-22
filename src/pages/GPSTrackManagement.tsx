@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ interface AttendanceData {
 }
 
 const GPSTrackManagement = () => {
-  const { user, userRole, loading } = useAuth();
+  const { hasAdminAccess, loading, user } = useAdminAccess();
   const navigate = useNavigate();
   const [date, setDate] = useState<Date>(new Date());
   const [gpsData, setGpsData] = useState<GPSData[]>([]);
@@ -136,7 +136,7 @@ const GPSTrackManagement = () => {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -1,12 +1,12 @@
 import React from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Navigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import ProductManagement from '@/components/ProductManagement';
 
 const ProductManagementPage = () => {
-  const { userRole, loading } = useAuth();
+  const { hasAdminAccess, loading } = useAdminAccess();
 
   if (loading) {
     return (
@@ -18,7 +18,7 @@ const ProductManagementPage = () => {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +62,7 @@ type VerificationStatusFilter = 'all' | 'verified' | 'pending' | 'needs_attentio
 type LastVisitedFilter = 'all' | 'this_month' | 'last_month' | '3_months' | '6_months';
 
 export default function RetailManagement() {
-  const { userRole, loading: authLoading } = useAuth();
+  const { hasAdminAccess, loading: authLoading } = useAdminAccess();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
@@ -174,10 +174,10 @@ export default function RetailManagement() {
   };
 
   useEffect(() => {
-    if (userRole === 'admin') {
+    if (hasAdminAccess) {
       loadData();
     }
-  }, [userRole]);
+  }, [hasAdminAccess]);
 
   const openVerifyDialog = (retailer: Retailer) => {
     setSelectedRetailer(retailer);
@@ -311,7 +311,7 @@ export default function RetailManagement() {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

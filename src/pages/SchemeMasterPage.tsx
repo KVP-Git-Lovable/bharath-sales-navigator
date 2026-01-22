@@ -1,4 +1,4 @@
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { SchemeMaster } from '@/components/SchemeMaster';
 
 const SchemeMasterPage = () => {
-  const { userRole, loading } = useAuth();
+  const { hasAdminAccess, loading } = useAdminAccess();
   const navigate = useNavigate();
 
   if (loading) {
@@ -19,7 +19,7 @@ const SchemeMasterPage = () => {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 
