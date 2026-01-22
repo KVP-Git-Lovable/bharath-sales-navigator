@@ -662,7 +662,14 @@ export const MyRetailers = () => {
         <Card className="bg-gradient-primary text-primary-foreground">
           <CardHeader className="pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base sm:text-xl font-bold">My Retailers</CardTitle>
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-base sm:text-xl font-bold">My Retailers</CardTitle>
+                {initialLoadComplete && (
+                  <span className="bg-primary-foreground/20 text-primary-foreground text-xs sm:text-sm font-medium px-2 py-1 rounded-full">
+                    {retailers.length.toLocaleString()} {retailers.length === 1 ? 'retailer' : 'retailers'}
+                  </span>
+                )}
+              </div>
               <CompactMultiUserSelector
                 selectedUserIds={selectedUserIds}
                 onSelectionChange={setSelectedUserIds}
