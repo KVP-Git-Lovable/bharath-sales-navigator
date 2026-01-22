@@ -87,6 +87,15 @@ export const SupervisorReport = () => {
     total: number;
   }[]>([]);
   const [productDayLoading, setProductDayLoading] = useState(false);
+  
+  // State for order details beat breakdown (retailers/beats boxes)
+  const [orderDetailsBeatBreakdown, setOrderDetailsBeatBreakdown] = useState<{
+    beat_name: string;
+    order_count: number;
+    total_retailers: number;
+    total_value: number;
+  }[]>([]);
+  const [orderDetailsBeatLoading, setOrderDetailsBeatLoading] = useState(false);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
 
   // State for beat-wise split view in User Order Summary
@@ -302,6 +311,7 @@ export const SupervisorReport = () => {
     setRetailersList([]);
     setBeatsList([]);
     setProductKgList([]);
+    setOrderDetailsBeatBreakdown([]);
     
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -625,90 +635,129 @@ export const SupervisorReport = () => {
     fetchUserDetails(userName);
   };
 
-  // Fetch retailers list when clicking on Retailers box
-  const handleRetailersBoxClick = async () => {
+  // Fetch beat breakdown with retailers and beats count for Order Details
+  const fetchOrderDetailsBeatBreakdown = async () => {
     if (!selectedUserDetails) return;
     
-    if (expandedBox === 'retailers') {
-      setExpandedBox(null);
-      setRetailersList([]);
-      return;
-    }
-
-    setExpandedBox('retailers');
+    setOrderDetailsBeatLoading(true);
+    setOrderDetailsBeatBreakdown([]);
     
-    const fromDate = format(dateRange.from, 'yyyy-MM-dd');
-    const toDate = format(dateRange.to, 'yyyy-MM-dd');
+    try {
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+      const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
 
-    // Get user profile by name
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .ilike('full_name', `${selectedUserDetails}%`)
-      .limit(1)
-      .single();
+      // Get user ID from profile
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('full_name', `${selectedUserDetails}%`)
+        .limit(1)
+        .maybeSingle();
 
-    if (!userProfile) return;
+      if (!userProfile) {
+        setOrderDetailsBeatBreakdown([]);
+        setOrderDetailsBeatLoading(false);
+        return;
+      }
 
-    // Fetch retailers created by user in date range
-    const { data: retailers, error } = await supabase
-      .from('retailers')
-      .select('id, name, created_at')
-      .eq('user_id', userProfile.id)
-      .gte('created_at', `${fromDate}T00:00:00`)
-      .lte('created_at', `${toDate}T23:59:59`)
-      .order('created_at', { ascending: true });
+      // Fetch orders with retailer info (confirmed orders in date range)
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          retailer_id,
+          retailers!inner(id, beat_name)
+        `)
+        .eq('user_id', userProfile.id)
+        .eq('status', 'confirmed')
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lt('created_at', `${nextDay}T00:00:00`);
 
-    if (!error && retailers) {
-      setRetailersList(retailers.map(r => ({
-        name: r.name,
-        created_date: format(new Date(r.created_at), 'MMMM dd, yyyy')
-      })));
+      if (ordersError || !orders || orders.length === 0) {
+        setOrderDetailsBeatBreakdown([]);
+        setOrderDetailsBeatLoading(false);
+        return;
+      }
+
+      // Get order IDs and fetch order items
+      const orderIds = orders.map(o => o.id);
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('order_id, total')
+        .in('order_id', orderIds);
+
+      // Map order totals
+      const orderTotals: Record<string, number> = {};
+      orderItems?.forEach(item => {
+        if (!orderTotals[item.order_id]) {
+          orderTotals[item.order_id] = 0;
+        }
+        orderTotals[item.order_id] += Number(item.total || 0);
+      });
+
+      // Group by beat_name and calculate: order_count, total_retailers, total_value
+      const beatGroups: Record<string, { 
+        order_ids: Set<string>; 
+        retailer_ids: Set<string>; 
+        total_value: number;
+      }> = {};
+      
+      orders.forEach((order: any) => {
+        const beatName = order.retailers?.beat_name || 'Unassigned';
+        const retailerId = order.retailers?.id || order.retailer_id;
+        const orderTotal = orderTotals[order.id] || 0;
+        
+        if (!beatGroups[beatName]) {
+          beatGroups[beatName] = { order_ids: new Set(), retailer_ids: new Set(), total_value: 0 };
+        }
+        
+        beatGroups[beatName].order_ids.add(order.id);
+        beatGroups[beatName].retailer_ids.add(retailerId);
+        beatGroups[beatName].total_value += orderTotal;
+      });
+
+      // Convert to array and sort by total_value descending
+      const breakdownData = Object.entries(beatGroups)
+        .map(([beat_name, data]) => ({
+          beat_name,
+          order_count: data.order_ids.size,
+          total_retailers: data.retailer_ids.size,
+          total_value: data.total_value
+        }))
+        .sort((a, b) => b.total_value - a.total_value);
+
+      setOrderDetailsBeatBreakdown(breakdownData);
+    } catch (error) {
+      console.error('Error fetching order details beat breakdown:', error);
+      setOrderDetailsBeatBreakdown([]);
+    } finally {
+      setOrderDetailsBeatLoading(false);
     }
   };
 
-  // Fetch beats list when clicking on Beats box
-  const handleBeatsBoxClick = async () => {
+  // Handle click on Retailers or Beats box - show beat breakdown table
+  const handleRetailersBeatsBoxClick = async () => {
     if (!selectedUserDetails) return;
     
-    if (expandedBox === 'beats') {
+    if (expandedBox === 'retailersBeats') {
       setExpandedBox(null);
-      setBeatsList([]);
+      setOrderDetailsBeatBreakdown([]);
       return;
     }
 
-    setExpandedBox('beats');
-    
-    const fromDate = format(dateRange.from, 'yyyy-MM-dd');
-    const toDate = format(dateRange.to, 'yyyy-MM-dd');
+    setExpandedBox('retailersBeats');
+    await fetchOrderDetailsBeatBreakdown();
+  };
 
-    // Get user profile by name
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .ilike('full_name', `${selectedUserDetails}%`)
-      .limit(1)
-      .single();
+  // Fetch retailers list when clicking on Retailers box (legacy - now redirects to beat breakdown)
+  const handleRetailersBoxClick = async () => {
+    await handleRetailersBeatsBoxClick();
+  };
 
-    if (!userProfile) return;
-
-    // Fetch beats created by user in date range
-    const { data: beats, error } = await supabase
-      .from('beats')
-      .select('id, beat_id, beat_name, category, is_active, created_at')
-      .eq('created_by', userProfile.id)
-      .gte('created_at', `${fromDate}T00:00:00`)
-      .lte('created_at', `${toDate}T23:59:59`)
-      .order('created_at', { ascending: true });
-
-    if (!error && beats) {
-      setBeatsList(beats.map(b => ({
-        beat_name: b.beat_name,
-        category: b.category,
-        is_active: b.is_active ?? true,
-        created_date: format(new Date(b.created_at), 'MMMM dd, yyyy')
-      })));
-    }
+  // Fetch beats list when clicking on Beats box (legacy - now redirects to beat breakdown)
+  const handleBeatsBoxClick = async () => {
+    await handleRetailersBeatsBoxClick();
   };
 
   // Fetch products/kg list when clicking on Products or Total KG box
@@ -1583,6 +1632,8 @@ export const SupervisorReport = () => {
               setSelectedUserDetails(null);
               setUserDetails([]);
               setDetailsSummary(null);
+              setOrderDetailsBeatBreakdown([]);
+              setExpandedBox(null);
             }}>
               <X className="h-4 w-4" />
             </Button>
@@ -1601,7 +1652,7 @@ export const SupervisorReport = () => {
                     <Card 
                       className={cn(
                         "p-4 cursor-pointer transition-colors hover:bg-muted/50",
-                        expandedBox === 'retailers' && "ring-2 ring-primary"
+                        expandedBox === 'retailersBeats' && "ring-2 ring-primary"
                       )}
                       onClick={handleRetailersBoxClick}
                     >
@@ -1609,12 +1660,16 @@ export const SupervisorReport = () => {
                         <Store className="h-4 w-4" />
                         Retailers
                       </div>
-                      <div className="text-2xl font-bold">{detailsSummary.retailers}</div>
+                      <div className="text-2xl font-bold">
+                        {orderDetailsBeatBreakdown.length > 0 
+                          ? orderDetailsBeatBreakdown.reduce((sum, b) => sum + b.total_retailers, 0)
+                          : detailsSummary.retailers}
+                      </div>
                     </Card>
                     <Card 
                       className={cn(
                         "p-4 cursor-pointer transition-colors hover:bg-muted/50",
-                        expandedBox === 'beats' && "ring-2 ring-primary"
+                        expandedBox === 'retailersBeats' && "ring-2 ring-primary"
                       )}
                       onClick={handleBeatsBoxClick}
                     >
@@ -1622,7 +1677,11 @@ export const SupervisorReport = () => {
                         <MapPin className="h-4 w-4" />
                         Beats
                       </div>
-                      <div className="text-2xl font-bold">{detailsSummary.beats}</div>
+                      <div className="text-2xl font-bold">
+                        {orderDetailsBeatBreakdown.length > 0 
+                          ? orderDetailsBeatBreakdown.length
+                          : detailsSummary.beats}
+                      </div>
                     </Card>
                     <Card 
                       className={cn(
@@ -1667,69 +1726,65 @@ export const SupervisorReport = () => {
                 {/* AI Insights */}
                 <OrderDetailsAIInsights userName={selectedUserDetails} dateRange={dateRange} />
 
-                {/* Retailers Subtable */}
-                {expandedBox === 'retailers' && retailersList.length > 0 && (
+                {/* Beat-wise Breakdown Subtable (for Retailers/Beats boxes) */}
+                {expandedBox === 'retailersBeats' && (
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
-                      Retailers Created ({retailersList.length})
-                      {retailersList.length > 8 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                      Beat-wise Breakdown
+                      {orderDetailsBeatBreakdown.length > 8 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </h4>
-                    <div className={cn(
-                      "border rounded-lg overflow-hidden",
-                      retailersList.length > 8 && "max-h-[360px] overflow-y-auto"
-                    )}>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Created Date</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {retailersList.map((retailer, index) => (
-                            <TableRow key={index} className="hover:bg-muted/30">
-                              <TableCell>{retailer.name}</TableCell>
-                              <TableCell>{retailer.created_date}</TableCell>
+                    {orderDetailsBeatLoading ? (
+                      <div className="flex items-center justify-center py-8 border rounded-lg">
+                        <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                        <span className="text-muted-foreground">Loading...</span>
+                      </div>
+                    ) : orderDetailsBeatBreakdown.length > 0 ? (
+                      <div className={cn(
+                        "border rounded-lg overflow-hidden",
+                        orderDetailsBeatBreakdown.length > 8 && "max-h-[360px] overflow-y-auto"
+                      )}>
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                            <TableRow>
+                              <TableHead>Beat Name</TableHead>
+                              <TableHead className="text-right">Orders</TableHead>
+                              <TableHead className="text-right">Retailers</TableHead>
+                              <TableHead className="text-right">Value</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Beats Subtable */}
-                {expandedBox === 'beats' && beatsList.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
-                      Beats Created ({beatsList.length})
-                      {beatsList.length > 8 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                    </h4>
-                    <div className={cn(
-                      "border rounded-lg overflow-hidden",
-                      beatsList.length > 8 && "max-h-[360px] overflow-y-auto"
-                    )}>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                          <TableRow>
-                            <TableHead>Beat Name</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Active</TableHead>
-                            <TableHead>Created Date</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {beatsList.map((beat, index) => (
-                            <TableRow key={index} className="hover:bg-muted/30">
-                              <TableCell>{beat.beat_name}</TableCell>
-                              <TableCell>{beat.category || '-'}</TableCell>
-                              <TableCell>{beat.is_active ? 'Yes' : 'No'}</TableCell>
-                              <TableCell>{beat.created_date}</TableCell>
+                          </TableHeader>
+                          <TableBody>
+                            {orderDetailsBeatBreakdown.map((beat, index) => (
+                              <TableRow key={index} className="hover:bg-muted/30">
+                                <TableCell className="font-medium">{beat.beat_name}</TableCell>
+                                <TableCell className="text-right">{beat.order_count}</TableCell>
+                                <TableCell className="text-right">{beat.total_retailers}</TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  ₹{beat.total_value.toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                          <tfoot className="bg-muted/30 sticky bottom-0">
+                            <TableRow>
+                              <TableCell className="font-semibold">TOTAL</TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {orderDetailsBeatBreakdown.reduce((s, b) => s + b.order_count, 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {orderDetailsBeatBreakdown.reduce((s, b) => s + b.total_retailers, 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-primary">
+                                ₹{orderDetailsBeatBreakdown.reduce((s, b) => s + b.total_value, 0).toLocaleString()}
+                              </TableCell>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </tfoot>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground border rounded-lg text-sm">
+                        No beat data found for this period
+                      </div>
+                    )}
                   </div>
                 )}
 
