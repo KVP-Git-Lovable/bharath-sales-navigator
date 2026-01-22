@@ -5,9 +5,10 @@ import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Shield, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Lock, Loader2, User } from 'lucide-react';
 import { ProfileManagement } from '@/components/security/ProfileManagement';
 import { ObjectPermissions } from '@/components/security/ObjectPermissions';
+import { UserObjectPermissions } from '@/components/security/UserObjectPermissions';
 
 export default function SecurityManagement() {
   const navigate = useNavigate();
@@ -77,21 +78,26 @@ export default function SecurityManagement() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p><strong className="text-foreground">Profiles:</strong> Define baseline permissions for users (e.g., Sales Manager, Field Sales Executive)</p>
-            <p><strong className="text-foreground">Object Permissions:</strong> Control what objects (tables) users can read, create, edit, or delete</p>
+            <p><strong className="text-foreground">Profile Permissions:</strong> Control what objects (tables) each profile can read, create, edit, or delete</p>
+            <p><strong className="text-foreground">User Permissions:</strong> Override profile permissions for specific users when needed</p>
             <p><strong className="text-foreground">Manager Hierarchy:</strong> Managers automatically see their team's data based on reporting structure</p>
           </CardContent>
         </Card>
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profiles" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Profiles
             </TabsTrigger>
             <TabsTrigger value="permissions" className="flex items-center gap-2">
               <Lock className="h-4 w-4" />
-              Permissions
+              Profile Permissions
+            </TabsTrigger>
+            <TabsTrigger value="user-permissions" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              User Permissions
             </TabsTrigger>
           </TabsList>
 
@@ -101,6 +107,10 @@ export default function SecurityManagement() {
 
           <TabsContent value="permissions" className="mt-6">
             <ObjectPermissions />
+          </TabsContent>
+
+          <TabsContent value="user-permissions" className="mt-6">
+            <UserObjectPermissions />
           </TabsContent>
         </Tabs>
       </div>
