@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, Users } from 'lucide-react';
+import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, Users, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -49,6 +49,13 @@ export const SupervisorReport = () => {
   const [userDetails, setUserDetails] = useState<UserOrderDetails[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsSummary, setDetailsSummary] = useState<{
+    retailers: number;
+    beats: number;
+    products: number;
+    totalKg: number;
+    productivityPercent: number | null;
+  } | null>(null);
+  const [allUsersSummary, setAllUsersSummary] = useState<{
     retailers: number;
     beats: number;
     products: number;
@@ -256,6 +263,9 @@ export const SupervisorReport = () => {
       setSelectedUserDetails(null);
       setUserDetails([]);
       setDetailsSummary(null);
+
+      // Fetch all-users summary when loading data
+      await fetchAllUsersSummary(fromDate, toDate);
     } catch (error) {
       console.error('Error in supervisor report:', error);
       setSummaryData([]);
@@ -294,7 +304,7 @@ export const SupervisorReport = () => {
       const userId = userProfile.id;
 
       // Fetch all data in parallel using the user's SQL query logic
-      const [retailersResult, beatsResult, ordersResult, productRevenueResult] = await Promise.all([
+      const [retailersResult, beatsResult, ordersResult, productRevenueResult, productivityResult] = await Promise.all([
         // Retailers created by user in date range
         supabase
           .from('retailers')
@@ -333,6 +343,13 @@ export const SupervisorReport = () => {
           user_full_name: userName,
           start_date: fromDate,
           end_date: toDate
+        }),
+        
+        // Get productivity summary using the RPC
+        supabase.rpc('get_productivity_summary', {
+          user_full_name: userName,
+          start_date: fromDate,
+          end_date: toDate
         })
       ]);
 
@@ -354,6 +371,21 @@ export const SupervisorReport = () => {
           totalQuantityKgFromRpc += qty;
         }
       });
+
+      // Calculate productivity percentage from RPC result
+      const productivityData = productivityResult.data || [];
+      let productivityPercent: number | null = null;
+      if (productivityData.length > 0) {
+        // Calculate overall productivity across all days
+        const totals = productivityData.reduce((acc: { productive: number; total: number }, row: any) => ({
+          productive: acc.productive + Number(row.productive_visits || 0),
+          total: acc.total + Number(row.total_visits || 0)
+        }), { productive: 0, total: 0 });
+        
+        if (totals.total > 0) {
+          productivityPercent = Math.round((totals.productive / totals.total) * 100 * 100) / 100;
+        }
+      }
 
       // Fetch order_items separately for the daily breakdown table
       const orderIds = ordersResult.data?.map(o => o.id) || [];
@@ -465,7 +497,8 @@ export const SupervisorReport = () => {
         retailers: totalRetailersCreated,
         beats: totalBeatsCreated,
         products: totalProductsSold, // Use RPC result count
-        totalKg: Math.round(totalQuantityKgFromRpc * 100) / 100 // Use RPC calculated KG, round to 2 decimals
+        totalKg: Math.round(totalQuantityKgFromRpc * 100) / 100, // Use RPC calculated KG, round to 2 decimals
+        productivityPercent
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -473,6 +506,78 @@ export const SupervisorReport = () => {
       setDetailsSummary(null);
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  // Fetch summary for all users combined (no user selected)
+  const fetchAllUsersSummary = async (fromDate: string, toDate: string) => {
+    try {
+      // Fetch all retailers created in date range
+      const { count: retailersCount } = await supabase
+        .from('retailers')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lte('created_at', `${toDate}T23:59:59`);
+
+      // Fetch all beats created in date range
+      const { count: beatsCount } = await supabase
+        .from('beats')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lte('created_at', `${toDate}T23:59:59`);
+
+      // Fetch all confirmed orders with order_items in date range
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('status', 'confirmed')
+        .gte('order_date', fromDate)
+        .lte('order_date', toDate);
+
+      if (!orders || orders.length === 0) {
+        setAllUsersSummary({
+          retailers: retailersCount || 0,
+          beats: beatsCount || 0,
+          products: 0,
+          totalKg: 0
+        });
+        return;
+      }
+
+      const orderIds = orders.map(o => o.id);
+
+      // Fetch order items for these orders
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('product_name, quantity, unit')
+        .in('order_id', orderIds);
+
+      // Calculate products count and total KG
+      const productSet = new Set<string>();
+      let totalKg = 0;
+
+      (orderItems || []).forEach((item: any) => {
+        if (item.product_name) {
+          productSet.add(item.product_name);
+        }
+        const qty = Number(item.quantity || 0);
+        const unit = (item.unit || '').toLowerCase();
+        if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+          totalKg += qty / 1000;
+        } else {
+          totalKg += qty;
+        }
+      });
+
+      setAllUsersSummary({
+        retailers: retailersCount || 0,
+        beats: beatsCount || 0,
+        products: productSet.size,
+        totalKg: Math.round(totalKg * 100) / 100
+      });
+    } catch (error) {
+      console.error('Error fetching all users summary:', error);
+      setAllUsersSummary(null);
     }
   };
 
@@ -1076,6 +1181,50 @@ export const SupervisorReport = () => {
         </Card>
       )}
 
+      {/* All Users Summary Section (when no specific user is selected) */}
+      {!selectedUserDetails && allUsersSummary && summaryData.length > 0 && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Summary - All Users</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Aggregated metrics for all users in the selected date range
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <Store className="h-4 w-4" />
+                  Total Retailers
+                </div>
+                <div className="text-2xl font-bold">{allUsersSummary.retailers}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <MapPin className="h-4 w-4" />
+                  Total Beats
+                </div>
+                <div className="text-2xl font-bold">{allUsersSummary.beats}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <Package className="h-4 w-4" />
+                  Total Products
+                </div>
+                <div className="text-2xl font-bold">{allUsersSummary.products}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <Scale className="h-4 w-4" />
+                  Total KG
+                </div>
+                <div className="text-2xl font-bold">{allUsersSummary.totalKg.toFixed(1)}</div>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* User Details Section */}
       {selectedUserDetails && (
         <Card className="shadow-lg">
@@ -1099,7 +1248,7 @@ export const SupervisorReport = () => {
               <>
                 {/* Summary Cards */}
                 {detailsSummary && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <Card 
                       className={cn(
                         "p-4 cursor-pointer transition-colors hover:bg-muted/50",
@@ -1151,6 +1300,17 @@ export const SupervisorReport = () => {
                         Total KG
                       </div>
                       <div className="text-2xl font-bold">{detailsSummary.totalKg.toFixed(1)}</div>
+                    </Card>
+                    <Card className="p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Productivity
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {detailsSummary.productivityPercent !== null 
+                          ? `${detailsSummary.productivityPercent}%` 
+                          : 'N/A'}
+                      </div>
                     </Card>
                   </div>
                 )}
