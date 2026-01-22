@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { RevenueBySKUSection } from './RevenueBySKUSection';
 
 interface UserOrderSummary {
   full_name: string;
@@ -1381,6 +1382,9 @@ export const SupervisorReport = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Revenue Summary by SKU Section */}
+      <RevenueBySKUSection />
     </div>
   );
 };
