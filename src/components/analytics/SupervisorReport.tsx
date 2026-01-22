@@ -313,6 +313,9 @@ export const SupervisorReport = () => {
     setProductKgList([]);
     setOrderDetailsBeatBreakdown([]);
     
+    // Immediately start fetching beat breakdown for retailers/beats counts
+    fetchOrderDetailsBeatBreakdownForUser(userName);
+    
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -636,8 +639,10 @@ export const SupervisorReport = () => {
   };
 
   // Fetch beat breakdown with retailers and beats count for Order Details
-  const fetchOrderDetailsBeatBreakdown = async () => {
-    if (!selectedUserDetails) return;
+  // Can optionally pass userName directly for immediate fetch before state updates
+  const fetchOrderDetailsBeatBreakdownForUser = async (userName?: string) => {
+    const targetUser = userName || selectedUserDetails;
+    if (!targetUser) return;
     
     setOrderDetailsBeatLoading(true);
     setOrderDetailsBeatBreakdown([]);
@@ -651,7 +656,7 @@ export const SupervisorReport = () => {
       const { data: userProfile } = await supabase
         .from('profiles')
         .select('id')
-        .ilike('full_name', `${selectedUserDetails}%`)
+        .ilike('full_name', `${targetUser}%`)
         .limit(1)
         .maybeSingle();
 
@@ -747,7 +752,7 @@ export const SupervisorReport = () => {
     }
 
     setExpandedBox('retailersBeats');
-    await fetchOrderDetailsBeatBreakdown();
+    await fetchOrderDetailsBeatBreakdownForUser();
   };
 
   // Fetch retailers list when clicking on Retailers box (legacy - now redirects to beat breakdown)
