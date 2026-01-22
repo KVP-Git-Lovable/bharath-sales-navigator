@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,7 +131,7 @@ const getSortValue = (
 };
 
 export const AdminDashboard = () => {
-  const { userRole, loading } = useAuth();
+  const { hasAdminAccess, loading } = useAdminAccess();
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -162,14 +162,14 @@ export const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    if (!loading && userRole === 'admin') {
+    if (!loading && hasAdminAccess) {
       fetchUsers();
     }
-  }, [userRole, loading]);
+  }, [hasAdminAccess, loading]);
 
   // Set up real-time subscription for automatic updates
   useEffect(() => {
-    if (userRole === 'admin') {
+    if (hasAdminAccess) {
       const profilesChannel = supabase
         .channel('profiles-changes')
         .on('postgres_changes', 
@@ -199,7 +199,7 @@ export const AdminDashboard = () => {
         supabase.removeChannel(profilesChannel);
       };
     }
-  }, [userRole]);
+  }, [hasAdminAccess]);
 
   const fetchUsers = async () => {
     try {
@@ -391,7 +391,7 @@ export const AdminDashboard = () => {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

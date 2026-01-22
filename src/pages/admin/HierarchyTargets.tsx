@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Target, Users, History, Plus, UserPlus, UserMinus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useHierarchyTargets, useHierarchyTargetAllocations, useHierarchyTargetHistory } from '@/hooks/useHierarchyTargets';
 import { HierarchyTargetBuilder } from '@/components/admin/HierarchyTargetBuilder';
@@ -26,7 +26,7 @@ const getCurrentFY = () => {
 
 const HierarchyTargets = () => {
   const navigate = useNavigate();
-  const { user, userRole } = useAuth();
+  const { hasAdminAccess } = useAdminAccess();
   const { subordinates, isManager } = useSubordinates();
   const [fyYear, setFyYear] = useState(getCurrentFY());
   const [selectedRootUserId, setSelectedRootUserId] = useState<string | null>(null);
@@ -132,7 +132,7 @@ const HierarchyTargets = () => {
 
   const fyYears = Array.from({ length: 5 }, (_, i) => getCurrentFY() - 2 + i);
 
-  if (userRole !== 'admin' && !isManager) {
+  if (!hasAdminAccess && !isManager) {
     return (
       <Layout>
         <div className="p-4 text-center">
