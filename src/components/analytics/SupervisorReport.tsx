@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, Users, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,6 +97,16 @@ export const SupervisorReport = () => {
     order_count: number;
   }[]>([]);
   const [beatBreakdownLoading, setBeatBreakdownLoading] = useState(false);
+
+  // State for retailer details popup (drill-down from beat)
+  const [retailerDetailsOpen, setRetailerDetailsOpen] = useState(false);
+  const [selectedBeatForDetails, setSelectedBeatForDetails] = useState<string | null>(null);
+  const [retailerDetailsData, setRetailerDetailsData] = useState<{
+    retailer_name: string;
+    order_count: number;
+    total_value: number;
+  }[]>([]);
+  const [retailerDetailsLoading, setRetailerDetailsLoading] = useState(false);
 
   // Generate AI insights based on the summary data
   const aiInsights = useMemo(() => {
@@ -1026,6 +1037,112 @@ export const SupervisorReport = () => {
     handleRowClick(userName);
   };
 
+  // Fetch retailer details for a specific beat (drill-down from beat-wise split)
+  const fetchRetailerDetailsForBeat = async (beatName: string) => {
+    if (!selectedSummaryUser) return;
+    
+    setRetailerDetailsLoading(true);
+    setSelectedBeatForDetails(beatName);
+    setRetailerDetailsOpen(true);
+    
+    try {
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+      // Get user ID from profile
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('full_name', `${selectedSummaryUser}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!userProfile) {
+        setRetailerDetailsData([]);
+        return;
+      }
+
+      // Calculate next day for date range query
+      const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
+
+      // Fetch orders with retailer info for this beat
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          retailer_id,
+          retailers!inner(id, name, beat_name)
+        `)
+        .eq('user_id', userProfile.id)
+        .eq('status', 'confirmed')
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lt('created_at', `${nextDay}T00:00:00`);
+
+      if (ordersError || !orders || orders.length === 0) {
+        setRetailerDetailsData([]);
+        return;
+      }
+
+      // Filter orders for this specific beat
+      const beatOrders = orders.filter((order: any) => {
+        const orderBeatName = order.retailers?.beat_name || 'Unassigned';
+        return orderBeatName === beatName;
+      });
+
+      if (beatOrders.length === 0) {
+        setRetailerDetailsData([]);
+        return;
+      }
+
+      // Get order IDs and fetch order items
+      const orderIds = beatOrders.map(o => o.id);
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('order_id, total')
+        .in('order_id', orderIds);
+
+      // Map order totals
+      const orderTotals: Record<string, number> = {};
+      orderItems?.forEach(item => {
+        if (!orderTotals[item.order_id]) {
+          orderTotals[item.order_id] = 0;
+        }
+        orderTotals[item.order_id] += Number(item.total || 0);
+      });
+
+      // Group by retailer and calculate totals
+      const retailerTotals: Record<string, { name: string; total_value: number; order_count: number }> = {};
+      
+      beatOrders.forEach((order: any) => {
+        const retailerId = order.retailer_id;
+        const retailerName = order.retailers?.name || 'Unknown Retailer';
+        const orderTotal = orderTotals[order.id] || 0;
+        
+        if (!retailerTotals[retailerId]) {
+          retailerTotals[retailerId] = { name: retailerName, total_value: 0, order_count: 0 };
+        }
+        retailerTotals[retailerId].total_value += orderTotal;
+        retailerTotals[retailerId].order_count += 1;
+      });
+
+      // Convert to array and sort by total_value descending
+      const details = Object.values(retailerTotals)
+        .map(data => ({
+          retailer_name: data.name,
+          total_value: data.total_value,
+          order_count: data.order_count
+        }))
+        .sort((a, b) => b.total_value - a.total_value);
+
+      setRetailerDetailsData(details);
+    } catch (error) {
+      console.error('Error fetching retailer details:', error);
+      setRetailerDetailsData([]);
+    } finally {
+      setRetailerDetailsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="shadow-lg">
@@ -1291,6 +1408,7 @@ export const SupervisorReport = () => {
                         </div>
                       ) : beatBreakdownData.length > 0 ? (
                         <div className="max-h-[300px] overflow-auto">
+                          <p className="text-xs text-muted-foreground px-4 py-1">Click a beat to see retailer details</p>
                           <Table>
                             <TableHeader>
                               <TableRow className="bg-muted/30">
@@ -1301,8 +1419,12 @@ export const SupervisorReport = () => {
                             </TableHeader>
                             <TableBody>
                               {beatBreakdownData.map((beat, index) => (
-                                <TableRow key={index}>
-                                  <TableCell>{beat.beat_name}</TableCell>
+                                <TableRow 
+                                  key={index}
+                                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => fetchRetailerDetailsForBeat(beat.beat_name)}
+                                >
+                                  <TableCell className="text-primary underline-offset-2 hover:underline">{beat.beat_name}</TableCell>
                                   <TableCell className="text-right">{beat.order_count}</TableCell>
                                   <TableCell className="text-right font-semibold">
                                     ₹{beat.total_value.toLocaleString()}
@@ -1340,6 +1462,64 @@ export const SupervisorReport = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Retailer Details Dialog (drill-down from beat row) */}
+      <Dialog open={retailerDetailsOpen} onOpenChange={setRetailerDetailsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Retailer Details - {selectedBeatForDetails}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {selectedSummaryUser} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {retailerDetailsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="animate-spin h-6 w-6" />
+              </div>
+            ) : retailerDetailsData.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30">
+                    <TableHead>Retailer Name</TableHead>
+                    <TableHead className="text-right">Orders</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {retailerDetailsData.map((retailer, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{retailer.retailer_name}</TableCell>
+                      <TableCell className="text-right">{retailer.order_count}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        ₹{retailer.total_value.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <tfoot className="bg-muted/30">
+                  <TableRow>
+                    <TableCell className="font-semibold">Total ({retailerDetailsData.length} retailers)</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {retailerDetailsData.reduce((s, r) => s + r.order_count, 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-primary">
+                      ₹{retailerDetailsData.reduce((s, r) => s + r.total_value, 0).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </tfoot>
+              </Table>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                No retailer data found for this beat
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* All Users Summary Section (when no specific user is selected) */}
       {!selectedUserDetails && allUsersSummary && summaryData.length > 0 && (
