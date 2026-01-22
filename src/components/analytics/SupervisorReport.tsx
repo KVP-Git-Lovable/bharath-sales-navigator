@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, Users, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, subDays } from 'date-fns';
+import { format, startOfMonth, startOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RevenueBySKUSection } from './RevenueBySKUSection';
@@ -942,10 +942,36 @@ export const SupervisorReport = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2 items-end">
-              <div>
-                <label className="text-sm font-medium mb-2 block">From Date</label>
-                <Popover>
+            <div className="flex flex-col gap-2">
+              {/* Quick date buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDateRange({
+                    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+                    to: new Date()
+                  })}
+                  className="text-xs"
+                >
+                  This Week
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDateRange({
+                    from: startOfMonth(new Date()),
+                    to: new Date()
+                  })}
+                  className="text-xs"
+                >
+                  This Month
+                </Button>
+              </div>
+              <div className="flex gap-2 items-end">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">From Date</label>
+                  <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -991,6 +1017,7 @@ export const SupervisorReport = () => {
               >
                 <X className="h-4 w-4" />
               </Button>
+              </div>
             </div>
             <Button onClick={fetchSummaryData} disabled={loading}>
               <RefreshCw size={16} className={cn("mr-2", loading && "animate-spin")} />
