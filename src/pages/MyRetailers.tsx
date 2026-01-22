@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserSelector } from "@/components/UserSelector";
+import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { buildRetailerIndex, filterRetailersIndexed, getUniqueValues, clearRetailerIndex } from "@/lib/retailerIndex";
@@ -59,26 +59,36 @@ interface Retailer {
   gst_number?: string | null;
   photo_url?: string | null;
   verified?: boolean;
+  user_id?: string;
+  owner_name?: string;
 }
 
 export const MyRetailers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // Hierarchical user filter
-  const { isManager, subordinateIds } = useSubordinates();
-  const [selectedUserId, setSelectedUserId] = useState<string>('self');
+  // Hierarchical user filter - multi-select
+  const { isManager, subordinates, subordinateIds } = useSubordinates();
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   
-  // Calculate effective user ID for data filtering
-  const effectiveUserId = useMemo(() => {
-    if (selectedUserId === 'self' || selectedUserId === user?.id) {
-      return user?.id;
+  // Initialize with current user when available
+  useEffect(() => {
+    if (user?.id && selectedUserIds.length === 0) {
+      setSelectedUserIds([user.id]);
     }
-    if (selectedUserId === 'all') {
-      return null; // Will filter by all subordinate IDs
+  }, [user?.id]);
+  
+  // Map of user IDs to names for owner column display
+  const userNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (user) {
+      map[user.id] = 'Me';
     }
-    return selectedUserId;
-  }, [selectedUserId, user?.id]);
+    subordinates.forEach(sub => {
+      map[sub.subordinate_user_id] = sub.full_name;
+    });
+    return map;
+  }, [user, subordinates]);
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [search, setSearch] = useState("");
@@ -154,19 +164,30 @@ export const MyRetailers = () => {
 
   const loadRetailers = useCallback(async () => {
     if (!user) return;
+    if (selectedUserIds.length === 0) return;
+    
     setLoading(true);
     
     try {
+      // Determine which user IDs to query
+      const userIdsToQuery = selectedUserIds;
+      
       // ALWAYS load from cache FIRST for instant display (works offline and online)
-      console.log('📦 Loading retailers from cache...');
+      console.log('📦 Loading retailers from cache for users:', userIdsToQuery);
       console.time('[MyRetailers] Cache load');
       let cachedRetailers: any[] = await offlineStorage.getAll(STORES.RETAILERS);
-      cachedRetailers = cachedRetailers.filter((r: any) => r.user_id === user.id);
+      // Filter cache by selected user IDs
+      cachedRetailers = cachedRetailers.filter((r: any) => userIdsToQuery.includes(r.user_id));
       console.timeEnd('[MyRetailers] Cache load');
       
       if (cachedRetailers.length > 0) {
         console.log('✅ Displaying cached retailers:', cachedRetailers.length);
-        const sorted = cachedRetailers.sort((a, b) => a.name.localeCompare(b.name));
+        // Add owner names
+        const withOwners = cachedRetailers.map(r => ({
+          ...r,
+          owner_name: userNameMap[r.user_id] || 'Unknown'
+        }));
+        const sorted = withOwners.sort((a, b) => a.name.localeCompare(b.name));
         setRetailers(sorted);
         // Build index for fast filtering
         console.time('[MyRetailers] Index build');
@@ -187,7 +208,7 @@ export const MyRetailers = () => {
         const { data, error } = await supabase
           .from("retailers")
           .select("*")
-          .eq("user_id", user.id)
+          .in("user_id", userIdsToQuery)
           .order("name");
           
         if (error) throw error;
@@ -197,10 +218,19 @@ export const MyRetailers = () => {
         if (data && data.length > 0) {
           console.log('🔄 Updating retailers cache with fresh data:', data.length);
           await offlineStorage.mergeData(STORES.RETAILERS, data as any);
-          const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+          // Add owner names
+          const withOwners = data.map(r => ({
+            ...r,
+            owner_name: userNameMap[r.user_id] || 'Unknown'
+          }));
+          const sorted = [...withOwners].sort((a, b) => a.name.localeCompare(b.name));
           setRetailers(sorted);
           // Rebuild index with fresh data
           buildRetailerIndex(sorted);
+        } else if (data && data.length === 0) {
+          // No retailers found for selected users
+          setRetailers([]);
+          buildRetailerIndex([]);
         }
       } catch (networkError: any) {
         // Silent fail - cached data is already displayed
@@ -211,7 +241,7 @@ export const MyRetailers = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, selectedUserIds, userNameMap]);
 
   useEffect(() => {
     if (user) loadRetailers();
@@ -539,11 +569,9 @@ export const MyRetailers = () => {
           <CardHeader className="pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base sm:text-xl font-bold">My Retailers</CardTitle>
-              <UserSelector
-                selectedUserId={selectedUserId}
-                onUserChange={setSelectedUserId}
-                showAllOption={true}
-                allOptionLabel="All Team"
+              <CompactMultiUserSelector
+                selectedUserIds={selectedUserIds}
+                onSelectionChange={setSelectedUserIds}
                 className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20"
               />
             </div>
@@ -719,6 +747,12 @@ export const MyRetailers = () => {
                         <span className="text-muted-foreground">Beat:</span>
                         <span>{r.beat_name || r.beat_id}</span>
                       </div>
+                      {selectedUserIds.length > 1 && r.owner_name && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Owner:</span>
+                          <span className="font-medium">{r.owner_name}</span>
+                        </div>
+                      )}
                       {r.category && (
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">Category:</span>
@@ -766,6 +800,7 @@ export const MyRetailers = () => {
                       />
                     </TableHead>
                     <TableHead>Name</TableHead>
+                    {selectedUserIds.length > 1 && <TableHead>Owner</TableHead>}
                     <TableHead>Phone Number</TableHead>
                     <TableHead>Address</TableHead>
                     <TableHead>Beat</TableHead>
@@ -801,6 +836,11 @@ export const MyRetailers = () => {
                             )}
                           </div>
                         </TableCell>
+                        {selectedUserIds.length > 1 && (
+                          <TableCell className="text-sm text-muted-foreground">
+                            {r.owner_name || '-'}
+                          </TableCell>
+                        )}
                         <TableCell>
                           {r.phone ? (
                             <a 
@@ -860,7 +900,7 @@ export const MyRetailers = () => {
                   })}
                   {paginatedRetailers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">{loading ? 'Loading...' : 'No retailers found'}</TableCell>
+                      <TableCell colSpan={selectedUserIds.length > 1 ? 7 : 6} className="text-center text-muted-foreground">{loading ? 'Loading...' : 'No retailers found'}</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
