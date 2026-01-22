@@ -30,6 +30,7 @@ import { VirtualizedRetailerTable } from "@/components/VirtualizedRetailerTable"
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
+import { RetailersSkeleton } from "@/components/home/RetailersSkeleton";
 
 
 interface Retailer {
@@ -89,7 +90,8 @@ export const MyRetailers = () => {
     });
     return map;
   }, [user, subordinates]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true to show skeleton immediately
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // Track if first load is done
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
@@ -298,6 +300,7 @@ export const MyRetailers = () => {
       setLoadingProgress('');
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true); // Mark initial load as complete
     }
   }, [user, selectedUserIds, userNameMap]);
 
@@ -643,9 +646,18 @@ export const MyRetailers = () => {
     }
   }, [location.state, retailers]);
 
+  // Show skeleton during initial load for smooth UX - no flicker
+  if (!initialLoadComplete && loading) {
+    return (
+      <Layout>
+        <RetailersSkeleton />
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <section className="container mx-auto p-4 space-y-4">
+      <section className="container mx-auto p-4 space-y-4 animate-fade-in">
         <Card className="bg-gradient-primary text-primary-foreground">
           <CardHeader className="pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
             <div className="flex items-center justify-between">
