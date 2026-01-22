@@ -1,14 +1,30 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Palette, FileText } from "lucide-react";
+import { ArrowLeft, Building2, Palette, FileText, Loader2 } from "lucide-react";
 import CompanySettings from "@/components/invoice/CompanySettings";
 import HeaderBrandingSettings from "@/components/invoice/HeaderBrandingSettings";
 import DocumentSettings from "@/components/invoice/DocumentSettings";
 import { Layout } from "@/components/Layout";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 
 export default function CompanyProfile() {
   const navigate = useNavigate();
+  const { hasAdminAccess, loading } = useAdminAccess();
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasAdminAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <Layout>

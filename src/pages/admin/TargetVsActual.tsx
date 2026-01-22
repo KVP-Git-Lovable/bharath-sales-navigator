@@ -4,7 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Target, BarChart3 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { AdminSetTarget } from '@/components/admin/AdminSetTarget';
 import { TeamTargetDashboard } from '@/components/admin/TeamTargetDashboard';
@@ -18,7 +18,7 @@ const getCurrentFY = () => {
 };
 
 const TargetVsActual = () => {
-  const { user, userRole, loading } = useAuth();
+  const { hasAdminAccess, loading, user } = useAdminAccess();
   const { subordinates, isManager, isLoading: subordinatesLoading } = useSubordinates();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'set-target' | 'target-vs-actual'>('set-target');
@@ -66,8 +66,8 @@ const TargetVsActual = () => {
     );
   }
 
-  // Only admin or managers can access
-  if (userRole !== 'admin' && !isManager) {
+  // Only admin, System Administrator, or managers can access
+  if (!hasAdminAccess && !isManager) {
     return <Navigate to="/dashboard" replace />;
   }
 

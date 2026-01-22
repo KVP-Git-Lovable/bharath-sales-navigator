@@ -1,5 +1,5 @@
 import { Layout } from "@/components/Layout";
-import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate } from "react-router-dom";
 import { Loader2, Gift } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +12,7 @@ import { LoyaltyAnalytics } from "@/components/loyalty/LoyaltyAnalytics";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function RetailerLoyaltyAdmin() {
-  const { userRole, loading } = useAuth();
+  const { hasAdminAccess, loading } = useAdminAccess();
 
   if (loading) {
     return (
@@ -24,7 +24,7 @@ export default function RetailerLoyaltyAdmin() {
     );
   }
 
-  if (userRole !== "admin") {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

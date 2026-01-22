@@ -1,14 +1,30 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, ListOrdered, Settings2 } from "lucide-react";
+import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2 } from "lucide-react";
 import InvoiceTemplateSelector from "@/components/invoice/InvoiceTemplateSelector";
 import AllInvoicesList from "@/components/invoice/AllInvoicesList";
 import InvoiceDisplaySettings from "@/components/invoice/InvoiceDisplaySettings";
 import { Layout } from "@/components/Layout";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 
 export default function InvoiceManagement() {
+  const { hasAdminAccess, loading } = useAdminAccess();
   const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasAdminAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <Layout>

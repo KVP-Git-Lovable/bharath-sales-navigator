@@ -31,7 +31,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 
 interface RecycleBinConfig {
   id: string;
@@ -58,7 +58,7 @@ interface DeletionLog {
 
 const RecycleBinAdmin = () => {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  const { hasAdminAccess } = useAdminAccess();
   const [config, setConfig] = useState<RecycleBinConfig | null>(null);
   const [deletionLogs, setDeletionLogs] = useState<DeletionLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,12 +66,12 @@ const RecycleBinAdmin = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (userRole !== 'admin') {
+    if (!hasAdminAccess) {
       navigate('/dashboard');
       return;
     }
     fetchData();
-  }, [userRole]);
+  }, [hasAdminAccess]);
 
   const fetchData = async () => {
     try {
