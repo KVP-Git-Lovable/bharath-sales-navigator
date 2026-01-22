@@ -13,7 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { User, Save, Search, AlertCircle, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAdminPanelPermissionItems, SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
+import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAllModulePermissionItems, SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
 
 interface UserPermission {
   id: string;
@@ -120,7 +120,7 @@ export const UserObjectPermissions = () => {
 
   const profilePermissions = userProfileData?.permissions || [];
   const isUserSystemAdministrator = userProfileData?.profileName === SYSTEM_ADMINISTRATOR_PROFILE;
-  const adminPanelItems = getAdminPanelPermissionItems();
+  const allPermissionItems = getAllModulePermissionItems();
 
   // Save mutations
   const saveMutation = useMutation({
@@ -219,8 +219,8 @@ export const UserObjectPermissions = () => {
   };
 
   const getPermissionValue = (featureName: string, field: string): boolean => {
-    // For System Administrator profile, auto-grant all Admin Panel permissions
-    if (isUserSystemAdministrator && adminPanelItems.includes(featureName)) {
+    // For System Administrator profile, auto-grant ALL permissions across all modules
+    if (isUserSystemAdministrator && allPermissionItems.includes(featureName)) {
       // Still allow pending changes to override
       if (pendingChanges[featureName]?.[field as keyof UserPermission] !== undefined) {
         return pendingChanges[featureName][field as keyof UserPermission] as boolean;
@@ -246,8 +246,8 @@ export const UserObjectPermissions = () => {
   };
 
   const getProfilePermissionValue = (featureName: string, field: string): boolean => {
-    // For System Administrator profile, auto-grant all Admin Panel permissions
-    if (isUserSystemAdministrator && adminPanelItems.includes(featureName)) {
+    // For System Administrator profile, auto-grant ALL permissions
+    if (isUserSystemAdministrator && allPermissionItems.includes(featureName)) {
       return true;
     }
     const perm = profilePermissions?.find(p => p.object_name === featureName);
