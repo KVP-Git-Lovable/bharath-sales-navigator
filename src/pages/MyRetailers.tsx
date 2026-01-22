@@ -72,14 +72,25 @@ export const MyRetailers = () => {
   const { isManager, subordinates, subordinateIds } = useSubordinates();
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   
-  // Initialize with current user when available
+  // Track if initial data load is complete (prevents flickering)
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [retailers, setRetailers] = useState<Retailer[]>([]);
+  
+  // Ref to prevent duplicate API calls
+  const loadingRef = useRef(false);
+  const lastLoadedUserIdsRef = useRef<string>('');
+  
+  // Initialize with current user when available (only once)
+  const userInitializedRef = useRef(false);
   useEffect(() => {
-    if (user?.id && selectedUserIds.length === 0) {
+    if (user?.id && !userInitializedRef.current) {
+      userInitializedRef.current = true;
       setSelectedUserIds([user.id]);
     }
   }, [user?.id]);
   
-  // Map of user IDs to names for owner column display
+  // Map of user IDs to names for owner column display - memoized with stable reference
   const userNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     if (user) {
@@ -89,10 +100,7 @@ export const MyRetailers = () => {
       map[sub.subordinate_user_id] = sub.full_name;
     });
     return map;
-  }, [user, subordinates]);
-  const [loading, setLoading] = useState(true); // Start with loading true to show skeleton immediately
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // Track if first load is done
-  const [retailers, setRetailers] = useState<Retailer[]>([]);
+  }, [user?.id, subordinates]);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [potentialFilter, setPotentialFilter] = useState<string | undefined>();
@@ -168,29 +176,32 @@ export const MyRetailers = () => {
   const [loadingProgress, setLoadingProgress] = useState<string>('');
   const PAGE_SIZE = 500; // Load 500 retailers at a time
   
-  const loadRetailers = useCallback(async () => {
+  const loadRetailers = useCallback(async (userIds: string[]) => {
     if (!user) return;
-    if (selectedUserIds.length === 0) {
-      setRetailers([]);
-      setLoadingProgress('');
+    if (userIds.length === 0) {
+      // Don't clear data, just mark as loaded
+      if (!initialLoadComplete) setInitialLoadComplete(true);
       return;
     }
     
+    // Prevent duplicate calls for the same user selection
+    const userIdsKey = userIds.sort().join(',');
+    if (loadingRef.current && lastLoadedUserIdsRef.current === userIdsKey) {
+      return;
+    }
+    
+    loadingRef.current = true;
+    lastLoadedUserIdsRef.current = userIdsKey;
     setLoading(true);
     setLoadingProgress('Loading...');
     
-    // Use setTimeout to allow UI to update before heavy processing
-    await new Promise(resolve => setTimeout(resolve, 0));
-    
     try {
-      const userIdsToQuery = selectedUserIds;
-      
       // Check if we're online before attempting network fetch
       if (navigator.onLine) {
         try {
-          console.log('🔄 Fetching retailers from database for users:', userIdsToQuery.length);
+          console.log('🔄 Fetching retailers from database for users:', userIds.length);
           
-          // Paginated fetch - load in batches
+          // Fetch all data in one go for better UX (avoid partial updates)
           let allRetailers: any[] = [];
           let page = 0;
           let hasMore = true;
@@ -199,12 +210,12 @@ export const MyRetailers = () => {
             const from = page * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
             
-            setLoadingProgress(`Loading retailers ${from + 1} - ${to + 1}...`);
+            setLoadingProgress(`Loading retailers ${from + 1}+...`);
             
             const { data, error } = await supabase
               .from("retailers")
               .select("*")
-              .in("user_id", userIdsToQuery)
+              .in("user_id", userIds)
               .order("name")
               .range(from, to);
               
@@ -212,23 +223,8 @@ export const MyRetailers = () => {
             
             if (data && data.length > 0) {
               allRetailers = [...allRetailers, ...data];
-              
-              // Update UI with current batch for immediate feedback
-              if (page === 0) {
-                const withOwners = allRetailers.map(r => ({
-                  ...r,
-                  owner_name: userNameMap[r.user_id] || 'Unknown'
-                }));
-                setRetailers(withOwners);
-                setLoading(false); // Stop loading spinner after first batch
-              }
-              
-              // Check if there are more pages
               hasMore = data.length === PAGE_SIZE;
               page++;
-              
-              // Yield to UI between batches
-              await new Promise(resolve => setTimeout(resolve, 10));
             } else {
               hasMore = false;
             }
@@ -236,32 +232,30 @@ export const MyRetailers = () => {
           
           console.log('✅ Fetched total retailers:', allRetailers.length);
           
-          if (allRetailers.length > 0) {
-            // Final update with all data
-            setLoadingProgress('Processing...');
-            await new Promise(resolve => setTimeout(resolve, 0));
-            
-            const withOwners = allRetailers.map(r => ({
-              ...r,
-              owner_name: userNameMap[r.user_id] || 'Unknown'
-            }));
-            
-            const sorted = [...withOwners].sort((a, b) => a.name.localeCompare(b.name));
-            setRetailers(sorted);
-            
-            // Build index in background
-            await new Promise(resolve => setTimeout(resolve, 0));
-            buildRetailerIndex(sorted);
-            
-            // Update cache in background (don't await)
-            offlineStorage.mergeData(STORES.RETAILERS, allRetailers as any).catch(console.error);
-          } else {
-            setRetailers([]);
-            buildRetailerIndex([]);
-          }
+          // Process and set all data at once (prevents flickering)
+          setLoadingProgress('Processing...');
+          await new Promise(resolve => setTimeout(resolve, 0));
+          
+          const withOwners = allRetailers.map(r => ({
+            ...r,
+            owner_name: userNameMap[r.user_id] || 'Unknown'
+          }));
+          
+          const sorted = [...withOwners].sort((a, b) => a.name.localeCompare(b.name));
+          
+          // Set data in one atomic update
+          setRetailers(sorted);
+          
+          // Build index after data is set
+          buildRetailerIndex(sorted);
+          
+          // Update cache in background (don't await)
+          offlineStorage.mergeData(STORES.RETAILERS, allRetailers as any).catch(console.error);
           
           setLoadingProgress('');
           setLoading(false);
+          setInitialLoadComplete(true);
+          loadingRef.current = false;
           return;
         } catch (networkError: any) {
           console.log('Network fetch failed, falling back to cache:', networkError.message);
@@ -270,28 +264,24 @@ export const MyRetailers = () => {
       
       // Fallback to cache if offline or network failed
       setLoadingProgress('Loading from cache...');
-      console.log('📦 Loading retailers from cache for users:', userIdsToQuery.length);
+      console.log('📦 Loading retailers from cache for users:', userIds.length);
       let cachedRetailers: any[] = await offlineStorage.getAll(STORES.RETAILERS);
       
       // Filter cache by selected user IDs
-      cachedRetailers = cachedRetailers.filter((r: any) => userIdsToQuery.includes(r.user_id));
+      cachedRetailers = cachedRetailers.filter((r: any) => userIds.includes(r.user_id));
       
       if (cachedRetailers.length > 0) {
         console.log('✅ Displaying cached retailers:', cachedRetailers.length);
-        await new Promise(resolve => setTimeout(resolve, 0));
         
         const withOwners = cachedRetailers.map(r => ({
           ...r,
           owner_name: userNameMap[r.user_id] || 'Unknown'
         }));
         const sorted = withOwners.sort((a, b) => a.name.localeCompare(b.name));
-        setRetailers(sorted);
         
-        await new Promise(resolve => setTimeout(resolve, 0));
+        // Set data in one atomic update
+        setRetailers(sorted);
         buildRetailerIndex(sorted);
-      } else {
-        setRetailers([]);
-        buildRetailerIndex([]);
       }
       
       setLoadingProgress('');
@@ -300,9 +290,15 @@ export const MyRetailers = () => {
       setLoadingProgress('');
     } finally {
       setLoading(false);
-      setInitialLoadComplete(true); // Mark initial load as complete
+      setInitialLoadComplete(true);
+      loadingRef.current = false;
     }
-  }, [user, selectedUserIds, userNameMap]);
+  }, [user, userNameMap]);
+  
+  // Wrapper function that uses current selectedUserIds - for use in callbacks
+  const refreshRetailers = useCallback(() => {
+    loadRetailers(selectedUserIds);
+  }, [loadRetailers, selectedUserIds]);
 
   // Debounce the loadRetailers call to prevent rapid firing
   const loadRetailersTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -314,26 +310,31 @@ export const MyRetailers = () => {
     }
     
     if (user && selectedUserIds.length > 0) {
-      // Set loading state immediately for user feedback
-      setLoading(true);
+      // Only show loading if we don't have data yet (prevents flicker on user change)
+      if (retailers.length === 0) {
+        setLoading(true);
+      }
       
-      // Debounce the actual data load by 150ms to prevent rapid firing
+      // Debounce the actual data load by 100ms to prevent rapid firing
       loadRetailersTimeoutRef.current = setTimeout(() => {
-        loadRetailers();
-      }, 150);
-    } else if (user && selectedUserIds.length === 0) {
-      setRetailers([]);
-      setLoading(false);
+        loadRetailers(selectedUserIds);
+      }, 100);
     }
     
-    // Cleanup on unmount
+    // Cleanup on unmount only
     return () => {
       if (loadRetailersTimeoutRef.current) {
         clearTimeout(loadRetailersTimeoutRef.current);
       }
-      clearRetailerIndex();
     };
   }, [user, selectedUserIds, loadRetailers]);
+  
+  // Cleanup index only on unmount
+  useEffect(() => {
+    return () => {
+      clearRetailerIndex();
+    };
+  }, []);
 
   // Use index for fast filter dropdown values
   const categories = useMemo(() => {
@@ -462,7 +463,7 @@ export const MyRetailers = () => {
       toast({ title: "Assigned", description: `${selectedRetailer.name} → ${chosenBeat}` });
       setBeatDialogOpen(false);
       setSelectedRetailer(null);
-      loadRetailers();
+      refreshRetailers();
     }
   }; 
 
@@ -495,7 +496,7 @@ export const MyRetailers = () => {
       toast({ title: "Updated", description: "Retailer updated successfully." });
       setEditDialogOpen(false);
       setEditForm(null);
-      loadRetailers();
+      refreshRetailers();
     }
   };
 
@@ -548,7 +549,7 @@ export const MyRetailers = () => {
       toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Moved to Recycle Bin", description: `${retailer.name} can be restored from Recycle Bin.` });
-      loadRetailers();
+      refreshRetailers();
     }
   };
 
@@ -582,7 +583,7 @@ export const MyRetailers = () => {
     } else {
       toast({ title: "Moved to Recycle Bin", description: `${count} retailer${count > 1 ? 's' : ''} can be restored from Recycle Bin.` });
       setSelectedRetailerIds([]);
-      loadRetailers();
+      refreshRetailers();
     }
     setLoading(false);
   };
@@ -635,7 +636,7 @@ export const MyRetailers = () => {
     }
     
     // Refresh the list
-    await loadRetailers();
+    await refreshRetailers();
   };
 
   useEffect(() => {
@@ -1036,7 +1037,7 @@ export const MyRetailers = () => {
           retailers={retailers}
           beats={beats}
           onSuccess={() => {
-            loadRetailers();
+            refreshRetailers();
             setMassEditModalOpen(false);
           }}
         />
@@ -1047,7 +1048,7 @@ export const MyRetailers = () => {
           onClose={() => setDetailModalOpen(false)}
           retailer={selectedRetailerForDetail}
           onSuccess={() => {
-            loadRetailers();
+            refreshRetailers();
             setDetailModalOpen(false);
             setSelectedRetailerForDetail(null);
           }}
@@ -1057,7 +1058,7 @@ export const MyRetailers = () => {
         <BulkImportRetailersModal
           open={bulkImportModalOpen}
           onOpenChange={setBulkImportModalOpen}
-          onSuccess={loadRetailers}
+          onSuccess={refreshRetailers}
         />
 
         {/* Retailer Analytics Modal */}
