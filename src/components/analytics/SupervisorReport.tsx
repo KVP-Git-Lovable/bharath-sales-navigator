@@ -169,10 +169,11 @@ export const SupervisorReport = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch orders in the date range
+      // Fetch confirmed orders in the date range
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('user_id, total_amount')
+        .eq('status', 'confirmed')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
 
@@ -224,8 +225,8 @@ export const SupervisorReport = () => {
       ordersData.forEach((order) => {
         const userName = userNameMap[order.user_id] || 'Unknown';
         
-        // Filter by selected user if not "all"
-        if (selectedUser !== 'all' && !userName.toLowerCase().startsWith(selectedUser.toLowerCase())) {
+        // Filter by selected user if not "all" - use exact match
+        if (selectedUser !== 'all' && userName !== selectedUser) {
           return;
         }
         
