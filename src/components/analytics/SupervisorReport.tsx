@@ -75,32 +75,58 @@ export const SupervisorReport = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      let query = supabase
+      // Fetch orders in the date range
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          total_amount,
-          user_id,
-          profiles!inner(full_name)
-        `)
+        .select('user_id, total_amount')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
 
-      if (selectedUser !== 'all') {
-        query = query.ilike('profiles.full_name', `${selectedUser}%`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching supervisor report:', error);
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
         setSummaryData([]);
+        setLoading(false);
         return;
       }
 
+      if (!ordersData || ordersData.length === 0) {
+        setSummaryData([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get unique user IDs
+      const userIds = [...new Set(ordersData.map(o => o.user_id))];
+
+      // Fetch profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        setSummaryData([]);
+        setLoading(false);
+        return;
+      }
+
+      // Create a map of user_id to full_name
+      const userNameMap: Record<string, string> = {};
+      profilesData?.forEach(p => {
+        userNameMap[p.id] = p.full_name || 'Unknown';
+      });
+
       // Group by user and calculate totals
       const userTotals: Record<string, number> = {};
-      data?.forEach((order: any) => {
-        const userName = order.profiles?.full_name || 'Unknown';
+      ordersData.forEach((order) => {
+        const userName = userNameMap[order.user_id] || 'Unknown';
+        
+        // Filter by selected user if not "all"
+        if (selectedUser !== 'all' && !userName.toLowerCase().startsWith(selectedUser.toLowerCase())) {
+          return;
+        }
+        
         userTotals[userName] = (userTotals[userName] || 0) + Number(order.total_amount || 0);
       });
 
