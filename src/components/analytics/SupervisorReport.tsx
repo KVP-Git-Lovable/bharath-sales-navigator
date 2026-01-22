@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale } from 'lucide-react';
+import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -53,13 +53,10 @@ export const SupervisorReport = () => {
   } | null>(null);
   const [expandedBox, setExpandedBox] = useState<string | null>(null);
   const [retailersList, setRetailersList] = useState<{
-    id: string;
     name: string;
     created_date: string;
   }[]>([]);
   const [beatsList, setBeatsList] = useState<{
-    beat_uuid: string;
-    beat_id: string;
     beat_name: string;
     category: string | null;
     is_active: boolean;
@@ -451,9 +448,8 @@ export const SupervisorReport = () => {
 
     if (!error && retailers) {
       setRetailersList(retailers.map(r => ({
-        id: r.id,
         name: r.name,
-        created_date: format(new Date(r.created_at), 'yyyy-MM-dd')
+        created_date: format(new Date(r.created_at), 'MMMM dd, yyyy')
       })));
     }
   };
@@ -494,12 +490,10 @@ export const SupervisorReport = () => {
 
     if (!error && beats) {
       setBeatsList(beats.map(b => ({
-        beat_uuid: b.id,
-        beat_id: b.beat_id,
         beat_name: b.beat_name,
         category: b.category,
         is_active: b.is_active ?? true,
-        created_date: format(new Date(b.created_at), 'yyyy-MM-dd')
+        created_date: format(new Date(b.created_at), 'MMMM dd, yyyy')
       })));
     }
   };
@@ -753,12 +747,17 @@ export const SupervisorReport = () => {
                 {/* Retailers Subtable */}
                 {expandedBox === 'retailers' && retailersList.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="font-semibold mb-3 text-sm">Retailers Created ({retailersList.length})</h4>
-                    <div className="border rounded-lg overflow-hidden">
+                    <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
+                      Retailers Created ({retailersList.length})
+                      {retailersList.length > 8 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </h4>
+                    <div className={cn(
+                      "border rounded-lg overflow-hidden",
+                      retailersList.length > 8 && "max-h-[360px] overflow-y-auto"
+                    )}>
                       <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>Retailer ID</TableHead>
+                        <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                          <TableRow>
                             <TableHead>Name</TableHead>
                             <TableHead>Created Date</TableHead>
                           </TableRow>
@@ -766,7 +765,6 @@ export const SupervisorReport = () => {
                         <TableBody>
                           {retailersList.map((retailer, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
-                              <TableCell className="font-mono text-xs">{retailer.id.slice(0, 8)}...</TableCell>
                               <TableCell>{retailer.name}</TableCell>
                               <TableCell>{retailer.created_date}</TableCell>
                             </TableRow>
@@ -780,12 +778,17 @@ export const SupervisorReport = () => {
                 {/* Beats Subtable */}
                 {expandedBox === 'beats' && beatsList.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="font-semibold mb-3 text-sm">Beats Created ({beatsList.length})</h4>
-                    <div className="border rounded-lg overflow-hidden">
+                    <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
+                      Beats Created ({beatsList.length})
+                      {beatsList.length > 8 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </h4>
+                    <div className={cn(
+                      "border rounded-lg overflow-hidden",
+                      beatsList.length > 8 && "max-h-[360px] overflow-y-auto"
+                    )}>
                       <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>Beat ID</TableHead>
+                        <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                          <TableRow>
                             <TableHead>Beat Name</TableHead>
                             <TableHead>Category</TableHead>
                             <TableHead>Active</TableHead>
@@ -795,7 +798,6 @@ export const SupervisorReport = () => {
                         <TableBody>
                           {beatsList.map((beat, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
-                              <TableCell className="font-mono text-xs">{beat.beat_id}</TableCell>
                               <TableCell>{beat.beat_name}</TableCell>
                               <TableCell>{beat.category || '-'}</TableCell>
                               <TableCell>{beat.is_active ? 'Yes' : 'No'}</TableCell>
