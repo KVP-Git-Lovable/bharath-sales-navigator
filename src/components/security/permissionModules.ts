@@ -1,5 +1,280 @@
-// Shared Module → Feature structure for permissions
-export const PERMISSION_MODULES = [
+// Shared Module → Feature → Sub-feature structure for permissions
+
+export interface SubFeature {
+  name: string;
+  label: string;
+}
+
+export interface Feature {
+  name: string;
+  label: string;
+  subFeatures?: SubFeature[];
+}
+
+export interface PermissionModule {
+  name: string;
+  label: string;
+  features: Feature[];
+}
+
+export const PERMISSION_MODULES: PermissionModule[] = [
+  {
+    name: 'admin_panel',
+    label: 'Admin Panel',
+    features: [
+      {
+        name: 'admin_dashboard',
+        label: 'Admin Dashboard',
+        subFeatures: [
+          { name: 'admin_dashboard_overview', label: 'Dashboard Overview' },
+          { name: 'admin_user_list', label: 'User List' },
+          { name: 'admin_user_create', label: 'Create User' },
+          { name: 'admin_user_edit', label: 'Edit User' },
+          { name: 'admin_user_delete', label: 'Delete User' },
+          { name: 'admin_user_activate_deactivate', label: 'Activate / Deactivate User' },
+          { name: 'admin_user_reset_password', label: 'Reset User Password' },
+          { name: 'admin_user_hierarchy', label: 'User Hierarchy Management' },
+          { name: 'admin_approver_management', label: 'Approver Management' },
+          { name: 'admin_security_roles_display', label: 'Security Roles Display' },
+        ]
+      },
+      {
+        name: 'admin_price_book',
+        label: 'Price Book Management',
+        subFeatures: [
+          { name: 'admin_price_book_list', label: 'Price Book List' },
+          { name: 'admin_price_book_create', label: 'Create Price Book' },
+          { name: 'admin_price_book_edit', label: 'Edit Price Book' },
+          { name: 'admin_price_book_delete', label: 'Delete Price Book' },
+          { name: 'admin_price_book_assignment', label: 'Price Book Assignment' },
+        ]
+      },
+      {
+        name: 'admin_attendance_mgmt',
+        label: 'Attendance Management',
+        subFeatures: [
+          { name: 'admin_attendance_live_monitoring', label: 'Live Attendance Monitoring' },
+          { name: 'admin_attendance_leave_approvals', label: 'Leave Approvals' },
+          { name: 'admin_attendance_regularization_approvals', label: 'Regularization Approvals' },
+          { name: 'admin_attendance_holiday_management', label: 'Holiday Management' },
+          { name: 'admin_attendance_leave_balances', label: 'Leave Balances Manager' },
+          { name: 'admin_attendance_policy_config', label: 'Attendance Policy Configuration' },
+          { name: 'admin_attendance_working_days', label: 'Working Days Configuration' },
+        ]
+      },
+      {
+        name: 'admin_product_mgmt',
+        label: 'Product Management',
+        subFeatures: [
+          { name: 'admin_product_list', label: 'Product List' },
+          { name: 'admin_product_create', label: 'Create Product' },
+          { name: 'admin_product_edit', label: 'Edit Product' },
+          { name: 'admin_product_delete', label: 'Delete Product' },
+          { name: 'admin_product_categories', label: 'Product Categories' },
+          { name: 'admin_product_bulk_import', label: 'Product Bulk Import' },
+        ]
+      },
+      {
+        name: 'admin_scheme_master',
+        label: 'Scheme Master',
+        subFeatures: [
+          { name: 'admin_scheme_list', label: 'Scheme List' },
+          { name: 'admin_scheme_create', label: 'Create Scheme' },
+          { name: 'admin_scheme_edit', label: 'Edit Scheme' },
+          { name: 'admin_scheme_delete', label: 'Delete Scheme' },
+          { name: 'admin_scheme_applicability', label: 'Scheme Applicability' },
+          { name: 'admin_scheme_policy_config', label: 'Scheme Policy Configuration' },
+        ]
+      },
+      {
+        name: 'admin_vendor_mgmt',
+        label: 'Vendor Management',
+        subFeatures: [
+          { name: 'admin_vendor_list', label: 'Vendor List' },
+          { name: 'admin_vendor_create', label: 'Create Vendor' },
+          { name: 'admin_vendor_edit', label: 'Edit Vendor' },
+          { name: 'admin_vendor_approvals', label: 'Vendor Approvals' },
+        ]
+      },
+      {
+        name: 'admin_territories_distributors',
+        label: 'Territories & Distributors',
+        subFeatures: [
+          { name: 'admin_territory_management', label: 'Territory Management' },
+          { name: 'admin_distributor_assignment', label: 'Distributor Assignment' },
+          { name: 'admin_region_management', label: 'Region Management' },
+        ]
+      },
+      {
+        name: 'admin_expense_mgmt',
+        label: 'Expense Management',
+        subFeatures: [
+          { name: 'admin_expense_claims_list', label: 'Expense Claims List' },
+          { name: 'admin_expense_approvals', label: 'Expense Approvals' },
+          { name: 'admin_expense_analytics', label: 'Expense Analytics' },
+          { name: 'admin_expense_policy_config', label: 'Expense Policy Configuration' },
+        ]
+      },
+      {
+        name: 'admin_feedback_mgmt',
+        label: 'Feedback Management',
+        subFeatures: [
+          { name: 'admin_feedback_list', label: 'Feedback List' },
+          { name: 'admin_competition_insights', label: 'Competition Insights' },
+          { name: 'admin_branding_requests', label: 'Branding Requests' },
+        ]
+      },
+      {
+        name: 'admin_operations',
+        label: 'Operations',
+        subFeatures: [
+          { name: 'admin_operations_dashboard', label: 'Operations Dashboard' },
+          { name: 'admin_checkin_monitoring', label: 'Check-in Monitoring' },
+          { name: 'admin_order_monitoring', label: 'Order Monitoring' },
+          { name: 'admin_stock_monitoring', label: 'Stock Data Monitoring' },
+        ]
+      },
+      {
+        name: 'admin_gps_track_mgmt',
+        label: 'GPS Track Management',
+        subFeatures: [
+          { name: 'admin_gps_live_location', label: 'Live Location Monitoring' },
+          { name: 'admin_gps_journey_playback', label: 'Journey Playback' },
+          { name: 'admin_gps_team_tracking', label: 'Team Tracking' },
+        ]
+      },
+      {
+        name: 'admin_retail_mgmt',
+        label: 'Retail Management',
+        subFeatures: [
+          { name: 'admin_retailer_list', label: 'Retailer List' },
+          { name: 'admin_retailer_verification', label: 'Retailer Verification' },
+          { name: 'admin_retailer_photo_update', label: 'Retailer Photo Update' },
+          { name: 'admin_retailer_territory_assignment', label: 'Territory Assignment' },
+        ]
+      },
+      {
+        name: 'admin_van_sales',
+        label: 'Van Sales Management',
+        subFeatures: [
+          { name: 'admin_van_list', label: 'Van List' },
+          { name: 'admin_van_create', label: 'Create Van' },
+          { name: 'admin_van_edit', label: 'Edit Van' },
+          { name: 'admin_van_driver_assignment', label: 'Driver Assignment' },
+          { name: 'admin_van_stock_view', label: 'Van Stock View' },
+          { name: 'admin_van_opening_grn_edits', label: 'Opening GRN Edits' },
+        ]
+      },
+      {
+        name: 'admin_security_access',
+        label: 'Security & Access',
+        subFeatures: [
+          { name: 'admin_security_profiles', label: 'Security Profiles' },
+          { name: 'admin_profile_permissions', label: 'Profile Permissions' },
+          { name: 'admin_user_specific_permissions', label: 'User-Specific Permissions' },
+        ]
+      },
+      {
+        name: 'admin_feature_mgmt',
+        label: 'Feature Management',
+        subFeatures: [
+          { name: 'admin_feature_flags', label: 'Feature Flags Management' },
+          { name: 'admin_feature_toggle', label: 'Toggle Feature Status' },
+        ]
+      },
+      {
+        name: 'admin_gamification',
+        label: 'Gamification',
+        subFeatures: [
+          { name: 'admin_gamification_config', label: 'Gamification Configuration' },
+          { name: 'admin_badges_management', label: 'Badges Management' },
+          { name: 'admin_rewards_management', label: 'Rewards Management' },
+          { name: 'admin_redemption_management', label: 'Redemption Management' },
+        ]
+      },
+      {
+        name: 'admin_retailer_loyalty',
+        label: 'Retailer Loyalty',
+        subFeatures: [
+          { name: 'admin_loyalty_programs', label: 'Loyalty Programs' },
+          { name: 'admin_loyalty_points', label: 'Points Management' },
+          { name: 'admin_loyalty_redemptions', label: 'Loyalty Redemptions' },
+        ]
+      },
+      {
+        name: 'admin_company_profile',
+        label: 'Company Profile',
+        subFeatures: [
+          { name: 'admin_company_details', label: 'Company Details' },
+          { name: 'admin_bank_information', label: 'Bank Information' },
+          { name: 'admin_header_branding', label: 'Header Branding' },
+        ]
+      },
+      {
+        name: 'admin_invoice_mgmt',
+        label: 'Invoice Management',
+        subFeatures: [
+          { name: 'admin_invoice_list', label: 'Invoice List' },
+          { name: 'admin_invoice_create', label: 'Create Invoice' },
+          { name: 'admin_invoice_templates', label: 'Invoice Templates' },
+        ]
+      },
+      {
+        name: 'admin_credit_mgmt',
+        label: 'Credit Management',
+        subFeatures: [
+          { name: 'admin_credit_scoring_config', label: 'Credit Scoring Configuration' },
+          { name: 'admin_credit_limits', label: 'Credit Limits Management' },
+        ]
+      },
+      {
+        name: 'admin_notification_setup',
+        label: 'Notification Setup',
+        subFeatures: [
+          { name: 'admin_notification_templates', label: 'Notification Templates' },
+          { name: 'admin_notification_schedules', label: 'Notification Schedules' },
+        ]
+      },
+      {
+        name: 'admin_recycle_bin',
+        label: 'Recycle Bin',
+        subFeatures: [
+          { name: 'admin_recycle_bin_settings', label: 'Recycle Bin Settings' },
+          { name: 'admin_permanent_deletion_logs', label: 'Permanent Deletion Logs' },
+          { name: 'admin_restore_deleted_items', label: 'Restore Deleted Items' },
+        ]
+      },
+      {
+        name: 'admin_distributor_portal',
+        label: 'Distributor Portal Admin',
+        subFeatures: [
+          { name: 'admin_portal_users', label: 'Portal Users Management' },
+          { name: 'admin_portal_orders', label: 'Portal Orders' },
+          { name: 'admin_portal_inventory', label: 'Portal Inventory' },
+          { name: 'admin_portal_claims', label: 'Portal Claims' },
+          { name: 'admin_portal_support', label: 'Portal Support Requests' },
+          { name: 'admin_portal_ideas', label: 'Portal Ideas' },
+        ]
+      },
+      {
+        name: 'admin_target_vs_actual',
+        label: 'Target vs Actual',
+        subFeatures: [
+          { name: 'admin_target_setting', label: 'Target Setting' },
+          { name: 'admin_target_tracking', label: 'Target vs Actual Tracking' },
+        ]
+      },
+      {
+        name: 'admin_hierarchy_targets',
+        label: 'Hierarchy Targets',
+        subFeatures: [
+          { name: 'admin_hierarchy_target_setup', label: 'Hierarchy Target Setup' },
+          { name: 'admin_target_cascade', label: 'Target Cascade Down' },
+          { name: 'admin_allocation_methods', label: 'Allocation Methods' },
+        ]
+      },
+    ]
+  },
   {
     name: 'attendance',
     label: 'Attendance',
@@ -220,3 +495,34 @@ export const PERMISSION_FIELDS = [
 ] as const;
 
 export type PermissionField = typeof PERMISSION_FIELDS[number]['key'];
+
+// Helper to get all permission items (features or sub-features) for a module
+export const getAllPermissionItems = (module: PermissionModule): { name: string; label: string; parentLabel?: string }[] => {
+  const items: { name: string; label: string; parentLabel?: string }[] = [];
+  
+  module.features.forEach(feature => {
+    if (feature.subFeatures && feature.subFeatures.length > 0) {
+      // For features with sub-features, add the sub-features
+      feature.subFeatures.forEach(subFeature => {
+        items.push({
+          name: subFeature.name,
+          label: subFeature.label,
+          parentLabel: feature.label
+        });
+      });
+    } else {
+      // For features without sub-features, add the feature itself
+      items.push({
+        name: feature.name,
+        label: feature.label
+      });
+    }
+  });
+  
+  return items;
+};
+
+// Helper to count total features (including sub-features)
+export const getTotalFeatureCount = (module: PermissionModule): number => {
+  return getAllPermissionItems(module).length;
+};
