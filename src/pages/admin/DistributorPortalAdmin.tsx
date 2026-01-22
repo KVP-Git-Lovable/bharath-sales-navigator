@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ interface DashboardStats {
 
 const DistributorPortalAdmin = () => {
   const navigate = useNavigate();
-  const { userRole, loading: authLoading } = useAuth();
+  const { hasAdminAccess, loading: authLoading } = useAdminAccess();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<DashboardStats>({
     totalDistributors: 0,
@@ -58,12 +58,12 @@ const DistributorPortalAdmin = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (!authLoading && userRole !== 'admin') {
+    if (!authLoading && !hasAdminAccess) {
       navigate('/dashboard');
       return;
     }
     loadStats();
-  }, [authLoading, userRole, navigate]);
+  }, [authLoading, hasAdminAccess, navigate]);
 
   const loadStats = async () => {
     setLoading(true);

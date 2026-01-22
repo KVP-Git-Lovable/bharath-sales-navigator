@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,7 @@ interface ExpenseMasterConfig {
 }
 
 const AdminExpenseManagement = () => {
-  const { userRole, loading: authLoading } = useAuth();
+  const { hasAdminAccess, loading: authLoading } = useAdminAccess();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [config, setConfig] = useState<ExpenseMasterConfig | null>(null);
@@ -89,7 +89,7 @@ const AdminExpenseManagement = () => {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/" replace />;
   }
 
