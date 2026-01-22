@@ -9,22 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { User, Database, Save, Search, AlertCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { User, Save, Search, AlertCircle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-const OBJECTS = [
-  { name: 'retailers', label: 'Retailers' },
-  { name: 'orders', label: 'Orders' },
-  { name: 'visits', label: 'Visits' },
-  { name: 'products', label: 'Products' },
-  { name: 'territories', label: 'Territories' },
-  { name: 'attendance', label: 'Attendance' },
-  { name: 'expenses', label: 'Expenses' },
-  { name: 'beats', label: 'Beats' },
-  { name: 'distributors', label: 'Distributors' },
-  { name: 'invoices', label: 'Invoices' },
-];
+import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField } from './permissionModules';
 
 interface UserPermission {
   id: string;
@@ -50,6 +39,7 @@ export const UserObjectPermissions = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<UserPermission>>>({});
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   // Fetch users
   const { data: users } = useQuery({
@@ -162,36 +152,95 @@ export const UserObjectPermissions = () => {
     }
   });
 
-  const handlePermissionChange = (objectName: string, field: string, value: boolean) => {
+  const toggleModule = (moduleName: string) => {
+    const newExpanded = new Set(expandedModules);
+    if (newExpanded.has(moduleName)) {
+      newExpanded.delete(moduleName);
+    } else {
+      newExpanded.add(moduleName);
+    }
+    setExpandedModules(newExpanded);
+  };
+
+  const expandAll = () => {
+    setExpandedModules(new Set(PERMISSION_MODULES.map(m => m.name)));
+  };
+
+  const collapseAll = () => {
+    setExpandedModules(new Set());
+  };
+
+  const handlePermissionChange = (featureName: string, field: string, value: boolean) => {
     setPendingChanges(prev => ({
       ...prev,
-      [objectName]: {
-        ...prev[objectName],
+      [featureName]: {
+        ...prev[featureName],
         [field]: value
       }
     }));
   };
 
-  const getPermissionValue = (objectName: string, field: string): boolean => {
+  const getPermissionValue = (featureName: string, field: string): boolean => {
     // First check pending changes
-    if (pendingChanges[objectName]?.[field as keyof UserPermission] !== undefined) {
-      return pendingChanges[objectName][field as keyof UserPermission] as boolean;
+    if (pendingChanges[featureName]?.[field as keyof UserPermission] !== undefined) {
+      return pendingChanges[featureName][field as keyof UserPermission] as boolean;
     }
     // Then check user-specific permissions
-    const perm = permissions?.find(p => p.object_name === objectName);
+    const perm = permissions?.find(p => p.object_name === featureName);
     if (perm) {
       return perm[field as keyof UserPermission] as boolean || false;
     }
     return false;
   };
 
-  const getProfilePermissionValue = (objectName: string, field: string): boolean => {
-    const perm = profilePermissions?.find(p => p.object_name === objectName);
+  const getProfilePermissionValue = (featureName: string, field: string): boolean => {
+    const perm = profilePermissions?.find(p => p.object_name === featureName);
     return perm?.[field as keyof typeof perm] as boolean || false;
   };
 
-  const hasUserOverride = (objectName: string): boolean => {
-    return !!permissions?.find(p => p.object_name === objectName);
+  const hasUserOverride = (featureName: string): boolean => {
+    return !!permissions?.find(p => p.object_name === featureName) || !!pendingChanges[featureName];
+  };
+
+  // Column-level bulk selection helpers
+  const isColumnAllChecked = (moduleName: string, field: PermissionField): boolean => {
+    const module = PERMISSION_MODULES.find(m => m.name === moduleName);
+    if (!module) return false;
+    return module.features.every(feature => getPermissionValue(feature.name, field));
+  };
+
+  const isColumnIndeterminate = (moduleName: string, field: PermissionField): boolean => {
+    const module = PERMISSION_MODULES.find(m => m.name === moduleName);
+    if (!module) return false;
+    const checkedCount = module.features.filter(feature => getPermissionValue(feature.name, field)).length;
+    return checkedCount > 0 && checkedCount < module.features.length;
+  };
+
+  const handleColumnToggle = (moduleName: string, field: PermissionField, checked: boolean) => {
+    const module = PERMISSION_MODULES.find(m => m.name === moduleName);
+    if (!module) return;
+    
+    const newChanges = { ...pendingChanges };
+    module.features.forEach(feature => {
+      newChanges[feature.name] = {
+        ...newChanges[feature.name],
+        [field]: checked
+      };
+    });
+    setPendingChanges(newChanges);
+  };
+
+  const getModuleEnabledCount = (moduleName: string): number => {
+    const module = PERMISSION_MODULES.find(m => m.name === moduleName);
+    if (!module) return 0;
+    
+    let count = 0;
+    module.features.forEach(feature => {
+      PERMISSION_FIELDS.forEach(field => {
+        if (getPermissionValue(feature.name, field.key)) count++;
+      });
+    });
+    return count;
   };
 
   const handleSave = () => {
@@ -312,55 +361,116 @@ export const UserObjectPermissions = () => {
           </div>
         )}
 
-        {/* Permissions Grid */}
+        {/* Expand/Collapse Controls */}
         {selectedUserId && (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-[200px]">Object</TableHead>
-                  <TableHead className="text-center">Read</TableHead>
-                  <TableHead className="text-center">Create</TableHead>
-                  <TableHead className="text-center">Edit</TableHead>
-                  <TableHead className="text-center">Delete</TableHead>
-                  <TableHead className="text-center">View All</TableHead>
-                  <TableHead className="text-center">Modify All</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {OBJECTS.map((obj) => {
-                  const hasOverride = hasUserOverride(obj.name);
-                  return (
-                    <TableRow key={obj.name} className={hasOverride ? 'bg-primary/5' : ''}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Database className="h-4 w-4 text-primary" />
-                          {obj.label}
-                          {hasOverride && (
-                            <Badge variant="secondary" className="text-xs">Override</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      {['can_read', 'can_create', 'can_edit', 'can_delete', 'can_view_all', 'can_modify_all'].map((field) => (
-                        <TableCell key={field} className="text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <Checkbox
-                              checked={getPermissionValue(obj.name, field)}
-                              onCheckedChange={(checked) => 
-                                handlePermissionChange(obj.name, field, checked as boolean)
-                              }
-                            />
-                            {!hasOverride && getProfilePermissionValue(obj.name, field) && (
-                              <span className="text-[10px] text-muted-foreground">(profile)</span>
-                            )}
-                          </div>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={expandAll}>
+              <Layers className="h-4 w-4 mr-1" />
+              Expand All
+            </Button>
+            <Button variant="outline" size="sm" onClick={collapseAll}>
+              Collapse All
+            </Button>
+          </div>
+        )}
+
+        {/* Module-based Permissions Grid */}
+        {selectedUserId && (
+          <div className="space-y-3">
+            {PERMISSION_MODULES.map((module) => {
+              const isExpanded = expandedModules.has(module.name);
+              const enabledCount = getModuleEnabledCount(module.name);
+              
+              return (
+                <Collapsible 
+                  key={module.name} 
+                  open={isExpanded}
+                  onOpenChange={() => toggleModule(module.name)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        <span className="font-medium">{module.label}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {module.features.length} features
+                        </Badge>
+                      </div>
+                      {enabledCount > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {enabledCount} enabled
+                        </Badge>
+                      )}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="border rounded-lg mt-2 overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30">
+                            <TableHead className="w-[250px]">Feature</TableHead>
+                            {PERMISSION_FIELDS.map((field) => (
+                              <TableHead key={field.key} className="text-center w-[100px]">
+                                <div className="flex flex-col items-center gap-1">
+                                  <Checkbox
+                                    checked={isColumnAllChecked(module.name, field.key)}
+                                    ref={(el) => {
+                                      if (el) {
+                                        (el as any).indeterminate = isColumnIndeterminate(module.name, field.key);
+                                      }
+                                    }}
+                                    onCheckedChange={(checked) => 
+                                      handleColumnToggle(module.name, field.key, checked as boolean)
+                                    }
+                                  />
+                                  <span className="text-xs">{field.label}</span>
+                                </div>
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {module.features.map((feature) => {
+                            const hasOverride = hasUserOverride(feature.name);
+                            return (
+                              <TableRow key={feature.name} className={hasOverride ? 'bg-primary/5' : ''}>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    {feature.label}
+                                    {hasOverride && (
+                                      <Badge variant="secondary" className="text-xs">Override</Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                {PERMISSION_FIELDS.map((field) => (
+                                  <TableCell key={field.key} className="text-center">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <Checkbox
+                                        checked={getPermissionValue(feature.name, field.key)}
+                                        onCheckedChange={(checked) => 
+                                          handlePermissionChange(feature.name, field.key, checked as boolean)
+                                        }
+                                      />
+                                      {!hasOverride && getProfilePermissionValue(feature.name, field.key) && (
+                                        <span className="text-[10px] text-muted-foreground">(profile)</span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
         )}
 
