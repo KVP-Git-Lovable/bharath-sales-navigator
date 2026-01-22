@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Shield, Save, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount } from './permissionModules';
+import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAdminPanelPermissionItems, SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
 
 interface ObjectPermission {
   id: string;
@@ -96,7 +96,22 @@ export const ObjectPermissions = () => {
     }));
   };
 
+  // Check if selected profile is System Administrator
+  const isSystemAdministrator = profiles?.find(p => p.id === selectedProfileId)?.name === SYSTEM_ADMINISTRATOR_PROFILE;
+  
+  // Get Admin Panel permission items for auto-grant logic
+  const adminPanelItems = getAdminPanelPermissionItems();
+
   const getPermissionValue = (objectName: string, field: string): boolean => {
+    // For System Administrator, auto-grant all Admin Panel permissions
+    if (isSystemAdministrator && adminPanelItems.includes(objectName)) {
+      // Still allow pending changes to override (in case admin wants to explicitly toggle)
+      if (pendingChanges[objectName]?.[field] !== undefined) {
+        return pendingChanges[objectName][field] as boolean;
+      }
+      return true; // Auto-grant for System Administrator
+    }
+    
     if (pendingChanges[objectName]?.[field] !== undefined) {
       return pendingChanges[objectName][field] as boolean;
     }

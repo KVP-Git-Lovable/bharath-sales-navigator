@@ -526,3 +526,13 @@ export const getAllPermissionItems = (module: PermissionModule): { name: string;
 export const getTotalFeatureCount = (module: PermissionModule): number => {
   return getAllPermissionItems(module).length;
 };
+
+// Helper to get all Admin Panel permission item names
+export const getAdminPanelPermissionItems = (): string[] => {
+  const adminPanelModule = PERMISSION_MODULES.find(m => m.name === 'admin_panel');
+  if (!adminPanelModule) return [];
+  return getAllPermissionItems(adminPanelModule).map(item => item.name);
+};
+
+// Constant for System Administrator profile name
+export const SYSTEM_ADMINISTRATOR_PROFILE = 'System Administrator';
