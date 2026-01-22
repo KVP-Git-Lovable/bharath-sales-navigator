@@ -57,6 +57,14 @@ export const SupervisorReport = () => {
     name: string;
     created_date: string;
   }[]>([]);
+  const [beatsList, setBeatsList] = useState<{
+    beat_uuid: string;
+    beat_id: string;
+    beat_name: string;
+    category: string | null;
+    is_active: boolean;
+    created_date: string;
+  }[]>([]);
 
   // Fetch users on mount
   useEffect(() => {
@@ -159,6 +167,7 @@ export const SupervisorReport = () => {
     setSelectedUserDetails(userName);
     setExpandedBox(null);
     setRetailersList([]);
+    setBeatsList([]);
     
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -181,7 +190,7 @@ export const SupervisorReport = () => {
       const userId = userProfile.id;
 
       // Fetch all data in parallel using the user's SQL query logic
-      const [retailersResult, visitsResult, ordersResult, productRevenueResult] = await Promise.all([
+      const [retailersResult, beatsResult, ordersResult, productRevenueResult] = await Promise.all([
         // Retailers created by user in date range
         supabase
           .from('retailers')
@@ -190,13 +199,13 @@ export const SupervisorReport = () => {
           .gte('created_at', `${fromDate}T00:00:00`)
           .lte('created_at', `${toDate}T23:59:59`),
         
-        // Distinct beats visited (using visits table)
+        // Beats created by user (using beats.created_by)
         supabase
-          .from('visits')
-          .select('retailer_id')
-          .eq('user_id', userId)
-          .gte('planned_date', fromDate)
-          .lte('planned_date', toDate),
+          .from('beats')
+          .select('id', { count: 'exact' })
+          .eq('created_by', userId)
+          .gte('created_at', `${fromDate}T00:00:00`)
+          .lte('created_at', `${toDate}T23:59:59`),
         
         // Orders for this user (confirmed) - use order_date as per SQL query
         supabase
@@ -222,6 +231,9 @@ export const SupervisorReport = () => {
           end_date: toDate
         })
       ]);
+
+      // Get beats count from beats table
+      const totalBeatsCreated = beatsResult.count || 0;
 
       // Calculate products and total KG from the RPC result (same logic as SQL Report)
       const productData = productRevenueResult.data || [];
@@ -262,10 +274,6 @@ export const SupervisorReport = () => {
 
       // Calculate retailer count
       const totalRetailersCreated = retailersResult.count || 0;
-
-      // Calculate distinct beats visited
-      const distinctBeats = new Set(visitsResult.data?.map(v => v.retailer_id).filter(Boolean) || []);
-      const totalBeatsVisited = distinctBeats.size;
 
       // Process orders for products and KG
       const orders = ordersResult.data || [];
@@ -351,7 +359,7 @@ export const SupervisorReport = () => {
       setUserDetails(detailsArray);
       setDetailsSummary({
         retailers: totalRetailersCreated,
-        beats: totalBeatsVisited,
+        beats: totalBeatsCreated,
         products: totalProductsSold, // Use RPC result count
         totalKg: Math.round(totalQuantityKgFromRpc * 100) / 100 // Use RPC calculated KG, round to 2 decimals
       });
@@ -427,6 +435,52 @@ export const SupervisorReport = () => {
         id: r.id,
         name: r.name,
         created_date: format(new Date(r.created_at), 'yyyy-MM-dd')
+      })));
+    }
+  };
+
+  // Fetch beats list when clicking on Beats box
+  const handleBeatsBoxClick = async () => {
+    if (!selectedUserDetails) return;
+    
+    if (expandedBox === 'beats') {
+      setExpandedBox(null);
+      setBeatsList([]);
+      return;
+    }
+
+    setExpandedBox('beats');
+    
+    const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+    const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+    // Get user profile by name
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .ilike('full_name', `${selectedUserDetails}%`)
+      .limit(1)
+      .single();
+
+    if (!userProfile) return;
+
+    // Fetch beats created by user in date range
+    const { data: beats, error } = await supabase
+      .from('beats')
+      .select('id, beat_id, beat_name, category, is_active, created_at')
+      .eq('created_by', userProfile.id)
+      .gte('created_at', `${fromDate}T00:00:00`)
+      .lte('created_at', `${toDate}T23:59:59`)
+      .order('created_at', { ascending: true });
+
+    if (!error && beats) {
+      setBeatsList(beats.map(b => ({
+        beat_uuid: b.id,
+        beat_id: b.beat_id,
+        beat_name: b.beat_name,
+        category: b.category,
+        is_active: b.is_active ?? true,
+        created_date: format(new Date(b.created_at), 'yyyy-MM-dd')
       })));
     }
   };
@@ -647,7 +701,13 @@ export const SupervisorReport = () => {
                       </div>
                       <div className="text-2xl font-bold">{detailsSummary.retailers}</div>
                     </Card>
-                    <Card className="p-4">
+                    <Card 
+                      className={cn(
+                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        expandedBox === 'beats' && "ring-2 ring-primary"
+                      )}
+                      onClick={handleBeatsBoxClick}
+                    >
                       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                         <MapPin className="h-4 w-4" />
                         Beats
@@ -690,6 +750,37 @@ export const SupervisorReport = () => {
                               <TableCell className="font-mono text-xs">{retailer.id.slice(0, 8)}...</TableCell>
                               <TableCell>{retailer.name}</TableCell>
                               <TableCell>{retailer.created_date}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Beats Subtable */}
+                {expandedBox === 'beats' && beatsList.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3 text-sm">Beats Created ({beatsList.length})</h4>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead>Beat ID</TableHead>
+                            <TableHead>Beat Name</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Active</TableHead>
+                            <TableHead>Created Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {beatsList.map((beat, index) => (
+                            <TableRow key={index} className="hover:bg-muted/30">
+                              <TableCell className="font-mono text-xs">{beat.beat_id}</TableCell>
+                              <TableCell>{beat.beat_name}</TableCell>
+                              <TableCell>{beat.category || '-'}</TableCell>
+                              <TableCell>{beat.is_active ? 'Yes' : 'No'}</TableCell>
+                              <TableCell>{beat.created_date}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
