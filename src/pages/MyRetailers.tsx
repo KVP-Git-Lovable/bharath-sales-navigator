@@ -690,20 +690,18 @@ export const MyRetailers = () => {
     <Layout>
       <section className="container mx-auto p-4 space-y-4 animate-fade-in">
         <Card className="bg-gradient-primary text-primary-foreground">
-          <CardHeader className="pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CardTitle className="text-base sm:text-xl font-bold">My Retailers</CardTitle>
-                {initialLoadComplete && (
-                  <span className="bg-primary-foreground/20 text-primary-foreground text-xs sm:text-sm font-medium px-2 py-1 rounded-full">
-                    {retailers.length.toLocaleString()} {retailers.length === 1 ? 'retailer' : 'retailers'}
-                  </span>
-                )}
+          <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <CardTitle className="text-lg sm:text-xl font-bold whitespace-nowrap">My Retailers</CardTitle>
+                <span className="bg-primary-foreground/20 text-primary-foreground text-sm font-medium px-3 py-1 rounded-full whitespace-nowrap">
+                  {loading ? '...' : retailers.length.toLocaleString()} {retailers.length === 1 ? 'retailer' : 'retailers'}
+                </span>
               </div>
               <CompactMultiUserSelector
                 selectedUserIds={selectedUserIds}
                 onSelectionChange={setSelectedUserIds}
-                className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20"
+                className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 flex-shrink-0"
               />
             </div>
           </CardHeader>
