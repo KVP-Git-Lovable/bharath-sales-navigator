@@ -1341,58 +1341,6 @@ export const SupervisorReport = () => {
         </CardContent>
       </Card>
 
-      {/* AI Insights Section */}
-      {aiInsights.length > 0 && (
-        <Card className="shadow-lg bg-gradient-to-r from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200/50 dark:border-violet-800/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-base">AI Insights</CardTitle>
-                <p className="text-xs text-muted-foreground">Analysis based on user performance data</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {aiInsights.map((insight, index) => (
-                <div 
-                  key={index}
-                  className={cn(
-                    "p-3 rounded-lg border",
-                    insight.type === 'success' && "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
-                    insight.type === 'warning' && "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
-                    insight.type === 'opportunity' && "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
-                    insight.type === 'info' && "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800"
-                  )}
-                >
-                  <div className="flex items-start gap-2">
-                    <div className={cn(
-                      "p-1.5 rounded-md flex-shrink-0",
-                      insight.type === 'success' && "bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400",
-                      insight.type === 'warning' && "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400",
-                      insight.type === 'opportunity' && "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400",
-                      insight.type === 'info' && "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400"
-                    )}>
-                      {insight.type === 'success' && <TrendingUp className="h-3.5 w-3.5" />}
-                      {insight.type === 'warning' && <AlertTriangle className="h-3.5 w-3.5" />}
-                      {insight.type === 'opportunity' && <Target className="h-3.5 w-3.5" />}
-                      {insight.type === 'info' && <Users className="h-3.5 w-3.5" />}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-medium text-sm">{insight.title}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{insight.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* All Users Summary Section (when no specific user is selected) */}
       {!selectedUserDetails && allUsersSummary && summaryData.length > 0 && (
         <Card className="shadow-lg">
@@ -1773,6 +1721,58 @@ export const SupervisorReport = () => {
 
       {/* Revenue Summary by SKU Section */}
       <RevenueBySKUSection selectedUser={selectedUser} dateRange={dateRange} />
+
+      {/* AI Insights Section - Moved to bottom */}
+      {aiInsights.length > 0 && (
+        <Card className="shadow-lg bg-gradient-to-r from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200/50 dark:border-violet-800/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">AI Insights</CardTitle>
+                <p className="text-xs text-muted-foreground">Analysis based on user performance data</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {aiInsights.map((insight, index) => (
+                <div 
+                  key={index}
+                  className={cn(
+                    "p-3 rounded-lg border",
+                    insight.type === 'success' && "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
+                    insight.type === 'warning' && "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
+                    insight.type === 'opportunity' && "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
+                    insight.type === 'info' && "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800"
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className={cn(
+                      "p-1.5 rounded-md flex-shrink-0",
+                      insight.type === 'success' && "bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400",
+                      insight.type === 'warning' && "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400",
+                      insight.type === 'opportunity' && "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400",
+                      insight.type === 'info' && "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400"
+                    )}>
+                      {insight.type === 'success' && <TrendingUp className="h-3.5 w-3.5" />}
+                      {insight.type === 'warning' && <AlertTriangle className="h-3.5 w-3.5" />}
+                      {insight.type === 'opportunity' && <Target className="h-3.5 w-3.5" />}
+                      {insight.type === 'info' && <Users className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-sm">{insight.title}</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{insight.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
