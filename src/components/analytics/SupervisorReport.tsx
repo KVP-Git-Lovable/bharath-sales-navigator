@@ -64,9 +64,18 @@ export const SupervisorReport = () => {
   }[]>([]);
   const [productKgList, setProductKgList] = useState<{
     order_date: string;
+    raw_date: string; // Store raw date for querying
     quantity_kg: number;
     revenue: number;
   }[]>([]);
+  const [selectedProductDate, setSelectedProductDate] = useState<string | null>(null);
+  const [productDayDetails, setProductDayDetails] = useState<{
+    product_name: string;
+    quantity: number;
+    unit: string;
+    total: number;
+  }[]>([]);
+  const [productDayLoading, setProductDayLoading] = useState(false);
 
   // Fetch users on mount
   useEffect(() => {
@@ -597,6 +606,7 @@ export const SupervisorReport = () => {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, data]) => ({
         order_date: format(new Date(date), 'MMMM dd, yyyy'),
+        raw_date: date,
         quantity_kg: Math.round(data.quantity_kg * 100) / 100,
         revenue: data.revenue
       }));
@@ -604,11 +614,109 @@ export const SupervisorReport = () => {
     // Add TOTAL row
     resultArray.push({
       order_date: 'TOTAL',
+      raw_date: '',
       quantity_kg: Math.round(grandTotalKg * 100) / 100,
       revenue: grandTotalRevenue
     });
 
     setProductKgList(resultArray);
+    setSelectedProductDate(null);
+    setProductDayDetails([]);
+  };
+
+  // Fetch product-wise data for a specific date
+  const handleProductDateClick = async (rawDate: string, displayDate: string) => {
+    if (!selectedUserDetails || rawDate === '' || displayDate === 'TOTAL') return;
+    
+    if (selectedProductDate === displayDate) {
+      setSelectedProductDate(null);
+      setProductDayDetails([]);
+      return;
+    }
+
+    setSelectedProductDate(displayDate);
+    setProductDayLoading(true);
+
+    try {
+      // Get user profile by name
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('full_name', `${selectedUserDetails}%`)
+        .limit(1)
+        .single();
+
+      if (!userProfile) {
+        setProductDayDetails([]);
+        setProductDayLoading(false);
+        return;
+      }
+
+      // Fetch orders for that specific date
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', userProfile.id)
+        .eq('status', 'confirmed')
+        .gte('created_at', `${rawDate}T00:00:00`)
+        .lt('created_at', `${rawDate}T23:59:59.999`);
+
+      if (ordersError || !orders || orders.length === 0) {
+        setProductDayDetails([]);
+        setProductDayLoading(false);
+        return;
+      }
+
+      const orderIds = orders.map(o => o.id);
+
+      // Fetch order items with product details
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, unit, total, products(name)')
+        .in('order_id', orderIds);
+
+      if (itemsError || !orderItems) {
+        setProductDayDetails([]);
+        setProductDayLoading(false);
+        return;
+      }
+
+      // Group by product
+      const productGroups: Record<string, { 
+        product_name: string; 
+        quantity: number; 
+        unit: string; 
+        total: number;
+      }> = {};
+
+      orderItems.forEach((item: any) => {
+        const productName = item.products?.name || 'Unknown Product';
+        const unit = item.unit || 'KG';
+        const key = `${productName}-${unit}`;
+
+        if (!productGroups[key]) {
+          productGroups[key] = {
+            product_name: productName,
+            quantity: 0,
+            unit: unit,
+            total: 0
+          };
+        }
+
+        productGroups[key].quantity += Number(item.quantity || 0);
+        productGroups[key].total += Number(item.total || 0);
+      });
+
+      const productArray = Object.values(productGroups)
+        .sort((a, b) => b.total - a.total);
+
+      setProductDayDetails(productArray);
+    } catch (error) {
+      console.error('Error fetching product day details:', error);
+      setProductDayDetails([]);
+    } finally {
+      setProductDayLoading(false);
+    }
   };
 
   return (
@@ -936,7 +1044,7 @@ export const SupervisorReport = () => {
                   </div>
                 )}
 
-                {/* Products/KG Subtable */}
+                {/* Products/KG Subtable with Split View */}
                 {expandedBox === 'productsKg' && productKgList.length > 0 && (
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
@@ -944,35 +1052,111 @@ export const SupervisorReport = () => {
                       {productKgList.length > 9 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </h4>
                     <div className={cn(
-                      "border rounded-lg overflow-hidden",
-                      productKgList.length > 9 && "max-h-[360px] overflow-y-auto"
+                      "grid gap-4 transition-all duration-300",
+                      selectedProductDate ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
                     )}>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                          <TableRow>
-                            <TableHead>Order Date</TableHead>
-                            <TableHead className="text-right">Quantity (KG)</TableHead>
-                            <TableHead className="text-right">Revenue</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {productKgList.map((row, index) => (
-                            <TableRow 
-                              key={index} 
-                              className={cn(
-                                "hover:bg-muted/30",
-                                row.order_date === 'TOTAL' && "bg-muted/50 font-semibold"
-                              )}
-                            >
-                              <TableCell className={row.order_date === 'TOTAL' ? 'font-bold' : ''}>
-                                {row.order_date}
-                              </TableCell>
-                              <TableCell className="text-right">{row.quantity_kg.toFixed(2)}</TableCell>
-                              <TableCell className="text-right">₹{row.revenue.toLocaleString()}</TableCell>
+                      {/* Left: Daily Summary Table */}
+                      <div className={cn(
+                        "border rounded-lg overflow-hidden",
+                        productKgList.length > 9 && "max-h-[360px] overflow-y-auto"
+                      )}>
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                            <TableRow>
+                              <TableHead>Order Date</TableHead>
+                              <TableHead className="text-right">Quantity (KG)</TableHead>
+                              <TableHead className="text-right">Revenue</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {productKgList.map((row, index) => (
+                              <TableRow 
+                                key={index} 
+                                className={cn(
+                                  "transition-colors",
+                                  row.order_date !== 'TOTAL' && "cursor-pointer hover:bg-muted/30",
+                                  row.order_date === 'TOTAL' && "bg-muted/50 font-semibold",
+                                  selectedProductDate === row.order_date && "bg-primary/10 ring-1 ring-primary"
+                                )}
+                                onClick={() => handleProductDateClick(row.raw_date, row.order_date)}
+                              >
+                                <TableCell className={row.order_date === 'TOTAL' ? 'font-bold' : ''}>
+                                  {row.order_date}
+                                </TableCell>
+                                <TableCell className="text-right">{row.quantity_kg.toFixed(2)}</TableCell>
+                                <TableCell className="text-right">₹{row.revenue.toLocaleString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Right: Product-wise breakdown for selected date */}
+                      {selectedProductDate && (
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-primary/10 px-4 py-2 border-b flex items-center justify-between">
+                            <h5 className="font-semibold text-sm">
+                              Products on {selectedProductDate}
+                            </h5>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => {
+                                setSelectedProductDate(null);
+                                setProductDayDetails([]);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {productDayLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                              <RefreshCw className="animate-spin h-5 w-5 text-muted-foreground" />
+                            </div>
+                          ) : productDayDetails.length > 0 ? (
+                            <div className={cn(
+                              productDayDetails.length > 8 && "max-h-[320px] overflow-y-auto"
+                            )}>
+                              <Table>
+                                <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                                  <TableRow>
+                                    <TableHead>Product</TableHead>
+                                    <TableHead className="text-right">Qty</TableHead>
+                                    <TableHead className="text-right">Revenue</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {productDayDetails.map((product, index) => (
+                                    <TableRow key={index} className="hover:bg-muted/30">
+                                      <TableCell className="max-w-[150px] truncate" title={product.product_name}>
+                                        {product.product_name}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {product.quantity} {product.unit}
+                                      </TableCell>
+                                      <TableCell className="text-right">₹{product.total.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                                <tfoot className="bg-muted/30">
+                                  <TableRow>
+                                    <TableCell className="font-semibold">Total</TableCell>
+                                    <TableCell />
+                                    <TableCell className="text-right font-bold text-primary">
+                                      ₹{productDayDetails.reduce((sum, p) => sum + p.total, 0).toLocaleString()}
+                                    </TableCell>
+                                  </TableRow>
+                                </tfoot>
+                              </Table>
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-muted-foreground text-sm">
+                              No product data found
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
