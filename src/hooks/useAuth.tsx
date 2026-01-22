@@ -13,6 +13,7 @@ interface AuthContextType {
   session: Session | null;
   userRole: 'admin' | 'user' | null;
   userProfile: UserProfile | null;
+  securityProfileName: string | null;
   loading: boolean;
   mustChangePassword: boolean;
   onPasswordChanged: () => void;
@@ -57,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [securityProfileName, setSecurityProfileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
@@ -80,6 +82,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return data?.role || null;
     } catch (error) {
       devError('Error in fetchUserRole:', error);
+      return null;
+    }
+  };
+
+  const fetchSecurityProfileName = async (userId: string): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('profile_id, security_profiles(name)')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        devError('Error fetching security profile:', error);
+        return null;
+      }
+
+      // Extract the profile name from the nested response
+      const profileName = (data?.security_profiles as any)?.name || null;
+      return profileName;
+    } catch (error) {
+      devError('Error in fetchSecurityProfileName:', error);
       return null;
     }
   };
@@ -134,11 +158,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const cachedUser = localStorage.getItem('cached_user');
         const cachedRole = localStorage.getItem('cached_role');
         const cachedProfile = localStorage.getItem('cached_profile');
+        const cachedSecurityProfile = localStorage.getItem('cached_security_profile');
         
         if (cachedUser) {
           setUser(JSON.parse(cachedUser));
           setUserRole(cachedRole as 'admin' | 'user' | null);
           setUserProfile(cachedProfile ? JSON.parse(cachedProfile) : null);
+          setSecurityProfileName(cachedSecurityProfile || null);
         }
       } catch (error) {
         devError('Error loading cached auth:', error);
@@ -181,6 +207,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const profile = await fetchUserProfile(session.user.id);
               setUserProfile(profile);
               if (profile) localStorage.setItem('cached_profile', JSON.stringify(profile));
+              
+              const secProfile = await fetchSecurityProfileName(session.user.id);
+              setSecurityProfileName(secProfile);
+              if (secProfile) localStorage.setItem('cached_security_profile', secProfile);
             } catch (err) {
               devError('Error loading user data in auth change:', err);
               // Set basic profile from user metadata as fallback
@@ -196,6 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setUserRole(null);
           setUserProfile(null);
+          setSecurityProfileName(null);
         }
         
         clearTimeout(loadingTimeout);
@@ -221,6 +252,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const profile = await fetchUserProfile(session.user.id);
           setUserProfile(profile);
           if (profile) localStorage.setItem('cached_profile', JSON.stringify(profile));
+          
+          const secProfile = await fetchSecurityProfileName(session.user.id);
+          setSecurityProfileName(secProfile);
+          if (secProfile) localStorage.setItem('cached_security_profile', secProfile);
           
           // Check if user must change password
           const { data: profileData } = await supabase
@@ -379,6 +414,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     setUserRole(null);
     setUserProfile(null);
+    setSecurityProfileName(null);
     
     // Clear all auth-related storage with integrity cleanup
     clearCachedAuth();
@@ -435,6 +471,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       session,
       userRole,
       userProfile,
+      securityProfileName,
       loading,
       mustChangePassword,
       onPasswordChanged,
