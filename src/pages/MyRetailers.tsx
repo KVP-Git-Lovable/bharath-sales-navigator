@@ -75,6 +75,7 @@ export const MyRetailers = () => {
   // Track if initial data load is complete (prevents flickering)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isUserChanging, setIsUserChanging] = useState(false); // Track user selection changes
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   
   // Ref to prevent duplicate API calls
@@ -254,6 +255,7 @@ export const MyRetailers = () => {
           
           setLoadingProgress('');
           setLoading(false);
+          setIsUserChanging(false);
           setInitialLoadComplete(true);
           loadingRef.current = false;
           return;
@@ -290,6 +292,7 @@ export const MyRetailers = () => {
       setLoadingProgress('');
     } finally {
       setLoading(false);
+      setIsUserChanging(false);
       setInitialLoadComplete(true);
       loadingRef.current = false;
     }
@@ -303,6 +306,9 @@ export const MyRetailers = () => {
   // Debounce the loadRetailers call to prevent rapid firing
   const loadRetailersTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Track previous user IDs to detect user changes
+  const prevUserIdsRef = useRef<string>('');
+  
   useEffect(() => {
     // Clear any pending timeout
     if (loadRetailersTimeoutRef.current) {
@@ -310,10 +316,18 @@ export const MyRetailers = () => {
     }
     
     if (user && selectedUserIds.length > 0) {
-      // Only show loading if we don't have data yet (prevents flicker on user change)
-      if (retailers.length === 0) {
+      const currentUserIdsKey = selectedUserIds.sort().join(',');
+      const isChangingUsers = prevUserIdsRef.current !== '' && prevUserIdsRef.current !== currentUserIdsKey;
+      
+      if (isChangingUsers) {
+        // Mark that we're changing users - this prevents flicker
+        setIsUserChanging(true);
+      } else if (retailers.length === 0 && !initialLoadComplete) {
+        // Only show loading for initial load when no data
         setLoading(true);
       }
+      
+      prevUserIdsRef.current = currentUserIdsKey;
       
       // Debounce the actual data load by 100ms to prevent rapid firing
       loadRetailersTimeoutRef.current = setTimeout(() => {
@@ -327,7 +341,7 @@ export const MyRetailers = () => {
         clearTimeout(loadRetailersTimeoutRef.current);
       }
     };
-  }, [user, selectedUserIds, loadRetailers]);
+  }, [user, selectedUserIds, loadRetailers, initialLoadComplete]);
   
   // Cleanup index only on unmount
   useEffect(() => {
@@ -869,8 +883,28 @@ export const MyRetailers = () => {
                 </Card>
               ))}
               {paginatedRetailers.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  {loading ? (loadingProgress || 'Loading...') : 'No retailers found'}
+                <div className="text-center py-12">
+                  {loading || isUserChanging ? (
+                    <div className="space-y-2">
+                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+                      <p className="text-muted-foreground">{loadingProgress || 'Loading...'}</p>
+                    </div>
+                  ) : retailers.length === 0 ? (
+                    <div className="space-y-3">
+                      <Users className="h-12 w-12 text-muted-foreground mx-auto opacity-50" />
+                      <p className="text-muted-foreground font-medium">No data available for this user</p>
+                      <p className="text-sm text-muted-foreground">This user has no retailers assigned yet.</p>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => navigate('/add-retailer', { state: { returnTo: '/my-retailers' } })}
+                        className="mt-2"
+                      >
+                        <Plus className="mr-2 h-4 w-4" /> Add Retailer
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No retailers match your filters</p>
+                  )}
                 </div>
               )}
               
@@ -1001,8 +1035,28 @@ export const MyRetailers = () => {
                   })}
                   {paginatedRetailers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={selectedUserIds.length > 1 ? 7 : 6} className="text-center text-muted-foreground">
-                        {loading ? (loadingProgress || 'Loading...') : 'No retailers found'}
+                      <TableCell colSpan={selectedUserIds.length > 1 ? 7 : 6} className="text-center py-12">
+                        {loading || isUserChanging ? (
+                          <div className="space-y-2">
+                            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+                            <p className="text-muted-foreground">{loadingProgress || 'Loading...'}</p>
+                          </div>
+                        ) : retailers.length === 0 ? (
+                          <div className="space-y-3">
+                            <Users className="h-12 w-12 text-muted-foreground mx-auto opacity-50" />
+                            <p className="text-muted-foreground font-medium">No data available for this user</p>
+                            <p className="text-sm text-muted-foreground">This user has no retailers assigned yet.</p>
+                            <Button 
+                              variant="outline" 
+                              onClick={() => navigate('/add-retailer', { state: { returnTo: '/my-retailers' } })}
+                              className="mt-2"
+                            >
+                              <Plus className="mr-2 h-4 w-4" /> Add Retailer
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground">No retailers match your filters</p>
+                        )}
                       </TableCell>
                     </TableRow>
                   )}
