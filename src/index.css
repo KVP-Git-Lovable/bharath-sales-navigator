@@ -236,6 +236,15 @@
     top: var(--sat);
     left: 0;
     right: 0;
+    z-index: 50;
+  }
+
+  /* Main content area - ensure it scrolls under fixed navbar */
+  .safe-area-main {
+    position: relative;
+    z-index: 1;
+    padding-bottom: calc(5rem + var(--sab));
+    min-height: 0;
   }
 
   /* Navbar spacer to prevent content from going under navbar */
@@ -274,11 +283,6 @@
     z-index: 9999;
   }
 
-  /* Main content area with proper padding */
-  .safe-area-main {
-    padding-bottom: calc(5rem + var(--sab));
-    min-height: 0;
-  }
 
   /* Safe area container for full app */
   .safe-area-container {
