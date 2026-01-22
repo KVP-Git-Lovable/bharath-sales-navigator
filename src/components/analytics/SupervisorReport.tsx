@@ -51,6 +51,12 @@ export const SupervisorReport = () => {
     products: number;
     totalKg: number;
   } | null>(null);
+  const [expandedBox, setExpandedBox] = useState<string | null>(null);
+  const [retailersList, setRetailersList] = useState<{
+    id: string;
+    name: string;
+    created_date: string;
+  }[]>([]);
 
   // Fetch users on mount
   useEffect(() => {
@@ -151,6 +157,8 @@ export const SupervisorReport = () => {
   const fetchUserDetails = async (userName: string) => {
     setDetailsLoading(true);
     setSelectedUserDetails(userName);
+    setExpandedBox(null);
+    setRetailersList([]);
     
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -380,6 +388,48 @@ export const SupervisorReport = () => {
     fetchUserDetails(userName);
   };
 
+  // Fetch retailers list when clicking on Retailers box
+  const handleRetailersBoxClick = async () => {
+    if (!selectedUserDetails) return;
+    
+    if (expandedBox === 'retailers') {
+      setExpandedBox(null);
+      setRetailersList([]);
+      return;
+    }
+
+    setExpandedBox('retailers');
+    
+    const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+    const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+    // Get user profile by name
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .ilike('full_name', `${selectedUserDetails}%`)
+      .limit(1)
+      .single();
+
+    if (!userProfile) return;
+
+    // Fetch retailers created by user in date range
+    const { data: retailers, error } = await supabase
+      .from('retailers')
+      .select('id, name, created_at')
+      .eq('user_id', userProfile.id)
+      .gte('created_at', `${fromDate}T00:00:00`)
+      .lte('created_at', `${toDate}T23:59:59`)
+      .order('created_at', { ascending: true });
+
+    if (!error && retailers) {
+      setRetailersList(retailers.map(r => ({
+        id: r.id,
+        name: r.name,
+        created_date: format(new Date(r.created_at), 'yyyy-MM-dd')
+      })));
+    }
+  };
   return (
     <div className="space-y-4">
       <Card className="shadow-lg">
@@ -584,7 +634,13 @@ export const SupervisorReport = () => {
                 {/* Summary Cards */}
                 {detailsSummary && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <Card className="p-4">
+                    <Card 
+                      className={cn(
+                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        expandedBox === 'retailers' && "ring-2 ring-primary"
+                      )}
+                      onClick={handleRetailersBoxClick}
+                    >
                       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                         <Store className="h-4 w-4" />
                         Retailers
@@ -612,6 +668,33 @@ export const SupervisorReport = () => {
                       </div>
                       <div className="text-2xl font-bold">{detailsSummary.totalKg.toFixed(1)}</div>
                     </Card>
+                  </div>
+                )}
+
+                {/* Retailers Subtable */}
+                {expandedBox === 'retailers' && retailersList.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3 text-sm">Retailers Created ({retailersList.length})</h4>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead>Retailer ID</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Created Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {retailersList.map((retailer, index) => (
+                            <TableRow key={index} className="hover:bg-muted/30">
+                              <TableCell className="font-mono text-xs">{retailer.id.slice(0, 8)}...</TableCell>
+                              <TableCell>{retailer.name}</TableCell>
+                              <TableCell>{retailer.created_date}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
 
