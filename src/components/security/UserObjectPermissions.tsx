@@ -13,7 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { User, Save, Search, AlertCircle, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount } from './permissionModules';
+import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAdminPanelPermissionItems, SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
 
 interface UserPermission {
   id: string;
@@ -81,11 +81,11 @@ export const UserObjectPermissions = () => {
     enabled: !!selectedUserId
   });
 
-  // Fetch user's profile permissions (inherited from profile)
-  const { data: profilePermissions } = useQuery({
-    queryKey: ['user-profile-permissions', selectedUserId],
+  // Fetch user's profile permissions (inherited from profile) and profile name
+  const { data: userProfileData } = useQuery({
+    queryKey: ['user-profile-data', selectedUserId],
     queryFn: async () => {
-      if (!selectedUserId) return [];
+      if (!selectedUserId) return null;
       
       // First get the user's profile_id
       const { data: userProfile } = await supabase
@@ -94,19 +94,33 @@ export const UserObjectPermissions = () => {
         .eq('user_id', selectedUserId)
         .single();
       
-      if (!userProfile?.profile_id) return [];
+      if (!userProfile?.profile_id) return null;
+      
+      // Get the profile name
+      const { data: profile } = await supabase
+        .from('security_profiles')
+        .select('id, name')
+        .eq('id', userProfile.profile_id)
+        .single();
       
       // Then get the profile permissions
-      const { data, error } = await supabase
+      const { data: permissions, error } = await supabase
         .from('profile_object_permissions')
         .select('*')
         .eq('profile_id', userProfile.profile_id);
       
       if (error) throw error;
-      return data;
+      return { 
+        profileName: profile?.name || null, 
+        permissions: permissions || [] 
+      };
     },
     enabled: !!selectedUserId
   });
+
+  const profilePermissions = userProfileData?.permissions || [];
+  const isUserSystemAdministrator = userProfileData?.profileName === SYSTEM_ADMINISTRATOR_PROFILE;
+  const adminPanelItems = getAdminPanelPermissionItems();
 
   // Save mutations
   const saveMutation = useMutation({
@@ -205,6 +219,20 @@ export const UserObjectPermissions = () => {
   };
 
   const getPermissionValue = (featureName: string, field: string): boolean => {
+    // For System Administrator profile, auto-grant all Admin Panel permissions
+    if (isUserSystemAdministrator && adminPanelItems.includes(featureName)) {
+      // Still allow pending changes to override
+      if (pendingChanges[featureName]?.[field as keyof UserPermission] !== undefined) {
+        return pendingChanges[featureName][field as keyof UserPermission] as boolean;
+      }
+      // Check user-specific override
+      const perm = permissions?.find(p => p.object_name === featureName);
+      if (perm) {
+        return perm[field as keyof UserPermission] as boolean || false;
+      }
+      return true; // Auto-grant for System Administrator
+    }
+    
     // First check pending changes
     if (pendingChanges[featureName]?.[field as keyof UserPermission] !== undefined) {
       return pendingChanges[featureName][field as keyof UserPermission] as boolean;
@@ -218,6 +246,10 @@ export const UserObjectPermissions = () => {
   };
 
   const getProfilePermissionValue = (featureName: string, field: string): boolean => {
+    // For System Administrator profile, auto-grant all Admin Panel permissions
+    if (isUserSystemAdministrator && adminPanelItems.includes(featureName)) {
+      return true;
+    }
     const perm = profilePermissions?.find(p => p.object_name === featureName);
     return perm?.[field as keyof typeof perm] as boolean || false;
   };
