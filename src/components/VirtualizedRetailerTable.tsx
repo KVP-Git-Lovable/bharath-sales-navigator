@@ -16,6 +16,7 @@ interface Retailer {
   priority?: string | null;
   status?: string | null;
   created_at?: string;
+  owner_name?: string;
   [key: string]: any;
 }
 
@@ -29,6 +30,7 @@ interface VirtualizedRetailerTableProps {
   loading?: boolean;
   rowHeight?: number;
   visibleRows?: number;
+  showOwnerColumn?: boolean;
 }
 
 export const VirtualizedRetailerTable: React.FC<VirtualizedRetailerTableProps> = ({
@@ -41,6 +43,7 @@ export const VirtualizedRetailerTable: React.FC<VirtualizedRetailerTableProps> =
   loading = false,
   rowHeight = 56,
   visibleRows = 15,
+  showOwnerColumn = false,
 }) => {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +130,7 @@ export const VirtualizedRetailerTable: React.FC<VirtualizedRetailerTableProps> =
               />
             </TableHead>
             <TableHead>Name</TableHead>
+            {showOwnerColumn && <TableHead>Owner</TableHead>}
             <TableHead>Phone Number</TableHead>
             <TableHead>Address</TableHead>
             <TableHead>Beat</TableHead>
@@ -172,6 +176,11 @@ export const VirtualizedRetailerTable: React.FC<VirtualizedRetailerTableProps> =
                         )}
                       </div>
                     </TableCell>
+                    {showOwnerColumn && (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.owner_name || '-'}
+                      </TableCell>
+                    )}
                     <TableCell>
                       {r.phone ? (
                         <a 
