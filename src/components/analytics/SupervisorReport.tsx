@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface UserOrderSummary {
   full_name: string;
@@ -76,6 +77,63 @@ export const SupervisorReport = () => {
     total: number;
   }[]>([]);
   const [productDayLoading, setProductDayLoading] = useState(false);
+  const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
+
+  // Generate AI insights based on the summary data
+  const aiInsights = useMemo(() => {
+    if (summaryData.length === 0) return [];
+
+    const insights: { type: 'success' | 'warning' | 'opportunity' | 'info'; title: string; description: string }[] = [];
+    const totalValue = summaryData.reduce((sum, item) => sum + item.total_order_value, 0);
+    const avgValue = totalValue / summaryData.length;
+    
+    // Find top performer
+    const topPerformer = summaryData[0];
+    if (topPerformer && summaryData.length > 1) {
+      const topShare = (topPerformer.total_order_value / totalValue) * 100;
+      insights.push({
+        type: 'success',
+        title: 'Top Performer',
+        description: `${topPerformer.full_name} leads with ₹${topPerformer.total_order_value.toLocaleString()} (${topShare.toFixed(1)}% of total)`
+      });
+    }
+
+    // Find underperformers (below 50% of average)
+    const underperformers = summaryData.filter(u => u.total_order_value < avgValue * 0.5);
+    if (underperformers.length > 0) {
+      insights.push({
+        type: 'warning',
+        title: 'Attention Needed',
+        description: `${underperformers.length} user(s) performing below 50% average: ${underperformers.map(u => u.full_name.split(' ')[0]).slice(0, 3).join(', ')}${underperformers.length > 3 ? '...' : ''}`
+      });
+    }
+
+    // Revenue distribution insight
+    if (summaryData.length >= 3) {
+      const top3Share = (summaryData.slice(0, 3).reduce((s, u) => s + u.total_order_value, 0) / totalValue) * 100;
+      if (top3Share > 70) {
+        insights.push({
+          type: 'info',
+          title: 'Concentrated Revenue',
+          description: `Top 3 users contribute ${top3Share.toFixed(0)}% of revenue. Consider diversifying sales coverage.`
+        });
+      }
+    }
+
+    // Growth opportunity
+    const midPerformers = summaryData.filter(u => 
+      u.total_order_value >= avgValue * 0.5 && u.total_order_value < avgValue * 0.9
+    );
+    if (midPerformers.length > 0) {
+      insights.push({
+        type: 'opportunity',
+        title: 'Growth Potential',
+        description: `${midPerformers.length} user(s) near average can improve with targeted coaching: ${midPerformers.map(u => u.full_name.split(' ')[0]).slice(0, 2).join(', ')}`
+      });
+    }
+
+    return insights.slice(0, 4); // Limit to 4 insights
+  }, [summaryData]);
 
   // Fetch users on mount
   useEffect(() => {
@@ -828,37 +886,72 @@ export const SupervisorReport = () => {
             </div>
           ) : summaryData.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Pie Chart */}
+              {/* Chart Section */}
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground text-center">Click on a segment or row to view details</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">Click on a segment or row to view details</p>
+                  <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
+                    <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
+                      <PieChartIcon className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
+                      <BarChart3 className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
                 <ResponsiveContainer width="100%" height={350}>
-                  <PieChart>
-                    <Pie
-                      data={pieChartData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={120}
-                      label={({ name, percentage }) => `${name} (${percentage}%)`}
-                      labelLine={{ stroke: '#888', strokeWidth: 1 }}
-                      onClick={handlePieClick}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {pieChartData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={entry.color}
-                          stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
-                          strokeWidth={selectedUserDetails === entry.name ? 3 : 0}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
-                    />
-                    <Legend />
-                  </PieChart>
+                  {chartType === 'pie' ? (
+                    <PieChart>
+                      <Pie
+                        data={pieChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={120}
+                        label={({ name, percentage }) => `${name} (${percentage}%)`}
+                        labelLine={{ stroke: '#888', strokeWidth: 1 }}
+                        onClick={handlePieClick}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color}
+                            stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
+                            strokeWidth={selectedUserDetails === entry.name ? 3 : 0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
+                      />
+                      <Legend />
+                    </PieChart>
+                  ) : (
+                    <BarChart data={pieChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        onClick={(data) => handleRowClick(data.name)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color}
+                            stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
+                            strokeWidth={selectedUserDetails === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
                 </ResponsiveContainer>
               </div>
 
@@ -915,6 +1008,58 @@ export const SupervisorReport = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* AI Insights Section */}
+      {aiInsights.length > 0 && (
+        <Card className="shadow-lg bg-gradient-to-r from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200/50 dark:border-violet-800/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">AI Insights</CardTitle>
+                <p className="text-xs text-muted-foreground">Analysis based on user performance data</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {aiInsights.map((insight, index) => (
+                <div 
+                  key={index}
+                  className={cn(
+                    "p-3 rounded-lg border",
+                    insight.type === 'success' && "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
+                    insight.type === 'warning' && "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
+                    insight.type === 'opportunity' && "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
+                    insight.type === 'info' && "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800"
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className={cn(
+                      "p-1.5 rounded-md flex-shrink-0",
+                      insight.type === 'success' && "bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400",
+                      insight.type === 'warning' && "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400",
+                      insight.type === 'opportunity' && "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400",
+                      insight.type === 'info' && "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400"
+                    )}>
+                      {insight.type === 'success' && <TrendingUp className="h-3.5 w-3.5" />}
+                      {insight.type === 'warning' && <AlertTriangle className="h-3.5 w-3.5" />}
+                      {insight.type === 'opportunity' && <Target className="h-3.5 w-3.5" />}
+                      {insight.type === 'info' && <Users className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-sm">{insight.title}</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{insight.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* User Details Section */}
       {selectedUserDetails && (
