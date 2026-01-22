@@ -164,17 +164,23 @@ export const SupervisorReport = () => {
     fetchUsers();
   }, []);
 
-  // Fetch summary data
+  // Fetch summary data - uses order_items.total for accurate revenue calculation
   const fetchSummaryData = async () => {
     setLoading(true);
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch confirmed orders in the date range
+      // Fetch confirmed orders with order_items in the date range
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('user_id, total_amount')
+        .select(`
+          id,
+          user_id,
+          order_items (
+            total
+          )
+        `)
         .eq('status', 'confirmed')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
@@ -222,7 +228,7 @@ export const SupervisorReport = () => {
         userNameMap[p.id] = p.full_name || 'Unknown';
       });
 
-      // Group by user and calculate totals
+      // Group by user and calculate totals from order_items.total (SUM)
       const userTotals: Record<string, number> = {};
       ordersData.forEach((order) => {
         const userName = userNameMap[order.user_id] || 'Unknown';
@@ -232,7 +238,13 @@ export const SupervisorReport = () => {
           return;
         }
         
-        userTotals[userName] = (userTotals[userName] || 0) + Number(order.total_amount || 0);
+        // Sum all order_items.total for this order
+        const orderRevenue = (order.order_items || []).reduce(
+          (sum: number, item: { total: number | null }) => sum + Number(item.total || 0),
+          0
+        );
+        
+        userTotals[userName] = (userTotals[userName] || 0) + orderRevenue;
       });
 
       // Convert to array and sort by total
