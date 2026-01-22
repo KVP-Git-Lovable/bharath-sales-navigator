@@ -12,6 +12,7 @@ import { format, startOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RevenueBySKUSection } from './RevenueBySKUSection';
+import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
 
 interface UserOrderSummary {
   full_name: string;
@@ -1142,6 +1143,9 @@ export const SupervisorReport = () => {
                   </div>
                 )}
 
+                {/* AI Insights */}
+                <OrderDetailsAIInsights userName={selectedUserDetails} dateRange={dateRange} />
+
                 {/* Retailers Subtable */}
                 {expandedBox === 'retailers' && retailersList.length > 0 && (
                   <div className="mb-6">
@@ -1384,7 +1388,7 @@ export const SupervisorReport = () => {
       )}
 
       {/* Revenue Summary by SKU Section */}
-      <RevenueBySKUSection />
+      <RevenueBySKUSection selectedUser={selectedUser} dateRange={dateRange} />
     </div>
   );
 };

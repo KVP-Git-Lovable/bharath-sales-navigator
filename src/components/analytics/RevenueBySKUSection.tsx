@@ -1,15 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, Calendar as CalendarIcon, X, PieChartIcon, BarChart3, Package } from 'lucide-react';
+import { RefreshCw, PieChartIcon, BarChart3, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface SKURevenue {
@@ -19,99 +14,118 @@ interface SKURevenue {
   unit: string;
 }
 
-interface UserProfile {
-  id: string;
-  full_name: string | null;
+interface RevenueBySKUSectionProps {
+  selectedUser: string;
+  dateRange: { from: Date; to: Date };
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7'];
 
-export const RevenueBySKUSection = () => {
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string>('');
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfMonth(new Date()),
-    to: new Date()
-  });
+export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSectionProps) => {
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
 
-  // Fetch users on mount
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const { data: adminData, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
-      
-      if (!adminError && adminData) {
-        const filteredUsers = adminData
-          .filter((u: any) => u.full_name)
-          .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
-        setUsers(filteredUsers);
-        // Set default user if available
-        if (filteredUsers.length > 0) {
-          setSelectedUser(filteredUsers[0].full_name);
-        }
-      } else {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .not('full_name', 'is', null)
-          .order('full_name');
-        
-        if (!error && data) {
-          setUsers(data);
-          if (data.length > 0 && data[0].full_name) {
-            setSelectedUser(data[0].full_name);
-          }
-        }
-      }
-    };
-    fetchUsers();
-  }, []);
-
   // Fetch SKU revenue data
   const fetchSKUData = async () => {
-    if (!selectedUser) return;
-    
     setLoading(true);
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      const { data, error } = await supabase.rpc('get_product_revenue_performance', {
-        user_full_name: selectedUser,
-        start_date: fromDate,
-        end_date: toDate
-      });
+      // If "all" users selected, we need to aggregate across all users
+      if (selectedUser === 'all') {
+        // Fetch all orders in the date range
+        const { data: orders, error: ordersError } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('status', 'confirmed')
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate);
 
-      if (error) {
-        console.error('Error fetching SKU data:', error);
-        setSkuData([]);
-        return;
-      }
+        if (ordersError || !orders || orders.length === 0) {
+          setSkuData([]);
+          setLoading(false);
+          return;
+        }
 
-      if (data && data.length > 0) {
-        // Aggregate by product name (in case of duplicates)
+        const orderIds = orders.map(o => o.id);
+
+        // Fetch order items for these orders
+        const { data: orderItems, error: itemsError } = await supabase
+          .from('order_items')
+          .select('product_name, quantity, unit, total')
+          .in('order_id', orderIds);
+
+        if (itemsError || !orderItems) {
+          setSkuData([]);
+          setLoading(false);
+          return;
+        }
+
+        // Aggregate by product
         const aggregated: Record<string, SKURevenue> = {};
-        data.forEach((item: any) => {
-          const key = item.product_name;
+        orderItems.forEach((item: any) => {
+          const key = item.product_name || 'Unknown';
           if (!aggregated[key]) {
             aggregated[key] = {
-              product_name: item.product_name,
+              product_name: key,
               quantity_sold: 0,
               revenue: 0,
               unit: item.unit || 'KG'
             };
           }
-          aggregated[key].quantity_sold += Number(item.quantity_sold || 0);
-          aggregated[key].revenue += Number(item.revenue || 0);
+          // Convert grams to KG
+          const qty = Number(item.quantity || 0);
+          const unit = (item.unit || '').toLowerCase();
+          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+            aggregated[key].quantity_sold += qty / 1000;
+            aggregated[key].unit = 'KG';
+          } else {
+            aggregated[key].quantity_sold += qty;
+          }
+          aggregated[key].revenue += Number(item.total || 0);
         });
 
-        // Sort by revenue descending
         const sortedData = Object.values(aggregated).sort((a, b) => b.revenue - a.revenue);
         setSkuData(sortedData);
       } else {
-        setSkuData([]);
+        // Use the RPC for single user
+        const { data, error } = await supabase.rpc('get_product_revenue_performance', {
+          user_full_name: selectedUser,
+          start_date: fromDate,
+          end_date: toDate
+        });
+
+        if (error) {
+          console.error('Error fetching SKU data:', error);
+          setSkuData([]);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Aggregate by product name (in case of duplicates)
+          const aggregated: Record<string, SKURevenue> = {};
+          data.forEach((item: any) => {
+            const key = item.product_name;
+            if (!aggregated[key]) {
+              aggregated[key] = {
+                product_name: item.product_name,
+                quantity_sold: 0,
+                revenue: 0,
+                unit: item.unit || 'KG'
+              };
+            }
+            aggregated[key].quantity_sold += Number(item.quantity_sold || 0);
+            aggregated[key].revenue += Number(item.revenue || 0);
+          });
+
+          // Sort by revenue descending
+          const sortedData = Object.values(aggregated).sort((a, b) => b.revenue - a.revenue);
+          setSkuData(sortedData);
+        } else {
+          setSkuData([]);
+        }
       }
     } catch (error) {
       console.error('Error in SKU revenue fetch:', error);
@@ -120,6 +134,11 @@ export const RevenueBySKUSection = () => {
       setLoading(false);
     }
   };
+
+  // Fetch data when props change
+  useEffect(() => {
+    fetchSKUData();
+  }, [selectedUser, dateRange.from, dateRange.to]);
 
   // Prepare chart data
   const chartData = useMemo(() => {
@@ -148,85 +167,12 @@ export const RevenueBySKUSection = () => {
           <div>
             <CardTitle>Revenue Summary by SKU</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Product-wise revenue breakdown based on confirmed orders
+              Product-wise revenue breakdown • {selectedUser === 'all' ? 'All Users' : selectedUser} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
             </p>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-sm font-medium mb-2 block">Select User</label>
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a user" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.filter(u => u.full_name).map((user) => (
-                  <SelectItem key={user.id} value={user.full_name!}>
-                    {user.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-2 items-end">
-            <div>
-              <label className="text-sm font-medium mb-2 block">From Date</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? format(dateRange.from, "MMM dd, yyyy") : "Start"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateRange.from}
-                    onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">To Date</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateRange.to && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.to ? format(dateRange.to, "MMM dd, yyyy") : "End"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateRange.to}
-                    onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDateRange({ from: startOfMonth(new Date()), to: new Date() })}
-              title="Reset to current month"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button onClick={fetchSKUData} disabled={loading || !selectedUser}>
-            <RefreshCw size={16} className={cn("mr-2", loading && "animate-spin")} />
-            Run Query
-          </Button>
-        </div>
-
         {/* Results */}
         {loading ? (
           <div className="text-center py-8">
@@ -267,7 +213,7 @@ export const RevenueBySKUSection = () => {
                     </Pie>
                     <Tooltip 
                       formatter={(value: number, name: string, props: any) => [
-                        `₹${value.toLocaleString()} | ${props.payload.quantity} ${props.payload.unit}`,
+                        `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
                         props.payload.fullName
                       ]}
                     />
@@ -280,7 +226,7 @@ export const RevenueBySKUSection = () => {
                     <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
                     <Tooltip 
                       formatter={(value: number, name: string, props: any) => [
-                        `₹${value.toLocaleString()} | ${props.payload.quantity} ${props.payload.unit}`,
+                        `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
                         props.payload.fullName
                       ]}
                     />
@@ -342,7 +288,7 @@ export const RevenueBySKUSection = () => {
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            {selectedUser ? 'No data found for the selected filters. Click "Run Query" to fetch data.' : 'Select a user and click "Run Query" to view SKU revenue data.'}
+            No SKU data found for the selected filters
           </div>
         )}
       </CardContent>
