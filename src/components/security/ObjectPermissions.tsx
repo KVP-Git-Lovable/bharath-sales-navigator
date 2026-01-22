@@ -344,6 +344,38 @@ export const ObjectPermissions = () => {
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
 
+  const PERMISSION_FIELDS = ['can_read', 'can_create', 'can_edit', 'can_delete', 'can_view_all', 'can_modify_all'] as const;
+
+  // Check if all features in a module have a specific permission enabled
+  const isColumnAllChecked = (moduleName: string, field: string): boolean => {
+    const module = MODULES.find(m => m.name === moduleName);
+    if (!module) return false;
+    return module.features.every(feature => getPermissionValue(feature.name, field));
+  };
+
+  // Check if some (but not all) features have a permission enabled
+  const isColumnIndeterminate = (moduleName: string, field: string): boolean => {
+    const module = MODULES.find(m => m.name === moduleName);
+    if (!module) return false;
+    const checkedCount = module.features.filter(feature => getPermissionValue(feature.name, field)).length;
+    return checkedCount > 0 && checkedCount < module.features.length;
+  };
+
+  // Toggle all features in a module for a specific permission
+  const handleColumnToggle = (moduleName: string, field: string, checked: boolean) => {
+    const module = MODULES.find(m => m.name === moduleName);
+    if (!module) return;
+
+    const newChanges: Record<string, Partial<ObjectPermission>> = { ...pendingChanges };
+    module.features.forEach(feature => {
+      newChanges[feature.name] = {
+        ...newChanges[feature.name],
+        [field]: checked
+      };
+    });
+    setPendingChanges(newChanges);
+  };
+
   // Count enabled permissions per module
   const getModuleEnabledCount = (moduleName: string) => {
     const module = MODULES.find(m => m.name === moduleName);
@@ -450,12 +482,102 @@ export const ObjectPermissions = () => {
                         <TableHeader>
                           <TableRow className="bg-background">
                             <TableHead className="w-[250px]">Feature</TableHead>
-                            <TableHead className="text-center w-[100px]">Read</TableHead>
-                            <TableHead className="text-center w-[100px]">Create</TableHead>
-                            <TableHead className="text-center w-[100px]">Edit</TableHead>
-                            <TableHead className="text-center w-[100px]">Delete</TableHead>
-                            <TableHead className="text-center w-[100px]">View All</TableHead>
-                            <TableHead className="text-center w-[100px]">Modify All</TableHead>
+                            <TableHead className="text-center w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>Read</span>
+                                <Checkbox
+                                  checked={isColumnAllChecked(module.name, 'can_read')}
+                                  ref={(el) => {
+                                    if (el) {
+                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_read');
+                                    }
+                                  }}
+                                  onCheckedChange={(checked) => 
+                                    handleColumnToggle(module.name, 'can_read', checked as boolean)
+                                  }
+                                />
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-center w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>Create</span>
+                                <Checkbox
+                                  checked={isColumnAllChecked(module.name, 'can_create')}
+                                  ref={(el) => {
+                                    if (el) {
+                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_create');
+                                    }
+                                  }}
+                                  onCheckedChange={(checked) => 
+                                    handleColumnToggle(module.name, 'can_create', checked as boolean)
+                                  }
+                                />
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-center w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>Edit</span>
+                                <Checkbox
+                                  checked={isColumnAllChecked(module.name, 'can_edit')}
+                                  ref={(el) => {
+                                    if (el) {
+                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_edit');
+                                    }
+                                  }}
+                                  onCheckedChange={(checked) => 
+                                    handleColumnToggle(module.name, 'can_edit', checked as boolean)
+                                  }
+                                />
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-center w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>Delete</span>
+                                <Checkbox
+                                  checked={isColumnAllChecked(module.name, 'can_delete')}
+                                  ref={(el) => {
+                                    if (el) {
+                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_delete');
+                                    }
+                                  }}
+                                  onCheckedChange={(checked) => 
+                                    handleColumnToggle(module.name, 'can_delete', checked as boolean)
+                                  }
+                                />
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-center w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>View All</span>
+                                <Checkbox
+                                  checked={isColumnAllChecked(module.name, 'can_view_all')}
+                                  ref={(el) => {
+                                    if (el) {
+                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_view_all');
+                                    }
+                                  }}
+                                  onCheckedChange={(checked) => 
+                                    handleColumnToggle(module.name, 'can_view_all', checked as boolean)
+                                  }
+                                />
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-center w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>Modify All</span>
+                                <Checkbox
+                                  checked={isColumnAllChecked(module.name, 'can_modify_all')}
+                                  ref={(el) => {
+                                    if (el) {
+                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_modify_all');
+                                    }
+                                  }}
+                                  onCheckedChange={(checked) => 
+                                    handleColumnToggle(module.name, 'can_modify_all', checked as boolean)
+                                  }
+                                />
+                              </div>
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
