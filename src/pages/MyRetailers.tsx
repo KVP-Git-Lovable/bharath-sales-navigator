@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, useCallback } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
@@ -164,24 +164,77 @@ export const MyRetailers = () => {
 
   const loadRetailers = useCallback(async () => {
     if (!user) return;
-    if (selectedUserIds.length === 0) return;
+    if (selectedUserIds.length === 0) {
+      setRetailers([]);
+      return;
+    }
     
     setLoading(true);
+    
+    // Use setTimeout to allow UI to update before heavy processing
+    await new Promise(resolve => setTimeout(resolve, 0));
     
     try {
       // Determine which user IDs to query
       const userIdsToQuery = selectedUserIds;
       
-      // ALWAYS load from cache FIRST for instant display (works offline and online)
-      console.log('📦 Loading retailers from cache for users:', userIdsToQuery);
-      console.time('[MyRetailers] Cache load');
+      // Check if we're online before attempting network fetch
+      if (navigator.onLine) {
+        // Try to fetch fresh data first
+        try {
+          console.log('🔄 Fetching retailers from database for users:', userIdsToQuery.length);
+          const { data, error } = await supabase
+            .from("retailers")
+            .select("*")
+            .in("user_id", userIdsToQuery)
+            .order("name")
+            .limit(2000); // Limit to prevent massive queries
+            
+          if (error) throw error;
+          
+          if (data) {
+            console.log('✅ Fetched retailers:', data.length);
+            // Process in chunks to avoid blocking UI
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            // Add owner names
+            const withOwners = data.map(r => ({
+              ...r,
+              owner_name: userNameMap[r.user_id] || 'Unknown'
+            }));
+            
+            // Sort
+            const sorted = [...withOwners].sort((a, b) => a.name.localeCompare(b.name));
+            setRetailers(sorted);
+            
+            // Rebuild index with fresh data - defer to allow UI to update
+            await new Promise(resolve => setTimeout(resolve, 0));
+            buildRetailerIndex(sorted);
+            
+            // Update cache in background
+            if (data.length > 0) {
+              offlineStorage.mergeData(STORES.RETAILERS, data as any).catch(console.error);
+            }
+            
+            setLoading(false);
+            return;
+          }
+        } catch (networkError: any) {
+          console.log('Network fetch failed, falling back to cache:', networkError.message);
+        }
+      }
+      
+      // Fallback to cache if offline or network failed
+      console.log('📦 Loading retailers from cache for users:', userIdsToQuery.length);
       let cachedRetailers: any[] = await offlineStorage.getAll(STORES.RETAILERS);
+      
       // Filter cache by selected user IDs
       cachedRetailers = cachedRetailers.filter((r: any) => userIdsToQuery.includes(r.user_id));
-      console.timeEnd('[MyRetailers] Cache load');
       
       if (cachedRetailers.length > 0) {
         console.log('✅ Displaying cached retailers:', cachedRetailers.length);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        
         // Add owner names
         const withOwners = cachedRetailers.map(r => ({
           ...r,
@@ -189,52 +242,13 @@ export const MyRetailers = () => {
         }));
         const sorted = withOwners.sort((a, b) => a.name.localeCompare(b.name));
         setRetailers(sorted);
-        // Build index for fast filtering
-        console.time('[MyRetailers] Index build');
-        buildRetailerIndex(sorted);
-        console.timeEnd('[MyRetailers] Index build');
-        setLoading(false); // Stop loading immediately once cache is displayed
-      }
-      
-      // Check if we're online before attempting network fetch
-      if (!navigator.onLine) {
-        console.log('📴 Offline - using cached data only');
-        setLoading(false);
-        return;
-      }
-      
-      // Try to fetch fresh data in background (silent fail if offline/slow)
-      try {
-        const { data, error } = await supabase
-          .from("retailers")
-          .select("*")
-          .in("user_id", userIdsToQuery)
-          .order("name");
-          
-        if (error) throw error;
         
-        // IMPORTANT: Only update cache AFTER successful fetch
-        // Save new data first, then clear old data to prevent data loss
-        if (data && data.length > 0) {
-          console.log('🔄 Updating retailers cache with fresh data:', data.length);
-          await offlineStorage.mergeData(STORES.RETAILERS, data as any);
-          // Add owner names
-          const withOwners = data.map(r => ({
-            ...r,
-            owner_name: userNameMap[r.user_id] || 'Unknown'
-          }));
-          const sorted = [...withOwners].sort((a, b) => a.name.localeCompare(b.name));
-          setRetailers(sorted);
-          // Rebuild index with fresh data
-          buildRetailerIndex(sorted);
-        } else if (data && data.length === 0) {
-          // No retailers found for selected users
-          setRetailers([]);
-          buildRetailerIndex([]);
-        }
-      } catch (networkError: any) {
-        // Silent fail - cached data is already displayed
-        console.log('Network sync failed, using cached data:', networkError.message);
+        // Build index for fast filtering
+        await new Promise(resolve => setTimeout(resolve, 0));
+        buildRetailerIndex(sorted);
+      } else {
+        setRetailers([]);
+        buildRetailerIndex([]);
       }
     } catch (error: any) {
       console.error('Error loading retailers:', error);
@@ -243,13 +257,36 @@ export const MyRetailers = () => {
     }
   }, [user, selectedUserIds, userNameMap]);
 
+  // Debounce the loadRetailers call to prevent rapid firing
+  const loadRetailersTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
-    if (user) loadRetailers();
-    // Clear index on unmount
+    // Clear any pending timeout
+    if (loadRetailersTimeoutRef.current) {
+      clearTimeout(loadRetailersTimeoutRef.current);
+    }
+    
+    if (user && selectedUserIds.length > 0) {
+      // Set loading state immediately for user feedback
+      setLoading(true);
+      
+      // Debounce the actual data load by 150ms to prevent rapid firing
+      loadRetailersTimeoutRef.current = setTimeout(() => {
+        loadRetailers();
+      }, 150);
+    } else if (user && selectedUserIds.length === 0) {
+      setRetailers([]);
+      setLoading(false);
+    }
+    
+    // Cleanup on unmount
     return () => {
+      if (loadRetailersTimeoutRef.current) {
+        clearTimeout(loadRetailersTimeoutRef.current);
+      }
       clearRetailerIndex();
     };
-  }, [user, loadRetailers]);
+  }, [user, selectedUserIds, loadRetailers]);
 
   // Use index for fast filter dropdown values
   const categories = useMemo(() => {
