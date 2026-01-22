@@ -409,9 +409,8 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="employment">Employment</TabsTrigger>
             <TabsTrigger value="managers">Managers</TabsTrigger>
             <TabsTrigger value="password">Reset Password</TabsTrigger>
           </TabsList>
@@ -462,74 +461,6 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
             </div>
           </TabsContent>
 
-          <TabsContent value="employment" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>HQ</Label>
-                <Input
-                  value={employeeData.hq}
-                  onChange={(e) => setEmployeeData(prev => ({ ...prev, hq: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Emergency Contact</Label>
-                <Input
-                  value={employeeData.emergency_contact_number}
-                  onChange={(e) => setEmployeeData(prev => ({ ...prev, emergency_contact_number: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Monthly Salary (₹)</Label>
-                <Input
-                  type="number"
-                  value={employeeData.monthly_salary}
-                  onChange={(e) => setEmployeeData(prev => ({ ...prev, monthly_salary: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Daily DA Allowance (₹)</Label>
-                <Input
-                  type="number"
-                  value={employeeData.daily_da_allowance}
-                  onChange={(e) => setEmployeeData(prev => ({ ...prev, daily_da_allowance: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Date of Joining</Label>
-                <Input
-                  type="date"
-                  value={employeeData.date_of_joining}
-                  onChange={(e) => setEmployeeData(prev => ({ ...prev, date_of_joining: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Date of Exit</Label>
-                <Input
-                  type="date"
-                  value={employeeData.date_of_exit}
-                  onChange={(e) => setEmployeeData(prev => ({ ...prev, date_of_exit: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Textarea
-                value={employeeData.address}
-                onChange={(e) => setEmployeeData(prev => ({ ...prev, address: e.target.value }))}
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Education</Label>
-              <Textarea
-                value={employeeData.education}
-                onChange={(e) => setEmployeeData(prev => ({ ...prev, education: e.target.value }))}
-                rows={2}
-              />
-            </div>
-          </TabsContent>
 
           <TabsContent value="managers" className="space-y-4 mt-4">
             <div className="space-y-4">
