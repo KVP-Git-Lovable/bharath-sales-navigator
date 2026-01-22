@@ -162,69 +162,112 @@ export const MyRetailers = () => {
   }, []);
 
 
+  // Pagination state for loading retailers in batches
+  const [loadingProgress, setLoadingProgress] = useState<string>('');
+  const PAGE_SIZE = 500; // Load 500 retailers at a time
+  
   const loadRetailers = useCallback(async () => {
     if (!user) return;
     if (selectedUserIds.length === 0) {
       setRetailers([]);
+      setLoadingProgress('');
       return;
     }
     
     setLoading(true);
+    setLoadingProgress('Loading...');
     
     // Use setTimeout to allow UI to update before heavy processing
     await new Promise(resolve => setTimeout(resolve, 0));
     
     try {
-      // Determine which user IDs to query
       const userIdsToQuery = selectedUserIds;
       
       // Check if we're online before attempting network fetch
       if (navigator.onLine) {
-        // Try to fetch fresh data first
         try {
           console.log('🔄 Fetching retailers from database for users:', userIdsToQuery.length);
-          const { data, error } = await supabase
-            .from("retailers")
-            .select("*")
-            .in("user_id", userIdsToQuery)
-            .order("name")
-            .limit(2000); // Limit to prevent massive queries
-            
-          if (error) throw error;
           
-          if (data) {
-            console.log('✅ Fetched retailers:', data.length);
-            // Process in chunks to avoid blocking UI
+          // Paginated fetch - load in batches
+          let allRetailers: any[] = [];
+          let page = 0;
+          let hasMore = true;
+          
+          while (hasMore) {
+            const from = page * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
+            
+            setLoadingProgress(`Loading retailers ${from + 1} - ${to + 1}...`);
+            
+            const { data, error } = await supabase
+              .from("retailers")
+              .select("*")
+              .in("user_id", userIdsToQuery)
+              .order("name")
+              .range(from, to);
+              
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+              allRetailers = [...allRetailers, ...data];
+              
+              // Update UI with current batch for immediate feedback
+              if (page === 0) {
+                const withOwners = allRetailers.map(r => ({
+                  ...r,
+                  owner_name: userNameMap[r.user_id] || 'Unknown'
+                }));
+                setRetailers(withOwners);
+                setLoading(false); // Stop loading spinner after first batch
+              }
+              
+              // Check if there are more pages
+              hasMore = data.length === PAGE_SIZE;
+              page++;
+              
+              // Yield to UI between batches
+              await new Promise(resolve => setTimeout(resolve, 10));
+            } else {
+              hasMore = false;
+            }
+          }
+          
+          console.log('✅ Fetched total retailers:', allRetailers.length);
+          
+          if (allRetailers.length > 0) {
+            // Final update with all data
+            setLoadingProgress('Processing...');
             await new Promise(resolve => setTimeout(resolve, 0));
             
-            // Add owner names
-            const withOwners = data.map(r => ({
+            const withOwners = allRetailers.map(r => ({
               ...r,
               owner_name: userNameMap[r.user_id] || 'Unknown'
             }));
             
-            // Sort
             const sorted = [...withOwners].sort((a, b) => a.name.localeCompare(b.name));
             setRetailers(sorted);
             
-            // Rebuild index with fresh data - defer to allow UI to update
+            // Build index in background
             await new Promise(resolve => setTimeout(resolve, 0));
             buildRetailerIndex(sorted);
             
-            // Update cache in background
-            if (data.length > 0) {
-              offlineStorage.mergeData(STORES.RETAILERS, data as any).catch(console.error);
-            }
-            
-            setLoading(false);
-            return;
+            // Update cache in background (don't await)
+            offlineStorage.mergeData(STORES.RETAILERS, allRetailers as any).catch(console.error);
+          } else {
+            setRetailers([]);
+            buildRetailerIndex([]);
           }
+          
+          setLoadingProgress('');
+          setLoading(false);
+          return;
         } catch (networkError: any) {
           console.log('Network fetch failed, falling back to cache:', networkError.message);
         }
       }
       
       // Fallback to cache if offline or network failed
+      setLoadingProgress('Loading from cache...');
       console.log('📦 Loading retailers from cache for users:', userIdsToQuery.length);
       let cachedRetailers: any[] = await offlineStorage.getAll(STORES.RETAILERS);
       
@@ -235,7 +278,6 @@ export const MyRetailers = () => {
         console.log('✅ Displaying cached retailers:', cachedRetailers.length);
         await new Promise(resolve => setTimeout(resolve, 0));
         
-        // Add owner names
         const withOwners = cachedRetailers.map(r => ({
           ...r,
           owner_name: userNameMap[r.user_id] || 'Unknown'
@@ -243,15 +285,17 @@ export const MyRetailers = () => {
         const sorted = withOwners.sort((a, b) => a.name.localeCompare(b.name));
         setRetailers(sorted);
         
-        // Build index for fast filtering
         await new Promise(resolve => setTimeout(resolve, 0));
         buildRetailerIndex(sorted);
       } else {
         setRetailers([]);
         buildRetailerIndex([]);
       }
+      
+      setLoadingProgress('');
     } catch (error: any) {
       console.error('Error loading retailers:', error);
+      setLoadingProgress('');
     } finally {
       setLoading(false);
     }
@@ -806,7 +850,7 @@ export const MyRetailers = () => {
               ))}
               {paginatedRetailers.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
-                  {loading ? 'Loading...' : 'No retailers found'}
+                  {loading ? (loadingProgress || 'Loading...') : 'No retailers found'}
                 </div>
               )}
               
@@ -937,7 +981,9 @@ export const MyRetailers = () => {
                   })}
                   {paginatedRetailers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={selectedUserIds.length > 1 ? 7 : 6} className="text-center text-muted-foreground">{loading ? 'Loading...' : 'No retailers found'}</TableCell>
+                      <TableCell colSpan={selectedUserIds.length > 1 ? 7 : 6} className="text-center text-muted-foreground">
+                        {loading ? (loadingProgress || 'Loading...') : 'No retailers found'}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
