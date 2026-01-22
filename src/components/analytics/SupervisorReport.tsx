@@ -62,6 +62,11 @@ export const SupervisorReport = () => {
     is_active: boolean;
     created_date: string;
   }[]>([]);
+  const [productKgList, setProductKgList] = useState<{
+    order_date: string;
+    quantity_kg: number;
+    revenue: number;
+  }[]>([]);
 
   // Fetch users on mount
   useEffect(() => {
@@ -184,6 +189,7 @@ export const SupervisorReport = () => {
     setExpandedBox(null);
     setRetailersList([]);
     setBeatsList([]);
+    setProductKgList([]);
     
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -497,6 +503,114 @@ export const SupervisorReport = () => {
       })));
     }
   };
+
+  // Fetch products/kg list when clicking on Products or Total KG box
+  const handleProductsKgBoxClick = async () => {
+    if (!selectedUserDetails) return;
+    
+    if (expandedBox === 'productsKg') {
+      setExpandedBox(null);
+      setProductKgList([]);
+      return;
+    }
+
+    setExpandedBox('productsKg');
+    
+    const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+    const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+    // Get user profile by name
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .ilike('full_name', `${selectedUserDetails}%`)
+      .limit(1)
+      .single();
+
+    if (!userProfile) return;
+
+    // Fetch orders with order_items for confirmed orders
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, created_at')
+      .eq('user_id', userProfile.id)
+      .eq('status', 'confirmed')
+      .gte('created_at', `${fromDate}T00:00:00`)
+      .lt('created_at', `${format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd')}T00:00:00`)
+      .order('created_at', { ascending: true });
+
+    if (ordersError || !orders || orders.length === 0) {
+      setProductKgList([]);
+      return;
+    }
+
+    const orderIds = orders.map(o => o.id);
+
+    // Fetch order items for these orders
+    const { data: orderItems, error: itemsError } = await supabase
+      .from('order_items')
+      .select('order_id, quantity, unit, total')
+      .in('order_id', orderIds);
+
+    if (itemsError || !orderItems) {
+      setProductKgList([]);
+      return;
+    }
+
+    // Create a map of order_id to created_at date
+    const orderDateMap: Record<string, string> = {};
+    orders.forEach(o => {
+      orderDateMap[o.id] = format(new Date(o.created_at), 'yyyy-MM-dd');
+    });
+
+    // Group by date
+    const dateGroups: Record<string, { quantity_kg: number; revenue: number }> = {};
+    let grandTotalKg = 0;
+    let grandTotalRevenue = 0;
+
+    orderItems.forEach(item => {
+      const dateKey = orderDateMap[item.order_id];
+      if (!dateKey) return;
+
+      if (!dateGroups[dateKey]) {
+        dateGroups[dateKey] = { quantity_kg: 0, revenue: 0 };
+      }
+
+      const qty = Number(item.quantity || 0);
+      const unit = (item.unit || '').toLowerCase();
+      let kg = 0;
+
+      if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+        kg = qty / 1000;
+      } else {
+        kg = qty;
+      }
+
+      dateGroups[dateKey].quantity_kg += kg;
+      dateGroups[dateKey].revenue += Number(item.total || 0);
+      grandTotalKg += kg;
+      grandTotalRevenue += Number(item.total || 0);
+    });
+
+    // Convert to array and add total row
+    const resultArray = Object.entries(dateGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({
+        order_date: format(new Date(date), 'MMMM dd, yyyy'),
+        quantity_kg: Math.round(data.quantity_kg * 100) / 100,
+        revenue: data.revenue
+      }));
+
+    // Add TOTAL row
+    resultArray.push({
+      order_date: 'TOTAL',
+      quantity_kg: Math.round(grandTotalKg * 100) / 100,
+      revenue: grandTotalRevenue
+    });
+
+    setProductKgList(resultArray);
+  };
+
   return (
     <div className="space-y-4">
       <Card className="shadow-lg">
@@ -727,14 +841,26 @@ export const SupervisorReport = () => {
                       </div>
                       <div className="text-2xl font-bold">{detailsSummary.beats}</div>
                     </Card>
-                    <Card className="p-4">
+                    <Card 
+                      className={cn(
+                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        expandedBox === 'productsKg' && "ring-2 ring-primary"
+                      )}
+                      onClick={handleProductsKgBoxClick}
+                    >
                       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                         <Package className="h-4 w-4" />
                         Products
                       </div>
                       <div className="text-2xl font-bold">{detailsSummary.products}</div>
                     </Card>
-                    <Card className="p-4">
+                    <Card 
+                      className={cn(
+                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        expandedBox === 'productsKg' && "ring-2 ring-primary"
+                      )}
+                      onClick={handleProductsKgBoxClick}
+                    >
                       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                         <Scale className="h-4 w-4" />
                         Total KG
@@ -802,6 +928,47 @@ export const SupervisorReport = () => {
                               <TableCell>{beat.category || '-'}</TableCell>
                               <TableCell>{beat.is_active ? 'Yes' : 'No'}</TableCell>
                               <TableCell>{beat.created_date}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Products/KG Subtable */}
+                {expandedBox === 'productsKg' && productKgList.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
+                      Daily Sales Summary ({productKgList.length - 1} days)
+                      {productKgList.length > 9 && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </h4>
+                    <div className={cn(
+                      "border rounded-lg overflow-hidden",
+                      productKgList.length > 9 && "max-h-[360px] overflow-y-auto"
+                    )}>
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                          <TableRow>
+                            <TableHead>Order Date</TableHead>
+                            <TableHead className="text-right">Quantity (KG)</TableHead>
+                            <TableHead className="text-right">Revenue</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productKgList.map((row, index) => (
+                            <TableRow 
+                              key={index} 
+                              className={cn(
+                                "hover:bg-muted/30",
+                                row.order_date === 'TOTAL' && "bg-muted/50 font-semibold"
+                              )}
+                            >
+                              <TableCell className={row.order_date === 'TOTAL' ? 'font-bold' : ''}>
+                                {row.order_date}
+                              </TableCell>
+                              <TableCell className="text-right">{row.quantity_kg.toFixed(2)}</TableCell>
+                              <TableCell className="text-right">₹{row.revenue.toLocaleString()}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
