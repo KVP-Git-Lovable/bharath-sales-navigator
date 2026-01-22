@@ -742,17 +742,21 @@ export const SupervisorReport = () => {
   };
 
   // Handle click on Retailers or Beats box - show beat breakdown table
+  // Don't clear orderDetailsBeatBreakdown when toggling - keep counts stable
   const handleRetailersBeatsBoxClick = async () => {
     if (!selectedUserDetails) return;
     
     if (expandedBox === 'retailersBeats') {
       setExpandedBox(null);
-      setOrderDetailsBeatBreakdown([]);
+      // Don't clear orderDetailsBeatBreakdown - keep the data for stable counts
       return;
     }
 
     setExpandedBox('retailersBeats');
-    await fetchOrderDetailsBeatBreakdownForUser();
+    // Only fetch if not already loaded
+    if (orderDetailsBeatBreakdown.length === 0) {
+      await fetchOrderDetailsBeatBreakdownForUser();
+    }
   };
 
   // Fetch retailers list when clicking on Retailers box (legacy - now redirects to beat breakdown)
