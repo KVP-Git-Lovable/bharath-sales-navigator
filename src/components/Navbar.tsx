@@ -51,7 +51,10 @@ import {
 
 // Memoized Navbar component for better performance
 export const Navbar = memo(() => {
-  const { signOut, userProfile, userRole } = useAuth();
+  const { signOut, userProfile, userRole, securityProfileName } = useAuth();
+  
+  // Check if user has admin access - either through role OR System Administrator profile
+  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
   const navigate = useNavigate();
   const location = useLocation();
   const connectivityStatus = useConnectivity();
@@ -248,7 +251,7 @@ export const Navbar = memo(() => {
                   <SheetTitle className="text-lg font-bold text-primary-foreground truncate w-full text-left">
                     {displayName}
                   </SheetTitle>
-                  {userRole === 'admin' && (
+                  {hasAdminAccess && (
                     <div className="flex items-center gap-1.5 text-xs opacity-90 text-primary-foreground mt-1">
                       <Shield className="h-3.5 w-3.5" />
                       <span className="font-medium">Admin</span>
@@ -272,7 +275,7 @@ export const Navbar = memo(() => {
           </SheetHeader>
 
           {/* Admin Controls Section */}
-          {userRole === 'admin' && (
+          {hasAdminAccess && (
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Admin Controls</h3>
               <div className="grid grid-cols-3 gap-3">

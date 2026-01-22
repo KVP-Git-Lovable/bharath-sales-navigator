@@ -8,9 +8,12 @@ import { Shield, Users, Settings, Package, ArrowLeft, CalendarDays, MapPin, Doll
 import { SearchInput } from '@/components/SearchInput';
 
 const AdminControls = () => {
-  const { userRole, loading } = useAuth();
+  const { userRole, securityProfileName, loading } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Check if user has admin access - either through role OR System Administrator profile
+  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
 
   if (loading) {
     return (
@@ -22,7 +25,7 @@ const AdminControls = () => {
     );
   }
 
-  if (userRole !== 'admin') {
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 

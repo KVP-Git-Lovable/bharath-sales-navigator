@@ -12,8 +12,11 @@ import { UserObjectPermissions } from '@/components/security/UserObjectPermissio
 
 export default function SecurityManagement() {
   const navigate = useNavigate();
-  const { userRole, loading, user } = useAuth();
+  const { userRole, securityProfileName, loading, user } = useAuth();
   const [activeTab, setActiveTab] = useState('profiles');
+
+  // Check if user has admin access - either through role OR System Administrator profile
+  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
 
   // Show loading while auth is being determined
   if (loading) {
@@ -31,7 +34,7 @@ export default function SecurityManagement() {
 
   // Wait a bit for role to load if user exists but role is null
   // This handles the race condition where user is set but role fetch is still pending
-  if (userRole === null) {
+  if (userRole === null && securityProfileName === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -39,8 +42,8 @@ export default function SecurityManagement() {
     );
   }
 
-  // Only redirect if we have confirmed the role is not admin
-  if (userRole !== 'admin') {
+  // Only redirect if we have confirmed the user doesn't have admin access
+  if (!hasAdminAccess) {
     return <Navigate to="/dashboard" replace />;
   }
 
