@@ -37,8 +37,6 @@ import { Preferences } from "@capacitor/preferences";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
-import { UserSelector } from "@/components/UserSelector";
-import { useSubordinates } from "@/hooks/useSubordinates";
 import { InsightsPanel } from "@/components/visits/InsightsPanel";
 
 interface Visit {
@@ -185,7 +183,6 @@ export const MyVisits = () => {
   const [isPointsDialogOpen, setIsPointsDialogOpen] = useState(false);
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
-  const [selectedViewUserId, setSelectedViewUserId] = useState<string>('self'); // For viewing subordinates' data
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const {
     user
@@ -193,9 +190,6 @@ export const MyVisits = () => {
   const navigate = useNavigate();
   const networkStatus = useConnectivity();
   const isOnline = networkStatus === 'online';
-  
-  // Get subordinates for manager hierarchy
-  const { isManager } = useSubordinates();
 
   // NOTE: AI Recommendations hooks moved below after plannedBeats is defined
   
@@ -251,11 +245,7 @@ export const MyVisits = () => {
   } = useVisitsDataOptimized({
     userId: user?.id,
     selectedDate,
-    viewUserId: selectedViewUserId, // Pass the selected user for hierarchy viewing
   });
-  
-  // Check if viewing someone else's data
-  const isViewingOther = selectedViewUserId !== 'self' && selectedViewUserId !== user?.id;
 
   // DERIVED VALUES - using useMemo to prevent double state and unnecessary re-renders
   const plannedBeats = useMemo(() => optimizedBeatPlans, [optimizedBeatPlans]);
@@ -433,13 +423,8 @@ export const MyVisits = () => {
     loadWeekPlans();
   }, [user, weekDays]);
   // Removed - now using useVisitsDataOptimized hook for better performance
-  // Calculate the effective user ID for timeline queries based on selected user
-  const timelineTargetUserId = useMemo(() => {
-    if (selectedViewUserId === 'self' || !selectedViewUserId) {
-      return user?.id;
-    }
-    return selectedViewUserId;
-  }, [selectedViewUserId, user?.id]);
+  // Calculate the effective user ID for timeline queries
+  const timelineTargetUserId = user?.id;
 
   const loadTimelineVisits = async (date: Date, targetUserId: string) => {
     if (!targetUserId) return;
@@ -1173,21 +1158,7 @@ export const MyVisits = () => {
                 <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
                 <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
               </div>
-              {/* User Selector for managers to view subordinates' data */}
-              {isManager && (
-                <UserSelector
-                  selectedUserId={selectedViewUserId}
-                  onUserChange={setSelectedViewUserId}
-                  showAllOption={false}
-                  className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20"
-                />
-              )}
             </div>
-            {isViewingOther && (
-              <Badge variant="secondary" className="mt-2 bg-primary-foreground/20 text-primary-foreground">
-                Viewing team member's data
-              </Badge>
-            )}
           </CardHeader>
           <CardContent className="space-y-2 sm:space-y-4 px-2 sm:px-6 pb-2 sm:pb-6">
             {/* Calendar Selector */}
@@ -1542,14 +1513,6 @@ export const MyVisits = () => {
             <DialogHeader>
               <DialogTitle>{t('visits.timelineView')} - {format(timelineDate, 'MMM dd, yyyy')}</DialogTitle>
             </DialogHeader>
-            {isManager && (
-              <UserSelector 
-                selectedUserId={selectedViewUserId} 
-                onUserChange={setSelectedViewUserId}
-                showAllOption={false}
-                className="w-full sm:w-auto"
-              />
-            )}
             <TimelineView visits={timelineVisits} dayStart={timelineDayStart} selectedDate={timelineDate} onDateChange={date => {
             setTimelineDate(date);
             if (timelineTargetUserId) {
