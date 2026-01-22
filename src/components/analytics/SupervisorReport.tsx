@@ -190,7 +190,7 @@ export const SupervisorReport = () => {
           .gte('planned_date', fromDate)
           .lte('planned_date', toDate),
         
-        // Orders with items for product count and total KG
+        // Orders for this user (confirmed) - use order_date as per SQL query
         supabase
           .from('orders')
           .select(`
@@ -199,15 +199,35 @@ export const SupervisorReport = () => {
             total_amount,
             status,
             retailer_id,
-            retailers(beat_id, beats(beat_name)),
-            order_items(product_id, quantity, unit, total)
+            retailers(beat_id, beats(beat_name))
           `)
           .eq('user_id', userId)
           .eq('status', 'confirmed')
-          .gte('created_at', `${fromDate}T00:00:00`)
-          .lte('created_at', `${toDate}T23:59:59`)
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate)
           .order('order_date', { ascending: true })
       ]);
+
+      // Fetch order_items separately for confirmed orders
+      const orderIds = ordersResult.data?.map(o => o.id) || [];
+      let orderItemsData: any[] = [];
+      
+      if (orderIds.length > 0) {
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('order_id, product_id, quantity, unit, total')
+          .in('order_id', orderIds);
+        orderItemsData = items || [];
+      }
+      
+      // Create a map of order_id to items
+      const orderItemsMap: Record<string, any[]> = {};
+      orderItemsData.forEach(item => {
+        if (!orderItemsMap[item.order_id]) {
+          orderItemsMap[item.order_id] = [];
+        }
+        orderItemsMap[item.order_id].push(item);
+      });
 
       // Calculate retailer count
       const totalRetailersCreated = retailersResult.count || 0;
@@ -261,7 +281,9 @@ export const SupervisorReport = () => {
           dateGroups[dateKey].beats.add(beatName);
         }
 
-        order.order_items?.forEach((item: any) => {
+        // Use order items from the separate query
+        const items = orderItemsMap[order.id] || [];
+        items.forEach((item: any) => {
           if (item.product_id) {
             dateGroups[dateKey].products.add(item.product_id);
             allProducts.add(item.product_id);
@@ -271,12 +293,11 @@ export const SupervisorReport = () => {
           const unit = (item.unit || '').toLowerCase();
           let kg = 0;
           
+          // Match SQL logic: if unit is 'Grams', divide by 1000
           if (unit === 'grams' || unit === 'gram' || unit === 'g') {
             kg = qty / 1000;
-          } else if (unit === 'kg' || unit === 'kgs' || unit === 'kilogram') {
-            kg = qty;
           } else {
-            // Default: assume it's already in base unit (could be pieces, etc.)
+            // For KG or other units, use quantity directly
             kg = qty;
           }
           
