@@ -296,18 +296,27 @@ export const MyRetailers = () => {
       setInitialLoadComplete(true);
       loadingRef.current = false;
     }
-  }, [user, userNameMap]);
+  }, [user]);
+  
+  // Stable ref for loadRetailers to avoid dependency issues
+  const loadRetailersRef = useRef(loadRetailers);
+  useEffect(() => {
+    loadRetailersRef.current = loadRetailers;
+  }, [loadRetailers]);
   
   // Wrapper function that uses current selectedUserIds - for use in callbacks
   const refreshRetailers = useCallback(() => {
-    loadRetailers(selectedUserIds);
-  }, [loadRetailers, selectedUserIds]);
+    loadRetailersRef.current(selectedUserIds);
+  }, [selectedUserIds]);
 
   // Debounce the loadRetailers call to prevent rapid firing
   const loadRetailersTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track previous user IDs to detect user changes
   const prevUserIdsRef = useRef<string>('');
+  
+  // Track if we've done initial load
+  const hasLoadedRef = useRef(false);
   
   useEffect(() => {
     // Clear any pending timeout
@@ -317,21 +326,28 @@ export const MyRetailers = () => {
     
     if (user && selectedUserIds.length > 0) {
       const currentUserIdsKey = selectedUserIds.sort().join(',');
+      
+      // Skip if already loaded for same users
+      if (hasLoadedRef.current && lastLoadedUserIdsRef.current === currentUserIdsKey) {
+        return;
+      }
+      
       const isChangingUsers = prevUserIdsRef.current !== '' && prevUserIdsRef.current !== currentUserIdsKey;
       
       if (isChangingUsers) {
         // Mark that we're changing users - this prevents flicker
         setIsUserChanging(true);
-      } else if (retailers.length === 0 && !initialLoadComplete) {
+      } else if (retailers.length === 0 && !hasLoadedRef.current) {
         // Only show loading for initial load when no data
         setLoading(true);
       }
       
       prevUserIdsRef.current = currentUserIdsKey;
+      hasLoadedRef.current = true;
       
       // Debounce the actual data load by 100ms to prevent rapid firing
       loadRetailersTimeoutRef.current = setTimeout(() => {
-        loadRetailers(selectedUserIds);
+        loadRetailersRef.current(selectedUserIds);
       }, 100);
     }
     
@@ -341,7 +357,7 @@ export const MyRetailers = () => {
         clearTimeout(loadRetailersTimeoutRef.current);
       }
     };
-  }, [user, selectedUserIds, loadRetailers, initialLoadComplete]);
+  }, [user, selectedUserIds]); // Removed loadRetailers and initialLoadComplete from deps
   
   // Cleanup index only on unmount
   useEffect(() => {
