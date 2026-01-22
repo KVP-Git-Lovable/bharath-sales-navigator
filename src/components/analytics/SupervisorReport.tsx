@@ -156,22 +156,7 @@ export const SupervisorReport = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch orders with details
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_date,
-          total_amount,
-          retailer_id,
-          retailers(beat_id, beats(beat_name)),
-          order_items(product_id, quantity, products(unit))
-        `)
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate)
-        .eq('profiles.full_name', userName);
-
-      // Use a different approach - get user ID first
+      // Get user ID first
       const { data: userProfile } = await supabase
         .from('profiles')
         .select('id')
@@ -185,30 +170,59 @@ export const SupervisorReport = () => {
         return;
       }
 
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_date,
-          total_amount,
-          retailer_id,
-          retailers(id, beat_id, beats(beat_name)),
-          order_items(product_id, quantity, products(unit))
-        `)
-        .eq('user_id', userProfile.id)
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate)
-        .order('order_date', { ascending: true });
+      const userId = userProfile.id;
 
-      if (error) {
-        console.error('Error fetching user details:', error);
-        setUserDetails([]);
-        setDetailsSummary(null);
-        setDetailsLoading(false);
-        return;
-      }
+      // Fetch all data in parallel using the user's SQL query logic
+      const [retailersResult, visitsResult, ordersResult] = await Promise.all([
+        // Retailers created by user in date range
+        supabase
+          .from('retailers')
+          .select('id', { count: 'exact' })
+          .eq('user_id', userId)
+          .gte('created_at', `${fromDate}T00:00:00`)
+          .lte('created_at', `${toDate}T23:59:59`),
+        
+        // Distinct beats visited (using visits table)
+        supabase
+          .from('visits')
+          .select('retailer_id')
+          .eq('user_id', userId)
+          .gte('planned_date', fromDate)
+          .lte('planned_date', toDate),
+        
+        // Orders with items for product count and total KG
+        supabase
+          .from('orders')
+          .select(`
+            id,
+            order_date,
+            total_amount,
+            status,
+            retailer_id,
+            retailers(beat_id, beats(beat_name)),
+            order_items(product_id, quantity, unit, total)
+          `)
+          .eq('user_id', userId)
+          .eq('status', 'confirmed')
+          .gte('created_at', `${fromDate}T00:00:00`)
+          .lte('created_at', `${toDate}T23:59:59`)
+          .order('order_date', { ascending: true })
+      ]);
 
-      // Group by date
+      // Calculate retailer count
+      const totalRetailersCreated = retailersResult.count || 0;
+
+      // Calculate distinct beats visited
+      const distinctBeats = new Set(visitsResult.data?.map(v => v.retailer_id).filter(Boolean) || []);
+      const totalBeatsVisited = distinctBeats.size;
+
+      // Process orders for products and KG
+      const orders = ordersResult.data || [];
+      const allProducts = new Set<string>();
+      let totalQuantityKg = 0;
+      let totalRevenue = 0;
+
+      // Group by date for the details table
       const dateGroups: Record<string, {
         orders: any[];
         totalAmount: number;
@@ -216,14 +230,10 @@ export const SupervisorReport = () => {
         retailers: Set<string>;
         products: Set<string>;
         totalKg: number;
+        invoiceCount: number;
       }> = {};
 
-      let allRetailers = new Set<string>();
-      let allBeats = new Set<string>();
-      let allProducts = new Set<string>();
-      let allTotalKg = 0;
-
-      orders?.forEach((order: any) => {
+      orders.forEach((order: any) => {
         const dateKey = order.order_date;
         if (!dateGroups[dateKey]) {
           dateGroups[dateKey] = {
@@ -232,22 +242,23 @@ export const SupervisorReport = () => {
             beats: new Set(),
             retailers: new Set(),
             products: new Set(),
-            totalKg: 0
+            totalKg: 0,
+            invoiceCount: 0
           };
         }
 
         dateGroups[dateKey].orders.push(order);
         dateGroups[dateKey].totalAmount += Number(order.total_amount || 0);
+        dateGroups[dateKey].invoiceCount += 1;
+        totalRevenue += Number(order.total_amount || 0);
 
         if (order.retailer_id) {
           dateGroups[dateKey].retailers.add(order.retailer_id);
-          allRetailers.add(order.retailer_id);
         }
 
         const beatName = order.retailers?.beats?.beat_name;
         if (beatName) {
           dateGroups[dateKey].beats.add(beatName);
-          allBeats.add(beatName);
         }
 
         order.order_items?.forEach((item: any) => {
@@ -255,16 +266,22 @@ export const SupervisorReport = () => {
             dateGroups[dateKey].products.add(item.product_id);
             allProducts.add(item.product_id);
           }
+          
           const qty = Number(item.quantity || 0);
-          const unit = (item.products?.unit || '').toLowerCase();
+          const unit = (item.unit || '').toLowerCase();
           let kg = 0;
-          if (unit === 'grams') {
+          
+          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
             kg = qty / 1000;
-          } else if (unit === 'kg' || unit === 'kgs') {
+          } else if (unit === 'kg' || unit === 'kgs' || unit === 'kilogram') {
+            kg = qty;
+          } else {
+            // Default: assume it's already in base unit (could be pieces, etc.)
             kg = qty;
           }
+          
           dateGroups[dateKey].totalKg += kg;
-          allTotalKg += kg;
+          totalQuantityKg += kg;
         });
       });
 
@@ -273,7 +290,7 @@ export const SupervisorReport = () => {
         order_date: date,
         beat_names: Array.from(data.beats).join(', ') || 'N/A',
         total_amount: data.totalAmount,
-        invoice_count: data.orders.length,
+        invoice_count: data.invoiceCount,
         retailers_count: data.retailers.size,
         products_count: data.products.size,
         total_kg: data.totalKg
@@ -281,10 +298,10 @@ export const SupervisorReport = () => {
 
       setUserDetails(detailsArray);
       setDetailsSummary({
-        retailers: allRetailers.size,
-        beats: allBeats.size,
+        retailers: totalRetailersCreated,
+        beats: totalBeatsVisited,
         products: allProducts.size,
-        totalKg: allTotalKg
+        totalKg: Math.round(totalQuantityKg * 10) / 10 // Round to 1 decimal
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
