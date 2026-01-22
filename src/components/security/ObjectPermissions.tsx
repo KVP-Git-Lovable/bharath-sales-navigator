@@ -8,9 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Shield, Save, ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { Shield, Save, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField } from './permissionModules';
+import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount } from './permissionModules';
 
 interface ObjectPermission {
   id: string;
@@ -29,6 +29,7 @@ export const ObjectPermissions = () => {
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<ObjectPermission>>>({});
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
 
   // Fetch profiles
   const { data: profiles } = useQuery({
@@ -123,40 +124,87 @@ export const ObjectPermissions = () => {
     });
   };
 
+  const toggleFeature = (featureName: string) => {
+    setExpandedFeatures(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(featureName)) {
+        newSet.delete(featureName);
+      } else {
+        newSet.add(featureName);
+      }
+      return newSet;
+    });
+  };
+
   const expandAll = () => {
     setExpandedModules(new Set(PERMISSION_MODULES.map(m => m.name)));
+    // Also expand all features with sub-features
+    const allFeatures: string[] = [];
+    PERMISSION_MODULES.forEach(m => {
+      m.features.forEach(f => {
+        if (f.subFeatures && f.subFeatures.length > 0) {
+          allFeatures.push(f.name);
+        }
+      });
+    });
+    setExpandedFeatures(new Set(allFeatures));
   };
 
   const collapseAll = () => {
     setExpandedModules(new Set());
+    setExpandedFeatures(new Set());
   };
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
 
-  // Check if all features in a module have a specific permission enabled
+  // Check if all items in a module have a specific permission enabled
   const isColumnAllChecked = (moduleName: string, field: string): boolean => {
     const module = PERMISSION_MODULES.find(m => m.name === moduleName);
     if (!module) return false;
-    return module.features.every(feature => getPermissionValue(feature.name, field));
+    const items = getAllPermissionItems(module);
+    return items.every(item => getPermissionValue(item.name, field));
   };
 
-  // Check if some (but not all) features have a permission enabled
+  // Check if some (but not all) items have a permission enabled
   const isColumnIndeterminate = (moduleName: string, field: string): boolean => {
     const module = PERMISSION_MODULES.find(m => m.name === moduleName);
     if (!module) return false;
-    const checkedCount = module.features.filter(feature => getPermissionValue(feature.name, field)).length;
-    return checkedCount > 0 && checkedCount < module.features.length;
+    const items = getAllPermissionItems(module);
+    const checkedCount = items.filter(item => getPermissionValue(item.name, field)).length;
+    return checkedCount > 0 && checkedCount < items.length;
   };
 
-  // Toggle all features in a module for a specific permission
+  // Toggle all items in a module for a specific permission
   const handleColumnToggle = (moduleName: string, field: string, checked: boolean) => {
     const module = PERMISSION_MODULES.find(m => m.name === moduleName);
     if (!module) return;
 
+    const items = getAllPermissionItems(module);
     const newChanges: Record<string, Partial<ObjectPermission>> = { ...pendingChanges };
-    module.features.forEach(feature => {
-      newChanges[feature.name] = {
-        ...newChanges[feature.name],
+    items.forEach(item => {
+      newChanges[item.name] = {
+        ...newChanges[item.name],
+        [field]: checked
+      };
+    });
+    setPendingChanges(newChanges);
+  };
+
+  // Feature-level column helpers for sub-features
+  const isFeatureColumnAllChecked = (featureName: string, subFeatures: { name: string; label: string }[], field: string): boolean => {
+    return subFeatures.every(sf => getPermissionValue(sf.name, field));
+  };
+
+  const isFeatureColumnIndeterminate = (featureName: string, subFeatures: { name: string; label: string }[], field: string): boolean => {
+    const checkedCount = subFeatures.filter(sf => getPermissionValue(sf.name, field)).length;
+    return checkedCount > 0 && checkedCount < subFeatures.length;
+  };
+
+  const handleFeatureColumnToggle = (subFeatures: { name: string; label: string }[], field: string, checked: boolean) => {
+    const newChanges: Record<string, Partial<ObjectPermission>> = { ...pendingChanges };
+    subFeatures.forEach(sf => {
+      newChanges[sf.name] = {
+        ...newChanges[sf.name],
         [field]: checked
       };
     });
@@ -168,14 +216,30 @@ export const ObjectPermissions = () => {
     const module = PERMISSION_MODULES.find(m => m.name === moduleName);
     if (!module) return 0;
     
+    const items = getAllPermissionItems(module);
     let count = 0;
-    module.features.forEach(feature => {
+    items.forEach(item => {
       PERMISSION_FIELDS.forEach(field => {
-        if (getPermissionValue(feature.name, field.key)) count++;
+        if (getPermissionValue(item.name, field.key)) count++;
       });
     });
     return count;
   };
+
+  const renderPermissionCheckboxes = (objectName: string) => (
+    <>
+      {PERMISSION_FIELDS.map((field) => (
+        <TableCell key={field.key} className="text-center">
+          <Checkbox
+            checked={getPermissionValue(objectName, field.key)}
+            onCheckedChange={(checked) => 
+              handlePermissionChange(objectName, field.key, checked as boolean)
+            }
+          />
+        </TableCell>
+      ))}
+    </>
+  );
 
   return (
     <Card>
@@ -233,6 +297,8 @@ export const ObjectPermissions = () => {
             {PERMISSION_MODULES.map((module) => {
               const isExpanded = expandedModules.has(module.name);
               const enabledCount = getModuleEnabledCount(module.name);
+              const totalCount = getTotalFeatureCount(module);
+              const hasSubFeatures = module.features.some(f => f.subFeatures && f.subFeatures.length > 0);
               
               return (
                 <Collapsible
@@ -252,7 +318,7 @@ export const ObjectPermissions = () => {
                           <Layers className="h-4 w-4 text-primary" />
                           <span className="font-medium">{module.label}</span>
                           <span className="text-xs text-muted-foreground">
-                            ({module.features.length} features)
+                            ({totalCount} {hasSubFeatures ? 'sub-features' : 'features'})
                           </span>
                         </div>
                         {enabledCount > 0 && (
@@ -264,166 +330,128 @@ export const ObjectPermissions = () => {
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-background">
-                            <TableHead className="w-[250px]">Feature</TableHead>
-                            <TableHead className="text-center w-[100px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span>Read</span>
-                                <Checkbox
-                                  checked={isColumnAllChecked(module.name, 'can_read')}
-                                  ref={(el) => {
-                                    if (el) {
-                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_read');
-                                    }
-                                  }}
-                                  onCheckedChange={(checked) => 
-                                    handleColumnToggle(module.name, 'can_read', checked as boolean)
-                                  }
-                                />
-                              </div>
-                            </TableHead>
-                            <TableHead className="text-center w-[100px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span>Create</span>
-                                <Checkbox
-                                  checked={isColumnAllChecked(module.name, 'can_create')}
-                                  ref={(el) => {
-                                    if (el) {
-                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_create');
-                                    }
-                                  }}
-                                  onCheckedChange={(checked) => 
-                                    handleColumnToggle(module.name, 'can_create', checked as boolean)
-                                  }
-                                />
-                              </div>
-                            </TableHead>
-                            <TableHead className="text-center w-[100px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span>Edit</span>
-                                <Checkbox
-                                  checked={isColumnAllChecked(module.name, 'can_edit')}
-                                  ref={(el) => {
-                                    if (el) {
-                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_edit');
-                                    }
-                                  }}
-                                  onCheckedChange={(checked) => 
-                                    handleColumnToggle(module.name, 'can_edit', checked as boolean)
-                                  }
-                                />
-                              </div>
-                            </TableHead>
-                            <TableHead className="text-center w-[100px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span>Delete</span>
-                                <Checkbox
-                                  checked={isColumnAllChecked(module.name, 'can_delete')}
-                                  ref={(el) => {
-                                    if (el) {
-                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_delete');
-                                    }
-                                  }}
-                                  onCheckedChange={(checked) => 
-                                    handleColumnToggle(module.name, 'can_delete', checked as boolean)
-                                  }
-                                />
-                              </div>
-                            </TableHead>
-                            <TableHead className="text-center w-[100px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span>View All</span>
-                                <Checkbox
-                                  checked={isColumnAllChecked(module.name, 'can_view_all')}
-                                  ref={(el) => {
-                                    if (el) {
-                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_view_all');
-                                    }
-                                  }}
-                                  onCheckedChange={(checked) => 
-                                    handleColumnToggle(module.name, 'can_view_all', checked as boolean)
-                                  }
-                                />
-                              </div>
-                            </TableHead>
-                            <TableHead className="text-center w-[100px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span>Modify All</span>
-                                <Checkbox
-                                  checked={isColumnAllChecked(module.name, 'can_modify_all')}
-                                  ref={(el) => {
-                                    if (el) {
-                                      (el as any).indeterminate = isColumnIndeterminate(module.name, 'can_modify_all');
-                                    }
-                                  }}
-                                  onCheckedChange={(checked) => 
-                                    handleColumnToggle(module.name, 'can_modify_all', checked as boolean)
-                                  }
-                                />
-                              </div>
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {module.features.map((feature) => (
-                            <TableRow key={feature.name}>
-                              <TableCell className="font-medium text-sm">
-                                {feature.label}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={getPermissionValue(feature.name, 'can_read')}
-                                  onCheckedChange={(checked) => 
-                                    handlePermissionChange(feature.name, 'can_read', checked as boolean)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={getPermissionValue(feature.name, 'can_create')}
-                                  onCheckedChange={(checked) => 
-                                    handlePermissionChange(feature.name, 'can_create', checked as boolean)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={getPermissionValue(feature.name, 'can_edit')}
-                                  onCheckedChange={(checked) => 
-                                    handlePermissionChange(feature.name, 'can_edit', checked as boolean)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={getPermissionValue(feature.name, 'can_delete')}
-                                  onCheckedChange={(checked) => 
-                                    handlePermissionChange(feature.name, 'can_delete', checked as boolean)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={getPermissionValue(feature.name, 'can_view_all')}
-                                  onCheckedChange={(checked) => 
-                                    handlePermissionChange(feature.name, 'can_view_all', checked as boolean)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={getPermissionValue(feature.name, 'can_modify_all')}
-                                  onCheckedChange={(checked) => 
-                                    handlePermissionChange(feature.name, 'can_modify_all', checked as boolean)
-                                  }
-                                />
-                              </TableCell>
+                      {hasSubFeatures ? (
+                        // Render 3-level hierarchy for modules with sub-features
+                        <div className="divide-y">
+                          {module.features.map((feature) => {
+                            const isFeatureExpanded = expandedFeatures.has(feature.name);
+                            const subFeatures = feature.subFeatures || [];
+                            
+                            if (subFeatures.length === 0) {
+                              // Simple feature without sub-features
+                              return (
+                                <Table key={feature.name}>
+                                  <TableBody>
+                                    <TableRow>
+                                      <TableCell className="w-[250px] font-medium text-sm pl-8">
+                                        {feature.label}
+                                      </TableCell>
+                                      {renderPermissionCheckboxes(feature.name)}
+                                    </TableRow>
+                                  </TableBody>
+                                </Table>
+                              );
+                            }
+                            
+                            return (
+                              <Collapsible
+                                key={feature.name}
+                                open={isFeatureExpanded}
+                                onOpenChange={() => toggleFeature(feature.name)}
+                              >
+                                <CollapsibleTrigger className="w-full">
+                                  <div className="flex items-center gap-3 p-3 pl-6 bg-muted/30 hover:bg-muted/50 transition-colors border-b">
+                                    {isFeatureExpanded ? (
+                                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                    )}
+                                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-sm font-medium">{feature.label}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({subFeatures.length} sub-features)
+                                    </span>
+                                  </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-background">
+                                        <TableHead className="w-[250px] pl-12">Sub-feature</TableHead>
+                                        {PERMISSION_FIELDS.map((field) => (
+                                          <TableHead key={field.key} className="text-center w-[100px]">
+                                            <div className="flex flex-col items-center gap-1">
+                                              <span className="text-xs">{field.label}</span>
+                                              <Checkbox
+                                                checked={isFeatureColumnAllChecked(feature.name, subFeatures, field.key)}
+                                                ref={(el) => {
+                                                  if (el) {
+                                                    (el as any).indeterminate = isFeatureColumnIndeterminate(feature.name, subFeatures, field.key);
+                                                  }
+                                                }}
+                                                onCheckedChange={(checked) => 
+                                                  handleFeatureColumnToggle(subFeatures, field.key, checked as boolean)
+                                                }
+                                              />
+                                            </div>
+                                          </TableHead>
+                                        ))}
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {subFeatures.map((subFeature) => (
+                                        <TableRow key={subFeature.name}>
+                                          <TableCell className="font-medium text-sm pl-12">
+                                            {subFeature.label}
+                                          </TableCell>
+                                          {renderPermissionCheckboxes(subFeature.name)}
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        // Render 2-level hierarchy for modules without sub-features
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-background">
+                              <TableHead className="w-[250px]">Feature</TableHead>
+                              {PERMISSION_FIELDS.map((field) => (
+                                <TableHead key={field.key} className="text-center w-[100px]">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <span>{field.label}</span>
+                                    <Checkbox
+                                      checked={isColumnAllChecked(module.name, field.key)}
+                                      ref={(el) => {
+                                        if (el) {
+                                          (el as any).indeterminate = isColumnIndeterminate(module.name, field.key);
+                                        }
+                                      }}
+                                      onCheckedChange={(checked) => 
+                                        handleColumnToggle(module.name, field.key, checked as boolean)
+                                      }
+                                    />
+                                  </div>
+                                </TableHead>
+                              ))}
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {module.features.map((feature) => (
+                              <TableRow key={feature.name}>
+                                <TableCell className="font-medium text-sm">
+                                  {feature.label}
+                                </TableCell>
+                                {renderPermissionCheckboxes(feature.name)}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
                     </CollapsibleContent>
                   </div>
                 </Collapsible>
@@ -433,37 +461,9 @@ export const ObjectPermissions = () => {
         )}
 
         {!selectedProfileId && (
-          <div className="text-center py-12 text-muted-foreground">
-            Select a profile to configure its permissions
+          <div className="text-center py-8 text-muted-foreground">
+            Select a profile to configure object permissions
           </div>
-        )}
-
-        {/* Legend */}
-        {selectedProfileId && (
-          <Card className="bg-muted/30">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <strong>Read:</strong> View records
-                </div>
-                <div>
-                  <strong>Create:</strong> Add new records
-                </div>
-                <div>
-                  <strong>Edit:</strong> Update own records
-                </div>
-                <div>
-                  <strong>Delete:</strong> Remove own records
-                </div>
-                <div>
-                  <strong>View All:</strong> See all users' records
-                </div>
-                <div>
-                  <strong>Modify All:</strong> Edit/delete all records
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         )}
       </CardContent>
     </Card>
