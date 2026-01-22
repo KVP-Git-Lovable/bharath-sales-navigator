@@ -88,6 +88,15 @@ export const SupervisorReport = () => {
   const [productDayLoading, setProductDayLoading] = useState(false);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
 
+  // State for beat-wise split view in User Order Summary
+  const [selectedSummaryUser, setSelectedSummaryUser] = useState<string | null>(null);
+  const [beatBreakdownData, setBeatBreakdownData] = useState<{
+    beat_name: string;
+    total_value: number;
+    order_count: number;
+  }[]>([]);
+  const [beatBreakdownLoading, setBeatBreakdownLoading] = useState(false);
+
   // Generate AI insights based on the summary data
   const aiInsights = useMemo(() => {
     if (summaryData.length === 0) return [];
@@ -914,6 +923,109 @@ export const SupervisorReport = () => {
     }
   };
 
+  // Fetch beat-wise breakdown for a selected user in the summary table
+  const fetchBeatBreakdown = async (userName: string) => {
+    setBeatBreakdownLoading(true);
+    try {
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+      // Get user ID from profile
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('full_name', `${userName}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!userProfile) {
+        setBeatBreakdownData([]);
+        return;
+      }
+
+      // Calculate next day for date range query
+      const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
+
+      // Fetch orders with retailer beat info
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          retailer_id,
+          retailers!inner(beat_name, beat_id)
+        `)
+        .eq('user_id', userProfile.id)
+        .eq('status', 'confirmed')
+        .gte('created_at', `${fromDate}T00:00:00`)
+        .lt('created_at', `${nextDay}T00:00:00`);
+
+      if (ordersError || !orders || orders.length === 0) {
+        setBeatBreakdownData([]);
+        return;
+      }
+
+      // Get order IDs and fetch order items
+      const orderIds = orders.map(o => o.id);
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('order_id, total')
+        .in('order_id', orderIds);
+
+      // Map order totals
+      const orderTotals: Record<string, number> = {};
+      orderItems?.forEach(item => {
+        if (!orderTotals[item.order_id]) {
+          orderTotals[item.order_id] = 0;
+        }
+        orderTotals[item.order_id] += Number(item.total || 0);
+      });
+
+      // Group by beat_name and calculate totals
+      const beatTotals: Record<string, { total_value: number; order_count: number }> = {};
+      
+      orders.forEach((order: any) => {
+        const beatName = order.retailers?.beat_name || 'Unassigned';
+        const orderTotal = orderTotals[order.id] || 0;
+        
+        if (!beatTotals[beatName]) {
+          beatTotals[beatName] = { total_value: 0, order_count: 0 };
+        }
+        beatTotals[beatName].total_value += orderTotal;
+        beatTotals[beatName].order_count += 1;
+      });
+
+      // Convert to array and sort by total_value descending
+      const breakdown = Object.entries(beatTotals)
+        .map(([beat_name, data]) => ({
+          beat_name,
+          total_value: data.total_value,
+          order_count: data.order_count
+        }))
+        .sort((a, b) => b.total_value - a.total_value);
+
+      setBeatBreakdownData(breakdown);
+    } catch (error) {
+      console.error('Error fetching beat breakdown:', error);
+      setBeatBreakdownData([]);
+    } finally {
+      setBeatBreakdownLoading(false);
+    }
+  };
+
+  // Handle click on user row in summary table to show beat split
+  const handleSummaryRowClick = (userName: string) => {
+    // Toggle off if same user clicked
+    if (selectedSummaryUser === userName) {
+      setSelectedSummaryUser(null);
+      setBeatBreakdownData([]);
+    } else {
+      setSelectedSummaryUser(userName);
+      fetchBeatBreakdown(userName);
+    }
+    // Also show detailed section below
+    handleRowClick(userName);
+  };
+
   return (
     <div className="space-y-4">
       <Card className="shadow-lg">
@@ -1102,49 +1214,122 @@ export const SupervisorReport = () => {
                 </ResponsiveContainer>
               </div>
 
-              {/* Summary Table */}
+              {/* Summary Table with Beat-wise Split View */}
               <div>
-                <h3 className="font-semibold mb-3">User Order Summary</h3>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead>Full Name</TableHead>
-                        <TableHead className="text-right">Total Order Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {summaryData.map((row, index) => (
-                        <TableRow 
-                          key={index} 
-                          className={cn(
-                            "cursor-pointer hover:bg-muted/50 transition-colors",
-                            selectedUserDetails === row.full_name && "bg-muted"
-                          )}
-                          onClick={() => handleRowClick(row.full_name)}
-                        >
-                          <TableCell className="flex items-center gap-2">
-                            <div 
-                              className="w-3 h-3 rounded-full" 
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            />
-                            {row.full_name}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            ₹{row.total_order_value.toLocaleString()}
+                <h3 className="font-semibold mb-2">User Order Summary</h3>
+                <p className="text-xs text-muted-foreground mb-3">Click a row to see beat-wise breakdown</p>
+                <div className={cn(
+                  "grid gap-4 transition-all duration-300",
+                  selectedSummaryUser ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+                )}>
+                  {/* Left: User Summary Table */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Full Name</TableHead>
+                          <TableHead className="text-right">Total Order Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {summaryData.map((row, index) => (
+                          <TableRow 
+                            key={index} 
+                            className={cn(
+                              "cursor-pointer hover:bg-muted/50 transition-colors",
+                              selectedSummaryUser === row.full_name && "bg-primary/10 border-l-2 border-l-primary"
+                            )}
+                            onClick={() => handleSummaryRowClick(row.full_name)}
+                          >
+                            <TableCell className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              {row.full_name}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              ₹{row.total_order_value.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <tfoot className="bg-muted/30">
+                        <TableRow>
+                          <TableCell className="font-semibold">Total</TableCell>
+                          <TableCell className="text-right font-bold text-primary">
+                            ₹{totalOrderValue.toLocaleString()}
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                    <tfoot className="bg-muted/30">
-                      <TableRow>
-                        <TableCell className="font-semibold">Total</TableCell>
-                        <TableCell className="text-right font-bold text-primary">
-                          ₹{totalOrderValue.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    </tfoot>
-                  </Table>
+                      </tfoot>
+                    </Table>
+                  </div>
+
+                  {/* Right: Beat-wise Breakdown Panel */}
+                  {selectedSummaryUser && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-primary/10 px-4 py-2 border-b flex items-center justify-between">
+                        <h5 className="font-semibold text-sm">
+                          Beat-wise Split - {selectedSummaryUser}
+                        </h5>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSummaryUser(null);
+                            setBeatBreakdownData([]);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {beatBreakdownLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="animate-spin h-5 w-5" />
+                        </div>
+                      ) : beatBreakdownData.length > 0 ? (
+                        <div className="max-h-[300px] overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/30">
+                                <TableHead>Beat Name</TableHead>
+                                <TableHead className="text-right">Orders</TableHead>
+                                <TableHead className="text-right">Value</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {beatBreakdownData.map((beat, index) => (
+                                <TableRow key={index}>
+                                  <TableCell>{beat.beat_name}</TableCell>
+                                  <TableCell className="text-right">{beat.order_count}</TableCell>
+                                  <TableCell className="text-right font-semibold">
+                                    ₹{beat.total_value.toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                            <tfoot className="bg-muted/30 sticky bottom-0">
+                              <TableRow>
+                                <TableCell className="font-semibold">Total</TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  {beatBreakdownData.reduce((s, b) => s + b.order_count, 0)}
+                                </TableCell>
+                                <TableCell className="text-right font-bold text-primary">
+                                  ₹{beatBreakdownData.reduce((s, b) => s + b.total_value, 0).toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            </tfoot>
+                          </Table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No beat data found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
