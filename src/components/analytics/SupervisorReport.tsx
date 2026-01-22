@@ -173,7 +173,7 @@ export const SupervisorReport = () => {
       const userId = userProfile.id;
 
       // Fetch all data in parallel using the user's SQL query logic
-      const [retailersResult, visitsResult, ordersResult] = await Promise.all([
+      const [retailersResult, visitsResult, ordersResult, productRevenueResult] = await Promise.all([
         // Retailers created by user in date range
         supabase
           .from('retailers')
@@ -205,10 +205,33 @@ export const SupervisorReport = () => {
           .eq('status', 'confirmed')
           .gte('order_date', fromDate)
           .lte('order_date', toDate)
-          .order('order_date', { ascending: true })
+          .order('order_date', { ascending: true }),
+        
+        // Use the same RPC as Product and Revenue Performance report
+        supabase.rpc('get_product_revenue_performance', {
+          user_full_name: userName,
+          start_date: fromDate,
+          end_date: toDate
+        })
       ]);
 
-      // Fetch order_items separately for confirmed orders
+      // Calculate products and total KG from the RPC result (same logic as SQL Report)
+      const productData = productRevenueResult.data || [];
+      const totalProductsSold = productData.length; // Count of distinct products
+      let totalQuantityKgFromRpc = 0;
+      
+      productData.forEach((row: any) => {
+        const qty = Number(row.quantity_sold || 0);
+        const unit = (row.unit || '').toLowerCase();
+        // Same conversion logic as Analytics.tsx line 2391-2393
+        if (unit === 'grams') {
+          totalQuantityKgFromRpc += qty / 1000;
+        } else {
+          totalQuantityKgFromRpc += qty;
+        }
+      });
+
+      // Fetch order_items separately for the daily breakdown table
       const orderIds = ordersResult.data?.map(o => o.id) || [];
       let orderItemsData: any[] = [];
       
@@ -321,8 +344,8 @@ export const SupervisorReport = () => {
       setDetailsSummary({
         retailers: totalRetailersCreated,
         beats: totalBeatsVisited,
-        products: allProducts.size,
-        totalKg: Math.round(totalQuantityKg * 10) / 10 // Round to 1 decimal
+        products: totalProductsSold, // Use RPC result count
+        totalKg: Math.round(totalQuantityKgFromRpc * 100) / 100 // Use RPC calculated KG, round to 2 decimals
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
