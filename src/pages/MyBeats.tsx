@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search } from "lucide-react";
-import { UserSelector } from "@/components/UserSelector";
+import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,20 +92,24 @@ export const MyBeats = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Hierarchical user filter
-  const { isManager, subordinateIds } = useSubordinates();
-  const [selectedUserId, setSelectedUserId] = useState<string>('self');
+  // Hierarchical user filter - multi-select like MyRetailers
+  const { isManager, subordinates, subordinateIds } = useSubordinates();
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   
-  // Calculate effective user ID for data filtering
-  const effectiveUserId = useMemo(() => {
-    if (selectedUserId === 'self' || selectedUserId === user?.id) {
-      return user?.id;
+  // Initialize with self when user is available
+  useEffect(() => {
+    if (user?.id && selectedUserIds.length === 0) {
+      setSelectedUserIds([user.id]);
     }
-    if (selectedUserId === 'all') {
-      return null; // Will filter by all subordinate IDs
+  }, [user?.id]);
+  
+  // Calculate effective user IDs for data filtering
+  const effectiveUserIds = useMemo(() => {
+    if (selectedUserIds.length === 0 && user?.id) {
+      return [user.id];
     }
-    return selectedUserId;
-  }, [selectedUserId, user?.id]);
+    return selectedUserIds;
+  }, [selectedUserIds, user?.id]);
   const { recommendations, loading: recsLoading, generateRecommendation, provideFeedback } = useRecommendations('beat_visit');
   const [activeTab, setActiveTab] = useState('beats');
   const [showRetailerAnalytics, setShowRetailerAnalytics] = useState(false);
@@ -159,29 +163,21 @@ export const MyBeats = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  // Load data when user selection changes
   useEffect(() => {
-    // Load data even if user is not available yet (offline support)
     const loadData = async () => {
-      // Try to get cached user ID if user is not available
-      const cachedUserId = localStorage.getItem('cached_user_id');
-      const effectiveUserId = user?.id || cachedUserId;
-      
-      if (effectiveUserId) {
+      if (effectiveUserIds.length > 0) {
         await loadBeats();
         await loadAllRetailers();
         
         if (isOnline) {
           await loadTerritories();
         }
-      } else {
-        // Still try to load from cache even without user
-        await loadBeats();
-        await loadAllRetailers();
       }
     };
     
     loadData();
-  }, [user, isOnline]);
+  }, [effectiveUserIds, isOnline]);
 
   // Set up real-time updates
   useEffect(() => {
@@ -227,12 +223,8 @@ export const MyBeats = () => {
   }, [user]);
 
   const loadBeats = async () => {
-    // Get user ID from cached data if not available
-    const cachedUserId = localStorage.getItem('cached_user_id');
-    const effectiveUserId = user?.id || cachedUserId;
-    
-    if (!effectiveUserId) {
-      console.log('No user ID available, skipping beat load');
+    if (effectiveUserIds.length === 0) {
+      console.log('No user IDs available, skipping beat load');
       setLoading(false);
       return;
     }
@@ -244,13 +236,15 @@ export const MyBeats = () => {
       const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
       const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
       
-      // Filter cached beats by user
-      const userCachedBeats = cachedBeats.filter((b: any) => b.created_by === effectiveUserId);
+      // Filter cached beats by selected users
+      const userCachedBeats = cachedBeats.filter((b: any) => 
+        effectiveUserIds.includes(b.created_by)
+      );
       
       if (userCachedBeats.length > 0) {
         // Display cached data IMMEDIATELY
         const cachedRetailersData = cachedRetailers.filter((r: any) => 
-          r.user_id === effectiveUserId && r.beat_id && r.beat_id !== '' && r.beat_id !== 'unassigned'
+          effectiveUserIds.includes(r.user_id) && r.beat_id && r.beat_id !== '' && r.beat_id !== 'unassigned'
         ).map((r: any) => ({ beat_id: r.beat_id }));
         
         const retailerCountMap = new Map<string, number>();
@@ -286,7 +280,7 @@ export const MyBeats = () => {
             .from('beats')
             .select('*')
             .eq('is_active', true)
-            .eq('created_by', effectiveUserId)
+            .in('created_by', effectiveUserIds)
             .order('created_at', { ascending: true });
 
           if (!beatsError && onlineBeats) {
@@ -309,7 +303,7 @@ export const MyBeats = () => {
             const { data: onlineRetailers, error: retailersError } = await supabase
               .from('retailers')
               .select('beat_id')
-              .eq('user_id', effectiveUserId)
+              .in('user_id', effectiveUserIds)
               .not('beat_id', 'is', null)
               .neq('beat_id', '')
               .neq('beat_id', 'unassigned');
@@ -374,16 +368,16 @@ export const MyBeats = () => {
   };
 
   const loadAllRetailers = async () => {
-    // Get user ID from cached data if not available
-    const cachedUserId = localStorage.getItem('cached_user_id');
-    const effectiveUserId = user?.id || cachedUserId;
+    if (effectiveUserIds.length === 0) {
+      return;
+    }
     
     try {
       // STEP 1: ALWAYS load from cache FIRST (instant display)
       const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
-      const userRetailers = effectiveUserId 
-        ? cachedRetailers.filter((r: any) => r.user_id === effectiveUserId)
-        : cachedRetailers;
+      const userRetailers = cachedRetailers.filter((r: any) => 
+        effectiveUserIds.includes(r.user_id)
+      );
       
       if (userRetailers.length > 0) {
         // Display cached data IMMEDIATELY
@@ -407,12 +401,12 @@ export const MyBeats = () => {
       }
       
       // STEP 2: If online, fetch fresh data in BACKGROUND and update cache
-      if (navigator.onLine && effectiveUserId) {
+      if (navigator.onLine && effectiveUserIds.length > 0) {
         try {
           const { data: onlineData, error } = await supabase
             .from('retailers')
             .select('*')
-            .eq('user_id', effectiveUserId)
+            .in('user_id', effectiveUserIds)
             .order('name');
 
           if (!error && onlineData) {
@@ -1012,13 +1006,11 @@ export const MyBeats = () => {
                   <CardTitle className="text-2xl font-bold">My Beats</CardTitle>
                   <p className="text-primary-foreground/80 mt-1">Manage your sales territories and routes</p>
                   <div className="flex items-center gap-2 flex-wrap mt-2">
-                    {/* User Selector below title */}
-                    <UserSelector
-                      selectedUserId={selectedUserId}
-                      onUserChange={setSelectedUserId}
-                      showAllOption={true}
-                      allOptionLabel="All Team"
-                      className="h-7 min-w-[100px] max-w-[140px] text-xs bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground [&>span]:text-primary-foreground"
+                    {/* Multi-User Selector below title */}
+                    <CompactMultiUserSelector
+                      selectedUserIds={selectedUserIds}
+                      onSelectionChange={setSelectedUserIds}
+                      className="bg-primary-foreground/10 border-primary-foreground/20"
                     />
                   </div>
                 </div>
