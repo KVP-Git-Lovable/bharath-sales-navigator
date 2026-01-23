@@ -1323,9 +1323,9 @@ const Attendance = () => {
                         const hasApprovedRequest = existingRequest?.status === 'approved';
                         const hasRejectedRequest = existingRequest?.status === 'rejected';
                         
-                        // Allow regularization for any record (absent, low face match, time corrections, etc.)
-                        // Only hide if there's a pending/approved request or already regularized
-                        const showRegularizationButton = !hasPendingRequest && !hasApprovedRequest && !isRegularized;
+                        // Always show regularization button for any record
+                        // Users can submit multiple requests or corrections as needed
+                        const showRegularizationButton = true;
                         
                         return (
                           <div 
