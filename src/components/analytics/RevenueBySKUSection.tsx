@@ -35,37 +35,47 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange }: RevenueBySKUSe
 
       // If no users selected or multiple users, aggregate across selected users
       if (selectedUsers.length === 0 || selectedUsers.length > 1) {
+        // First get the user IDs for the selected user names
+        let userIds: string[] = [];
+        
+        if (selectedUsers.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('full_name', selectedUsers);
+          
+          if (profilesError || !profiles) {
+            console.error('Error fetching profiles:', profilesError);
+            setSkuData([]);
+            setLoading(false);
+            return;
+          }
+          userIds = profiles.map(p => p.id);
+        }
+
         // Fetch orders for selected users in the date range
         let ordersQuery = supabase
           .from('orders')
-          .select('id, user_id, profiles!orders_user_id_fkey(full_name)')
+          .select('id')
           .eq('status', 'confirmed')
           .gte('order_date', fromDate)
           .lte('order_date', toDate);
+        
+        // Filter by user IDs if we have selected users
+        if (userIds.length > 0) {
+          ordersQuery = ordersQuery.in('user_id', userIds);
+        }
 
         const { data: orders, error: ordersError } = await ordersQuery;
 
         if (ordersError || !orders || orders.length === 0) {
+          console.error('Orders error or no orders:', ordersError);
           setSkuData([]);
           setLoading(false);
           return;
         }
 
-        // Filter orders by selected users if any are selected
-        const filteredOrders = selectedUsers.length > 0
-          ? orders.filter((o: any) => {
-              const userName = o.profiles?.full_name;
-              return userName && selectedUsers.includes(userName);
-            })
-          : orders;
-
-        if (filteredOrders.length === 0) {
-          setSkuData([]);
-          setLoading(false);
-          return;
-        }
-
-        const orderIds = filteredOrders.map((o: any) => o.id);
+        const orderIds = orders.map((o: any) => o.id);
 
         // Fetch order items for these orders
         const { data: orderItems, error: itemsError } = await supabase
@@ -74,6 +84,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange }: RevenueBySKUSe
           .in('order_id', orderIds);
 
         if (itemsError || !orderItems) {
+          console.error('Order items error:', itemsError);
           setSkuData([]);
           setLoading(false);
           return;
