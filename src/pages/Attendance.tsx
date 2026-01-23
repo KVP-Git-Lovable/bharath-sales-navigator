@@ -1444,9 +1444,22 @@ const Attendance = () => {
                                     </DialogTrigger>
                                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
                                       <DialogHeader>
-                                        <DialogTitle>
-                                          Journey Heat Map - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                        </DialogTitle>
+                                        <div className="flex items-center justify-between">
+                                          <DialogTitle>
+                                            Journey Heat Map - {format(new Date(record.date), 'MMM dd, yyyy')}
+                                          </DialogTitle>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              const userId = effectiveUserId || user?.id;
+                                              navigate(`/gps-track?date=${recordDate}&userId=${userId}`);
+                                            }}
+                                          >
+                                            <Navigation2 className="h-4 w-4 mr-2" />
+                                            Open in GPS Track
+                                          </Button>
+                                        </div>
                                       </DialogHeader>
                                       <div className="mt-4">
                                         <JourneyMap 

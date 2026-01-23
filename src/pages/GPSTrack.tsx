@@ -16,6 +16,7 @@ import { UserSelector } from '@/components/UserSelector';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { GPSStatsCard } from '@/components/gps/GPSStatsCard';
 import { EnhancedRetailerLocation, RetailerStatus } from '@/components/gps/RetailerListModal';
+import { useSearchParams } from 'react-router-dom';
 
 interface GPSData {
   latitude: number;
@@ -33,7 +34,18 @@ interface VisitStats {
 
 export default function GPSTrack() {
   const { user } = useAuth();
-  const [date, setDate] = useState<Date>(new Date());
+  const [searchParams] = useSearchParams();
+  
+  // Read URL parameters for date and userId
+  const dateParam = searchParams.get('date');
+  const userParam = searchParams.get('userId');
+  
+  const [date, setDate] = useState<Date>(() => {
+    if (dateParam) {
+      return new Date(dateParam + 'T00:00:00');
+    }
+    return new Date();
+  });
   const [gpsData, setGpsData] = useState<GPSData[]>([]);
   const [retailers, setRetailers] = useState<EnhancedRetailerLocation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,8 +59,10 @@ export default function GPSTrack() {
   // Hierarchical user filter using useSubordinates hook
   const { isManager, subordinates, isLoading: subordinatesLoading } = useSubordinates();
   
-  // State for user selection - 'self' means current user
-  const [selectedUserId, setSelectedUserId] = useState<string>('self');
+  // State for user selection - initialize from URL param or 'self'
+  const [selectedUserId, setSelectedUserId] = useState<string>(() => {
+    return userParam || 'self';
+  });
   const [currentLocationUserId, setCurrentLocationUserId] = useState<string>('self');
   
   // Determine if user can select team members (is a manager with subordinates)
