@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search } from "lucide-react";
+import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle } from "lucide-react";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Layout } from "@/components/Layout";
 import { RetailerAnalytics } from "@/components/RetailerAnalytics";
 import { EditBeatModal } from "@/components/EditBeatModal";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -149,6 +151,9 @@ export const MyBeats = () => {
   // Delete state
   const [isDeleting, setIsDeleting] = useState(false);
   const [affectedRetailerCount, setAffectedRetailerCount] = useState(0);
+  
+  // Stats detail dialog state
+  const [statsDetailDialog, setStatsDetailDialog] = useState<'beats' | 'retailers' | 'unassigned' | 'average' | null>(null);
   
   // Delete confirmation dialog
   const { isOpen: isDeleteOpen, itemId: deleteItemId, itemName: deleteItemName, openDeleteDialog, closeDeleteDialog, setOpen: setDeleteOpen } = useDeleteConfirm();
@@ -1029,13 +1034,19 @@ export const MyBeats = () => {
 
         {/* Stats Dashboard */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="text-center">
+          <Card 
+            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-primary"
+            onClick={() => setStatsDetailDialog('beats')}
+          >
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-primary">{beats.length}</div>
               <div className="text-sm text-muted-foreground">Total Beats</div>
             </CardContent>
           </Card>
-          <Card className="text-center">
+          <Card 
+            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-green-500"
+            onClick={() => setStatsDetailDialog('retailers')}
+          >
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-green-600">
                 {beats.reduce((sum, beat) => sum + beat.retailer_count, 0)}
@@ -1043,7 +1054,10 @@ export const MyBeats = () => {
               <div className="text-sm text-muted-foreground">Total Retailers</div>
             </CardContent>
           </Card>
-          <Card className="text-center">
+          <Card 
+            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-orange-500"
+            onClick={() => setStatsDetailDialog('unassigned')}
+          >
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-orange-600">
                 {allRetailers.filter(r => !r.beat_id || r.beat_id === 'unassigned').length}
@@ -1051,7 +1065,10 @@ export const MyBeats = () => {
               <div className="text-sm text-muted-foreground">Unassigned</div>
             </CardContent>
           </Card>
-          <Card className="text-center">
+          <Card 
+            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-blue-500"
+            onClick={() => setStatsDetailDialog('average')}
+          >
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-blue-600">
                 {beats.length > 0 ? Math.round(beats.reduce((sum, beat) => sum + beat.retailer_count, 0) / beats.length) : 0}
@@ -1060,6 +1077,269 @@ export const MyBeats = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Stats Detail Dialog */}
+        <Dialog open={statsDetailDialog !== null} onOpenChange={(open) => !open && setStatsDetailDialog(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {statsDetailDialog === 'beats' && (
+                  <>
+                    <Hash className="h-5 w-5 text-primary" />
+                    Total Beats Breakdown
+                  </>
+                )}
+                {statsDetailDialog === 'retailers' && (
+                  <>
+                    <Store className="h-5 w-5 text-green-600" />
+                    Retailers by Beat
+                  </>
+                )}
+                {statsDetailDialog === 'unassigned' && (
+                  <>
+                    <AlertCircle className="h-5 w-5 text-orange-600" />
+                    Unassigned Retailers
+                  </>
+                )}
+                {statsDetailDialog === 'average' && (
+                  <>
+                    <Percent className="h-5 w-5 text-blue-600" />
+                    Beat Distribution Analysis
+                  </>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <ScrollArea className="max-h-[60vh]">
+              {/* Total Beats Detail */}
+              {statsDetailDialog === 'beats' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <div className="text-3xl font-bold text-primary">{beats.length}</div>
+                        <div className="text-sm text-muted-foreground">Active Beats</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <div className="text-3xl font-bold text-green-600">
+                          {beats.reduce((sum, beat) => sum + beat.retailer_count, 0)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Total Retailers</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Beat Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Retailers</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {beats.map((beat, index) => (
+                        <TableRow 
+                          key={beat.id} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => {
+                            setStatsDetailDialog(null);
+                            navigate(`/beats/${beat.id}`);
+                          }}
+                        >
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell>{beat.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{beat.category || 'General'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{beat.retailer_count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Retailers by Beat Detail */}
+              {statsDetailDialog === 'retailers' && (
+                <div className="space-y-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Beat Name</TableHead>
+                        <TableHead className="text-right">Retailer Count</TableHead>
+                        <TableHead className="text-right">% of Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {beats
+                        .sort((a, b) => b.retailer_count - a.retailer_count)
+                        .map((beat) => {
+                          const totalRetailers = beats.reduce((sum, b) => sum + b.retailer_count, 0);
+                          const percentage = totalRetailers > 0 
+                            ? ((beat.retailer_count / totalRetailers) * 100).toFixed(1) 
+                            : '0';
+                          return (
+                            <TableRow 
+                              key={beat.id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => {
+                                setStatsDetailDialog(null);
+                                navigate(`/beats/${beat.id}`);
+                              }}
+                            >
+                              <TableCell className="font-medium">{beat.name}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="secondary">{beat.retailer_count}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {percentage}%
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                  <div className="text-sm text-muted-foreground text-center pt-2 border-t">
+                    Total: {beats.reduce((sum, beat) => sum + beat.retailer_count, 0)} retailers across {beats.length} beats
+                  </div>
+                </div>
+              )}
+
+              {/* Unassigned Retailers Detail */}
+              {statsDetailDialog === 'unassigned' && (
+                <div className="space-y-4">
+                  {allRetailers.filter(r => !r.beat_id || r.beat_id === 'unassigned').length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-muted-foreground">All retailers are assigned to beats!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-orange-50 dark:bg-orange-950/20 p-3 rounded-lg mb-4">
+                        <p className="text-sm text-orange-700 dark:text-orange-400">
+                          {allRetailers.filter(r => !r.beat_id || r.beat_id === 'unassigned').length} retailers need to be assigned to beats
+                        </p>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Retailer Name</TableHead>
+                            <TableHead>Address</TableHead>
+                            <TableHead>Category</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {allRetailers
+                            .filter(r => !r.beat_id || r.beat_id === 'unassigned')
+                            .slice(0, 20)
+                            .map((retailer) => (
+                              <TableRow 
+                                key={retailer.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => {
+                                  setStatsDetailDialog(null);
+                                  navigate(`/retailers/${retailer.id}`);
+                                }}
+                              >
+                                <TableCell className="font-medium">{retailer.name}</TableCell>
+                                <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                                  {retailer.address}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{retailer.category || 'N/A'}</Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                      {allRetailers.filter(r => !r.beat_id || r.beat_id === 'unassigned').length > 20 && (
+                        <p className="text-sm text-muted-foreground text-center">
+                          Showing 20 of {allRetailers.filter(r => !r.beat_id || r.beat_id === 'unassigned').length} unassigned retailers
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Average per Beat Analysis */}
+              {statsDetailDialog === 'average' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {beats.length > 0 ? Math.round(beats.reduce((sum, beat) => sum + beat.retailer_count, 0) / beats.length) : 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Average</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {beats.length > 0 ? Math.max(...beats.map(b => b.retailer_count)) : 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Maximum</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {beats.length > 0 ? Math.min(...beats.map(b => b.retailer_count)) : 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Minimum</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Beat Name</TableHead>
+                        <TableHead className="text-right">Retailers</TableHead>
+                        <TableHead className="text-right">vs Avg</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {beats
+                        .sort((a, b) => b.retailer_count - a.retailer_count)
+                        .map((beat) => {
+                          const avg = beats.length > 0 
+                            ? beats.reduce((sum, b) => sum + b.retailer_count, 0) / beats.length 
+                            : 0;
+                          const diff = beat.retailer_count - avg;
+                          return (
+                            <TableRow 
+                              key={beat.id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => {
+                                setStatsDetailDialog(null);
+                                navigate(`/beats/${beat.id}`);
+                              }}
+                            >
+                              <TableCell className="font-medium">{beat.name}</TableCell>
+                              <TableCell className="text-right">{beat.retailer_count}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={diff >= 0 ? "default" : "secondary"}
+                                  className={diff >= 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                                >
+                                  {diff >= 0 ? '+' : ''}{Math.round(diff)}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
 
         {/* Search Bar */}
         <div className="flex items-center gap-2">
