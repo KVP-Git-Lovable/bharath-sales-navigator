@@ -1470,46 +1470,17 @@ const Attendance = () => {
                                     </DialogContent>
                                   </Dialog>
 
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button
-                                        size="icon"
-                                        variant="outline"
-                                        className="h-8 w-8"
-                                        onClick={async () => {
-                                          await fetchVisitsForDate(recordDate);
-                                        }}
-                                        title="Timeline View"
-                                      >
-                                        <CalendarDays className="h-4 w-4" />
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                                      <DialogHeader>
-                                        <div className="flex items-center justify-between">
-                                          <DialogTitle>
-                                            Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                          </DialogTitle>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                              navigate(`/my-visits?date=${recordDate}&timeline=true`);
-                                            }}
-                                          >
-                                            <Clock className="h-4 w-4 mr-2" />
-                                            Open in Timeline
-                                          </Button>
-                                        </div>
-                                      </DialogHeader>
-                                      <div className="mt-4">
-                                        <TimelineView 
-                                          visits={selectedDateVisits}
-                                          dayStart={formatTime(record.check_in_time)}
-                                        />
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                      navigate(`/my-visits?date=${recordDate}&timeline=true`);
+                                    }}
+                                    title="Timeline View"
+                                  >
+                                    <CalendarDays className="h-4 w-4" />
+                                  </Button>
 
                                   <Button
                                     size="icon"
