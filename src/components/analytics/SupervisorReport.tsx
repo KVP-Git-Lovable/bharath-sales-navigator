@@ -2132,7 +2132,7 @@ export const SupervisorReport = () => {
       <RevenueBySKUSection selectedUser={selectedUser} dateRange={dateRange} />
 
       {/* Productivity Summary Section */}
-      <ProductivitySummarySection selectedUser={selectedUser} dateRange={dateRange} />
+      <ProductivitySummarySection selectedUsers={selectedUsers} dateRange={dateRange} />
 
       {/* AI Insights Section - Moved to bottom */}
       {aiInsights.length > 0 && (
