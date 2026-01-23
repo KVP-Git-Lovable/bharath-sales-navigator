@@ -1486,9 +1486,21 @@ const Attendance = () => {
                                     </DialogTrigger>
                                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
                                       <DialogHeader>
-                                        <DialogTitle>
-                                          Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
-                                        </DialogTitle>
+                                        <div className="flex items-center justify-between">
+                                          <DialogTitle>
+                                            Day Timeline - {format(new Date(record.date), 'MMM dd, yyyy')}
+                                          </DialogTitle>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              navigate(`/my-visits?date=${recordDate}&timeline=true`);
+                                            }}
+                                          >
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            Open in Timeline
+                                          </Button>
+                                        </div>
                                       </DialogHeader>
                                       <div className="mt-4">
                                         <TimelineView 

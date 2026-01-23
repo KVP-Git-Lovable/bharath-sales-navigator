@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
@@ -151,12 +151,19 @@ export const MyVisits = () => {
   const {
     t
   } = useTranslation();
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Read URL parameters for date and timeline
+  const dateParam = searchParams.get('date');
+  const timelineParam = searchParams.get('timeline');
+
   // Set default selected date/day immediately (avoids first-load empty state)
-  const initialWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+  const initialWeekStart = startOfWeek(dateParam ? new Date(dateParam + 'T00:00:00') : new Date(), { weekStartsOn: 0 });
   const initialWeekDays = getWeekDays(initialWeekStart);
-  const initialDayInfo = initialWeekDays.find(d => d.isToday) || initialWeekDays[0];
+  const initialDayInfo = dateParam 
+    ? initialWeekDays.find(d => d.isoDate === dateParam) || initialWeekDays[0]
+    : initialWeekDays.find(d => d.isToday) || initialWeekDays[0];
 
   const [selectedDay, setSelectedDay] = useState(() => initialDayInfo.day);
   const [selectedDate, setSelectedDate] = useState(() => initialDayInfo.isoDate);
@@ -172,8 +179,8 @@ export const MyVisits = () => {
   const [isCreateVisitModalOpen, setIsCreateVisitModalOpen] = useState(false);
   const [isOrdersDialogOpen, setIsOrdersDialogOpen] = useState(false);
   const [ordersData, setOrdersData] = useState<any[]>([]);
-  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
-  const [timelineDate, setTimelineDate] = useState<Date>(new Date());
+  const [isTimelineOpen, setIsTimelineOpen] = useState(() => timelineParam === 'true');
+  const [timelineDate, setTimelineDate] = useState<Date>(() => dateParam ? new Date(dateParam + 'T00:00:00') : new Date());
   const [timelineVisits, setTimelineVisits] = useState<any[]>([]);
   const [timelineDayStart, setTimelineDayStart] = useState<string>('08:00 AM');
   const [isVanStockOpen, setIsVanStockOpen] = useState(false);
