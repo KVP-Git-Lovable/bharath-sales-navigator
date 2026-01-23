@@ -901,6 +901,9 @@ export const AddRetailer = () => {
     if (retailerData.parentType === "Distributor" && (!retailerData.selectedDistributors || retailerData.selectedDistributors.length === 0)) {
       errors.distributor = "Distributor selection is required";
     }
+    if (!retailerData.latitude || !retailerData.longitude) {
+      errors.location = "GPS location is required - please tap 'Get Location' button";
+    }
     
     return errors;
   };
@@ -1485,7 +1488,10 @@ export const AddRetailer = () => {
                     <MapPin size={16} />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">{t('retailer.gpsButton')}</p>
+                <p className="text-xs text-muted-foreground">{t('retailer.gpsButton')} *</p>
+                {validationErrors.location && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.location}</p>
+                )}
                 
                 {/* Latitude and Longitude Display */}
                 {(retailerData.latitude || retailerData.longitude) && (
