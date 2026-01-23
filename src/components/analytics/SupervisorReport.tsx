@@ -13,6 +13,7 @@ import { format, startOfMonth, startOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RevenueBySKUSection } from './RevenueBySKUSection';
+import { ProductivitySummarySection } from './ProductivitySummarySection';
 import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
 
 interface UserOrderSummary {
@@ -1974,6 +1975,9 @@ export const SupervisorReport = () => {
 
       {/* Revenue Summary by SKU Section */}
       <RevenueBySKUSection selectedUser={selectedUser} dateRange={dateRange} />
+
+      {/* Productivity Summary Section */}
+      <ProductivitySummarySection selectedUser={selectedUser} dateRange={dateRange} />
 
       {/* AI Insights Section - Moved to bottom */}
       {aiInsights.length > 0 && (
