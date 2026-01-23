@@ -349,33 +349,39 @@ export default function GPSTrack() {
     setBeatName(data?.beat_name || null);
   };
 
-  const loadVisitStats = async () => {
+  const loadVisitStats = useCallback(async () => {
     if (!selectedMember) return;
 
     const dateStr = date.toISOString().split('T')[0];
     
-    // Calculate stats from the retailers state
-    const planned = retailers.length;
-    const productive = retailers.filter(r => r.status === 'productive').length;
-    const unproductive = retailers.filter(r => r.status === 'unproductive').length;
-    const pending = retailers.filter(r => r.status === 'pending' || r.status === 'planned').length;
-    
-    setVisitStats({ planned, productive, unproductive, pending });
-  };
+    // Calculate stats directly from visits table (not dependent on retailer coordinates)
+    const { data: visits, error } = await supabase
+      .from('visits')
+      .select('id, status, no_order_reason')
+      .eq('user_id', selectedMember)
+      .eq('planned_date', dateStr);
 
-  // Calculate stats when retailers change
-  useEffect(() => {
-    if (retailers.length > 0) {
-      const planned = retailers.length;
-      const productive = retailers.filter(r => r.status === 'productive').length;
-      const unproductive = retailers.filter(r => r.status === 'unproductive').length;
-      const pending = retailers.filter(r => r.status === 'pending' || r.status === 'planned').length;
+    if (error) {
+      console.error('Error loading visit stats:', error);
+      return;
+    }
+
+    if (visits) {
+      const total = visits.length;
+      const productive = visits.filter(v => v.status === 'productive').length;
+      const unproductive = visits.filter(v => v.status === 'unproductive' || !!v.no_order_reason).length;
+      const pending = visits.filter(v => v.status === 'planned' || v.status === 'pending').length;
       
-      setVisitStats({ planned, productive, unproductive, pending });
+      setVisitStats({ 
+        planned: total, 
+        productive, 
+        unproductive, 
+        pending 
+      });
     } else {
       setVisitStats({ planned: 0, productive: 0, unproductive: 0, pending: 0 });
     }
-  }, [retailers]);
+  }, [selectedMember, date]);
 
   // Data loading effect - called after all functions are defined
   useEffect(() => {
@@ -383,8 +389,9 @@ export default function GPSTrack() {
       loadGPSData();
       loadRetailerLocations();
       loadBeatInfo();
+      loadVisitStats();
     }
-  }, [selectedMember, date]);
+  }, [selectedMember, date, loadVisitStats]);
 
   const isViewingOtherUser = currentLocationUser !== user?.id;
 
