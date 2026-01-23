@@ -1323,9 +1323,9 @@ const Attendance = () => {
                         const hasApprovedRequest = existingRequest?.status === 'approved';
                         const hasRejectedRequest = existingRequest?.status === 'rejected';
                         
-                        // Show regularization button for absent, missing punch-in/out, or if rejected (allow resubmit)
-                        const showRegularizationButton = (isAbsent || !record.check_in_time || !record.check_out_time || hasRejectedRequest) && 
-                          !hasPendingRequest && !hasApprovedRequest && !isRegularized;
+                        // Allow regularization for any record (absent, low face match, time corrections, etc.)
+                        // Only hide if there's a pending/approved request or already regularized
+                        const showRegularizationButton = !hasPendingRequest && !hasApprovedRequest && !isRegularized;
                         
                         return (
                           <div 
