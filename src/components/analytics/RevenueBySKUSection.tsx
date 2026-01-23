@@ -15,13 +15,13 @@ interface SKURevenue {
 }
 
 interface RevenueBySKUSectionProps {
-  selectedUser: string;
+  selectedUsers: string[];
   dateRange: { from: Date; to: Date };
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7'];
 
-export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSectionProps) => {
+export const RevenueBySKUSection = ({ selectedUsers, dateRange }: RevenueBySKUSectionProps) => {
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
@@ -33,15 +33,17 @@ export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSec
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // If "all" users selected, we need to aggregate across all users
-      if (selectedUser === 'all') {
-        // Fetch all orders in the date range
-        const { data: orders, error: ordersError } = await supabase
+      // If no users selected or multiple users, aggregate across selected users
+      if (selectedUsers.length === 0 || selectedUsers.length > 1) {
+        // Fetch orders for selected users in the date range
+        let ordersQuery = supabase
           .from('orders')
-          .select('id')
+          .select('id, user_id, profiles!orders_user_id_fkey(full_name)')
           .eq('status', 'confirmed')
           .gte('order_date', fromDate)
           .lte('order_date', toDate);
+
+        const { data: orders, error: ordersError } = await ordersQuery;
 
         if (ordersError || !orders || orders.length === 0) {
           setSkuData([]);
@@ -49,7 +51,21 @@ export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSec
           return;
         }
 
-        const orderIds = orders.map(o => o.id);
+        // Filter orders by selected users if any are selected
+        const filteredOrders = selectedUsers.length > 0
+          ? orders.filter((o: any) => {
+              const userName = o.profiles?.full_name;
+              return userName && selectedUsers.includes(userName);
+            })
+          : orders;
+
+        if (filteredOrders.length === 0) {
+          setSkuData([]);
+          setLoading(false);
+          return;
+        }
+
+        const orderIds = filteredOrders.map((o: any) => o.id);
 
         // Fetch order items for these orders
         const { data: orderItems, error: itemsError } = await supabase
@@ -92,7 +108,7 @@ export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSec
       } else {
         // Use the RPC for single user
         const { data, error } = await supabase.rpc('get_product_revenue_performance', {
-          user_full_name: selectedUser,
+          user_full_name: selectedUsers[0],
           start_date: fromDate,
           end_date: toDate
         });
@@ -138,7 +154,7 @@ export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSec
   // Fetch data when props change
   useEffect(() => {
     fetchSKUData();
-  }, [selectedUser, dateRange.from, dateRange.to]);
+  }, [selectedUsers, dateRange.from, dateRange.to]);
 
   // Prepare chart data
   const chartData = useMemo(() => {
@@ -167,7 +183,7 @@ export const RevenueBySKUSection = ({ selectedUser, dateRange }: RevenueBySKUSec
           <div>
             <CardTitle>Revenue Summary by SKU</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Product-wise revenue breakdown • {selectedUser === 'all' ? 'All Users' : selectedUser} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
+              Product-wise revenue breakdown • {selectedUsers.length === 0 ? 'All Users' : selectedUsers.length === 1 ? selectedUsers[0] : `${selectedUsers.length} Users`} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
             </p>
           </div>
         </div>
