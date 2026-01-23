@@ -308,7 +308,9 @@ export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
       }));
       setPlans(plansData);
       if (plansData.length > 0) {
-        setSelectedPlan(plansData[0]);
+        // Prioritize selecting the current FY plan, otherwise select the most recent
+        const currentFYPlan = plansData.find((p: BusinessPlan) => p.year === currentFY);
+        setSelectedPlan(currentFYPlan || plansData[0]);
       }
     } catch (error: any) {
       toast.error("Failed to load FY plans: " + error.message);
