@@ -148,33 +148,54 @@ const CreateUserWizard: React.FC = () => {
           password: formData.password,
           username: formData.username,
           full_name: formData.full_name,
-          phone_number: formData.phone_number,
-          recovery_email: formData.recovery_email,
-          hint_question: formData.hint_question,
-          hint_answer: formData.hint_answer,
-          monthly_salary: formData.monthly_salary,
-          daily_da_allowance: formData.daily_da_allowance,
-          manager_id: formData.manager_id,
-          secondary_manager_id: formData.secondary_manager_id,
-          security_profile_id: formData.security_profile_id,
-          hq: formData.hq,
-          date_of_joining: formData.date_of_joining,
-          date_of_exit: formData.date_of_exit,
-          alternate_email: formData.alternate_email,
-          address: formData.address,
-          education: formData.education,
-          emergency_contact_number: formData.emergency_contact_number,
-          band: formData.band,
+          phone_number: formData.phone_number || undefined,
+          recovery_email: formData.recovery_email || undefined,
+          hint_question: formData.hint_question || undefined,
+          hint_answer: formData.hint_answer || undefined,
+          monthly_salary: formData.monthly_salary || undefined,
+          daily_da_allowance: formData.daily_da_allowance || undefined,
+          manager_id: formData.manager_id || undefined,
+          secondary_manager_id: formData.secondary_manager_id || undefined,
+          security_profile_id: formData.security_profile_id || undefined,
+          hq: formData.hq || undefined,
+          date_of_joining: formData.date_of_joining || undefined,
+          date_of_exit: formData.date_of_exit || undefined,
+          alternate_email: formData.alternate_email || undefined,
+          address: formData.address || undefined,
+          education: formData.education || undefined,
+          emergency_contact_number: formData.emergency_contact_number || undefined,
+          band: formData.band || undefined,
           is_temporary_password: formData.requirePasswordChange
         }
       });
 
+      // Handle edge function errors with better error extraction
       if (error) {
-        throw new Error(error.message || 'Failed to create user');
+        // Try to extract the actual error message from the response
+        let errorMessage = 'Failed to create user';
+        let errorDetails = '';
+        
+        // FunctionsError may have context with the response body
+        if (error.context) {
+          try {
+            const responseBody = await error.context.json?.() || error.context;
+            if (responseBody?.error) {
+              errorMessage = responseBody.error;
+              errorDetails = responseBody.details || '';
+            }
+          } catch {
+            // If we can't parse the context, use the error message
+            errorMessage = error.message || errorMessage;
+          }
+        } else {
+          errorMessage = error.message || errorMessage;
+        }
+        
+        throw new Error(errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage);
       }
 
       if (data?.error) {
-        throw new Error(data.details || data.error || 'Failed to create user');
+        throw new Error(data.details ? `${data.error}: ${data.details}` : data.error);
       }
 
       if (!data?.user?.id) {
