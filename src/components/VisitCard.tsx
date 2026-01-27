@@ -3427,8 +3427,13 @@ export const VisitCard = ({
         <StockDataModal isOpen={showStockDataModal} onClose={() => setShowStockDataModal(false)} retailerId={(visit.retailerId || visit.id) as string} retailerName={visit.retailerName} />
 
         {/* Payment Marking Modal */}
-        <PaymentMarkingModal open={showPaymentModal} onOpenChange={setShowPaymentModal} retailerId={(visit.retailerId || visit.id) as string} currentPendingAmount={pendingAmount} onPaymentMarked={() => {
-        // Refresh the visit data
+        <PaymentMarkingModal open={showPaymentModal} onOpenChange={setShowPaymentModal} retailerId={(visit.retailerId || visit.id) as string} currentPendingAmount={pendingAmount} onPaymentMarked={(newPendingAmount: number) => {
+        // Update local state immediately with the new pending amount
+        setPendingAmount(newPendingAmount);
+        if (newPendingAmount === 0) {
+          setPendingSinceDate(null);
+        }
+        // Also dispatch event for any other listeners
         window.dispatchEvent(new CustomEvent('visitStatusChanged'));
       }} />
 
