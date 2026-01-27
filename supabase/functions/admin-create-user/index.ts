@@ -13,65 +13,72 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+    // Initialize admin client for privileged operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    )
+    });
 
-    // Verify admin role
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      console.error('No authorization header provided')
+    // Verify the requesting user's JWT manually (since verify_jwt = false)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('No authorization header provided');
       return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
+        JSON.stringify({ error: 'Unauthorized', details: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    const token = authHeader.replace('Bearer ', '');
     
-    if (userError || !user) {
-      console.error('Invalid token:', userError)
+    // Create a client with the user's token to validate it
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getUser(token);
+    
+    if (claimsError || !claimsData?.user) {
+      console.error('Invalid token:', claimsError);
       return new Response(
-        JSON.stringify({ error: 'Invalid token or unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    console.log('User authenticated:', user.id)
+    const adminUserId = claimsData.user.id;
+    console.log('User authenticated:', adminUserId);
 
     // Check if user is admin
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .single()
+      .eq('user_id', adminUserId)
+      .single();
 
     if (roleError) {
-      console.error('Error fetching user role:', roleError)
+      console.error('Error fetching user role:', roleError);
       return new Response(
-        JSON.stringify({ error: 'Error checking user permissions' }),
+        JSON.stringify({ error: 'Error checking user permissions', details: roleError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
     if (roleData?.role !== 'admin') {
-      console.error('User is not admin. Role:', roleData?.role)
+      console.error('User is not admin. Role:', roleData?.role);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    console.log('Admin verified')
+    console.log('Admin verified');
 
     // Parse request body
     const {
@@ -86,6 +93,8 @@ serve(async (req) => {
       monthly_salary,
       daily_da_allowance,
       manager_id,
+      secondary_manager_id,
+      security_profile_id,
       hq,
       date_of_joining,
       date_of_exit,
@@ -95,68 +104,92 @@ serve(async (req) => {
       emergency_contact_number,
       band,
       is_temporary_password
-    } = await req.json()
+    } = await req.json();
 
-    console.log('Creating user with email:', email)
+    console.log('Creating user with email:', email);
 
     // Validate required fields
     if (!email || !password || !username || !full_name) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: email, password, username, and full_name are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
+    // Validate and parse band if provided
+    let parsedBand: number | null = null;
+    if (band !== undefined && band !== null && band !== '') {
+      const bandNum = parseInt(band, 10);
+      if (isNaN(bandNum)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid band value', details: 'Band must be a number' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (bandNum < 1 || bandNum > 10) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid band value', details: 'Band must be between 1 and 10' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      parsedBand = bandNum;
+    }
+
+    // Build sanitized user metadata - ONLY include non-empty values
+    // This prevents empty strings from triggering DB CHECK constraints
+    const userMetadata: Record<string, string> = {
+      username,
+      full_name,
+    };
+    if (phone_number?.trim()) userMetadata.phone_number = phone_number.trim();
+    if (recovery_email?.trim()) userMetadata.recovery_email = recovery_email.trim();
+    if (hint_question?.trim()) userMetadata.hint_question = hint_question.trim();
+    if (hint_answer?.trim()) userMetadata.hint_answer = hint_answer.trim();
+
     // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
     
-    let authUserId: string
+    let authUserId: string;
     
     if (existingUser) {
-      console.log('User already exists, updating:', existingUser.id)
+      console.log('User already exists, updating:', existingUser.id);
       
       // Update existing user's password and metadata
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
         password,
-        user_metadata: {
-          username,
-          full_name,
-          phone_number,
-          recovery_email,
-          hint_question,
-          hint_answer
-        }
-      })
+        user_metadata: userMetadata
+      });
       
       if (updateError) {
-        console.error('User update error:', updateError)
+        console.error('User update error:', updateError);
         return new Response(
           JSON.stringify({ 
             error: 'Failed to update existing user', 
             details: updateError.message 
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        );
       }
       
-      authUserId = existingUser.id
+      authUserId = existingUser.id;
       
       // Check if employee record already exists
       const { data: existingEmployee } = await supabaseAdmin
         .from('employees')
         .select('id')
         .eq('user_id', existingUser.id)
-        .single()
+        .single();
       
       if (existingEmployee) {
-        console.log('Employee record already exists, updating')
+        console.log('Employee record already exists, updating');
         const { error: empUpdateError } = await supabaseAdmin
           .from('employees')
           .update({
-            monthly_salary: monthly_salary || 0,
-            daily_da_allowance: daily_da_allowance || 0,
+            monthly_salary: monthly_salary ? parseFloat(monthly_salary) : 0,
+            daily_da_allowance: daily_da_allowance ? parseFloat(daily_da_allowance) : 0,
             manager_id: manager_id || null,
+            secondary_manager_id: secondary_manager_id || null,
             hq: hq || null,
             date_of_joining: date_of_joining || null,
             date_of_exit: date_of_exit || null,
@@ -164,12 +197,12 @@ serve(async (req) => {
             address: address || null,
             education: education || null,
             emergency_contact_number: emergency_contact_number || null,
-            band: band || null
+            band: parsedBand
           })
-          .eq('user_id', existingUser.id)
+          .eq('user_id', existingUser.id);
         
         if (empUpdateError) {
-          console.error('Employee update error:', empUpdateError)
+          console.error('Employee update error:', empUpdateError);
         }
         
         // Update must_change_password flag if using temporary password
@@ -177,10 +210,24 @@ serve(async (req) => {
           const { error: profileUpdateError } = await supabaseAdmin
             .from('profiles')
             .update({ must_change_password: true })
-            .eq('id', existingUser.id)
+            .eq('id', existingUser.id);
           
           if (profileUpdateError) {
-            console.error('Profile update error:', profileUpdateError)
+            console.error('Profile update error:', profileUpdateError);
+          }
+        }
+
+        // Update security profile if provided
+        if (security_profile_id) {
+          const { error: profileAssignError } = await supabaseAdmin
+            .from('user_profiles')
+            .upsert({
+              user_id: existingUser.id,
+              profile_id: security_profile_id
+            }, { onConflict: 'user_id' });
+          
+          if (profileAssignError) {
+            console.error('Security profile assignment error:', profileAssignError);
           }
         }
         
@@ -196,59 +243,50 @@ serve(async (req) => {
             }
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        );
       }
     } else {
-      // Create new auth user - only include hint_question/hint_answer if they have values
-      // This prevents the profiles_hint_question_not_empty constraint violation
-      const userMetadata: Record<string, string> = {
-        username,
-        full_name,
-      };
-      if (phone_number) userMetadata.phone_number = phone_number;
-      if (recovery_email) userMetadata.recovery_email = recovery_email;
-      if (hint_question && hint_question.trim()) userMetadata.hint_question = hint_question;
-      if (hint_answer && hint_answer.trim()) userMetadata.hint_answer = hint_answer;
-
+      // Create new auth user
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         user_metadata: userMetadata,
         email_confirm: true
-      })
+      });
 
       if (authError) {
-        console.error('Auth creation error:', authError)
+        console.error('Auth creation error:', authError);
         return new Response(
           JSON.stringify({ 
             error: 'Failed to create user account', 
             details: authError.message 
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        );
       }
 
       if (!authUser.user) {
-        console.error('User creation returned no user object')
+        console.error('User creation returned no user object');
         return new Response(
           JSON.stringify({ error: 'User creation failed - no user returned' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        );
       }
       
-      authUserId = authUser.user.id
+      authUserId = authUser.user.id;
     }
 
-    console.log('Auth user created/updated:', authUserId)
+    console.log('Auth user created/updated:', authUserId);
 
     // Create employee record for new user
     const { error: employeeError } = await supabaseAdmin
       .from('employees')
       .insert({
         user_id: authUserId,
-        monthly_salary: monthly_salary || 0,
-        daily_da_allowance: daily_da_allowance || 0,
+        monthly_salary: monthly_salary ? parseFloat(monthly_salary) : 0,
+        daily_da_allowance: daily_da_allowance ? parseFloat(daily_da_allowance) : 0,
         manager_id: manager_id || null,
+        secondary_manager_id: secondary_manager_id || null,
         hq: hq || null,
         date_of_joining: date_of_joining || null,
         date_of_exit: date_of_exit || null,
@@ -256,14 +294,14 @@ serve(async (req) => {
         address: address || null,
         education: education || null,
         emergency_contact_number: emergency_contact_number || null,
-        band: band || null
-      })
+        band: parsedBand
+      });
 
     if (employeeError) {
-      console.error('Employee creation error:', employeeError)
+      console.error('Employee creation error:', employeeError);
       // Clean up auth user if employee creation fails (only for new users)
       if (!existingUser) {
-        await supabaseAdmin.auth.admin.deleteUser(authUserId)
+        await supabaseAdmin.auth.admin.deleteUser(authUserId);
       }
       return new Response(
         JSON.stringify({ 
@@ -271,20 +309,52 @@ serve(async (req) => {
           details: employeeError.message 
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    console.log('Employee record created successfully')
+    console.log('Employee record created successfully');
 
     // Set must_change_password flag if using temporary password
     if (is_temporary_password) {
       const { error: profileUpdateError } = await supabaseAdmin
         .from('profiles')
         .update({ must_change_password: true })
-        .eq('id', authUserId)
+        .eq('id', authUserId);
       
       if (profileUpdateError) {
-        console.error('Profile update error for must_change_password:', profileUpdateError)
+        console.error('Profile update error for must_change_password:', profileUpdateError);
+      }
+    }
+
+    // Assign default 'user' role (ignore conflict if exists)
+    const { error: roleInsertError } = await supabaseAdmin
+      .from('user_roles')
+      .upsert({
+        user_id: authUserId,
+        role: 'user'
+      }, { onConflict: 'user_id,role', ignoreDuplicates: true });
+
+    if (roleInsertError) {
+      console.error('Role assignment error:', roleInsertError);
+      // Non-blocking - continue even if role assignment fails
+    } else {
+      console.log('User role assigned successfully');
+    }
+
+    // Assign security profile if provided
+    if (security_profile_id) {
+      const { error: profileAssignError } = await supabaseAdmin
+        .from('user_profiles')
+        .upsert({
+          user_id: authUserId,
+          profile_id: security_profile_id
+        }, { onConflict: 'user_id' });
+      
+      if (profileAssignError) {
+        console.error('Security profile assignment error:', profileAssignError);
+        // Non-blocking - continue even if profile assignment fails
+      } else {
+        console.log('Security profile assigned successfully');
       }
     }
 
@@ -302,10 +372,10 @@ serve(async (req) => {
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    )
+    );
 
   } catch (error) {
-    console.error('Error creating user:', error)
+    console.error('Error creating user:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to create user' 
@@ -314,6 +384,6 @@ serve(async (req) => {
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    )
+    );
   }
-})
+});
