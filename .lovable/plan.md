@@ -1,102 +1,190 @@
 
-## Problem
+# Distributor Company Profile Feature Implementation Plan
 
-In the "AI Insights" section under "Order Details", retailer names are showing as "Unknown" instead of their actual names (as shown in the screenshot: "Unknown, Unknown, Unknown ordered earlier but not in last week").
+## Current State Analysis
 
-## Root Cause
+### Existing Infrastructure
+1. **Document Settings System** (`src/utils/documentHeaderSource.ts`): Already supports switching between "Company" and "Distributor" as the header source for invoices/challans
+2. **Company Settings** (`src/components/invoice/CompanySettings.tsx`): Complete company profile form with logo, bank details, UPI QR, terms & conditions
+3. **Distributor Portal Profile** (`src/pages/distributor-portal/DistributorProfile.tsx`): Basic business profile (contact info, SWOT) - missing invoice-related fields
+4. **Distributor Detail** (`src/pages/DistributorDetail.tsx`): Has 7 tabs (Overview, Primary, Secondary, Network, Portal, Pricing, FY Plan) - missing Company Profile tab
+5. **Invoice Generator** (`src/utils/invoiceGenerator.ts`): Uses company data for headers, but `getDistributorHeaderData()` in `documentHeaderSource.ts` attempts to read from `retailers` table (incorrect - distributors are in `distributors` table)
 
-In `src/components/analytics/OrderDetailsAIInsights.tsx`:
+### Gap Analysis
+- **Database**: `distributors` table lacks invoice-related columns (bank_name, bank_account, ifsc, account_holder_name, logo_url, qr_code_url, qr_upi, terms_conditions, state)
+- **UI**: No Company Profile tab in Distributor Master detail view
+- **Distributor Portal**: Missing invoice settings in the Business Profile
+- **Data Flow**: `getDistributorHeaderData()` queries wrong table (`retailers` instead of `distributors`)
 
-1. **Line 55-58**: Retailers are fetched with `.eq('user_id', userId)` - only retailers *owned by* this specific user
-2. **Line 61-67**: Orders are fetched separately without retailer name information
-3. **Line 121-124 & 166**: When building insights, the code tries to find retailer names by matching `order.retailer_id` against the `retailers` array using `retailers.find(r => r.id === id)?.name || 'Unknown'`
+---
 
-**The mismatch**: If any order references a retailer that isn't in the separately-fetched `retailers` array (because it's not directly owned by this user), the name lookup fails and returns "Unknown".
+## Implementation Plan
 
-## Solution
+### Step 1: Database Schema Update
+Add invoice-related columns to the `distributors` table:
 
-Modify the orders query to include retailer name directly via a nested select (Supabase join), eliminating the need for a separate lookup. This ensures every order carries its retailer's name regardless of ownership.
-
-## Technical Changes
-
-### File: `src/components/analytics/OrderDetailsAIInsights.tsx`
-
-**1. Update the orders query to include retailer name (line 61-67)**
-
-```typescript
-// Current:
-supabase
-  .from('orders')
-  .select('retailer_id, total_amount, order_date')
-  .eq('user_id', userId)
-  .eq('status', 'confirmed')
-  .gte('order_date', fromDate)
-  .lte('order_date', toDate)
-
-// Change to:
-supabase
-  .from('orders')
-  .select('retailer_id, total_amount, order_date, retailers(name)')
-  .eq('user_id', userId)
-  .eq('status', 'confirmed')
-  .gte('order_date', fromDate)
-  .lte('order_date', toDate)
+```sql
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS bank_name text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS bank_account text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS ifsc text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS account_holder_name text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS logo_url text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS qr_code_url text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS qr_upi text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS terms_conditions text;
+ALTER TABLE public.distributors ADD COLUMN IF NOT EXISTS state text;
 ```
 
-**2. Update order type handling (after line 86)**
+---
 
-```typescript
-// Orders now include: { retailer_id, total_amount, order_date, retailers: { name } }
-const orders = (ordersResult.data || []).map(o => ({
-  ...o,
-  retailer_name: o.retailers?.name || 'Unknown'
-}));
+### Step 2: Create Distributor Company Profile Component
+Create `src/components/distributor/DistributorCompanyProfile.tsx` - a reusable component mirroring `CompanySettings.tsx` structure:
+
+**Features:**
+- Logo upload with Supabase storage
+- Company details (name is read-only, GST, state)
+- Bank details (bank name, account, IFSC, account holder)
+- UPI details (UPI ID, QR code upload)
+- Terms & conditions text area
+
+**Props:**
+- `distributorId: string`
+- `readOnly?: boolean` (for admin viewing distributor-entered data)
+
+---
+
+### Step 3: Add Company Profile Tab to Distributor Master
+Update `src/pages/DistributorDetail.tsx`:
+
+**Changes:**
+- Add 8th tab: "Company Profile" after "FY Plan"
+- Update grid layout from `sm:grid-cols-7` to `sm:grid-cols-8`
+- Add TabsContent with the new `DistributorCompanyProfile` component (readOnly mode for admin view)
+
+```text
+Tab order: Overview | Primary | Secondary | Network | Portal | Pricing | FY Plan | Company Profile
 ```
 
-**3. Update Analysis 3 - Top retailer by value (lines 117-128)**
+---
+
+### Step 4: Enhance Distributor Portal with Company Profile Settings
+Update `src/pages/distributor-portal/DistributorProfile.tsx`:
+
+**Changes:**
+- Add new tab "Invoice Settings" alongside existing tabs (Details, Business Info, SWOT)
+- Include same fields as admin Company Profile:
+  - Logo upload
+  - Bank details
+  - UPI QR code
+  - Terms & conditions
+- This allows distributors to manage their own invoice header data
+
+---
+
+### Step 5: Fix Document Header Source Logic
+Update `src/utils/documentHeaderSource.ts`:
+
+**Current Bug:** `getDistributorHeaderData()` queries `retailers` table
+**Fix:** Query `distributors` table instead
 
 ```typescript
-// Use order.retailer_name directly instead of looking up from retailers array
-orders.forEach(o => {
-  if (!retailerOrders[o.retailer_id]) {
-    retailerOrders[o.retailer_id] = { 
-      total: 0, 
-      name: o.retailer_name  // <-- Use the joined name
-    };
-  }
-  retailerOrders[o.retailer_id].total += Number(o.total_amount || 0);
-});
+// Change from:
+const { data: distributor } = await supabase
+  .from('retailers')
+  .select('*')
+  .eq('id', retailer.distributor_id)
+  .single();
+
+// To:
+const { data: distributor } = await supabase
+  .from('distributors')
+  .select('*')
+  .eq('id', retailer.distributor_id)
+  .single();
 ```
 
-**4. Update Analysis 5 - Re-engage retailers (lines 163-166)**
+Also update field mappings:
+- `distributor.gst_number` stays the same
+- Add new fields: `bank_name`, `bank_account`, `ifsc`, `account_holder_name`, `logo_url`, `qr_code_url`, `qr_upi`, `terms_conditions`, `state`
 
-```typescript
-// Build a map of retailer_id -> name from orders
-const orderRetailerNames: Record<string, string> = {};
-orders.forEach(o => {
-  if (!orderRetailerNames[o.retailer_id]) {
-    orderRetailerNames[o.retailer_id] = o.retailer_name;
-  }
-});
+---
 
-// Then use this map for declined retailers
-const declinedNames = uniqueDeclined
-  .slice(0, 3)
-  .map(id => orderRetailerNames[id] || 'Unknown');
+### Step 6: Update Invoice Generator Integration
+The invoice generator (`src/utils/invoiceGenerator.ts`) already receives `company` data. To support distributor headers:
+
+**Changes to invoice generation flow:**
+1. When generating invoice, check Document Settings
+2. If source = "distributor", call `getDocumentHeaderData('invoices', retailerId)` 
+3. Use returned data as `company` parameter for invoice generation
+
+This requires updating places that call `generateTemplate4Invoice()` to:
+- Fetch retailer's distributor mapping
+- Get appropriate header data based on settings
+
+---
+
+## File Changes Summary
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| Database migration | Create | Add 9 columns to `distributors` table |
+| `src/components/distributor/DistributorCompanyProfile.tsx` | Create | New reusable company profile form |
+| `src/pages/DistributorDetail.tsx` | Modify | Add 8th "Company Profile" tab |
+| `src/pages/distributor-portal/DistributorProfile.tsx` | Modify | Add "Invoice Settings" tab |
+| `src/utils/documentHeaderSource.ts` | Modify | Fix to query `distributors` table, map new fields |
+| `src/pages/distributor-portal/DMSLayout.tsx` | Modify (optional) | Add "Company Profile" as separate nav item if preferred |
+
+---
+
+## Data Flow After Implementation
+
+```text
+1. Admin configures Document Settings:
+   - Enables "Distributor Details"
+   - Sets Invoices source to "Distributor"
+
+2. Distributor fills Company Profile (via Portal or admin enters in Master)
+
+3. Admin/User assigns distributor to retailer (retailers.distributor_id)
+
+4. Invoice generation:
+   a. System checks Document Settings → Invoices = "Distributor"
+   b. Looks up retailer → finds distributor_id
+   c. Fetches distributor's company profile from distributors table
+   d. Uses distributor's logo, bank details, terms in invoice header
+   e. Falls back to company details if no distributor or fields missing
 ```
 
-## Summary of Changes
+---
 
-| Location | Change |
-|----------|--------|
-| Line 61-67 | Add `retailers(name)` to the orders select query |
-| Line 86 | Map orders to include `retailer_name` from the joined data |
-| Lines 117-128 | Use `o.retailer_name` instead of `retailers.find()` |
-| Lines 163-166 | Build name map from orders, use for declined retailer names |
+## Technical Details
 
-## Expected Result
+### Storage Bucket
+Logo and QR uploads will use existing `company-assets` bucket with paths:
+- `distributor-logos/{distributorId}-{timestamp}.{ext}`
+- `distributor-qr-codes/{distributorId}-{timestamp}.{ext}`
 
-After this fix:
-- "Re-engage These Retailers" will show actual names like "Ajay Prabhu, KVP, Testing3 ordered earlier but not in last week"
-- "Top Performing Retailer" will correctly show the retailer name
-- All other retailer name references in AI Insights will work correctly
+### Validation
+- GST format validation (optional)
+- Bank account number (numeric validation)
+- IFSC code format (11 characters, starts with 4 letters)
+
+### Security
+- Distributor Portal users can only edit their own distributor's profile
+- Admins can view all distributor profiles in read-only mode from Distributor Master
+
+---
+
+## Definition of Done
+
+1. Distributors table has all invoice-related columns
+2. "Company Profile" tab visible in Distributor Master with all settings
+3. Distributor Portal has "Invoice Settings" tab where distributors can update their profile
+4. When Document Settings has Invoices = "Distributor", invoices show distributor's:
+   - Logo
+   - Company name and address
+   - GST number
+   - Bank details
+   - QR code
+   - Terms & conditions
+5. Falls back to company data when distributor profile is incomplete
