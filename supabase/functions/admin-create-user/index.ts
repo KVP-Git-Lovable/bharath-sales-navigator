@@ -239,7 +239,7 @@ serve(async (req) => {
       authUserId = authUser.user.id
     }
 
-    console.log('Auth user created:', authUser.user.id)
+    console.log('Auth user created/updated:', authUserId)
 
     // Create employee record for new user
     const { error: employeeError } = await supabaseAdmin
