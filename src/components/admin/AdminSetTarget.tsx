@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserSelector } from '@/components/UserSelector';
 import { MultiUserSelector } from './MultiUserSelector';
-import { TargetAdjustmentSettings, AdjustmentMode } from './TargetAdjustmentSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { UserFYPlanTarget } from '@/components/profile/UserFYPlanTarget';
@@ -30,8 +28,6 @@ export function AdminSetTarget({
 }: AdminSetTargetProps) {
   const { user } = useAuth();
   const { subordinates, isManager } = useSubordinates();
-  const [autoAdjust, setAutoAdjust] = useState(false);
-  const [adjustmentMode, setAdjustmentMode] = useState<AdjustmentMode>('redistribute');
   const [activeUserTab, setActiveUserTab] = useState<string>('');
 
   // Get effective user ID for single-user mode
@@ -60,14 +56,6 @@ export function AdminSetTarget({
       case 'self':
         return (
           <div className="space-y-6">
-            <TargetAdjustmentSettings
-              userId={user?.id}
-              fyYear={fyYear}
-              autoAdjust={autoAdjust}
-              adjustmentMode={adjustmentMode}
-              onAutoAdjustChange={setAutoAdjust}
-              onAdjustmentModeChange={setAdjustmentMode}
-            />
             <UserFYPlanTarget />
           </div>
         );
@@ -96,14 +84,6 @@ export function AdminSetTarget({
                 </AlertDescription>
               </Alert>
             )}
-            <TargetAdjustmentSettings
-              userId={effectiveUserId}
-              fyYear={fyYear}
-              autoAdjust={autoAdjust}
-              adjustmentMode={adjustmentMode}
-              onAutoAdjustChange={setAutoAdjust}
-              onAdjustmentModeChange={setAdjustmentMode}
-            />
             <UserFYPlanTarget targetUserId={effectiveUserId} />
           </div>
         );
@@ -118,15 +98,6 @@ export function AdminSetTarget({
 
             {selectedUserIds.length > 0 && (
               <>
-                <TargetAdjustmentSettings
-                  userId={selectedUserIds[0]} // Use first user for preview
-                  fyYear={fyYear}
-                  autoAdjust={autoAdjust}
-                  adjustmentMode={adjustmentMode}
-                  onAutoAdjustChange={setAutoAdjust}
-                  onAdjustmentModeChange={setAdjustmentMode}
-                />
-
                 {/* User Tabs for editing */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -194,14 +165,6 @@ export function AdminSetTarget({
               </AlertDescription>
             </Alert>
 
-            <TargetAdjustmentSettings
-              userId={subordinates[0]?.subordinate_user_id}
-              fyYear={fyYear}
-              autoAdjust={autoAdjust}
-              adjustmentMode={adjustmentMode}
-              onAutoAdjustChange={setAutoAdjust}
-              onAdjustmentModeChange={setAdjustmentMode}
-            />
 
             {/* Show tabs for all team members */}
             <Card>
