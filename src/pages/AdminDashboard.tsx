@@ -803,7 +803,7 @@ export const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="create-user" className="space-y-6">
-            <CreateUserWizard />
+            <CreateUserWizard onSuccess={fetchUsers} />
           </TabsContent>
 
           <TabsContent value="invite-user" className="space-y-6">

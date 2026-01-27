@@ -19,7 +19,11 @@ import {
   initialFormData 
 } from './types';
 
-const CreateUserWizard: React.FC = () => {
+interface CreateUserWizardProps {
+  onSuccess?: () => void;
+}
+
+const CreateUserWizard: React.FC<CreateUserWizardProps> = ({ onSuccess }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<WizardStep>('basics');
@@ -226,6 +230,9 @@ const CreateUserWizard: React.FC = () => {
         title: "Success",
         description: "User created successfully!"
       });
+
+      // Notify parent to refresh user list
+      onSuccess?.();
 
       // Reset form
       setFormData(initialFormData);
