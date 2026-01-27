@@ -1,93 +1,102 @@
 
-## Problem Analysis
+## Problem
 
-After creating a user successfully via the Create User wizard, the new user does not appear in the "Users & Roles Management" tab. This is a **data synchronization issue** between the user creation flow and the user list display.
+In the "AI Insights" section under "Order Details", retailer names are showing as "Unknown" instead of their actual names (as shown in the screenshot: "Unknown, Unknown, Unknown ordered earlier but not in last week").
 
-### Root Cause
+## Root Cause
 
-The `CreateUserWizard` component is a standalone component that:
-- Successfully creates users via the `admin-create-user` edge function
-- Shows a success toast and resets its form
-- **Does NOT notify the parent `AdminDashboard` to refresh the user list**
+In `src/components/analytics/OrderDetailsAIInsights.tsx`:
 
-While there IS a real-time subscription on `profiles`, `user_roles`, and `employees` tables, it may not be triggering reliably due to:
-- Closure staleness (the `fetchUsers` function reference in the effect)
-- Supabase Realtime connection issues
-- Timing between database writes and subscription events
+1. **Line 55-58**: Retailers are fetched with `.eq('user_id', userId)` - only retailers *owned by* this specific user
+2. **Line 61-67**: Orders are fetched separately without retailer name information
+3. **Line 121-124 & 166**: When building insights, the code tries to find retailer names by matching `order.retailer_id` against the `retailers` array using `retailers.find(r => r.id === id)?.name || 'Unknown'`
 
----
+**The mismatch**: If any order references a retailer that isn't in the separately-fetched `retailers` array (because it's not directly owned by this user), the name lookup fails and returns "Unknown".
 
-## Solution Overview
+## Solution
 
-Implement an `onSuccess` callback mechanism so that when a user is created, the parent dashboard is notified and immediately refreshes the user list.
-
----
+Modify the orders query to include retailer name directly via a nested select (Supabase join), eliminating the need for a separate lookup. This ensures every order carries its retailer's name regardless of ownership.
 
 ## Technical Changes
 
-### 1. Update CreateUserWizard to Accept `onSuccess` Prop
+### File: `src/components/analytics/OrderDetailsAIInsights.tsx`
 
-**File:** `src/components/admin/create-user/CreateUserWizard.tsx`
+**1. Update the orders query to include retailer name (line 61-67)**
 
-- Add an optional `onSuccess?: () => void` prop to the component
-- Call `onSuccess()` after successful user creation (after the success toast)
+```typescript
+// Current:
+supabase
+  .from('orders')
+  .select('retailer_id, total_amount, order_date')
+  .eq('user_id', userId)
+  .eq('status', 'confirmed')
+  .gte('order_date', fromDate)
+  .lte('order_date', toDate)
 
-```text
-Changes:
-- Line 22: Add props interface with optional onSuccess callback
-- Line 228 (after toast): Call onSuccess?.() to notify parent
+// Change to:
+supabase
+  .from('orders')
+  .select('retailer_id, total_amount, order_date, retailers(name)')
+  .eq('user_id', userId)
+  .eq('status', 'confirmed')
+  .gte('order_date', fromDate)
+  .lte('order_date', toDate)
 ```
 
-### 2. Update AdminDashboard to Pass the Callback
+**2. Update order type handling (after line 86)**
 
-**File:** `src/pages/AdminDashboard.tsx`
-
-- Pass `fetchUsers` as the `onSuccess` callback to `CreateUserWizard`
-- This ensures the user list is refreshed immediately after creation
-
-```text
-Changes:
-- Line 806: Change from <CreateUserWizard /> 
-            to <CreateUserWizard onSuccess={fetchUsers} />
+```typescript
+// Orders now include: { retailer_id, total_amount, order_date, retailers: { name } }
+const orders = (ordersResult.data || []).map(o => ({
+  ...o,
+  retailer_name: o.retailers?.name || 'Unknown'
+}));
 ```
 
-### 3. Add Tab Change Handler (Optional Enhancement)
+**3. Update Analysis 3 - Top retailer by value (lines 117-128)**
 
-As a safety net, also refresh data when switching to the "users" tab:
-
-- Convert from uncontrolled `Tabs` to controlled with state
-- Call `fetchUsers()` when the active tab changes to "users"
-
----
-
-## Code Flow After Fix
-
-```text
-1. Admin fills Create User form
-2. Clicks "Create User" button
-3. Edge function creates user → returns success
-4. CreateUserWizard:
-   a. Shows success toast
-   b. Calls onSuccess() callback
-   c. Resets form
-5. AdminDashboard.fetchUsers() is called
-6. User list is refreshed with new user visible
-7. Admin switches to "Users & Roles" tab → sees new user
+```typescript
+// Use order.retailer_name directly instead of looking up from retailers array
+orders.forEach(o => {
+  if (!retailerOrders[o.retailer_id]) {
+    retailerOrders[o.retailer_id] = { 
+      total: 0, 
+      name: o.retailer_name  // <-- Use the joined name
+    };
+  }
+  retailerOrders[o.retailer_id].total += Number(o.total_amount || 0);
+});
 ```
 
----
+**4. Update Analysis 5 - Re-engage retailers (lines 163-166)**
 
-## Files to Change
+```typescript
+// Build a map of retailer_id -> name from orders
+const orderRetailerNames: Record<string, string> = {};
+orders.forEach(o => {
+  if (!orderRetailerNames[o.retailer_id]) {
+    orderRetailerNames[o.retailer_id] = o.retailer_name;
+  }
+});
 
-| File | Change |
-|------|--------|
-| `src/components/admin/create-user/CreateUserWizard.tsx` | Add `onSuccess` prop and call it after success |
-| `src/pages/AdminDashboard.tsx` | Pass `fetchUsers` to `CreateUserWizard` |
+// Then use this map for declined retailers
+const declinedNames = uniqueDeclined
+  .slice(0, 3)
+  .map(id => orderRetailerNames[id] || 'Unknown');
+```
 
----
+## Summary of Changes
 
-## Definition of Done
+| Location | Change |
+|----------|--------|
+| Line 61-67 | Add `retailers(name)` to the orders select query |
+| Line 86 | Map orders to include `retailer_name` from the joined data |
+| Lines 117-128 | Use `o.retailer_name` instead of `retailers.find()` |
+| Lines 163-166 | Build name map from orders, use for declined retailer names |
 
-- After successfully creating a user, the user list in "Users & Roles Management" tab shows the new user without requiring a manual page refresh or clicking the "Refresh" button
-- The success toast still appears
-- Form still resets properly after creation
+## Expected Result
+
+After this fix:
+- "Re-engage These Retailers" will show actual names like "Ajay Prabhu, KVP, Testing3 ordered earlier but not in last week"
+- "Top Performing Retailer" will correctly show the retailer name
+- All other retailer name references in AI Insights will work correctly
