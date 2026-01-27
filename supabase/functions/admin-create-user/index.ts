@@ -199,18 +199,21 @@ serve(async (req) => {
         )
       }
     } else {
-      // Create new auth user
+      // Create new auth user - only include hint_question/hint_answer if they have values
+      // This prevents the profiles_hint_question_not_empty constraint violation
+      const userMetadata: Record<string, string> = {
+        username,
+        full_name,
+      };
+      if (phone_number) userMetadata.phone_number = phone_number;
+      if (recovery_email) userMetadata.recovery_email = recovery_email;
+      if (hint_question && hint_question.trim()) userMetadata.hint_question = hint_question;
+      if (hint_answer && hint_answer.trim()) userMetadata.hint_answer = hint_answer;
+
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        user_metadata: {
-          username,
-          full_name,
-          phone_number,
-          recovery_email,
-          hint_question,
-          hint_answer
-        },
+        user_metadata: userMetadata,
         email_confirm: true
       })
 
