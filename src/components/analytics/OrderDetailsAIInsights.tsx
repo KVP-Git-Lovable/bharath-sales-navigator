@@ -57,10 +57,10 @@ export const OrderDetailsAIInsights = ({ userName, dateRange }: OrderDetailsAIIn
             .select('id, name, beat_id, beats(beat_name)')
             .eq('user_id', userId),
 
-          // Orders in date range
+          // Orders in date range with retailer name
           supabase
             .from('orders')
-            .select('retailer_id, total_amount, order_date')
+            .select('retailer_id, total_amount, order_date, retailers(name)')
             .eq('user_id', userId)
             .eq('status', 'confirmed')
             .gte('order_date', fromDate)
@@ -83,7 +83,10 @@ export const OrderDetailsAIInsights = ({ userName, dateRange }: OrderDetailsAIIn
         ]);
 
         const retailers = retailersResult.data || [];
-        const orders = ordersResult.data || [];
+        const orders = (ordersResult.data || []).map(o => ({
+          ...o,
+          retailer_name: (o.retailers as { name: string } | null)?.name || 'Unknown'
+        }));
         const beats = beatsResult.data || [];
         const beatPlans = beatPlansResult.data || [];
 
@@ -118,10 +121,9 @@ export const OrderDetailsAIInsights = ({ userName, dateRange }: OrderDetailsAIIn
         const retailerOrders: Record<string, { total: number; name: string }> = {};
         orders.forEach(o => {
           if (!retailerOrders[o.retailer_id]) {
-            const retailer = retailers.find(r => r.id === o.retailer_id);
             retailerOrders[o.retailer_id] = { 
               total: 0, 
-              name: retailer?.name || 'Unknown' 
+              name: o.retailer_name
             };
           }
           retailerOrders[o.retailer_id].total += Number(o.total_amount || 0);
@@ -161,9 +163,17 @@ export const OrderDetailsAIInsights = ({ userName, dateRange }: OrderDetailsAIIn
         
         const uniqueDeclined = [...new Set(olderOrderRetailers)];
         if (uniqueDeclined.length > 0) {
+          // Build a map of retailer_id -> name from orders
+          const orderRetailerNames: Record<string, string> = {};
+          orders.forEach(o => {
+            if (!orderRetailerNames[o.retailer_id]) {
+              orderRetailerNames[o.retailer_id] = o.retailer_name;
+            }
+          });
+          
           const declinedNames = uniqueDeclined
             .slice(0, 3)
-            .map(id => retailers.find(r => r.id === id)?.name || 'Unknown');
+            .map(id => orderRetailerNames[id] || 'Unknown');
           
           insightsList.push({
             type: 'warning',
