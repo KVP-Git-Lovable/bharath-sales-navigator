@@ -14,7 +14,7 @@ interface PaymentMarkingModalProps {
   onOpenChange: (open: boolean) => void;
   retailerId: string;
   currentPendingAmount: number;
-  onPaymentMarked: () => void;
+  onPaymentMarked: (newPendingAmount: number) => void;
 }
 
 export const PaymentMarkingModal = ({
@@ -84,7 +84,7 @@ export const PaymentMarkingModal = ({
       if (error) throw error;
 
       toast.success("Full payment marked successfully!");
-      onPaymentMarked();
+      onPaymentMarked(0); // Full payment means 0 pending
       onOpenChange(false);
       resetForm();
     } catch (error) {
@@ -130,7 +130,7 @@ export const PaymentMarkingModal = ({
       if (error) throw error;
 
       toast.success(`Payment of ₹${amount.toLocaleString()} marked successfully!`);
-      onPaymentMarked();
+      onPaymentMarked(newPendingAmount); // Pass the new pending amount
       onOpenChange(false);
       resetForm();
     } catch (error) {
