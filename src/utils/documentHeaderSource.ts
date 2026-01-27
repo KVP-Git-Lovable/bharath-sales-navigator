@@ -170,9 +170,9 @@ async function getDistributorHeaderData(retailerId: string): Promise<DocumentHea
       return null;
     }
 
-    // Distributors are stored in the retailers table with entity_type = 'distributor'
+    // Fetch from distributors table (not retailers table)
     const { data: distributor, error: distributorError } = await supabase
-      .from('retailers')
+      .from('distributors')
       .select('*')
       .eq('id', retailer.distributor_id)
       .single();
@@ -186,7 +186,7 @@ async function getDistributorHeaderData(retailerId: string): Promise<DocumentHea
       name: distributor.name || '',
       address: distributor.address || '',
       phone: distributor.phone || '',
-      email: '', // Distributors in retailers table may not have email
+      email: distributor.email || '',
       gstin: distributor.gst_number || '',
       state: distributor.state || '',
       bank_name: distributor.bank_name || '',
@@ -194,7 +194,7 @@ async function getDistributorHeaderData(retailerId: string): Promise<DocumentHea
       ifsc: distributor.ifsc || '',
       account_holder_name: distributor.account_holder_name || '',
       qr_upi: distributor.qr_upi || '',
-      qr_code_url: '', // Generate from qr_upi if needed
+      qr_code_url: distributor.qr_code_url || '',
       terms_conditions: distributor.terms_conditions || '',
       logo_url: distributor.logo_url || '',
     };
