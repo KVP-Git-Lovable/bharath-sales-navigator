@@ -3716,10 +3716,13 @@ export type Database = {
       distributors: {
         Row: {
           about_business: string | null
+          account_holder_name: string | null
           address: string | null
           annual_revenue: number | null
           assets_trucks: number | null
           assets_vans: number | null
+          bank_account: string | null
+          bank_name: string | null
           business_hunger: string | null
           competition_products: string[] | null
           contact_person: string
@@ -3735,6 +3738,8 @@ export type Database = {
           evaluation_checklist: Json | null
           gst_number: string | null
           id: string
+          ifsc: string | null
+          logo_url: string | null
           name: string
           network_retailers_count: number | null
           onboarding_date: string | null
@@ -3749,10 +3754,14 @@ export type Database = {
           phone: string
           products_distributed: string[] | null
           profitability: string | null
+          qr_code_url: string | null
+          qr_upi: string | null
           region_coverage: string | null
           sales_team_size: number | null
+          state: string | null
           status: string
           strength: string | null
+          terms_conditions: string | null
           territory_id: string | null
           threats: string | null
           updated_at: string
@@ -3761,10 +3770,13 @@ export type Database = {
         }
         Insert: {
           about_business?: string | null
+          account_holder_name?: string | null
           address?: string | null
           annual_revenue?: number | null
           assets_trucks?: number | null
           assets_vans?: number | null
+          bank_account?: string | null
+          bank_name?: string | null
           business_hunger?: string | null
           competition_products?: string[] | null
           contact_person: string
@@ -3780,6 +3792,8 @@ export type Database = {
           evaluation_checklist?: Json | null
           gst_number?: string | null
           id?: string
+          ifsc?: string | null
+          logo_url?: string | null
           name: string
           network_retailers_count?: number | null
           onboarding_date?: string | null
@@ -3794,10 +3808,14 @@ export type Database = {
           phone: string
           products_distributed?: string[] | null
           profitability?: string | null
+          qr_code_url?: string | null
+          qr_upi?: string | null
           region_coverage?: string | null
           sales_team_size?: number | null
+          state?: string | null
           status?: string
           strength?: string | null
+          terms_conditions?: string | null
           territory_id?: string | null
           threats?: string | null
           updated_at?: string
@@ -3806,10 +3824,13 @@ export type Database = {
         }
         Update: {
           about_business?: string | null
+          account_holder_name?: string | null
           address?: string | null
           annual_revenue?: number | null
           assets_trucks?: number | null
           assets_vans?: number | null
+          bank_account?: string | null
+          bank_name?: string | null
           business_hunger?: string | null
           competition_products?: string[] | null
           contact_person?: string
@@ -3825,6 +3846,8 @@ export type Database = {
           evaluation_checklist?: Json | null
           gst_number?: string | null
           id?: string
+          ifsc?: string | null
+          logo_url?: string | null
           name?: string
           network_retailers_count?: number | null
           onboarding_date?: string | null
@@ -3839,10 +3862,14 @@ export type Database = {
           phone?: string
           products_distributed?: string[] | null
           profitability?: string | null
+          qr_code_url?: string | null
+          qr_upi?: string | null
           region_coverage?: string | null
           sales_team_size?: number | null
+          state?: string | null
           status?: string
           strength?: string | null
+          terms_conditions?: string | null
           territory_id?: string | null
           threats?: string | null
           updated_at?: string

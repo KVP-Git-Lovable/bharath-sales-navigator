@@ -24,6 +24,7 @@ import {
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import DistributorCompanyProfile from '@/components/distributor/DistributorCompanyProfile';
 
 interface Distributor {
   id: string;
@@ -230,10 +231,11 @@ const DistributorProfile = () => {
         </Card>
 
         <Tabs defaultValue="details" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="business">Business Info</TabsTrigger>
             <TabsTrigger value="swot">SWOT</TabsTrigger>
+            <TabsTrigger value="invoice-settings">Invoice Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -504,6 +506,10 @@ const DistributorProfile = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="invoice-settings" className="space-y-4">
+            <DistributorCompanyProfile distributorId={distributor.id} />
           </TabsContent>
         </Tabs>
       </main>
