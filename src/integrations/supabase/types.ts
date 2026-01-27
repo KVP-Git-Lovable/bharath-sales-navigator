@@ -129,13 +129,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ai_feature_feedback_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ai_feature_feedback_visit_id_fkey"
             columns: ["visit_id"]
             isOneToOne: false
@@ -3558,13 +3551,6 @@ export type Database = {
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "distributor_returns_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
         ]
       }
       distributor_support_requests: {
@@ -6213,13 +6199,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "joint_sales_feedback_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "joint_sales_feedback_visit_id_fkey"
             columns: ["visit_id"]
             isOneToOne: false
@@ -6787,13 +6766,6 @@ export type Database = {
             columns: ["retailer_id"]
             isOneToOne: false
             referencedRelation: "retailers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
             referencedColumns: ["id"]
           },
         ]
@@ -8402,13 +8374,6 @@ export type Database = {
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "retailer_credit_scores_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: true
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
         ]
       }
       retailer_feedback: {
@@ -8955,13 +8920,6 @@ export type Database = {
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "retailer_loyalty_points_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
         ]
       }
       retailer_loyalty_programs: {
@@ -9088,13 +9046,6 @@ export type Database = {
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "retailer_loyalty_redemptions_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
         ]
       }
       retailer_loyalty_reward_redemptions: {
@@ -9159,13 +9110,6 @@ export type Database = {
             columns: ["retailer_id"]
             isOneToOne: false
             referencedRelation: "retailers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailer_loyalty_reward_redemptions_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
             referencedColumns: ["id"]
           },
           {
@@ -9270,13 +9214,6 @@ export type Database = {
             columns: ["retailer_id"]
             isOneToOne: true
             referencedRelation: "retailers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailer_loyalty_tracking_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: true
-            referencedRelation: "retailers_created_2025_12_09"
             referencedColumns: ["id"]
           },
         ]
@@ -10866,13 +10803,6 @@ export type Database = {
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "user_business_plan_retailers_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
         ]
       }
       user_business_plan_territories: {
@@ -11967,13 +11897,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "van_return_grn_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "van_return_grn_van_id_fkey"
             columns: ["van_id"]
             isOneToOne: false
@@ -12464,13 +12387,6 @@ export type Database = {
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "visit_ai_insights_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
         ]
       }
       visits: {
@@ -12738,203 +12654,6 @@ export type Database = {
             columns: ["retailer_id"]
             isOneToOne: false
             referencedRelation: "retailers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailer_loyalty_points_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers_created_2025_12_09"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      retailers_created_2025_12_09: {
-        Row: {
-          account_holder_name: string | null
-          address: string | null
-          avg_monthly_orders_3m: number | null
-          avg_order_per_visit_3m: number | null
-          bank_account: string | null
-          bank_name: string | null
-          beat_id: string | null
-          beat_name: string | null
-          category: string | null
-          competitors: string[] | null
-          contact_name: string | null
-          contact_title: string | null
-          created_at: string | null
-          distributor_id: string | null
-          entity_type: string | null
-          gst_number: string | null
-          id: string | null
-          ifsc: string | null
-          last_order_date: string | null
-          last_order_value: number | null
-          last_visit_date: string | null
-          latitude: number | null
-          location_tag: string | null
-          logo_url: string | null
-          longitude: number | null
-          manual_credit_score: number | null
-          name: string | null
-          notes: string | null
-          order_value: number | null
-          owner_id: string | null
-          owner_name: string | null
-          parent_name: string | null
-          parent_type: string | null
-          pending_amount: number | null
-          phone: string | null
-          photo_url: string | null
-          potential: string | null
-          priority: string | null
-          productive_visits_3m: number | null
-          qr_upi: string | null
-          retail_type: string | null
-          state: string | null
-          status: string | null
-          terms_conditions: string | null
-          territory_id: string | null
-          total_visits_3m: number | null
-          updated_at: string | null
-          user_id: string | null
-          verification_address: boolean | null
-          verification_contact: boolean | null
-          verification_status: string | null
-          verification_territory: boolean | null
-          verified: boolean | null
-        }
-        Insert: {
-          account_holder_name?: string | null
-          address?: string | null
-          avg_monthly_orders_3m?: number | null
-          avg_order_per_visit_3m?: number | null
-          bank_account?: string | null
-          bank_name?: string | null
-          beat_id?: string | null
-          beat_name?: string | null
-          category?: string | null
-          competitors?: string[] | null
-          contact_name?: string | null
-          contact_title?: string | null
-          created_at?: string | null
-          distributor_id?: string | null
-          entity_type?: string | null
-          gst_number?: string | null
-          id?: string | null
-          ifsc?: string | null
-          last_order_date?: string | null
-          last_order_value?: number | null
-          last_visit_date?: string | null
-          latitude?: number | null
-          location_tag?: string | null
-          logo_url?: string | null
-          longitude?: number | null
-          manual_credit_score?: number | null
-          name?: string | null
-          notes?: string | null
-          order_value?: number | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_name?: string | null
-          parent_type?: string | null
-          pending_amount?: number | null
-          phone?: string | null
-          photo_url?: string | null
-          potential?: string | null
-          priority?: string | null
-          productive_visits_3m?: number | null
-          qr_upi?: string | null
-          retail_type?: string | null
-          state?: string | null
-          status?: string | null
-          terms_conditions?: string | null
-          territory_id?: string | null
-          total_visits_3m?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-          verification_address?: boolean | null
-          verification_contact?: boolean | null
-          verification_status?: string | null
-          verification_territory?: boolean | null
-          verified?: boolean | null
-        }
-        Update: {
-          account_holder_name?: string | null
-          address?: string | null
-          avg_monthly_orders_3m?: number | null
-          avg_order_per_visit_3m?: number | null
-          bank_account?: string | null
-          bank_name?: string | null
-          beat_id?: string | null
-          beat_name?: string | null
-          category?: string | null
-          competitors?: string[] | null
-          contact_name?: string | null
-          contact_title?: string | null
-          created_at?: string | null
-          distributor_id?: string | null
-          entity_type?: string | null
-          gst_number?: string | null
-          id?: string | null
-          ifsc?: string | null
-          last_order_date?: string | null
-          last_order_value?: number | null
-          last_visit_date?: string | null
-          latitude?: number | null
-          location_tag?: string | null
-          logo_url?: string | null
-          longitude?: number | null
-          manual_credit_score?: number | null
-          name?: string | null
-          notes?: string | null
-          order_value?: number | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_name?: string | null
-          parent_type?: string | null
-          pending_amount?: number | null
-          phone?: string | null
-          photo_url?: string | null
-          potential?: string | null
-          priority?: string | null
-          productive_visits_3m?: number | null
-          qr_upi?: string | null
-          retail_type?: string | null
-          state?: string | null
-          status?: string | null
-          terms_conditions?: string | null
-          territory_id?: string | null
-          total_visits_3m?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-          verification_address?: boolean | null
-          verification_contact?: boolean | null
-          verification_status?: string | null
-          verification_territory?: boolean | null
-          verified?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "retailers_distributor_id_fkey"
-            columns: ["distributor_id"]
-            isOneToOne: false
-            referencedRelation: "distributors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailers_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailers_territory_id_fkey"
-            columns: ["territory_id"]
-            isOneToOne: false
-            referencedRelation: "territories"
             referencedColumns: ["id"]
           },
         ]
