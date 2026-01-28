@@ -29,6 +29,7 @@ import { WifiOff, Wifi, MapPin, CheckCircle2, AlertTriangle } from "lucide-react
 import { useRetailerVisitTracking } from "@/hooks/useRetailerVisitTracking";
 import { RetailerVisitDetailsModal } from "@/components/RetailerVisitDetailsModal";
 import { getLocalTodayDate } from "@/utils/dateUtils";
+import { OrderGuideManualButton } from "@/components/OrderGuideManualButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1811,8 +1812,13 @@ export const OrderEntry = () => {
               </div>
             </div>
               
-              {/* Right side - Clear, Cart and Current value */}
+              {/* Right side - Help, Clear, Cart and Current value */}
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                {/* Help/Guide Button */}
+                <OrderGuideManualButton 
+                  variant="icon" 
+                  className="text-primary-foreground hover:bg-primary-foreground/20 h-8 w-8"
+                />
                 {/* Clear Form Button */}
                 <Button variant="ghost" onClick={handleDeleteClick} className="text-primary-foreground hover:bg-primary-foreground/20 h-auto p-1 sm:p-1.5 flex flex-col items-center gap-0 min-w-[40px] sm:min-w-[45px]" title="Clear all form data">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-[14px] sm:h-[14px]">
