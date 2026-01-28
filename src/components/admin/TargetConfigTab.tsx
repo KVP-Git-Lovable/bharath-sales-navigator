@@ -1,14 +1,15 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Settings, Save, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
+import { WizardProgress } from './target-config/WizardProgress';
+import { ConfigurationStep } from './target-config/ConfigurationStep';
+import { SetTargetsStep } from './target-config/SetTargetsStep';
+import { ApplyToUsersStep } from './target-config/ApplyToUsersStep';
 
 interface TargetConfig {
   id?: string;
@@ -25,13 +26,21 @@ interface TargetConfig {
     territory: boolean;
     monthly: boolean;
   };
+  total_quantity_target: number;
+  total_revenue_target: number;
+  total_visits_target: number;
+  setup_completed: boolean;
 }
 
 interface TargetConfigTabProps {
   fyYear: number;
 }
 
-const QUANTITY_UNITS = ['Kg', 'Units', 'Liters', 'Pcs', 'Boxes', 'Tonnes', 'Cartons'];
+const WIZARD_STEPS = [
+  { id: 1, title: 'Configure', description: 'Set parameters' },
+  { id: 2, title: 'Set Targets', description: 'Define FY targets' },
+  { id: 3, title: 'Apply to Users', description: 'Allocate targets' },
+];
 
 const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   enable_quantity: true,
@@ -46,12 +55,17 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
     territory: true,
     monthly: true,
   },
+  total_quantity_target: 0,
+  total_revenue_target: 0,
+  total_visits_target: 0,
+  setup_completed: false,
 };
 
 export function TargetConfigTab({ fyYear }: TargetConfigTabProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [config, setConfig] = React.useState<TargetConfig>({
+  const [currentStep, setCurrentStep] = useState(1);
+  const [config, setConfig] = useState<TargetConfig>({
     fy_year: fyYear,
     ...DEFAULT_CONFIG,
   });
@@ -73,8 +87,9 @@ export function TargetConfigTab({ fyYear }: TargetConfigTabProps) {
   });
 
   // Update local state when data loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (existingConfig) {
+      const enabledParams = (existingConfig.enabled_parameters as TargetConfig['enabled_parameters']) ?? DEFAULT_CONFIG.enabled_parameters;
       setConfig({
         id: existingConfig.id,
         fy_year: existingConfig.fy_year,
@@ -82,13 +97,27 @@ export function TargetConfigTab({ fyYear }: TargetConfigTabProps) {
         enable_revenue: existingConfig.enable_revenue ?? true,
         enable_visits: existingConfig.enable_visits ?? false,
         quantity_unit: existingConfig.quantity_unit ?? 'Kg',
-        enabled_parameters: (existingConfig.enabled_parameters as TargetConfig['enabled_parameters']) ?? DEFAULT_CONFIG.enabled_parameters,
+        enabled_parameters: enabledParams,
+        total_quantity_target: existingConfig.total_quantity_target ?? 0,
+        total_revenue_target: existingConfig.total_revenue_target ?? 0,
+        total_visits_target: existingConfig.total_visits_target ?? 0,
+        setup_completed: existingConfig.setup_completed ?? false,
       });
+      
+      // If setup is already completed, start at step 3, otherwise check what's done
+      if (existingConfig.setup_completed) {
+        setCurrentStep(3);
+      } else if (existingConfig.total_quantity_target > 0 || existingConfig.total_revenue_target > 0) {
+        setCurrentStep(3);
+      } else if (existingConfig.id) {
+        setCurrentStep(2);
+      }
     } else {
       setConfig({
         fy_year: fyYear,
         ...DEFAULT_CONFIG,
       });
+      setCurrentStep(1);
     }
   }, [existingConfig, fyYear]);
 
@@ -104,11 +133,15 @@ export function TargetConfigTab({ fyYear }: TargetConfigTabProps) {
             enable_visits: configData.enable_visits,
             quantity_unit: configData.quantity_unit,
             enabled_parameters: configData.enabled_parameters,
+            total_quantity_target: configData.total_quantity_target,
+            total_revenue_target: configData.total_revenue_target,
+            total_visits_target: configData.total_visits_target,
+            setup_completed: configData.setup_completed,
           })
           .eq('id', configData.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('fy_target_config')
           .insert({
             fy_year: configData.fy_year,
@@ -117,36 +150,53 @@ export function TargetConfigTab({ fyYear }: TargetConfigTabProps) {
             enable_visits: configData.enable_visits,
             quantity_unit: configData.quantity_unit,
             enabled_parameters: configData.enabled_parameters,
+            total_quantity_target: configData.total_quantity_target,
+            total_revenue_target: configData.total_revenue_target,
+            total_visits_target: configData.total_visits_target,
+            setup_completed: configData.setup_completed,
             created_by: user?.id,
-          });
+          })
+          .select()
+          .single();
         if (error) throw error;
+        // Update local config with the new ID
+        if (data) {
+          setConfig(prev => ({ ...prev, id: data.id }));
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fy-target-config'] });
-      toast.success('Configuration saved successfully');
     },
     onError: (error: any) => {
       toast.error('Failed to save configuration: ' + error.message);
     },
   });
 
-  const handleBasisChange = (field: 'enable_quantity' | 'enable_revenue' | 'enable_visits', checked: boolean) => {
-    setConfig(prev => ({ ...prev, [field]: checked }));
+  const handleConfigChange = (newConfig: Omit<TargetConfig, 'fy_year' | 'total_quantity_target' | 'total_revenue_target' | 'total_visits_target' | 'setup_completed'>) => {
+    setConfig(prev => ({ ...prev, ...newConfig }));
   };
 
-  const handleParameterChange = (param: keyof TargetConfig['enabled_parameters'], checked: boolean) => {
-    setConfig(prev => ({
-      ...prev,
-      enabled_parameters: {
-        ...prev.enabled_parameters,
-        [param]: checked,
-      },
-    }));
+  const handleTargetsChange = (targets: { total_quantity_target: number; total_revenue_target: number; total_visits_target: number }) => {
+    setConfig(prev => ({ ...prev, ...targets }));
   };
 
-  const handleSave = () => {
-    saveMutation.mutate(config);
+  const handleStep1Next = async () => {
+    await saveMutation.mutateAsync(config);
+    toast.success('Configuration saved');
+    setCurrentStep(2);
+  };
+
+  const handleStep2Next = async () => {
+    await saveMutation.mutateAsync(config);
+    toast.success('Targets saved');
+    setCurrentStep(3);
+  };
+
+  const handleStep3Complete = async () => {
+    const completedConfig = { ...config, setup_completed: true };
+    await saveMutation.mutateAsync(completedConfig);
+    toast.success('Target setup completed!');
   };
 
   if (isLoading) {
@@ -161,115 +211,67 @@ export function TargetConfigTab({ fyYear }: TargetConfigTabProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Target Configuration for FY {fyYear - 1}-{String(fyYear).slice(-2)}
-          </CardTitle>
-          <CardDescription>
-            Define what metrics and parameters to track for targets this financial year
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Target Basis */}
-          <div className="space-y-4">
-            <Label className="text-base font-semibold">Target Basis</Label>
-            <p className="text-sm text-muted-foreground">Select which metrics to track for targets</p>
-            <div className="flex flex-wrap gap-6">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="enable_quantity"
-                  checked={config.enable_quantity}
-                  onCheckedChange={(checked) => handleBasisChange('enable_quantity', !!checked)}
-                />
-                <Label htmlFor="enable_quantity" className="font-normal cursor-pointer">
-                  Quantity
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="enable_revenue"
-                  checked={config.enable_revenue}
-                  onCheckedChange={(checked) => handleBasisChange('enable_revenue', !!checked)}
-                />
-                <Label htmlFor="enable_revenue" className="font-normal cursor-pointer">
-                  Revenue (₹)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="enable_visits"
-                  checked={config.enable_visits}
-                  onCheckedChange={(checked) => handleBasisChange('enable_visits', !!checked)}
-                />
-                <Label htmlFor="enable_visits" className="font-normal cursor-pointer">
-                  Productive Visits
-                </Label>
-              </div>
-            </div>
-          </div>
+      {/* Wizard Progress */}
+      <WizardProgress currentStep={currentStep} steps={WIZARD_STEPS} />
 
-          {/* Parameters */}
-          <div className="space-y-4">
-            <Label className="text-base font-semibold">Target Parameters</Label>
-            <p className="text-sm text-muted-foreground">Select which breakdowns are available for targets</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {Object.entries({
-                product: 'Product-wise',
-                retailer: 'Retailer-wise',
-                beat: 'Beat-wise',
-                distributor: 'Distributor-wise',
-                territory: 'Territory-wise',
-                monthly: 'Month-wise',
-              }).map(([key, label]) => (
-                <div key={key} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`param_${key}`}
-                    checked={config.enabled_parameters[key as keyof typeof config.enabled_parameters]}
-                    onCheckedChange={(checked) => handleParameterChange(key as keyof typeof config.enabled_parameters, !!checked)}
-                  />
-                  <Label htmlFor={`param_${key}`} className="font-normal cursor-pointer">
-                    {label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Step Content */}
+      {currentStep === 1 && (
+        <ConfigurationStep
+          config={{
+            enable_quantity: config.enable_quantity,
+            enable_revenue: config.enable_revenue,
+            enable_visits: config.enable_visits,
+            quantity_unit: config.quantity_unit,
+            enabled_parameters: config.enabled_parameters,
+          }}
+          fyYear={fyYear}
+          onConfigChange={handleConfigChange}
+          onNext={handleStep1Next}
+          isSaving={saveMutation.isPending}
+        />
+      )}
 
-          {/* Quantity Unit */}
-          {config.enable_quantity && (
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">Quantity Unit</Label>
-              <p className="text-sm text-muted-foreground">Default unit for quantity targets</p>
-              <Select value={config.quantity_unit} onValueChange={(v) => setConfig(prev => ({ ...prev, quantity_unit: v }))}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUANTITY_UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+      {currentStep === 2 && (
+        <SetTargetsStep
+          config={{
+            enable_quantity: config.enable_quantity,
+            enable_revenue: config.enable_revenue,
+            enable_visits: config.enable_visits,
+            quantity_unit: config.quantity_unit,
+            enabled_parameters: config.enabled_parameters,
+          }}
+          targets={{
+            total_quantity_target: config.total_quantity_target,
+            total_revenue_target: config.total_revenue_target,
+            total_visits_target: config.total_visits_target,
+          }}
+          fyYear={fyYear}
+          onTargetsChange={handleTargetsChange}
+          onBack={() => setCurrentStep(1)}
+          onNext={handleStep2Next}
+          isSaving={saveMutation.isPending}
+        />
+      )}
 
-          {/* Save Button */}
-          <div className="pt-4 flex justify-end">
-            <Button onClick={handleSave} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              Save Configuration
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {currentStep === 3 && (
+        <ApplyToUsersStep
+          config={{
+            enable_quantity: config.enable_quantity,
+            enable_revenue: config.enable_revenue,
+            enable_visits: config.enable_visits,
+            quantity_unit: config.quantity_unit,
+            enabled_parameters: config.enabled_parameters,
+          }}
+          targets={{
+            total_quantity_target: config.total_quantity_target,
+            total_revenue_target: config.total_revenue_target,
+            total_visits_target: config.total_visits_target,
+          }}
+          fyYear={fyYear}
+          onBack={() => setCurrentStep(2)}
+          onComplete={handleStep3Complete}
+        />
+      )}
     </div>
   );
 }
