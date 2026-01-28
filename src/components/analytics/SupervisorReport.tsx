@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -43,6 +44,7 @@ interface UserProfile {
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16'];
 
 export const SupervisorReport = () => {
+  const isMobile = useIsMobile();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [userSelectOpen, setUserSelectOpen] = useState(false);
@@ -1496,18 +1498,18 @@ export const SupervisorReport = () => {
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
-                <ResponsiveContainer width="100%" height={selectedSummaryUser ? 280 : 350}>
+                <ResponsiveContainer width="100%" height={isMobile ? 280 : (selectedSummaryUser ? 280 : 350)}>
                   {chartType === 'pie' ? (
-                    <PieChart>
+                    <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
                       <Pie
                         data={pieChartData}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={selectedSummaryUser ? 90 : 120}
-                        label={selectedSummaryUser ? false : ({ name, percentage }) => `${name} (${percentage}%)`}
-                        labelLine={selectedSummaryUser ? false : { stroke: '#888', strokeWidth: 1 }}
+                        outerRadius={isMobile ? 70 : (selectedSummaryUser ? 90 : 120)}
+                        label={isMobile || selectedSummaryUser ? false : ({ name, percentage }) => `${name} (${percentage}%)`}
+                        labelLine={isMobile || selectedSummaryUser ? false : { stroke: '#888', strokeWidth: 1 }}
                         onClick={handlePieClick}
                         style={{ cursor: 'pointer' }}
                       >
@@ -1523,7 +1525,7 @@ export const SupervisorReport = () => {
                       <Tooltip 
                         formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
                       />
-                      <Legend wrapperStyle={{ fontSize: selectedSummaryUser ? '10px' : '12px' }} />
+                      <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : (selectedSummaryUser ? '10px' : '12px') }} />
                     </PieChart>
                   ) : (
                     <BarChart data={pieChartData} layout="vertical" margin={{ left: 20, right: 20 }}>

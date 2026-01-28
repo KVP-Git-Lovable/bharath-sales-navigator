@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -26,6 +27,7 @@ interface RevenueBySKUSectionProps {
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7'];
 
 export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName, onClearFilter }: RevenueBySKUSectionProps) => {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
@@ -240,18 +242,18 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   </ToggleGroupItem>
                 </ToggleGroup>
               </div>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
                 {chartType === 'pie' ? (
-                  <PieChart>
+                  <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
                     <Pie
                       data={chartData}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={120}
-                      label={({ name, percentage }) => `${name} (${percentage}%)`}
-                      labelLine={{ stroke: '#888', strokeWidth: 1 }}
+                      outerRadius={isMobile ? 70 : 120}
+                      label={isMobile ? false : ({ name, percentage }) => `${name} (${percentage}%)`}
+                      labelLine={isMobile ? false : { stroke: '#888', strokeWidth: 1 }}
                     >
                       {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -263,7 +265,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                         props.payload.fullName
                       ]}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : '12px' }} />
                   </PieChart>
                 ) : (
                   <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
