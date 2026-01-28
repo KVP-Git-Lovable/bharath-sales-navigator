@@ -610,10 +610,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     }
   };
 
-  // Auto-fetch on mount
-  useEffect(() => {
-    fetchSummaryData();
-  }, []);
 
   const totalOrderValue = summaryData.reduce((sum, item) => sum + item.total_order_value, 0);
 
