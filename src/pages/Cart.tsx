@@ -2051,7 +2051,7 @@ export const Cart = () => {
                   </div>}
 
                 {/* Payment Method Selection - Only for legacy flow when full or partial payment selected */}
-                {(paymentType === "full" || paymentType === "partial") && (deliveryPaymentType === "pay_now" || !isOrderBasedDeliveryEnabled) && <div className="space-y-2 p-2.5 border rounded-lg bg-muted/50">
+                {(paymentType === "full" || paymentType === "partial") && (deliveryPaymentType === "pay_now" || !isOrderBasedDeliveryEnabled || isVanSalesEnabled) && <div className="space-y-2 p-2.5 border rounded-lg bg-muted/50">
                     <p className="text-xs font-medium">Payment Method:</p>
                     <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)} className="flex items-center gap-6">
                       <div className="flex items-center space-x-1.5">
