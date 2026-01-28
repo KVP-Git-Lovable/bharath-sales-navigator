@@ -1,232 +1,196 @@
 
-# Phase 1: Admin Target Management Redesign
+# Target Configuration Stepped Workflow Implementation
 
-## Overview
+## Problem Statement
 
-This plan consolidates all target management functionality into a single, powerful admin interface at `/admin/target-vs-actual`. We will integrate the existing Hierarchy-wise Targets UI components directly into the Target vs Actual page, removing redundancy and creating a unified experience.
+Currently, after saving the Target Configuration with selected parameters (Quantity/Revenue/Visits + Product/Retailer/Beat etc.), there is no guided workflow to:
+1. Set the FY-wide quantity/revenue targets first
+2. Then apply those targets to users with all the selected parameter breakdowns
 
-## Current State Analysis
+The user expects a stepped experience where configuration flows into target setting.
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Target vs Actual | `/admin/target-vs-actual` | Individual user target setting + dashboard |
-| Hierarchy Targets | `/admin/hierarchy-targets` | Top-down cascade target allocation |
-| UserFYPlanTarget | Component | Detailed FY plan with Product/Retailer/Month breakdowns |
+## Proposed Solution
 
-**Issues with Current State:**
-- Two separate pages for related functionality
-- No unified target configuration (basis, parameters)
-- Hierarchy targets isolated from individual targets
-- Admin must navigate between pages
-
-## Proposed UI Structure
+Transform the Target Config tab into a **multi-step wizard** that guides the admin through:
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│                         Target vs Actual                                  │
-│              Unified Admin Target Management                              │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  TOP CONTROL BAR                                                         │
-│  ┌────────────┐ ┌──────────────────┐ ┌───────────┐ ┌──────────────────┐ │
-│  │ FY: 2026   │ │ Mode: Hierarchy ▼│ │ Root User │ │ Actions: ⋯       │ │
-│  └────────────┘ └──────────────────┘ └───────────┘ └──────────────────┘ │
-│                                                                          │
-│  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │ [ Target Config ] [ Assign Targets ] [ Target vs Actual ]            ││
-│  └──────────────────────────────────────────────────────────────────────┘│
-│                                                                          │
-│  TAB 1: TARGET CONFIGURATION (NEW)                                       │
-│  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │  Target Basis:    ☑ Quantity  ☑ Revenue  ☐ Visits                   ││
-│  │  Parameters:      ☑ Product   ☑ Retailer  ☑ Beat  ☑ Distributor     ││
-│  │                   ☑ Territory ☑ Monthly                              ││
-│  │  Quantity Unit:   [ Kg ▼ ]                                           ││
-│  │  Revenue Unit:    ₹ (Fixed)                                          ││
-│  │                                           [ Save Configuration ]     ││
-│  └──────────────────────────────────────────────────────────────────────┘│
-│                                                                          │
-│  TAB 2: ASSIGN TARGETS                                                   │
-│  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │  Mode Toggle: ( ) Individual Users  (•) Hierarchy Cascade            ││
-│  │                                                                       ││
-│  │  [HIERARCHY MODE]                                                     ││
-│  │  Uses existing HierarchyTargetBuilder component                       ││
-│  │  - Set total Qty/Rev at top                                          ││
-│  │  - Allocation: Equal / Percentage / Manual                           ││
-│  │  - Visual tree with all subordinates                                 ││
-│  │  - Save Draft / Publish to sync                                      ││
-│  │                                                                       ││
-│  │  [INDIVIDUAL MODE]                                                    ││
-│  │  Uses existing TopControlBar + UserFYPlanTarget                      ││
-│  │  - Select Single/Multiple/All Team                                   ││
-│  │  - Edit targets per user                                             ││
-│  └──────────────────────────────────────────────────────────────────────┘│
-│                                                                          │
-│  TAB 3: TARGET VS ACTUAL (Enhanced)                                      │
-│  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │  Filters: Period [Month▼] Date [Jan 2026] Basis [Revenue▼]          ││
-│  │                                                                       ││
-│  │  Summary Cards: Total | Achieved | In Progress | Not Achieved        ││
-│  │                                                                       ││
-│  │  Team Performance Table (existing TeamTargetDashboard)               ││
-│  └──────────────────────────────────────────────────────────────────────┘│
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    Target Configuration Wizard                              │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Progress: [ Step 1 ] ──► [ Step 2 ] ──► [ Step 3 ]                        │
+│            Configure     Set Targets    Apply to Users                      │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ STEP 1: CONFIGURATION (Current UI)                                    │  │
+│  │ - Target Basis: ☑ Quantity ☑ Revenue ☐ Visits                        │  │
+│  │ - Parameters: ☑ Product ☑ Retailer ☑ Beat ☑ Distributor              │  │
+│  │ - Quantity Unit: Kg                                                   │  │
+│  │                                        [ Save & Continue → ]          │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ STEP 2: SET FY TARGETS (NEW)                                          │  │
+│  │ Set the company-wide targets for FY 2025-26                           │  │
+│  │                                                                        │  │
+│  │ Quantity Target: [________] Kg                                         │  │
+│  │ Revenue Target:  ₹ [________]                                         │  │
+│  │ Visits Target:   [________] (if enabled)                              │  │
+│  │                                                                        │  │
+│  │                 [ ← Back ]  [ Save & Continue → ]                     │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ STEP 3: APPLY TO USERS (NEW)                                          │  │
+│  │ Allocate targets to users with parameter breakdowns                   │  │
+│  │                                                                        │  │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
+│  │ │ Allocation Method: (•) Individual  ( ) Hierarchy Cascade        │   │  │
+│  │ └─────────────────────────────────────────────────────────────────┘   │  │
+│  │                                                                        │  │
+│  │ Select Users → Set breakdown by enabled parameters                    │  │
+│  │ [Product-wise] [Retailer-wise] [Beat-wise] [Month-wise]              │  │
+│  │                                                                        │  │
+│  │                 [ ← Back ]  [ Apply Targets ]                         │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Implementation Details
 
-### 1. New: Target Configuration Tab
+### 1. Enhanced TargetConfigTab with Wizard Steps
 
-**Purpose:** Admin defines once per FY what metrics and parameters to track
+Transform `TargetConfigTab.tsx` from a simple form into a stepped wizard component:
 
-**Database:** Use existing `target_setup_master` table or create new `fy_target_config`
+**Step 1 - Configure** (Existing UI Enhanced):
+- Target Basis checkboxes (Quantity, Revenue, Visits)
+- Parameter checkboxes (Product, Retailer, Beat, Distributor, Territory, Monthly)
+- Quantity Unit selector
+- "Save & Continue" button to move to Step 2
 
-| Field | Type | Description |
-|-------|------|-------------|
-| fy_year | integer | Financial year |
-| enable_quantity | boolean | Track quantity targets |
-| enable_revenue | boolean | Track revenue targets |
-| enable_visits | boolean | Track visit targets |
-| quantity_unit | text | Kg, Units, Liters, etc. |
-| enabled_parameters | jsonb | {product, retailer, beat, distributor, territory, monthly} |
+**Step 2 - Set FY Targets** (New):
+- Input for total Quantity Target (uses configured unit)
+- Input for total Revenue Target (₹)
+- Input for Visits Target (only shown if enabled in Step 1)
+- Shows summary of what will be tracked
+- "Back" and "Save & Continue" buttons
 
-**UI Components:**
-- Checkbox group for Target Basis (Quantity/Revenue/Visits)
-- Checkbox group for Parameters
-- Dropdown for Quantity Unit
-- Save button
+**Step 3 - Apply to Users** (New):
+- User selection interface (Single/Multiple/All Team)
+- For each selected user, show parameter breakdown tabs
+- Only show tabs for enabled parameters (e.g., if Beat is disabled, don't show Beat tab)
+- Reuse existing `UserFYPlanTarget` logic but filtered by config
+- "Back" and "Apply Targets" buttons
 
-### 2. Redesigned Assign Targets Tab
+### 2. Database Changes
 
-**Mode Selector:**
-- Individual Users: Uses existing `TopControlBar` + `UserFYPlanTarget`
-- Hierarchy Cascade: Uses existing `HierarchyTargetBuilder`
+Add columns to `fy_target_config` to store FY-wide targets:
 
-**Hierarchy Mode Integration:**
-- Import `HierarchyTargetBuilder` component
-- Add Root User selector (managers/top-level)
-- Show allocation method (Equal/Percentage/Manual)
-- Display hierarchy tree with targets
-- Save Draft / Publish buttons
+```sql
+ALTER TABLE fy_target_config 
+ADD COLUMN IF NOT EXISTS total_quantity_target NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS total_revenue_target NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS total_visits_target INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS setup_completed BOOLEAN DEFAULT false;
+```
 
-**Individual Mode:**
-- Keep existing TopControlBar with Scope selector
-- UserFYPlanTarget for detailed breakdowns
+### 3. Component Structure
 
-### 3. Enhanced Target vs Actual Tab
+```text
+TargetConfigTab.tsx (Refactored)
+├── WizardProgress (Step indicator)
+├── Step 1: ConfigurationStep
+│   └── (existing checkboxes + unit selector)
+├── Step 2: SetTargetsStep (NEW)
+│   └── FY target inputs based on enabled basis
+└── Step 3: ApplyToUsersStep (NEW)
+    ├── UserSelector (reuse from TopControlBar)
+    └── FilteredUserFYPlanTarget (only show enabled parameter tabs)
+```
 
-**Keep existing functionality:**
-- Period/Date/Basis filters
-- Summary cards
-- Team Performance table
+### 4. Key Changes to UserFYPlanTarget
 
-**Add:**
-- Export to Excel button (already in TopControlBar)
-- Click-through to user details
+Create a wrapper or pass props to `UserFYPlanTarget` to:
+- Only show tabs for parameters enabled in config
+- Pre-populate FY targets from config
+- Lock certain fields if they come from hierarchy
+
+**Props to add:**
+```typescript
+interface UserFYPlanTargetProps {
+  targetUserId?: string;
+  enabledParameters?: {
+    product: boolean;
+    retailer: boolean;
+    beat: boolean;
+    distributor: boolean;
+    territory: boolean;
+    monthly: boolean;
+  };
+  fyConfig?: {
+    quantityTarget: number;
+    revenueTarget: number;
+    quantityUnit: string;
+  };
+}
+```
+
+### 5. User Flow
+
+1. **Admin opens Target Config tab** → Sees Step 1 (Configuration)
+2. **Selects parameters & saves** → Moves to Step 2 (Set Targets)
+3. **Enters FY targets & saves** → Moves to Step 3 (Apply to Users)
+4. **Selects users & breaks down targets** → Applies targets
+5. **"View Dashboard"** button appears to see results
+
+If config already exists and is complete, show a summary view with "Edit Configuration" option.
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/admin/TargetVsActual.tsx` | Major restructure - add 3 tabs, integrate hierarchy |
-| `src/components/admin/TopControlBar.tsx` | Add mode selector, simplify for hierarchy mode |
-| `src/components/admin/AdminSetTarget.tsx` | Refactor to support both modes |
-| New: `src/components/admin/TargetConfigTab.tsx` | FY target configuration UI |
-| New: `src/components/admin/AssignTargetsTab.tsx` | Unified assign targets with mode toggle |
+| `src/components/admin/TargetConfigTab.tsx` | Major refactor - add wizard steps, state machine |
+| `src/components/profile/UserFYPlanTarget.tsx` | Add enabledParameters prop to filter tabs |
+| `supabase/migrations/...` | Add total target columns to fy_target_config |
 
-## Component Architecture
+## New Components
+
+| Component | Purpose |
+|-----------|---------|
+| `WizardProgress.tsx` | Step indicator showing 1-2-3 progress |
+| `SetTargetsStep.tsx` | Step 2 - FY target input form |
+| `ApplyToUsersStep.tsx` | Step 3 - User selection + filtered breakdown |
+
+## Visual Flow Summary
 
 ```text
-TargetVsActual.tsx (Page)
-├── TopControlBar (FY selector, mode, actions)
-├── Tabs
-│   ├── TargetConfigTab (NEW)
-│   │   └── FY configuration form
-│   ├── AssignTargetsTab (NEW)
-│   │   ├── ModeToggle (Individual / Hierarchy)
-│   │   ├── [If Hierarchy]
-│   │   │   ├── RootUserSelector
-│   │   │   └── HierarchyTargetBuilder (EXISTING)
-│   │   └── [If Individual]
-│   │       ├── UserScopeSelector
-│   │       └── UserFYPlanTarget (EXISTING)
-│   └── TeamTargetDashboard (EXISTING - enhanced)
+Step 1: Configure           Step 2: Set Targets         Step 3: Apply to Users
+┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ ☑ Quantity          │     │ Quantity: 50000 Kg  │     │ User: [Girish ▼]    │
+│ ☑ Revenue           │ ──► │ Revenue: ₹25,00,000 │ ──► │ [Products][Beats]   │
+│ ☐ Visits            │     │                     │     │ [Months]...         │
+│ ☑ Product ☑ Beat    │     │ (Visits hidden -    │     │ (Only enabled tabs) │
+│ ☑ Retailer ☐ Terr   │     │  not enabled)       │     │                     │
+└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
+         │                           │                           │
+    [ Save & Next ]           [ Save & Next ]            [ Apply Targets ]
 ```
-
-## Database Changes
-
-**Option: Use existing tables (Recommended for Phase 1)**
-
-The existing tables already support this:
-- `hierarchy_targets` - Top-level targets with cascade
-- `hierarchy_target_allocations` - Per-user allocations
-- `user_business_plans` - Individual user FY targets
-- `user_business_plan_months` - Monthly breakdowns
-
-**New table for configuration:**
-
-```sql
-CREATE TABLE IF NOT EXISTS fy_target_config (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fy_year INTEGER NOT NULL UNIQUE,
-  enable_quantity BOOLEAN DEFAULT true,
-  enable_revenue BOOLEAN DEFAULT true,
-  enable_visits BOOLEAN DEFAULT false,
-  quantity_unit TEXT DEFAULT 'Kg',
-  enabled_parameters JSONB DEFAULT '{"product":true,"retailer":true,"beat":true,"distributor":true,"territory":true,"monthly":true}',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  created_by UUID REFERENCES auth.users(id)
-);
-```
-
-## Navigation Changes
-
-**Remove duplicate page:**
-- Keep `/admin/target-vs-actual` as the unified page
-- Redirect `/admin/hierarchy-targets` to `/admin/target-vs-actual?mode=hierarchy`
-- Update AdminControls.tsx to remove separate Hierarchy Targets card (or keep as shortcut)
-
-## Phase 1 Scope Boundaries
-
-**Included:**
-- Admin can configure FY target settings
-- Admin can set targets via hierarchy cascade OR individual
-- Admin can view Target vs Actual for all users
-- All existing functionality preserved
-
-**Excluded (Future Phases):**
-- Supervisor role-based views
-- User My Target page changes
-- Automated hierarchy enforcement
-- Visit-based targets calculation
-
-## Implementation Order
-
-1. Create `fy_target_config` table with migration
-2. Create `TargetConfigTab.tsx` component
-3. Create `AssignTargetsTab.tsx` with mode toggle
-4. Refactor `TargetVsActual.tsx` to use 3-tab structure
-5. Import and integrate `HierarchyTargetBuilder`
-6. Update routing to redirect old hierarchy page
-7. Test all flows end-to-end
 
 ## Technical Notes
 
-- Reuse `HierarchyTargetBuilder` and `HierarchyTargetNode` components as-is
-- Reuse `UserFYPlanTarget` for individual user editing
-- Reuse `TeamTargetDashboard` for the dashboard tab
-- Keep existing hooks: `useHierarchyTargets`, `useTeamTargetProgress`
-- Admin access check via `useAdminAccess` hook (already in place)
+- Use React state to track current step (1, 2, or 3)
+- Save partial progress at each step to database
+- Show "✓ Configured" badge if config exists
+- Allow going back to previous steps
+- Validate totals before applying to users
+- The existing `AssignTargetsTab` can remain as an alternative advanced interface
+- This wizard provides a guided experience for first-time setup
 
-## Expected Result
+## Phase Approach
 
-After implementation, admins will have a single, powerful page to:
-1. Configure what to track (Qty/Rev/Visits + parameters)
-2. Set targets via hierarchy cascade OR per-user
-3. View consolidated Target vs Actual dashboard
-4. Export data and manage bulk operations
-
-This eliminates the need for two separate admin pages and provides a streamlined experience.
+This implementation covers the admin-only Phase 1 scope:
+- No supervisor/user role checks
+- No hierarchy enforcement
+- Manual application to selected users
+- All functionality under Target Config tab
