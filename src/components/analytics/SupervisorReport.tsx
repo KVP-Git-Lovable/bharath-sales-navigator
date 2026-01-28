@@ -166,6 +166,9 @@ export const SupervisorReport = () => {
   }[]>([]);
   const [retailerDetailsLoading, setRetailerDetailsLoading] = useState(false);
 
+  // State for SKU filter from chart clicks - when a user is clicked in Order Summary charts
+  const [skuFilterUser, setSkuFilterUser] = useState<string | null>(null);
+
   // Generate AI insights based on the summary data
   const aiInsights = useMemo(() => {
     if (summaryData.length === 0) return [];
@@ -680,11 +683,15 @@ export const SupervisorReport = () => {
   const handlePieClick = (data: any) => {
     if (data && data.name) {
       fetchUserDetails(data.name);
+      // Also set SKU filter to show this user's data in Revenue Summary by SKU
+      setSkuFilterUser(data.name);
     }
   };
 
   const handleRowClick = (userName: string) => {
     fetchUserDetails(userName);
+    // Also set SKU filter to show this user's data in Revenue Summary by SKU
+    setSkuFilterUser(userName);
   };
 
   // Fetch beat breakdown with retailers and beats count for Order Details
@@ -2129,7 +2136,12 @@ export const SupervisorReport = () => {
       )}
 
       {/* Revenue Summary by SKU Section */}
-      <RevenueBySKUSection selectedUsers={selectedUsers} dateRange={dateRange} />
+      <RevenueBySKUSection 
+        selectedUsers={skuFilterUser ? [skuFilterUser] : selectedUsers} 
+        dateRange={dateRange}
+        filteredUserName={skuFilterUser}
+        onClearFilter={() => setSkuFilterUser(null)}
+      />
 
       {/* Productivity Summary Section */}
       <ProductivitySummarySection selectedUsers={selectedUsers} dateRange={dateRange} />
