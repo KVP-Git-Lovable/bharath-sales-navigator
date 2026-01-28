@@ -1,232 +1,355 @@
 
-
-# Hierarchy Cascade Target Assignment with Parameter-Filtered User View
+# Target Management UI Redesign - Two-Phase Flow
 
 ## Overview
 
-This plan enhances the **Apply to Users (Step 3)** in the Target Config wizard and the **Hierarchy Cascade mode** in Assign Targets tab to show:
-1. Only the parameters that were selected in Step 1 (e.g., Beat, Monthly, Retailer)
-2. A user-wise hierarchy view where each user's targets can be expanded to show parameter breakdowns
-3. Support for multiple target types (Quantity/Kg, Revenue, Visits) with dropdowns for each parameter
+This plan redesigns the Target Management UI to match the reference mockup with a clean two-phase workflow:
+1. **Phase 1: Create Target** - Define target name, metrics, parameters, units, then lock
+2. **Phase 2: Assign to Hierarchy** - Select organization level, allocate to subordinates
 
-## Current State
+The key difference from the current wizard is that this UI is more streamlined with all configuration on one screen before locking, and hierarchy assignment happens on a separate tabbed view with a left sidebar tree.
 
-- **ApplyToUsersStep.tsx**: Shows allocation mode toggle but Hierarchy mode just redirects to Assign Targets tab
-- **AssignTargetsTab.tsx**: Has Hierarchy Cascade mode with `HierarchyTargetBuilder` but only shows Qty/Revenue totals per user - no parameter breakdowns
-- **UserFYPlanTarget.tsx**: Has full parameter tabs (Products, Retailers, Distributors, Monthly, Territory) but doesn't filter based on config
+---
 
-## Proposed UI Flow
+## Proposed UI Structure
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────┐
-│  STEP 3: APPLY TARGETS TO USERS (Hierarchy Cascade)                       │
-├────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  FY Targets Summary: 50,000 Kg | ₹25,00,000 | 1,200 Visits                │
-│                                                                             │
-│  Enabled Parameters: [Beat] [Monthly] [Retailer]                           │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ Target Type: [ Quantity (Kg) ▼ ]                                      │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ HIERARCHY VIEW                                                        │  │
-│  │                                                                        │  │
-│  │ ▼ Girish (Manager)                    12,500 Kg | ₹6,25,000 | 300    │  │
-│  │   │                                                                    │  │
-│  │   │ ┌────────────────────────────────────────────────────────────┐    │  │
-│  │   │ │ [ Beat ▼ ] [ Monthly ▼ ] [ Retailer ▼ ]                    │    │  │
-│  │   │ │                                                              │    │  │
-│  │   │ │ [BEAT TAB]                                                   │    │  │
-│  │   │ │ Beat-1: 4,166 Kg | ₹2,08,333                                │    │  │
-│  │   │ │ Beat-2: 4,166 Kg | ₹2,08,333                                │    │  │
-│  │   │ │ Beat-3: 4,168 Kg | ₹2,08,334                                │    │  │
-│  │   │ │                                                              │    │  │
-│  │   │ │ [Equally divide across all beats] ✓                         │    │  │
-│  │   │ └────────────────────────────────────────────────────────────┘    │  │
-│  │   │                                                                    │  │
-│  │   ├─ ▶ Ravi (Rep)                     6,250 Kg | ₹3,12,500 | 150     │  │
-│  │   └─ ▶ Priya (Rep)                    6,250 Kg | ₹3,12,500 | 150     │  │
-│  │                                                                        │  │
-│  │ ▶ Suresh (Manager)                    12,500 Kg | ₹6,25,000 | 300    │  │
-│  │                                                                        │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  [ ← Back ]                                         [ Apply Targets ]      │
-│                                                                             │
-└────────────────────────────────────────────────────────────────────────────┘
+TARGET MANAGEMENT
+├── Tab: "Targets" (Create/Edit Target Configs)
+│   ├── Target Plan Name Input
+│   ├── Target Metrics Checkboxes (Quantity, Revenue, Productive Visits)
+│   ├── Target Parameters Checkboxes (Product-wise, Retailer-wise, Beat-wise, etc.)
+│   ├── Units Section
+│   └── [Lock and Assign to Hierarchy] Button
+│
+├── Tab: "Hierarchy" (Allocate to Users)
+│   ├── Left Panel: Organization Tree (CEO > Manager > Rep)
+│   │   └── Clickable nodes with drill-down
+│   └── Right Panel: Allocation View
+│       ├── Target Summary Card (Locked, shows totals)
+│       ├── Allocation Table (User, Quantity, Progress Bar)
+│       ├── "Remaining" indicator
+│       └── [Save Allocation] Button
+│
+└── Tab: "Dashboard" (Existing - Target vs Actual View)
 ```
 
-## Implementation Details
+---
 
-### 1. Enhanced ApplyToUsersStep.tsx
+## Detailed Component Design
 
-Transform to use Hierarchy Cascade directly (not redirect to another tab):
+### Tab 1: "Targets" - Create Target Configuration
 
-**New Features:**
-- Full hierarchy tree with expandable user nodes
-- Each user node shows target totals (Qty/Rev/Visits based on config)
-- Clicking "expand" on a user shows parameter breakdown tabs
-- Only show tabs for enabled parameters from Step 1 config
-- Target type selector dropdown at top (Quantity/Revenue/Visits)
+This is a single-page form (no wizard steps) that contains:
 
-### 2. New Component: HierarchyUserTargetNode
-
-A new component that renders each user in the hierarchy with:
-- Collapsible node showing user name, avatar, and target summary
-- When expanded, shows filtered parameter tabs (only enabled params)
-- Each parameter tab has:
-  - "Equally divide" checkbox
-  - List of items (beats/retailers/products/months) with individual targets
-  - Editable target values
-
-**Props:**
-```typescript
-interface HierarchyUserTargetNodeProps {
-  node: {
-    userId: string;
-    fullName: string;
-    profilePictureUrl: string | null;
-    level: number;
-    quantityTarget: number;
-    revenueTarget: number;
-    visitsTarget: number;
-    children: HierarchyUserTargetNodeProps['node'][];
-  };
-  enabledParameters: {
-    product: boolean;
-    retailer: boolean;
-    beat: boolean;
-    distributor: boolean;
-    territory: boolean;
-    monthly: boolean;
-  };
-  enabledBasis: {
-    quantity: boolean;
-    revenue: boolean;
-    visits: boolean;
-  };
-  quantityUnit: string;
-  fyYear: number;
-  selectedTargetType: 'quantity' | 'revenue' | 'visits';
-  onTargetChange: (userId: string, field: string, value: number) => void;
-}
+**Card: Create Target**
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│  🎯 Create Target                                                    │
+├──────────────────────────────────────────────────────────────────────┤
+│  FY Year: [FY 2025-26 ▼]                                             │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ [FY 25 Sales Plan                                              ]│ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│  Target Metrics                                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ ☑ Quantity    ☑ Revenue    ☑ Productive Visits                 │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│  Target Parameters                                                    │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ ☑ Product-wise  ☑ Retailer-wise  ☑ Beat-wise  ☑ Distributor    │ │
+│  │ ☑ Month         ☐ Territory-wise                                │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│  Units                                                                │
+│  [Kg ▼] for Quantity                                                 │
+│                                                                       │
+│  Satisfied with the target configuration?                            │
+│                              [🔒 Lock and Assign to Hierarchy]       │
+│                                                                       │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3. Parameter Breakdown Components
+**Behavior:**
+- Target Plan Name is editable text input
+- On "Lock and Assign to Hierarchy" click:
+  - Save configuration with `is_locked = true`
+  - Switch to "Hierarchy" tab
+  - Show FY total inputs (Quantity/Revenue/Visits based on selected metrics)
 
-Create lightweight parameter breakdown sub-components that work within the hierarchy node:
+### Tab 2: "Hierarchy" - Assign to Organization
 
-**UserBeatTargets.tsx** - For beat-wise breakdown:
-- Fetch beats for the user
-- Show equal divide option
-- Individual beat target inputs
-
-**UserRetailerTargets.tsx** - For retailer-wise breakdown:
-- Fetch retailers for the user
-- Category-grouped view
-- Individual retailer target inputs
-
-**UserMonthlyTargets.tsx** - For month-wise breakdown:
-- 12-month FY grid
-- Equal divide option
-- Individual month targets
-
-**UserProductTargets.tsx** - For product-wise breakdown:
-- Reuse existing category-product hierarchy
-- Equal divide per category
-
-### 4. Data Flow
+Split-panel layout with organization tree on left and allocation form on right:
 
 ```text
-fy_target_config (Step 1)
-        │
-        ▼
-Set FY Totals (Step 2)
-        │
-        ▼
-Hierarchy Allocation (Equal/Percentage/Manual)
-        │
-        ▼
-Per-User Totals (Step 3 - Hierarchy View)
-        │
-        ▼
-Parameter Breakdowns (Beat/Retailer/Month/Product)
-        │
-        ▼
-Save to user_business_plan_* tables
+┌────────────────────────┬─────────────────────────────────────────────┐
+│ Organization Hierarchy │  Target: FY 25 Sales Plan       [🔒 Locked]│
+├────────────────────────┼─────────────────────────────────────────────┤
+│                        │                                             │
+│ ● CEO                  │  Total Target              FY 2025-26       │
+│ └ 📋 National Manager  │  ───────────────────────────────────────   │
+│   └ 📋 Regional Manager│  Quantity: 1,00,000 KG                     │
+│     ├ 📍 ASM-1         │  Revenue: ₹ 55,000,00,000                  │
+│     ├ 📍 ASM-2         │  Productive Visits: 12,000                 │
+│     └ 📍 ASM-3         │                                   [≡ Tool] │
+│                        │─────────────────────────────────────────────│
+│                        │                                             │
+│                        │  Allocation Method                          │
+│                        │  ┌───────────────────────────────────────┐ │
+│                        │  │ Target    │ Quantity  │ ₹ Total      │ │
+│                        │  ├───────────┼───────────┼──────────────┤ │
+│                        │  │ ASM-1     │ 25,000 KG │ ████░░ 25,00 │ │
+│                        │  │ ASM-2     │ 35,000 KG │ █████░ 35,000│ │
+│                        │  │ ASM-3     │ 40,000 KG │ ██████ 40,000│ │
+│                        │  └───────────┴───────────┴──────────────┘ │
+│                        │                 Remaining: [0]             │
+│                        │                                             │
+│                        │              [≡ Save Allocation]           │
+└────────────────────────┴─────────────────────────────────────────────┘
 ```
 
-### 5. Database Integration
+**Left Panel - Organization Tree:**
+- Uses existing `get_all_subordinates` RPC
+- Clickable nodes - clicking a manager shows their direct reports in the allocation table
+- Icons differentiate managers (📋) from reps (📍)
+- Current selected node is highlighted
 
-**Saving user targets with breakdowns:**
-- Create/update `user_business_plans` for each user with allocated targets
-- Create/update `user_business_plan_beats` for beat breakdown
-- Create/update `user_business_plan_retailers` for retailer breakdown
-- Create/update `user_business_plan_months` for monthly breakdown
-- Create/update `user_business_plan_products` for product breakdown
+**Right Panel - Allocation View:**
+- Shows locked target summary at top
+- FY totals for each enabled metric
+- Allocation table shows direct subordinates of selected tree node
+- Editable quantity/revenue input with visual progress bar
+- "Remaining" shows unallocated amount (auto-calculates)
+- "Save Allocation" persists to `user_business_plans`
 
-### 6. Component Structure
+### Tab 3: "Dashboard" - Target vs Actual (Existing)
 
-```text
-ApplyToUsersStep.tsx (Refactored)
-├── FY Targets Summary Banner
-├── Enabled Parameters Badges
-├── Target Type Selector
-├── HierarchyTargetTree
-│   └── HierarchyUserTargetNode (recursive)
-│       ├── User Header (avatar, name, totals)
-│       ├── Collapsible Expand
-│       └── ParameterBreakdownTabs (only enabled params)
-│           ├── UserBeatTargets (if beat enabled)
-│           ├── UserRetailerTargets (if retailer enabled)
-│           ├── UserMonthlyTargets (if monthly enabled)
-│           ├── UserProductTargets (if product enabled)
-│           ├── UserDistributorTargets (if distributor enabled)
-│           └── UserTerritoryTargets (if territory enabled)
-└── Action Buttons (Back, Apply)
+Keep the existing `TeamTargetDashboard` component - no changes needed.
+
+---
+
+## Database Schema Changes
+
+Add new columns to `fy_target_config`:
+
+```sql
+ALTER TABLE fy_target_config
+ADD COLUMN IF NOT EXISTS target_plan_name TEXT DEFAULT 'FY Sales Plan',
+ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
 ```
+
+---
 
 ## Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/admin/target-config/ApplyToUsersStep.tsx` | **Major Refactor** | Add hierarchy view with parameter breakdowns |
-| `src/components/admin/target-config/HierarchyUserTargetNode.tsx` | **Create** | Collapsible user node with parameter tabs |
-| `src/components/admin/target-config/UserBeatTargets.tsx` | **Create** | Beat breakdown sub-component |
-| `src/components/admin/target-config/UserRetailerTargets.tsx` | **Create** | Retailer breakdown sub-component |
-| `src/components/admin/target-config/UserMonthlyTargets.tsx` | **Create** | Monthly breakdown sub-component |
-| `src/components/admin/target-config/UserProductTargets.tsx` | **Create** | Product breakdown sub-component |
-| `src/components/admin/target-config/UserDistributorTargets.tsx` | **Create** | Distributor breakdown sub-component |
+| `src/pages/admin/TargetVsActual.tsx` | Modify | Update tabs to "Targets", "Hierarchy", "Dashboard" |
+| `src/components/admin/TargetConfigTab.tsx` | Major Refactor | Convert to single-page "Create Target" form |
+| `src/components/admin/HierarchyAllocationTab.tsx` | Create | New split-panel hierarchy allocation view |
+| `src/components/admin/OrganizationTree.tsx` | Create | Left panel tree component with clickable nodes |
+| `src/components/admin/AllocationTable.tsx` | Create | Right panel allocation table with progress bars |
+| `src/components/admin/TargetSummaryCard.tsx` | Create | Locked target summary header component |
+| `supabase/migrations/...` | Create | Add target_plan_name and is_locked columns |
+| `src/integrations/supabase/types.ts` | Auto-update | Regenerate types |
 
-## Key Behaviors
+---
 
-1. **Parameter Filtering**: Only tabs for enabled parameters are shown
-2. **Target Type Toggle**: Dropdown to switch view between Quantity/Revenue/Visits
-3. **Equal Divide**: Each parameter tab has option to equally distribute
-4. **Hierarchy Display**: Tree structure with expand/collapse for each user
-5. **Real-time Totals**: Sum validation to ensure parameter totals match user target
-6. **Auto-populate**: When expanding a user, auto-populate from existing data or equal divide
+## Detailed Component Breakdown
+
+### 1. TargetConfigTab.tsx (Refactored)
+
+Remove wizard steps, make it a single-page form:
+
+```typescript
+interface TargetConfigTabProps {
+  fyYear: number;
+  onLockedAndAssign: () => void; // Callback to switch to Hierarchy tab
+}
+```
+
+Key changes:
+- Add `target_plan_name` text input at top
+- Remove step indicators (WizardProgress)
+- Keep all configuration fields on one card
+- Add "Lock and Assign to Hierarchy" button
+- When locked, show read-only summary with "Edit Configuration" option
+- Show FY total inputs (Quantity/Revenue/Visits) in same form
+
+### 2. HierarchyAllocationTab.tsx (New)
+
+Split-panel component with:
+- Left: `OrganizationTree` component
+- Right: `TargetSummaryCard` + `AllocationTable`
+
+```typescript
+interface HierarchyAllocationTabProps {
+  fyYear: number;
+  config: TargetConfig; // From parent or fetched
+}
+```
+
+### 3. OrganizationTree.tsx (New)
+
+Recursive tree component:
+
+```typescript
+interface OrganizationTreeProps {
+  rootUserId: string | null;
+  selectedNodeId: string | null;
+  onNodeSelect: (userId: string, level: number) => void;
+}
+```
+
+Features:
+- Fetches hierarchy using `get_all_subordinates`
+- Renders as collapsible tree with icons
+- Clicking a node selects it and updates right panel
+- Shows count of direct reports next to manager names
+
+### 4. AllocationTable.tsx (New)
+
+Allocation grid with editable inputs:
+
+```typescript
+interface AllocationTableProps {
+  parentUserId: string;
+  subordinates: SubordinateData[];
+  totalQuantity: number;
+  totalRevenue: number;
+  totalVisits: number;
+  quantityUnit: string;
+  enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean };
+  onAllocationChange: (userId: string, field: string, value: number) => void;
+  onSave: () => void;
+}
+```
+
+Features:
+- Grid with columns: Name, Quantity, Progress, Revenue, Progress
+- Progress bars showing % of parent allocation
+- Auto-calculate "Remaining" as parent total - sum of children
+- Validation: warn if allocations exceed parent total
+
+---
+
+## Workflow Flow
+
+```text
+USER FLOW:
+
+1. Admin opens Target Management
+   └─► Sees "Targets" tab by default
+
+2. On "Targets" tab:
+   ├─► Enters/edits "FY 25 Sales Plan" name
+   ├─► Checks Target Metrics (Quantity, Revenue, Visits)
+   ├─► Checks Target Parameters (Product-wise, Beat-wise, Monthly, etc.)
+   ├─► Selects Quantity Unit (Kg)
+   ├─► Enters FY Totals (Quantity: 1,00,000, Revenue: 55Cr, Visits: 12000)
+   └─► Clicks "Lock and Assign to Hierarchy"
+       └─► Config saved with is_locked=true
+       └─► Auto-switches to "Hierarchy" tab
+
+3. On "Hierarchy" tab:
+   ├─► Sees organization tree on left
+   ├─► Clicks "Regional Manager" in tree
+   ├─► Right panel shows:
+   │   ├─► Target Summary Card (locked totals)
+   │   └─► Allocation table for ASM-1, ASM-2, ASM-3
+   ├─► Enters allocation for each ASM
+   ├─► Sees "Remaining" update in real-time
+   └─► Clicks "Save Allocation"
+       └─► Creates/updates user_business_plans for each user
+
+4. Drill-down allocation:
+   ├─► Clicks on "ASM-1" in tree
+   └─► Right panel now shows ASM-1's direct reports
+       └─► Can allocate ASM-1's total to their team
+
+5. On "Dashboard" tab:
+   └─► Existing Target vs Actual view (no changes)
+```
+
+---
+
+## Parameter-wise Target Setting (After Basic Allocation)
+
+After setting user-level totals, clicking on a user row can expand to show parameter breakdowns:
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│ ASM-1: 25,000 KG | ₹13,75,00,000                          [▼ Expand]│
+├────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [ Beats ] [ Monthly ] [ Retailers ] [ Products ]                   │
+│                                                                     │
+│ ┌─────────────────────────────────────────────────────────────────┐│
+│ │ BEAT TAB                                                        ││
+│ │ ☑ Equally divide across all beats                               ││
+│ │ Beat-1: 8,333 KG   Beat-2: 8,333 KG   Beat-3: 8,334 KG         ││
+│ │                                    [Save Beat Targets]          ││
+│ └─────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────┘
+```
+
+This reuses the existing `HierarchyUserTargetNode` component with:
+- Filtered tabs based on enabled parameters
+- `UserBeatTargets`, `UserMonthlyTargets`, `UserRetailerTargets` sub-components
+
+---
 
 ## Technical Notes
 
-- Reuse `get_all_subordinates` RPC for building hierarchy tree
-- Reuse existing beat/retailer/product fetching logic from UserFYPlanTarget
-- Use Supabase upsert pattern for saving breakdowns
-- Maintain state per-user in a Map for performance
-- Lazy load parameter data only when user node is expanded
+1. **State Management**: 
+   - Config state persisted to `fy_target_config` table
+   - User allocations persisted to `user_business_plans` table
+   - Parameter breakdowns to respective `user_business_plan_*` tables
 
-## Visual Reference (from user screenshot)
+2. **Lock Behavior**:
+   - Once locked, config cannot be edited without explicit "Unlock" action
+   - Locked configs show read-only summary on "Targets" tab
+   - "Hierarchy" tab only available when a locked config exists
 
-The user's screenshot shows the desired view:
-- User-specific target card with "Setting targets for: Girish"
-- FY Overview card with Qty Target and Revenue Target
-- Tabs at bottom: Products | Retailers | Distributors | Monthly | Territory
-- "Equally divide across all products" checkbox
+3. **Hierarchy Tree**:
+   - Use `get_all_subordinates` RPC for full hierarchy
+   - Build client-side tree structure from flat list
+   - Support for clicking any level to allocate to that level's direct reports
 
-This plan implements the same view but:
-1. Within the hierarchy cascade context
-2. Filtered to only show enabled parameters
-3. With support for multiple target types (Qty/Revenue/Visits)
+4. **Progress Bars**:
+   - Visual representation of allocation percentage
+   - Color-coded: green (within target), orange (over target)
 
+5. **Validation**:
+   - Warn if sum of allocations exceeds parent total
+   - "Remaining" can be negative (over-allocation) or positive (under-allocation)
+
+---
+
+## Migration Script
+
+```sql
+-- Add new columns for target plan name and lock status
+ALTER TABLE fy_target_config
+ADD COLUMN IF NOT EXISTS target_plan_name TEXT DEFAULT 'FY Sales Plan',
+ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+```
+
+---
+
+## Summary of Changes
+
+| Current | New |
+|---------|-----|
+| 3-step wizard (Configure → Set Targets → Apply to Users) | Single-page form with Lock button |
+| Separate tabs: Config, Assign, Dashboard | Tabs: Targets, Hierarchy, Dashboard |
+| Step-by-step flow | All config on one screen, then hierarchy |
+| No target plan name | Named target plans |
+| No lock mechanism | Explicit lock before assignment |
+| Hierarchy in Step 3 | Dedicated "Hierarchy" tab with tree view |
+| Single-panel hierarchy | Split-panel with tree + allocation table |
+
+This redesign provides a cleaner, more intuitive flow that matches the reference mockup while maintaining all existing functionality.
