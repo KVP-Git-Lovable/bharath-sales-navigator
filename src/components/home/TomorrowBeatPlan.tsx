@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useTranslation } from "react-i18next";
 
 interface TomorrowBeatPlanProps {
   userId: string;
@@ -51,6 +52,7 @@ export const TomorrowBeatPlan = ({ userId }: TomorrowBeatPlanProps) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const { t } = useTranslation('common');
 
   const tomorrow = addDays(new Date(), 1);
   const tomorrowDate = format(tomorrow, 'yyyy-MM-dd');
@@ -399,7 +401,7 @@ Keep it concise and practical.`;
         <CardHeader className="pb-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10">
           <CardTitle className="text-sm flex items-center gap-2">
             <MapPin className="h-4 w-4" />
-            Tomorrow's Beat Plan
+            {t('home.tomorrowsBeatPlan')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 pt-3">
@@ -416,11 +418,11 @@ Keep it concise and practical.`;
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <MapPin className="h-4 w-4" />
-            Tomorrow's Beat Plan
+            {t('home.tomorrowsBeatPlan')}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-sm">No beat planned for tomorrow</p>
+          <p className="text-muted-foreground text-sm">{t('home.noBeatPlannedForTomorrow')}</p>
         </CardContent>
       </Card>
     );
@@ -433,7 +435,7 @@ Keep it concise and practical.`;
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" />
-              Tomorrow's Beat Plan
+              {t('home.tomorrowsBeatPlan')}
             </CardTitle>
             <div className="flex gap-1">
               <Button
@@ -477,9 +479,9 @@ Keep it concise and practical.`;
           {insights && (
             <Badge variant={insights.isAboveAverage ? "default" : "secondary"} className="text-xs">
               {insights.isAboveAverage ? (
-                <><TrendingUp className="h-3 w-3 mr-1" /> Above Avg</>
+                <><TrendingUp className="h-3 w-3 mr-1" /> {t('home.aboveAvg')}</>
               ) : (
-                <><TrendingDown className="h-3 w-3 mr-1" /> Below Avg</>
+                <><TrendingDown className="h-3 w-3 mr-1" /> {t('home.belowAvg')}</>
               )}
             </Badge>
           )}

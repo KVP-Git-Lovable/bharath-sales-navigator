@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RetailerDetailModal } from "@/components/RetailerDetailModal";
+import { useTranslation } from "react-i18next";
 
 interface PendingPayment {
   retailerId: string;
@@ -21,6 +22,7 @@ interface PendingPaymentsProps {
 
 export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const [payments, setPayments] = useState<PendingPayment[]>([]);
   const [totalPending, setTotalPending] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -181,11 +183,11 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-destructive" />
-            Pending Payments
+            {t('home.pendingPayments')}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs text-muted-foreground">
-              Updated {formatTime(lastUpdated)}
+              {t('home.updated')} {formatTime(lastUpdated)}
             </Badge>
             <Button 
               variant="ghost" 
@@ -202,7 +204,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
         {/* Total Pending */}
         <div className="bg-destructive/10 rounded-lg p-3 flex items-center justify-between">
           <div>
-            <p className="text-xs text-muted-foreground">Total Pending</p>
+            <p className="text-xs text-muted-foreground">{t('home.totalPending')}</p>
             <p className="text-xl font-bold text-destructive">{formatCurrency(totalPending)}</p>
           </div>
           <AlertCircle className="h-8 w-8 text-destructive/50" />
@@ -221,7 +223,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
                   <p className="text-sm font-medium truncate">{payment.retailerName}</p>
                   {payment.lastOrderDate && (
                     <p className="text-xs text-muted-foreground">
-                      Last order: {new Date(payment.lastOrderDate).toLocaleDateString('en-IN')}
+                      {t('home.lastOrder')}: {new Date(payment.lastOrderDate).toLocaleDateString('en-IN')}
                     </p>
                   )}
                 </div>
@@ -236,7 +238,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
           </div>
         ) : (
           <div className="text-center py-4 text-muted-foreground">
-            <p className="text-sm">No pending payments</p>
+            <p className="text-sm">{t('home.noPendingPaymentsMessage')}</p>
           </div>
         )}
 
@@ -247,7 +249,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
             className="w-full text-sm"
             onClick={() => navigate('/pending-payments-all')}
           >
-            View All Pending Payments
+            {t('home.viewAllPendingPayments')}
           </Button>
         )}
       </CardContent>

@@ -9,6 +9,7 @@ import { useUserTargetProgress, TargetPeriod, TargetBasis } from "@/hooks/useUse
 import { usePeriodStats } from "@/hooks/usePeriodStats";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface TodaysBeatCardProps {
   beatPlan: any | null;
@@ -30,25 +31,25 @@ interface TodaysBeatCardProps {
   onDateChange: (date: Date) => void;
 }
 
-// Grouped period options - Past and Future
-const PAST_PERIOD_OPTIONS: { value: TargetPeriod; label: string }[] = [
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'last_week', label: 'Last Week' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'last_quarter', label: 'Last Quarter' },
+// These will be replaced with translated versions in the component
+const PAST_PERIOD_OPTIONS: { value: TargetPeriod; labelKey: string }[] = [
+  { value: 'yesterday', labelKey: 'home.yesterday' },
+  { value: 'last_week', labelKey: 'home.lastWeek' },
+  { value: 'last_month', labelKey: 'home.lastMonth' },
+  { value: 'last_quarter', labelKey: 'home.lastQuarter' },
 ];
 
-const FUTURE_PERIOD_OPTIONS: { value: TargetPeriod; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: 'this_week', label: 'This Week' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'this_quarter', label: 'This Quarter' },
-  { value: 'this_year', label: 'This FY' },
+const FUTURE_PERIOD_OPTIONS: { value: TargetPeriod; labelKey: string }[] = [
+  { value: 'today', labelKey: 'home.today' },
+  { value: 'this_week', labelKey: 'home.thisWeek' },
+  { value: 'this_month', labelKey: 'home.thisMonth' },
+  { value: 'this_quarter', labelKey: 'home.thisQuarter' },
+  { value: 'this_year', labelKey: 'home.thisFY' },
 ];
 
-const BASIS_OPTIONS: { value: TargetBasis; label: string }[] = [
-  { value: 'quantity', label: 'Quantity' },
-  { value: 'revenue', label: 'Revenue' },
+const BASIS_OPTIONS: { value: TargetBasis; labelKey: string }[] = [
+  { value: 'quantity', labelKey: 'home.quantity' },
+  { value: 'revenue', labelKey: 'home.revenue' },
 ];
 
 export const TodaysBeatCard = ({ 
@@ -65,6 +66,7 @@ export const TodaysBeatCard = ({
 }: TodaysBeatCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation('common');
   const [targetPeriod, setTargetPeriod] = useState<TargetPeriod>('today');
   const [targetBasis, setTargetBasis] = useState<TargetBasis>('quantity');
 
@@ -133,19 +135,20 @@ export const TodaysBeatCard = ({
   // Get display label for current period
   const getPeriodLabel = (period: TargetPeriod) => {
     const allOptions = [...PAST_PERIOD_OPTIONS, ...FUTURE_PERIOD_OPTIONS];
-    return allOptions.find(opt => opt.value === period)?.label || period;
+    const option = allOptions.find(opt => opt.value === period);
+    return option ? t(option.labelKey) : period;
   };
 
   // Determine beat name display based on period
   const getDisplayBeatName = () => {
     if (isToday) {
-      return beatName || beatPlan?.beat_name || 'Not Planned';
+      return beatName || beatPlan?.beat_name || t('home.notPlanned');
     }
     // For week/month/quarter/year periods, show a summary label
     if (periodStats && periodStats.planned > 0) {
-      return `${getPeriodLabel(targetPeriod)} Schedule`;
+      return `${getPeriodLabel(targetPeriod)} ${t('home.schedule')}`;
     }
-    return beatName || beatPlan?.beat_name || 'No Schedule';
+    return beatName || beatPlan?.beat_name || t('home.noSchedule');
   };
 
   const displayBeatName = getDisplayBeatName();
@@ -161,7 +164,7 @@ export const TodaysBeatCard = ({
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground truncate">{displayBeatName}</h3>
             {!beatPlan && !beatName && (
-              <p className="text-xs text-muted-foreground">No beat planned</p>
+              <p className="text-xs text-muted-foreground">{t('home.noBeatPlanned')}</p>
             )}
           </div>
         </div>
@@ -176,18 +179,18 @@ export const TodaysBeatCard = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">Current / Future</SelectLabel>
+                  <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('home.currentFuture')}</SelectLabel>
                   {FUTURE_PERIOD_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
                 <SelectGroup>
-                  <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">Past</SelectLabel>
+                  <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('home.past')}</SelectLabel>
                   {PAST_PERIOD_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -200,7 +203,7 @@ export const TodaysBeatCard = ({
               <SelectContent>
                 {BASIS_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -211,14 +214,14 @@ export const TodaysBeatCard = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">
-                Target ({getPeriodLabel(targetPeriod)})
+                {t('home.target')} ({getPeriodLabel(targetPeriod)})
               </p>
               <p className="text-sm font-bold text-foreground">
                 {targetLoading ? '...' : formatValue(target)}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground mb-0.5">Achievement</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t('home.achievement')}</p>
               <p className={`text-sm font-bold ${progress >= 100 ? 'text-success' : progress >= 50 ? 'text-warning' : 'text-destructive'}`}>
                 {targetLoading ? '...' : `${progress}%`}
               </p>
@@ -259,7 +262,7 @@ export const TodaysBeatCard = ({
             <div className="flex flex-col gap-2 mt-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
-                  Gap: {formatGapValue(gap)} to go
+                  {t('home.gapToGo', { value: formatGapValue(gap) })}
                 </div>
                 <Button
                   variant="outline"
@@ -268,7 +271,7 @@ export const TodaysBeatCard = ({
                   className="text-xs h-8 gap-1"
                 >
                   <Sparkles className="h-3 w-3" />
-                  Target Advisor
+                  {t('home.targetAdvisor')}
                 </Button>
               </div>
               <Button
@@ -278,7 +281,7 @@ export const TodaysBeatCard = ({
                 className="text-xs h-8 gap-1 w-full"
               >
                 <BarChart3 className="h-3 w-3" />
-                View Performance
+                {t('home.viewPerformance')}
               </Button>
             </div>
           )}
@@ -287,7 +290,7 @@ export const TodaysBeatCard = ({
             <div className="flex flex-col gap-2 mt-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-bold text-success bg-success/10 px-3 py-1.5 rounded-md border border-success/20">
-                  Overachieved by +{formatGapValue(gap)}
+                  {t('home.overachievedBy', { value: formatGapValue(gap) })}
                 </div>
                 <Button
                   variant="outline"
@@ -296,7 +299,7 @@ export const TodaysBeatCard = ({
                   className="text-xs h-8 gap-1"
                 >
                   <Sparkles className="h-3 w-3" />
-                  Target Advisor
+                  {t('home.targetAdvisor')}
                 </Button>
               </div>
               <Button
@@ -306,7 +309,7 @@ export const TodaysBeatCard = ({
                 className="text-xs h-8 gap-1 w-full"
               >
                 <BarChart3 className="h-3 w-3" />
-                View Performance
+                {t('home.viewPerformance')}
               </Button>
             </div>
           )}
@@ -314,7 +317,7 @@ export const TodaysBeatCard = ({
           {gap === 0 && !targetLoading && target > 0 && (
             <div className="flex flex-col gap-2 mt-2">
               <div className="text-sm font-bold text-success bg-success/10 px-3 py-1.5 rounded-md border border-success/20 text-center">
-                Target Achieved! 🎉
+                {t('home.targetAchieved')}
               </div>
               <Button
                 variant="ghost"
@@ -323,14 +326,14 @@ export const TodaysBeatCard = ({
                 className="text-xs h-8 gap-1 w-full"
               >
                 <BarChart3 className="h-3 w-3" />
-                View Performance
+                {t('home.viewPerformance')}
               </Button>
             </div>
           )}
           {target === 0 && !targetLoading && (
             <div className="flex items-center justify-between mt-2">
               <div className="text-xs text-muted-foreground italic">
-                No target set in My Profile
+                {t('home.noTargetSet')}
               </div>
               <Button
                 variant="ghost"
@@ -339,7 +342,7 @@ export const TodaysBeatCard = ({
                 className="text-xs h-8 gap-1"
               >
                 <BarChart3 className="h-3 w-3" />
-                Performance
+                {t('home.performance')}
               </Button>
             </div>
           )}
@@ -356,7 +359,7 @@ export const TodaysBeatCard = ({
               ) : (
                 <p className="text-xl font-bold text-foreground">{displayPlanned}</p>
               )}
-              <p className="text-[10px] text-muted-foreground mt-0.5">Planned</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{t('home.planned')}</p>
           </div>
 
           <div className="text-center p-3 rounded-lg bg-success/5 border border-success/10">
@@ -368,7 +371,7 @@ export const TodaysBeatCard = ({
             ) : (
               <p className="text-xl font-bold text-foreground">{displayProductive}</p>
             )}
-            <p className="text-[10px] text-muted-foreground mt-0.5">Productive</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{t('home.productive')}</p>
           </div>
 
           <div className="text-center p-3 rounded-lg bg-warning/5 border border-warning/10">
@@ -380,7 +383,7 @@ export const TodaysBeatCard = ({
             ) : (
               <p className="text-xl font-bold text-foreground">{displayRemaining}</p>
             )}
-            <p className="text-[10px] text-muted-foreground mt-0.5">Remaining</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{t('home.remaining')}</p>
           </div>
         </div>
 
@@ -395,7 +398,7 @@ export const TodaysBeatCard = ({
             ) : (
               <p className="text-base font-bold text-foreground">{displayNewRetailers}</p>
             )}
-            <p className="text-[10px] text-muted-foreground mt-0.5">New Added</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{t('home.newAdded')}</p>
           </div>
 
           <div className="text-center p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/10">
@@ -407,7 +410,7 @@ export const TodaysBeatCard = ({
             ) : (
               <p className="text-base font-bold text-foreground">{formatCurrencyShort(displayPotentialRevenue)}</p>
             )}
-            <p className="text-[10px] text-muted-foreground mt-0.5">Potential</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{t('home.potential')}</p>
           </div>
 
           <div className="text-center p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
@@ -419,7 +422,7 @@ export const TodaysBeatCard = ({
             ) : (
               <p className="text-base font-bold text-foreground">{displayPoints}</p>
             )}
-            <p className="text-[10px] text-muted-foreground mt-0.5">Points</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{t('home.points')}</p>
           </div>
         </div>
 
@@ -431,7 +434,7 @@ export const TodaysBeatCard = ({
             size="sm"
             className="w-full"
           >
-            My Visits
+            {t('nav.myVisit')}
           </Button>
           <Button 
             onClick={() => navigate(`/today-summary?date=${format(selectedDate, 'yyyy-MM-dd')}`)}
@@ -439,7 +442,7 @@ export const TodaysBeatCard = ({
             size="sm"
             className="w-full"
           >
-            Today's Summary
+            {t('visits.summary')}
           </Button>
         </div>
       </CardContent>

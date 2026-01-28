@@ -17,10 +17,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useTranslation } from "react-i18next";
 
 const Index = () => {
   const { userProfile, user, userRole } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { todayData, performance, urgentItems, isLoading, lastUpdated, refresh } = useHomeDashboard(userProfile?.id, selectedDate);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
@@ -70,13 +72,20 @@ const Index = () => {
     'User';
   const roleDisplay = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : 'Field Executive';
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t('home.goodMorning');
+    if (hour < 18) return t('home.goodAfternoon');
+    return t('home.goodEvening');
+  };
+
   const quickNavItems = [
-    { icon: Store, label: "All Retailers", href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
-    { icon: Users, label: "My Beats", href: "/my-beats", color: "from-orange-500 to-orange-600" },
-    { icon: Trophy, label: "Leaderboard", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" },
-    { icon: BarChart, label: "Analytics", href: "/analytics", color: "from-violet-500 to-violet-600" },
-    { icon: CreditCard, label: "Expenses", href: "/expenses", color: "from-indigo-500 to-indigo-600" },
-    { icon: MapPin, label: "Territories", href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },
+    { icon: Store, label: t('home.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
+    { icon: Users, label: t('home.myBeats'), href: "/my-beats", color: "from-orange-500 to-orange-600" },
+    { icon: Trophy, label: t('home.leaderboard'), href: "/leaderboard", color: "from-yellow-500 to-yellow-600" },
+    { icon: BarChart, label: t('home.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600" },
+    { icon: CreditCard, label: t('home.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600" },
+    { icon: MapPin, label: t('home.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },
   ];
 
   return (
@@ -107,7 +116,7 @@ const Index = () => {
                 )}
                 <div>
                   <p className="text-[10px] opacity-80">
-                    Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}!
+                    {getGreeting()}!
                   </p>
                   <h1 className="text-base font-bold leading-tight">{displayName}</h1>
                   <p className="text-[10px] opacity-70">{roleDisplay}</p>
@@ -122,29 +131,29 @@ const Index = () => {
                     className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 px-3"
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Quick Add</span>
+                    <span className="text-xs">{t('home.quickAdd')}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[180px]">
                   <DropdownMenuItem onClick={() => navigate('/visits/retailers')} className="cursor-pointer">
                     <ShoppingCart className="h-4 w-4 mr-2 text-blue-500" />
-                    <span>Today's Visit</span>
+                    <span>{t('home.todaysVisit')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/retailers/add')} className="cursor-pointer">
                     <Plus className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Add Retailer</span>
+                    <span>{t('home.addRetailer')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/competition')} className="cursor-pointer">
                     <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
-                    <span>Add Competition</span>
+                    <span>{t('home.addCompetition')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/schemes')} className="cursor-pointer">
                     <Tag className="h-4 w-4 mr-2 text-purple-500" />
-                    <span>Check Schemes</span>
+                    <span>{t('home.checkSchemes')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/leaderboard')} className="cursor-pointer">
                     <Award className="h-4 w-4 mr-2 text-yellow-500" />
-                    <span>Leaderboard</span>
+                    <span>{t('home.leaderboard')}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -159,7 +168,7 @@ const Index = () => {
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center gap-2">
               <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
               <span className="text-xs text-amber-700 dark:text-amber-400">
-                Offline - Showing cached data from {new Date(lastUpdated).toLocaleTimeString()}
+                {t('home.offline')} - {t('home.showingCachedData')} {new Date(lastUpdated).toLocaleTimeString()}
               </span>
             </div>
           )}

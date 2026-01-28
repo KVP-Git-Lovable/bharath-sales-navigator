@@ -1,5 +1,6 @@
 import { LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface NavItem {
   icon: LucideIcon;
@@ -13,9 +14,11 @@ interface QuickNavGridProps {
 }
 
 export const QuickNavGrid = ({ items }: QuickNavGridProps) => {
+  const { t } = useTranslation('common');
+  
   return (
     <div className="space-y-3">
-      <h2 className="text-base font-semibold text-foreground">Quick Actions</h2>
+      <h2 className="text-base font-semibold text-foreground">{t('home.quickActions')}</h2>
       <div className="grid grid-cols-3 gap-3">
         {items.map((item) => (
           <NavLink 

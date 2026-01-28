@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { format, differenceInMinutes } from "date-fns";
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 interface CheckInStatusBannerProps {
   attendance: any | null;
@@ -71,6 +72,7 @@ const useMarketHoursTimer = (
 
 export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckInStatusBannerProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const isCheckedIn = attendance?.check_in_time;
   const isCheckedOut = attendance?.check_out_time;
   const isOnLeave = attendance?.on_leave;
@@ -90,9 +92,9 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
             <Calendar className="h-5 w-5 text-blue-500" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-blue-500">On Leave</p>
+            <p className="text-sm font-semibold text-blue-500">{t('home.onLeave')}</p>
             <p className="text-xs text-muted-foreground">
-              Approved Leave
+              {t('home.approvedLeave')}
             </p>
           </div>
         </div>
@@ -110,7 +112,7 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
                 <CheckCircle2 className="h-5 w-5 text-success" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-success">Day Start</p>
+                <p className="text-sm font-semibold text-success">{t('home.dayStart')}</p>
                 <p className="text-xs text-muted-foreground">
                   {format(new Date(attendance.check_in_time), 'h:mm a')}
                 </p>
@@ -125,7 +127,7 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
                 className="border-success/30 text-success hover:bg-success/10"
               >
                 <LogOut className="h-3.5 w-3.5 mr-1.5" />
-                End My Day
+                {t('home.endMyDay')}
               </Button>
             )}
           </div>
@@ -134,13 +136,13 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
             {isCheckedOut && (
               <div className="flex items-center gap-1">
                 <LogOut className="h-3 w-3" />
-                <span>Out: {format(new Date(attendance.check_out_time), 'h:mm a')}</span>
+                <span>{t('home.out')}: {format(new Date(attendance.check_out_time), 'h:mm a')}</span>
               </div>
             )}
             {marketHours && (
               <div className="flex items-center gap-1">
                 <Briefcase className="h-3 w-3" />
-                <span>Market: {marketHours}</span>
+                <span>{t('home.market')}: {marketHours}</span>
               </div>
             )}
           </div>
@@ -157,8 +159,8 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
             <Clock className="h-5 w-5 text-warning-foreground" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-warning-foreground">Day Not Started</p>
-            <p className="text-xs text-muted-foreground">Start your day by marking attendance</p>
+            <p className="text-sm font-semibold text-warning-foreground">{t('home.dayNotStarted')}</p>
+            <p className="text-xs text-muted-foreground">{t('home.startYourDay')}</p>
           </div>
         </div>
         <Button 
@@ -166,7 +168,7 @@ export const CheckInStatusBanner = ({ attendance, onStartDay, onEndDay }: CheckI
           className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
         >
           <LogIn className="h-4 w-4 mr-2" />
-          Start My Day
+          {t('home.startMyDay')}
         </Button>
       </div>
     </Card>

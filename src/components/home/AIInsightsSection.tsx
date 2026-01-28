@@ -6,6 +6,7 @@ import { Sparkles, Calendar, TrendingUp, MapPin } from "lucide-react";
 import { TomorrowBeatPlan } from "./TomorrowBeatPlan";
 import { WeekAISummary } from "./WeekAISummary";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface AIInsightsSectionProps {
   userId: string;
@@ -15,28 +16,29 @@ type InsightTab = 'tomorrow' | 'current' | 'next';
 
 export const AIInsightsSection = ({ userId }: AIInsightsSectionProps) => {
   const [activeTab, setActiveTab] = useState<InsightTab>('tomorrow');
+  const { t } = useTranslation('common');
 
   const tabs = [
     { 
       id: 'tomorrow' as InsightTab, 
-      label: "Tomorrow's Plan", 
-      shortLabel: "Tomorrow",
+      label: t('home.tomorrowsPlan'), 
+      shortLabel: t('home.tomorrow'),
       icon: MapPin,
-      description: "Beat insights & recommendations"
+      description: t('home.beatInsights')
     },
     { 
       id: 'current' as InsightTab, 
-      label: "This Week", 
-      shortLabel: "This Week",
+      label: t('home.thisWeek'), 
+      shortLabel: t('home.thisWeek'),
       icon: Calendar,
-      description: "Current week performance"
+      description: t('home.currentWeekPerformance')
     },
     { 
       id: 'next' as InsightTab, 
-      label: "Next Week", 
-      shortLabel: "Next Week",
+      label: t('home.nextWeek'), 
+      shortLabel: t('home.nextWeek'),
       icon: TrendingUp,
-      description: "Upcoming week outlook"
+      description: t('home.upcomingWeekOutlook')
     },
   ];
 
@@ -48,12 +50,12 @@ export const AIInsightsSection = ({ userId }: AIInsightsSectionProps) => {
           <Sparkles className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1">
-          <h2 className="text-lg font-bold">AI Insights</h2>
-          <p className="text-xs text-muted-foreground">Smart recommendations for your sales</p>
+          <h2 className="text-lg font-bold">{t('home.aiInsights')}</h2>
+          <p className="text-xs text-muted-foreground">{t('home.smartRecommendations')}</p>
         </div>
         <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
           <Sparkles className="h-3 w-3 mr-1" />
-          Powered by AI
+          {t('home.poweredByAI')}
         </Badge>
       </div>
 
