@@ -68,6 +68,7 @@ const Analytics = () => {
   const [showCustomKpiDate, setShowCustomKpiDate] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter' | 'custom'>('week');
+  const [dashboardPeriod, setDashboardPeriod] = useState<string>('this_month');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfWeek(new Date()),
     to: endOfWeek(new Date())
@@ -1245,8 +1246,9 @@ const Analytics = () => {
 
                 {/* Period Selector */}
                 <Select
-                  value=""
+                  value={dashboardPeriod}
                   onValueChange={(value) => {
+                    setDashboardPeriod(value);
                     const today = new Date();
                     let from: Date;
                     let to: Date = today;
@@ -1323,7 +1325,16 @@ const Analytics = () => {
                   }}
                 >
                   <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Select period" />
+                    <SelectValue placeholder="Select period">
+                      {dashboardPeriod === 'this_week' && 'This Week'}
+                      {dashboardPeriod === 'this_month' && 'This Month'}
+                      {dashboardPeriod === 'this_quarter' && 'This Quarter'}
+                      {dashboardPeriod === 'this_fy' && 'This FY'}
+                      {dashboardPeriod === 'last_week' && 'Last Week'}
+                      {dashboardPeriod === 'last_month' && 'Last Month'}
+                      {dashboardPeriod === 'last_quarter' && 'Last Quarter'}
+                      {dashboardPeriod === 'last_fy' && 'Last FY'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="this_week">This Week</SelectItem>
