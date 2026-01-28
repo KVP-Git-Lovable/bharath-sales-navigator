@@ -1,14 +1,14 @@
 {
   "nav": {
     "attendance": "उपस्थिति",
-    "myVisit": "मेरी विज़िट",
+    "myVisit": "विज़िट",
     "allRetailers": "सभी रिटेलर",
     "territories": "क्षेत्र",
     "gpsTrack": "जीपीएस ट्रैक",
     "branding": "ब्रांडिंग",
     "myBeats": "मेरे बीट्स",
     "schemes": "योजनाएं देखें",
-    "expenses": "मेरे खर्चे",
+    "expenses": "खर्चे",
     "performance": "प्रदर्शन सारांश",
     "adminPanel": "एडमिन पैनल",
     "analytics": "विश्लेषण",

@@ -1,14 +1,14 @@
 {
   "nav": {
     "attendance": "Attendance",
-    "myVisit": "My Visit",
+    "myVisit": "Visit",
     "allRetailers": "All Retailers",
     "territories": "Territories",
     "gpsTrack": "GPS Track",
     "branding": "Branding",
     "myBeats": "My Beats",
     "schemes": "Check Schemes",
-    "expenses": "My Expenses",
+    "expenses": "Expenses",
     "performance": "Performance Summary",
     "adminPanel": "Admin Panel",
     "analytics": "Analytics",
