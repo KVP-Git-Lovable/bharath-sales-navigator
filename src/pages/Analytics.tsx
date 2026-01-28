@@ -384,6 +384,16 @@ const Analytics = () => {
     fetchDashboardData();
   }, [selectedUserId]);
 
+  // Auto-fetch when date range changes (from period selector or manual date picks)
+  useEffect(() => {
+    if (users.length > 0 && selectedUserIds.length > 0) {
+      const selectedUserNames = selectedUserIds
+        .map(id => users.find(u => u.id === id)?.full_name)
+        .filter((name): name is string => !!name);
+      fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
+    }
+  }, [dashboardDateRange]);
+
   // Fetch SQL Report data
   const fetchSqlReportData = async () => {
     if (!sqlReportUser) {
@@ -1232,6 +1242,100 @@ const Analytics = () => {
                     />
                   </PopoverContent>
                 </Popover>
+
+                {/* Period Selector */}
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    const today = new Date();
+                    let from: Date;
+                    let to: Date = today;
+
+                    const getWeekStart = (d: Date) => {
+                      const day = d.getDay();
+                      const diff = (day === 0 ? -6 : 1) - day;
+                      const start = new Date(d);
+                      start.setDate(d.getDate() + diff);
+                      start.setHours(0, 0, 0, 0);
+                      return start;
+                    };
+
+                    const getMonthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+                    
+                    const getFYStart = (d: Date) => {
+                      // FY starts April 1st
+                      const year = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+                      return new Date(year, 3, 1); // April 1st
+                    };
+
+                    const getQuarterStart = (d: Date) => {
+                      // FY quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar
+                      const month = d.getMonth();
+                      if (month >= 3 && month <= 5) return new Date(d.getFullYear(), 3, 1); // Q1
+                      if (month >= 6 && month <= 8) return new Date(d.getFullYear(), 6, 1); // Q2
+                      if (month >= 9 && month <= 11) return new Date(d.getFullYear(), 9, 1); // Q3
+                      return new Date(d.getFullYear(), 0, 1); // Q4 (Jan-Mar)
+                    };
+
+                    switch (value) {
+                      case 'this_week':
+                        from = getWeekStart(today);
+                        break;
+                      case 'this_month':
+                        from = getMonthStart(today);
+                        break;
+                      case 'this_quarter':
+                        from = getQuarterStart(today);
+                        break;
+                      case 'this_fy':
+                        from = getFYStart(today);
+                        break;
+                      case 'last_week':
+                        const lastWeekDate = new Date(today);
+                        lastWeekDate.setDate(today.getDate() - 7);
+                        from = getWeekStart(lastWeekDate);
+                        to = new Date(from);
+                        to.setDate(from.getDate() + 6);
+                        break;
+                      case 'last_month':
+                        const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        from = lastMonthDate;
+                        to = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of prev month
+                        break;
+                      case 'last_quarter':
+                        const currentQStart = getQuarterStart(today);
+                        const lastQEnd = new Date(currentQStart);
+                        lastQEnd.setDate(lastQEnd.getDate() - 1);
+                        from = getQuarterStart(lastQEnd);
+                        to = lastQEnd;
+                        break;
+                      case 'last_fy':
+                        const currentFYStart = getFYStart(today);
+                        to = new Date(currentFYStart);
+                        to.setDate(to.getDate() - 1); // March 31st
+                        from = new Date(to.getFullYear() - 1, 3, 1); // Previous April 1st
+                        break;
+                      default:
+                        return;
+                    }
+
+                    setDashboardDateRange({ from, to });
+                  }}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="this_month">This Month</SelectItem>
+                    <SelectItem value="this_quarter">This Quarter</SelectItem>
+                    <SelectItem value="this_fy">This FY</SelectItem>
+                    <SelectItem value="last_week">Last Week</SelectItem>
+                    <SelectItem value="last_month">Last Month</SelectItem>
+                    <SelectItem value="last_quarter">Last Quarter</SelectItem>
+                    <SelectItem value="last_fy">Last FY</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 <Button 
                   variant="outline" 
