@@ -198,7 +198,7 @@ export const TodaySummary = () => {
       // No date param - default to today
       handleDateFilterChange('today');
     }
-  }, []);
+  }, [searchParams]);
 
   // Use primitive values for dependencies to avoid infinite loops
   const dateRangeKey = `${dateRange.from.toISOString()}-${dateRange.to.toISOString()}`;
