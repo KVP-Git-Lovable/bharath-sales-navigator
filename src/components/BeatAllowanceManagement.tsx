@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import AdditionalExpenses from '@/components/AdditionalExpenses';
 import ProductivityTracking from '@/components/ProductivityTracking';
 import * as XLSX from 'xlsx';
-import { UserSelector } from '@/components/UserSelector';
+import { CompactMultiUserSelector } from '@/components/CompactMultiUserSelector';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -56,7 +56,10 @@ const BeatAllowanceManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { subordinateIds, isManager } = useSubordinates();
-  const [selectedUserId, setSelectedUserId] = useState<string>('self');
+  
+  // Multi-user selector state (like MyBeats)
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [dateRangeStart, setDateRangeStart] = useState<Date>();
   const [dateRangeEnd, setDateRangeEnd] = useState<Date>();
@@ -74,22 +77,20 @@ const BeatAllowanceManagement = () => {
   const fetchVersionRef = useRef(0);
   const isMountedRef = useRef(true);
 
-  // Calculate effective user ID based on selection
-  const effectiveUserId = useMemo(() => {
-    if (selectedUserId === 'self' || selectedUserId === user?.id) {
-      return user?.id;
+  // Initialize with self when user is available
+  useEffect(() => {
+    if (user?.id && selectedUserIds.length === 0) {
+      setSelectedUserIds([user.id]);
     }
-    if (selectedUserId === 'all') {
-      return null; // Will filter by multiple user IDs
-    }
-    return selectedUserId;
-  }, [selectedUserId, user?.id]);
+  }, [user?.id]);
 
-  // Get all viewable user IDs for 'all' filter
-  const viewableUserIds = useMemo(() => {
-    if (!user?.id) return [];
-    return [user.id, ...subordinateIds];
-  }, [user?.id, subordinateIds]);
+  // Calculate effective user IDs for data filtering (like MyBeats)
+  const effectiveUserIds = useMemo(() => {
+    if (selectedUserIds.length === 0 && user?.id) {
+      return [user.id];
+    }
+    return selectedUserIds;
+  }, [selectedUserIds, user?.id]);
 
   // Calculate date range based on filter type
   const getDateRange = (): { start: Date; end: Date } => {
@@ -129,21 +130,14 @@ const BeatAllowanceManagement = () => {
 
   const fetchLeaveDates = async () => {
     try {
-      if (!user?.id) return;
+      if (!user?.id || effectiveUserIds.length === 0) return;
 
-      // Build query based on effective user
-      let query = supabase
+      // Build query based on effective users
+      const { data: attendanceData } = await supabase
         .from('attendance')
         .select('date, status')
-        .in('status', ['leave', 'on_leave', 'absent']);
-      
-      if (effectiveUserId) {
-        query = query.eq('user_id', effectiveUserId);
-      } else {
-        query = query.in('user_id', viewableUserIds);
-      }
-
-      const { data: attendanceData } = await query;
+        .in('status', ['leave', 'on_leave', 'absent'])
+        .in('user_id', effectiveUserIds);
 
       const leaveSet = new Set<string>();
       attendanceData?.forEach((record: any) => {
@@ -159,7 +153,7 @@ const BeatAllowanceManagement = () => {
 
   const fetchExpenseData = async () => {
     try {
-      if (!user?.id) return;
+      if (!user?.id || effectiveUserIds.length === 0) return;
 
       // Fetch expense master config for TA type
       const { data: configData } = await supabase
@@ -171,18 +165,11 @@ const BeatAllowanceManagement = () => {
       const fixedTaAmount = configData?.fixed_ta_amount || 0;
 
       // Fetch beat plans (journey plans) to get dates and beats
-      let beatPlansQuery = supabase
+      const { data: beatPlans, error: beatPlansError } = await supabase
         .from('beat_plans')
         .select('plan_date, beat_id, beat_name')
+        .in('user_id', effectiveUserIds)
         .order('plan_date', { ascending: true });
-      
-      if (effectiveUserId) {
-        beatPlansQuery = beatPlansQuery.eq('user_id', effectiveUserId);
-      } else {
-        beatPlansQuery = beatPlansQuery.in('user_id', viewableUserIds);
-      }
-
-      const { data: beatPlans, error: beatPlansError } = await beatPlansQuery;
 
       if (beatPlansError) throw beatPlansError;
 
@@ -200,46 +187,34 @@ const BeatAllowanceManagement = () => {
       });
 
       // Fetch additional expenses
-      let expensesQuery = supabase.from('additional_expenses').select('*');
-      if (effectiveUserId) {
-        expensesQuery = expensesQuery.eq('user_id', effectiveUserId);
-      } else {
-        expensesQuery = expensesQuery.in('user_id', viewableUserIds);
-      }
-      const { data: expensesData, error: expensesError } = await expensesQuery;
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('additional_expenses')
+        .select('*')
+        .in('user_id', effectiveUserIds);
 
       if (expensesError) throw expensesError;
 
       // Fetch orders with visit data to get order values
-      let ordersQuery = supabase.from('orders').select('total_amount, visit_id, created_at');
-      if (effectiveUserId) {
-        ordersQuery = ordersQuery.eq('user_id', effectiveUserId);
-      } else {
-        ordersQuery = ordersQuery.in('user_id', viewableUserIds);
-      }
-      const { data: ordersData, error: ordersError } = await ordersQuery;
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('total_amount, visit_id, created_at')
+        .in('user_id', effectiveUserIds);
 
       if (ordersError) throw ordersError;
 
       // Fetch visits to link orders to beats and count productive visits
-      let visitsQuery = supabase.from('visits').select('id, planned_date, retailer_id, status');
-      if (effectiveUserId) {
-        visitsQuery = visitsQuery.eq('user_id', effectiveUserId);
-      } else {
-        visitsQuery = visitsQuery.in('user_id', viewableUserIds);
-      }
-      const { data: visitsData, error: visitsError } = await visitsQuery;
+      const { data: visitsData, error: visitsError } = await supabase
+        .from('visits')
+        .select('id, planned_date, retailer_id, status')
+        .in('user_id', effectiveUserIds);
 
       if (visitsError) throw visitsError;
 
       // Fetch retailers to get beat info
-      let retailersQuery = supabase.from('retailers').select('id, beat_id, beat_name');
-      if (effectiveUserId) {
-        retailersQuery = retailersQuery.eq('user_id', effectiveUserId);
-      } else {
-        retailersQuery = retailersQuery.in('user_id', viewableUserIds);
-      }
-      const { data: retailersData, error: retailersError } = await retailersQuery;
+      const { data: retailersData, error: retailersError } = await supabase
+        .from('retailers')
+        .select('id, beat_id, beat_name')
+        .in('user_id', effectiveUserIds);
 
       if (retailersError) throw retailersError;
 
@@ -342,18 +317,11 @@ const BeatAllowanceManagement = () => {
       const daPerDay = configData?.da_amount || 0;
 
       // Fetch attendance data with check-in/check-out times
-      let attendanceQuery = supabase
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .select('date, check_in_time, check_out_time, status')
+        .in('user_id', effectiveUserIds)
         .order('date', { ascending: true });
-      
-      if (effectiveUserId) {
-        attendanceQuery = attendanceQuery.eq('user_id', effectiveUserId);
-      } else {
-        attendanceQuery = attendanceQuery.in('user_id', viewableUserIds);
-      }
-
-      const { data: attendanceData, error: attendanceError } = await attendanceQuery;
 
       if (attendanceError) throw attendanceError;
 
@@ -408,20 +376,13 @@ const BeatAllowanceManagement = () => {
 
   const fetchAdditionalExpenseData = async () => {
     try {
-      if (!user?.id) return;
+      if (!user?.id || effectiveUserIds.length === 0) return;
 
-      let expensesQuery = supabase
+      const { data: expensesData, error } = await supabase
         .from('additional_expenses')
         .select('expense_date, category, custom_category, description, amount, bill_url')
+        .in('user_id', effectiveUserIds)
         .order('expense_date', { ascending: true });
-      
-      if (effectiveUserId) {
-        expensesQuery = expensesQuery.eq('user_id', effectiveUserId);
-      } else {
-        expensesQuery = expensesQuery.in('user_id', viewableUserIds);
-      }
-
-      const { data: expensesData, error } = await expensesQuery;
 
       if (error) throw error;
 
@@ -491,7 +452,7 @@ const BeatAllowanceManagement = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, [user?.id, effectiveUserId, filterType, dateRangeStart, dateRangeEnd]);
+  }, [user?.id, effectiveUserIds, filterType, dateRangeStart, dateRangeEnd]);
 
   const handleAdditionalExpensesClick = () => {
     // Check if any selected date is a leave date
@@ -625,12 +586,10 @@ const BeatAllowanceManagement = () => {
         <CardContent className="py-3 px-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 w-full sm:w-auto">
-              {/* User Selector for managers */}
-              <UserSelector
-                selectedUserId={selectedUserId}
-                onUserChange={setSelectedUserId}
-                showAllOption={true}
-                allOptionLabel="All Team"
+              {/* Multi-User Selector for managers (like My Beats) */}
+              <CompactMultiUserSelector
+                selectedUserIds={selectedUserIds}
+                onSelectionChange={setSelectedUserIds}
               />
               <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
                 <SelectTrigger className="w-full xs:w-[160px] sm:w-[180px]">
