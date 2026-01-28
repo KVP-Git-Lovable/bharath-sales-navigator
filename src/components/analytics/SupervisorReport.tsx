@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users } from 'lucide-react';
+import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2 } from 'lucide-react';
+import { fetchAndGenerateInvoice } from '@/utils/invoiceGenerator';
+import { downloadPDF } from '@/utils/fileDownloader';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -130,8 +133,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     retailer_name: string;
     order_count: number;
     total_value: number;
+    order_ids: string[];
   }[]>([]);
   const [retailerDetailsLoading, setRetailerDetailsLoading] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
 
   // State for SKU filter from chart clicks - when a user is clicked in Order Summary charts
   const [skuFilterUser, setSkuFilterUser] = useState<string | null>(null);
@@ -1165,7 +1170,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       });
 
       // Group by retailer and calculate totals
-      const retailerTotals: Record<string, { name: string; total_value: number; order_count: number }> = {};
+      const retailerTotals: Record<string, { name: string; total_value: number; order_count: number; order_ids: string[] }> = {};
       
       beatOrders.forEach((order: any) => {
         const retailerId = order.retailer_id;
@@ -1173,10 +1178,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         const orderTotal = orderTotals[order.id] || 0;
         
         if (!retailerTotals[retailerId]) {
-          retailerTotals[retailerId] = { name: retailerName, total_value: 0, order_count: 0 };
+          retailerTotals[retailerId] = { name: retailerName, total_value: 0, order_count: 0, order_ids: [] };
         }
         retailerTotals[retailerId].total_value += orderTotal;
         retailerTotals[retailerId].order_count += 1;
+        retailerTotals[retailerId].order_ids.push(order.id);
       });
 
       // Convert to array and sort by total_value descending
@@ -1184,7 +1190,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         .map(data => ({
           retailer_name: data.name,
           total_value: data.total_value,
-          order_count: data.order_count
+          order_count: data.order_count,
+          order_ids: data.order_ids
         }))
         .sort((a, b) => b.total_value - a.total_value);
 
@@ -1449,18 +1456,58 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                     <TableHead>Retailer Name</TableHead>
                     <TableHead className="text-right">Orders</TableHead>
                     <TableHead className="text-right">Value</TableHead>
+                    <TableHead className="text-center">Invoice</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {retailerDetailsData.map((retailer, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{retailer.retailer_name}</TableCell>
-                      <TableCell className="text-right">{retailer.order_count}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        ₹{retailer.total_value.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {retailerDetailsData.map((retailer, index) => {
+                    const isDownloading = retailer.order_ids.some(id => downloadingInvoice === id);
+                    
+                    const handleDownloadInvoices = async () => {
+                      if (retailer.order_ids.length === 0) return;
+                      
+                      try {
+                        // Download all invoices for this retailer
+                        for (const orderId of retailer.order_ids) {
+                          setDownloadingInvoice(orderId);
+                          const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
+                          await downloadPDF(blob, `invoice-${invoiceNumber}.pdf`);
+                        }
+                        toast.success(`${retailer.order_ids.length > 1 ? `${retailer.order_ids.length} invoices` : 'Invoice'} downloaded`);
+                      } catch (error) {
+                        console.error('Error downloading invoice:', error);
+                        toast.error('Failed to download invoice');
+                      } finally {
+                        setDownloadingInvoice(null);
+                      }
+                    };
+                    
+                    return (
+                      <TableRow key={index}>
+                        <TableCell>{retailer.retailer_name}</TableCell>
+                        <TableCell className="text-right">{retailer.order_count}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          ₹{retailer.total_value.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={handleDownloadInvoices}
+                            disabled={isDownloading}
+                            title={`Download ${retailer.order_count} invoice(s)`}
+                          >
+                            {isDownloading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
                 <tfoot className="bg-muted/30">
                   <TableRow>
@@ -1471,6 +1518,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                     <TableCell className="text-right font-bold text-primary">
                       ₹{retailerDetailsData.reduce((s, r) => s + r.total_value, 0).toLocaleString()}
                     </TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                 </tfoot>
               </Table>
