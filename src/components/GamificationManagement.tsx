@@ -135,6 +135,13 @@ const METRIC_TYPES = [
     defaultPoints: 2,
     configType: "unlimited",
     description: "Awarded upon successful submission of a Branding Request form"
+  },
+  {
+    value: "total_visits",
+    label: "Total Visits",
+    defaultPoints: 20,
+    configType: "visit_threshold",
+    description: "Awarded once per day when user completes the daily visit target (50+ visits required, no partial points)"
   }
 ];
 
@@ -302,6 +309,10 @@ export function GamificationManagement() {
         toast.error("Please configure minimum growth percentage");
         return;
       }
+      if (activityConfigType === "visit_threshold" && !metricConfig.daily_visit_target) {
+        toast.error("Please configure daily visit target");
+        return;
+      }
     }
 
     if (selectedTerritories.length === 0 && !isAllTerritories) {
@@ -393,6 +404,10 @@ export function GamificationManagement() {
       }
       if (activityConfigType === "growth_percentage" && !metricConfig.min_growth_percentage) {
         toast.error("Please configure minimum growth percentage");
+        return;
+      }
+      if (activityConfigType === "visit_threshold" && !metricConfig.daily_visit_target) {
+        toast.error("Please configure daily visit target");
         return;
       }
     }

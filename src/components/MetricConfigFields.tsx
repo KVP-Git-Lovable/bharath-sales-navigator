@@ -202,6 +202,33 @@ export function MetricConfigFields({ metricType, config, onConfigChange }: Metri
         </div>
       );
 
+    case "total_visits":
+      return (
+        <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+          <h4 className="font-semibold text-sm">Configuration</h4>
+          <div>
+            <Label htmlFor="dailyVisitTarget">Daily Visit Target</Label>
+            <Input
+              id="dailyVisitTarget"
+              type="number"
+              min="1"
+              value={config?.daily_visit_target || 50}
+              onChange={(e) => handleConfigUpdate("daily_visit_target", parseInt(e.target.value))}
+              placeholder="e.g., 50"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Minimum number of total visits required per day to earn points
+            </p>
+          </div>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-xs text-amber-800">
+              <strong>Note:</strong> Points are only awarded when the user meets or exceeds the target. 
+              Partial completion does not award any points.
+            </p>
+          </div>
+        </div>
+      );
+
     default:
       return null;
   }
