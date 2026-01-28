@@ -193,9 +193,28 @@ const getWorkingDaysInMonth = (fyMonthNumber: number, fyYear: number): number =>
 
 interface UserFYPlanTargetProps {
   targetUserId?: string; // Optional: if provided, manage targets for this user instead of self
+  enabledParameters?: {
+    product: boolean;
+    retailer: boolean;
+    beat: boolean;
+    distributor: boolean;
+    territory: boolean;
+    monthly: boolean;
+  };
+  fyConfig?: {
+    quantityTarget: number;
+    revenueTarget: number;
+    quantityUnit: string;
+  };
+  preselectedYear?: number;
 }
 
-export function UserFYPlanTarget({ targetUserId }: UserFYPlanTargetProps = {}) {
+export function UserFYPlanTarget({ 
+  targetUserId, 
+  enabledParameters,
+  fyConfig,
+  preselectedYear 
+}: UserFYPlanTargetProps = {}) {
   const { user } = useAuth();
   // Use targetUserId if provided, otherwise use current user's id
   const effectiveUserId = targetUserId || user?.id;
