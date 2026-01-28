@@ -303,21 +303,48 @@ export function usePerformanceSummary(
         setTerritories(territoryPerformance);
 
         // Calculate beat performance (quantities in grams, convert to KG)
+        // First, get all beats to map beat_id (string) to id (uuid) and beat_name
+        const uniqueBeatIds = new Set<string>();
+        ordersData?.forEach(order => {
+          const retailer = order.retailers as any;
+          if (retailer?.beat_id) {
+            uniqueBeatIds.add(retailer.beat_id);
+          }
+        });
+
+        // Fetch beats data to map beat_id strings to UUIDs and names
+        let beatsMap: Record<string, { uuid: string; name: string }> = {};
+        if (uniqueBeatIds.size > 0) {
+          const { data: beatsData } = await supabase
+            .from('beats')
+            .select('id, beat_id, beat_name')
+            .in('beat_id', Array.from(uniqueBeatIds));
+          
+          beatsData?.forEach(beat => {
+            beatsMap[beat.beat_id] = { uuid: beat.id, name: beat.beat_name };
+          });
+        }
+
+        // Build beat actuals using UUID as key
         const beatActuals: Record<string, { revenue: number; quantity: number; name: string }> = {};
         ordersData?.forEach(order => {
           const retailer = order.retailers as any;
           if (retailer?.beat_id) {
-            if (!beatActuals[retailer.beat_id]) {
-              beatActuals[retailer.beat_id] = { revenue: 0, quantity: 0, name: '' };
+            const beatInfo = beatsMap[retailer.beat_id];
+            const beatUuid = beatInfo?.uuid || retailer.beat_id;
+            const beatName = beatInfo?.name || '';
+            
+            if (!beatActuals[beatUuid]) {
+              beatActuals[beatUuid] = { revenue: 0, quantity: 0, name: beatName };
             }
-            beatActuals[retailer.beat_id].revenue += Number(order.total_amount || 0);
+            beatActuals[beatUuid].revenue += Number(order.total_amount || 0);
             // Convert order quantities (in grams) to KG
             const orderQtyInGrams = orderQuantities[order.id] || 0;
-            beatActuals[retailer.beat_id].quantity += orderQtyInGrams / 1000;
+            beatActuals[beatUuid].quantity += orderQtyInGrams / 1000;
           }
         });
 
-        // Build beat targets map
+        // Build beat targets map (uses UUID as beat_id)
         const beatTargetsMap: Record<string, { name: string; revenueTarget: number; quantityTarget: number }> = {};
         (beatTargets || []).forEach(bt => {
           beatTargetsMap[bt.beat_id] = {
@@ -326,21 +353,6 @@ export function usePerformanceSummary(
             quantityTarget: (bt.quantity_target || 0) * periodMultiplier,
           };
         });
-
-        // Get beat names for beats that have actuals but no targets
-        const beatIdsWithoutTargets = Object.keys(beatActuals).filter(id => !beatTargetsMap[id]);
-        if (beatIdsWithoutTargets.length > 0) {
-          const { data: beatsData } = await supabase
-            .from('beats')
-            .select('id, beat_name')
-            .in('id', beatIdsWithoutTargets);
-          
-          beatsData?.forEach(beat => {
-            if (beatActuals[beat.id]) {
-              beatActuals[beat.id].name = beat.beat_name;
-            }
-          });
-        }
 
         // Merge beats with targets and actuals
         const allBeatIds = new Set([...Object.keys(beatActuals), ...Object.keys(beatTargetsMap)]);
