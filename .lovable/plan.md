@@ -1,196 +1,184 @@
 
-# Target Configuration Stepped Workflow Implementation
 
-## Problem Statement
+# Fix: Total Visits Points Not Being Awarded
 
-Currently, after saving the Target Configuration with selected parameters (Quantity/Revenue/Visits + Product/Retailer/Beat etc.), there is no guided workflow to:
-1. Set the FY-wide quantity/revenue targets first
-2. Then apply those targets to users with all the selected parameter breakdowns
+## Problem Identified
 
-The user expects a stepped experience where configuration flows into target setting.
+The user MANVITH had **54 completed visits** on December 17, 2025 (15 productive + 39 unproductive), which exceeds the **50 visit threshold** for the "Total Visits" gamification activity. However, the 20 points for this achievement were never awarded.
 
-## Proposed Solution
+**Root Causes:**
 
-Transform the Target Config tab into a **multi-step wizard** that guides the admin through:
+1. **Missing Backend Logic**: The `gamificationPointsAwarder.ts` file does NOT contain any code to handle the `total_visits` action type. While the activity is configured in the admin UI, no code actually awards points when the threshold is met.
 
-```text
-┌────────────────────────────────────────────────────────────────────────────┐
-│                    Target Configuration Wizard                              │
-├────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Progress: [ Step 1 ] ──► [ Step 2 ] ──► [ Step 3 ]                        │
-│            Configure     Set Targets    Apply to Users                      │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ STEP 1: CONFIGURATION (Current UI)                                    │  │
-│  │ - Target Basis: ☑ Quantity ☑ Revenue ☐ Visits                        │  │
-│  │ - Parameters: ☑ Product ☑ Retailer ☑ Beat ☑ Distributor              │  │
-│  │ - Quantity Unit: Kg                                                   │  │
-│  │                                        [ Save & Continue → ]          │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ STEP 2: SET FY TARGETS (NEW)                                          │  │
-│  │ Set the company-wide targets for FY 2025-26                           │  │
-│  │                                                                        │  │
-│  │ Quantity Target: [________] Kg                                         │  │
-│  │ Revenue Target:  ₹ [________]                                         │  │
-│  │ Visits Target:   [________] (if enabled)                              │  │
-│  │                                                                        │  │
-│  │                 [ ← Back ]  [ Save & Continue → ]                     │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ STEP 3: APPLY TO USERS (NEW)                                          │  │
-│  │ Allocate targets to users with parameter breakdowns                   │  │
-│  │                                                                        │  │
-│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
-│  │ │ Allocation Method: (•) Individual  ( ) Hierarchy Cascade        │   │  │
-│  │ └─────────────────────────────────────────────────────────────────┘   │  │
-│  │                                                                        │  │
-│  │ Select Users → Set breakdown by enabled parameters                    │  │
-│  │ [Product-wise] [Retailer-wise] [Beat-wise] [Month-wise]              │  │
-│  │                                                                        │  │
-│  │                 [ ← Back ]  [ Apply Targets ]                         │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-└────────────────────────────────────────────────────────────────────────────┘
-```
+2. **Game Creation Date Issue**: The "Total Visits" game was created on January 28, 2026 with a start date of January 21, 2026. December 17, 2025 falls before this date, so even if the logic existed, it wouldn't have applied.
 
-## Implementation Details
+3. **No Trigger Point**: Unlike productive visits (triggered on order/checkout), there's no event that checks "did this user just hit 50 total visits today?"
 
-### 1. Enhanced TargetConfigTab with Wizard Steps
+## Solution
 
-Transform `TargetConfigTab.tsx` from a simple form into a stepped wizard component:
+Add a new function `awardPointsForTotalVisits` to the gamification points awarder that:
+1. Counts all completed visits (productive + unproductive) for the user on a given day
+2. Checks if the count meets or exceeds the configured threshold (default: 50)
+3. Awards points once per day when threshold is reached
+4. Gets triggered whenever a visit is completed (both productive and unproductive)
 
-**Step 1 - Configure** (Existing UI Enhanced):
-- Target Basis checkboxes (Quantity, Revenue, Visits)
-- Parameter checkboxes (Product, Retailer, Beat, Distributor, Territory, Monthly)
-- Quantity Unit selector
-- "Save & Continue" button to move to Step 2
+## Implementation Plan
 
-**Step 2 - Set FY Targets** (New):
-- Input for total Quantity Target (uses configured unit)
-- Input for total Revenue Target (₹)
-- Input for Visits Target (only shown if enabled in Step 1)
-- Shows summary of what will be tracked
-- "Back" and "Save & Continue" buttons
+### Step 1: Add `awardPointsForTotalVisits` Function
 
-**Step 3 - Apply to Users** (New):
-- User selection interface (Single/Multiple/All Team)
-- For each selected user, show parameter breakdown tabs
-- Only show tabs for enabled parameters (e.g., if Beat is disabled, don't show Beat tab)
-- Reuse existing `UserFYPlanTarget` logic but filtered by config
-- "Back" and "Apply Targets" buttons
+Create a new exported function in `src/utils/gamificationPointsAwarder.ts`:
 
-### 2. Database Changes
-
-Add columns to `fy_target_config` to store FY-wide targets:
-
-```sql
-ALTER TABLE fy_target_config 
-ADD COLUMN IF NOT EXISTS total_quantity_target NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS total_revenue_target NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS total_visits_target INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS setup_completed BOOLEAN DEFAULT false;
-```
-
-### 3. Component Structure
-
-```text
-TargetConfigTab.tsx (Refactored)
-├── WizardProgress (Step indicator)
-├── Step 1: ConfigurationStep
-│   └── (existing checkboxes + unit selector)
-├── Step 2: SetTargetsStep (NEW)
-│   └── FY target inputs based on enabled basis
-└── Step 3: ApplyToUsersStep (NEW)
-    ├── UserSelector (reuse from TopControlBar)
-    └── FilteredUserFYPlanTarget (only show enabled parameter tabs)
-```
-
-### 4. Key Changes to UserFYPlanTarget
-
-Create a wrapper or pass props to `UserFYPlanTarget` to:
-- Only show tabs for parameters enabled in config
-- Pre-populate FY targets from config
-- Lock certain fields if they come from hierarchy
-
-**Props to add:**
 ```typescript
-interface UserFYPlanTargetProps {
-  targetUserId?: string;
-  enabledParameters?: {
-    product: boolean;
-    retailer: boolean;
-    beat: boolean;
-    distributor: boolean;
-    territory: boolean;
-    monthly: boolean;
-  };
-  fyConfig?: {
-    quantityTarget: number;
-    revenueTarget: number;
-    quantityUnit: string;
-  };
+export async function awardPointsForTotalVisits(userId: string, visitDate: string) {
+  // 1. Get total completed visits (productive + unproductive) for the day
+  // 2. Find active "total_visits" actions
+  // 3. Check if threshold met (from metadata.daily_visit_target or default 50)
+  // 4. Check if already awarded today
+  // 5. Award points if conditions met
 }
 ```
 
-### 5. User Flow
+### Step 2: Integrate Trigger Points
 
-1. **Admin opens Target Config tab** → Sees Step 1 (Configuration)
-2. **Selects parameters & saves** → Moves to Step 2 (Set Targets)
-3. **Enters FY targets & saves** → Moves to Step 3 (Apply to Users)
-4. **Selects users & breaks down targets** → Applies targets
-5. **"View Dashboard"** button appears to see results
+Call the new function from `VisitCard.tsx` in two places:
+1. When a visit is marked as productive (after order)
+2. When a visit is marked as unproductive (no order)
 
-If config already exists and is complete, show a summary view with "Edit Configuration" option.
+This ensures points are checked whenever any visit is completed.
+
+### Step 3: Handle Historical Data (Optional)
+
+For December 17, 2025 specifically, since the game didn't exist then, the points cannot be retroactively awarded through the normal system. However, an admin could manually insert the points if needed.
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/admin/TargetConfigTab.tsx` | Major refactor - add wizard steps, state machine |
-| `src/components/profile/UserFYPlanTarget.tsx` | Add enabledParameters prop to filter tabs |
-| `supabase/migrations/...` | Add total target columns to fy_target_config |
+| `src/utils/gamificationPointsAwarder.ts` | Add new `awardPointsForTotalVisits` function |
+| `src/components/VisitCard.tsx` | Call `awardPointsForTotalVisits` on visit completion |
 
-## New Components
+## Technical Details
 
-| Component | Purpose |
-|-----------|---------|
-| `WizardProgress.tsx` | Step indicator showing 1-2-3 progress |
-| `SetTargetsStep.tsx` | Step 2 - FY target input form |
-| `ApplyToUsersStep.tsx` | Step 3 - User selection + filtered breakdown |
+### New Function: `awardPointsForTotalVisits`
 
-## Visual Flow Summary
+```typescript
+export async function awardPointsForTotalVisits(userId: string, visitDate: string) {
+  const today = new Date(visitDate);
+  const todayStart = startOfDay(today);
+  const todayEnd = endOfDay(today);
+  const todayDateOnly = visitDate;
 
-```text
-Step 1: Configure           Step 2: Set Targets         Step 3: Apply to Users
-┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│ ☑ Quantity          │     │ Quantity: 50000 Kg  │     │ User: [Girish ▼]    │
-│ ☑ Revenue           │ ──► │ Revenue: ₹25,00,000 │ ──► │ [Products][Beats]   │
-│ ☐ Visits            │     │                     │     │ [Months]...         │
-│ ☑ Product ☑ Beat    │     │ (Visits hidden -    │     │ (Only enabled tabs) │
-│ ☑ Retailer ☐ Terr   │     │  not enabled)       │     │                     │
-└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
-         │                           │                           │
-    [ Save & Next ]           [ Save & Next ]            [ Apply Targets ]
+  // Count completed visits for the day
+  const { count: completedVisits } = await supabase
+    .from("visits")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("planned_date", todayDateOnly)
+    .in("status", ["productive", "unproductive"]);
+
+  if (!completedVisits) return;
+
+  // Fetch user's territories
+  const { data: userProfile } = await supabase
+    .from("profiles")
+    .select("territories_covered, work_location")
+    .eq("id", userId)
+    .single();
+
+  const userTerritories = userProfile?.territories_covered || [];
+  const userLocation = userProfile?.work_location;
+
+  // Fetch active games
+  const { data: activeGames } = await supabase
+    .from("gamification_games")
+    .select("*")
+    .eq("is_active", true)
+    .lte("start_date", todayDateOnly)
+    .gte("end_date", todayDateOnly);
+
+  if (!activeGames || activeGames.length === 0) return;
+
+  // Filter games applicable to user's territory
+  const applicableGames = activeGames.filter((game: any) => 
+    game.is_all_territories || 
+    (game.territories && game.territories.some((t: string) => 
+      userTerritories.includes(t) || t === userLocation
+    ))
+  );
+
+  // Fetch total_visits actions
+  const gameIds = applicableGames.map(g => g.id);
+  const { data: actions } = await supabase
+    .from("gamification_actions")
+    .select("*")
+    .in("game_id", gameIds)
+    .eq("is_enabled", true)
+    .eq("action_type", "total_visits");
+
+  if (!actions || actions.length === 0) return;
+
+  for (const action of actions) {
+    const game = applicableGames.find(g => g.id === action.game_id);
+    if (!game) continue;
+
+    // Get threshold from metadata (default: 50)
+    const threshold = action.metadata?.daily_visit_target || 50;
+
+    // Check if threshold met
+    if (completedVisits >= threshold) {
+      // Check if already awarded today
+      const { count: alreadyAwarded } = await supabase
+        .from("gamification_points")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("action_id", action.id)
+        .eq("game_id", game.id)
+        .gte("earned_at", todayStart.toISOString())
+        .lte("earned_at", todayEnd.toISOString());
+
+      if (alreadyAwarded === 0) {
+        await supabase.from("gamification_points").insert({
+          user_id: userId,
+          game_id: game.id,
+          action_id: action.id,
+          points: action.points,
+          reference_type: "total_visits",
+          reference_id: todayDateOnly,
+          metadata: { 
+            completed_visits: completedVisits,
+            threshold: threshold,
+            visit_date: todayDateOnly
+          },
+        });
+        console.log(`Awarded ${action.points} points for total visits (${completedVisits}/${threshold})`);
+      }
+    }
+  }
+}
 ```
 
-## Technical Notes
+### Trigger Integration in VisitCard.tsx
 
-- Use React state to track current step (1, 2, or 3)
-- Save partial progress at each step to database
-- Show "✓ Configured" badge if config exists
-- Allow going back to previous steps
-- Validate totals before applying to users
-- The existing `AssignTargetsTab` can remain as an alternative advanced interface
-- This wizard provides a guided experience for first-time setup
+Add call after visit completion:
+```typescript
+// After marking visit as productive or unproductive
+const { awardPointsForTotalVisits } = await import('@/utils/gamificationPointsAwarder');
+await awardPointsForTotalVisits(userId, plannedDate);
+```
 
-## Phase Approach
+## Important Notes
 
-This implementation covers the admin-only Phase 1 scope:
-- No supervisor/user role checks
-- No hierarchy enforcement
-- Manual application to selected users
-- All functionality under Target Config tab
+1. **All-or-nothing**: Points are only awarded when threshold is met (no partial points)
+2. **Once per day**: Duplicate award prevention is built in
+3. **Counts both productive AND unproductive**: Any completed visit counts
+4. **Threshold configurable**: Uses `metadata.daily_visit_target` from the action config
+5. **Historical limitation**: Cannot retroactively award for dates before the game existed
+
+## Testing Checklist
+
+- Create a Total Visits activity with 50 visit threshold
+- Complete visits until reaching 50
+- Verify 20 points are awarded
+- Verify points only awarded once per day
+- Verify Points Earned KPI updates correctly
+
