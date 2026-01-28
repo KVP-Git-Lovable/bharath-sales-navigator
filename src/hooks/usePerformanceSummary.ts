@@ -144,6 +144,12 @@ export function usePerformanceSummary(
           .select('territory_id, territory_name, quantity_target, revenue_target')
           .eq('business_plan_id', planData.id);
 
+        // Fetch beat targets
+        const { data: beatTargets } = await supabase
+          .from('user_business_plan_territory_beats')
+          .select('beat_id, beat_name, quantity_target, revenue_target')
+          .eq('business_plan_id', planData.id);
+
         // Fetch retailer targets
         const { data: retailerTargets } = await supabase
           .from('user_business_plan_retailers')
@@ -311,13 +317,23 @@ export function usePerformanceSummary(
           }
         });
 
-        // Get beat names
-        const beatIds = Object.keys(beatActuals);
-        if (beatIds.length > 0) {
+        // Build beat targets map
+        const beatTargetsMap: Record<string, { name: string; revenueTarget: number; quantityTarget: number }> = {};
+        (beatTargets || []).forEach(bt => {
+          beatTargetsMap[bt.beat_id] = {
+            name: bt.beat_name,
+            revenueTarget: (bt.revenue_target || 0) * periodMultiplier,
+            quantityTarget: (bt.quantity_target || 0) * periodMultiplier,
+          };
+        });
+
+        // Get beat names for beats that have actuals but no targets
+        const beatIdsWithoutTargets = Object.keys(beatActuals).filter(id => !beatTargetsMap[id]);
+        if (beatIdsWithoutTargets.length > 0) {
           const { data: beatsData } = await supabase
             .from('beats')
             .select('id, beat_name')
-            .in('id', beatIds);
+            .in('id', beatIdsWithoutTargets);
           
           beatsData?.forEach(beat => {
             if (beatActuals[beat.id]) {
@@ -326,18 +342,26 @@ export function usePerformanceSummary(
           });
         }
 
-        const beatPerformance: PerformanceData[] = Object.entries(beatActuals).map(([id, data]) => ({
-          id,
-          name: data.name || 'Unknown Beat',
-          revenueTarget: 0, // No beat-level targets
-          revenueActual: data.revenue,
-          revenueProgress: 0,
-          revenueGap: 0,
-          quantityTarget: 0,
-          quantityActual: data.quantity,
-          quantityProgress: 0,
-          quantityGap: 0,
-        }));
+        // Merge beats with targets and actuals
+        const allBeatIds = new Set([...Object.keys(beatActuals), ...Object.keys(beatTargetsMap)]);
+        const beatPerformance: PerformanceData[] = Array.from(allBeatIds).map(id => {
+          const target = beatTargetsMap[id] || { name: '', revenueTarget: 0, quantityTarget: 0 };
+          const actual = beatActuals[id] || { revenue: 0, quantity: 0, name: '' };
+          const beatName = target.name || actual.name || 'Unknown Beat';
+          
+          return {
+            id,
+            name: beatName,
+            revenueTarget: target.revenueTarget,
+            revenueActual: actual.revenue,
+            revenueProgress: target.revenueTarget > 0 ? Math.round((actual.revenue / target.revenueTarget) * 100) : 0,
+            revenueGap: Math.max(target.revenueTarget - actual.revenue, 0),
+            quantityTarget: target.quantityTarget,
+            quantityActual: actual.quantity,
+            quantityProgress: target.quantityTarget > 0 ? Math.round((actual.quantity / target.quantityTarget) * 100) : 0,
+            quantityGap: Math.max(target.quantityTarget - actual.quantity, 0),
+          };
+        });
         setBeats(beatPerformance);
 
         // Calculate retailer performance (quantities in grams, convert to KG)

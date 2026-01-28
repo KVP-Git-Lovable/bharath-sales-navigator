@@ -76,6 +76,7 @@ export function BeatPerformance({ beats, quantityUnit, isLoading }: BeatPerforma
             <TableHeader>
               <TableRow>
                 <TableHead>Beat</TableHead>
+                <TableHead className="text-right">Target</TableHead>
                 <TableHead className="text-right">Revenue</TableHead>
                 <TableHead className="text-right">Quantity ({quantityUnit})</TableHead>
               </TableRow>
@@ -103,6 +104,9 @@ export function BeatPerformance({ beats, quantityUnit, isLoading }: BeatPerforma
                         <ExternalLink className="h-3 w-3 opacity-50" />
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {beat.revenueTarget > 0 ? formatCurrency(beat.revenueTarget) : '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium">{formatCurrency(beat.revenueActual)}</TableCell>
                   <TableCell className="text-right">{beat.quantityActual.toFixed(0)}</TableCell>
