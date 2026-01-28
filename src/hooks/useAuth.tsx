@@ -7,6 +7,7 @@ import { devLog, devError } from '@/utils/devLog';
 import { Preferences } from '@capacitor/preferences';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { clearRetailerIndex } from '@/lib/retailerIndex';
+import i18n from '@/i18n/config';
 
 interface AuthContextType {
   user: User | null;
@@ -113,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Use a simple query without any complex operations
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, full_name, phone_number, recovery_email, profile_picture_url')
+        .select('id, username, full_name, phone_number, recovery_email, profile_picture_url, preferred_language')
         .eq('id', userId)
         .single();
 
@@ -131,6 +132,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         devError('Error fetching user profile:', error);
         return null;
+      }
+
+      // Sync language preference from profile
+      if (data?.preferred_language && data.preferred_language !== i18n.language) {
+        await i18n.changeLanguage(data.preferred_language);
+        localStorage.setItem('preferredLanguage', data.preferred_language);
+        devLog('Language synced from profile:', data.preferred_language);
       }
 
       return data;

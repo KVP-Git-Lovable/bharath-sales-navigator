@@ -18,6 +18,7 @@ import { OnboardingChecklistSection } from '@/components/profile/about/Onboardin
 import { AboutViewMode } from '@/components/profile/about/AboutViewMode';
 import { AboutEditMode } from '@/components/profile/about/AboutEditMode';
 import { ProfilePointsBadge } from '@/components/profile/ProfilePointsBadge';
+import { LanguageSettings } from '@/components/profile/LanguageSettings';
 
 
 interface Territory {
@@ -251,6 +252,9 @@ const UserProfile = () => {
                 onEdit={() => setIsEditMode(true)}
               />
             )}
+
+            {/* Language Settings */}
+            <LanguageSettings />
 
             {/* Additional Sections - Always in view/edit with their own controls */}
             <WorkExperienceSection />
