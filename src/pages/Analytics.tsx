@@ -13,7 +13,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
 } from "recharts";
-import { ArrowLeft, TrendingUp, TrendingDown, Users, ShoppingCart, Target, Heart, RefreshCw, Activity, Info, Calendar as CalendarIcon, Sparkles, AlertTriangle, MessageSquare, X, MapPin, Store, Package, IndianRupee, CreditCard, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Users, ShoppingCart, Target, Heart, RefreshCw, Activity, Info, Calendar as CalendarIcon, Sparkles, AlertTriangle, MessageSquare, X, MapPin, Store, Package, IndianRupee, CreditCard, Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { supabase } from "@/integrations/supabase/client";
@@ -1267,17 +1267,43 @@ const Analytics = () => {
           </Card>
 
           <Tabs defaultValue="progress" className="space-y-4">
-            <ScrollArea className="w-full">
-              <TabsList className="inline-flex w-max min-w-full gap-1 p-1">
-                <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">KPI</TabsTrigger>
-                <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Dashboard</TabsTrigger>
-                <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
-                <TabsTrigger value="retailers" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Retailers</TabsTrigger>
-                <TabsTrigger value="predictions" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Predictions</TabsTrigger>
-                <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
-                <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Supervisor</TabsTrigger>
-              </TabsList>
-            </ScrollArea>
+            <div className="relative flex items-center gap-1">
+              <button
+                onClick={() => {
+                  const container = document.getElementById('analytics-tabs-container');
+                  if (container) container.scrollBy({ left: -150, behavior: 'smooth' });
+                }}
+                className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-muted hover:bg-muted/80 border"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div 
+                id="analytics-tabs-container"
+                className="flex-1 overflow-x-auto scrollbar-hide"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                <TabsList className="inline-flex w-max gap-1 p-1">
+                  <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">KPI</TabsTrigger>
+                  <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Dashboard</TabsTrigger>
+                  <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
+                  <TabsTrigger value="retailers" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Retailers</TabsTrigger>
+                  <TabsTrigger value="predictions" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Predictions</TabsTrigger>
+                  <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
+                  <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Supervisor</TabsTrigger>
+                </TabsList>
+              </div>
+              <button
+                onClick={() => {
+                  const container = document.getElementById('analytics-tabs-container');
+                  if (container) container.scrollBy({ left: 150, behavior: 'smooth' });
+                }}
+                className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-muted hover:bg-muted/80 border"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
 
             {/* KPI Dashboard */}
             <TabsContent value="kpi" className="space-y-4">
