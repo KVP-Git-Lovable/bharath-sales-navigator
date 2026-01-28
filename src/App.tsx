@@ -378,7 +378,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/schemes" element={<ProtectedRoute><Schemes /></ProtectedRoute>} />
         
         <Route path="/branding-requests" element={<ProtectedRoute><BrandingRequests /></ProtectedRoute>} />
-        <Route path="/admin/hierarchy-targets" element={<ProtectedRoute><HierarchyTargets /></ProtectedRoute>} />
+        <Route path="/admin/hierarchy-targets" element={<Navigate to="/admin/target-vs-actual?mode=hierarchy" replace />} />
         <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
         <Route path="/gps-track" element={<ProtectedRoute><GPSTrack /></ProtectedRoute>} />
         <Route path="/gps-track-management" element={<ProtectedRoute><GPSTrackManagement /></ProtectedRoute>} />

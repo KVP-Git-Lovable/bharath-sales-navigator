@@ -55,8 +55,7 @@ const AdminControls = () => {
     { title: "Notification Setup", description: "Manage automated content templates and schedules for users", icon: Bell, color: "rose", path: "/push-content-setup" },
     { title: "Recycle Bin Master", description: "Configure recycle bin settings and view permanent deletion logs", icon: Trash2, color: "rose", path: "/admin/recycle-bin" },
     { title: "Distributor Portal Admin", description: "Manage distributor portal users, orders, claims, support, and ideas", icon: Building2, color: "cyan", path: "/admin/distributor-portal" },
-    { title: "Target vs Actual", description: "Set targets for team members and track their achievement", icon: Target, color: "blue", path: "/admin/target-vs-actual" },
-    { title: "Hierarchy Targets", description: "Set targets from top and cascade down to all team members", icon: Users, color: "violet", path: "/admin/hierarchy-targets" },
+    { title: "Target Management", description: "Configure, assign, and track team targets with hierarchy cascade", icon: Target, color: "blue", path: "/admin/target-vs-actual" },
   ];
 
   const filteredModules = adminModules.filter(module => 

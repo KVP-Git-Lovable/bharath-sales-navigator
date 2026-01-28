@@ -4339,6 +4339,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fy_target_config: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          enable_quantity: boolean | null
+          enable_revenue: boolean | null
+          enable_visits: boolean | null
+          enabled_parameters: Json | null
+          fy_year: number
+          id: string
+          quantity_unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          enable_quantity?: boolean | null
+          enable_revenue?: boolean | null
+          enable_visits?: boolean | null
+          enabled_parameters?: Json | null
+          fy_year: number
+          id?: string
+          quantity_unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          enable_quantity?: boolean | null
+          enable_revenue?: boolean | null
+          enable_visits?: boolean | null
+          enabled_parameters?: Json | null
+          fy_year?: number
+          id?: string
+          quantity_unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       gamification_actions: {
         Row: {
           action_name: string
