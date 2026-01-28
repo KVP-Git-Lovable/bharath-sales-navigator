@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Target, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Target, BarChart3, Settings } from 'lucide-react';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { useSubordinates } from '@/hooks/useSubordinates';
-import { AdminSetTarget } from '@/components/admin/AdminSetTarget';
 import { TeamTargetDashboard } from '@/components/admin/TeamTargetDashboard';
-import { TopControlBar, UserScope } from '@/components/admin/TopControlBar';
+import { TargetConfigTab } from '@/components/admin/TargetConfigTab';
+import { AssignTargetsTab } from '@/components/admin/AssignTargetsTab';
+import { UserScope } from '@/components/admin/TopControlBar';
 import { toast } from 'sonner';
 
 // Get current FY year
@@ -17,17 +19,39 @@ const getCurrentFY = () => {
   return now.getMonth() < 3 ? now.getFullYear() : now.getFullYear() + 1;
 };
 
+// Generate FY options
+const generateFYOptions = () => {
+  const currentFY = getCurrentFY();
+  const options = [];
+  for (let i = -2; i <= 2; i++) {
+    const year = currentFY + i;
+    options.push({
+      value: year,
+      label: `FY ${year - 1}-${String(year).slice(-2)}`,
+    });
+  }
+  return options;
+};
+
 const TargetVsActual = () => {
   const { hasAdminAccess, loading, user } = useAdminAccess();
   const { subordinates, isManager, isLoading: subordinatesLoading } = useSubordinates();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'set-target' | 'target-vs-actual'>('set-target');
+  const [searchParams] = useSearchParams();
   
-  // Top Control Bar state
+  // Determine initial tab from URL params (support redirect from old hierarchy page)
+  const initialMode = searchParams.get('mode');
+  const initialTab = initialMode === 'hierarchy' ? 'assign-targets' : 'target-config';
+  
+  const [activeTab, setActiveTab] = useState<'target-config' | 'assign-targets' | 'target-vs-actual'>(initialTab as any);
+  const [fyYear, setFYYear] = useState(getCurrentFY());
+  
+  // Assign Targets tab state
   const [userScope, setUserScope] = useState<UserScope>('single');
   const [selectedUserId, setSelectedUserId] = useState<string>('self');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [fyYear, setFYYear] = useState(getCurrentFY());
+
+  const fyOptions = useMemo(() => generateFYOptions(), []);
 
   // Get effective user IDs based on scope
   const effectiveUserIds = useMemo(() => {
@@ -47,14 +71,6 @@ const TargetVsActual = () => {
         return [];
     }
   }, [userScope, user?.id, selectedUserId, selectedUserIds, subordinates]);
-
-  const handleBulkAction = (action: 'copy' | 'export') => {
-    if (action === 'copy') {
-      toast.info('Copy targets feature coming soon');
-    } else if (action === 'export') {
-      toast.info('Export feature coming soon');
-    }
-  };
 
   if (loading || subordinatesLoading) {
     return (
@@ -86,48 +102,64 @@ const TargetVsActual = () => {
               <ArrowLeft size={20} />
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Target vs Actual</h1>
-              <p className="text-muted-foreground text-sm">Set team targets and track achievements</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Target Management</h1>
+              <p className="text-muted-foreground text-sm">Configure, assign, and track team targets</p>
+            </div>
+            
+            {/* FY Selector in Header */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground hidden sm:inline">FY:</span>
+              <Select value={String(fyYear)} onValueChange={(v) => setFYYear(parseInt(v))}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fyOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Top Control Bar */}
-          <TopControlBar
-            userScope={userScope}
-            onUserScopeChange={setUserScope}
-            selectedUserId={selectedUserId}
-            onSelectedUserChange={setSelectedUserId}
-            selectedUserIds={selectedUserIds}
-            fyYear={fyYear}
-            onFYYearChange={setFYYear}
-            onBulkAction={handleBulkAction}
-          />
-
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'set-target' | 'target-vs-actual')}>
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
-              <TabsTrigger value="set-target" className="flex items-center gap-2">
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+            <TabsList className="grid w-full grid-cols-3 max-w-lg">
+              <TabsTrigger value="target-config" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Config</span>
+              </TabsTrigger>
+              <TabsTrigger value="assign-targets" className="flex items-center gap-2">
                 <Target className="h-4 w-4" />
-                <span className="hidden sm:inline">Assign Targets</span>
-                <span className="sm:hidden">Assign</span>
+                <span className="hidden sm:inline">Assign</span>
               </TabsTrigger>
               <TabsTrigger value="target-vs-actual" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Target vs Actual</span>
-                <span className="sm:hidden">Dashboard</span>
+                <span className="hidden sm:inline">Dashboard</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="set-target" className="mt-6">
-              <AdminSetTarget 
+            {/* Target Configuration Tab */}
+            <TabsContent value="target-config" className="mt-6">
+              <TargetConfigTab fyYear={fyYear} />
+            </TabsContent>
+
+            {/* Assign Targets Tab */}
+            <TabsContent value="assign-targets" className="mt-6">
+              <AssignTargetsTab
+                fyYear={fyYear}
                 userScope={userScope}
+                onUserScopeChange={setUserScope}
                 selectedUserId={selectedUserId}
+                onSelectedUserChange={setSelectedUserId}
                 selectedUserIds={selectedUserIds}
                 onSelectedUserIdsChange={setSelectedUserIds}
-                fyYear={fyYear}
               />
             </TabsContent>
 
+            {/* Target vs Actual Dashboard Tab */}
             <TabsContent value="target-vs-actual" className="mt-6">
               <TeamTargetDashboard 
                 userScope={userScope}
