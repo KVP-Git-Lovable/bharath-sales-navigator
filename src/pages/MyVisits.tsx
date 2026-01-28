@@ -1225,19 +1225,19 @@ export const MyVisits = () => {
                 ) : (
                   <Sparkles size={12} className="mr-1 sm:mr-1.5" />
                 )}
-                <span className="whitespace-nowrap">{isGeneratingPlan ? 'Planning...' : 'Auto Plan'}</span>
+                <span className="whitespace-nowrap">{isGeneratingPlan ? t('visits.planning') : t('visits.autoPlan')}</span>
               </Button>
               <Button variant="secondary" size="sm" className={`bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3 ${selectedDate < new Date().toISOString().split('T')[0] ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => navigate(`/beat-planning?date=${selectedDate}`)} disabled={selectedDate < new Date().toISOString().split('T')[0]}>
                 <Route size={12} className="mr-1 sm:mr-1.5" />
-                <span className="whitespace-nowrap">All Beat</span>
+                <span className="whitespace-nowrap">{t('visits.journeyPlan')}</span>
               </Button>
               <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={() => navigate('/my-retailers', { state: { returnTo: '/visits/retailers' } })}>
                 <Users size={12} className="mr-1 sm:mr-1.5" />
-                <span className="whitespace-nowrap">Retailers</span>
+                <span className="whitespace-nowrap">{t('visits.retailers')}</span>
               </Button>
               <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3 overflow-hidden" onClick={() => navigate(`/today-summary?date=${selectedDate}`)}>
                 <FileText size={10} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                <span className="truncate">Summary</span>
+                <span className="truncate">{t('visits.summary')}</span>
               </Button>
             </div>
             
@@ -1248,15 +1248,15 @@ export const MyVisits = () => {
               setIsTimelineOpen(true);
             }}>
                 <Clock size={14} className="mr-1.5" />
-                Timeline
+                {t('visits.timeline')}
               </Button>
               <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3" onClick={() => navigate('/gps-track')}>
                 <MapPin size={14} className="mr-1.5" />
-                GPS Track
+                {t('visits.gpsTrack')}
               </Button>
               <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3" onClick={() => setIsVanStockOpen(true)}>
                 <Truck size={14} className="mr-1.5" />
-                Van Stock
+                {t('visits.vanStock')}
               </Button>
             </div>
           </CardContent>
@@ -1304,11 +1304,11 @@ export const MyVisits = () => {
                {/* Row 1: Planned, Pending */}
                <button className="bg-gradient-to-br from-indigo-50 to-indigo-100 hover:from-indigo-100 hover:to-indigo-150 border border-indigo-200 p-2 sm:p-3 rounded-lg text-center transition-all flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px]">
                  <div className="text-base sm:text-xl font-bold text-indigo-600 leading-tight">{totalPlannedVisits}</div>
-                 <div className="text-[9px] sm:text-xs font-medium text-indigo-600/80 mt-1 leading-tight">Planned Visits</div>
+                 <div className="text-[9px] sm:text-xs font-medium text-indigo-600/80 mt-1 leading-tight">{t('visits.plannedVisits')}</div>
                </button>
                <button onClick={() => handleStatusClick("planned")} className={`p-2 sm:p-3 rounded-lg text-center transition-all transform hover:scale-105 flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px] ${statusFilter === "planned" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25" : "bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 border border-blue-200"}`}>
                  <div className="text-base sm:text-xl font-bold leading-tight">{plannedVisitsCount}</div>
-                 <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">Pending Visits</div>
+                 <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.pendingVisits')}</div>
                </button>
                
                {/* Row 2: Productive, Unproductive */}
@@ -1328,7 +1328,7 @@ export const MyVisits = () => {
                </button>
                <button onClick={() => setIsPointsDialogOpen(true)} className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 p-2 sm:p-3 rounded-lg border border-amber-500/20 cursor-pointer hover:from-amber-500/15 hover:to-yellow-500/15 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
                  <div className="text-base sm:text-xl font-bold text-amber-600 leading-tight">{pointsEarnedToday}</div>
-                 <div className="text-[9px] sm:text-xs text-amber-600/80 font-medium mt-1 leading-tight">Points Earned</div>
+                 <div className="text-[9px] sm:text-xs text-amber-600/80 font-medium mt-1 leading-tight">{t('visits.pointsEarned')}</div>
                </button>
              </div>
            </CardContent>
@@ -1367,7 +1367,7 @@ export const MyVisits = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-background z-50">
                   <DropdownMenuItem onClick={() => setSortOrder('recent')} className={cn("cursor-pointer", sortOrder === 'recent' && "bg-primary/10")}>
-                    Recent
+                    {t('visits.recent')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setSortOrder('asc')} className={cn("cursor-pointer", sortOrder === 'asc' && "bg-primary/10")}>
                     A-Z

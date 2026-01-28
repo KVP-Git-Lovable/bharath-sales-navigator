@@ -76,41 +76,41 @@ export const Navbar = memo(() => {
   const navigationItems: NavItem[] = useMemo(() => {
     const baseItems: NavItem[] = [
       { id: 'attendance', icon: UserCheck, label: t('nav.attendance'), href: "/attendance", color: "from-blue-500 to-blue-600" },
-      { id: 'my-visit', icon: Car, label: "Visits", href: "/visits/retailers", color: "from-green-500 to-green-600" },
+      { id: 'my-visit', icon: Car, label: t('nav.myVisit'), href: "/visits/retailers", color: "from-green-500 to-green-600" },
       { id: 'all-retailers', icon: Store, label: t('nav.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
-      { id: 'my-target', icon: Target, label: "Target", href: "/my-target", color: "from-cyan-500 to-cyan-600" },
-      { id: 'performance', icon: TrendingUp, label: "Target Vs Actual", href: "/performance-dashboard", color: "from-emerald-500 to-emerald-600" },
+      { id: 'my-target', icon: Target, label: t('nav.target'), href: "/my-target", color: "from-cyan-500 to-cyan-600" },
+      { id: 'performance', icon: TrendingUp, label: t('nav.targetVsActual'), href: "/performance-dashboard", color: "from-emerald-500 to-emerald-600" },
       { id: 'analytics', icon: BarChart3, label: t('nav.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600" },
-      { id: 'institutional-sales', icon: Building2, label: "Institutional Sales", href: "/institutional-sales", color: "from-indigo-500 to-indigo-600" },
-      { id: 'distributor-master', icon: Factory, label: "Distributor Master", href: "/distributor-master", color: "from-cyan-500 to-cyan-600" },
-      { id: 'primary-orders', icon: ShoppingCart, label: "Primary Orders", href: "/primary-orders", color: "from-rose-500 to-rose-600" },
+      { id: 'institutional-sales', icon: Building2, label: t('nav.institutionalSales'), href: "/institutional-sales", color: "from-indigo-500 to-indigo-600" },
+      { id: 'distributor-master', icon: Factory, label: t('nav.distributorMaster'), href: "/distributor-master", color: "from-cyan-500 to-cyan-600" },
+      { id: 'primary-orders', icon: ShoppingCart, label: t('nav.primaryOrders'), href: "/primary-orders", color: "from-rose-500 to-rose-600" },
       { id: 'territories', icon: MapPin, label: t('nav.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },
       { id: 'gps-track', icon: Navigation2, label: t('nav.gpsTrack'), href: "/gps-track", color: "from-purple-500 to-purple-600" },
-      { id: 'my-beats', icon: Users, label: "Beats", href: "/my-beats", color: "from-orange-500 to-orange-600" },
-      { id: 'competition-master', icon: Trophy, label: "Competition Master", href: "/competition-master", color: "from-slate-500 to-slate-600" },
+      { id: 'my-beats', icon: Users, label: t('nav.beats'), href: "/my-beats", color: "from-orange-500 to-orange-600" },
+      { id: 'competition-master', icon: Trophy, label: t('nav.competitionMaster'), href: "/competition-master", color: "from-slate-500 to-slate-600" },
       { id: 'schemes', icon: Gift, label: t('nav.schemes'), href: "/schemes", color: "from-pink-500 to-pink-600" },
-      { id: 'expenses', icon: CreditCard, label: "Expenses", href: "/expenses", color: "from-indigo-500 to-indigo-600" },
+      { id: 'expenses', icon: CreditCard, label: t('nav.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600" },
     ];
 
     // Add Leaderboard only if gamification is active
     if (isGamificationActive) {
-      baseItems.push({ id: 'leaderboard', icon: Trophy, label: "Gamification", href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
+      baseItems.push({ id: 'leaderboard', icon: Trophy, label: t('nav.gamification'), href: "/leaderboard", color: "from-yellow-500 to-yellow-600" });
     }
 
     // Add Packing List Management if enabled (admin module for creating/managing packing lists)
     if (isPackingListEnabled) {
-      baseItems.push({ id: 'packing-list', icon: ClipboardList, label: "Packing List", href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
+      baseItems.push({ id: 'packing-list', icon: ClipboardList, label: t('nav.packingList'), href: "/packing-list-management", color: "from-teal-500 to-teal-600" });
     }
 
     // Add My Deliveries as separate module (visible when delivery agent app is enabled)
     if (isDeliveryAgentEnabled || isPackingListEnabled) {
-      baseItems.push({ id: 'my-deliveries', icon: Truck, label: "Deliveries", href: "/my-deliveries", color: "from-orange-500 to-orange-600" });
+      baseItems.push({ id: 'my-deliveries', icon: Truck, label: t('nav.deliveries'), href: "/my-deliveries", color: "from-orange-500 to-orange-600" });
     }
 
     // Add remaining items
     baseItems.push(
-      { id: 'my-competency', icon: Target, label: "Competency", href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
-      { id: 'recycle-bin', icon: Trash2, label: "Recycle Bin", href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
+      { id: 'my-competency', icon: Target, label: t('nav.competency'), href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
+      { id: 'recycle-bin', icon: Trash2, label: t('nav.recycleBin'), href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
     );
 
     return baseItems;
@@ -133,7 +133,7 @@ export const Navbar = memo(() => {
 
   // Admin-only navigation items
   const adminNavigationItems = [
-    { icon: Shield, label: t('nav.adminPanel'), href: "/admin-controls", color: "from-emerald-500 to-emerald-600" },
+    { icon: Shield, label: t('nav.adminControls'), href: "/admin-controls", color: "from-emerald-500 to-emerald-600" },
   ];
 
   // Get user display name and initials
@@ -268,7 +268,7 @@ export const Navbar = memo(() => {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors"
                 >
                   <LogOut className="h-4 w-4 text-primary-foreground" />
-                  <span className="text-sm text-primary-foreground font-medium">Logout</span>
+                  <span className="text-sm text-primary-foreground font-medium">{t('nav.logout')}</span>
                 </button>
               </div>
             </div>
@@ -277,7 +277,7 @@ export const Navbar = memo(() => {
           {/* Admin Controls Section */}
           {hasAdminAccess && (
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Admin Controls</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">{t('nav.adminControls')}</h3>
               <div className="grid grid-cols-3 gap-3">
                 {adminNavigationItems.map((item) => (
                   <NavLink 
@@ -299,7 +299,7 @@ export const Navbar = memo(() => {
           {/* Navigation Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-muted-foreground px-1">Navigation</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground px-1">{t('nav.navigation')}</h3>
               <div className="flex items-center gap-1">
                 <NavSearch items={navigationItems} onItemClick={handleMenuItemClick} />
                 <NavCustomizeDialog

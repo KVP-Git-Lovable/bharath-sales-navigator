@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,7 @@ interface ProcessingState {
 }
 
 const Attendance = () => {
+  const { t } = useTranslation('common');
   const { toast } = useToast();
   const { userProfile, user } = useAuth();
   const navigate = useNavigate();
@@ -958,18 +960,18 @@ const Attendance = () => {
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header Stats */}
           <div className="text-center space-y-4">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Attendance</h1>
-            <p className="text-muted-foreground">Track your daily attendance and working hours</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('attendance.title')}</h1>
+            <p className="text-muted-foreground">{t('attendance.subtitle')}</p>
             
             {/* Main Stats */}
             <div className="flex justify-center items-center gap-8 mb-6">
               <div className="text-center">
                 <div className="text-4xl font-bold text-primary">{stats.attendance}%</div>
-                <div className="text-sm text-muted-foreground">This Month</div>
+                <div className="text-sm text-muted-foreground">{t('attendance.thisMonth')}</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-foreground">{stats.presentDays}/{stats.totalDays}</div>
-                <div className="text-sm text-muted-foreground">Present Days</div>
+                <div className="text-sm text-muted-foreground">{t('attendance.presentDays')}</div>
               </div>
             </div>
 
@@ -985,12 +987,12 @@ const Attendance = () => {
                 {todaysAttendance?.check_in_time ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-600" />
-                    Day Started
+                    {t('attendance.dayStarted')}
                   </>
                 ) : (
                   <>
                     <Camera className="h-4 w-4" />
-                    {isMarkingAttendance ? 'Starting Day...' : 'Start My Day'}
+                    {isMarkingAttendance ? t('attendance.startingDay') : t('attendance.startMyDay')}
                   </>
                 )}
               </Button>
@@ -1005,12 +1007,12 @@ const Attendance = () => {
                 {todaysAttendance?.check_out_time ? (
                   <>
                     <XCircle className="h-4 w-4 text-red-600" />
-                    Day Ended
+                    {t('attendance.dayEnded')}
                   </>
                 ) : (
                   <>
                     <Camera className="h-4 w-4" />
-                    {isMarkingAttendance ? 'Ending Day...' : 'End My Day'}
+                    {isMarkingAttendance ? t('attendance.endingDay') : t('attendance.endMyDay')}
                   </>
                 )}
               </Button>
@@ -1082,7 +1084,7 @@ const Attendance = () => {
               <div className="flex justify-center items-center gap-2 text-sm text-muted-foreground">
                 <Navigation2 className={cn("h-4 w-4", isTracking && "animate-pulse text-primary")} />
                 <span>
-                  {isTracking ? '🟢 GPS tracking active' : 'GPS tracking will start at 9 AM'}
+                  {isTracking ? `🟢 ${t('attendance.gpsTrackingActive')}` : t('attendance.gpsTrackingWillStart')}
                 </span>
               </div>
             )}
@@ -1127,8 +1129,8 @@ const Attendance = () => {
                 <CardContent className="p-4 text-center">
                   <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.presentDays}</div>
-                  <div className="text-sm text-green-600 dark:text-green-400">Present Days</div>
-                  <div className="text-xs text-green-500 mt-1">Tap to view dates</div>
+                  <div className="text-sm text-green-600 dark:text-green-400">{t('attendance.presentDays')}</div>
+                  <div className="text-xs text-green-500 mt-1">{t('attendance.tapToViewDates')}</div>
                 </CardContent>
               </Card>
               
@@ -1139,8 +1141,8 @@ const Attendance = () => {
                 <CardContent className="p-4 text-center">
                   <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.absentDays}</div>
-                  <div className="text-sm text-red-600 dark:text-red-400">Absent Days</div>
-                  <div className="text-xs text-red-500 mt-1">Tap to view dates</div>
+                  <div className="text-sm text-red-600 dark:text-red-400">{t('attendance.absentDays')}</div>
+                  <div className="text-xs text-red-500 mt-1">{t('attendance.tapToViewDates')}</div>
                 </CardContent>
               </Card>
             </div>
@@ -1199,7 +1201,7 @@ const Attendance = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />
-                Today's Market Hours
+                {t('attendance.todaysMarketHours')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1288,15 +1290,15 @@ const Attendance = () => {
           {/* Tabs for different sections */}
           <Tabs defaultValue="attendance" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="attendance">My Attendance</TabsTrigger>
-              <TabsTrigger value="leave">Leave</TabsTrigger>
-              <TabsTrigger value="holiday">Holiday</TabsTrigger>
+              <TabsTrigger value="attendance">{t('attendance.myAttendance')}</TabsTrigger>
+              <TabsTrigger value="leave">{t('attendance.leave')}</TabsTrigger>
+              <TabsTrigger value="holiday">{t('attendance.holiday')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="attendance" className="space-y-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Recent Attendance</CardTitle>
+                  <CardTitle>{t('attendance.recentAttendance')}</CardTitle>
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -1304,9 +1306,9 @@ const Attendance = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="current-week">This Week</SelectItem>
-                        <SelectItem value="current-month">This Month</SelectItem>
-                        <SelectItem value="last-month">Last Month</SelectItem>
+                        <SelectItem value="current-week">{t('common.thisWeek')}</SelectItem>
+                        <SelectItem value="current-month">{t('common.thisMonth')}</SelectItem>
+                        <SelectItem value="last-month">{t('common.lastMonth')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
