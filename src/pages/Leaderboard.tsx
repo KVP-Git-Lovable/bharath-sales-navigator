@@ -67,6 +67,7 @@ export default function Leaderboard() {
   const { userProfile } = useAuth();
   const [leaderboard, setLeaderboard] = useState<UserPoints[]>([]);
   const [myPoints, setMyPoints] = useState<MyPoints>({ today: 0, week: 0, month: 0, quarter: 0, year: 0, total: 0 });
+  const [availableToRedeem, setAvailableToRedeem] = useState(0);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [games, setGames] = useState<GameWithPoints[]>([]);
   const [pointsBreakdown, setPointsBreakdown] = useState<PointsBreakdown[]>([]);
@@ -251,9 +252,11 @@ export default function Leaderboard() {
         if (earnedDate >= startOfYear) points.year += pointsValue;
       });
       
-      // Subtract redeemed points from total to get available points
-      points.total = Math.max(0, points.total - totalRedeemedPoints);
+      // Calculate available to redeem (total earned - total redeemed)
+      const availableBalance = Math.max(0, points.total - totalRedeemedPoints);
+      setAvailableToRedeem(availableBalance);
       
+      // Keep points.total as lifetime earned (do NOT subtract redemptions)
       setMyPoints(points);
     }
   };
@@ -359,7 +362,7 @@ export default function Leaderboard() {
       return;
     }
 
-    if (points > myPoints.total) {
+    if (points > availableToRedeem) {
       toast.error("Insufficient points");
       return;
     }
@@ -555,7 +558,7 @@ export default function Leaderboard() {
                   <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                   <p className="text-xs sm:text-sm text-muted-foreground">Available to Redeem</p>
                 </div>
-                <p className="text-2xl sm:text-4xl font-bold text-purple-700">{myPoints.total}</p>
+                <p className="text-2xl sm:text-4xl font-bold text-purple-700">{availableToRedeem}</p>
                 <Button className="w-full mt-3 text-xs sm:text-sm" size="sm" onClick={() => setShowRedeemDialog(true)}>
                   Redeem Now
                 </Button>
