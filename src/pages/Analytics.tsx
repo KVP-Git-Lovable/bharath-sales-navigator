@@ -1267,15 +1267,17 @@ const Analytics = () => {
           </Card>
 
           <Tabs defaultValue="progress" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="kpi">KPI</TabsTrigger>
-              <TabsTrigger value="progress">Dashboard</TabsTrigger>
-              <TabsTrigger value="products">Products</TabsTrigger>
-              <TabsTrigger value="retailers">Retailers</TabsTrigger>
-              <TabsTrigger value="predictions">Predictions</TabsTrigger>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="supervisor-report">Supervisor Report</TabsTrigger>
-            </TabsList>
+            <ScrollArea className="w-full">
+              <TabsList className="inline-flex w-max min-w-full gap-1 p-1">
+                <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">KPI</TabsTrigger>
+                <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Dashboard</TabsTrigger>
+                <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
+                <TabsTrigger value="retailers" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Retailers</TabsTrigger>
+                <TabsTrigger value="predictions" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Predictions</TabsTrigger>
+                <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
+                <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Supervisor</TabsTrigger>
+              </TabsList>
+            </ScrollArea>
 
             {/* KPI Dashboard */}
             <TabsContent value="kpi" className="space-y-4">
