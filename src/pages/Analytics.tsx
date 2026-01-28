@@ -2017,7 +2017,11 @@ const Analytics = () => {
 
             {/* Supervisor Report Tab */}
             <TabsContent value="supervisor-report" className="space-y-4">
-              <SupervisorReport />
+              <SupervisorReport 
+                users={users}
+                selectedUserIds={selectedUserIds}
+                dateRange={dashboardDateRange}
+              />
             </TabsContent>
           </Tabs>
 
