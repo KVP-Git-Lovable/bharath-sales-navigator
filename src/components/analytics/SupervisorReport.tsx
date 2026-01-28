@@ -286,24 +286,21 @@ export const SupervisorReport = () => {
       // Get unique user IDs
       const userIds = [...new Set(ordersData.map(o => o.user_id))];
 
-      // Fetch profiles for these users - try admin function first, fallback to direct query
+      // Fetch profiles for these users - use the selector RPC that works for all authenticated users
       let profilesData: { id: string; full_name: string | null }[] = [];
       
-      // Try using the admin function (bypasses RLS)
-      const { data: adminProfiles, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
+      // Use the selector RPC (works for all authenticated users)
+      const { data: selectorProfiles, error: selectorError } = await supabase.rpc('get_profiles_for_selector');
       
-      if (!adminError && adminProfiles) {
+      if (!selectorError && selectorProfiles) {
         // Filter to only the user IDs we need
-        profilesData = adminProfiles.filter((p: any) => userIds.includes(p.id));
+        profilesData = selectorProfiles.filter((p: any) => userIds.includes(p.id));
       } else {
-        // Fallback to direct query if admin function fails
-        const { data: directProfiles, error: directError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds);
+        // Fallback to admin function if selector fails
+        const { data: adminProfiles, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
         
-        if (!directError && directProfiles) {
-          profilesData = directProfiles;
+        if (!adminError && adminProfiles) {
+          profilesData = adminProfiles.filter((p: any) => userIds.includes(p.id));
         }
       }
 
