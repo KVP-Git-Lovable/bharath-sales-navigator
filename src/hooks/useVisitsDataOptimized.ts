@@ -802,13 +802,27 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       const slowConn = isSlowConnection();
       if (slowConn) {
         console.log('[LoadData] ⚡ Using offline data only - slow connection detected');
-      } else if (navigator.onLine && isToday(selectedDate)) {
-        // Skip throttle check for today - visit status must always be fresh
-        requestIdleCallback?.(() => smartDeltaSync(effectiveUserId, selectedDate)) || 
-          setTimeout(() => smartDeltaSync(effectiveUserId, selectedDate), 50);
-      } else if (navigator.onLine && shouldSyncNow(selectedDate)) {
-        requestIdleCallback?.(() => smartDeltaSync(effectiveUserId, selectedDate)) || 
-          setTimeout(() => smartDeltaSync(effectiveUserId, selectedDate), 100);
+      } else if (navigator.onLine) {
+        // FIX: Immediately fetch points for the selected date (not just today)
+        // This ensures Points Earned updates correctly when date changes
+        fetchPointsForDate(effectiveUserId, selectedDate)
+          .then((pointsFetched) => {
+            if (mountedRef.current && lastDateRef.current === selectedDate) {
+              setPointsData(pointsFetched);
+              console.log('[LoadData] Fetched points for', selectedDate, ':', pointsFetched.total);
+            }
+          })
+          .catch((e) => console.warn('[LoadData] Points fetch failed:', e));
+        
+        // Background sync for other data
+        if (isToday(selectedDate)) {
+          // Skip throttle check for today - visit status must always be fresh
+          requestIdleCallback?.(() => smartDeltaSync(effectiveUserId, selectedDate)) || 
+            setTimeout(() => smartDeltaSync(effectiveUserId, selectedDate), 50);
+        } else if (shouldSyncNow(selectedDate)) {
+          requestIdleCallback?.(() => smartDeltaSync(effectiveUserId, selectedDate)) || 
+            setTimeout(() => smartDeltaSync(effectiveUserId, selectedDate), 100);
+        }
       }
       isFetchingRef.current = false;
       return;
