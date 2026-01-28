@@ -1,224 +1,119 @@
 
-# Order Creation Guide Manual - PDF Generator Implementation Plan
+# Language Selection in Profile - Implementation Plan
 
 ## Overview
-Create a comprehensive, professionally designed PDF manual that guides end users through the complete order creation process in the Field Sales Navigator application. This manual will be accessible from the app and can be downloaded for offline reference.
+Add a language preference option to the user profile page that allows users to select the display language for the Home page Menu bar and the Visits (My Visit) page. The selected language will persist in both localStorage and the user's Supabase profile.
 
-## Manual Content Structure
+## Current State Analysis
 
-### 1. Cover Page
-- Title: "Field Sales Order Entry Guide"
-- Subtitle: "Complete User Manual for Sales Representatives"
-- Company logo placeholder
-- Version and date
+### Existing Infrastructure
+1. **i18n Configuration**: Already set up in `src/i18n/config.ts` with support for 6 languages:
+   - English (en)
+   - Hindi (hi)
+   - Kannada (kn)
+   - Tamil (ta)
+   - Telugu (te)
+   - Gujarati (gu)
 
-### 2. Table of Contents
-- Quick navigation to all sections
+2. **Database Support**: The `profiles` table already has a `preferred_language` column (varchar type).
 
-### 3. Getting Started
-- **Logging In**: How to access the app
-- **Marking Attendance**: Requirement before order entry (if enabled)
-- **Understanding the Dashboard**: Navigation basics
+3. **LanguageSelector Component**: Exists at `src/components/LanguageSelector.tsx` but is currently a header dropdown. We need to add a similar selector to the profile page.
 
-### 4. Accessing Order Entry
-- **From My Visits**: Clicking on a retailer card
-- **Phone Orders**: How to place phone orders
-- **Order Entry URL Parameters**: Understanding visit context
+4. **Translation Files**: All 6 languages have translation files in `src/i18n/locales/[lang]/common.json` with keys for:
+   - Navigation menu items (`nav.*`)
+   - Visit page content (`visits.*`)
+   - Common actions (`common.*`)
+   - Retailer forms (`retailer.*`)
+   - Order entry (`order.*`)
 
-### 5. Order Entry Screen Overview
-- **Header Section**: Retailer name, connection status, location tracking
-- **Mode Selection Tabs**: Table View, Grid View, Returns, No Order, Competition
-- **AI Tools**: Voice Order Assistant, Smart Basket, AI Stock Capture
-- **Cart Summary**: Total items and value display
+## Implementation Details
 
-### 6. Table View Order Entry (Default Mode)
-- **Product Search**: Using the searchable dropdown
-- **Selecting Products**: Choosing base products and variants
-- **Entering Quantities**: KG vs Grams conversion
-- **Understanding Rates**: How pricing is displayed
-- **Adding Rows**: Creating multiple product entries
-- **Removing Items**: Deleting unwanted rows
-- **Scheme Indicators**: Recognizing available offers
+### 1. Create Profile Language Settings Component
+**New File**: `src/components/profile/LanguageSettings.tsx`
 
-### 7. Grid View Order Entry
-- **Category Navigation**: Filtering by product category
-- **Product Cards**: Understanding product display
-- **Quick Add**: Increment/decrement buttons
-- **Variant Selection**: Expanding product variants
-- **Focused Products**: Star indicators for priority items
+This component will:
+- Display current language selection with a visual indicator
+- Show all 6 available languages in a card-based grid layout
+- Allow users to select their preferred language
+- Save the selection to both localStorage and Supabase profiles table
+- Show a success toast on language change
+- Include descriptive text explaining what areas are affected (Menu bar, Visits page)
 
-### 8. Understanding Schemes & Offers
-- **Scheme Types**: BOGO, percentage discounts, quantity-based
-- **Viewing Scheme Details**: Clicking the gift icon
-- **Auto-Applied Schemes**: How schemes apply automatically
-- **Applied Schemes Summary**: Viewing active discounts
+UI Design:
+- Section header: "Language Preferences" with a Globe icon
+- Subtitle: "Choose your preferred language for the app interface"
+- Grid of language cards (2 columns on mobile, 3 on larger screens)
+- Each card shows: Native language name + English name
+- Selected language highlighted with primary color border and checkmark
 
-### 9. AI-Powered Features
-- **Voice Order Assistant**: Speaking your order
-- **Smart Basket**: AI-recommended products based on history
-- **AI Stock Capture**: Taking photos to record closing stock
+### 2. Integrate into User Profile Page
+**Modify**: `src/pages/UserProfile.tsx`
 
-### 10. Return Stock Entry
-- **Accessing Returns Mode**: Clicking "Returns" button
-- **Recording Return Items**: Product, quantity, reason
-- **Submitting Returns**: Completing the return entry
+Add the LanguageSettings component as a new section in the "About" tab, positioned after the "Address" section and before "Social Links".
 
-### 11. No Order Entry (Unproductive Visit)
-- **Reasons Available**:
-  - Over Stocked
-  - Owner Not Available
-  - Store Closed
-  - Permanently Closed
-  - Other (custom reason)
-- **Submitting No Order**: Completing the visit
+### 3. Load User's Language Preference on App Start
+**Modify**: `src/main.tsx` or `src/App.tsx`
 
-### 12. Competition Data Entry
-- **Recording Competitor Information**: Adding competition data
-- **Photos and Notes**: Capturing competitive intelligence
+Ensure the user's saved language preference is loaded from:
+1. First check localStorage (for immediate load)
+2. Then sync with Supabase profile when user is authenticated
+3. Update i18n if the stored preference differs from current
 
-### 13. Viewing and Managing Cart
-- **Cart Button**: Accessing the cart page
-- **Cart Summary**: Review of all items
-- **Modifying Quantities**: Adjusting order amounts
-- **Removing Items**: Deleting products from cart
-- **Discount Display**: Understanding applied discounts
+### 4. Sync Language on Login
+**Modify**: `src/hooks/useAuth.ts` (if exists) or create a new hook
 
-### 14. Payment Options
-- **Full Payment**: Clearing all dues
-- **Partial Payment**: Making a portion of payment
-- **Credit**: Recording order on credit
-- **Payment Methods**:
-  - Cash
-  - Cheque (with photo capture)
-  - UPI (with transaction ID and photo)
-  - NEFT (with photo capture)
-
-### 15. Invoice Preview
-- **Preview Button**: Viewing invoice before submission
-- **Invoice Details**: Understanding the invoice layout
-- **Company vs Distributor Headers**: How source is selected
-
-### 16. Submitting the Order
-- **Place Order Button**: Final submission
-- **Confirmation Message**: Success feedback
-- **Offline Submission**: How orders save when offline
-
-### 17. Working Offline
-- **Offline Indicator**: Recognizing offline mode
-- **What Works Offline**: Products, orders, visits
-- **Auto-Sync**: When connection restores
-- **Sync Status**: Monitoring pending syncs
-
-### 18. Troubleshooting
-- **Order Not Saving**: Common solutions
-- **Products Not Loading**: Cache refresh steps
-- **Payment Photo Not Uploading**: Offline handling
-- **GPS/Location Issues**: Permission settings
-
-### 19. Quick Reference Card
-- **Keyboard Shortcuts** (if applicable)
-- **Common Actions Summary**
-- **Support Contact Information**
-
----
-
-## Technical Implementation
-
-### New File: `src/utils/orderGuideManualGenerator.ts`
-
-**Purpose**: Generate a multi-page PDF manual with professional formatting
-
-**Key Functions**:
-- `generateOrderGuideManualPDF()`: Main function to create and download the PDF
-- Helper functions for consistent styling (headers, bullets, numbered lists, screenshots placeholders)
-
-**Dependencies**:
-- `jspdf` (already installed)
-- `date-fns` (already installed for date formatting)
-
-### PDF Design Specifications:
-- **Page Size**: A4 (210 x 297 mm)
-- **Margins**: 20mm all sides
-- **Primary Color**: Amber (#F59E0B) - matching app theme
-- **Secondary Color**: Dark slate for text
-- **Font**: Helvetica (built-in)
-- **Header Style**: Amber colored section headers with underlines
-- **Content Style**: Clear numbered steps with adequate spacing
-
-### Page Structure:
-1. Cover page with dark background
-2. Table of contents with page numbers
-3. Content sections with consistent formatting
-4. Step-by-step instructions with numbered lists
-5. Tips and notes in highlighted boxes
-6. Footer with page numbers
-
-### New Component: `src/components/OrderGuideManualButton.tsx`
-
-**Purpose**: Button component to trigger PDF generation
-
-**Placement Options**:
-- Settings page under "Help & Support"
-- Order Entry page (help icon)
-- My Visits page (help menu)
-
-### Integration Points:
-1. **Settings Page**: Add "Download Order Guide" option
-2. **Order Entry Page**: Add help icon that downloads the manual
-3. **Help & Documentation Section**: If exists, add link there
-
----
+When user logs in, fetch their `preferred_language` from the profiles table and apply it.
 
 ## File Changes Summary
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/utils/orderGuideManualGenerator.ts` | Create | PDF generation logic with all content |
-| `src/components/OrderGuideManualButton.tsx` | Create | Reusable button component |
-| `src/pages/OrderEntry.tsx` | Modify | Add help icon to download guide |
+| `src/components/profile/LanguageSettings.tsx` | Create | New component for language selection in profile |
+| `src/pages/UserProfile.tsx` | Modify | Import and add LanguageSettings component to About tab |
+| `src/App.tsx` | Modify | Add language preference sync on app load when user is authenticated |
 
----
+## Technical Implementation
 
-## Content Details
+### LanguageSettings Component Structure
+```text
++------------------------------------------+
+|  Language Preferences          [Globe]   |
+|  Choose your preferred language          |
++------------------------------------------+
+|  +------------+  +------------+          |
+|  | English    |  | हिंदी      |          |
+|  | English  ✓ |  | Hindi      |          |
+|  +------------+  +------------+          |
+|  +------------+  +------------+          |
+|  | ಕನ್ನಡ      |  | தமிழ்      |          |
+|  | Kannada    |  | Tamil      |          |
+|  +------------+  +------------+          |
+|  +------------+  +------------+          |
+|  | తెలుగు     |  | ગુજરાતી    |          |
+|  | Telugu     |  | Gujarati   |          |
+|  +------------+  +------------+          |
++------------------------------------------+
+```
 
-### Section Examples
+### Language Change Flow
+1. User taps on a language card
+2. Call `i18n.changeLanguage(langCode)` to update UI immediately
+3. Save to localStorage: `localStorage.setItem('preferredLanguage', langCode)`
+4. If user is authenticated, update Supabase: `profiles.preferred_language`
+5. Show success toast: "Language changed to [Language Name]"
 
-**Example: Table View Order Entry Steps**
-1. Tap on the product search dropdown
-2. Type product name or scroll to find it
-3. Select the product from the list
-4. If product has variants, a variant dropdown appears
-5. Choose the desired variant (e.g., "500g Pack")
-6. Enter quantity in the Quantity field
-7. Select unit (KG or Grams) from the dropdown
-8. Total is calculated automatically
-9. Repeat for additional products
-10. Click "Add to Cart" to proceed
+### App Startup Language Sync
+1. i18n loads with localStorage preference (already configured)
+2. When user authenticates, fetch profile with `preferred_language`
+3. If profile language differs from current i18n language, update i18n
+4. Sync localStorage if needed
 
-**Example: Payment Flow**
-1. On Cart page, review all items and totals
-2. Select Payment Type:
-   - Full Payment: Clears current order + any previous pending
-   - Partial Payment: Enter amount being paid now
-   - Credit: Full amount added to retailer's pending
-3. If Full or Partial, select Payment Method
-4. For Cheque/UPI/NEFT: Capture proof photo
-5. For UPI: Enter last 4 digits of transaction ID
-6. Click "Place Order" to submit
+## UI/UX Considerations
+- Language selection should be immediate (no save button needed)
+- Visual feedback with checkmark on selected language
+- Cards should be touch-friendly with adequate padding
+- Native language name displayed prominently (for users who may not read English)
+- English name as secondary text for clarity
 
----
-
-## Estimated Implementation Effort
-
-- PDF generator utility: ~400-500 lines
-- Button component: ~30 lines
-- Integration changes: ~10 lines
-- Total: ~550 lines of new code
-
-## Notes
-
-- Manual is generated client-side (no server dependency)
-- Works offline once app is loaded
-- PDF is ~15-20 pages when generated
-- File size: ~100-200KB (text-only, no embedded images)
-- Can be extended to include screenshots as base64 images in future
+## No Database Changes Required
+The `preferred_language` column already exists in the profiles table, so no migration is needed.
