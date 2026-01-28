@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2 } from 'lucide-react';
+import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity } from 'lucide-react';
 import { fetchAndGenerateInvoice } from '@/utils/invoiceGenerator';
 import { downloadPDF } from '@/utils/fileDownloader';
 import { toast } from 'sonner';
@@ -140,6 +140,17 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
   // State for SKU filter from chart clicks - when a user is clicked in Order Summary charts
   const [skuFilterUser, setSkuFilterUser] = useState<string | null>(null);
+  
+  // State for productivity drilldown from Order Details card
+  const [productivityDrilldownUser, setProductivityDrilldownUser] = useState<string | null>(null);
+  const [productivityDrilldownData, setProductivityDrilldownData] = useState<{
+    planned_date: string;
+    productive_visits: number;
+    unproductive_visits: number;
+    total_visits: number;
+    productivity_percentage: number;
+  }[]>([]);
+  const [productivityDrilldownLoading, setProductivityDrilldownLoading] = useState(false);
 
   // Generate AI insights based on the summary data
   const aiInsights = useMemo(() => {
@@ -203,6 +214,42 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       fetchSummaryData();
     }
   }, [selectedUserIds, dateRange, users]);
+
+  // Fetch productivity data for drilldown
+  useEffect(() => {
+    const fetchProductivityDrilldown = async () => {
+      if (!productivityDrilldownUser) {
+        setProductivityDrilldownData([]);
+        return;
+      }
+
+      setProductivityDrilldownLoading(true);
+      try {
+        const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+        const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+        const { data, error } = await supabase.rpc('get_productivity_summary', {
+          user_full_name: productivityDrilldownUser,
+          start_date: fromDate,
+          end_date: toDate
+        });
+
+        if (error) {
+          console.error('Error fetching productivity drilldown:', error);
+          setProductivityDrilldownData([]);
+        } else {
+          setProductivityDrilldownData(data || []);
+        }
+      } catch (err) {
+        console.error('Error in productivity drilldown:', err);
+        setProductivityDrilldownData([]);
+      } finally {
+        setProductivityDrilldownLoading(false);
+      }
+    };
+
+    fetchProductivityDrilldown();
+  }, [productivityDrilldownUser, dateRange]);
 
   // Fetch summary data - uses order_items.total for accurate revenue calculation
   const fetchSummaryData = async () => {
@@ -1311,9 +1358,12 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                   selectedSummaryUser ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
                 )}>
                   {/* Left: User Summary Table */}
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className={cn(
+                    "border rounded-lg overflow-hidden",
+                    summaryData.length > 6 && "max-h-[320px] overflow-y-auto"
+                  )}>
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-muted/50 z-10">
                         <TableRow className="bg-muted/50">
                           <TableHead>Full Name</TableHead>
                           <TableHead className="text-right">Total Order Value</TableHead>
@@ -1342,7 +1392,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                           </TableRow>
                         ))}
                       </TableBody>
-                      <tfoot className="bg-muted/30">
+                      <tfoot className="bg-muted/30 sticky bottom-0">
                         <TableRow>
                           <TableCell className="font-semibold">Total</TableCell>
                           <TableCell className="text-right font-bold text-primary">
@@ -1663,7 +1713,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                       </div>
                       <div className="text-2xl font-bold">{detailsSummary.totalKg.toFixed(1)}</div>
                     </Card>
-                    <Card className="p-4">
+                    <Card 
+                      className="p-4 cursor-pointer transition-colors hover:bg-muted/50"
+                      onClick={() => setProductivityDrilldownUser(selectedUserDetails)}
+                    >
                       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                         <CheckCircle2 className="h-4 w-4" />
                         Productivity
@@ -1983,6 +2036,90 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
           </CardContent>
         </Card>
       )}
+
+      {/* Day-wise Productivity Drilldown Dialog (from Order Details Productivity card) */}
+      <Dialog open={!!productivityDrilldownUser} onOpenChange={() => setProductivityDrilldownUser(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Day-wise Productivity - {productivityDrilldownUser}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto border rounded-lg">
+            {productivityDrilldownLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="animate-spin h-5 w-5 mr-2" />
+                <span className="text-muted-foreground">Loading...</span>
+              </div>
+            ) : productivityDrilldownData.length > 0 ? (
+              <Table>
+                <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Productive</TableHead>
+                    <TableHead className="text-right">Unproductive</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Productivity %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {productivityDrilldownData.map((row, index) => (
+                    <TableRow key={index} className="hover:bg-muted/30">
+                      <TableCell className="font-medium">{row.planned_date}</TableCell>
+                      <TableCell className="text-right text-green-600 font-medium">
+                        {row.productive_visits}
+                      </TableCell>
+                      <TableCell className="text-right text-orange-600 font-medium">
+                        {row.unproductive_visits}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {row.total_visits}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        <span className={cn(
+                          row.productivity_percentage >= 70 ? 'text-green-600' :
+                          row.productivity_percentage >= 50 ? 'text-yellow-600' : 'text-red-600'
+                        )}>
+                          {row.productivity_percentage}%
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <tfoot className="bg-muted/30 sticky bottom-0">
+                  <TableRow>
+                    <TableCell className="font-semibold">Total ({productivityDrilldownData.length} days)</TableCell>
+                    <TableCell className="text-right font-bold text-green-600">
+                      {productivityDrilldownData.reduce((sum, row) => sum + row.productive_visits, 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-orange-600">
+                      {productivityDrilldownData.reduce((sum, row) => sum + row.unproductive_visits, 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-bold">
+                      {productivityDrilldownData.reduce((sum, row) => sum + row.total_visits, 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-primary">
+                      {(() => {
+                        const totalProd = productivityDrilldownData.reduce((s, r) => s + r.productive_visits, 0);
+                        const totalVisits = productivityDrilldownData.reduce((s, r) => s + r.total_visits, 0);
+                        return totalVisits > 0 ? Math.round((totalProd / totalVisits) * 100 * 100) / 100 : 0;
+                      })()}%
+                    </TableCell>
+                  </TableRow>
+                </tfoot>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No productivity data found for this user
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
