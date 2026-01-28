@@ -4349,8 +4349,10 @@ export type Database = {
           enabled_parameters: Json | null
           fy_year: number
           id: string
+          is_locked: boolean | null
           quantity_unit: string | null
           setup_completed: boolean | null
+          target_plan_name: string | null
           total_quantity_target: number | null
           total_revenue_target: number | null
           total_visits_target: number | null
@@ -4365,8 +4367,10 @@ export type Database = {
           enabled_parameters?: Json | null
           fy_year: number
           id?: string
+          is_locked?: boolean | null
           quantity_unit?: string | null
           setup_completed?: boolean | null
+          target_plan_name?: string | null
           total_quantity_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
@@ -4381,8 +4385,10 @@ export type Database = {
           enabled_parameters?: Json | null
           fy_year?: number
           id?: string
+          is_locked?: boolean | null
           quantity_unit?: string | null
           setup_completed?: boolean | null
+          target_plan_name?: string | null
           total_quantity_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
