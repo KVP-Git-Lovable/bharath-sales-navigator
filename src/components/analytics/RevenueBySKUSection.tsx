@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, PieChartIcon, BarChart3, Package } from 'lucide-react';
+import { RefreshCw, PieChartIcon, BarChart3, Package, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface SKURevenue {
   product_name: string;
@@ -17,11 +19,13 @@ interface SKURevenue {
 interface RevenueBySKUSectionProps {
   selectedUsers: string[];
   dateRange: { from: Date; to: Date };
+  filteredUserName?: string | null;
+  onClearFilter?: () => void;
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7'];
 
-export const RevenueBySKUSection = ({ selectedUsers, dateRange }: RevenueBySKUSectionProps) => {
+export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName, onClearFilter }: RevenueBySKUSectionProps) => {
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
@@ -189,14 +193,29 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange }: RevenueBySKUSe
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Package className="h-5 w-5 text-primary" />
-          <div>
-            <CardTitle>Revenue Summary by SKU</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Product-wise revenue breakdown • {selectedUsers.length === 0 ? 'All Users' : selectedUsers.length === 1 ? selectedUsers[0] : `${selectedUsers.length} Users`} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-primary" />
+            <div>
+              <CardTitle>Revenue Summary by SKU</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Product-wise revenue breakdown • {selectedUsers.length === 0 ? 'All Users' : selectedUsers.length === 1 ? selectedUsers[0] : `${selectedUsers.length} Users`} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
+              </p>
+            </div>
           </div>
+          {filteredUserName && onClearFilter && (
+            <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1">
+              <span className="text-xs">Filtered: {filteredUserName}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 p-0 hover:bg-muted"
+                onClick={onClearFilter}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
