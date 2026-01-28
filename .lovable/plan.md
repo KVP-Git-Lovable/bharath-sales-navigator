@@ -1,232 +1,226 @@
 
 
-# Complete Hindi Translation Implementation Plan
+# Order Creation Manual with Screenshots and Visual Annotations
 
-## Problem Summary
-The application has translation infrastructure set up (`i18next`) but many UI components use hardcoded English strings instead of translation keys. This results in an inconsistent experience when Hindi (or any other language) is selected.
+## Overview
 
-## Scope of Changes
+Create an enhanced PDF manual generator that includes actual screenshots of each step in the order creation flow, with visual annotations (arrows, highlights, numbered callouts) pointing to buttons, fields, and dropdowns.
 
-### What Will Be Translated
-- Navigation menu items (Navbar)
-- All button labels and headers
-- Status labels (Planned, Pending, Productive, etc.)
-- Page titles and section headers
-- Dialog titles and messages
-- Attendance page labels
+## Implementation Approach
 
-### What Will NOT Be Translated (per user requirements)
-- Retailer names (user-entered data)
-- Beat names (user-entered data)
-- Invoice content (must remain in English)
+We will extend the existing `orderGuideManualGenerator.ts` utility to include:
+1. Pre-captured screenshot images encoded as base64
+2. Visual annotation overlays (arrows, circles, numbered callouts)
+3. Enhanced layout with image-text combinations
 
----
+## Technical Details
 
-## Files to Modify
+### Strategy: Pre-Captured Annotated Screenshots
 
-### 1. Translation Files (Add Missing Keys)
+Since generating live screenshots with annotations at runtime is complex, we will:
+1. **Create a dedicated screenshots folder** with annotated images
+2. **Pre-design the annotated screenshots** using a design tool or HTML canvas
+3. **Embed these as base64 in the PDF generator** using jsPDF's image capabilities
 
-#### `src/i18n/locales/en/common.json`
-Add the following new keys:
+### Files to Create/Modify
+
+#### 1. New Screenshot Assets (Pre-Annotated)
+Create annotated screenshot images for each step:
 
 ```text
-nav section:
-- "target": "Target"
-- "targetVsActual": "Target Vs Actual"  
-- "beats": "Beats"
-- "institutionalSales": "Institutional Sales"
-- "distributorMaster": "Distributor Master"
-- "primaryOrders": "Primary Orders"
-- "competitionMaster": "Competition Master"
-- "gamification": "Gamification"
-- "packingList": "Packing List"
-- "deliveries": "Deliveries"
-- "competency": "Competency"
-- "recycleBin": "Recycle Bin"
-- "adminControls": "Admin Controls"
-- "navigation": "Navigation"
-
-visits section:
-- "autoPlan": "Auto Plan"
-- "planning": "Planning..."
-- "retailers": "Retailers"
-- "summary": "Summary"
-- "pendingVisits": "Pending Visits"
-- "pointsEarned": "Points Earned"
-- "recent": "Recent"
-
-attendance section (NEW):
-- "title": "Attendance"
-- "subtitle": "Track your daily attendance and working hours"
-- "thisMonth": "This Month"
-- "presentDays": "Present Days"
-- "absentDays": "Absent Days"
-- "startMyDay": "Start My Day"
-- "endMyDay": "End My Day"
-- "dayStarted": "Day Started"
-- "dayEnded": "Day Ended"
-- "startingDay": "Starting Day..."
-- "endingDay": "Ending Day..."
-- "gpsTrackingActive": "GPS tracking active"
-- "gpsTrackingWillStart": "GPS tracking will start at 9 AM"
-- "marketHours": "Market Hours"
-- "recentAttendance": "Recent Attendance"
-- "leaves": "Leaves"
-- "holidays": "Holidays"
-- "tapToViewDates": "Tap to view dates"
-- "noPresentDays": "No present days recorded"
-- "noAbsentDays": "No absent days recorded"
-- "currentMonth": "Current Month"
-- "currentWeek": "Current Week"
-- "lastMonth": "Last Month"
+public/manual-screenshots/
+├── 01-login-screen.png          # Login form with arrows to email, password, button
+├── 02-dashboard-home.png        # Dashboard with arrow to "My Visits"
+├── 03-my-visits-page.png        # Beat list with arrow to retailer card
+├── 04-order-entry-header.png    # Header showing retailer name, tabs
+├── 05-table-view-form.png       # Table order form with numbered callouts
+├── 06-grid-view-products.png    # Grid view with product cards
+├── 07-scheme-icon-popup.png     # Scheme details modal
+├── 08-voice-order-mic.png       # Voice order interface
+├── 09-smart-basket.png          # AI recommendations
+├── 10-returns-form.png          # Return stock entry
+├── 11-no-order-reasons.png      # No order selection
+├── 12-cart-summary.png          # Cart with all items
+├── 13-payment-options.png       # Payment type selection
+├── 14-invoice-preview.png       # Invoice preview screen
+├── 15-order-confirmation.png    # Success message
+└── 16-offline-indicator.png     # Offline mode badge
 ```
 
-#### `src/i18n/locales/hi/common.json`
-Add Hindi translations for all new keys:
+#### 2. Enhanced PDF Generator
+Modify `src/utils/orderGuideManualGenerator.ts`:
 
-```text
-nav section:
-- "target": "लक्ष्य"
-- "targetVsActual": "लक्ष्य बनाम वास्तविक"
-- "beats": "बीट्स"
-- "institutionalSales": "संस्थागत बिक्री"
-- "distributorMaster": "वितरक मास्टर"
-- "primaryOrders": "प्राथमिक ऑर्डर"
-- "competitionMaster": "प्रतिस्पर्धा मास्टर"
-- "gamification": "गेमिफिकेशन"
-- "packingList": "पैकिंग सूची"
-- "deliveries": "डिलीवरी"
-- "competency": "दक्षता"
-- "recycleBin": "रीसायकल बिन"
-- "adminControls": "एडमिन नियंत्रण"
-- "navigation": "नेविगेशन"
-
-visits section:
-- "autoPlan": "ऑटो प्लान"
-- "planning": "योजना बना रहे हैं..."
-- "retailers": "रिटेलर"
-- "summary": "सारांश"
-- "pendingVisits": "लंबित विज़िट"
-- "pointsEarned": "अर्जित अंक"
-- "recent": "हाल का"
-
-attendance section (NEW):
-- "title": "उपस्थिति"
-- "subtitle": "अपनी दैनिक उपस्थिति और कार्य घंटे ट्रैक करें"
-- "thisMonth": "इस महीने"
-- "presentDays": "उपस्थित दिन"
-- "absentDays": "अनुपस्थित दिन"
-- "startMyDay": "मेरा दिन शुरू करें"
-- "endMyDay": "मेरा दिन समाप्त करें"
-- "dayStarted": "दिन शुरू हुआ"
-- "dayEnded": "दिन समाप्त हुआ"
-- "startingDay": "दिन शुरू हो रहा है..."
-- "endingDay": "दिन समाप्त हो रहा है..."
-- "gpsTrackingActive": "जीपीएस ट्रैकिंग सक्रिय"
-- "gpsTrackingWillStart": "जीपीएस ट्रैकिंग सुबह 9 बजे शुरू होगी"
-- "marketHours": "मार्केट घंटे"
-- "recentAttendance": "हाल की उपस्थिति"
-- "leaves": "छुट्टियाँ"
-- "holidays": "अवकाश"
-- "tapToViewDates": "तारीखें देखने के लिए टैप करें"
-- "noPresentDays": "कोई उपस्थित दिन दर्ज नहीं"
-- "noAbsentDays": "कोई अनुपस्थित दिन दर्ज नहीं"
-- "currentMonth": "वर्तमान महीना"
-- "currentWeek": "वर्तमान सप्ताह"
-- "lastMonth": "पिछला महीना"
-```
-
-### 2. Component Files to Update
-
-#### `src/components/Navbar.tsx`
-**Changes:**
-- Replace hardcoded strings with `t()` function calls
-- Navigation items with hardcoded labels:
-  - Line 79: `"Visits"` → `t('nav.myVisit')`
-  - Line 81: `"Target"` → `t('nav.target')`
-  - Line 82: `"Target Vs Actual"` → `t('nav.targetVsActual')`
-  - Line 84: `"Institutional Sales"` → `t('nav.institutionalSales')`
-  - Line 85: `"Distributor Master"` → `t('nav.distributorMaster')`
-  - Line 86: `"Primary Orders"` → `t('nav.primaryOrders')`
-  - Line 89: `"Beats"` → `t('nav.beats')`
-  - Line 90: `"Competition Master"` → `t('nav.competitionMaster')`
-  - Line 92: `"Expenses"` → `t('nav.expenses')`
-  - Line 97: `"Gamification"` → `t('nav.gamification')`
-  - Line 102: `"Packing List"` → `t('nav.packingList')`
-  - Line 107: `"Deliveries"` → `t('nav.deliveries')`
-  - Line 112: `"Competency"` → `t('nav.competency')`
-  - Line 113: `"Recycle Bin"` → `t('nav.recycleBin')`
-  - Line 271: `"Logout"` → `t('nav.logout')`
-  - Line 280: `"Admin Controls"` → `t('nav.adminControls')`
-  - Line 302: `"Navigation"` → `t('nav.navigation')`
-
-#### `src/pages/MyVisits.tsx`
-**Changes:**
-- Add `useTranslation` hook usage for all UI labels
-- Button labels to translate:
-  - Line 1228: `"Auto Plan"` / `"Planning..."` → `t('visits.autoPlan')` / `t('visits.planning')`
-  - Line 1232: `"All Beat"` → `t('visits.journeyPlan')`
-  - Line 1236: `"Retailers"` → `t('visits.retailers')`
-  - Line 1240: `"Summary"` → `t('visits.summary')`
-  - Line 1251: `"Timeline"` → `t('visits.timeline')`
-  - Line 1255: `"GPS Track"` → `t('visits.gpsTrack')`
-  - Line 1259: `"Van Stock"` → `t('visits.vanStock')`
-  - Line 1307: `"Planned Visits"` → `t('visits.plannedVisits')`
-  - Line 1311: `"Pending Visits"` → `t('visits.pendingVisits')`
-  - Line 1331: `"Points Earned"` → `t('visits.pointsEarned')`
-  - Line 1370-1376: Sort options `"Recent"`, `"A-Z"`, `"Z-A"` → translated
-
-#### `src/pages/Attendance.tsx`
-**Changes:**
-- Import `useTranslation` from `react-i18next`
-- Initialize `const { t } = useTranslation('common');`
-- Replace all hardcoded strings with `t()` calls:
-  - Line 961: `"Attendance"` → `t('attendance.title')`
-  - Line 962: Description → `t('attendance.subtitle')`
-  - Line 969: `"This Month"` → `t('attendance.thisMonth')`
-  - Line 988-996: Start/End day buttons → `t('attendance.*')`
-  - Line 1130: `"Present Days"` → `t('attendance.presentDays')`
-  - Line 1142: `"Absent Days"` → `t('attendance.absentDays')`
-  - Dialog titles and content
-
----
-
-## Technical Implementation Details
-
-### Pattern to Follow
-Existing working example from MyVisits:
 ```typescript
-const { t } = useTranslation();
-// Usage:
-<CardTitle>{t('visits.title')}</CardTitle>
+// New function to add annotated screenshot to PDF
+const addScreenshot = async (
+  doc: jsPDF, 
+  imageData: string, 
+  caption: string,
+  yPos: number
+): number => {
+  const imgWidth = CONTENT_WIDTH * 0.8; // 80% of content width
+  const imgHeight = imgWidth * 1.5;     // Mobile aspect ratio
+  
+  checkPageBreak(imgHeight + 20);
+  
+  // Center the image
+  const xPos = MARGIN + (CONTENT_WIDTH - imgWidth) / 2;
+  
+  // Add image with border
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.5);
+  doc.rect(xPos - 2, yPos - 2, imgWidth + 4, imgHeight + 4);
+  doc.addImage(imageData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+  
+  // Add caption below image
+  yPos += imgHeight + 5;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(100, 100, 100);
+  doc.text(caption, PAGE_WIDTH / 2, yPos, { align: 'center' });
+  
+  return yPos + 10;
+};
 ```
 
-### Invoice Generation Exception
-The invoice utility files (`src/utils/invoiceGenerator.ts` and related) will NOT be modified. All invoice content will remain hardcoded in English as requested.
+#### 3. Screenshot Annotation Component (For Generating Screenshots)
+Create `src/components/ManualScreenshotGenerator.tsx` - an admin tool to capture and annotate screenshots:
 
----
+```typescript
+// Component that renders each screen with SVG overlays for arrows/circles
+// Export as PNG using html2canvas
+// This is a one-time tool to generate the static images
+```
 
-## Summary of Changes
+### Visual Annotation Elements
 
-| File | Type | Changes |
-|------|------|---------|
-| `src/i18n/locales/en/common.json` | Translation | Add ~35 new keys |
-| `src/i18n/locales/hi/common.json` | Translation | Add ~35 Hindi translations |
-| `src/i18n/locales/kn/common.json` | Translation | Add ~35 Kannada keys (English fallback) |
-| `src/i18n/locales/ta/common.json` | Translation | Add ~35 Tamil keys (English fallback) |
-| `src/i18n/locales/te/common.json` | Translation | Add ~35 Telugu keys (English fallback) |
-| `src/i18n/locales/gu/common.json` | Translation | Add ~35 Gujarati keys (English fallback) |
-| `src/components/Navbar.tsx` | Component | ~17 string replacements |
-| `src/pages/MyVisits.tsx` | Component | ~15 string replacements |
-| `src/pages/Attendance.tsx` | Component | ~25 string replacements + add hook |
+Each screenshot will include:
 
----
+| Element | Visual | Purpose |
+|---------|--------|---------|
+| **Numbered Callout** | Orange circle with number | Sequential step indicator |
+| **Arrow Pointer** | Curved arrow | Points to specific UI element |
+| **Highlight Box** | Dotted rectangle | Highlights input fields |
+| **Text Label** | Small caption | Explains the element |
 
-## Expected Outcome
-After implementation:
-1. All navigation items will display in Hindi when Hindi is selected
-2. MyVisits page buttons and labels will display in Hindi
-3. Attendance page will fully support Hindi
-4. Retailer/beat names remain unchanged (user data)
-5. Invoices remain in English only
+### PDF Structure with Screenshots
+
+```text
+COVER PAGE
+├── Title, Version, Date
+
+TABLE OF CONTENTS
+├── Linked sections with page numbers
+
+SECTION 1: GETTING STARTED
+├── Text: Introduction
+├── Screenshot: Login Screen
+│   └── Callouts: (1) Email field, (2) Password field, (3) Sign In button
+├── Text: Step-by-step instructions
+
+SECTION 2: NAVIGATING TO ORDER ENTRY
+├── Screenshot: Dashboard
+│   └── Arrow pointing to "My Visits" nav item
+├── Screenshot: My Visits Page
+│   └── Arrow pointing to retailer card "Take Order" action
+├── Text: Explanation
+
+SECTION 3: ORDER ENTRY SCREEN
+├── Screenshot: Order Entry Header
+│   └── Callouts: Retailer name, connection status, tabs
+├── Text: Mode selection explanation
+
+SECTION 4: TABLE VIEW ORDER ENTRY
+├── Screenshot: Table Order Form (Full)
+│   └── Numbered callouts:
+│       (1) Product dropdown
+│       (2) Variant dropdown
+│       (3) Quantity field
+│       (4) Unit selector
+│       (5) Rate display
+│       (6) Total calculation
+│       (7) Add row button
+│       (8) Add to Cart button
+├── Text: Field-by-field explanation
+
+SECTION 5: GRID VIEW ORDER ENTRY
+├── Screenshot: Grid View
+│   └── Callouts: Category tabs, product cards, +/- buttons
+├── Text: Quick add workflow
+
+... (Sections 6-17 follow same pattern)
+```
+
+### Implementation Steps
+
+1. **Phase 1: Create Screenshot Capture Tool**
+   - Build a hidden admin component that renders each screen state
+   - Add SVG overlay for annotations (arrows, circles, labels)
+   - Export each annotated view as PNG using html2canvas
+
+2. **Phase 2: Generate Annotated Screenshots**
+   - Navigate through the app manually
+   - Capture each screen with annotations
+   - Save to `public/manual-screenshots/` folder
+
+3. **Phase 3: Update PDF Generator**
+   - Modify `orderGuideManualGenerator.ts`
+   - Add image embedding function using jsPDF
+   - Restructure sections to include images before/after text
+   - Adjust page breaks to accommodate images
+
+4. **Phase 4: Optimize and Test**
+   - Compress images for smaller PDF size
+   - Test PDF generation on mobile devices
+   - Verify all screenshots render correctly
+
+### Alternative Approach: Dynamic SVG Annotations
+
+Instead of pre-captured images, we could generate annotation overlays dynamically:
+
+```typescript
+// Draw annotation directly in PDF
+const drawAnnotatedArea = (doc, x, y, width, height, number, label) => {
+  // Draw highlight rectangle
+  doc.setDrawColor(245, 158, 11);
+  doc.setLineWidth(1);
+  doc.rect(x, y, width, height);
+  
+  // Draw number circle
+  doc.setFillColor(245, 158, 11);
+  doc.circle(x + width + 5, y, 4, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text(String(number), x + width + 5, y + 1.5, { align: 'center' });
+  
+  // Draw label
+  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(8);
+  doc.text(label, x + width + 12, y + 1);
+};
+```
+
+### Dependencies
+
+- **jsPDF** (already installed) - PDF generation
+- **html2canvas** (already installed) - Screenshot capture
+- No additional dependencies required
+
+### Estimated Effort
+
+| Task | Effort |
+|------|--------|
+| Screenshot capture tool | 2-3 hours |
+| Annotate 16 screenshots | 2-3 hours |
+| Update PDF generator | 2-3 hours |
+| Testing and optimization | 1-2 hours |
+| **Total** | **7-11 hours** |
+
+### Sample Output Structure
+
+The final PDF will be approximately 25-30 pages with:
+- Cover page
+- Table of contents
+- 17 sections with screenshots
+- Each section: Screenshot + Text explanation
+- Quick reference card at the end
 
