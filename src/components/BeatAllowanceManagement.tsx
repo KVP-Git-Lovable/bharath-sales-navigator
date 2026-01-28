@@ -580,95 +580,110 @@ const BeatAllowanceManagement = () => {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Date Filter - At Top */}
+    <div className="space-y-3">
+      {/* Compact Filter Bar - Mobile Optimized */}
       <Card>
-        <CardContent className="py-3 px-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 w-full sm:w-auto">
-              {/* Multi-User Selector for managers (like My Beats) */}
-              <CompactMultiUserSelector
-                selectedUserIds={selectedUserIds}
-                onSelectionChange={setSelectedUserIds}
-              />
-              <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
-                <SelectTrigger className="w-full xs:w-[160px] sm:w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="yesterday">Yesterday</SelectItem>
-                  <SelectItem value="current_week">Current Week</SelectItem>
-                  <SelectItem value="last_week">Last Week</SelectItem>
-                  <SelectItem value="current_month">Current Month</SelectItem>
-                  <SelectItem value="last_month">Last Month</SelectItem>
-                  <SelectItem value="current_quarter">Current Quarter</SelectItem>
-                  <SelectItem value="previous_quarter">Previous Quarter</SelectItem>
-                  <SelectItem value="custom">Custom Date</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {filterType === 'custom' && (
-                <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full xs:w-[120px] sm:w-[140px] justify-start text-left font-normal text-xs sm:text-sm",
-                          !dateRangeStart && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                        {dateRangeStart ? format(dateRangeStart, "MMM dd") : <span>Start</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateRangeStart}
-                        onSelect={setDateRangeStart}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full xs:w-[120px] sm:w-[140px] justify-start text-left font-normal text-xs sm:text-sm",
-                          !dateRangeEnd && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                        {dateRangeEnd ? format(dateRangeEnd, "MMM dd") : <span>End</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateRangeEnd}
-                        onSelect={setDateRangeEnd}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
-            </div>
+        <CardContent className="py-2.5 px-3">
+          {/* Row 1: User selector + Date filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Compact User Selector */}
+            <CompactMultiUserSelector
+              selectedUserIds={selectedUserIds}
+              onSelectionChange={setSelectedUserIds}
+            />
             
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setIsProductivityReportOpen(true)} variant="outline" size="sm" className="flex items-center gap-1">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Productive</span> Report
+            {/* Date Range Filter */}
+            <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
+              <SelectTrigger className="h-8 w-[130px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-background">
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="current_week">This Week</SelectItem>
+                <SelectItem value="last_week">Last Week</SelectItem>
+                <SelectItem value="current_month">This Month</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="current_quarter">This Quarter</SelectItem>
+                <SelectItem value="previous_quarter">Last Quarter</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Custom Date Pickers - Inline */}
+            {filterType === 'custom' && (
+              <>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-8 w-[90px] justify-start text-left font-normal text-xs px-2",
+                        !dateRangeStart && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-1 h-3 w-3" />
+                      {dateRangeStart ? format(dateRangeStart, "MMM dd") : "Start"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-background" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRangeStart}
+                      onSelect={setDateRangeStart}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-8 w-[90px] justify-start text-left font-normal text-xs px-2",
+                        !dateRangeEnd && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-1 h-3 w-3" />
+                      {dateRangeEnd ? format(dateRangeEnd, "MMM dd") : "End"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-background" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRangeEnd}
+                      onSelect={setDateRangeEnd}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </>
+            )}
+
+            {/* Action Buttons - Right aligned */}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <Button 
+                onClick={() => setIsProductivityReportOpen(true)} 
+                variant="outline" 
+                size="sm" 
+                className="h-8 px-2 text-xs"
+              >
+                <BarChart3 className="h-3.5 w-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">Report</span>
               </Button>
-              <Button onClick={downloadXLS} variant="outline" size="sm" className="flex items-center gap-1">
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Download</span> XLS
+              <Button 
+                onClick={downloadXLS} 
+                variant="outline" 
+                size="sm" 
+                className="h-8 px-2 text-xs"
+              >
+                <Download className="h-3.5 w-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">XLS</span>
               </Button>
             </div>
           </div>
