@@ -12841,6 +12841,13 @@ export type Database = {
               unproductive_visits: number
             }[]
           }
+      get_profiles_for_selector: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       get_public_vendors: {
         Args: never
         Returns: {
