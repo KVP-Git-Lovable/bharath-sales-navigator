@@ -47,6 +47,7 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
   const [timeFilter, setTimeFilter] = useState<"today" | "yesterday" | "week" | "month" | "quarter" | "year" | "custom">(initialTimeFilter);
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [suggestedTimeFilter, setSuggestedTimeFilter] = useState<"yesterday" | null>(null);
 
   useEffect(() => {
     if (open && userId) {
@@ -59,6 +60,13 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
       fetchPointDetails();
     }
   }, [open, userId, timeFilter, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    // Clear the suggestion when user navigates away from Today
+    if (timeFilter !== "today") {
+      setSuggestedTimeFilter(null);
+    }
+  }, [timeFilter]);
 
   const getDateRange = () => {
     const now = new Date();
@@ -132,6 +140,34 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
       toast.error("Failed to load point details");
       setLoading(false);
       return;
+    }
+
+    // If "Today" has no points, check whether "Yesterday" has points and suggest switching.
+    // This avoids confusion when users earned points late/earlier and are viewing a different day.
+    if ((data?.length || 0) === 0 && timeFilter === "today") {
+      try {
+        const now = new Date();
+        const yStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+        const yEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+
+        const { count: yCount, error: yErr } = await supabase
+          .from("gamification_points")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .gte("earned_at", yStart.toISOString())
+          .lte("earned_at", yEnd.toISOString());
+
+        if (!yErr && (yCount || 0) > 0) {
+          setSuggestedTimeFilter("yesterday");
+        } else {
+          setSuggestedTimeFilter(null);
+        }
+      } catch {
+        // Silent fail: suggestion is just a UX improvement
+        setSuggestedTimeFilter(null);
+      }
+    } else {
+      setSuggestedTimeFilter(null);
     }
 
     // Collect all retailer IDs from multiple sources
@@ -290,6 +326,22 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
                   Export
                 </Button>
               </div>
+
+              {suggestedTimeFilter === "yesterday" && filteredPoints.length === 0 && (
+                <div className="flex items-center justify-between gap-2 rounded-md border bg-background/60 px-2 py-1.5">
+                  <div className="text-[11px] text-muted-foreground leading-tight">
+                    No points found for Today. You have points in Yesterday.
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => setTimeFilter("yesterday")}
+                  >
+                    Show Yesterday
+                  </Button>
+                </div>
+              )}
 
               {timeFilter === "custom" && (
                 <div className="grid grid-cols-2 gap-2">
