@@ -211,8 +211,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch confirmed orders with order_items in the date range
-      const { data: ordersData, error: ordersError } = await supabase
+      // Build query with optional user filtering at database level
+      let query = supabase
         .from('orders')
         .select(`
           id,
@@ -224,6 +224,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         .eq('status', 'confirmed')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
+      
+      // Filter by user IDs if specific users are selected
+      if (selectedUserIds.length > 0) {
+        query = query.in('user_id', selectedUserIds);
+      }
+
+      const { data: ordersData, error: ordersError } = await query;
 
       if (ordersError) {
         console.error('Error fetching orders:', ordersError);
@@ -269,11 +276,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       const userTotals: Record<string, number> = {};
       ordersData.forEach((order) => {
         const userName = userNameMap[order.user_id] || 'Unknown';
-        
-        // Filter by selected users if any are selected
-        if (selectedUsers.length > 0 && !selectedUsers.includes(userName)) {
-          return;
-        }
         
         // Sum all order_items.total for this order
         const orderRevenue = (order.order_items || []).reduce(
