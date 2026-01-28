@@ -39,7 +39,7 @@ export interface EnabledBasis {
 }
 
 interface HierarchyUserTargetNodeProps {
-  node: HierarchyNodeData;
+  node: HierarchyNodeData | SimpleNodeData;
   enabledParameters: EnabledParameters;
   enabledBasis: EnabledBasis;
   quantityUnit: string;
@@ -47,6 +47,20 @@ interface HierarchyUserTargetNodeProps {
   selectedTargetType: 'quantity' | 'revenue' | 'visits';
   onTargetChange: (userId: string, field: string, value: number) => void;
   depth?: number;
+  isExpanded?: boolean;
+  hideHeader?: boolean;
+}
+
+// Simplified node data for AllocationTable
+interface SimpleNodeData {
+  userId: string;
+  fullName: string;
+  profilePictureUrl: string | null;
+  level: number;
+  quantityTarget: number;
+  revenueTarget: number;
+  visitsTarget: number;
+  children: any[];
 }
 
 export function HierarchyUserTargetNode({
@@ -58,8 +72,13 @@ export function HierarchyUserTargetNode({
   selectedTargetType,
   onTargetChange,
   depth = 0,
+  isExpanded: forceExpanded,
+  hideHeader = false,
 }: HierarchyUserTargetNodeProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpandedState, setIsExpandedState] = useState(false);
+  const isExpanded = forceExpanded !== undefined ? forceExpanded : isExpandedState;
+  const setIsExpanded = forceExpanded !== undefined ? () => {} : setIsExpandedState;
+  
   const [activeTab, setActiveTab] = useState<string>(() => {
     // Set initial tab based on enabled parameters
     if (enabledParameters.beat) return 'beat';
@@ -103,6 +122,93 @@ export function HierarchyUserTargetNode({
 
   const enabledTabs = getEnabledTabs();
   const hasEnabledTabs = enabledTabs.length > 0;
+
+  // If hideHeader is true, render only the tabs content
+  if (hideHeader) {
+    return (
+      <div>
+        {hasEnabledTabs && (
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              {enabledTabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+                  {tab.icon}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {enabledParameters.beat && (
+              <TabsContent value="beat" className="m-0">
+                <UserBeatTargets
+                  userId={node.userId}
+                  fyYear={fyYear}
+                  totalQuantity={node.quantityTarget}
+                  totalRevenue={node.revenueTarget}
+                  quantityUnit={quantityUnit}
+                  selectedTargetType={selectedTargetType}
+                  enabledBasis={enabledBasis}
+                />
+              </TabsContent>
+            )}
+
+            {enabledParameters.monthly && (
+              <TabsContent value="monthly" className="m-0">
+                <UserMonthlyTargets
+                  userId={node.userId}
+                  fyYear={fyYear}
+                  totalQuantity={node.quantityTarget}
+                  totalRevenue={node.revenueTarget}
+                  totalVisits={node.visitsTarget}
+                  quantityUnit={quantityUnit}
+                  selectedTargetType={selectedTargetType}
+                  enabledBasis={enabledBasis}
+                />
+              </TabsContent>
+            )}
+
+            {enabledParameters.retailer && (
+              <TabsContent value="retailer" className="m-0">
+                <UserRetailerTargets
+                  userId={node.userId}
+                  fyYear={fyYear}
+                  totalQuantity={node.quantityTarget}
+                  totalRevenue={node.revenueTarget}
+                  quantityUnit={quantityUnit}
+                  selectedTargetType={selectedTargetType}
+                  enabledBasis={enabledBasis}
+                />
+              </TabsContent>
+            )}
+
+            {enabledParameters.product && (
+              <TabsContent value="product" className="m-0">
+                <div className="text-sm text-muted-foreground text-center py-8">
+                  Product breakdown coming soon
+                </div>
+              </TabsContent>
+            )}
+
+            {enabledParameters.distributor && (
+              <TabsContent value="distributor" className="m-0">
+                <div className="text-sm text-muted-foreground text-center py-8">
+                  Distributor breakdown coming soon
+                </div>
+              </TabsContent>
+            )}
+
+            {enabledParameters.territory && (
+              <TabsContent value="territory" className="m-0">
+                <div className="text-sm text-muted-foreground text-center py-8">
+                  Territory breakdown coming soon
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("border-l-2 border-muted", depth > 0 && "ml-6")}>
