@@ -1926,7 +1926,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       />
 
       {/* Productivity Summary Section */}
-      <ProductivitySummarySection selectedUsers={selectedUsers} dateRange={dateRange} />
+      <ProductivitySummarySection 
+        selectedUsers={selectedUsers} 
+        dateRange={dateRange}
+        allUsers={users}
+      />
 
       {/* AI Insights Section - Moved to bottom */}
       {aiInsights.length > 0 && (

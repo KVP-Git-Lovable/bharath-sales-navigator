@@ -27,20 +27,26 @@ interface UserProductivitySummary {
 interface ProductivitySummarySectionProps {
   selectedUsers: string[];
   dateRange: { from: Date; to: Date };
+  allUsers?: { id: string; full_name: string | null }[];
 }
 
-export const ProductivitySummarySection = ({ selectedUsers, dateRange }: ProductivitySummarySectionProps) => {
+export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers = [] }: ProductivitySummarySectionProps) => {
   const [loading, setLoading] = useState(false);
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
   const [selectedUserForDrilldown, setSelectedUserForDrilldown] = useState<string | null>(null);
 
   // Determine if we're in single-user or multi-user mode
-  const isSingleUserMode = selectedUsers.length === 1;
-  const hasNoUserSelected = selectedUsers.length === 0;
+  // When selectedUsers is empty, it means "All Users" - so we fetch all
+  const effectiveUsers = selectedUsers.length === 0 
+    ? [...new Set(allUsers.map(u => u.full_name).filter((name): name is string => !!name))]
+    : selectedUsers;
+  
+  const isSingleUserMode = effectiveUsers.length === 1;
+  const hasNoData = effectiveUsers.length === 0 && allUsers.length === 0;
 
   // Fetch productivity data for all selected users
   const fetchProductivityData = async () => {
-    if (hasNoUserSelected) {
+    if (hasNoData) {
       setProductivityData([]);
       return;
     }
@@ -50,8 +56,8 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange }: Product
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch data for all selected users in parallel
-      const promises = selectedUsers.map(userName => 
+      // Fetch data for all effective users in parallel
+      const promises = effectiveUsers.map(userName => 
         supabase.rpc('get_productivity_summary', {
           user_full_name: userName,
           start_date: fromDate,
@@ -81,7 +87,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange }: Product
   // Fetch data when props change
   useEffect(() => {
     fetchProductivityData();
-  }, [selectedUsers, dateRange.from, dateRange.to]);
+  }, [effectiveUsers.join(','), dateRange.from, dateRange.to]);
 
   // Group data by user for multi-user mode
   const userSummaries = useMemo((): UserProductivitySummary[] => {
@@ -185,18 +191,18 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange }: Product
               <CardTitle>Productivity Summary</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Visit productivity {isSingleUserMode ? 'by date' : 'by user'} • {
-                  hasNoUserSelected ? 'Select user(s)' : 
-                  isSingleUserMode ? selectedUsers[0] : 
-                  `${selectedUsers.length} users`
+                  hasNoData ? 'Loading users...' : 
+                  isSingleUserMode ? effectiveUsers[0] : 
+                  `${effectiveUsers.length} users`
                 } • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
               </p>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {hasNoUserSelected ? (
+          {hasNoData ? (
             <div className="text-center py-8 text-muted-foreground">
-              Please select user(s) to view productivity data
+              No user data available
             </div>
           ) : loading ? (
             <div className="text-center py-8">

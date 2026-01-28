@@ -51,6 +51,7 @@ const Analytics = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [userSelectOpen, setUserSelectOpen] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
   const [dashboardDateRange, setDashboardDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: new Date()
@@ -1149,7 +1150,16 @@ const Analytics = () => {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[280px] p-0" align="start">
-                    <div className="p-2 border-b">
+                    <div className="p-2 border-b space-y-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search users..."
+                          value={userSearchQuery}
+                          onChange={(e) => setUserSearchQuery(e.target.value)}
+                          className="w-full h-9 px-3 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -1157,6 +1167,7 @@ const Analytics = () => {
                         onClick={() => {
                           setSelectedUserIds([]);
                           setUserSelectOpen(false);
+                          setUserSearchQuery('');
                         }}
                       >
                         <X size={14} className="mr-2" />
@@ -1165,7 +1176,12 @@ const Analytics = () => {
                     </div>
                     <ScrollArea className="h-[250px]">
                       <div className="p-2 space-y-1">
-                        {users.map((user) => (
+                        {users
+                          .filter(user => 
+                            !userSearchQuery || 
+                            (user.full_name?.toLowerCase() || '').includes(userSearchQuery.toLowerCase())
+                          )
+                          .map((user) => (
                           <div
                             key={user.id}
                             className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer"
