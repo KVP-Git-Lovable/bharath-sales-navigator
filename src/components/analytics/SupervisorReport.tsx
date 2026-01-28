@@ -228,24 +228,21 @@ export const SupervisorReport = () => {
   // Fetch users on mount
   useEffect(() => {
     const fetchUsers = async () => {
-      // Try admin function first (bypasses RLS)
-      const { data: adminData, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
+      // Use the selector RPC function that works for all authenticated users
+      const { data, error } = await supabase.rpc('get_profiles_for_selector');
       
-      if (!adminError && adminData) {
-        const filteredUsers = adminData
-          .filter((u: any) => u.full_name)
-          .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
-        setUsers(filteredUsers);
+      if (!error && data) {
+        setUsers(data);
       } else {
-        // Fallback to direct query
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .not('full_name', 'is', null)
-          .order('full_name');
+        console.error('Error fetching profiles:', error);
+        // Fallback to admin function if selector fails
+        const { data: adminData, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
         
-        if (!error && data) {
-          setUsers(data);
+        if (!adminError && adminData) {
+          const filteredUsers = adminData
+            .filter((u: any) => u.full_name)
+            .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
+          setUsers(filteredUsers);
         }
       }
     };
