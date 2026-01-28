@@ -220,11 +220,22 @@ export default function Leaderboard() {
     const startOfQuarter = new Date(now.getFullYear(), currentQuarter * 3, 1, 0, 0, 0, 0);
     const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
 
+    // Fetch earned points
     const { data } = await supabase
       .from("gamification_points")
       .select("points, earned_at")
       .eq("user_id", userProfile.id)
       .order("earned_at", { ascending: false });
+
+    // Fetch approved and pending redemptions to subtract from available points
+    const { data: redemptionsData } = await supabase
+      .from("gamification_redemptions")
+      .select("points_redeemed, status")
+      .eq("user_id", userProfile.id)
+      .in("status", ["approved", "pending"]); // Include both approved and pending redemptions
+
+    // Calculate total redeemed points (approved + pending)
+    const totalRedeemedPoints = redemptionsData?.reduce((sum, r) => sum + (r.points_redeemed || 0), 0) || 0;
 
     if (data) {
       const points: MyPoints = { today: 0, week: 0, month: 0, quarter: 0, year: 0, total: 0 };
@@ -239,6 +250,10 @@ export default function Leaderboard() {
         if (earnedDate >= startOfQuarter) points.quarter += pointsValue;
         if (earnedDate >= startOfYear) points.year += pointsValue;
       });
+      
+      // Subtract redeemed points from total to get available points
+      points.total = Math.max(0, points.total - totalRedeemedPoints);
+      
       setMyPoints(points);
     }
   };
