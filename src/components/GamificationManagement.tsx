@@ -276,30 +276,32 @@ export function GamificationManagement() {
     const activity = METRIC_TYPES.find((a) => a.value === selectedActivity);
     const activityConfigType = activity?.configType;
 
-    // Validate configuration based on activity type
-    if (activityConfigType === "max_activities" && !metricConfig.max_awardable_activities) {
-      toast.error("Please configure maximum awardable activities");
-      return;
-    }
-    if (activityConfigType === "daily_threshold" && !metricConfig.base_daily_target) {
-      toast.error("Please configure daily threshold");
-      return;
-    }
-    if (activityConfigType === "product_selection" && (!metricConfig.focused_products || metricConfig.focused_products.length === 0)) {
-      toast.error("Please select focused products");
-      return;
-    }
-    if (activityConfigType === "daily_limit" && !metricConfig.max_daily_awards) {
-      toast.error("Please configure maximum daily awards");
-      return;
-    }
-    if (activityConfigType === "consecutive_orders" && !metricConfig.consecutive_orders_required) {
-      toast.error("Please configure consecutive orders required");
-      return;
-    }
-    if (activityConfigType === "growth_percentage" && !metricConfig.min_growth_percentage) {
-      toast.error("Please configure minimum growth percentage");
-      return;
+    // Only validate configuration when activity is being created as active
+    if (isActive) {
+      if (activityConfigType === "max_activities" && !metricConfig.max_awardable_activities) {
+        toast.error("Please configure maximum awardable activities");
+        return;
+      }
+      if (activityConfigType === "daily_threshold" && !metricConfig.base_daily_target) {
+        toast.error("Please configure daily threshold");
+        return;
+      }
+      if (activityConfigType === "product_selection" && (!metricConfig.focused_products || metricConfig.focused_products.length === 0)) {
+        toast.error("Please select focused products");
+        return;
+      }
+      if (activityConfigType === "daily_limit" && !metricConfig.max_daily_awards) {
+        toast.error("Please configure maximum daily awards");
+        return;
+      }
+      if (activityConfigType === "consecutive_orders" && !metricConfig.consecutive_orders_required) {
+        toast.error("Please configure consecutive orders required");
+        return;
+      }
+      if (activityConfigType === "growth_percentage" && !metricConfig.min_growth_percentage) {
+        toast.error("Please configure minimum growth percentage");
+        return;
+      }
     }
 
     if (selectedTerritories.length === 0 && !isAllTerritories) {
@@ -367,30 +369,32 @@ export function GamificationManagement() {
     const activity = METRIC_TYPES.find((a) => a.value === selectedActivity);
     const activityConfigType = activity?.configType;
 
-    // Validate configuration based on activity type
-    if (activityConfigType === "max_activities" && !metricConfig.max_awardable_activities) {
-      toast.error("Please configure maximum awardable activities");
-      return;
-    }
-    if (activityConfigType === "daily_threshold" && !metricConfig.base_daily_target) {
-      toast.error("Please configure daily threshold");
-      return;
-    }
-    if (activityConfigType === "product_selection" && (!metricConfig.focused_products || metricConfig.focused_products.length === 0)) {
-      toast.error("Please select focused products");
-      return;
-    }
-    if (activityConfigType === "daily_limit" && !metricConfig.max_daily_awards) {
-      toast.error("Please configure maximum daily awards");
-      return;
-    }
-    if (activityConfigType === "consecutive_orders" && !metricConfig.consecutive_orders_required) {
-      toast.error("Please configure consecutive orders required");
-      return;
-    }
-    if (activityConfigType === "growth_percentage" && !metricConfig.min_growth_percentage) {
-      toast.error("Please configure minimum growth percentage");
-      return;
+    // Only validate configuration when activity is being set to active
+    if (isActive) {
+      if (activityConfigType === "max_activities" && !metricConfig.max_awardable_activities) {
+        toast.error("Please configure maximum awardable activities");
+        return;
+      }
+      if (activityConfigType === "daily_threshold" && !metricConfig.base_daily_target) {
+        toast.error("Please configure daily threshold");
+        return;
+      }
+      if (activityConfigType === "product_selection" && (!metricConfig.focused_products || metricConfig.focused_products.length === 0)) {
+        toast.error("Please select focused products");
+        return;
+      }
+      if (activityConfigType === "daily_limit" && !metricConfig.max_daily_awards) {
+        toast.error("Please configure maximum daily awards");
+        return;
+      }
+      if (activityConfigType === "consecutive_orders" && !metricConfig.consecutive_orders_required) {
+        toast.error("Please configure consecutive orders required");
+        return;
+      }
+      if (activityConfigType === "growth_percentage" && !metricConfig.min_growth_percentage) {
+        toast.error("Please configure minimum growth percentage");
+        return;
+      }
     }
 
     if (selectedTerritories.length === 0 && !isAllTerritories) {
