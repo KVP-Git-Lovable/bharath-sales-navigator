@@ -3,6 +3,7 @@ import { visitStatusCache } from '@/lib/visitStatusCache';
 import { updateVisitStatusInSnapshot } from '@/lib/myVisitsSnapshot';
 import { supabase } from '@/integrations/supabase/client';
 import { markVisitDataChanged } from '@/lib/visitChangeMarker';
+import { awardPointsForTotalVisits } from '@/utils/gamificationPointsAwarder';
 
 const SYNC_TIMEOUT_MS = 5000; // 5 second timeout for all sync operations
 
@@ -96,6 +97,13 @@ export async function submitNoOrderLocalFirst(params: {
       );
 
       await Promise.race([syncPromise, timeoutPromise]);
+      
+      // STEP 4: Check for total visits points after successful sync
+      try {
+        await awardPointsForTotalVisits(userId, today);
+      } catch (err) {
+        console.error('[noOrderUtils] Error checking total visits points:', err);
+      }
     } catch {
       // Auto-queue to offline sync on any error or timeout
       offlineStorage.addToSyncQueue('UPDATE_VISIT_NO_ORDER', {

@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, addDays } from "date-fns";
 import { usePaymentProofMandatory } from '@/hooks/usePaymentProofMandatory';
-import { awardPointsForOrder, updateRetailerSequence } from "@/utils/gamificationPointsAwarder";
+import { awardPointsForOrder, updateRetailerSequence, awardPointsForTotalVisits } from "@/utils/gamificationPointsAwarder";
 import { awardLoyaltyPointsForOrder } from "@/utils/retailerLoyaltyPointsAwarder";
 import { CreditScoreDisplay } from "@/components/CreditScoreDisplay";
 import { submitOrderWithOfflineSupport } from "@/utils/offlineOrderUtils";
@@ -1146,6 +1146,10 @@ export const Cart = () => {
               fseUserId: currentUserId,
               orderDate: new Date()
             });
+
+            // Award points for total visits threshold
+            const orderDate = new Date().toISOString().split('T')[0];
+            await awardPointsForTotalVisits(currentUserId, orderDate);
 
             // Create invoice record (for future editing/management)
             const invoiceDate = new Date().toISOString().split('T')[0];

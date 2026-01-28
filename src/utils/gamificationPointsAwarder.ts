@@ -674,3 +674,128 @@ export async function awardPointsForBrandingRequest(userId: string, retailerId: 
     }
   }
 }
+
+/**
+ * Award points for reaching total visits threshold in a day
+ * Counts both productive AND unproductive visits
+ * Awards once per day when threshold (default 50) is reached
+ */
+export async function awardPointsForTotalVisits(userId: string, visitDate: string) {
+  const today = new Date(visitDate);
+  const todayStart = startOfDay(today);
+  const todayEnd = endOfDay(today);
+  const todayDateOnly = visitDate;
+
+  // Count completed visits for the day (both productive and unproductive)
+  const { count: completedVisits } = await supabase
+    .from("visits")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("planned_date", todayDateOnly)
+    .in("status", ["productive", "unproductive"]);
+
+  if (!completedVisits) {
+    console.log('[awardPointsForTotalVisits] No completed visits found');
+    return;
+  }
+
+  console.log(`[awardPointsForTotalVisits] User has ${completedVisits} completed visits on ${todayDateOnly}`);
+
+  // Fetch user's territories
+  const { data: userProfile } = await supabase
+    .from("profiles")
+    .select("territories_covered, work_location")
+    .eq("id", userId)
+    .single();
+
+  const userTerritories = userProfile?.territories_covered || [];
+  const userLocation = userProfile?.work_location;
+
+  // Fetch active games - use date-only comparison for proper date filtering
+  const { data: activeGames } = await supabase
+    .from("gamification_games")
+    .select("*")
+    .eq("is_active", true)
+    .lte("start_date", todayDateOnly)
+    .gte("end_date", todayDateOnly);
+
+  if (!activeGames || activeGames.length === 0) {
+    console.log('[awardPointsForTotalVisits] No active games found for this date');
+    return;
+  }
+
+  // Filter games applicable to user's territory
+  const applicableGames = activeGames.filter((game: any) => 
+    game.is_all_territories || 
+    (game.territories && game.territories.some((t: string) => 
+      userTerritories.includes(t) || t === userLocation
+    ))
+  );
+
+  if (applicableGames.length === 0) {
+    console.log('[awardPointsForTotalVisits] No applicable games for user territory');
+    return;
+  }
+
+  // Fetch total_visits actions
+  const gameIds = applicableGames.map(g => g.id);
+  const { data: actions } = await supabase
+    .from("gamification_actions")
+    .select("*")
+    .in("game_id", gameIds)
+    .eq("is_enabled", true)
+    .eq("action_type", "total_visits");
+
+  if (!actions || actions.length === 0) {
+    console.log('[awardPointsForTotalVisits] No total_visits actions configured');
+    return;
+  }
+
+  for (const action of actions) {
+    const game = applicableGames.find(g => g.id === action.game_id);
+    if (!game) continue;
+
+    // Get threshold from metadata (default: 50)
+    const metadata = action.metadata as { daily_visit_target?: number } | null;
+    const threshold = metadata?.daily_visit_target || 50;
+
+    console.log(`[awardPointsForTotalVisits] Checking threshold: ${completedVisits} >= ${threshold}`);
+
+    // Check if threshold met
+    if (completedVisits >= threshold) {
+      // Check if already awarded today for this action
+      const { count: alreadyAwarded } = await supabase
+        .from("gamification_points")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("action_id", action.id)
+        .eq("game_id", game.id)
+        .gte("earned_at", todayStart.toISOString())
+        .lte("earned_at", todayEnd.toISOString());
+
+      if (alreadyAwarded === 0) {
+        const { error } = await supabase.from("gamification_points").insert({
+          user_id: userId,
+          game_id: game.id,
+          action_id: action.id,
+          points: action.points,
+          reference_type: "total_visits",
+          reference_id: todayDateOnly,
+          metadata: { 
+            completed_visits: completedVisits,
+            threshold: threshold,
+            visit_date: todayDateOnly
+          },
+        });
+
+        if (!error) {
+          console.log(`✅ Awarded ${action.points} points for total visits (${completedVisits}/${threshold})`);
+        } else {
+          console.error('[awardPointsForTotalVisits] Error awarding points:', error);
+        }
+      } else {
+        console.log('[awardPointsForTotalVisits] Points already awarded today for this action');
+      }
+    }
+  }
+}
