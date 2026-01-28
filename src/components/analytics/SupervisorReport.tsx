@@ -2,23 +2,17 @@ import { useState, useEffect, useMemo } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, Calendar as CalendarIcon, X, Store, MapPin, Package, Scale, ChevronDown, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, Users, CheckCircle2, Search, UserCheck } from 'lucide-react';
+import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, startOfWeek } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RevenueBySKUSection } from './RevenueBySKUSection';
 import { ProductivitySummarySection } from './ProductivitySummarySection';
 import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
 interface UserOrderSummary {
@@ -41,61 +35,32 @@ interface UserProfile {
   full_name: string | null;
 }
 
+interface SupervisorReportProps {
+  users: UserProfile[];
+  selectedUserIds: string[];
+  dateRange: { from: Date; to: Date };
+}
+
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16'];
 
-export const SupervisorReport = () => {
+export const SupervisorReport = ({ users, selectedUserIds, dateRange }: SupervisorReportProps) => {
   const isMobile = useIsMobile();
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [userSelectOpen, setUserSelectOpen] = useState(false);
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfMonth(new Date()),
-    to: new Date()
-  });
   const [loading, setLoading] = useState(false);
 
+  // Derive selected user names from IDs for filtering
+  const selectedUsers = useMemo(() => {
+    if (selectedUserIds.length === 0) return [];
+    return selectedUserIds
+      .map(id => users.find(u => u.id === id)?.full_name)
+      .filter((name): name is string => !!name);
+  }, [selectedUserIds, users]);
+
   // Derived value for backward compatibility with single-user components
-  // If multiple users selected, use 'all', if single user, use that user's name
   const selectedUser = useMemo(() => {
     if (selectedUsers.length === 0) return 'all';
     if (selectedUsers.length === 1) return selectedUsers[0];
     return 'all'; // Multiple users = show all of them
   }, [selectedUsers]);
-
-  // Filtered users for search
-  const filteredUsers = useMemo(() => {
-    if (!userSearchQuery.trim()) return users;
-    const query = userSearchQuery.toLowerCase();
-    return users.filter(u => 
-      u.full_name?.toLowerCase().includes(query)
-    );
-  }, [users, userSearchQuery]);
-
-  // User selection helpers
-  const handleToggleUser = (userName: string) => {
-    if (selectedUsers.includes(userName)) {
-      setSelectedUsers(selectedUsers.filter(u => u !== userName));
-    } else {
-      setSelectedUsers([...selectedUsers, userName]);
-    }
-  };
-
-  const handleSelectAllUsers = () => {
-    const allNames = users.filter(u => u.full_name).map(u => u.full_name!);
-    setSelectedUsers(allNames);
-  };
-
-  const handleDeselectAllUsers = () => {
-    setSelectedUsers([]);
-  };
-
-  const getUserSelectionText = () => {
-    if (selectedUsers.length === 0) return 'All Users';
-    if (selectedUsers.length === 1) return selectedUsers[0];
-    if (selectedUsers.length === users.filter(u => u.full_name).length) return 'All Users';
-    return `${selectedUsers.length} users`;
-  };
   const [summaryData, setSummaryData] = useState<UserOrderSummary[]>([]);
   const [selectedUserDetails, setSelectedUserDetails] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<UserOrderDetails[]>([]);
@@ -227,29 +192,12 @@ export const SupervisorReport = () => {
     return insights.slice(0, 4); // Limit to 4 insights
   }, [summaryData]);
 
-  // Fetch users on mount
+  // Auto-fetch data when props change
   useEffect(() => {
-    const fetchUsers = async () => {
-      // Use the selector RPC function that works for all authenticated users
-      const { data, error } = await supabase.rpc('get_profiles_for_selector');
-      
-      if (!error && data) {
-        setUsers(data);
-      } else {
-        console.error('Error fetching profiles:', error);
-        // Fallback to admin function if selector fails
-        const { data: adminData, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
-        
-        if (!adminError && adminData) {
-          const filteredUsers = adminData
-            .filter((u: any) => u.full_name)
-            .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
-          setUsers(filteredUsers);
-        }
-      }
-    };
-    fetchUsers();
-  }, []);
+    if (users.length > 0) {
+      fetchSummaryData();
+    }
+  }, [selectedUserIds, dateRange, users]);
 
   // Fetch summary data - uses order_items.total for accurate revenue calculation
   const fetchSummaryData = async () => {
@@ -1263,214 +1211,6 @@ export const SupervisorReport = () => {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-sm font-medium mb-2 block">Select Users</label>
-              <Popover open={userSelectOpen} onOpenChange={setUserSelectOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={userSelectOpen}
-                    className="w-full justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{getUserSelectionText()}</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <div className="p-3 border-b space-y-3">
-                    {/* Search */}
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search users..."
-                        value={userSearchQuery}
-                        onChange={(e) => setUserSearchQuery(e.target.value)}
-                        className="pl-9 h-9"
-                      />
-                    </div>
-                    
-                    {/* Quick actions */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleSelectAllUsers();
-                          setUserSelectOpen(false);
-                        }}
-                        className="flex-1 h-7 text-xs"
-                      >
-                        All Users
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          handleDeselectAllUsers();
-                        }}
-                        disabled={selectedUsers.length === 0}
-                        className="h-7 text-xs px-2"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* User List */}
-                  <ScrollArea className="h-[200px]">
-                    <div className="p-2 space-y-1">
-                      {filteredUsers.length === 0 ? (
-                        <div className="text-center py-6 text-muted-foreground text-sm">
-                          {userSearchQuery ? 'No matching users' : 'No users found'}
-                        </div>
-                      ) : (
-                        filteredUsers.filter(u => u.full_name).map((user) => (
-                          <div
-                            key={user.id}
-                            className={cn(
-                              'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors',
-                              selectedUsers.includes(user.full_name!)
-                                ? 'bg-primary/10 border border-primary/30'
-                                : 'hover:bg-muted/50'
-                            )}
-                            onClick={() => handleToggleUser(user.full_name!)}
-                          >
-                            <Checkbox
-                              checked={selectedUsers.includes(user.full_name!)}
-                              onCheckedChange={() => handleToggleUser(user.full_name!)}
-                            />
-                            <span className="text-sm font-medium truncate flex-1">{user.full_name}</span>
-                            {selectedUsers.includes(user.full_name!) && (
-                              <UserCheck className="h-4 w-4 text-primary shrink-0" />
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-
-                  {/* Selected Summary */}
-                  {selectedUsers.length > 0 && (
-                    <div className="p-2 border-t bg-muted/30">
-                      <div className="flex flex-wrap gap-1">
-                        {selectedUsers.slice(0, 3).map((userName) => (
-                          <Badge
-                            key={userName}
-                            variant="secondary"
-                            className="gap-1 pr-1 text-xs"
-                          >
-                            {userName.split(' ')[0]}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleUser(userName);
-                              }}
-                              className="ml-0.5 hover:bg-muted rounded p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                        {selectedUsers.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{selectedUsers.length - 3} more
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="flex flex-col gap-2">
-              {/* Quick date buttons */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDateRange({
-                    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-                    to: new Date()
-                  })}
-                  className="text-xs"
-                >
-                  This Week
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDateRange({
-                    from: startOfMonth(new Date()),
-                    to: new Date()
-                  })}
-                  className="text-xs"
-                >
-                  This Month
-                </Button>
-              </div>
-              <div className="flex gap-2 items-end">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">From Date</label>
-                  <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange.from ? format(dateRange.from, "MMM dd, yyyy") : "Start"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateRange.from}
-                      onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">To Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-[140px] justify-start text-left font-normal", !dateRange.to && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange.to ? format(dateRange.to, "MMM dd, yyyy") : "End"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateRange.to}
-                      onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDateRange({ from: startOfMonth(new Date()), to: new Date() })}
-                title="Reset to current month"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              </div>
-            </div>
-            <Button onClick={fetchSummaryData} disabled={loading}>
-              <RefreshCw size={16} className={cn("mr-2", loading && "animate-spin")} />
-              Run Query
-            </Button>
-          </div>
-
           {/* Results */}
           {loading ? (
             <div className="text-center py-8">
