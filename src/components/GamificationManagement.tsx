@@ -357,6 +357,9 @@ export function GamificationManagement() {
       consecutive_orders_required: metricConfig.consecutive_orders_required || null,
       min_growth_percentage: metricConfig.min_growth_percentage || null,
       target_type: metricConfig.target_type || null,
+      metadata: {
+        daily_visit_target: metricConfig.daily_visit_target || null,
+      },
     });
 
     if (actionsError) {
@@ -453,6 +456,9 @@ export function GamificationManagement() {
         consecutive_orders_required: metricConfig.consecutive_orders_required || null,
         min_growth_percentage: metricConfig.min_growth_percentage || null,
         target_type: metricConfig.target_type || null,
+        metadata: {
+          daily_visit_target: metricConfig.daily_visit_target || null,
+        },
       })
       .eq("id", editingAction.id);
 
@@ -526,6 +532,9 @@ export function GamificationManagement() {
     setSelectedActivity(action.action_type);
     setRewardPoints(action.points.toString());
     setIsActive(action.is_enabled);
+    // Extract daily_visit_target from metadata if present
+    const metadata = action.metadata as Record<string, any> | null;
+    
     setMetricConfig({
       max_awardable_activities: action.max_awardable_activities,
       base_daily_target: action.base_daily_target,
@@ -534,6 +543,7 @@ export function GamificationManagement() {
       consecutive_orders_required: action.consecutive_orders_required,
       min_growth_percentage: action.min_growth_percentage,
       target_type: action.target_type,
+      daily_visit_target: metadata?.daily_visit_target || null,
     });
     setShowEditDialog(true);
   };
@@ -594,6 +604,9 @@ export function GamificationManagement() {
     const activity = METRIC_TYPES.find((a) => a.value === action.action_type);
     if (!activity) return "-";
 
+    // Check metadata for visit_threshold config
+    const metadata = action.metadata as Record<string, any> | null;
+
     switch (activity.configType) {
       case "max_activities":
         return `Max ${action.max_awardable_activities || 0} activities`;
@@ -607,6 +620,8 @@ export function GamificationManagement() {
         return `${action.consecutive_orders_required || 0} consecutive`;
       case "growth_percentage":
         return `Min ${action.min_growth_percentage || 0}% growth`;
+      case "visit_threshold":
+        return `${metadata?.daily_visit_target || 50} visits/day`;
       case "unlimited":
         return "Unlimited";
       default:
