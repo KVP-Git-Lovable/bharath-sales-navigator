@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { RefreshCw, Activity, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface ProductivityData {
   full_name: string;
@@ -210,7 +211,11 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
               <p className="text-muted-foreground">Loading productivity data...</p>
             </div>
           ) : productivityData.length > 0 ? (
-            <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+            <div className={cn(
+              "border rounded-lg overflow-hidden",
+              productivityData.length > 6 && isSingleUserMode && "max-h-[320px] overflow-y-auto",
+              userSummaries.length > 6 && !isSingleUserMode && "max-h-[320px] overflow-y-auto"
+            )}>
               {isSingleUserMode ? (
                 // Single user: Day-wise breakdown (original view)
                 <Table>
