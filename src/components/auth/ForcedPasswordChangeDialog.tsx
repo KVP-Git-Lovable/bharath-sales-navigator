@@ -82,6 +82,7 @@ const ForcedPasswordChangeDialog = ({ open, userId, onPasswordChanged }: ForcedP
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
         className="sm:max-w-md" 
+        hideCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
