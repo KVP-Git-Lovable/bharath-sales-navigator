@@ -1,88 +1,153 @@
 
-# Plan: Fix Value Calculations to Use `total_amount` Instead of `subtotal`
+# Plan: Fix "End My Day" to Auto-Capture All Activities
 
 ## Problem Summary
 
-In the Supervisor Report's "Order Summary by User" section, three areas are calculating order values incorrectly:
+When clicking "End My Day" in the Attendance module, the system currently:
+- Records attendance check-out time and location
+- Cancels remaining "planned" visits
+- Stops GPS tracking
 
-| Location | Current Behavior | Expected Behavior |
-|----------|-----------------|-------------------|
-| User Order Summary (Total Order Value) | Uses `SUM(order_items.total)` = subtotal | Should use `orders.total_amount` |
-| Beat-wise Split (Value) | Uses `SUM(order_items.total)` = subtotal | Should use `orders.total_amount` |
-| Retailer Details (Value) | Uses `SUM(order_items.total)` = subtotal | Should use `orders.total_amount` |
+**However, it fails to:**
+1. Close "in-progress" visits with proper check-out times and mark them as 'unproductive'
+2. Close active `retailer_visit_logs` entries (which track detailed time spent per retailer)
 
-**Example from database:**
-- `subtotal` / `SUM(order_items.total)`: 17,943.00
-- `total_amount`: 18,840.00 (includes taxes/charges)
-
-## Root Cause
-
-The code fetches orders but doesn't include `total_amount` in the select, then makes a separate query to `order_items` to sum up the `total` field. This gives the subtotal instead of the final order amount.
-
-## Solution
-
-Modify three functions in `SupervisorReport.tsx` to select and use `orders.total_amount` directly instead of summing `order_items.total`.
+This leaves incomplete data in the system, affecting reports and analytics.
 
 ---
 
-## Technical Changes
+## Solution Overview
 
-### 1. Fix `fetchSummaryData()` (Lines 254-354)
+Enhance the "End My Day" check-out flow in `Attendance.tsx` to:
+1. Auto-checkout all in-progress visits using their `updated_at` timestamp as the last activity time
+2. Close all active retailer visit logs with proper time calculations
 
-**Current approach:**
-```typescript
-.select(`id, user_id, order_items (total)`)
-// Then sums order_items.total per order
+---
+
+## Technical Implementation
+
+### File: `src/pages/Attendance.tsx`
+
+**Location:** After line 756 (after cancelling planned visits), add the following logic:
+
+### Step 1: Auto-Checkout In-Progress Visits
+
+```text
+// Auto-checkout all in-progress visits using their last activity time
+const { data: inProgressVisits } = await supabase
+  .from('visits')
+  .select('id, updated_at')
+  .eq('user_id', user.id)
+  .eq('planned_date', today)
+  .eq('status', 'in-progress');
+
+if (inProgressVisits && inProgressVisits.length > 0) {
+  for (const visit of inProgressVisits) {
+    // Use visit's updated_at as last activity time, fallback to current time
+    const checkOutTime = visit.updated_at || timestamp;
+    
+    await supabase
+      .from('visits')
+      .update({
+        check_out_time: checkOutTime,
+        check_out_location: freshLocation,
+        check_out_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
+        status: 'unproductive',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', visit.id);
+  }
+  console.log(`Auto checked-out ${inProgressVisits.length} in-progress visits`);
+}
 ```
 
-**New approach:**
-```typescript
-.select(`id, user_id, total_amount`)
-// Use total_amount directly for each order
+### Step 2: Close Active Retailer Visit Logs
+
+```text
+// Close all active retailer visit logs
+const { data: activeLogs } = await supabase
+  .from('retailer_visit_logs')
+  .select('id, start_time, updated_at')
+  .eq('user_id', user.id)
+  .eq('visit_date', today)
+  .is('end_time', null);
+
+if (activeLogs && activeLogs.length > 0) {
+  for (const log of activeLogs) {
+    // Use updated_at as last activity time, fallback to current time
+    const endTime = log.updated_at || timestamp;
+    const startTimeMs = new Date(log.start_time).getTime();
+    const endTimeMs = new Date(endTime).getTime();
+    const timeSpentSeconds = Math.floor((endTimeMs - startTimeMs) / 1000);
+
+    await supabase
+      .from('retailer_visit_logs')
+      .update({
+        end_time: endTime,
+        time_spent_seconds: Math.max(0, timeSpentSeconds)
+      })
+      .eq('id', log.id);
+  }
+  console.log(`Closed ${activeLogs.length} active retailer visit logs`);
+}
 ```
 
-### 2. Fix `fetchBeatBreakdown()` (Lines 1038-1132)
+---
 
-**Current approach:**
-- Fetches orders without `total_amount`
-- Makes separate query to `order_items` for totals
-- Sums `order_items.total`
+## Why "unproductive" Status?
 
-**New approach:**
-- Add `total_amount` to the orders select
-- Use `order.total_amount` directly instead of summing order items
-- Remove the separate `order_items` query
+When a visit is auto-closed by "End My Day":
+- The salesperson did not complete the visit workflow normally
+- No order was placed (otherwise it would already be 'productive')
+- Therefore, marking as 'unproductive' is the correct business logic
 
-### 3. Fix `fetchRetailerDetailsForBeat()` (Lines 1148-1254)
+---
 
-**Current approach:**
-- Same pattern - fetches orders, then order_items separately
-- Sums `order_items.total`
+## Data Flow After Implementation
 
-**New approach:**
-- Add `total_amount` to the orders select
-- Use `order.total_amount` directly
-- Remove the separate `order_items` query
-
-### 4. Fix `fetchOrderDetailsBeatBreakdownForUser()` (Lines 693-792)
-
-**Current approach:**
-- Fetches orders without `total_amount`
-- Sums `order_items.total` per order
-
-**New approach:**
-- Add `total_amount` to the orders select
-- Use it directly for beat grouping
+```text
+User clicks "End My Day"
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│ 1. Record attendance check-out              │
+│    (time, location, photo, face match)      │
+└─────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│ 2. Cancel all 'planned' visits              │
+│    (existing behavior - unchanged)          │
+└─────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│ 3. NEW: Auto-checkout 'in-progress' visits  │
+│    - Set check_out_time = updated_at        │
+│    - Set status = 'unproductive'            │
+│    - Set check_out_location = GPS           │
+└─────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│ 4. NEW: Close active retailer_visit_logs    │
+│    - Set end_time = updated_at              │
+│    - Calculate time_spent_seconds           │
+└─────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│ 5. Stop GPS tracking                        │
+│    (existing behavior - unchanged)          │
+└─────────────────────────────────────────────┘
+```
 
 ---
 
 ## Summary of Changes
 
-| Function | Line Range | Change |
-|----------|-----------|--------|
-| `fetchSummaryData` | ~262-334 | Select `total_amount`, use directly |
-| `fetchOrderDetailsBeatBreakdownForUser` | ~720-773 | Select `total_amount`, remove order_items query |
-| `fetchBeatBreakdown` | ~1069-1114 | Select `total_amount`, remove order_items query |
-| `fetchRetailerDetailsForBeat` | ~1177-1235 | Select `total_amount`, remove order_items query |
+| File | Change Description |
+|------|-------------------|
+| `src/pages/Attendance.tsx` | Add auto-checkout logic for in-progress visits and retailer visit logs after line 756 |
 
-All four functions will be simplified by removing the extra `order_items` query and using the pre-calculated `total_amount` from the orders table, ensuring accurate totals that include taxes and additional charges.
+This ensures complete data capture when ending the day, maintaining data integrity for reports and analytics.
