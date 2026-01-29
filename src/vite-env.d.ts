@@ -75,6 +75,14 @@ declare namespace google.maps {
     map?: Map;
     title?: string;
     icon?: string | Symbol;
+    label?: string | MarkerLabel;
+  }
+  
+  interface MarkerLabel {
+    text: string;
+    color?: string;
+    fontSize?: string;
+    fontWeight?: string;
   }
   
   interface Symbol {
@@ -102,6 +110,30 @@ declare namespace google.maps {
   interface InfoWindowOptions {
     content?: string | HTMLElement;
   }
+  
+  class Geocoder {
+    constructor();
+    geocode(
+      request: GeocoderRequest,
+      callback: (results: GeocoderResult[] | null, status: GeocoderStatus) => void
+    ): void;
+  }
+  
+  interface GeocoderRequest {
+    address?: string;
+    location?: LatLngLiteral;
+    placeId?: string;
+  }
+  
+  interface GeocoderResult {
+    formatted_address: string;
+    geometry: {
+      location: LatLng;
+    };
+    place_id: string;
+  }
+  
+  type GeocoderStatus = 'OK' | 'ZERO_RESULTS' | 'OVER_QUERY_LIMIT' | 'REQUEST_DENIED' | 'INVALID_REQUEST' | 'UNKNOWN_ERROR';
 }
 
 interface Window {
