@@ -1296,6 +1296,17 @@ const Analytics = () => {
                     };
 
                     switch (value) {
+                      case 'today':
+                        from = new Date(today);
+                        from.setHours(0, 0, 0, 0);
+                        break;
+                      case 'yesterday':
+                        from = new Date(today);
+                        from.setDate(today.getDate() - 1);
+                        from.setHours(0, 0, 0, 0);
+                        to = new Date(from);
+                        to.setHours(23, 59, 59, 999);
+                        break;
                       case 'this_week':
                         from = getWeekStart(today);
                         break;
@@ -1333,6 +1344,21 @@ const Analytics = () => {
                         to.setDate(to.getDate() - 1); // March 31st
                         from = new Date(to.getFullYear() - 1, 3, 1); // Previous April 1st
                         break;
+                      case 'last_60_days':
+                        from = new Date(today);
+                        from.setDate(today.getDate() - 60);
+                        from.setHours(0, 0, 0, 0);
+                        break;
+                      case 'last_90_days':
+                        from = new Date(today);
+                        from.setDate(today.getDate() - 90);
+                        from.setHours(0, 0, 0, 0);
+                        break;
+                      case 'last_180_days':
+                        from = new Date(today);
+                        from.setDate(today.getDate() - 180);
+                        from.setHours(0, 0, 0, 0);
+                        break;
                       default:
                         return;
                     }
@@ -1342,6 +1368,8 @@ const Analytics = () => {
                 >
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Select period">
+                      {dashboardPeriod === 'today' && 'Today'}
+                      {dashboardPeriod === 'yesterday' && 'Yesterday'}
                       {dashboardPeriod === 'this_week' && 'This Week'}
                       {dashboardPeriod === 'this_month' && 'This Month'}
                       {dashboardPeriod === 'this_quarter' && 'This Quarter'}
@@ -1350,9 +1378,14 @@ const Analytics = () => {
                       {dashboardPeriod === 'last_month' && 'Last Month'}
                       {dashboardPeriod === 'last_quarter' && 'Last Quarter'}
                       {dashboardPeriod === 'last_fy' && 'Last FY'}
+                      {dashboardPeriod === 'last_60_days' && 'Last 60 Days'}
+                      {dashboardPeriod === 'last_90_days' && 'Last 90 Days'}
+                      {dashboardPeriod === 'last_180_days' && 'Last 180 Days'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="yesterday">Yesterday</SelectItem>
                     <SelectItem value="this_week">This Week</SelectItem>
                     <SelectItem value="this_month">This Month</SelectItem>
                     <SelectItem value="this_quarter">This Quarter</SelectItem>
@@ -1361,6 +1394,9 @@ const Analytics = () => {
                     <SelectItem value="last_month">Last Month</SelectItem>
                     <SelectItem value="last_quarter">Last Quarter</SelectItem>
                     <SelectItem value="last_fy">Last FY</SelectItem>
+                    <SelectItem value="last_60_days">Last 60 Days</SelectItem>
+                    <SelectItem value="last_90_days">Last 90 Days</SelectItem>
+                    <SelectItem value="last_180_days">Last 180 Days</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -1405,10 +1441,6 @@ const Analytics = () => {
                     )}
                   </>
                 )}
-                <span className="text-xs text-muted-foreground">|</span>
-                <Badge variant="outline" className="text-xs">
-                  {format(dashboardDateRange.from, 'MMM dd')} - {format(dashboardDateRange.to, 'MMM dd, yyyy')}
-                </Badge>
               </div>
             </CardContent>
           </Card>
