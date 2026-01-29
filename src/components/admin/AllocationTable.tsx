@@ -83,9 +83,14 @@ export function AllocationTable({
 
       if (subError) throw subError;
 
-      if (!subordinatesData?.length) return [];
+      // Filter out the parent user (level 0), we want to show subordinates only
+      const subordinatesOnly = (subordinatesData || []).filter(
+        (s: { subordinate_user_id: string; level: number }) => s.level > 0
+      );
 
-      const userIds = subordinatesData.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
+      if (!subordinatesOnly.length) return [];
+
+      const userIds = subordinatesOnly.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
 
       // Get profiles
       const { data: profiles } = await supabase
@@ -121,10 +126,10 @@ export function AllocationTable({
         }
       });
 
-      // Build hierarchy tree
+      // Build hierarchy tree - levels are relative to parentUserId (which is level 0)
       const nodeMap = new Map<string, SubordinateAllocation>();
 
-      subordinatesData.forEach((sub: { subordinate_user_id: string; level: number }) => {
+      subordinatesOnly.forEach((sub: { subordinate_user_id: string; level: number }) => {
         const profile = profileMap.get(sub.subordinate_user_id);
         const existingPlan = planMap.get(sub.subordinate_user_id);
         
@@ -136,19 +141,21 @@ export function AllocationTable({
           revenueTarget: existingPlan?.revenue_target || 0,
           visitsTarget: 0,
           existingPlanId: existingPlan?.id,
-          level: sub.level,
+          level: sub.level, // Level relative to parentUserId
           subordinateCount: subordinateCounts.get(sub.subordinate_user_id) || 0,
           children: [],
         });
       });
 
-      // Build tree structure
+      // Build tree structure - direct children of parentUserId are level 1
       const roots: SubordinateAllocation[] = [];
       nodeMap.forEach((node, userId) => {
         const managerId = managerMap.get(userId);
+        // If the manager is in our nodeMap, add as child; otherwise check if it's a direct report
         if (managerId && nodeMap.has(managerId)) {
           nodeMap.get(managerId)!.children.push(node);
-        } else if (node.level === 1 || managerId === parentUserId) {
+        } else if (managerId === parentUserId || node.level === 1) {
+          // Direct child of the selected user
           roots.push(node);
         }
       });
