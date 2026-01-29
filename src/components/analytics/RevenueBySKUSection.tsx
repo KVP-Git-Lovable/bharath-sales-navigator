@@ -192,6 +192,17 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
     [skuData]
   );
 
+  const totalQuantityKG = useMemo(() => 
+    skuData.reduce((sum, item) => {
+      const unit = (item.unit || '').toLowerCase();
+      if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+        return sum + (item.quantity_sold / 1000);
+      }
+      return sum + item.quantity_sold;
+    }, 0), 
+    [skuData]
+  );
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -313,7 +324,13 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {row.quantity_sold.toFixed(1)} {row.unit}
+                          {(() => {
+                            const unit = (row.unit || '').toLowerCase();
+                            if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+                              return `${(row.quantity_sold / 1000).toFixed(2)} KG`;
+                            }
+                            return `${row.quantity_sold.toFixed(1)} ${row.unit}`;
+                          })()}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
                           ₹{row.revenue.toLocaleString()}
@@ -324,7 +341,9 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   <tfoot className="bg-muted/30 sticky bottom-0">
                     <TableRow>
                       <TableCell className="font-semibold">Total ({skuData.length} SKUs)</TableCell>
-                      <TableCell />
+                      <TableCell className="text-right font-semibold">
+                        {totalQuantityKG.toFixed(2)} KG
+                      </TableCell>
                       <TableCell className="text-right font-bold text-primary">
                         ₹{totalRevenue.toLocaleString()}
                       </TableCell>
