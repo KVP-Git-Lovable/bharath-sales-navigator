@@ -31,6 +31,7 @@ import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
 import { RetailersSkeleton } from "@/components/home/RetailersSkeleton";
+import { DakshinaKannadaMap } from "@/components/retailers/DakshinaKannadaMap";
 
 
 interface Retailer {
@@ -706,6 +707,18 @@ export const MyRetailers = () => {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Dakshina Kannada Map Section */}
+        <DakshinaKannadaMap 
+          retailers={filtered.map(r => ({
+            id: r.id,
+            name: r.name,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            address: r.address
+          }))}
+          height="350px"
+        />
 
         <Card>
           <CardContent className="pt-6 space-y-3">
