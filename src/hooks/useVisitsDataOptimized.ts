@@ -1382,12 +1382,50 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       }
     };
 
+    // Handle points earned - immediately refresh points data for instant UI update
+    const handlePointsEarned = async (event: CustomEvent) => {
+      const currentDate = selectedDateRef.current;
+      const currentUserId = userIdRef.current;
+      
+      if (!currentUserId) return;
+      
+      // Only refresh if the points are for today (the date we're viewing)
+      const eventDate = (event.detail?.date || new Date().toISOString().split('T')[0]);
+      if (eventDate !== currentDate) {
+        console.log('[LocalEvent] pointsEarned for different date, skipping:', eventDate, '!=', currentDate);
+        return;
+      }
+      
+      console.log('[LocalEvent] pointsEarned - refreshing points immediately');
+      
+      try {
+        const freshPoints = await fetchPointsForDate(currentUserId, currentDate);
+        setPointsData(freshPoints);
+        
+        // Update cache with new points
+        const cached = cacheRef.current.get(currentDate);
+        if (cached) {
+          cached.points = { 
+            total: freshPoints.total, 
+            byRetailer: Array.from(freshPoints.byRetailer.entries()) 
+          };
+          cached.timestamp = Date.now();
+          cacheRef.current.set(currentDate, cached);
+        }
+        
+        console.log('[LocalEvent] Points refreshed:', freshPoints.total);
+      } catch (e) {
+        console.error('[LocalEvent] Failed to refresh points:', e);
+      }
+    };
+
     window.addEventListener('visitStatusChanged', handleStatusChange as EventListener);
     window.addEventListener('retailerAdded', handleRetailerAdded as EventListener);
     window.addEventListener('visitDataChanged', handleVisitDataChanged);
     window.addEventListener('syncComplete', handleSyncComplete);
     window.addEventListener('beatDeleted', handleBeatDeleted as EventListener);
     window.addEventListener('forceVisitsRefresh', handleForceRefresh);
+    window.addEventListener('pointsEarned', handlePointsEarned as EventListener);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
@@ -1397,6 +1435,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       window.removeEventListener('syncComplete', handleSyncComplete);
       window.removeEventListener('beatDeleted', handleBeatDeleted as EventListener);
       window.removeEventListener('forceVisitsRefresh', handleForceRefresh);
+      window.removeEventListener('pointsEarned', handlePointsEarned as EventListener);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [selectedDate, isToday, userId, smartDeltaSync, shouldSyncNow, loadFromOfflineStorage, doFullInitialLoad]);

@@ -1,6 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
 
+// Helper to dispatch points earned event for instant UI updates
+const dispatchPointsEarnedEvent = () => {
+  const todayDate = new Date().toISOString().split('T')[0];
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pointsEarned', { 
+      detail: { date: todayDate } 
+    }));
+    console.log('[Gamification] Dispatched pointsEarned event for date:', todayDate);
+  }
+};
+
 interface OrderContext {
   userId: string;
   retailerId: string;
@@ -327,6 +338,7 @@ export async function awardPointsForOrder(context: OrderContext) {
 
       if (!error) {
         console.log(`Awarded ${pointsToAward} points for ${action.action_name}`);
+        dispatchPointsEarnedEvent();
       }
     }
   }
@@ -447,6 +459,7 @@ export async function awardPointsForVisitCompletion(context: VisitContext) {
           metadata: { retailer_id: retailerId, has_order: hasOrder },
         });
         console.log(`Awarded ${action.points} points for productive visit`);
+        dispatchPointsEarnedEvent();
       }
     } else if (hasOrder) {
       await supabase.from("gamification_points").insert({
@@ -459,6 +472,7 @@ export async function awardPointsForVisitCompletion(context: VisitContext) {
         metadata: { retailer_id: retailerId, has_order: hasOrder },
       });
       console.log(`Awarded ${action.points} points for productive visit`);
+      dispatchPointsEarnedEvent();
     }
   }
 }
@@ -547,6 +561,7 @@ export async function awardPointsForCompetitionData(userId: string, retailerId: 
       
       if (!error) {
         console.log(`Awarded ${action.points} points for competition data capture`);
+        dispatchPointsEarnedEvent();
       } else {
         console.error('Error awarding competition data points:', error);
       }
@@ -640,6 +655,7 @@ export async function awardPointsForRetailerFeedback(userId: string, retailerId:
       
       if (!error) {
         console.log(`Awarded ${action.points} points for retailer feedback`);
+        dispatchPointsEarnedEvent();
       } else {
         console.error('Error awarding retailer feedback points:', error);
       }
@@ -733,6 +749,7 @@ export async function awardPointsForBrandingRequest(userId: string, retailerId: 
       
       if (!error) {
         console.log(`Awarded ${action.points} points for branding request`);
+        dispatchPointsEarnedEvent();
       } else {
         console.error('Error awarding branding request points:', error);
       }
@@ -857,6 +874,7 @@ export async function awardPointsForTotalVisits(userId: string, visitDate: strin
 
         if (!error) {
           console.log(`✅ Awarded ${action.points} points for total visits (${completedVisits}/${threshold})`);
+          dispatchPointsEarnedEvent();
         } else {
           console.error('[awardPointsForTotalVisits] Error awarding points:', error);
         }
