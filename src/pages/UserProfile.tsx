@@ -18,6 +18,7 @@ import { OnboardingChecklistSection } from '@/components/profile/about/Onboardin
 import { AboutViewMode } from '@/components/profile/about/AboutViewMode';
 import { AboutEditMode } from '@/components/profile/about/AboutEditMode';
 import { ProfilePointsBadge } from '@/components/profile/ProfilePointsBadge';
+import { PasswordChangeSection } from '@/components/profile/PasswordChangeSection';
 import { LanguageSettings } from '@/components/profile/LanguageSettings';
 
 
@@ -252,6 +253,9 @@ const UserProfile = () => {
                 onEdit={() => setIsEditMode(true)}
               />
             )}
+
+            {/* Password & Security */}
+            <PasswordChangeSection />
 
             {/* Language Settings */}
             <LanguageSettings />
