@@ -332,37 +332,37 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         <div className="space-y-4">
           <Label className="text-base font-semibold">Target Metrics</Label>
           <p className="text-sm text-muted-foreground">Select which metrics to track for targets</p>
-          <div className="flex flex-wrap gap-6">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="enable_quantity"
-                checked={config.enable_quantity}
-                onCheckedChange={(checked) => handleBasisChange('enable_quantity', !!checked)}
-              />
-              <Label htmlFor="enable_quantity" className="font-normal cursor-pointer">
-                Quantity
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="enable_revenue"
-                checked={config.enable_revenue}
-                onCheckedChange={(checked) => handleBasisChange('enable_revenue', !!checked)}
-              />
-              <Label htmlFor="enable_revenue" className="font-normal cursor-pointer">
-                Revenue (₹)
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="enable_visits"
-                checked={config.enable_visits}
-                onCheckedChange={(checked) => handleBasisChange('enable_visits', !!checked)}
-              />
-              <Label htmlFor="enable_visits" className="font-normal cursor-pointer">
-                Productive Visits
-              </Label>
-            </div>
+          <div className="flex flex-wrap gap-3">
+            {[
+              { key: 'enable_quantity', label: 'Quantity', checked: config.enable_quantity },
+              { key: 'enable_revenue', label: 'Revenue (₹)', checked: config.enable_revenue },
+              { key: 'enable_visits', label: 'Productive Visits', checked: config.enable_visits },
+            ].map(({ key, label, checked }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handleBasisChange(key as 'enable_quantity' | 'enable_revenue' | 'enable_visits', !checked)}
+                className={`
+                  flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all cursor-pointer
+                  ${checked 
+                    ? 'bg-primary/10 border-primary text-primary' 
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/50'
+                  }
+                `}
+              >
+                <div className={`
+                  w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                  ${checked ? 'border-primary bg-primary' : 'border-muted-foreground'}
+                `}>
+                  {checked && (
+                    <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium text-sm">{label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -372,7 +372,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         <div className="space-y-4">
           <Label className="text-base font-semibold">Target Parameters</Label>
           <p className="text-sm text-muted-foreground">Select which breakdowns are available for targets</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {Object.entries({
               product: 'Product-wise',
               retailer: 'Retailer-wise',
@@ -380,18 +380,35 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
               distributor: 'Distributor-wise',
               territory: 'Territory-wise',
               monthly: 'Month-wise',
-            }).map(([key, label]) => (
-              <div key={key} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`param_${key}`}
-                  checked={config.enabled_parameters[key as keyof typeof config.enabled_parameters]}
-                  onCheckedChange={(checked) => handleParameterChange(key as keyof typeof config.enabled_parameters, !!checked)}
-                />
-                <Label htmlFor={`param_${key}`} className="font-normal cursor-pointer">
-                  {label}
-                </Label>
-              </div>
-            ))}
+            }).map(([key, label]) => {
+              const isChecked = config.enabled_parameters[key as keyof typeof config.enabled_parameters];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleParameterChange(key as keyof typeof config.enabled_parameters, !isChecked)}
+                  className={`
+                    flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all cursor-pointer
+                    ${isChecked 
+                      ? 'bg-primary/10 border-primary text-primary' 
+                      : 'bg-background border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/50'
+                    }
+                  `}
+                >
+                  <div className={`
+                    w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                    ${isChecked ? 'border-primary bg-primary' : 'border-muted-foreground'}
+                  `}>
+                    {isChecked && (
+                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="font-medium text-sm">{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
