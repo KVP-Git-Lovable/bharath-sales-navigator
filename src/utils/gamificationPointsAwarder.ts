@@ -90,60 +90,127 @@ export async function awardPointsForOrder(context: OrderContext) {
           break;
 
         case "daily_target":
-          // Check if user has met daily target
-          const targetValue = action.base_daily_target || 0;
-          const targetType = action.target_type || "orders";
-
-          if (targetType === "sales_value") {
-            // Get today's total sales
-            const { data: todaysOrders } = await supabase
+          // Get user's assigned target from user_business_plans
+          const dailyTargetType = action.target_type || "quantity";
+          
+          // Calculate FY year (April-March fiscal year)
+          const todayMonth = today.getMonth();
+          const todayYear = today.getFullYear();
+          const fyYearCalc = todayMonth < 3 ? todayYear : todayYear + 1;
+          
+          // Get FY month number (April = 1, March = 12)
+          const FY_MONTH_MAP: Record<number, number> = { 0: 10, 1: 11, 2: 12, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7, 10: 8, 11: 9 };
+          const fyMonthNum = FY_MONTH_MAP[todayMonth];
+          
+          // Fetch user's business plan
+          const { data: userPlanData } = await supabase
+            .from("user_business_plans")
+            .select("id, quantity_target, revenue_target, quantity_unit")
+            .eq("user_id", userId)
+            .eq("year", fyYearCalc)
+            .single();
+          
+          if (!userPlanData) {
+            console.log(`No business plan found for user ${userId} in FY ${fyYearCalc}`);
+            break;
+          }
+          
+          // Fetch monthly target breakdown
+          const { data: monthlyData } = await supabase
+            .from("user_business_plan_months")
+            .select("quantity_target, revenue_target, working_days")
+            .eq("business_plan_id", userPlanData.id)
+            .eq("month_number", fyMonthNum)
+            .single();
+          
+          // Calculate daily target (monthly target / working days)
+          const workingDays = monthlyData?.working_days || 26;
+          let dailyTargetValue = 0;
+          let actualDayValue = 0;
+          
+          if (dailyTargetType === "revenue") {
+            const monthlyRevTarget = monthlyData?.revenue_target || (userPlanData.revenue_target || 0) / 12;
+            dailyTargetValue = monthlyRevTarget / workingDays;
+            
+            // Get today's actual revenue
+            const { data: todayOrdersRev } = await supabase
               .from("orders")
               .select("total_amount")
               .eq("user_id", userId)
               .gte("created_at", todayStart.toISOString())
               .lte("created_at", todayEnd.toISOString());
-
-            const totalSales = todaysOrders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
-
-            if (totalSales >= targetValue) {
-              // Check if already awarded today
-              const { count } = await supabase
-                .from("gamification_points")
-                .select("*", { count: "exact", head: true })
-                .eq("user_id", userId)
-                .eq("action_id", action.id)
-                .eq("game_id", game.id)
-                .gte("earned_at", todayStart.toISOString())
-                .lte("earned_at", todayEnd.toISOString());
-
-              if (count === 0) {
-                shouldAward = true;
-                metadata.target_achieved = totalSales;
-              }
-            }
-          } else {
-            // Count orders
-            const { count: orderCount } = await supabase
-              .from("orders")
+            
+            actualDayValue = todayOrdersRev?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+            metadata.target_type = "revenue";
+            metadata.daily_target = dailyTargetValue;
+            metadata.actual_achieved = actualDayValue;
+          } else if (dailyTargetType === "visits") {
+            // For visits, use a default of 5 visits per day if no specific target
+            // (visits_target doesn't exist in the schema, so we use a sensible default)
+            dailyTargetValue = 5; // Default daily visit target
+            
+            // Get today's actual productive visits
+            const { count: visitCnt } = await supabase
+              .from("visits")
               .select("*", { count: "exact", head: true })
+              .eq("user_id", userId)
+              .eq("status", "productive")
+              .gte("planned_date", todayDateOnly)
+              .lte("planned_date", todayDateOnly);
+            
+            actualDayValue = visitCnt || 0;
+            metadata.target_type = "visits";
+            metadata.daily_target = dailyTargetValue;
+            metadata.actual_achieved = actualDayValue;
+          } else {
+            // Default: quantity
+            const monthlyQtyTarget = monthlyData?.quantity_target || (userPlanData.quantity_target || 0) / 12;
+            dailyTargetValue = monthlyQtyTarget / workingDays;
+            
+            // Get today's actual quantity from orders
+            const { data: todayOrderItems } = await supabase
+              .from("orders")
+              .select("order_items(quantity, unit)")
               .eq("user_id", userId)
               .gte("created_at", todayStart.toISOString())
               .lte("created_at", todayEnd.toISOString());
-
-            if (orderCount !== null && orderCount >= targetValue) {
-              const { count: awardedCount } = await supabase
-                .from("gamification_points")
-                .select("*", { count: "exact", head: true })
-                .eq("user_id", userId)
-                .eq("action_id", action.id)
-                .eq("game_id", game.id)
-                .gte("earned_at", todayStart.toISOString())
-                .lte("earned_at", todayEnd.toISOString());
-
-              if (awardedCount === 0) {
-                shouldAward = true;
-                metadata.orders_count = orderCount;
-              }
+            
+            // Sum quantities and convert to KG
+            const totalQtyGrams = todayOrderItems?.reduce((sum, order) => {
+              const orderQty = (order.order_items as any[])?.reduce(
+                (itemSum, item) => {
+                  const qty = Number(item.quantity) || 0;
+                  const itemUnit = (item.unit || '').toLowerCase();
+                  if (itemUnit === 'kg' || itemUnit === 'kgs') {
+                    return itemSum + (qty * 1000);
+                  }
+                  return itemSum + qty;
+                }, 0
+              ) || 0;
+              return sum + orderQty;
+            }, 0) || 0;
+            
+            actualDayValue = totalQtyGrams / 1000; // Convert to KG
+            metadata.target_type = "quantity";
+            metadata.daily_target = dailyTargetValue;
+            metadata.actual_achieved = actualDayValue;
+          }
+          
+          // Check if user met the daily target
+          if (dailyTargetValue > 0 && actualDayValue >= dailyTargetValue) {
+            // Check if already awarded today
+            const { count: alreadyAwardedToday } = await supabase
+              .from("gamification_points")
+              .select("*", { count: "exact", head: true })
+              .eq("user_id", userId)
+              .eq("action_id", action.id)
+              .eq("game_id", game.id)
+              .gte("earned_at", todayStart.toISOString())
+              .lte("earned_at", todayEnd.toISOString());
+            
+            if (alreadyAwardedToday === 0) {
+              shouldAward = true;
+              metadata.percentage_achieved = Math.round((actualDayValue / dailyTargetValue) * 100);
             }
           }
           break;
@@ -217,30 +284,30 @@ export async function awardPointsForOrder(context: OrderContext) {
 
         case "monthly_growth":
           // Calculate month-over-month growth
-          const currentMonth = startOfMonth(today);
-          const { data: currentMonthOrders } = await supabase
+          const growthMonthStart = startOfMonth(today);
+          const { data: growthMonthOrders } = await supabase
             .from("orders")
             .select("total_amount")
             .eq("user_id", userId)
-            .gte("created_at", currentMonth.toISOString());
+            .gte("created_at", growthMonthStart.toISOString());
 
-          const currentTotal = currentMonthOrders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+          const growthMonthTotal = growthMonthOrders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
 
           // Compare with previous month (simplified - would need proper implementation)
           const minGrowth = action.min_growth_percentage || 10;
           // For now, award if total > 0 (needs proper previous month comparison)
-          if (currentTotal > 0) {
+          if (growthMonthTotal > 0) {
             const { count } = await supabase
               .from("gamification_points")
               .select("*", { count: "exact", head: true })
               .eq("user_id", userId)
               .eq("action_id", action.id)
               .eq("game_id", game.id)
-              .gte("earned_at", currentMonth.toISOString());
+              .gte("earned_at", growthMonthStart.toISOString());
 
             if (count === 0) {
               shouldAward = true;
-              metadata.current_month_total = currentTotal;
+              metadata.current_month_total = growthMonthTotal;
             }
           }
           break;

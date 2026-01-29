@@ -69,32 +69,27 @@ export function MetricConfigFields({ metricType, config, onConfigChange }: Metri
           <div>
             <Label htmlFor="targetType">Target Type</Label>
             <Select 
-              value={config?.target_type || "orders"} 
+              value={config?.target_type || "quantity"} 
               onValueChange={(value) => handleConfigUpdate("target_type", value)}
             >
               <SelectTrigger id="targetType">
                 <SelectValue placeholder="Select target type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="orders">Total Orders</SelectItem>
-                <SelectItem value="sales_value">Sales Value (Rs.)</SelectItem>
+                <SelectItem value="quantity">Quantity (from My Target)</SelectItem>
+                <SelectItem value="revenue">Revenue (from My Target)</SelectItem>
+                <SelectItem value="visits">Productive Visits (from My Target)</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div>
-            <Label htmlFor="dailyTarget">Base Daily Target</Label>
-            <Input
-              id="dailyTarget"
-              type="number"
-              min="1"
-              value={config?.base_daily_target || 5}
-              onChange={(e) => handleConfigUpdate("base_daily_target", parseFloat(e.target.value))}
-              placeholder={config?.target_type === "sales_value" ? "e.g., 1000" : "e.g., 5"}
-            />
             <p className="text-xs text-muted-foreground mt-1">
-              {config?.target_type === "sales_value" 
-                ? "Target sales value (Rs.) to achieve daily"
-                : "Target number of orders to achieve daily"}
+              Select which target type from user's assigned business plan to track
+            </p>
+          </div>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-xs text-blue-800">
+              <strong>How it works:</strong> Points are awarded when the user meets their daily target 
+              as assigned in Target Management (My Target). The daily target is calculated from their 
+              monthly target divided by working days.
             </p>
           </div>
         </div>
