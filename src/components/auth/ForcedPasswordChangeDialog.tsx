@@ -24,9 +24,10 @@ interface ForcedPasswordChangeDialogProps {
   open: boolean;
   userId: string;
   onPasswordChanged: () => void;
+  onDismiss: () => void;
 }
 
-const ForcedPasswordChangeDialog = ({ open, userId, onPasswordChanged }: ForcedPasswordChangeDialogProps) => {
+const ForcedPasswordChangeDialog = ({ open, userId, onPasswordChanged, onDismiss }: ForcedPasswordChangeDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -79,10 +80,14 @@ const ForcedPasswordChangeDialog = ({ open, userId, onPasswordChanged }: ForcedP
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onDismiss();
+      }}
+    >
       <DialogContent 
         className="sm:max-w-md" 
-        hideCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >

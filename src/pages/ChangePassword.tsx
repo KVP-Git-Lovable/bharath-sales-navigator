@@ -38,7 +38,12 @@ const ChangePassword = () => {
   });
 
   const handleClose = () => {
-    navigate(-1); // Go back to previous page
+    // Go back if possible; otherwise fall back to dashboard
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
   };
 
   const onSubmit = async (data: ChangePasswordFormData) => {
