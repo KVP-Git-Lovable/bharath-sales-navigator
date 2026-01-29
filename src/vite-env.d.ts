@@ -17,6 +17,10 @@ declare namespace google.maps {
   class Map {
     constructor(element: HTMLElement, options?: MapOptions);
     fitBounds(bounds: LatLngBounds, padding?: number | Padding): void;
+    setCenter(center: LatLng | LatLngLiteral): void;
+    setZoom(zoom: number): void;
+    getCenter(): LatLng | null;
+    getZoom(): number | undefined;
   }
   
   interface MapOptions {
@@ -39,6 +43,12 @@ declare namespace google.maps {
     lat: number;
     lng: number;
   }
+
+  class LatLng {
+    constructor(lat: number, lng: number);
+    lat(): number;
+    lng(): number;
+  }
   
   interface Padding {
     top: number;
@@ -49,7 +59,9 @@ declare namespace google.maps {
   
   class LatLngBounds {
     constructor();
-    extend(point: LatLngLiteral): LatLngBounds;
+    extend(point: LatLngLiteral | LatLng): LatLngBounds;
+    getCenter(): LatLng;
+    isEmpty(): boolean;
   }
   
   class Marker {
