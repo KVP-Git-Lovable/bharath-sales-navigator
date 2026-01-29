@@ -264,9 +264,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         .select(`
           id,
           user_id,
-          order_items (
-            total
-          )
+          total_amount
         `)
         .eq('status', 'confirmed')
         .gte('order_date', fromDate)
@@ -319,16 +317,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         userNameMap[p.id] = p.full_name || 'Unknown';
       });
 
-      // Group by user and calculate totals from order_items.total (SUM)
+      // Group by user and calculate totals using total_amount directly
       const userTotals: Record<string, number> = {};
       ordersData.forEach((order) => {
         const userName = userNameMap[order.user_id] || 'Unknown';
         
-        // Sum all order_items.total for this order
-        const orderRevenue = (order.order_items || []).reduce(
-          (sum: number, item: { total: number | null }) => sum + Number(item.total || 0),
-          0
-        );
+        // Use total_amount directly (includes taxes and charges)
+        const orderRevenue = Number(order.total_amount || 0);
         
         userTotals[userName] = (userTotals[userName] || 0) + orderRevenue;
       });
@@ -716,12 +711,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         return;
       }
 
-      // Fetch orders with retailer info (confirmed orders in date range)
+      // Fetch orders with retailer info and total_amount (confirmed orders in date range)
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
           retailer_id,
+          total_amount,
           retailers!inner(id, beat_name)
         `)
         .eq('user_id', userProfile.id)
@@ -735,22 +731,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         return;
       }
 
-      // Get order IDs and fetch order items
-      const orderIds = orders.map(o => o.id);
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('order_id, total')
-        .in('order_id', orderIds);
-
-      // Map order totals
-      const orderTotals: Record<string, number> = {};
-      orderItems?.forEach(item => {
-        if (!orderTotals[item.order_id]) {
-          orderTotals[item.order_id] = 0;
-        }
-        orderTotals[item.order_id] += Number(item.total || 0);
-      });
-
       // Group by beat_name and calculate: order_count, total_retailers, total_value
       const beatGroups: Record<string, { 
         order_ids: Set<string>; 
@@ -761,7 +741,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       orders.forEach((order: any) => {
         const beatName = order.retailers?.beat_name || 'Unassigned';
         const retailerId = order.retailers?.id || order.retailer_id;
-        const orderTotal = orderTotals[order.id] || 0;
+        // Use total_amount directly (includes taxes and charges)
+        const orderTotal = Number(order.total_amount || 0);
         
         if (!beatGroups[beatName]) {
           beatGroups[beatName] = { order_ids: new Set(), retailer_ids: new Set(), total_value: 0 };
@@ -1065,12 +1046,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       // Calculate next day for date range query
       const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
 
-      // Fetch orders with retailer beat info
+      // Fetch orders with retailer beat info and total_amount
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
           retailer_id,
+          total_amount,
           retailers!inner(beat_name, beat_id)
         `)
         .eq('user_id', userProfile.id)
@@ -1083,28 +1065,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         return;
       }
 
-      // Get order IDs and fetch order items
-      const orderIds = orders.map(o => o.id);
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('order_id, total')
-        .in('order_id', orderIds);
-
-      // Map order totals
-      const orderTotals: Record<string, number> = {};
-      orderItems?.forEach(item => {
-        if (!orderTotals[item.order_id]) {
-          orderTotals[item.order_id] = 0;
-        }
-        orderTotals[item.order_id] += Number(item.total || 0);
-      });
-
-      // Group by beat_name and calculate totals
+      // Group by beat_name and calculate totals using total_amount directly
       const beatTotals: Record<string, { total_value: number; order_count: number }> = {};
       
       orders.forEach((order: any) => {
         const beatName = order.retailers?.beat_name || 'Unassigned';
-        const orderTotal = orderTotals[order.id] || 0;
+        // Use total_amount directly (includes taxes and charges)
+        const orderTotal = Number(order.total_amount || 0);
         
         if (!beatTotals[beatName]) {
           beatTotals[beatName] = { total_value: 0, order_count: 0 };
@@ -1173,12 +1140,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       // Calculate next day for date range query
       const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
 
-      // Fetch orders with retailer info for this beat
+      // Fetch orders with retailer info and total_amount for this beat
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
           retailer_id,
+          total_amount,
           retailers!inner(id, name, beat_name)
         `)
         .eq('user_id', userProfile.id)
@@ -1202,29 +1170,14 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         return;
       }
 
-      // Get order IDs and fetch order items
-      const orderIds = beatOrders.map(o => o.id);
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('order_id, total')
-        .in('order_id', orderIds);
-
-      // Map order totals
-      const orderTotals: Record<string, number> = {};
-      orderItems?.forEach(item => {
-        if (!orderTotals[item.order_id]) {
-          orderTotals[item.order_id] = 0;
-        }
-        orderTotals[item.order_id] += Number(item.total || 0);
-      });
-
-      // Group by retailer and calculate totals
+      // Group by retailer and calculate totals using total_amount directly
       const retailerTotals: Record<string, { name: string; total_value: number; order_count: number; order_ids: string[] }> = {};
       
       beatOrders.forEach((order: any) => {
         const retailerId = order.retailer_id;
         const retailerName = order.retailers?.name || 'Unknown Retailer';
-        const orderTotal = orderTotals[order.id] || 0;
+        // Use total_amount directly (includes taxes and charges)
+        const orderTotal = Number(order.total_amount || 0);
         
         if (!retailerTotals[retailerId]) {
           retailerTotals[retailerId] = { name: retailerName, total_value: 0, order_count: 0, order_ids: [] };
