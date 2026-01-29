@@ -85,7 +85,7 @@ const METRIC_TYPES = [
     label: "Meeting daily target",
     defaultPoints: 15,
     configType: "daily_threshold",
-    description: "Awarded once per day when the rep hits the defined daily threshold"
+    description: "Awarded once per day when the user meets their assigned daily target from My Target (Quantity/Revenue/Visits)"
   },
   {
     value: "focused_product_sales",
@@ -289,8 +289,8 @@ export function GamificationManagement() {
         toast.error("Please configure maximum awardable activities");
         return;
       }
-      if (activityConfigType === "daily_threshold" && !metricConfig.base_daily_target) {
-        toast.error("Please configure daily threshold");
+      if (activityConfigType === "daily_threshold" && !metricConfig.target_type) {
+        toast.error("Please select a target type");
         return;
       }
       if (activityConfigType === "product_selection" && (!metricConfig.focused_products || metricConfig.focused_products.length === 0)) {
@@ -389,8 +389,8 @@ export function GamificationManagement() {
         toast.error("Please configure maximum awardable activities");
         return;
       }
-      if (activityConfigType === "daily_threshold" && !metricConfig.base_daily_target) {
-        toast.error("Please configure daily threshold");
+      if (activityConfigType === "daily_threshold" && !metricConfig.target_type) {
+        toast.error("Please select a target type");
         return;
       }
       if (activityConfigType === "product_selection" && (!metricConfig.focused_products || metricConfig.focused_products.length === 0)) {
@@ -611,7 +611,8 @@ export function GamificationManagement() {
       case "max_activities":
         return `Max ${action.max_awardable_activities || 0} activities`;
       case "daily_threshold":
-        return `Target: ${action.base_daily_target || 0}`;
+        const targetLabel = action.target_type === 'revenue' ? 'Revenue' : action.target_type === 'visits' ? 'Visits' : 'Quantity';
+        return `Target: ${targetLabel} (from My Target)`;
       case "product_selection":
         return `${action.focused_products?.length || 0} products`;
       case "daily_limit":
