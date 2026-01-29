@@ -262,7 +262,7 @@ const App = () => {
 
 const AppContent = ({ hasError }: { hasError: boolean }) => {
   useAndroidBackButton();
-  const { user, mustChangePassword, onPasswordChanged } = useAuth();
+  const { user, mustChangePassword, onPasswordChanged, dismissPasswordChange } = useAuth();
 
   if (hasError) {
     return (
@@ -293,6 +293,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           open={mustChangePassword} 
           userId={user.id}
           onPasswordChanged={onPasswordChanged}
+          onDismiss={dismissPasswordChange}
         />
       )}
       

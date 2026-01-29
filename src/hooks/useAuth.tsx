@@ -18,6 +18,7 @@ interface AuthContextType {
   loading: boolean;
   mustChangePassword: boolean;
   onPasswordChanged: () => void;
+  dismissPasswordChange: () => void;
   signUp: (data: SignUpData) => Promise<void>;
   signIn: (email: string, password: string, role?: 'admin' | 'user') => Promise<void>;
   signOut: () => Promise<void>;
@@ -64,6 +65,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
   const onPasswordChanged = () => {
+    setMustChangePassword(false);
+  };
+
+  const dismissPasswordChange = () => {
     setMustChangePassword(false);
   };
 
@@ -483,6 +488,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loading,
       mustChangePassword,
       onPasswordChanged,
+      dismissPasswordChange,
       signUp,
       signIn,
       signOut,
