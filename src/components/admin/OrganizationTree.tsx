@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { ChevronRight, ChevronDown, User, Users, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Loader2, Users, Circle, Building2, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TreeNode {
@@ -20,6 +19,19 @@ interface OrganizationTreeProps {
   selectedNodeId: string | null;
   onNodeSelect: (userId: string, fullName: string, level: number) => void;
 }
+
+// Get role-based icon based on hierarchy level
+const getRoleIcon = (level: number, isManager: boolean) => {
+  if (level === 0) {
+    // Root/CEO level - filled circle
+    return <Circle className="h-4 w-4 fill-primary text-primary" />;
+  } else if (level === 1 || isManager) {
+    // Manager level - building icon
+    return <Building2 className="h-4 w-4 text-muted-foreground" />;
+  }
+  // Field staff level - map pin
+  return <MapPin className="h-4 w-4 text-muted-foreground" />;
+};
 
 export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationTreeProps) {
   const { user } = useAuth();
@@ -37,23 +49,14 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
 
       if (error) throw error;
 
-      // Also get profile pictures
-      const userIds = data?.map((d: { subordinate_user_id: string }) => d.subordinate_user_id) || [];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, profile_picture_url')
-        .in('id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.id, p.profile_picture_url]) || []);
-
       // Build tree structure
-      const tree = buildTree(data || [], profileMap);
+      const tree = buildTree(data || []);
       return tree;
     },
     enabled: !!user?.id,
   });
 
-  const buildTree = (flatData: Array<{ subordinate_user_id: string; full_name: string; level: number }>, profileMap: Map<string, string | null>): TreeNode[] => {
+  const buildTree = (flatData: Array<{ subordinate_user_id: string; full_name: string; level: number }>): TreeNode[] => {
     if (flatData.length === 0) return [];
 
     // Group by level
@@ -78,7 +81,7 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
       nodeMap.set(item.subordinate_user_id, {
         userId: item.subordinate_user_id,
         fullName: item.full_name || 'Unknown',
-        profilePictureUrl: profileMap.get(item.subordinate_user_id) || null,
+        profilePictureUrl: null,
         level: item.level,
         children: [],
         isManager: false,
@@ -130,14 +133,34 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
     const hasChildren = node.children.length > 0;
 
     return (
-      <div key={node.userId}>
+      <div key={node.userId} className="relative">
+        {/* Vertical connector line for nested items */}
+        {depth > 0 && (
+          <div 
+            className="absolute left-0 top-0 bottom-0 border-l-2 border-border"
+            style={{ left: `${(depth - 1) * 20 + 10}px` }}
+          />
+        )}
+        
+        {/* Horizontal connector line */}
+        {depth > 0 && (
+          <div 
+            className="absolute top-4 h-0.5 bg-border"
+            style={{ 
+              left: `${(depth - 1) * 20 + 10}px`,
+              width: '10px'
+            }}
+          />
+        )}
+
         <div
           className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors',
-            isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted',
-            depth > 0 && 'ml-4'
+            'flex items-center gap-2 px-3 py-2.5 rounded-md cursor-pointer transition-all',
+            isSelected 
+              ? 'bg-primary/10 text-primary border border-primary/30' 
+              : 'hover:bg-muted border border-transparent',
           )}
-          style={{ paddingLeft: `${depth * 16 + 12}px` }}
+          style={{ marginLeft: `${depth * 20}px` }}
           onClick={() => {
             onNodeSelect(node.userId, node.fullName, node.level);
             if (hasChildren) {
@@ -145,42 +168,47 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
             }
           }}
         >
+          {/* Expand/Collapse chevron */}
           {hasChildren ? (
             <button
-              className="p-0.5 hover:bg-muted-foreground/10 rounded"
+              className="p-0.5 hover:bg-muted-foreground/10 rounded shrink-0"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleExpand(node.userId);
               }}
             >
               {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
           ) : (
             <div className="w-5" />
           )}
 
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={node.profilePictureUrl || undefined} />
-            <AvatarFallback>
-              {node.fullName.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          {/* Role-based icon */}
+          <div className="shrink-0">
+            {getRoleIcon(node.level, node.isManager)}
+          </div>
 
-          <span className="flex-1 truncate text-sm font-medium">
+          {/* Name */}
+          <span className={cn(
+            "flex-1 truncate text-sm font-medium",
+            isSelected && "text-primary"
+          )}>
             {node.fullName}
           </span>
 
+          {/* Manager indicator */}
           {node.isManager && (
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           )}
         </div>
 
+        {/* Children */}
         {isExpanded && hasChildren && (
-          <div className="border-l border-border ml-6">
+          <div className="relative">
             {node.children.map(child => renderNode(child, depth + 1))}
           </div>
         )}
@@ -199,7 +227,7 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
   if (!hierarchy || hierarchy.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
         <p className="text-sm">No team hierarchy found</p>
       </div>
     );
@@ -207,11 +235,14 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
 
   return (
     <ScrollArea className="h-[500px]">
-      <div className="p-2">
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">
+      <div className="p-3">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1 flex items-center gap-2">
+          <Users className="h-4 w-4" />
           Organization Hierarchy
         </h3>
-        {hierarchy.map(node => renderNode(node))}
+        <div className="space-y-1">
+          {hierarchy.map(node => renderNode(node))}
+        </div>
       </div>
     </ScrollArea>
   );

@@ -4,13 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Save, AlertCircle, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { HierarchyUserTargetNode } from './target-config/HierarchyUserTargetNode';
+import { cn } from '@/lib/utils';
 
 interface EnabledParameters {
   product: boolean;
@@ -45,6 +45,13 @@ interface AllocationTableProps {
   enabledParameters: EnabledParameters;
   fyYear: number;
 }
+
+// Progress bar color based on percentage
+const getProgressColor = (percent: number) => {
+  if (percent <= 60) return 'bg-emerald-500';
+  if (percent <= 85) return 'bg-amber-500';
+  return 'bg-red-500';
+};
 
 export function AllocationTable({
   parentUserId,
@@ -81,7 +88,7 @@ export function AllocationTable({
         .select('id, full_name, profile_picture_url')
         .in('id', userIds);
 
-      // Get existing business plans - use 'year' column not 'fy_year'
+      // Get existing business plans
       const { data: plans } = await supabase
         .from('user_business_plans')
         .select('*')
@@ -98,7 +105,7 @@ export function AllocationTable({
           profilePictureUrl: profile.profile_picture_url,
           quantityTarget: existingPlan?.quantity_target || 0,
           revenueTarget: existingPlan?.revenue_target || 0,
-          visitsTarget: 0, // visits_target doesn't exist in schema, so default to 0
+          visitsTarget: 0,
           existingPlanId: existingPlan?.id,
         };
       }) || [];
@@ -159,6 +166,15 @@ export function AllocationTable({
     return new Intl.NumberFormat('en-IN').format(num);
   };
 
+  const formatCurrency = (num: number) => {
+    if (num >= 10000000) {
+      return `₹${(num / 10000000).toFixed(2)} Cr`;
+    } else if (num >= 100000) {
+      return `₹${(num / 100000).toFixed(2)} L`;
+    }
+    return `₹${formatNumber(num)}`;
+  };
+
   const parseNumber = (value: string) => {
     const cleaned = value.replace(/,/g, '');
     const num = parseFloat(cleaned);
@@ -207,15 +223,217 @@ export function AllocationTable({
     );
   }
 
+  const hasOverAllocation = remainingQuantity < 0 || remainingRevenue < 0 || remainingVisits < 0;
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center justify-between">
-          <span>Allocate to Team ({subordinates.length} members)</span>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <span className="border-b-2 border-primary/30 pb-0.5">Allocation Method</span>
+          <Badge variant="secondary" className="ml-auto">
+            {subordinates.length} members
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Allocation Table */}
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-10"></TableHead>
+                <TableHead>Target</TableHead>
+                {enabledMetrics.quantity && (
+                  <TableHead className="text-right">Quantity</TableHead>
+                )}
+                {enabledMetrics.quantity && (
+                  <TableHead className="w-32">Progress</TableHead>
+                )}
+                {enabledMetrics.revenue && (
+                  <TableHead className="text-right">₹ Total</TableHead>
+                )}
+                {enabledMetrics.visits && (
+                  <TableHead className="text-right">Visits</TableHead>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from(allocations.values()).map(alloc => {
+                const quantityPercent = totalQuantity > 0 ? (alloc.quantityTarget / totalQuantity) * 100 : 0;
+                const isExpanded = expandedUsers.has(alloc.userId);
+
+                return (
+                  <Collapsible key={alloc.userId} open={isExpanded} asChild>
+                    <>
+                      <TableRow className="hover:bg-muted/30">
+                        <TableCell className="p-2">
+                          <CollapsibleTrigger asChild>
+                            <button
+                              className="p-1 hover:bg-muted rounded"
+                              onClick={() => toggleUserExpand(alloc.userId)}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          </CollapsibleTrigger>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {alloc.fullName}
+                        </TableCell>
+                        {enabledMetrics.quantity && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Input
+                                type="text"
+                                value={alloc.quantityTarget > 0 ? formatNumber(alloc.quantityTarget) : ''}
+                                onChange={(e) => handleAllocationChange(alloc.userId, 'quantityTarget', parseNumber(e.target.value))}
+                                placeholder="0"
+                                className="h-8 w-24 text-right text-sm"
+                              />
+                              <span className="text-xs text-muted-foreground w-12">{quantityUnit}</span>
+                            </div>
+                          </TableCell>
+                        )}
+                        {enabledMetrics.quantity && (
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={cn(
+                                    "h-full transition-all",
+                                    getProgressColor(quantityPercent)
+                                  )}
+                                  style={{ width: `${Math.min(quantityPercent, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground w-10 text-right">
+                                {quantityPercent.toFixed(0)}%
+                              </span>
+                            </div>
+                          </TableCell>
+                        )}
+                        {enabledMetrics.revenue && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end">
+                              <span className="text-muted-foreground text-sm mr-1">₹</span>
+                              <Input
+                                type="text"
+                                value={alloc.revenueTarget > 0 ? formatNumber(alloc.revenueTarget) : ''}
+                                onChange={(e) => handleAllocationChange(alloc.userId, 'revenueTarget', parseNumber(e.target.value))}
+                                placeholder="0"
+                                className="h-8 w-28 text-right text-sm"
+                              />
+                            </div>
+                          </TableCell>
+                        )}
+                        {enabledMetrics.visits && (
+                          <TableCell className="text-right">
+                            <Input
+                              type="text"
+                              value={alloc.visitsTarget > 0 ? formatNumber(alloc.visitsTarget) : ''}
+                              onChange={(e) => handleAllocationChange(alloc.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                              placeholder="0"
+                              className="h-8 w-20 text-right text-sm"
+                            />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      <CollapsibleContent asChild>
+                        <tr>
+                          <td colSpan={6} className="p-0">
+                            <div className="bg-muted/20 px-4 py-3 border-t">
+                              <HierarchyUserTargetNode
+                                node={{
+                                  userId: alloc.userId,
+                                  fullName: alloc.fullName,
+                                  profilePictureUrl: alloc.profilePictureUrl,
+                                  level: 1,
+                                  quantityTarget: alloc.quantityTarget,
+                                  revenueTarget: alloc.revenueTarget,
+                                  visitsTarget: alloc.visitsTarget,
+                                  children: [],
+                                }}
+                                enabledParameters={enabledParameters}
+                                enabledBasis={{
+                                  quantity: enabledMetrics.quantity,
+                                  revenue: enabledMetrics.revenue,
+                                  visits: enabledMetrics.visits,
+                                }}
+                                quantityUnit={quantityUnit}
+                                fyYear={fyYear}
+                                selectedTargetType="quantity"
+                                onTargetChange={() => {}}
+                                isExpanded={true}
+                                hideHeader={true}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      </CollapsibleContent>
+                    </>
+                  </Collapsible>
+                );
+              })}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="bg-muted/30">
+                <TableCell colSpan={2} className="font-medium">
+                  Remaining
+                </TableCell>
+                {enabledMetrics.quantity && (
+                  <TableCell className="text-right">
+                    <Badge 
+                      variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}
+                      className="font-mono"
+                    >
+                      {formatNumber(remainingQuantity)} {quantityUnit}
+                    </Badge>
+                  </TableCell>
+                )}
+                {enabledMetrics.quantity && <TableCell />}
+                {enabledMetrics.revenue && (
+                  <TableCell className="text-right">
+                    <Badge 
+                      variant={remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary'}
+                      className="font-mono"
+                    >
+                      {formatCurrency(remainingRevenue)}
+                    </Badge>
+                  </TableCell>
+                )}
+                {enabledMetrics.visits && (
+                  <TableCell className="text-right">
+                    <Badge 
+                      variant={remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary'}
+                      className="font-mono"
+                    >
+                      {formatNumber(remainingVisits)}
+                    </Badge>
+                  </TableCell>
+                )}
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
+
+        {/* Warning for over-allocation */}
+        {hasOverAllocation && (
+          <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Total allocations exceed the target. Please adjust.</span>
+          </div>
+        )}
+
+        {/* Centered Save Button */}
+        <div className="flex justify-center pt-2">
           <Button
-            size="sm"
+            size="lg"
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
+            className="min-w-[200px]"
           >
             {saveMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -224,149 +442,7 @@ export function AllocationTable({
             )}
             Save Allocation
           </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Remaining indicators */}
-        <div className="flex flex-wrap gap-3 mb-4">
-          {enabledMetrics.quantity && (
-            <Badge variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}>
-              Remaining: {formatNumber(remainingQuantity)} {quantityUnit}
-            </Badge>
-          )}
-          {enabledMetrics.revenue && (
-            <Badge variant={remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary'}>
-              Remaining: ₹{formatNumber(remainingRevenue)}
-            </Badge>
-          )}
-          {enabledMetrics.visits && (
-            <Badge variant={remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary'}>
-              Remaining: {formatNumber(remainingVisits)} visits
-            </Badge>
-          )}
         </div>
-
-        {/* Allocation rows */}
-        <div className="space-y-3">
-          {Array.from(allocations.values()).map(alloc => {
-            const quantityPercent = totalQuantity > 0 ? (alloc.quantityTarget / totalQuantity) * 100 : 0;
-            const revenuePercent = totalRevenue > 0 ? (alloc.revenueTarget / totalRevenue) * 100 : 0;
-            const isExpanded = expandedUsers.has(alloc.userId);
-
-            return (
-              <Collapsible key={alloc.userId} open={isExpanded}>
-                <div className="border rounded-lg p-3 space-y-3">
-                  {/* User header row */}
-                  <div className="flex items-center gap-3">
-                    <CollapsibleTrigger
-                      className="p-1 hover:bg-muted rounded"
-                      onClick={() => toggleUserExpand(alloc.userId)}
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </CollapsibleTrigger>
-
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={alloc.profilePictureUrl || undefined} />
-                      <AvatarFallback>
-                        {alloc.fullName.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{alloc.fullName}</p>
-                    </div>
-
-                    {/* Metric inputs */}
-                    <div className="flex items-center gap-4">
-                      {enabledMetrics.quantity && (
-                        <div className="w-32">
-                          <Input
-                            type="text"
-                            value={alloc.quantityTarget > 0 ? formatNumber(alloc.quantityTarget) : ''}
-                            onChange={(e) => handleAllocationChange(alloc.userId, 'quantityTarget', parseNumber(e.target.value))}
-                            placeholder={quantityUnit}
-                            className="h-8 text-sm"
-                          />
-                          <Progress value={quantityPercent} className="h-1 mt-1" />
-                        </div>
-                      )}
-
-                      {enabledMetrics.revenue && (
-                        <div className="w-32">
-                          <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                            <Input
-                              type="text"
-                              value={alloc.revenueTarget > 0 ? formatNumber(alloc.revenueTarget) : ''}
-                              onChange={(e) => handleAllocationChange(alloc.userId, 'revenueTarget', parseNumber(e.target.value))}
-                              placeholder="Revenue"
-                              className="h-8 text-sm pl-6"
-                            />
-                          </div>
-                          <Progress value={revenuePercent} className="h-1 mt-1" />
-                        </div>
-                      )}
-
-                      {enabledMetrics.visits && (
-                        <div className="w-24">
-                          <Input
-                            type="text"
-                            value={alloc.visitsTarget > 0 ? formatNumber(alloc.visitsTarget) : ''}
-                            onChange={(e) => handleAllocationChange(alloc.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
-                            placeholder="Visits"
-                            className="h-8 text-sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanded parameter breakdown */}
-                  <CollapsibleContent>
-                    <div className="pt-3 border-t">
-                      <HierarchyUserTargetNode
-                        node={{
-                          userId: alloc.userId,
-                          fullName: alloc.fullName,
-                          profilePictureUrl: alloc.profilePictureUrl,
-                          level: 1,
-                          quantityTarget: alloc.quantityTarget,
-                          revenueTarget: alloc.revenueTarget,
-                          visitsTarget: alloc.visitsTarget,
-                          children: [],
-                        }}
-                        enabledParameters={enabledParameters}
-                        enabledBasis={{
-                          quantity: enabledMetrics.quantity,
-                          revenue: enabledMetrics.revenue,
-                          visits: enabledMetrics.visits,
-                        }}
-                        quantityUnit={quantityUnit}
-                        fyYear={fyYear}
-                        selectedTargetType="quantity"
-                        onTargetChange={() => {}}
-                        isExpanded={true}
-                        hideHeader={true}
-                      />
-                    </div>
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            );
-          })}
-        </div>
-
-        {/* Warning for over-allocation */}
-        {(remainingQuantity < 0 || remainingRevenue < 0 || remainingVisits < 0) && (
-          <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-sm">Total allocations exceed the target. Please adjust.</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

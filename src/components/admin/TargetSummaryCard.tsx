@@ -48,42 +48,55 @@ export function TargetSummaryCard({
   return (
     <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
       <CardContent className="py-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
+        {/* Header with Title and Badge */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
             <h3 className="font-semibold text-lg">
-              {config.target_plan_name || 'FY Sales Plan'}
+              Target: <span className="text-primary">{config.target_plan_name || 'FY Sales Plan'}</span>
             </h3>
-            <p className="text-sm text-muted-foreground">
-              FY {fyYear - 1}-{String(fyYear).slice(-2)} Targets
-            </p>
+            {config.is_locked && (
+              <Badge variant="default" className="gap-1">
+                <Lock className="h-3 w-3" />
+                Locked
+              </Badge>
+            )}
           </div>
-          {config.is_locked && (
-            <Badge variant="outline" className="gap-1">
-              <Lock className="h-3 w-3" />
-              Locked
-            </Badge>
-          )}
+          <div className="text-sm font-medium text-muted-foreground bg-background/60 px-3 py-1 rounded-full">
+            FY {fyYear - 1}-{String(fyYear).slice(-2)}
+          </div>
         </div>
 
+        {/* Total Target Label */}
+        <div className="mb-3">
+          <span className="text-sm font-medium text-muted-foreground border-b-2 border-primary/30 pb-0.5">
+            Total Target
+          </span>
+        </div>
+
+        {/* Selected user indicator */}
         {selectedUserName && (
           <p className="text-sm text-muted-foreground mb-3">
             Allocating for: <span className="font-medium text-foreground">{selectedUserName}</span>
           </p>
         )}
 
+        {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {config.enable_quantity && (
-            <div className="flex items-center gap-3 bg-background/50 rounded-lg p-3">
+            <div className="flex items-center gap-3 bg-background/70 rounded-lg p-3 border border-border/50">
               <div className="p-2 bg-primary/10 rounded-full">
                 <Package className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Quantity</p>
-                <p className="font-semibold">
-                  {formatNumber(config.total_quantity_target)} {config.quantity_unit}
+                <p className="text-xs text-muted-foreground font-medium">Quantity</p>
+                <p className="font-bold text-lg">
+                  {formatNumber(config.total_quantity_target)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {config.quantity_unit}
                 </p>
                 {allocatedQuantity > 0 && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-primary mt-1">
                     Allocated: {formatNumber(allocatedQuantity)}
                   </p>
                 )}
@@ -91,38 +104,41 @@ export function TargetSummaryCard({
             </div>
           )}
 
-          {config.enable_revenue && (
-            <div className="flex items-center gap-3 bg-background/50 rounded-lg p-3">
+          {config.enable_visits && (
+            <div className="flex items-center gap-3 bg-background/70 rounded-lg p-3 border border-border/50">
               <div className="p-2 bg-secondary/50 rounded-full">
-                <IndianRupee className="h-4 w-4 text-secondary-foreground" />
+                <Users className="h-4 w-4 text-secondary-foreground" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Revenue</p>
-                <p className="font-semibold">
-                  {formatCurrency(config.total_revenue_target)}
+                <p className="text-xs text-muted-foreground font-medium">Productive Visits</p>
+                <p className="font-bold text-lg">
+                  {formatNumber(config.total_visits_target)}
                 </p>
-                {allocatedRevenue > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Allocated: {formatCurrency(allocatedRevenue)}
+                <p className="text-xs text-muted-foreground">
+                  visits
+                </p>
+                {allocatedVisits > 0 && (
+                  <p className="text-xs text-primary mt-1">
+                    Allocated: {formatNumber(allocatedVisits)}
                   </p>
                 )}
               </div>
             </div>
           )}
 
-          {config.enable_visits && (
-            <div className="flex items-center gap-3 bg-background/50 rounded-lg p-3">
+          {config.enable_revenue && (
+            <div className="flex items-center gap-3 bg-background/70 rounded-lg p-3 border border-border/50">
               <div className="p-2 bg-accent rounded-full">
-                <Users className="h-4 w-4 text-accent-foreground" />
+                <IndianRupee className="h-4 w-4 text-accent-foreground" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Productive Visits</p>
-                <p className="font-semibold">
-                  {formatNumber(config.total_visits_target)}
+                <p className="text-xs text-muted-foreground font-medium">Revenue</p>
+                <p className="font-bold text-lg">
+                  {formatCurrency(config.total_revenue_target)}
                 </p>
-                {allocatedVisits > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Allocated: {formatNumber(allocatedVisits)}
+                {allocatedRevenue > 0 && (
+                  <p className="text-xs text-primary mt-1">
+                    Allocated: {formatCurrency(allocatedRevenue)}
                   </p>
                 )}
               </div>
