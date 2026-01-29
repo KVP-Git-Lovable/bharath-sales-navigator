@@ -1,153 +1,92 @@
 
-# Plan: Fix "End My Day" to Auto-Capture All Activities
+# Plan: Redesign Hierarchy View UI
 
-## Problem Summary
-
-When clicking "End My Day" in the Attendance module, the system currently:
-- Records attendance check-out time and location
-- Cancels remaining "planned" visits
-- Stops GPS tracking
-
-**However, it fails to:**
-1. Close "in-progress" visits with proper check-out times and mark them as 'unproductive'
-2. Close active `retailer_visit_logs` entries (which track detailed time spent per retailer)
-
-This leaves incomplete data in the system, affecting reports and analytics.
+## Overview
+Transform the Hierarchy tab UI in Target Management to match the provided screenshot design with a clean split-panel layout, enhanced organization tree with role icons, and a streamlined allocation table.
 
 ---
 
-## Solution Overview
+## Changes Summary
 
-Enhance the "End My Day" check-out flow in `Attendance.tsx` to:
-1. Auto-checkout all in-progress visits using their `updated_at` timestamp as the last activity time
-2. Close all active retailer visit logs with proper time calculations
+### 1. OrganizationTree.tsx - Enhanced Tree with Role Icons
 
----
+**Visual Changes:**
+- Replace avatars with role-based icons:
+  - Level 0 (Root/CEO): Filled circle icon
+  - Level 1 (Managers): Cloud/building icon  
+  - Level 2+ (Field staff): Map pin icon
+- Add vertical tree connector lines
+- Improved expand/collapse chevron indicators
+- Clean selected state styling
 
-## Technical Implementation
-
-### File: `src/pages/Attendance.tsx`
-
-**Location:** After line 756 (after cancelling planned visits), add the following logic:
-
-### Step 1: Auto-Checkout In-Progress Visits
-
-```text
-// Auto-checkout all in-progress visits using their last activity time
-const { data: inProgressVisits } = await supabase
-  .from('visits')
-  .select('id, updated_at')
-  .eq('user_id', user.id)
-  .eq('planned_date', today)
-  .eq('status', 'in-progress');
-
-if (inProgressVisits && inProgressVisits.length > 0) {
-  for (const visit of inProgressVisits) {
-    // Use visit's updated_at as last activity time, fallback to current time
-    const checkOutTime = visit.updated_at || timestamp;
-    
-    await supabase
-      .from('visits')
-      .update({
-        check_out_time: checkOutTime,
-        check_out_location: freshLocation,
-        check_out_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
-        status: 'unproductive',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', visit.id);
-  }
-  console.log(`Auto checked-out ${inProgressVisits.length} in-progress visits`);
-}
-```
-
-### Step 2: Close Active Retailer Visit Logs
-
-```text
-// Close all active retailer visit logs
-const { data: activeLogs } = await supabase
-  .from('retailer_visit_logs')
-  .select('id, start_time, updated_at')
-  .eq('user_id', user.id)
-  .eq('visit_date', today)
-  .is('end_time', null);
-
-if (activeLogs && activeLogs.length > 0) {
-  for (const log of activeLogs) {
-    // Use updated_at as last activity time, fallback to current time
-    const endTime = log.updated_at || timestamp;
-    const startTimeMs = new Date(log.start_time).getTime();
-    const endTimeMs = new Date(endTime).getTime();
-    const timeSpentSeconds = Math.floor((endTimeMs - startTimeMs) / 1000);
-
-    await supabase
-      .from('retailer_visit_logs')
-      .update({
-        end_time: endTime,
-        time_spent_seconds: Math.max(0, timeSpentSeconds)
-      })
-      .eq('id', log.id);
-  }
-  console.log(`Closed ${activeLogs.length} active retailer visit logs`);
-}
-```
+**Code Changes:**
+- Import `Circle`, `Building2`, `MapPin` icons from lucide-react
+- Add `getRoleIcon(level)` helper function
+- Update `renderNode` to use role icons instead of avatars
+- Improve tree line styling with proper border connectors
 
 ---
 
-## Why "unproductive" Status?
+### 2. TargetSummaryCard.tsx - Redesigned Header Card
 
-When a visit is auto-closed by "End My Day":
-- The salesperson did not complete the visit workflow normally
-- No order was placed (otherwise it would already be 'productive')
-- Therefore, marking as 'unproductive' is the correct business logic
+**Visual Changes:**
+- New layout: "Target: {plan_name}" as main title
+- "Locked" badge in green with lock icon (right side)
+- "Total Target" section label
+- FY year display in top-right corner
+- Clean 3-column grid for metrics (Quantity, Productive Visits, Revenue)
 
----
-
-## Data Flow After Implementation
-
-```text
-User clicks "End My Day"
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ 1. Record attendance check-out              │
-│    (time, location, photo, face match)      │
-└─────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ 2. Cancel all 'planned' visits              │
-│    (existing behavior - unchanged)          │
-└─────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ 3. NEW: Auto-checkout 'in-progress' visits  │
-│    - Set check_out_time = updated_at        │
-│    - Set status = 'unproductive'            │
-│    - Set check_out_location = GPS           │
-└─────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ 4. NEW: Close active retailer_visit_logs    │
-│    - Set end_time = updated_at              │
-│    - Calculate time_spent_seconds           │
-└─────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ 5. Stop GPS tracking                        │
-│    (existing behavior - unchanged)          │
-└─────────────────────────────────────────────┘
-```
+**Code Changes:**
+- Update card gradient to light green/teal tint
+- Restructure header layout with title format change
+- Add "Total Target" label with underline
+- Update badge styling to green variant
 
 ---
 
-## Summary of Changes
+### 3. AllocationTable.tsx - Clean Table Layout
 
-| File | Change Description |
-|------|-------------------|
-| `src/pages/Attendance.tsx` | Add auto-checkout logic for in-progress visits and retailer visit logs after line 756 |
+**Visual Changes:**
+- Section header: "Allocation Method"
+- Clean table structure with columns:
+  - Target (name)
+  - Quantity (editable input with unit)
+  - Progress bar (color-coded based on %)
+  - ₹ Total (revenue value)
+- "Remaining: X" row at bottom
+- Prominent "Save Allocation" button centered at bottom
 
-This ensures complete data capture when ending the day, maintaining data integrity for reports and analytics.
+**Code Changes:**
+- Convert from card-based rows to proper table layout
+- Remove collapsible/expandable sections (flatten to simple rows)
+- Add progress bar colors: green (0-60%), yellow (60-85%), red (85%+)
+- Move remaining display to table footer row
+- Center save button at bottom with icon
+
+---
+
+### 4. HierarchyAllocationTab.tsx - Minor Layout Updates
+
+**Changes:**
+- Adjust grid proportions for better balance
+- Ensure proper spacing between components
+
+---
+
+## File Changes
+
+| File | Type | Description |
+|------|------|-------------|
+| `src/components/admin/OrganizationTree.tsx` | Modify | Add role icons, tree lines, enhanced styling |
+| `src/components/admin/TargetSummaryCard.tsx` | Modify | Redesign header, add Total Target section |
+| `src/components/admin/AllocationTable.tsx` | Modify | Convert to table layout, redesign footer |
+| `src/components/admin/HierarchyAllocationTab.tsx` | Modify | Minor layout adjustments |
+
+---
+
+## Expected Result
+
+The updated UI will feature:
+- Left panel: Organization tree with role-based icons and clean hierarchy lines
+- Right panel top: Target summary card with "Locked" badge and FY display
+- Right panel bottom: Clean allocation table with progress bars and centered save button
