@@ -3,39 +3,59 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface Retailer {
+interface Territory {
   id: string;
   name: string;
+  region?: string;
   latitude?: number | null;
   longitude?: number | null;
-  address?: string;
 }
 
-interface DakshinaKannadaMapProps {
-  retailers?: Retailer[];
+interface TerritoryMapProps {
+  territories?: Territory[];
   height?: string;
 }
 
-// Dakshina Kannada district center coordinates
-const DAKSHINA_KANNADA_CENTER = { lat: 12.8698, lng: 74.8426 };
-const DEFAULT_ZOOM = 10;
+// Karnataka center (covers Dakshina Kannada, Udupi region)
+const KARNATAKA_CENTER = { lat: 13.3409, lng: 74.7421 };
+const DEFAULT_ZOOM = 9;
 
-export function DakshinaKannadaMap({ retailers = [], height = "350px" }: DakshinaKannadaMapProps) {
+export function TerritoryMap({ territories = [], height = "350px" }: TerritoryMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const geocoderRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const retailersWithCoords = retailers.filter(r => r.latitude && r.longitude);
+  const [geocodedTerritories, setGeocodedTerritories] = useState<Map<string, { lat: number; lng: number }>>(new Map());
 
-  const initializeMap = useCallback(() => {
+  // Geocode territory names to get coordinates
+  const geocodeTerritory = useCallback(async (name: string): Promise<{ lat: number; lng: number } | null> => {
+    if (!geocoderRef.current) return null;
+    
+    // Add ", Karnataka, India" for better geocoding accuracy
+    const searchQuery = `${name}, Karnataka, India`;
+    
+    return new Promise((resolve) => {
+      geocoderRef.current!.geocode({ address: searchQuery }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          const location = results[0].geometry.location;
+          resolve({ lat: location.lat(), lng: location.lng() });
+        } else {
+          console.log(`Geocoding failed for ${name}: ${status}`);
+          resolve(null);
+        }
+      });
+    });
+  }, []);
+
+  const initializeMap = useCallback(async () => {
     if (!mapRef.current || !window.google?.maps) return;
 
     try {
       // Create map
       const map = new google.maps.Map(mapRef.current, {
-        center: DAKSHINA_KANNADA_CENTER,
+        center: KARNATAKA_CENTER,
         zoom: DEFAULT_ZOOM,
         mapTypeControl: true,
         streetViewControl: false,
@@ -44,32 +64,63 @@ export function DakshinaKannadaMap({ retailers = [], height = "350px" }: Dakshin
       });
 
       mapInstanceRef.current = map;
+      geocoderRef.current = new (google.maps as any).Geocoder();
 
       // Clear existing markers
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
 
-      // Add markers for retailers with coordinates
+      // Geocode and add markers for territories
       const bounds = new google.maps.LatLngBounds();
       let hasMarkers = false;
+      const newGeocodedTerritories = new Map<string, { lat: number; lng: number }>();
 
-      retailersWithCoords.forEach((retailer) => {
-        if (retailer.latitude && retailer.longitude) {
-          const position = { lat: retailer.latitude, lng: retailer.longitude };
-          
+      for (const territory of territories) {
+        let position: { lat: number; lng: number } | null = null;
+
+        // Use existing coordinates if available
+        if (territory.latitude && territory.longitude) {
+          position = { lat: territory.latitude, lng: territory.longitude };
+        } else {
+          // Geocode the territory name
+          position = await geocodeTerritory(territory.name);
+        }
+
+        if (position) {
+          newGeocodedTerritories.set(territory.id, position);
+
+          // Create marker with custom icon
           const marker = new google.maps.Marker({
             position,
             map,
-            title: retailer.name,
-          });
+            title: territory.name,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: '#3b82f6',
+              fillOpacity: 1,
+              strokeColor: '#1d4ed8',
+              strokeWeight: 2,
+            },
+          } as google.maps.MarkerOptions);
+
+          // Add a separate label marker for territory name
+          const labelMarker = new google.maps.Marker({
+            position: { lat: position.lat + 0.01, lng: position.lng },
+            map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 0,
+            } as google.maps.Symbol,
+          } as google.maps.MarkerOptions);
 
           // Add info window with Google Maps link
-          const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${retailer.latitude},${retailer.longitude}`;
+          const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${position.lat},${position.lng}`;
           const infoWindow = new google.maps.InfoWindow({
             content: `
               <div style="padding: 8px; max-width: 220px;">
-                <h3 style="margin: 0 0 4px 0; font-weight: 600; font-size: 14px;">${retailer.name}</h3>
-                ${retailer.address ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">${retailer.address}</p>` : ''}
+                <h3 style="margin: 0 0 4px 0; font-weight: 600; font-size: 14px;">${territory.name}</h3>
+                ${territory.region ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">Region: ${territory.region}</p>` : ''}
                 <a href="${googleMapsUrl}" target="_blank" rel="noopener noreferrer" 
                    style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #4285f4; color: white; border-radius: 4px; text-decoration: none; font-size: 12px;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -88,18 +139,23 @@ export function DakshinaKannadaMap({ retailers = [], height = "350px" }: Dakshin
           });
 
           markersRef.current.push(marker);
+          markersRef.current.push(labelMarker);
           bounds.extend(position);
           hasMarkers = true;
         }
-      });
+      }
+
+      setGeocodedTerritories(newGeocodedTerritories);
 
       // Fit bounds if we have markers
-      if (hasMarkers && retailersWithCoords.length > 1) {
+      if (hasMarkers && territories.length > 1) {
         map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
-      } else if (hasMarkers && retailersWithCoords.length === 1) {
-        const center = bounds.getCenter() as unknown as { lat: () => number; lng: () => number };
-        (map as unknown as { setCenter: (c: { lat: number; lng: number }) => void }).setCenter({ lat: center.lat(), lng: center.lng() });
-        (map as unknown as { setZoom: (z: number) => void }).setZoom(14);
+      } else if (hasMarkers && territories.length === 1) {
+        const firstTerritory = newGeocodedTerritories.values().next().value;
+        if (firstTerritory) {
+          map.setCenter(firstTerritory);
+          map.setZoom(12);
+        }
       }
 
       setIsLoading(false);
@@ -109,7 +165,7 @@ export function DakshinaKannadaMap({ retailers = [], height = "350px" }: Dakshin
       setError('Failed to initialize map');
       setIsLoading(false);
     }
-  }, [retailersWithCoords]);
+  }, [territories, geocodeTerritory]);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -155,15 +211,15 @@ export function DakshinaKannadaMap({ retailers = [], height = "350px" }: Dakshin
     };
   }, [initializeMap]);
 
-  // Update markers when retailers change
+  // Update markers when territories change
   useEffect(() => {
     if (mapInstanceRef.current && window.google?.maps) {
       initializeMap();
     }
-  }, [retailers, initializeMap]);
+  }, [territories, initializeMap]);
 
   const openInGoogleMaps = () => {
-    const url = `https://www.google.com/maps/@${DAKSHINA_KANNADA_CENTER.lat},${DAKSHINA_KANNADA_CENTER.lng},${DEFAULT_ZOOM}z`;
+    const url = `https://www.google.com/maps/@${KARNATAKA_CENTER.lat},${KARNATAKA_CENTER.lng},${DEFAULT_ZOOM}z`;
     window.open(url, '_blank');
   };
 
@@ -173,12 +229,12 @@ export function DakshinaKannadaMap({ retailers = [], height = "350px" }: Dakshin
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <MapPin className="h-4 w-4" />
-            Dakshina Kannada Map
+            Territory Map
           </CardTitle>
           <div className="flex items-center gap-2">
-            {retailersWithCoords.length > 0 && (
+            {territories.length > 0 && (
               <span className="text-xs text-muted-foreground">
-                {retailersWithCoords.length} retailers
+                {geocodedTerritories.size} of {territories.length} mapped
               </span>
             )}
             <Button variant="outline" size="sm" onClick={openInGoogleMaps}>
@@ -195,7 +251,10 @@ export function DakshinaKannadaMap({ retailers = [], height = "350px" }: Dakshin
         >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">Loading territories...</p>
+              </div>
             </div>
           )}
           {error && (

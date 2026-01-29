@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Plus, FileDown, Search, Check, ChevronsUpDown, X, BarChart3, Pencil, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TerritoryDetailsModal from './TerritoryDetailsModal';
+import { TerritoryMap } from './territories/TerritoryMap';
 
 import { format } from 'date-fns';
 import {
@@ -1116,8 +1117,17 @@ const TerritoriesManagement = () => {
             )}
           </CardContent>
         </Card>
-      </div>
 
+        {/* Territory Map Section */}
+        <TerritoryMap 
+          territories={filteredTerritories.map(t => ({
+            id: t.id,
+            name: t.name,
+            region: t.region,
+          }))} 
+          height="400px"
+        />
+      </div>
       <TerritoryDetailsModal
         open={detailsModalOpen} 
         onOpenChange={setDetailsModalOpen} 
