@@ -124,7 +124,7 @@ export function TerritoryMap({ territories = [], height = "350px" }: TerritoryMa
               <div style="padding: 8px; max-width: 220px;">
                 <h3 style="margin: 0 0 4px 0; font-weight: 600; font-size: 14px;">${territory.name}</h3>
                 ${territory.region ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">Region: ${territory.region}</p>` : ''}
-                <a href="${googleMapsUrl}" target="_blank" rel="noopener noreferrer" 
+                <a href="${googleMapsUrl}" target="_blank" rel="noreferrer noopener" 
                    style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #4285f4; color: white; border-radius: 4px; text-decoration: none; font-size: 12px;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
