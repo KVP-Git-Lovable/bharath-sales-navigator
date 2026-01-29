@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Loader2 } from "lucide-react";
+import { MapPin, Loader2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Retailer {
   id: string;
@@ -25,6 +26,7 @@ export function DakshinaKannadaMap({ retailers = [], height = "400px" }: Dakshin
   const markersRef = useRef<google.maps.Marker[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const initAttemptedRef = useRef(false);
 
   // Load Google Maps script
   useEffect(() => {
@@ -35,39 +37,64 @@ export function DakshinaKannadaMap({ retailers = [], height = "400px" }: Dakshin
       return;
     }
 
-    // Check if script is already loaded
-    if (window.google?.maps) {
+    // Check if already loaded and working
+    if (window.google?.maps?.Map) {
       setIsLoaded(true);
       return;
     }
 
-    // Check if script is already being loaded
+    // Don't add script multiple times
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
-      existingScript.addEventListener('load', () => setIsLoaded(true));
+      // Wait for it to load
+      const checkLoaded = setInterval(() => {
+        if (window.google?.maps?.Map) {
+          setIsLoaded(true);
+          clearInterval(checkLoaded);
+        }
+      }, 100);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkLoaded);
+        if (!window.google?.maps?.Map) {
+          setError("Google Maps failed to load. Please check API key configuration in Google Cloud Console.");
+        }
+      }, 10000);
       return;
     }
 
+    // Add callback for when script loads
+    const callbackName = `initGoogleMaps_${Date.now()}`;
+    (window as any)[callbackName] = () => {
+      setIsLoaded(true);
+      delete (window as any)[callbackName];
+    };
+
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}`;
     script.async = true;
     script.defer = true;
     
-    script.onload = () => setIsLoaded(true);
-    script.onerror = () => setError("Failed to load Google Maps");
+    script.onerror = () => {
+      setError("Failed to load Google Maps. Check your API key and ensure Maps JavaScript API is enabled.");
+      delete (window as any)[callbackName];
+    };
     
     document.head.appendChild(script);
-
-    return () => {
-      // Don't remove script on unmount as it may be used by other components
-    };
   }, []);
 
   // Initialize map
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || mapInstanceRef.current) return;
+    if (!isLoaded || !mapRef.current || initAttemptedRef.current) return;
+    initAttemptedRef.current = true;
 
     try {
+      if (!window.google?.maps?.Map) {
+        setError("Google Maps not available. Please verify API key settings.");
+        return;
+      }
+
       mapInstanceRef.current = new google.maps.Map(mapRef.current, {
         center: DAKSHINA_KANNADA_CENTER,
         zoom: DEFAULT_ZOOM,
@@ -75,13 +102,6 @@ export function DakshinaKannadaMap({ retailers = [], height = "400px" }: Dakshin
         streetViewControl: false,
         fullscreenControl: true,
         zoomControl: true,
-        styles: [
-          {
-            featureType: "poi",
-            elementType: "labels",
-            stylers: [{ visibility: "off" }]
-          }
-        ]
       });
 
       // Add a marker for the district center
@@ -158,6 +178,12 @@ export function DakshinaKannadaMap({ retailers = [], height = "400px" }: Dakshin
     }
   }, [retailers, isLoaded]);
 
+  // Open in Google Maps (external link)
+  const openInGoogleMaps = () => {
+    const url = `https://www.google.com/maps/@${DAKSHINA_KANNADA_CENTER.lat},${DAKSHINA_KANNADA_CENTER.lng},${DEFAULT_ZOOM}z`;
+    window.open(url, '_blank');
+  };
+
   if (error) {
     return (
       <Card>
@@ -169,10 +195,20 @@ export function DakshinaKannadaMap({ retailers = [], height = "400px" }: Dakshin
         </CardHeader>
         <CardContent>
           <div 
-            className="flex items-center justify-center bg-muted rounded-lg"
+            className="flex flex-col items-center justify-center bg-muted rounded-lg gap-3 p-6"
             style={{ height }}
           >
-            <p className="text-muted-foreground text-sm">{error}</p>
+            <p className="text-muted-foreground text-sm text-center">{error}</p>
+            <p className="text-xs text-muted-foreground text-center max-w-md">
+              To fix this, ensure the Google Maps JavaScript API is enabled and billing is set up in your 
+              <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener" className="text-primary ml-1 underline">
+                Google Cloud Console
+              </a>
+            </p>
+            <Button variant="outline" size="sm" onClick={openInGoogleMaps}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open in Google Maps
+            </Button>
           </div>
         </CardContent>
       </Card>
