@@ -1,355 +1,88 @@
 
-# Target Management UI Redesign - Two-Phase Flow
+# Plan: Fix Value Calculations to Use `total_amount` Instead of `subtotal`
 
-## Overview
+## Problem Summary
 
-This plan redesigns the Target Management UI to match the reference mockup with a clean two-phase workflow:
-1. **Phase 1: Create Target** - Define target name, metrics, parameters, units, then lock
-2. **Phase 2: Assign to Hierarchy** - Select organization level, allocate to subordinates
+In the Supervisor Report's "Order Summary by User" section, three areas are calculating order values incorrectly:
 
-The key difference from the current wizard is that this UI is more streamlined with all configuration on one screen before locking, and hierarchy assignment happens on a separate tabbed view with a left sidebar tree.
+| Location | Current Behavior | Expected Behavior |
+|----------|-----------------|-------------------|
+| User Order Summary (Total Order Value) | Uses `SUM(order_items.total)` = subtotal | Should use `orders.total_amount` |
+| Beat-wise Split (Value) | Uses `SUM(order_items.total)` = subtotal | Should use `orders.total_amount` |
+| Retailer Details (Value) | Uses `SUM(order_items.total)` = subtotal | Should use `orders.total_amount` |
 
----
+**Example from database:**
+- `subtotal` / `SUM(order_items.total)`: 17,943.00
+- `total_amount`: 18,840.00 (includes taxes/charges)
 
-## Proposed UI Structure
+## Root Cause
 
-```text
-TARGET MANAGEMENT
-├── Tab: "Targets" (Create/Edit Target Configs)
-│   ├── Target Plan Name Input
-│   ├── Target Metrics Checkboxes (Quantity, Revenue, Productive Visits)
-│   ├── Target Parameters Checkboxes (Product-wise, Retailer-wise, Beat-wise, etc.)
-│   ├── Units Section
-│   └── [Lock and Assign to Hierarchy] Button
-│
-├── Tab: "Hierarchy" (Allocate to Users)
-│   ├── Left Panel: Organization Tree (CEO > Manager > Rep)
-│   │   └── Clickable nodes with drill-down
-│   └── Right Panel: Allocation View
-│       ├── Target Summary Card (Locked, shows totals)
-│       ├── Allocation Table (User, Quantity, Progress Bar)
-│       ├── "Remaining" indicator
-│       └── [Save Allocation] Button
-│
-└── Tab: "Dashboard" (Existing - Target vs Actual View)
-```
+The code fetches orders but doesn't include `total_amount` in the select, then makes a separate query to `order_items` to sum up the `total` field. This gives the subtotal instead of the final order amount.
+
+## Solution
+
+Modify three functions in `SupervisorReport.tsx` to select and use `orders.total_amount` directly instead of summing `order_items.total`.
 
 ---
 
-## Detailed Component Design
+## Technical Changes
 
-### Tab 1: "Targets" - Create Target Configuration
+### 1. Fix `fetchSummaryData()` (Lines 254-354)
 
-This is a single-page form (no wizard steps) that contains:
-
-**Card: Create Target**
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│  🎯 Create Target                                                    │
-├──────────────────────────────────────────────────────────────────────┤
-│  FY Year: [FY 2025-26 ▼]                                             │
-│                                                                       │
-│  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │ [FY 25 Sales Plan                                              ]│ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  Target Metrics                                                       │
-│  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │ ☑ Quantity    ☑ Revenue    ☑ Productive Visits                 │ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  Target Parameters                                                    │
-│  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │ ☑ Product-wise  ☑ Retailer-wise  ☑ Beat-wise  ☑ Distributor    │ │
-│  │ ☑ Month         ☐ Territory-wise                                │ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  Units                                                                │
-│  [Kg ▼] for Quantity                                                 │
-│                                                                       │
-│  Satisfied with the target configuration?                            │
-│                              [🔒 Lock and Assign to Hierarchy]       │
-│                                                                       │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-**Behavior:**
-- Target Plan Name is editable text input
-- On "Lock and Assign to Hierarchy" click:
-  - Save configuration with `is_locked = true`
-  - Switch to "Hierarchy" tab
-  - Show FY total inputs (Quantity/Revenue/Visits based on selected metrics)
-
-### Tab 2: "Hierarchy" - Assign to Organization
-
-Split-panel layout with organization tree on left and allocation form on right:
-
-```text
-┌────────────────────────┬─────────────────────────────────────────────┐
-│ Organization Hierarchy │  Target: FY 25 Sales Plan       [🔒 Locked]│
-├────────────────────────┼─────────────────────────────────────────────┤
-│                        │                                             │
-│ ● CEO                  │  Total Target              FY 2025-26       │
-│ └ 📋 National Manager  │  ───────────────────────────────────────   │
-│   └ 📋 Regional Manager│  Quantity: 1,00,000 KG                     │
-│     ├ 📍 ASM-1         │  Revenue: ₹ 55,000,00,000                  │
-│     ├ 📍 ASM-2         │  Productive Visits: 12,000                 │
-│     └ 📍 ASM-3         │                                   [≡ Tool] │
-│                        │─────────────────────────────────────────────│
-│                        │                                             │
-│                        │  Allocation Method                          │
-│                        │  ┌───────────────────────────────────────┐ │
-│                        │  │ Target    │ Quantity  │ ₹ Total      │ │
-│                        │  ├───────────┼───────────┼──────────────┤ │
-│                        │  │ ASM-1     │ 25,000 KG │ ████░░ 25,00 │ │
-│                        │  │ ASM-2     │ 35,000 KG │ █████░ 35,000│ │
-│                        │  │ ASM-3     │ 40,000 KG │ ██████ 40,000│ │
-│                        │  └───────────┴───────────┴──────────────┘ │
-│                        │                 Remaining: [0]             │
-│                        │                                             │
-│                        │              [≡ Save Allocation]           │
-└────────────────────────┴─────────────────────────────────────────────┘
-```
-
-**Left Panel - Organization Tree:**
-- Uses existing `get_all_subordinates` RPC
-- Clickable nodes - clicking a manager shows their direct reports in the allocation table
-- Icons differentiate managers (📋) from reps (📍)
-- Current selected node is highlighted
-
-**Right Panel - Allocation View:**
-- Shows locked target summary at top
-- FY totals for each enabled metric
-- Allocation table shows direct subordinates of selected tree node
-- Editable quantity/revenue input with visual progress bar
-- "Remaining" shows unallocated amount (auto-calculates)
-- "Save Allocation" persists to `user_business_plans`
-
-### Tab 3: "Dashboard" - Target vs Actual (Existing)
-
-Keep the existing `TeamTargetDashboard` component - no changes needed.
-
----
-
-## Database Schema Changes
-
-Add new columns to `fy_target_config`:
-
-```sql
-ALTER TABLE fy_target_config
-ADD COLUMN IF NOT EXISTS target_plan_name TEXT DEFAULT 'FY Sales Plan',
-ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
-```
-
----
-
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/pages/admin/TargetVsActual.tsx` | Modify | Update tabs to "Targets", "Hierarchy", "Dashboard" |
-| `src/components/admin/TargetConfigTab.tsx` | Major Refactor | Convert to single-page "Create Target" form |
-| `src/components/admin/HierarchyAllocationTab.tsx` | Create | New split-panel hierarchy allocation view |
-| `src/components/admin/OrganizationTree.tsx` | Create | Left panel tree component with clickable nodes |
-| `src/components/admin/AllocationTable.tsx` | Create | Right panel allocation table with progress bars |
-| `src/components/admin/TargetSummaryCard.tsx` | Create | Locked target summary header component |
-| `supabase/migrations/...` | Create | Add target_plan_name and is_locked columns |
-| `src/integrations/supabase/types.ts` | Auto-update | Regenerate types |
-
----
-
-## Detailed Component Breakdown
-
-### 1. TargetConfigTab.tsx (Refactored)
-
-Remove wizard steps, make it a single-page form:
-
+**Current approach:**
 ```typescript
-interface TargetConfigTabProps {
-  fyYear: number;
-  onLockedAndAssign: () => void; // Callback to switch to Hierarchy tab
-}
+.select(`id, user_id, order_items (total)`)
+// Then sums order_items.total per order
 ```
 
-Key changes:
-- Add `target_plan_name` text input at top
-- Remove step indicators (WizardProgress)
-- Keep all configuration fields on one card
-- Add "Lock and Assign to Hierarchy" button
-- When locked, show read-only summary with "Edit Configuration" option
-- Show FY total inputs (Quantity/Revenue/Visits) in same form
-
-### 2. HierarchyAllocationTab.tsx (New)
-
-Split-panel component with:
-- Left: `OrganizationTree` component
-- Right: `TargetSummaryCard` + `AllocationTable`
-
+**New approach:**
 ```typescript
-interface HierarchyAllocationTabProps {
-  fyYear: number;
-  config: TargetConfig; // From parent or fetched
-}
+.select(`id, user_id, total_amount`)
+// Use total_amount directly for each order
 ```
 
-### 3. OrganizationTree.tsx (New)
+### 2. Fix `fetchBeatBreakdown()` (Lines 1038-1132)
 
-Recursive tree component:
+**Current approach:**
+- Fetches orders without `total_amount`
+- Makes separate query to `order_items` for totals
+- Sums `order_items.total`
 
-```typescript
-interface OrganizationTreeProps {
-  rootUserId: string | null;
-  selectedNodeId: string | null;
-  onNodeSelect: (userId: string, level: number) => void;
-}
-```
+**New approach:**
+- Add `total_amount` to the orders select
+- Use `order.total_amount` directly instead of summing order items
+- Remove the separate `order_items` query
 
-Features:
-- Fetches hierarchy using `get_all_subordinates`
-- Renders as collapsible tree with icons
-- Clicking a node selects it and updates right panel
-- Shows count of direct reports next to manager names
+### 3. Fix `fetchRetailerDetailsForBeat()` (Lines 1148-1254)
 
-### 4. AllocationTable.tsx (New)
+**Current approach:**
+- Same pattern - fetches orders, then order_items separately
+- Sums `order_items.total`
 
-Allocation grid with editable inputs:
+**New approach:**
+- Add `total_amount` to the orders select
+- Use `order.total_amount` directly
+- Remove the separate `order_items` query
 
-```typescript
-interface AllocationTableProps {
-  parentUserId: string;
-  subordinates: SubordinateData[];
-  totalQuantity: number;
-  totalRevenue: number;
-  totalVisits: number;
-  quantityUnit: string;
-  enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean };
-  onAllocationChange: (userId: string, field: string, value: number) => void;
-  onSave: () => void;
-}
-```
+### 4. Fix `fetchOrderDetailsBeatBreakdownForUser()` (Lines 693-792)
 
-Features:
-- Grid with columns: Name, Quantity, Progress, Revenue, Progress
-- Progress bars showing % of parent allocation
-- Auto-calculate "Remaining" as parent total - sum of children
-- Validation: warn if allocations exceed parent total
+**Current approach:**
+- Fetches orders without `total_amount`
+- Sums `order_items.total` per order
 
----
-
-## Workflow Flow
-
-```text
-USER FLOW:
-
-1. Admin opens Target Management
-   └─► Sees "Targets" tab by default
-
-2. On "Targets" tab:
-   ├─► Enters/edits "FY 25 Sales Plan" name
-   ├─► Checks Target Metrics (Quantity, Revenue, Visits)
-   ├─► Checks Target Parameters (Product-wise, Beat-wise, Monthly, etc.)
-   ├─► Selects Quantity Unit (Kg)
-   ├─► Enters FY Totals (Quantity: 1,00,000, Revenue: 55Cr, Visits: 12000)
-   └─► Clicks "Lock and Assign to Hierarchy"
-       └─► Config saved with is_locked=true
-       └─► Auto-switches to "Hierarchy" tab
-
-3. On "Hierarchy" tab:
-   ├─► Sees organization tree on left
-   ├─► Clicks "Regional Manager" in tree
-   ├─► Right panel shows:
-   │   ├─► Target Summary Card (locked totals)
-   │   └─► Allocation table for ASM-1, ASM-2, ASM-3
-   ├─► Enters allocation for each ASM
-   ├─► Sees "Remaining" update in real-time
-   └─► Clicks "Save Allocation"
-       └─► Creates/updates user_business_plans for each user
-
-4. Drill-down allocation:
-   ├─► Clicks on "ASM-1" in tree
-   └─► Right panel now shows ASM-1's direct reports
-       └─► Can allocate ASM-1's total to their team
-
-5. On "Dashboard" tab:
-   └─► Existing Target vs Actual view (no changes)
-```
-
----
-
-## Parameter-wise Target Setting (After Basic Allocation)
-
-After setting user-level totals, clicking on a user row can expand to show parameter breakdowns:
-
-```text
-┌────────────────────────────────────────────────────────────────────┐
-│ ASM-1: 25,000 KG | ₹13,75,00,000                          [▼ Expand]│
-├────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│ [ Beats ] [ Monthly ] [ Retailers ] [ Products ]                   │
-│                                                                     │
-│ ┌─────────────────────────────────────────────────────────────────┐│
-│ │ BEAT TAB                                                        ││
-│ │ ☑ Equally divide across all beats                               ││
-│ │ Beat-1: 8,333 KG   Beat-2: 8,333 KG   Beat-3: 8,334 KG         ││
-│ │                                    [Save Beat Targets]          ││
-│ └─────────────────────────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────┘
-```
-
-This reuses the existing `HierarchyUserTargetNode` component with:
-- Filtered tabs based on enabled parameters
-- `UserBeatTargets`, `UserMonthlyTargets`, `UserRetailerTargets` sub-components
-
----
-
-## Technical Notes
-
-1. **State Management**: 
-   - Config state persisted to `fy_target_config` table
-   - User allocations persisted to `user_business_plans` table
-   - Parameter breakdowns to respective `user_business_plan_*` tables
-
-2. **Lock Behavior**:
-   - Once locked, config cannot be edited without explicit "Unlock" action
-   - Locked configs show read-only summary on "Targets" tab
-   - "Hierarchy" tab only available when a locked config exists
-
-3. **Hierarchy Tree**:
-   - Use `get_all_subordinates` RPC for full hierarchy
-   - Build client-side tree structure from flat list
-   - Support for clicking any level to allocate to that level's direct reports
-
-4. **Progress Bars**:
-   - Visual representation of allocation percentage
-   - Color-coded: green (within target), orange (over target)
-
-5. **Validation**:
-   - Warn if sum of allocations exceeds parent total
-   - "Remaining" can be negative (over-allocation) or positive (under-allocation)
-
----
-
-## Migration Script
-
-```sql
--- Add new columns for target plan name and lock status
-ALTER TABLE fy_target_config
-ADD COLUMN IF NOT EXISTS target_plan_name TEXT DEFAULT 'FY Sales Plan',
-ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
-```
+**New approach:**
+- Add `total_amount` to the orders select
+- Use it directly for beat grouping
 
 ---
 
 ## Summary of Changes
 
-| Current | New |
-|---------|-----|
-| 3-step wizard (Configure → Set Targets → Apply to Users) | Single-page form with Lock button |
-| Separate tabs: Config, Assign, Dashboard | Tabs: Targets, Hierarchy, Dashboard |
-| Step-by-step flow | All config on one screen, then hierarchy |
-| No target plan name | Named target plans |
-| No lock mechanism | Explicit lock before assignment |
-| Hierarchy in Step 3 | Dedicated "Hierarchy" tab with tree view |
-| Single-panel hierarchy | Split-panel with tree + allocation table |
+| Function | Line Range | Change |
+|----------|-----------|--------|
+| `fetchSummaryData` | ~262-334 | Select `total_amount`, use directly |
+| `fetchOrderDetailsBeatBreakdownForUser` | ~720-773 | Select `total_amount`, remove order_items query |
+| `fetchBeatBreakdown` | ~1069-1114 | Select `total_amount`, remove order_items query |
+| `fetchRetailerDetailsForBeat` | ~1177-1235 | Select `total_amount`, remove order_items query |
 
-This redesign provides a cleaner, more intuitive flow that matches the reference mockup while maintaining all existing functionality.
+All four functions will be simplified by removing the extra `order_items` query and using the pre-calculated `total_amount` from the orders table, ensuring accurate totals that include taxes and additional charges.
