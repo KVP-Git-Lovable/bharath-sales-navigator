@@ -526,6 +526,16 @@ const TerritoriesManagement = () => {
       </div>
 
       <div className="space-y-6">
+        {/* Territory Map Section - At Top */}
+        <TerritoryMap 
+          territories={territories.map(t => ({
+            id: t.id,
+            name: t.name,
+            region: t.region,
+          }))} 
+          height="400px"
+        />
+
         {showForm && (
           <Card>
             <CardHeader><CardTitle>{editingTerritoryId ? 'Edit Territory' : 'Add New Territory'}</CardTitle></CardHeader>
@@ -1118,15 +1128,6 @@ const TerritoriesManagement = () => {
           </CardContent>
         </Card>
 
-        {/* Territory Map Section */}
-        <TerritoryMap 
-          territories={filteredTerritories.map(t => ({
-            id: t.id,
-            name: t.name,
-            region: t.region,
-          }))} 
-          height="400px"
-        />
       </div>
       <TerritoryDetailsModal
         open={detailsModalOpen} 
