@@ -147,8 +147,11 @@ export function TerritoryMap({ territories = [], height = "350px" }: TerritoryMa
               const button = document.getElementById(buttonId);
               if (button) {
                 button.onclick = () => {
-                  // Direct navigation to clear security headers
-                  window.location.href = googleMapsUrl;
+                  // Clean break method to open Google Maps without referrer
+                  const newWindow = window.open(googleMapsUrl, '_blank', 'noreferrer,noopener');
+                  if (newWindow) {
+                    newWindow.opener = null;
+                  }
                 };
               }
             }, 100);
