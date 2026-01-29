@@ -107,6 +107,7 @@ export function ConfigurationStep({ config, fyYear, onConfigChange, onNext, isSa
             {Object.entries({
               product: 'Product-wise',
               retailer: 'Retailer-wise',
+              new_retailer: 'New Retailer Target',
               beat: 'Beat-wise',
               distributor: 'Distributor-wise',
               territory: 'Territory-wise',
