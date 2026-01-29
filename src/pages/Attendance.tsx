@@ -755,6 +755,60 @@ const Attendance = () => {
           console.log('Remaining planned visits cancelled');
         }
 
+        // Auto-checkout all in-progress visits using their last activity time
+        const { data: inProgressVisits } = await supabase
+          .from('visits')
+          .select('id, updated_at')
+          .eq('user_id', user.id)
+          .eq('planned_date', today)
+          .eq('status', 'in-progress');
+
+        if (inProgressVisits && inProgressVisits.length > 0) {
+          for (const visit of inProgressVisits) {
+            // Use visit's updated_at as last activity time, fallback to current time
+            const checkOutTime = visit.updated_at || timestamp;
+            
+            await supabase
+              .from('visits')
+              .update({
+                check_out_time: checkOutTime,
+                check_out_location: freshLocation,
+                check_out_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
+                status: 'unproductive',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', visit.id);
+          }
+          console.log(`Auto checked-out ${inProgressVisits.length} in-progress visits`);
+        }
+
+        // Close all active retailer visit logs
+        const { data: activeLogs } = await supabase
+          .from('retailer_visit_logs')
+          .select('id, start_time, updated_at')
+          .eq('user_id', user.id)
+          .eq('visit_date', today)
+          .is('end_time', null);
+
+        if (activeLogs && activeLogs.length > 0) {
+          for (const log of activeLogs) {
+            // Use updated_at as last activity time, fallback to current time
+            const endTime = log.updated_at || timestamp;
+            const startTimeMs = new Date(log.start_time).getTime();
+            const endTimeMs = new Date(endTime).getTime();
+            const timeSpentSeconds = Math.floor((endTimeMs - startTimeMs) / 1000);
+
+            await supabase
+              .from('retailer_visit_logs')
+              .update({
+                end_time: endTime,
+                time_spent_seconds: Math.max(0, timeSpentSeconds)
+              })
+              .eq('id', log.id);
+          }
+          console.log(`Closed ${activeLogs.length} active retailer visit logs`);
+        }
+
         // Update to complete step
         setProcessingState({
           isProcessing: true,
