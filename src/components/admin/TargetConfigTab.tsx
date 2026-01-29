@@ -345,17 +345,17 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
                 className={`
                   flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all cursor-pointer
                   ${checked 
-                    ? 'bg-primary/10 border-primary text-primary' 
-                    : 'bg-background border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/50'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
+                    : 'bg-white dark:bg-background border-border text-muted-foreground hover:border-emerald-300 hover:bg-emerald-50/50'
                   }
                 `}
               >
                 <div className={`
                   w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-                  ${checked ? 'border-primary bg-primary' : 'border-muted-foreground'}
+                  ${checked ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground bg-white dark:bg-background'}
                 `}>
                   {checked && (
-                    <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -390,17 +390,17 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
                   className={`
                     flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all cursor-pointer
                     ${isChecked 
-                      ? 'bg-primary/10 border-primary text-primary' 
-                      : 'bg-background border-border text-muted-foreground hover:border-primary/50 hover:bg-muted/50'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
+                      : 'bg-white dark:bg-background border-border text-muted-foreground hover:border-emerald-300 hover:bg-emerald-50/50'
                     }
                   `}
                 >
                   <div className={`
                     w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-                    ${isChecked ? 'border-primary bg-primary' : 'border-muted-foreground'}
+                    ${isChecked ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground bg-white dark:bg-background'}
                   `}>
                     {isChecked && (
-                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
