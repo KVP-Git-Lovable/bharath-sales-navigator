@@ -5,11 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Save, AlertCircle, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Save, AlertCircle, Loader2, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { HierarchyUserTargetNode } from './target-config/HierarchyUserTargetNode';
 import { cn } from '@/lib/utils';
 
 interface EnabledParameters {
@@ -29,6 +27,9 @@ interface SubordinateAllocation {
   revenueTarget: number;
   visitsTarget: number;
   existingPlanId?: string;
+  level: number;
+  subordinateCount: number;
+  children: SubordinateAllocation[];
 }
 
 interface AllocationTableProps {
@@ -46,11 +47,15 @@ interface AllocationTableProps {
   fyYear: number;
 }
 
-// Progress bar color based on percentage
-const getProgressColor = (percent: number) => {
-  if (percent <= 60) return 'bg-emerald-500';
-  if (percent <= 85) return 'bg-amber-500';
-  return 'bg-red-500';
+// Level-based background colors (matching screenshot 2)
+const getLevelBackground = (level: number) => {
+  switch (level) {
+    case 0: return 'bg-background border-border';
+    case 1: return 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800';
+    case 2: return 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800';
+    case 3: return 'bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800';
+    default: return 'bg-muted/30 border-border';
+  }
 };
 
 export function AllocationTable({
@@ -67,20 +72,20 @@ export function AllocationTable({
   const [allocations, setAllocations] = useState<Map<string, SubordinateAllocation>>(new Map());
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
-  // Fetch direct subordinates
-  const { data: subordinates, isLoading } = useQuery({
-    queryKey: ['direct-subordinates', parentUserId, fyYear],
+  // Fetch hierarchy recursively
+  const { data: hierarchyData, isLoading } = useQuery({
+    queryKey: ['hierarchy-allocations', parentUserId, fyYear],
     queryFn: async () => {
-      const { data: employees, error } = await supabase
-        .from('employees')
-        .select('user_id')
-        .eq('manager_id', parentUserId);
+      // Get all subordinates using the RPC
+      const { data: subordinatesData, error: subError } = await supabase.rpc('get_all_subordinates', {
+        manager_user_id: parentUserId,
+      });
 
-      if (error) throw error;
+      if (subError) throw subError;
 
-      if (!employees?.length) return [];
+      if (!subordinatesData?.length) return [];
 
-      const userIds = employees.map(e => e.user_id);
+      const userIds = subordinatesData.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
 
       // Get profiles
       const { data: profiles } = await supabase
@@ -95,34 +100,80 @@ export function AllocationTable({
         .in('user_id', userIds)
         .eq('year', fyYear);
 
-      const planMap = new Map(plans?.map(p => [p.user_id, p]) || []);
+      // Get subordinate counts
+      const { data: employees } = await supabase
+        .from('employees')
+        .select('manager_id, user_id');
 
-      return profiles?.map(profile => {
-        const existingPlan = planMap.get(profile.id);
-        return {
-          userId: profile.id,
-          fullName: profile.full_name || 'Unknown',
-          profilePictureUrl: profile.profile_picture_url,
+      const subordinateCounts = new Map<string, number>();
+      employees?.forEach(emp => {
+        if (emp.manager_id) {
+          subordinateCounts.set(emp.manager_id, (subordinateCounts.get(emp.manager_id) || 0) + 1);
+        }
+      });
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const planMap = new Map(plans?.map(p => [p.user_id, p]) || []);
+      const managerMap = new Map<string, string>();
+      employees?.forEach(emp => {
+        if (emp.manager_id) {
+          managerMap.set(emp.user_id, emp.manager_id);
+        }
+      });
+
+      // Build hierarchy tree
+      const nodeMap = new Map<string, SubordinateAllocation>();
+
+      subordinatesData.forEach((sub: { subordinate_user_id: string; level: number }) => {
+        const profile = profileMap.get(sub.subordinate_user_id);
+        const existingPlan = planMap.get(sub.subordinate_user_id);
+        
+        nodeMap.set(sub.subordinate_user_id, {
+          userId: sub.subordinate_user_id,
+          fullName: profile?.full_name || 'Unknown',
+          profilePictureUrl: profile?.profile_picture_url || null,
           quantityTarget: existingPlan?.quantity_target || 0,
           revenueTarget: existingPlan?.revenue_target || 0,
           visitsTarget: 0,
           existingPlanId: existingPlan?.id,
-        };
-      }) || [];
+          level: sub.level,
+          subordinateCount: subordinateCounts.get(sub.subordinate_user_id) || 0,
+          children: [],
+        });
+      });
+
+      // Build tree structure
+      const roots: SubordinateAllocation[] = [];
+      nodeMap.forEach((node, userId) => {
+        const managerId = managerMap.get(userId);
+        if (managerId && nodeMap.has(managerId)) {
+          nodeMap.get(managerId)!.children.push(node);
+        } else if (node.level === 1 || managerId === parentUserId) {
+          roots.push(node);
+        }
+      });
+
+      return roots;
     },
     enabled: !!parentUserId,
   });
 
-  // Initialize allocations when subordinates load
+  // Flatten hierarchy for allocations map
   useEffect(() => {
-    if (subordinates) {
+    if (hierarchyData) {
       const newAllocations = new Map<string, SubordinateAllocation>();
-      subordinates.forEach(sub => {
-        newAllocations.set(sub.userId, sub);
-      });
+      const flatten = (nodes: SubordinateAllocation[]) => {
+        nodes.forEach(node => {
+          newAllocations.set(node.userId, node);
+          if (node.children.length > 0) {
+            flatten(node.children);
+          }
+        });
+      };
+      flatten(hierarchyData);
       setAllocations(newAllocations);
     }
-  }, [subordinates]);
+  }, [hierarchyData]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -143,7 +194,7 @@ export function AllocationTable({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['direct-subordinates', parentUserId] });
+      queryClient.invalidateQueries({ queryKey: ['hierarchy-allocations', parentUserId] });
       toast.success('Allocations saved successfully');
     },
     onError: (error: Error) => {
@@ -181,16 +232,7 @@ export function AllocationTable({
     return isNaN(num) ? 0 : num;
   };
 
-  // Calculate totals
-  const allocatedQuantity = Array.from(allocations.values()).reduce((sum, a) => sum + a.quantityTarget, 0);
-  const allocatedRevenue = Array.from(allocations.values()).reduce((sum, a) => sum + a.revenueTarget, 0);
-  const allocatedVisits = Array.from(allocations.values()).reduce((sum, a) => sum + a.visitsTarget, 0);
-
-  const remainingQuantity = totalQuantity - allocatedQuantity;
-  const remainingRevenue = totalRevenue - allocatedRevenue;
-  const remainingVisits = totalVisits - allocatedVisits;
-
-  const toggleUserExpand = (userId: string) => {
+  const toggleExpand = (userId: string) => {
     setExpandedUsers(prev => {
       const next = new Set(prev);
       if (next.has(userId)) {
@@ -202,6 +244,135 @@ export function AllocationTable({
     });
   };
 
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Render a single user card
+  const renderUserCard = (user: SubordinateAllocation, depth: number = 0) => {
+    const isExpanded = expandedUsers.has(user.userId);
+    const hasChildren = user.children.length > 0;
+    const levelBg = getLevelBackground(user.level);
+
+    return (
+      <div key={user.userId} style={{ marginLeft: `${depth * 48}px` }}>
+        <div
+          className={cn(
+            'flex items-center gap-3 p-3 rounded-lg border transition-all mb-2',
+            levelBg
+          )}
+        >
+          {/* Expand/Collapse */}
+          {hasChildren ? (
+            <button
+              onClick={() => toggleExpand(user.userId)}
+              className="p-1 hover:bg-muted/50 rounded shrink-0"
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+          ) : (
+            <div className="w-6" />
+          )}
+
+          {/* Avatar */}
+          <Avatar className="h-10 w-10 shrink-0">
+            <AvatarImage src={user.profilePictureUrl || undefined} alt={user.fullName} />
+            <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+              {getInitials(user.fullName)}
+            </AvatarFallback>
+          </Avatar>
+
+          {/* Name and badges */}
+          <div className="flex items-center gap-2 min-w-[140px]">
+            <span className="font-medium text-sm truncate">{user.fullName}</span>
+            <Badge variant="outline" className="text-xs shrink-0">
+              L{user.level}
+            </Badge>
+            {user.subordinateCount > 0 && (
+              <Badge variant="secondary" className="text-xs gap-0.5 shrink-0">
+                <Users className="h-3 w-3" />
+                {user.subordinateCount}
+              </Badge>
+            )}
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Input fields */}
+          <div className="flex items-center gap-4">
+            {enabledMetrics.quantity && (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground w-8">Qty</span>
+                <Input
+                  type="text"
+                  value={user.quantityTarget > 0 ? formatNumber(user.quantityTarget) : ''}
+                  onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))}
+                  placeholder="0"
+                  className="h-8 w-20 text-right text-sm"
+                />
+                <span className="text-xs text-muted-foreground w-8">{quantityUnit}</span>
+              </div>
+            )}
+            {enabledMetrics.revenue && (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">₹</span>
+                <Input
+                  type="text"
+                  value={user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : ''}
+                  onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))}
+                  placeholder="Revenue"
+                  className="h-8 w-24 text-right text-sm"
+                />
+              </div>
+            )}
+            {enabledMetrics.visits && (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">Visits</span>
+                <Input
+                  type="text"
+                  value={user.visitsTarget > 0 ? formatNumber(user.visitsTarget) : ''}
+                  onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                  placeholder="0"
+                  className="h-8 w-16 text-right text-sm"
+                />
+              </div>
+            )}
+            <span className="text-sm text-muted-foreground w-12 text-right">
+              ₹{user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : '0'}
+            </span>
+          </div>
+        </div>
+
+        {/* Children */}
+        {isExpanded && hasChildren && (
+          <div>
+            {user.children.map(child => renderUserCard(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Calculate totals
+  const allocatedQuantity = Array.from(allocations.values()).reduce((sum, a) => sum + a.quantityTarget, 0);
+  const allocatedRevenue = Array.from(allocations.values()).reduce((sum, a) => sum + a.revenueTarget, 0);
+  const allocatedVisits = Array.from(allocations.values()).reduce((sum, a) => sum + a.visitsTarget, 0);
+
+  const remainingQuantity = totalQuantity - allocatedQuantity;
+  const remainingRevenue = totalRevenue - allocatedRevenue;
+  const remainingVisits = totalVisits - allocatedVisits;
+  const hasOverAllocation = remainingQuantity < 0 || remainingRevenue < 0 || remainingVisits < 0;
+
   if (isLoading) {
     return (
       <Card>
@@ -212,7 +383,7 @@ export function AllocationTable({
     );
   }
 
-  if (!subordinates?.length) {
+  if (!hierarchyData?.length) {
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
@@ -223,200 +394,51 @@ export function AllocationTable({
     );
   }
 
-  const hasOverAllocation = remainingQuantity < 0 || remainingRevenue < 0 || remainingVisits < 0;
-
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <span className="border-b-2 border-primary/30 pb-0.5">Allocation Method</span>
           <Badge variant="secondary" className="ml-auto">
-            {subordinates.length} members
+            {allocations.size} members
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Allocation Table */}
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-10"></TableHead>
-                <TableHead>Target</TableHead>
-                {enabledMetrics.quantity && (
-                  <TableHead className="text-right">Quantity</TableHead>
-                )}
-                {enabledMetrics.quantity && (
-                  <TableHead className="w-32">Progress</TableHead>
-                )}
-                {enabledMetrics.revenue && (
-                  <TableHead className="text-right">₹ Total</TableHead>
-                )}
-                {enabledMetrics.visits && (
-                  <TableHead className="text-right">Visits</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from(allocations.values()).map(alloc => {
-                const quantityPercent = totalQuantity > 0 ? (alloc.quantityTarget / totalQuantity) * 100 : 0;
-                const isExpanded = expandedUsers.has(alloc.userId);
+        {/* Hierarchy Cards */}
+        <div className="space-y-0">
+          {hierarchyData.map(user => renderUserCard(user))}
+        </div>
 
-                return (
-                  <Collapsible key={alloc.userId} open={isExpanded} asChild>
-                    <>
-                      <TableRow className="hover:bg-muted/30">
-                        <TableCell className="p-2">
-                          <CollapsibleTrigger asChild>
-                            <button
-                              className="p-1 hover:bg-muted rounded"
-                              onClick={() => toggleUserExpand(alloc.userId)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </button>
-                          </CollapsibleTrigger>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {alloc.fullName}
-                        </TableCell>
-                        {enabledMetrics.quantity && (
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Input
-                                type="text"
-                                value={alloc.quantityTarget > 0 ? formatNumber(alloc.quantityTarget) : ''}
-                                onChange={(e) => handleAllocationChange(alloc.userId, 'quantityTarget', parseNumber(e.target.value))}
-                                placeholder="0"
-                                className="h-8 w-24 text-right text-sm"
-                              />
-                              <span className="text-xs text-muted-foreground w-12">{quantityUnit}</span>
-                            </div>
-                          </TableCell>
-                        )}
-                        {enabledMetrics.quantity && (
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                <div 
-                                  className={cn(
-                                    "h-full transition-all",
-                                    getProgressColor(quantityPercent)
-                                  )}
-                                  style={{ width: `${Math.min(quantityPercent, 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground w-10 text-right">
-                                {quantityPercent.toFixed(0)}%
-                              </span>
-                            </div>
-                          </TableCell>
-                        )}
-                        {enabledMetrics.revenue && (
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end">
-                              <span className="text-muted-foreground text-sm mr-1">₹</span>
-                              <Input
-                                type="text"
-                                value={alloc.revenueTarget > 0 ? formatNumber(alloc.revenueTarget) : ''}
-                                onChange={(e) => handleAllocationChange(alloc.userId, 'revenueTarget', parseNumber(e.target.value))}
-                                placeholder="0"
-                                className="h-8 w-28 text-right text-sm"
-                              />
-                            </div>
-                          </TableCell>
-                        )}
-                        {enabledMetrics.visits && (
-                          <TableCell className="text-right">
-                            <Input
-                              type="text"
-                              value={alloc.visitsTarget > 0 ? formatNumber(alloc.visitsTarget) : ''}
-                              onChange={(e) => handleAllocationChange(alloc.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
-                              placeholder="0"
-                              className="h-8 w-20 text-right text-sm"
-                            />
-                          </TableCell>
-                        )}
-                      </TableRow>
-                      <CollapsibleContent asChild>
-                        <tr>
-                          <td colSpan={6} className="p-0">
-                            <div className="bg-muted/20 px-4 py-3 border-t">
-                              <HierarchyUserTargetNode
-                                node={{
-                                  userId: alloc.userId,
-                                  fullName: alloc.fullName,
-                                  profilePictureUrl: alloc.profilePictureUrl,
-                                  level: 1,
-                                  quantityTarget: alloc.quantityTarget,
-                                  revenueTarget: alloc.revenueTarget,
-                                  visitsTarget: alloc.visitsTarget,
-                                  children: [],
-                                }}
-                                enabledParameters={enabledParameters}
-                                enabledBasis={{
-                                  quantity: enabledMetrics.quantity,
-                                  revenue: enabledMetrics.revenue,
-                                  visits: enabledMetrics.visits,
-                                }}
-                                quantityUnit={quantityUnit}
-                                fyYear={fyYear}
-                                selectedTargetType="quantity"
-                                onTargetChange={() => {}}
-                                isExpanded={true}
-                                hideHeader={true}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      </CollapsibleContent>
-                    </>
-                  </Collapsible>
-                );
-              })}
-            </TableBody>
-            <TableFooter>
-              <TableRow className="bg-muted/30">
-                <TableCell colSpan={2} className="font-medium">
-                  Remaining
-                </TableCell>
-                {enabledMetrics.quantity && (
-                  <TableCell className="text-right">
-                    <Badge 
-                      variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}
-                      className="font-mono"
-                    >
-                      {formatNumber(remainingQuantity)} {quantityUnit}
-                    </Badge>
-                  </TableCell>
-                )}
-                {enabledMetrics.quantity && <TableCell />}
-                {enabledMetrics.revenue && (
-                  <TableCell className="text-right">
-                    <Badge 
-                      variant={remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary'}
-                      className="font-mono"
-                    >
-                      {formatCurrency(remainingRevenue)}
-                    </Badge>
-                  </TableCell>
-                )}
-                {enabledMetrics.visits && (
-                  <TableCell className="text-right">
-                    <Badge 
-                      variant={remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary'}
-                      className="font-mono"
-                    >
-                      {formatNumber(remainingVisits)}
-                    </Badge>
-                  </TableCell>
-                )}
-              </TableRow>
-            </TableFooter>
-          </Table>
+        {/* Remaining Summary */}
+        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+          <span className="font-medium">Remaining</span>
+          <div className="flex items-center gap-4">
+            {enabledMetrics.quantity && (
+              <Badge 
+                variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}
+                className="font-mono"
+              >
+                {formatNumber(remainingQuantity)} {quantityUnit}
+              </Badge>
+            )}
+            {enabledMetrics.revenue && (
+              <Badge 
+                variant={remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary'}
+                className="font-mono"
+              >
+                {formatCurrency(remainingRevenue)}
+              </Badge>
+            )}
+            {enabledMetrics.visits && (
+              <Badge 
+                variant={remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary'}
+                className="font-mono"
+              >
+                {formatNumber(remainingVisits)} visits
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Warning for over-allocation */}
