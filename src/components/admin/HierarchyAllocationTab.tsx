@@ -136,10 +136,10 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
       };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
       {/* Left Panel - Organization Tree */}
-      <div className="lg:col-span-1">
-        <Card className="h-fit">
+      <div className="lg:col-span-4 xl:col-span-3">
+        <Card className="h-fit sticky top-4">
           <CardContent className="p-0">
             <OrganizationTree
               selectedNodeId={selectedNode?.userId || null}
@@ -152,7 +152,7 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
       </div>
 
       {/* Right Panel - Allocation View */}
-      <div className="lg:col-span-3 space-y-4">
+      <div className="lg:col-span-8 xl:col-span-9 space-y-4">
         {/* Target Summary */}
         <TargetSummaryCard
           config={{
