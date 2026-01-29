@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Lock, ShieldCheck, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,6 +36,10 @@ const ChangePassword = () => {
       confirmPassword: '',
     },
   });
+
+  const handleClose = () => {
+    navigate(-1); // Go back to previous page
+  };
 
   const onSubmit = async (data: ChangePasswordFormData) => {
     if (!user) {
@@ -79,14 +83,25 @@ const ChangePassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
+      <Card className="w-full max-w-md relative">
+        {/* Close button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2 h-8 w-8 rounded-full"
+          onClick={handleClose}
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </Button>
+        
+        <CardHeader className="text-center space-y-2 pt-8">
           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
             <ShieldCheck className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">Change Your Password</CardTitle>
           <CardDescription>
-            You must set a new password before continuing. Please choose a strong password.
+            Please choose a strong password for your account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -158,9 +173,19 @@ const ChangePassword = () => {
                 </ul>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Changing Password...' : 'Set New Password'}
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={handleClose}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={isLoading}>
+                  {isLoading ? 'Changing Password...' : 'Set New Password'}
+                </Button>
+              </div>
             </form>
           </Form>
         </CardContent>
