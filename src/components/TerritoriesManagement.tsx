@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
-import { Plus, FileDown, Search, Check, ChevronsUpDown, X, BarChart3, Pencil, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, AlertTriangle } from 'lucide-react';
+import { Plus, FileDown, Search, Check, ChevronsUpDown, X, BarChart3, Pencil, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, AlertTriangle, MapPin, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TerritoryDetailsModal from './TerritoryDetailsModal';
 import { TerritoryMap } from './territories/TerritoryMap';
@@ -46,6 +46,7 @@ interface Territory {
   description?: string;
   created_at: string;
   updated_at: string;
+  place_id?: string | null;
 }
 
 const TerritoriesManagement = () => {
@@ -84,6 +85,7 @@ const TerritoriesManagement = () => {
   const [distributorComboOpen, setDistributorComboOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [territoryToDelete, setTerritoryToDelete] = useState<any>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
   useEffect(() => {
     loadTerritories();
@@ -514,15 +516,45 @@ const TerritoriesManagement = () => {
     navigate(`/territory/${territory.id}`);
   };
 
+  const handleGeocodeAll = async () => {
+    setIsGeocoding(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('geocode-territories', {
+        body: {}
+      });
+      
+      if (error) throw error;
+      
+      toast.success(`Geocoding complete! Updated ${data?.updated || 0} territories`);
+      loadTerritories(); // Refresh to get new place_ids
+    } catch (err: any) {
+      console.error('Geocoding error:', err);
+      toast.error('Failed to geocode territories: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center p-8">Loading...</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Territories Management</h2>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-          <Plus size={16} /> Add Territory
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleGeocodeAll} 
+            disabled={isGeocoding}
+            className="gap-2"
+          >
+            {isGeocoding ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+            {isGeocoding ? 'Geocoding...' : 'Sync Place IDs'}
+          </Button>
+          <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+            <Plus size={16} /> Add Territory
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -532,6 +564,7 @@ const TerritoriesManagement = () => {
             id: t.id,
             name: t.name,
             region: t.region,
+            place_id: t.place_id,
           }))} 
           height="400px"
         />

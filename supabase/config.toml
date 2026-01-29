@@ -83,3 +83,6 @@ verify_jwt = false
 
 [functions.admin-create-user]
 verify_jwt = false
+
+[functions.geocode-territories]
+verify_jwt = true

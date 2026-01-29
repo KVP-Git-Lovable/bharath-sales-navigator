@@ -9,6 +9,7 @@ interface Territory {
   region?: string;
   latitude?: number | null;
   longitude?: number | null;
+  place_id?: string | null;
 }
 
 interface TerritoryMapProps {
@@ -114,8 +115,10 @@ export function TerritoryMap({ territories = [], height = "350px" }: TerritoryMa
             } as google.maps.Symbol,
           } as google.maps.MarkerOptions);
 
-          // Add info window with Google Maps link
-          const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${position.lat},${position.lng}`;
+          // Add info window with Google Maps link using place_id if available
+          const googleMapsUrl = territory.place_id 
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(territory.name)}&query_place_id=${territory.place_id}`
+            : `https://www.google.com/maps/search/?api=1&query=${position.lat},${position.lng}`;
           const infoWindow = new google.maps.InfoWindow({
             content: `
               <div style="padding: 8px; max-width: 220px;">

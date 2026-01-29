@@ -10441,6 +10441,7 @@ export type Database = {
           owner_id: string | null
           parent_id: string | null
           pincode_ranges: string[] | null
+          place_id: string | null
           population: number | null
           region: string
           retailer_count: number | null
@@ -10464,6 +10465,7 @@ export type Database = {
           owner_id?: string | null
           parent_id?: string | null
           pincode_ranges?: string[] | null
+          place_id?: string | null
           population?: number | null
           region: string
           retailer_count?: number | null
@@ -10487,6 +10489,7 @@ export type Database = {
           owner_id?: string | null
           parent_id?: string | null
           pincode_ranges?: string[] | null
+          place_id?: string | null
           population?: number | null
           region?: string
           retailer_count?: number | null
