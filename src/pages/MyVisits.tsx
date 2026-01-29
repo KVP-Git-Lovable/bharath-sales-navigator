@@ -38,6 +38,7 @@ import { useConnectivity } from "@/hooks/useConnectivity";
 import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
 import { InsightsPanel } from "@/components/visits/InsightsPanel";
+import { StartBeatButton } from "@/components/StartBeatButton";
 
 interface Visit {
   id: string;
@@ -192,7 +193,8 @@ export const MyVisits = () => {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const {
-    user
+    user,
+    userProfile
   } = useAuth();
   const navigate = useNavigate();
   const networkStatus = useConnectivity();
@@ -1380,6 +1382,14 @@ export const MyVisits = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Start Beat Button - Only for Prajwal when retailers exist */}
+        {userProfile?.full_name === 'Prajwal' && filteredVisits.length > 0 && (
+          <StartBeatButton 
+            retailers={filteredVisits}
+            className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:from-primary/90 hover:to-primary/70 h-10 sm:h-11 text-sm sm:text-base font-medium shadow-lg"
+          />
+        )}
 
         {/* Visits List */}
         <div className="space-y-2 sm:space-y-3">
