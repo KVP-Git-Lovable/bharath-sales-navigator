@@ -85,13 +85,15 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
   });
   
   const [state, setState] = useState<NetworkState>(() => {
-    const isOnline = navigator.onLine;
+    // ALWAYS assume online initially to prevent false offline screens on startup
+    // Some devices briefly report offline during app initialization
+    // The actual network check will update this shortly after mount
     const slowModeEnabled = getManualSlowMode();
     
     return {
-      isOnline,
+      isOnline: true, // Optimistic: assume online until proven otherwise
       isSlow: slowModeEnabled,
-      connectionQuality: isOnline ? 'fast' : 'offline',
+      connectionQuality: 'fast', // Optimistic default
       effectiveType: 'unknown',
       connectionType: 'unknown',
       shouldReduceData: slowModeEnabled,

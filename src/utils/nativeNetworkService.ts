@@ -70,11 +70,13 @@ const getNativeNetworkStatus = async (): Promise<NetworkStatus> => {
       isSlowConnection: isSlowConnectionType(connectionType),
     };
   } catch (error) {
-    console.error('Failed to get native network status:', error);
+    console.warn('Failed to get native network status, assuming online:', error);
+    // CHANGED: Return connected=true on error to prevent false offline screens
+    // The native network plugin may fail during app startup
     return {
-      connected: false,
+      connected: true, // Optimistic default - assume online
       connectionType: 'unknown',
-      isSlowConnection: true,
+      isSlowConnection: false,
     };
   }
 };
