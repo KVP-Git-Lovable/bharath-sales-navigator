@@ -16,8 +16,10 @@ type Status = 'unknown' | 'online' | 'offline';
  */
 export function useConnectivity(pollMs = 30000, startupDelayMs = 2000) {
   const [status, setStatus] = useState<Status>(() => {
-    // Start with browser's connectivity state for instant feedback
-    return navigator.onLine ? 'online' : 'offline';
+    // ALWAYS assume online initially to prevent false offline screens
+    // The actual network check will update this shortly after mount
+    // This prevents the "Connect to Internet" screen from showing on startup
+    return 'online';
   });
   
   const timer = useRef<number | null>(null);
@@ -51,9 +53,17 @@ export function useConnectivity(pollMs = 30000, startupDelayMs = 2000) {
       return;
     }
     
-    // Trust browser's navigator.onLine as primary source
+    // Trust browser's navigator.onLine but with a grace period
+    // Some devices report offline briefly during startup or network transitions
     if (!navigator.onLine) {
-      setStatus('offline');
+      // Don't immediately set offline - wait for confirmation
+      // This prevents false offline detection on app startup
+      console.log('⚠️ Browser reports offline, waiting for confirmation...');
+      setTimeout(() => {
+        if (!navigator.onLine && mountedRef.current) {
+          setStatus('offline');
+        }
+      }, 2000); // 2 second grace period
       return;
     }
 
