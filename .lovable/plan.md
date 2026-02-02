@@ -1,92 +1,104 @@
 
-# Plan: Redesign Hierarchy View UI
+# Attendance Page Optimization Plan
 
-## Overview
-Transform the Hierarchy tab UI in Target Management to match the provided screenshot design with a clean split-panel layout, enhanced organization tree with role icons, and a streamlined allocation table.
+## Problem Summary
+The attendance page makes 5-6 network requests every time it loads, even when data hasn't changed. This causes:
+- Slow page loading with spinners
+- Unnecessary network traffic
+- Poor user experience, especially on slow connections
 
----
+## Current Data Loading Flow
+```text
+Page Load
+    ├── fetchAttendanceData() → Supabase
+    │       ├── Fetch attendance records
+    │       ├── Fetch week_off_config
+    │       └── Fetch holidays
+    ├── fetchTodaysVisits() → Supabase
+    ├── getCurrentLocation() → GPS
+    └── fetchUserRegularizationRequests() → Supabase
+```
 
-## Changes Summary
+## Solution: Offline-First with Smart Refresh
 
-### 1. OrganizationTree.tsx - Enhanced Tree with Role Icons
+### Technical Approach
 
-**Visual Changes:**
-- Replace avatars with role-based icons:
-  - Level 0 (Root/CEO): Filled circle icon
-  - Level 1 (Managers): Cloud/building icon  
-  - Level 2+ (Field staff): Map pin icon
-- Add vertical tree connector lines
-- Improved expand/collapse chevron indicators
-- Clean selected state styling
+**1. Create New Hook: `useAttendanceData`**
+A dedicated React Query hook that:
+- Loads cached data instantly from offline storage
+- Shows UI immediately with cached data
+- Fetches fresh data in background only when needed
+- Uses stale-while-revalidate pattern
 
-**Code Changes:**
-- Import `Circle`, `Building2`, `MapPin` icons from lucide-react
-- Add `getRoleIcon(level)` helper function
-- Update `renderNode` to use role icons instead of avatars
-- Improve tree line styling with proper border connectors
+**2. Cache Static Configuration Data**
+Week-off config and holidays rarely change, so we'll:
+- Cache them in offline storage when master data syncs
+- Load from cache first, refresh in background
 
----
+**3. Split Data Loading by Change Frequency**
+```text
+Static Data (cache for hours):
+├── Week-off configuration
+├── Holidays  
+└── Working days per month
 
-### 2. TargetSummaryCard.tsx - Redesigned Header Card
+Dynamic Data (cache, refresh on focus):
+├── Today's attendance record
+├── Today's visits
+└── This month's attendance records
 
-**Visual Changes:**
-- New layout: "Target: {plan_name}" as main title
-- "Locked" badge in green with lock icon (right side)
-- "Total Target" section label
-- FY year display in top-right corner
-- Clean 3-column grid for metrics (Quantity, Productive Visits, Revenue)
+Real-time Data (always fresh):
+└── GPS location (only when marking attendance)
+```
 
-**Code Changes:**
-- Update card gradient to light green/teal tint
-- Restructure header layout with title format change
-- Add "Total Target" label with underline
-- Update badge styling to green variant
+### Implementation Steps
 
----
+**Step 1: Create `useAttendanceCache.ts` Hook**
+- Load attendance records from offline storage first
+- Background sync with network
+- 5-minute stale time for current month data
+- Cache working days calculation results
 
-### 3. AllocationTable.tsx - Clean Table Layout
+**Step 2: Create `useWorkingDaysConfig.ts` Hook**  
+- Cache week-off and holiday config in offline storage
+- Load from cache on page open
+- Refresh only every 6 hours (like master data)
 
-**Visual Changes:**
-- Section header: "Allocation Method"
-- Clean table structure with columns:
-  - Target (name)
-  - Quantity (editable input with unit)
-  - Progress bar (color-coded based on %)
-  - ₹ Total (revenue value)
-- "Remaining: X" row at bottom
-- Prominent "Save Allocation" button centered at bottom
+**Step 3: Update `Attendance.tsx`**
+- Replace direct Supabase calls with new hooks
+- Remove `useEffect` that fetches on every load
+- Use React Query's built-in caching
+- Only fetch GPS when user clicks check-in/out
 
-**Code Changes:**
-- Convert from card-based rows to proper table layout
-- Remove collapsible/expandable sections (flatten to simple rows)
-- Add progress bar colors: green (0-60%), yellow (60-85%), red (85%+)
-- Move remaining display to table footer row
-- Center save button at bottom with icon
+**Step 4: Add to Master Data Cache**
+- Add week-off config to `useMasterDataCache`
+- Add holidays to `useMasterDataCache`
+- These sync when user opens app
 
----
+### Data Flow After Fix
+```text
+Page Load
+    ├── [INSTANT] Load from offline cache
+    │       ├── Cached attendance records → Show UI
+    │       ├── Cached week-off config → Calculate stats
+    │       └── Cached holidays → Calculate stats
+    │
+    └── [BACKGROUND] Smart refresh
+            ├── Check if today's data needs refresh (stale > 5 min)
+            ├── If online & stale → fetch only changed data
+            └── Update UI seamlessly without flicker
+```
 
-### 4. HierarchyAllocationTab.tsx - Minor Layout Updates
+### Benefits
+- **Instant page load** - UI shows immediately from cache
+- **Reduced network calls** - Only fetch when data is stale
+- **Offline support** - Works without internet after first load
+- **Stable UI** - No flickering or unnecessary re-renders
+- **Battery efficient** - Fewer network requests
 
-**Changes:**
-- Adjust grid proportions for better balance
-- Ensure proper spacing between components
-
----
-
-## File Changes
-
-| File | Type | Description |
-|------|------|-------------|
-| `src/components/admin/OrganizationTree.tsx` | Modify | Add role icons, tree lines, enhanced styling |
-| `src/components/admin/TargetSummaryCard.tsx` | Modify | Redesign header, add Total Target section |
-| `src/components/admin/AllocationTable.tsx` | Modify | Convert to table layout, redesign footer |
-| `src/components/admin/HierarchyAllocationTab.tsx` | Modify | Minor layout adjustments |
-
----
-
-## Expected Result
-
-The updated UI will feature:
-- Left panel: Organization tree with role-based icons and clean hierarchy lines
-- Right panel top: Target summary card with "Locked" badge and FY display
-- Right panel bottom: Clean allocation table with progress bars and centered save button
+### Files to Modify
+1. Create `src/hooks/useAttendanceCache.ts` - New caching hook
+2. Create `src/hooks/useWorkingDaysConfig.ts` - Config caching hook  
+3. Modify `src/pages/Attendance.tsx` - Use new hooks instead of direct fetches
+4. Modify `src/hooks/useMasterDataCache.ts` - Add week-off and holiday caching
+5. Modify `src/lib/offlineStorage.ts` - Add WEEK_OFF_CONFIG and HOLIDAYS stores
