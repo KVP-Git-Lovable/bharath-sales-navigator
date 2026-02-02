@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTranslation } from 'react-i18next';
 import { useActivePerformanceModule } from "@/hooks/useActivePerformanceModule";
@@ -216,12 +217,15 @@ export const Navbar = memo(() => {
               </NavLink>
             </div>
             
-            <button 
-              onClick={() => setIsMenuOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white"
-            >
-              <Menu size={20} />
-            </button>
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <button 
+                onClick={() => setIsMenuOpen(true)}
+                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white"
+              >
+                <Menu size={20} />
+              </button>
+            </div>
           </div>
         </div>
       </nav>
