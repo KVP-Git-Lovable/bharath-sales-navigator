@@ -1417,7 +1417,7 @@ const Attendance = () => {
                                     variant="outline"
                                     className="h-8 w-8"
                                     onClick={() => {
-                                      navigate(`/my-visits?date=${recordDate}&timeline=true`);
+                                      navigate(`/visits/retailers?date=${recordDate}&timeline=true`);
                                     }}
                                     title="Timeline View"
                                   >
