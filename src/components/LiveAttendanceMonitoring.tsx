@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Search, Download, Users, Clock, MapPin, UserCheck, User, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadCSV } from '@/utils/fileDownloader';
+import { AttendanceDetailsDialog } from './attendance/AttendanceDetailsDialog';
 
 interface User {
   id: string;
@@ -73,6 +74,11 @@ const LiveAttendanceMonitoring = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showLocationId, setShowLocationId] = useState<string | null>(null);
+  const [detailsDialog, setDetailsDialog] = useState<{
+    open: boolean;
+    type: 'present' | 'absent' | 'half-day';
+    title: string;
+  }>({ open: false, type: 'present', title: '' });
 
   useEffect(() => {
     fetchUsers();
@@ -409,7 +415,10 @@ const LiveAttendanceMonitoring = () => {
     <div className="space-y-6">
       {/* Summary Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card 
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setDetailsDialog({ open: true, type: 'present', title: 'Present Today' })}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Present Today</CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
@@ -419,7 +428,10 @@ const LiveAttendanceMonitoring = () => {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card 
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setDetailsDialog({ open: true, type: 'absent', title: 'Absent Today' })}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Absent Today</CardTitle>
             <User className="h-4 w-4 text-muted-foreground" />
@@ -429,7 +441,10 @@ const LiveAttendanceMonitoring = () => {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card 
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setDetailsDialog({ open: true, type: 'half-day', title: 'Half Day' })}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Half Day</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -716,6 +731,18 @@ const LiveAttendanceMonitoring = () => {
           )}
         </CardContent>
       </Card>
+      {/* Attendance Details Dialog */}
+      <AttendanceDetailsDialog
+        open={detailsDialog.open}
+        onOpenChange={(open) => setDetailsDialog((prev) => ({ ...prev, open }))}
+        title={detailsDialog.title}
+        type={detailsDialog.type}
+        records={filteredData.filter((record) => {
+          const today = format(new Date(), 'yyyy-MM-dd');
+          if (record.date !== today) return false;
+          return record.status === detailsDialog.type;
+        })}
+      />
     </div>
   );
 };
