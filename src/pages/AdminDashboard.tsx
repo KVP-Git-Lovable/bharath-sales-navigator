@@ -799,7 +799,6 @@ export const AdminDashboard = () => {
                                       e.stopPropagation();
                                       try {
                                         toast.loading('Generating login session...', { id: 'login-as-user' });
-                                        const { data: { session } } = await supabase.auth.getSession();
                                         const response = await supabase.functions.invoke('admin-login-as-user', {
                                           body: { targetUserId: user.id }
                                         });
@@ -808,12 +807,22 @@ export const AdminDashboard = () => {
                                           throw new Error(response.error.message || 'Failed to login as user');
                                         }
                                         
-                                        if (response.data?.loginUrl) {
-                                          toast.success(`Logging in as ${user.email}`, { id: 'login-as-user' });
-                                          // Redirect to the magic link
-                                          window.location.href = response.data.loginUrl;
+                                        if (response.data?.session) {
+                                          // Set the new session using the tokens from the edge function
+                                          const { error: setSessionError } = await supabase.auth.setSession({
+                                            access_token: response.data.session.access_token,
+                                            refresh_token: response.data.session.refresh_token,
+                                          });
+                                          
+                                          if (setSessionError) {
+                                            throw new Error(setSessionError.message || 'Failed to set session');
+                                          }
+                                          
+                                          toast.success(`Logged in as ${response.data.user?.email || user.email}`, { id: 'login-as-user' });
+                                          // Redirect to dashboard
+                                          window.location.href = '/dashboard';
                                         } else {
-                                          throw new Error('No login URL received');
+                                          throw new Error(response.data?.error || 'No session received');
                                         }
                                       } catch (error: any) {
                                         console.error('Login as user error:', error);

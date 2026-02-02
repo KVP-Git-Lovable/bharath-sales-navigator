@@ -88,14 +88,13 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Generate a magic link for the target user
-    // This will create a valid session for the target user
+    // Log the impersonation for audit purposes
+    console.log(`Admin ${adminUser.email} (${adminUser.id}) is logging in as ${targetUser.email} (${targetUser.id})`)
+
+    // Generate a magic link and extract the token components
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: targetUser.email!,
-      options: {
-        redirectTo: `${req.headers.get('origin') || 'https://field-sales-navigator.lovable.app'}/`
-      }
     })
 
     if (linkError || !linkData) {
@@ -106,24 +105,37 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Log the impersonation for audit purposes
-    console.log(`Admin ${adminUser.email} (${adminUser.id}) is logging in as ${targetUser.email} (${targetUser.id})`)
+    // The linkData contains hashed_token and verification_type
+    // We can use these to verify the OTP and create a session
+    const { hashed_token, verification_type } = linkData.properties
+    
+    // Use verifyOtp with token_hash to create a session
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.verifyOtp({
+      token_hash: hashed_token,
+      type: verification_type as any,
+    })
 
-    // Extract the token from the action link and create a session
-    const actionLink = linkData.properties?.action_link
-    if (!actionLink) {
+    if (sessionError || !sessionData.session) {
+      console.error('Failed to create session:', sessionError)
       return new Response(
-        JSON.stringify({ error: 'Failed to generate login link' }),
+        JSON.stringify({ error: 'Failed to create login session' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Return the magic link - the frontend will redirect to it
+    // Return the session tokens for the frontend to set
     return new Response(
       JSON.stringify({ 
         success: true, 
-        loginUrl: actionLink,
-        message: `Logging in as ${targetUser.email}`
+        session: {
+          access_token: sessionData.session.access_token,
+          refresh_token: sessionData.session.refresh_token,
+        },
+        user: {
+          email: targetUser.email,
+          id: targetUser.id,
+        },
+        message: `Logged in as ${targetUser.email}`
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
