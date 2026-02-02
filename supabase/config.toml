@@ -89,3 +89,6 @@ verify_jwt = true
 
 [functions.admin-login-as-user]
 verify_jwt = false
+
+[functions.auto-end-day]
+verify_jwt = false
