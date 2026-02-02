@@ -27,7 +27,10 @@ export const STORES = {
   COMPETITION_DATA: 'competitionData',
   ATTENDANCE: 'attendance',
   RETAILER_VISIT_LOGS: 'retailerVisitLogs',
-  SYNC_METADATA: 'syncMetadata'
+  SYNC_METADATA: 'syncMetadata',
+  // Attendance-specific config caching
+  WEEK_OFF_CONFIG: 'weekOffConfig',
+  HOLIDAYS: 'holidays'
 } as const;
 
 // Sync metadata interface
