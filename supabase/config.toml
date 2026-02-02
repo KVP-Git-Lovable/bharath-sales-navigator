@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.geocode-territories]
 verify_jwt = true
+
+[functions.admin-login-as-user]
+verify_jwt = false
