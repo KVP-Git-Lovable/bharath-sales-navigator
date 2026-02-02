@@ -1,49 +1,58 @@
 
-# Attendance Page Optimization Plan ✅ COMPLETED
+# Fix Leave Application Approval - RLS Policy Issue
 
-## Problem Summary
-The attendance page made 5-6 network requests every time it loaded. This has been fixed with offline-first caching.
+## Problem Identified
+The leave application approval fails because the Row Level Security (RLS) policies on the `leave_applications` table only allow users to update **their own** leave applications. There is no policy that allows admins or managers to approve/reject other employees' leave requests.
 
-## Solution Implemented
+**Error**: `"new row violates row-level security policy for table 'leave_applications'"`
 
-### New Files Created
-1. **`src/hooks/useAttendanceCache.ts`** - React Query hook with stale-while-revalidate pattern:
-   - Loads attendance records from offline storage instantly
-   - Shows UI immediately with cached data
-   - Fetches fresh data in background (5-minute stale time)
-   - Provides `refreshTodayOnly()` for lightweight refresh after check-in/out
+## Current RLS Policies (Insufficient)
+| Policy | Command | Condition |
+|--------|---------|-----------|
+| Users can create their own leave applications | INSERT | `user_id = auth.uid()` |
+| Users can update their own pending leave applications | UPDATE | `user_id = auth.uid() AND status = 'pending'` |
+| Users can view their own leave applications | SELECT | `user_id = auth.uid()` |
 
-2. **`src/hooks/useWorkingDaysConfig.ts`** - Config caching hook:
-   - Caches week-off config and holidays in localStorage
-   - 6-hour cache lifetime (rarely changes)
-   - Calculates working days stats locally
+**Missing**: No policy for admins/managers to view or update employee leave applications.
 
-### Files Modified
-1. **`src/pages/Attendance.tsx`**:
-   - Replaced direct Supabase calls with new caching hooks
-   - Removed `fetchAttendanceData()` and `fetchTodaysVisits()` functions (180+ lines removed)
-   - Data now syncs from cache via useEffect
-   - GPS location only fetched during check-in/out actions (not on page load)
+## Solution
+Add two new RLS policies to the `leave_applications` table:
 
-2. **`src/lib/offlineStorage.ts`**:
-   - Added `WEEK_OFF_CONFIG` and `HOLIDAYS` stores
+1. **Admin SELECT Policy**: Allow admins to view all leave applications
+2. **Admin UPDATE Policy**: Allow admins to update (approve/reject) leave applications
 
-### New Data Flow
-```text
-Page Load
-    ├── [INSTANT] React Query loads from cache
-    │       ├── Cached attendance records → Show UI immediately
-    │       ├── Cached week-off config → Calculate stats locally
-    │       └── Cached holidays → Calculate stats locally
-    │
-    └── [BACKGROUND] Smart refresh (only if stale > 5 min)
-            └── Updates cache seamlessly without UI flicker
+Both policies will use the existing `has_role(auth.uid(), 'admin'::app_role)` function that's already used across other tables for admin access.
+
+## Implementation
+
+**Step 1: Create a new migration file**
+
+Add an SQL migration with these statements:
+
+```sql
+-- Allow admins to view all leave applications
+CREATE POLICY "Admins can view all leave applications"
+  ON public.leave_applications
+  FOR SELECT
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+
+-- Allow admins to update any leave application (approve/reject)
+CREATE POLICY "Admins can update leave applications"
+  ON public.leave_applications
+  FOR UPDATE
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role))
+  WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 ```
 
-### Benefits Achieved
-- ✅ **Instant page load** - UI shows immediately from cache
-- ✅ **Reduced network calls** - Only fetch when data is stale (5 min)
-- ✅ **Offline support** - Works without internet after first load
-- ✅ **Stable UI** - No flickering or unnecessary re-renders
-- ✅ **Battery efficient** - Fewer network requests
-- ✅ **GPS optimization** - Only requested during check-in/out actions
+## Files to Create/Modify
+1. **Create**: `supabase/migrations/[timestamp]_add_admin_leave_policies.sql` - New migration with admin RLS policies
+
+## Expected Result After Fix
+- Admins will be able to see all employee leave applications in the Leave Management tab
+- Clicking the approve (checkmark) or reject (X) buttons will successfully update the leave status
+- Regular users will still only see and manage their own leave applications
+
+## Technical Note
+The `has_role` function already exists in the database and is used consistently across other tables (holidays, products, user_roles, branding_requests, etc.) for admin permission checks.
