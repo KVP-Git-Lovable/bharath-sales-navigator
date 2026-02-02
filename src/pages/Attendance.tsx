@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ import { shouldSuppressError } from '@/utils/offlineErrorHandler';
 import { useVanSales } from '@/hooks/useVanSales';
 import { getLocalTodayDate, toLocalISODate } from '@/utils/dateUtils';
 import RegularizationRequestModal from '@/components/RegularizationRequestModal';
+import { useAttendanceCache } from '@/hooks/useAttendanceCache';
+import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
 
 // Processing steps for attendance
 type ProcessingStep = 'location' | 'photo' | 'face' | 'saving' | 'complete';
@@ -61,6 +63,32 @@ const Attendance = () => {
   
   // Check if viewing own data
   const isViewingOwnData = selectedUserId === 'self' || selectedUserId === user?.id;
+  
+  // Date filter state - must be before hooks that use it
+  const [dateFilter, setDateFilter] = useState('current-month');
+  
+  // NEW: Use cached attendance data hooks (offline-first pattern)
+  const {
+    attendanceRecords: cachedAttendanceRecords,
+    todaysAttendance: cachedTodaysAttendance,
+    todaysVisits: cachedTodaysVisits,
+    regularizationRequests: cachedRegularizationRequests,
+    activeMarketHours: cachedActiveMarketHours,
+    isLoading: isLoadingAttendance,
+    refreshTodayOnly,
+    forceRefresh
+  } = useAttendanceCache(dateFilter);
+  
+  // NEW: Use cached working days config (offline-first pattern)
+  const {
+    totalWorkingDays,
+    elapsedWorkingDays,
+    elapsedWorkingDates,
+    holidayDates,
+    isLoading: isLoadingConfig
+  } = useWorkingDaysConfig(dateFilter);
+  
+  // Derived state from cached data
   const [attendanceData, setAttendanceData] = useState([]);
   const [todaysAttendance, setTodaysAttendance] = useState(null);
   const [todaysVisits, setTodaysVisits] = useState([]);
@@ -78,7 +106,6 @@ const Attendance = () => {
   const [isMarkingAttendance, setIsMarkingAttendance] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [location, setLocation] = useState(null);
-  const [dateFilter, setDateFilter] = useState('current-month');
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [selectedDateForMap, setSelectedDateForMap] = useState<Date | null>(null);
   const [selectedDateVisits, setSelectedDateVisits] = useState([]);
@@ -95,7 +122,7 @@ const Attendance = () => {
   const { compareImages, getMatchStatusIcon, getMatchStatusText } = useFaceMatching();
   const { isVanSalesEnabled } = useVanSales();
 
-  // Regularization request states
+  // Regularization request states - use cached data
   const [regularizationRequests, setRegularizationRequests] = useState<Map<string, any>>(new Map());
   const [showRegularizationModal, setShowRegularizationModal] = useState(false);
   const [selectedRecordForRegularization, setSelectedRecordForRegularization] = useState<any>(null);
@@ -162,40 +189,77 @@ const Attendance = () => {
     }
   };
 
+  // NEW: Sync cached data to local state when cache updates
+  // This allows instant UI updates from cache while background refresh happens
   useEffect(() => {
-    fetchAttendanceData();
-    fetchTodaysVisits();
-    getCurrentLocation();
-    fetchUserRegularizationRequests();
-  }, [dateFilter]);
+    if (!isLoadingAttendance && !isLoadingConfig) {
+      // Sync attendance records from cache
+      if (cachedAttendanceRecords.length > 0) {
+        const presentDaysCount = cachedAttendanceRecords.filter((r: any) => r.status === 'present').length;
+        const presentDates = cachedAttendanceRecords.filter((r: any) => r.status === 'present').map((r: any) => r.date);
+        const presentDatesSet = new Set(presentDates);
+        
+        // Calculate absent dates using cached working days config
+        const absentDates = elapsedWorkingDates.filter(date => !presentDatesSet.has(date));
+        const absentDays = absentDates.length;
+        const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDaysCount / totalWorkingDays) * 100) : 0;
 
-  // Fetch user's regularization requests for the current period
-  const fetchUserRegularizationRequests = async () => {
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) return;
+        // Update stats
+        setStats({
+          totalDays: totalWorkingDays,
+          presentDays: presentDaysCount,
+          absentDays,
+          attendance: attendancePercentage
+        });
 
-      const { start, end } = getDateRange();
+        setPresentDatesList(presentDates.sort());
+        setAbsentDatesList(absentDates.sort());
 
-      const { data, error } = await supabase
-        .from('regularization_requests')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .gte('attendance_date', start)
-        .lte('attendance_date', end);
+        // Merge attendance records with absent day placeholders
+        const absentRecords = absentDates.map(date => ({
+          id: `absent-${date}`,
+          date,
+          status: 'absent',
+          check_in_time: null,
+          check_out_time: null,
+          total_hours: null,
+          face_match_confidence: null,
+          isAbsentPlaceholder: true
+        }));
+        
+        const mergedRecords = [...cachedAttendanceRecords, ...absentRecords]
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        setAttendanceData(mergedRecords);
+      }
 
-      if (error) throw error;
+      // Sync today's attendance
+      setTodaysAttendance(cachedTodaysAttendance);
 
-      // Map by date for quick lookup
-      const requestsMap = new Map();
-      data?.forEach(req => {
-        requestsMap.set(req.attendance_date, req);
-      });
-      setRegularizationRequests(requestsMap);
-    } catch (error) {
-      console.error('Error fetching regularization requests:', error);
+      // Sync today's visits
+      setTodaysVisits(cachedTodaysVisits);
+      setActiveMarketHours(cachedActiveMarketHours);
+
+      // Sync regularization requests
+      setRegularizationRequests(cachedRegularizationRequests);
     }
-  };
+  }, [
+    cachedAttendanceRecords, 
+    cachedTodaysAttendance, 
+    cachedTodaysVisits, 
+    cachedActiveMarketHours,
+    cachedRegularizationRequests,
+    elapsedWorkingDates,
+    totalWorkingDays,
+    isLoadingAttendance,
+    isLoadingConfig
+  ]);
+
+  // Only fetch location on mount - GPS is only needed for check-in/out actions
+  useEffect(() => {
+    // Don't auto-fetch location on page load - wait until user initiates check-in/out
+    // This saves battery and reduces permission prompts
+  }, []);
 
   const handleOpenRegularizationModal = (record: any) => {
     setSelectedRecordForRegularization(record);
@@ -203,8 +267,8 @@ const Attendance = () => {
   };
 
   const handleRegularizationSubmitted = () => {
-    fetchUserRegularizationRequests();
-    fetchAttendanceData();
+    // Use cached data refresh instead of direct network call
+    forceRefresh();
   };
 
   const getCurrentLocation = async () => {
@@ -277,189 +341,11 @@ const Attendance = () => {
     };
   };
 
-  const fetchAttendanceData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { start, end } = getDateRange();
-
-      // Fetch attendance records for selected period
-      const { data: attendanceRecords, error } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('date', start)
-        .lte('date', end)
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-
-      const presentDaysCount = attendanceRecords?.filter(record => record.status === 'present').length || 0;
-      const presentDates = attendanceRecords?.filter(record => record.status === 'present').map(r => r.date) || [];
-      const presentDatesSet = new Set(presentDates);
-      
-      // Calculate working days ELAPSED up to today (not the entire month)
-      let totalWorkingDays = 20; // Default fallback
-      let elapsedWorkingDays = 0; // Working days that have passed up to today
-      const elapsedWorkingDates: string[] = []; // Track specific working dates
-      
-      const currentDate = new Date();
-      const todayDate = currentDate.getDate();
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1; // 1-indexed for DB
-      
-      if (dateFilter === 'current-week') {
-        // For week view, calculate working days in the week up to today
-        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        // Assume Mon-Sat are working days (6 days), Sunday is off
-        elapsedWorkingDays = dayOfWeek === 0 ? 6 : dayOfWeek; // If Sunday, count full week
-        totalWorkingDays = 6; // Week has 6 working days (Mon-Sat)
-        
-        // Get working dates for the week
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-        for (let i = 0; i < 6 && i < dayOfWeek; i++) {
-          const date = new Date(weekStart);
-          date.setDate(weekStart.getDate() + i);
-          const dateStr = format(date, 'yyyy-MM-dd');
-          elapsedWorkingDates.push(dateStr);
-        }
-      } else {
-        // For month view, fetch week-off config and holidays to calculate elapsed working days
-        const { data: weekOffConfig } = await supabase
-          .from('week_off_config')
-          .select('day_of_week, is_off');
-        
-        // Build array of week-off days (0=Sunday, 1=Monday, etc.)
-        const weekOffDays: number[] = weekOffConfig
-          ?.filter(config => config.is_off)
-          .map(config => config.day_of_week) || [0]; // Default Sunday off
-        
-        // Fetch holidays for this month
-        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
-        const monthEnd = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
-        
-        const { data: holidays } = await supabase
-          .from('holidays')
-          .select('date')
-          .gte('date', monthStart)
-          .lte('date', monthEnd);
-        
-        const holidayDates = new Set(holidays?.map(h => h.date) || []);
-        
-        // Calculate elapsed working days (from 1st to today)
-        for (let day = 1; day <= todayDate; day++) {
-          const date = new Date(year, month - 1, day);
-          const dayOfWeek = date.getDay();
-          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          
-          // Check if it's not a week-off day and not a holiday
-          if (!weekOffDays.includes(dayOfWeek) && !holidayDates.has(dateStr)) {
-            elapsedWorkingDays++;
-            elapsedWorkingDates.push(dateStr);
-          }
-        }
-        
-        // Calculate total working days for the entire month (for display purposes)
-        const daysInMonth = new Date(year, month, 0).getDate();
-        let monthTotalWorkingDays = 0;
-        for (let day = 1; day <= daysInMonth; day++) {
-          const date = new Date(year, month - 1, day);
-          const dayOfWeek = date.getDay();
-          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          
-          if (!weekOffDays.includes(dayOfWeek) && !holidayDates.has(dateStr)) {
-            monthTotalWorkingDays++;
-          }
-        }
-        
-        totalWorkingDays = monthTotalWorkingDays;
-      }
-      
-      // Calculate absent dates (working days where user was not present)
-      const absentDates = elapsedWorkingDates.filter(date => !presentDatesSet.has(date));
-      
-      // Absent days = elapsed working days - present days (only count days that have passed)
-      const absentDays = absentDates.length;
-      const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDaysCount / totalWorkingDays) * 100) : 0;
-
-      // Store date lists for dialog display
-      setPresentDatesList(presentDates.sort());
-      setAbsentDatesList(absentDates.sort());
-
-      setStats({
-        totalDays: totalWorkingDays,
-        presentDays: presentDaysCount,
-        absentDays,
-        attendance: attendancePercentage
-      });
-
-      // Merge attendance records with absent day placeholders for Recent Attendance display
-      const absentRecords = absentDates.map(date => ({
-        id: `absent-${date}`,
-        date,
-        status: 'absent',
-        check_in_time: null,
-        check_out_time: null,
-        total_hours: null,
-        face_match_confidence: null,
-        isAbsentPlaceholder: true
-      }));
-      
-      const mergedRecords = [...(attendanceRecords || []), ...absentRecords]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      setAttendanceData(mergedRecords);
-
-
-      // Check today's attendance
-      const todayStr = getLocalTodayDate();
-      const todayRecord = attendanceRecords?.find(record => record.date === todayStr);
-      setTodaysAttendance(todayRecord);
-
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch attendance data",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const fetchTodaysVisits = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const today = getLocalTodayDate();
-
-      // Fetch all visits for today with check-in times
-      const { data: visits, error } = await supabase
-        .from('visits')
-        .select('id, check_in_time, check_in_location, retailer_id')
-        .eq('user_id', user.id)
-        .eq('planned_date', today)
-        .not('check_in_time', 'is', null)
-        .order('check_in_time', { ascending: true });
-
-      if (error) throw error;
-
-      setTodaysVisits(visits || []);
-
-      // Calculate active market hours if we have visits
-      if (visits && visits.length > 0) {
-        const firstCheckIn = new Date(visits[0].check_in_time);
-        const lastCheckIn = new Date(visits[visits.length - 1].check_in_time);
-        const hoursWorked = (lastCheckIn.getTime() - firstCheckIn.getTime()) / (1000 * 60 * 60);
-        setActiveMarketHours(hoursWorked);
-      } else {
-        setActiveMarketHours(null);
-      }
-    } catch (error) {
-      console.error('Error fetching today\'s visits:', error);
-    }
-  };
+  // REMOVED: Old fetchAttendanceData and fetchTodaysVisits functions
+  // These are now handled by useAttendanceCache hook which provides:
+  // - Instant loading from offline cache
+  // - Background network sync when online
+  // - 5-minute stale time to prevent unnecessary network calls
 
   const handleCameraCapture = async (photoBlob: Blob) => {
     if (!attendanceType) return;
@@ -696,9 +582,8 @@ const Attendance = () => {
         setAttendanceType(null);
         setIsMarkingAttendance(false);
 
-        // Refresh attendance data
-        await fetchAttendanceData();
-        await fetchTodaysVisits();
+        // Refresh attendance data using cached hooks
+        await refreshTodayOnly();
 
         // Reset processing state
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
@@ -821,9 +706,8 @@ const Attendance = () => {
         setAttendanceType(null);
         setIsMarkingAttendance(false);
 
-        // Refresh attendance data
-        await fetchAttendanceData();
-        await fetchTodaysVisits();
+        // Refresh attendance data using cached hooks
+        await refreshTodayOnly();
 
         // Reset processing state
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
