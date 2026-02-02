@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { useConnectivity } from './useConnectivity';
@@ -69,16 +69,43 @@ const getDateRange = (dateFilter: string) => {
   };
 };
 
-// Offline storage key for attendance
-const ATTENDANCE_CACHE_KEY = 'attendance_records';
-const VISITS_TODAY_CACHE_KEY = 'visits_today';
-const REGULARIZATION_CACHE_KEY = 'regularization_requests';
+// Synchronous cache loader for instant UI display
+const getCachedAttendanceSync = (userId: string | undefined, start: string, end: string): AttendanceRecord[] => {
+  if (!userId) return [];
+  try {
+    const cached = localStorage.getItem(`attendance_${userId}_${start}_${end}`);
+    if (cached) {
+      console.log('[AttendanceCache] ✅ Instant load from localStorage');
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.error('[AttendanceCache] Sync cache read error:', e);
+  }
+  return [];
+};
+
+const getCachedVisitsSync = (userId: string | undefined): Visit[] => {
+  if (!userId) return [];
+  try {
+    const cached = localStorage.getItem(`visits_today_${userId}`);
+    if (cached) {
+      const { data, date } = JSON.parse(cached);
+      if (date === getLocalTodayDate()) {
+        console.log('[AttendanceCache] ✅ Instant load visits from localStorage');
+        return data;
+      }
+    }
+  } catch (e) {
+    console.error('[AttendanceCache] Sync visits cache read error:', e);
+  }
+  return [];
+};
 
 /**
  * Hook for caching and managing attendance data with offline-first pattern
- * - Loads from cache instantly
- * - Syncs with network in background
- * - Prevents unnecessary network calls
+ * - Loads from localStorage SYNCHRONOUSLY for instant UI
+ * - Syncs with IndexedDB and network in background
+ * - Prevents unnecessary network calls with stale-while-revalidate
  */
 export function useAttendanceCache(dateFilter: string = 'current-month') {
   const connectivityStatus = useConnectivity();
@@ -88,9 +115,20 @@ export function useAttendanceCache(dateFilter: string = 'current-month') {
 
   const { start, end } = getDateRange(dateFilter);
 
-  // Load attendance records from cache, then sync with network
+  // INSTANT: Get cached data synchronously for immediate UI display
+  const cachedRecordsSync = useMemo(() => 
+    getCachedAttendanceSync(user?.id, start, end), 
+    [user?.id, start, end]
+  );
+  
+  const cachedVisitsSync = useMemo(() => 
+    getCachedVisitsSync(user?.id),
+    [user?.id]
+  );
+
+  // Load attendance records with placeholderData for instant display
   const {
-    data: attendanceRecords = [],
+    data: attendanceRecords = cachedRecordsSync,
     isLoading: isLoadingRecords,
     refetch: refetchRecords
   } = useQuery({
@@ -98,25 +136,20 @@ export function useAttendanceCache(dateFilter: string = 'current-month') {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // 1. Load from offline cache first (instant)
-      try {
-        const cached = await offlineStorage.getAll<AttendanceRecord>(STORES.ATTENDANCE);
-        const filteredCached = cached.filter(r => 
-          r.user_id === user.id && 
-          r.date >= start && 
-          r.date <= end
-        );
-        
-        if (filteredCached.length > 0 && !isOnline) {
-          console.log('[AttendanceCache] ✅ Loaded from offline cache:', filteredCached.length);
-          return filteredCached;
+      // Fetch from network if online
+      if (!isOnline) {
+        // Try IndexedDB for offline
+        try {
+          const cached = await offlineStorage.getAll<AttendanceRecord>(STORES.ATTENDANCE);
+          return cached.filter(r => 
+            r.user_id === user.id && 
+            r.date >= start && 
+            r.date <= end
+          );
+        } catch (e) {
+          return cachedRecordsSync;
         }
-      } catch (e) {
-        console.error('[AttendanceCache] Cache read error:', e);
       }
-
-      // 2. Fetch from network if online
-      if (!isOnline) return [];
 
       const { data, error } = await supabase
         .from('attendance')
@@ -128,9 +161,10 @@ export function useAttendanceCache(dateFilter: string = 'current-month') {
 
       if (error) throw error;
 
-      // 3. Cache results for offline access
+      // Cache results for instant loading next time
       if (data && data.length > 0) {
         try {
+          localStorage.setItem(`attendance_${user.id}_${start}_${end}`, JSON.stringify(data));
           await offlineStorage.mergeData(STORES.ATTENDANCE, data);
           console.log('[AttendanceCache] ✅ Cached attendance records:', data.length);
         } catch (e) {
@@ -140,16 +174,17 @@ export function useAttendanceCache(dateFilter: string = 'current-month') {
 
       return data || [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - don't refetch if data is fresh
-    gcTime: 30 * 60 * 1000, // Keep in memory for 30 minutes
+    placeholderData: cachedRecordsSync.length > 0 ? cachedRecordsSync : undefined,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
     enabled: !!user?.id,
-    refetchOnWindowFocus: false, // Don't refetch on tab focus
-    refetchOnMount: false, // Use cached data on mount
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
-  // Load today's visits from cache, then sync
+  // Load today's visits with placeholderData for instant display
   const {
-    data: todaysVisits = [],
+    data: todaysVisits = cachedVisitsSync,
     isLoading: isLoadingVisits,
     refetch: refetchVisits
   } = useQuery({
@@ -159,21 +194,8 @@ export function useAttendanceCache(dateFilter: string = 'current-month') {
 
       const today = getLocalTodayDate();
 
-      // 1. Try offline cache first
-      try {
-        const cached = await offlineStorage.getAll<Visit>(STORES.VISITS);
-        const todayCached = cached.filter(v => v.check_in_time);
-        
-        if (todayCached.length > 0 && !isOnline) {
-          console.log('[AttendanceCache] ✅ Loaded visits from cache:', todayCached.length);
-          return todayCached;
-        }
-      } catch (e) {
-        console.error('[AttendanceCache] Visits cache read error:', e);
-      }
-
-      // 2. Fetch from network if online
-      if (!isOnline) return [];
+      // Fetch from network if online
+      if (!isOnline) return cachedVisitsSync;
 
       const { data, error } = await supabase
         .from('visits')
@@ -185,8 +207,21 @@ export function useAttendanceCache(dateFilter: string = 'current-month') {
 
       if (error) throw error;
 
+      // Cache for instant loading
+      if (data) {
+        try {
+          localStorage.setItem(`visits_today_${user.id}`, JSON.stringify({
+            data,
+            date: today
+          }));
+        } catch (e) {
+          console.error('[AttendanceCache] Visits cache error:', e);
+        }
+      }
+
       return data || [];
     },
+    placeholderData: cachedVisitsSync.length > 0 ? cachedVisitsSync : undefined,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     enabled: !!user?.id,

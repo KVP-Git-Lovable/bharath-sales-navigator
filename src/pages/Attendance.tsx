@@ -88,16 +88,23 @@ const Attendance = () => {
     isLoading: isLoadingConfig
   } = useWorkingDaysConfig(dateFilter);
   
-  // Derived state from cached data
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [todaysAttendance, setTodaysAttendance] = useState(null);
-  const [todaysVisits, setTodaysVisits] = useState([]);
-  const [activeMarketHours, setActiveMarketHours] = useState(null);
-  const [stats, setStats] = useState({
-    totalDays: 20,
-    presentDays: 0,
-    absentDays: 0,
-    attendance: 0
+  // Use cached data IMMEDIATELY for instant UI - don't wait for loading
+  // The hooks now return cached data synchronously via placeholderData
+  const [attendanceData, setAttendanceData] = useState<any[]>(() => cachedAttendanceRecords);
+  const [todaysAttendance, setTodaysAttendance] = useState<any>(() => cachedTodaysAttendance);
+  const [todaysVisits, setTodaysVisits] = useState<any[]>(() => cachedTodaysVisits);
+  const [activeMarketHours, setActiveMarketHours] = useState<number | null>(() => cachedActiveMarketHours);
+  const [stats, setStats] = useState(() => {
+    // Calculate initial stats from cached data
+    const presentDaysCount = cachedAttendanceRecords.filter((r: any) => r.status === 'present').length;
+    const workingDays = totalWorkingDays || 20;
+    const attendancePercentage = workingDays > 0 ? Math.round((presentDaysCount / workingDays) * 100) : 0;
+    return {
+      totalDays: workingDays,
+      presentDays: presentDaysCount,
+      absentDays: Math.max(0, elapsedWorkingDays - presentDaysCount),
+      attendance: attendancePercentage
+    };
   });
   const [presentDatesList, setPresentDatesList] = useState<string[]>([]);
   const [absentDatesList, setAbsentDatesList] = useState<string[]>([]);
@@ -189,60 +196,56 @@ const Attendance = () => {
     }
   };
 
-  // NEW: Sync cached data to local state when cache updates
-  // This allows instant UI updates from cache while background refresh happens
+  // Sync cached data to local state when cache updates
+  // This runs AFTER initial render with cached data, updating only if data changed
   useEffect(() => {
-    if (!isLoadingAttendance && !isLoadingConfig) {
-      // Sync attendance records from cache
-      if (cachedAttendanceRecords.length > 0) {
-        const presentDaysCount = cachedAttendanceRecords.filter((r: any) => r.status === 'present').length;
-        const presentDates = cachedAttendanceRecords.filter((r: any) => r.status === 'present').map((r: any) => r.date);
-        const presentDatesSet = new Set(presentDates);
-        
-        // Calculate absent dates using cached working days config
-        const absentDates = elapsedWorkingDates.filter(date => !presentDatesSet.has(date));
-        const absentDays = absentDates.length;
-        const attendancePercentage = totalWorkingDays > 0 ? Math.round((presentDaysCount / totalWorkingDays) * 100) : 0;
+    // Sync attendance records from cache (runs on any update)
+    if (cachedAttendanceRecords.length > 0 || !isLoadingAttendance) {
+      const records = cachedAttendanceRecords.length > 0 ? cachedAttendanceRecords : [];
+      const presentDaysCount = records.filter((r: any) => r.status === 'present').length;
+      const presentDates = records.filter((r: any) => r.status === 'present').map((r: any) => r.date);
+      const presentDatesSet = new Set(presentDates);
+      
+      // Calculate absent dates using working days config
+      const workingDays = totalWorkingDays > 0 ? totalWorkingDays : 20;
+      const absentDates = elapsedWorkingDates.filter(date => !presentDatesSet.has(date));
+      const absentDays = absentDates.length;
+      const attendancePercentage = workingDays > 0 ? Math.round((presentDaysCount / workingDays) * 100) : 0;
 
-        // Update stats
-        setStats({
-          totalDays: totalWorkingDays,
-          presentDays: presentDaysCount,
-          absentDays,
-          attendance: attendancePercentage
-        });
+      // Update stats
+      setStats({
+        totalDays: workingDays,
+        presentDays: presentDaysCount,
+        absentDays,
+        attendance: attendancePercentage
+      });
 
-        setPresentDatesList(presentDates.sort());
-        setAbsentDatesList(absentDates.sort());
+      setPresentDatesList(presentDates.sort());
+      setAbsentDatesList(absentDates.sort());
 
-        // Merge attendance records with absent day placeholders
-        const absentRecords = absentDates.map(date => ({
-          id: `absent-${date}`,
-          date,
-          status: 'absent',
-          check_in_time: null,
-          check_out_time: null,
-          total_hours: null,
-          face_match_confidence: null,
-          isAbsentPlaceholder: true
-        }));
-        
-        const mergedRecords = [...cachedAttendanceRecords, ...absentRecords]
-          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        setAttendanceData(mergedRecords);
-      }
-
-      // Sync today's attendance
-      setTodaysAttendance(cachedTodaysAttendance);
-
-      // Sync today's visits
-      setTodaysVisits(cachedTodaysVisits);
-      setActiveMarketHours(cachedActiveMarketHours);
-
-      // Sync regularization requests
-      setRegularizationRequests(cachedRegularizationRequests);
+      // Merge attendance records with absent day placeholders
+      const absentRecords = absentDates.map(date => ({
+        id: `absent-${date}`,
+        date,
+        status: 'absent',
+        check_in_time: null,
+        check_out_time: null,
+        total_hours: null,
+        face_match_confidence: null,
+        isAbsentPlaceholder: true
+      }));
+      
+      const mergedRecords = [...records, ...absentRecords]
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setAttendanceData(mergedRecords);
     }
+
+    // Sync today's data
+    setTodaysAttendance(cachedTodaysAttendance);
+    setTodaysVisits(cachedTodaysVisits);
+    setActiveMarketHours(cachedActiveMarketHours);
+    setRegularizationRequests(cachedRegularizationRequests);
   }, [
     cachedAttendanceRecords, 
     cachedTodaysAttendance, 
@@ -251,8 +254,7 @@ const Attendance = () => {
     cachedRegularizationRequests,
     elapsedWorkingDates,
     totalWorkingDays,
-    isLoadingAttendance,
-    isLoadingConfig
+    isLoadingAttendance
   ]);
 
   // Only fetch location on mount - GPS is only needed for check-in/out actions
@@ -918,7 +920,7 @@ const Attendance = () => {
               {/* Start My Day Button */}
               <Button
                 onClick={() => markAttendance('check-in')}
-                disabled={isMarkingAttendance || todaysAttendance?.check_in_time}
+                disabled={isMarkingAttendance || !!todaysAttendance?.check_in_time}
                 variant={todaysAttendance?.check_in_time ? "outline" : "default"}
                 className="gap-2"
               >
@@ -938,7 +940,7 @@ const Attendance = () => {
               {/* End My Day Button */}
               <Button
                 onClick={() => markAttendance('check-out')}
-                disabled={isMarkingAttendance || !todaysAttendance?.check_in_time || todaysAttendance?.check_out_time}
+                disabled={isMarkingAttendance || !todaysAttendance?.check_in_time || !!todaysAttendance?.check_out_time}
                 variant={todaysAttendance?.check_out_time ? "outline" : "destructive"}
                 className="gap-2"
               >
