@@ -8,7 +8,7 @@ const corsHeaders = {
 /**
  * Auto End Day Edge Function
  * 
- * Runs at 12:00 AM IST (18:30 UTC) daily via cron job
+ * Runs at 11:59 PM IST (18:29 UTC) daily via cron job
  * Automatically closes attendance for users who forgot to check out
  * Uses last activity time from visits, orders, and retailer_visit_logs
  */
@@ -33,15 +33,13 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Get today's date in IST (UTC+5:30)
-    // When this runs at 12:00 AM IST, we want to close the previous day's attendance
+    // When this runs at 11:59 PM IST, we close the CURRENT day's attendance
     const now = new Date()
     const istOffset = 5.5 * 60 * 60 * 1000 // IST is UTC+5:30
     const istNow = new Date(now.getTime() + istOffset)
     
-    // The date we're closing is "yesterday" in IST terms since we run at midnight
-    const targetDate = new Date(istNow)
-    targetDate.setDate(targetDate.getDate() - 1)
-    const dateStr = targetDate.toISOString().split('T')[0]
+    // The date we're closing is TODAY in IST terms since we run at 11:59 PM
+    const dateStr = istNow.toISOString().split('T')[0]
     
     console.log(`📅 Processing attendance for date: ${dateStr}`)
 
