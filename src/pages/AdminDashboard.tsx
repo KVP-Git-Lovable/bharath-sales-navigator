@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, UserPlus, Shield, BarChart3, Settings, Database, ArrowLeft, Pencil, Search, Columns3, X } from 'lucide-react';
+import { Users, UserPlus, Shield, BarChart3, Settings, Database, ArrowLeft, Pencil, Search, Columns3, X, LogIn } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Navigate, useNavigate } from 'react-router-dom';
 
@@ -778,18 +778,53 @@ export const AdminDashboard = () => {
                             )}
                             {visibleColumns.includes('action') && (
                               <TableCell className="py-1.5">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs px-2"
-                                  onClick={() => {
-                                    setSelectedUser(user);
-                                    setIsEditDialogOpen(true);
-                                  }}
-                                >
-                                  <Pencil className="h-3 w-3 mr-1" />
-                                  Edit
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs px-2"
+                                    onClick={() => {
+                                      setSelectedUser(user);
+                                      setIsEditDialogOpen(true);
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs px-2 text-primary hover:text-primary"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        toast.loading('Generating login session...', { id: 'login-as-user' });
+                                        const { data: { session } } = await supabase.auth.getSession();
+                                        const response = await supabase.functions.invoke('admin-login-as-user', {
+                                          body: { targetUserId: user.id }
+                                        });
+                                        
+                                        if (response.error) {
+                                          throw new Error(response.error.message || 'Failed to login as user');
+                                        }
+                                        
+                                        if (response.data?.loginUrl) {
+                                          toast.success(`Logging in as ${user.email}`, { id: 'login-as-user' });
+                                          // Redirect to the magic link
+                                          window.location.href = response.data.loginUrl;
+                                        } else {
+                                          throw new Error('No login URL received');
+                                        }
+                                      } catch (error: any) {
+                                        console.error('Login as user error:', error);
+                                        toast.error(error.message || 'Failed to login as user', { id: 'login-as-user' });
+                                      }
+                                    }}
+                                  >
+                                    <LogIn className="h-3 w-3 mr-1" />
+                                    Login
+                                  </Button>
+                                </div>
                               </TableCell>
                             )}
                           </TableRow>
