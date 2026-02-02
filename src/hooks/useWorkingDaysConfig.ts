@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { useConnectivity } from './useConnectivity';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths } from 'date-fns';
 
@@ -48,8 +47,34 @@ const getDateRange = (dateFilter: string) => {
   };
 };
 
+// Synchronous cache loaders for instant UI display
+const getCachedWeekOffSync = (): WeekOffConfig[] => {
+  try {
+    const cached = localStorage.getItem('week_off_config');
+    if (cached) {
+      console.log('[WorkingDays] ✅ Instant load week-off config');
+      return JSON.parse(cached);
+    }
+  } catch (e) {}
+  // Default: Sunday off
+  return [{ id: 'default', day_of_week: 0, is_off: true }];
+};
+
+const getCachedHolidaysSync = (start: string, end: string): Holiday[] => {
+  try {
+    const cacheKey = `holidays_${start}_${end}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      console.log('[WorkingDays] ✅ Instant load holidays');
+      return JSON.parse(cached);
+    }
+  } catch (e) {}
+  return [];
+};
+
 /**
  * Hook for caching week-off configuration and holidays
+ * Uses localStorage for INSTANT synchronous loading
  * These rarely change, so we cache aggressively (6 hours)
  */
 export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
@@ -58,35 +83,30 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
   const { start, end, startDate, endDate } = getDateRange(dateFilter);
 
-  // Load week-off configuration (which days are off - e.g., Sunday)
+  // INSTANT: Synchronous cache load
+  const cachedWeekOffSync = useMemo(() => getCachedWeekOffSync(), []);
+  const cachedHolidaysSync = useMemo(() => getCachedHolidaysSync(start, end), [start, end]);
+
+  // Load week-off configuration with instant placeholder
   const {
-    data: weekOffConfig = [],
+    data: weekOffConfig = cachedWeekOffSync,
     isLoading: isLoadingWeekOff
   } = useQuery({
     queryKey: ['week-off-config'],
     queryFn: async () => {
-      // 1. Try localStorage cache first (very fast)
+      // Check if cache is fresh (less than 6 hours old)
       try {
-        const cached = localStorage.getItem('week_off_config');
         const cachedAt = localStorage.getItem('week_off_config_cached_at');
-        
-        if (cached && cachedAt) {
+        if (cachedAt) {
           const age = Date.now() - parseInt(cachedAt);
-          // Use cache if less than 6 hours old
           if (age < 6 * 60 * 60 * 1000) {
-            console.log('[WorkingDays] ✅ Using cached week-off config');
-            return JSON.parse(cached) as WeekOffConfig[];
+            return cachedWeekOffSync;
           }
         }
-      } catch (e) {
-        console.error('[WorkingDays] Cache read error:', e);
-      }
+      } catch (e) {}
 
-      // 2. Fetch from network if online
-      if (!isOnline) {
-        // Return default: Sunday off
-        return [{ id: 'default', day_of_week: 0, is_off: true }];
-      }
+      // Fetch from network if online and cache is stale
+      if (!isOnline) return cachedWeekOffSync;
 
       const { data, error } = await supabase
         .from('week_off_config')
@@ -94,49 +114,43 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
       if (error) throw error;
 
-      // 3. Cache for future use
+      // Cache for future instant loads
       if (data) {
         localStorage.setItem('week_off_config', JSON.stringify(data));
         localStorage.setItem('week_off_config_cached_at', Date.now().toString());
-        console.log('[WorkingDays] ✅ Cached week-off config');
       }
 
-      return data || [];
+      return data || cachedWeekOffSync;
     },
-    staleTime: 6 * 60 * 60 * 1000, // 6 hours - very stable config
-    gcTime: 24 * 60 * 60 * 1000, // Keep for 24 hours
+    placeholderData: cachedWeekOffSync,
+    staleTime: 6 * 60 * 60 * 1000, // 6 hours
+    gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
 
-  // Load holidays for the period
+  // Load holidays with instant placeholder
   const {
-    data: holidays = [],
+    data: holidays = cachedHolidaysSync,
     isLoading: isLoadingHolidays
   } = useQuery({
     queryKey: ['holidays', start, end],
     queryFn: async () => {
       const cacheKey = `holidays_${start}_${end}`;
       
-      // 1. Try localStorage cache
+      // Check if cache is fresh
       try {
-        const cached = localStorage.getItem(cacheKey);
         const cachedAt = localStorage.getItem(`${cacheKey}_cached_at`);
-        
-        if (cached && cachedAt) {
+        if (cachedAt) {
           const age = Date.now() - parseInt(cachedAt);
-          // Use cache if less than 6 hours old
           if (age < 6 * 60 * 60 * 1000) {
-            console.log('[WorkingDays] ✅ Using cached holidays');
-            return JSON.parse(cached) as Holiday[];
+            return cachedHolidaysSync;
           }
         }
-      } catch (e) {
-        console.error('[WorkingDays] Holiday cache read error:', e);
-      }
+      } catch (e) {}
 
-      // 2. Fetch from network if online
-      if (!isOnline) return [];
+      // Fetch from network if online
+      if (!isOnline) return cachedHolidaysSync;
 
       const { data, error } = await supabase
         .from('holidays')
@@ -146,15 +160,15 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
       if (error) throw error;
 
-      // 3. Cache for future use
+      // Cache for instant loads
       if (data) {
         localStorage.setItem(cacheKey, JSON.stringify(data));
         localStorage.setItem(`${cacheKey}_cached_at`, Date.now().toString());
-        console.log('[WorkingDays] ✅ Cached holidays:', data.length);
       }
 
-      return data || [];
+      return data || cachedHolidaysSync;
     },
+    placeholderData: cachedHolidaysSync.length > 0 ? cachedHolidaysSync : undefined,
     staleTime: 6 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
