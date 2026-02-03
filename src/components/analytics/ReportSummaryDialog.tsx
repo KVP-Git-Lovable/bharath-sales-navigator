@@ -86,37 +86,27 @@ export const ReportSummaryDialog = ({
   }, [messages]);
 
   const generateSummary = (): string => {
-    const lines: string[] = [];
+    const parts: string[] = [];
     
-    // Date range
+    // Date range header
     const fromStr = dateRange.from.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const toStr = dateRange.to.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    lines.push(`📊 Supervisor Report Summary (${fromStr} - ${toStr})`);
-    lines.push('');
+    parts.push(`📊 Supervisor Report Summary\n${fromStr} to ${toStr}`);
     
     // Summary - All Users
     if (allUsersSummary) {
-      lines.push('📈 Overall Summary (All Users):');
-      lines.push(`• Total Retailers: ${allUsersSummary.retailers}`);
-      lines.push(`• Total Beats: ${allUsersSummary.beats}`);
-      lines.push(`• Total Products: ${allUsersSummary.products}`);
-      lines.push(`• Total Quantity: ${allUsersSummary.totalKg.toFixed(2)} KG`);
-      lines.push('');
+      parts.push(`\n📈 Overall Summary\nThe team covered ${allUsersSummary.retailers} retailers across ${allUsersSummary.beats} beats, handling ${allUsersSummary.products} products with a total quantity of ${allUsersSummary.totalKg.toFixed(2)} KG.`);
     }
     
     // Total Order Summary
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
-      lines.push('🛒 Order Summary:');
-      lines.push(`• Total Users: ${orderSummaryData.length}`);
-      lines.push(`• Total Order Value: ₹${totalOrderValue.toLocaleString('en-IN')}`);
-      
-      // Top performer in orders
       const topOrderUser = orderSummaryData[0];
+      let orderText = `\n🛒 Order Summary\nA total of ${orderSummaryData.length} team members generated orders worth ₹${totalOrderValue.toLocaleString('en-IN')}.`;
       if (topOrderUser) {
-        lines.push(`• Top Performer: ${topOrderUser.full_name} (₹${topOrderUser.total_order_value.toLocaleString('en-IN')})`);
+        orderText += ` The top performer in orders was ${topOrderUser.full_name} with ₹${topOrderUser.total_order_value.toLocaleString('en-IN')}.`;
       }
-      lines.push('');
+      parts.push(orderText);
     }
     
     // SKU Revenue Summary
@@ -129,18 +119,13 @@ export const ReportSummaryDialog = ({
         }
         return sum + s.quantity_sold;
       }, 0);
-      
-      lines.push('📦 SKU Revenue Summary:');
-      lines.push(`• Total SKUs: ${skuData.length}`);
-      lines.push(`• Total Revenue: ₹${totalRevenue.toLocaleString('en-IN')}`);
-      lines.push(`• Total Quantity: ${totalKg.toFixed(2)} KG`);
-      
-      // Top selling product
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
+      
+      let skuText = `\n📦 Product Performance\nAcross ${skuData.length} SKUs, the team achieved ₹${totalRevenue.toLocaleString('en-IN')} in revenue with ${totalKg.toFixed(2)} KG sold.`;
       if (topProduct) {
-        lines.push(`• Top Product: ${topProduct.product_name} (₹${topProduct.revenue.toLocaleString('en-IN')})`);
+        skuText += ` The best-selling product was ${topProduct.product_name}, contributing ₹${topProduct.revenue.toLocaleString('en-IN')} in revenue.`;
       }
-      lines.push('');
+      parts.push(skuText);
     }
     
     // Productivity Summary
@@ -148,41 +133,38 @@ export const ReportSummaryDialog = ({
       const totalProductive = productivityData.reduce((sum, p) => sum + p.productive_visits, 0);
       const totalVisits = productivityData.reduce((sum, p) => sum + p.total_visits, 0);
       const avgProductivity = totalVisits > 0 ? (totalProductive / totalVisits) * 100 : 0;
-      
-      lines.push('⚡ Productivity Summary:');
-      lines.push(`• Total Productive Visits: ${totalProductive} / ${totalVisits}`);
-      lines.push(`• Overall Productivity: ${avgProductivity.toFixed(1)}%`);
-      
-      // Top productive user
       const topProductiveUser = productivityData.reduce((max, p) => 
         p.productivity_percentage > max.productivity_percentage ? p : max, productivityData[0]
       );
+      
+      let productivityText = `\n⚡ Productivity Insights\nOut of ${totalVisits} total visits, ${totalProductive} were productive, resulting in an overall productivity rate of ${avgProductivity.toFixed(1)}%.`;
       if (topProductiveUser) {
-        lines.push(`• Top Performer: ${topProductiveUser.full_name} (${topProductiveUser.productivity_percentage.toFixed(1)}%)`);
+        productivityText += ` ${topProductiveUser.full_name} led the team with ${topProductiveUser.productivity_percentage.toFixed(1)}% productivity.`;
       }
-      lines.push('');
+      parts.push(productivityText);
     }
     
     // Top Performers Section
-    lines.push('🏆 Top Performers:');
-    
+    const performers: string[] = [];
     if (orderSummaryData.length > 0) {
-      lines.push(`• Highest Orders: ${orderSummaryData[0].full_name}`);
+      performers.push(`${orderSummaryData[0].full_name} for highest orders`);
     }
-    
     if (skuData.length > 0) {
       const topSKU = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
-      lines.push(`• Best Selling Product: ${topSKU.product_name}`);
+      performers.push(`${topSKU.product_name} as the best-selling product`);
     }
-    
     if (productivityData.length > 0) {
       const topProductiveUser = productivityData.reduce((max, p) => 
         p.productivity_percentage > max.productivity_percentage ? p : max, productivityData[0]
       );
-      lines.push(`• Most Productive: ${topProductiveUser.full_name}`);
+      performers.push(`${topProductiveUser.full_name} for highest productivity`);
     }
     
-    return lines.join('\n');
+    if (performers.length > 0) {
+      parts.push(`\n🏆 Top Performers\n${performers.join(', ')}.`);
+    }
+    
+    return parts.join('\n');
   };
 
   // Generate spoken version (without emojis for TTS)
