@@ -263,8 +263,10 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                       cx="50%"
                       cy="50%"
                       outerRadius={isMobile ? 70 : 120}
-                      label={isMobile ? false : ({ name, percentage }) => `${name} (${percentage}%)`}
-                      labelLine={isMobile ? false : { stroke: '#888', strokeWidth: 1 }}
+                      label={isMobile ? false : ({ name, percentage, index }: { name: string; percentage: number; index: number }) => 
+                        chartData.length > 8 ? (index < 3 ? `${name} (${percentage}%)` : '') : `${name} (${percentage}%)`
+                      }
+                      labelLine={isMobile || chartData.length > 8 ? false : { stroke: '#888', strokeWidth: 1 }}
                     >
                       {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
