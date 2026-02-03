@@ -1133,20 +1133,23 @@ const Analytics = () => {
           {/* Multi-Select User Filter with Date Range */}
           <Card className="mb-4 shadow-lg">
             <CardContent className="p-3">
-              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto">
                 {/* Multi-select User Dropdown */}
                 <Popover open={userSelectOpen} onOpenChange={setUserSelectOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="min-w-[150px] justify-between">
-                      <div className="flex items-center gap-2">
-                        <Users size={16} />
-                        <span>
+                    <Button variant="outline" className="h-8 px-2 sm:px-3 min-w-0 sm:min-w-[150px] justify-between text-xs sm:text-sm">
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <Users size={14} className="shrink-0" />
+                        <span className="hidden sm:inline">
                           {selectedUserIds.length === 0 
                             ? 'All Users' 
-                            : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''} Selected`}
+                            : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}`}
+                        </span>
+                        <span className="sm:hidden">
+                          {selectedUserIds.length === 0 ? 'All' : selectedUserIds.length}
                         </span>
                       </div>
-                      <ChevronDown size={16} />
+                      <ChevronDown size={14} className="shrink-0 ml-1" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[280px] p-0" align="start">
@@ -1336,7 +1339,7 @@ const Analytics = () => {
                     setDashboardDateRange({ from, to });
                   }}
                 >
-                  <SelectTrigger className="min-w-[120px] w-auto">
+                  <SelectTrigger className="h-8 min-w-[90px] sm:min-w-[120px] w-auto text-xs sm:text-sm px-2 sm:px-3">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1359,8 +1362,8 @@ const Analytics = () => {
                 {/* From Date Picker */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="min-w-[120px] justify-start h-9">
-                      <CalendarIcon size={14} className="mr-1" />
+                    <Button variant="outline" size="sm" className="h-8 w-[70px] sm:w-[100px] justify-start px-2 text-xs sm:text-sm">
+                      <CalendarIcon size={12} className="mr-0.5 sm:mr-1 shrink-0" />
                       {format(dashboardDateRange.from, 'dd MMM')}
                     </Button>
                   </PopoverTrigger>
@@ -1375,13 +1378,13 @@ const Analytics = () => {
                   </PopoverContent>
                 </Popover>
 
-                <span className="text-muted-foreground text-sm">to</span>
+                <span className="text-muted-foreground text-xs shrink-0">-</span>
 
                 {/* To Date Picker */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="min-w-[120px] justify-start h-9">
-                      <CalendarIcon size={14} className="mr-1" />
+                    <Button variant="outline" size="sm" className="h-8 w-[70px] sm:w-[100px] justify-start px-2 text-xs sm:text-sm">
+                      <CalendarIcon size={12} className="mr-0.5 sm:mr-1 shrink-0" />
                       {format(dashboardDateRange.to, 'dd MMM')}
                     </Button>
                   </PopoverTrigger>
@@ -1398,7 +1401,8 @@ const Analytics = () => {
 
                 <Button 
                   variant="outline" 
-                  size="sm" 
+                  size="sm"
+                  className="h-8 px-2 sm:px-3 shrink-0"
                   onClick={() => {
                     fetchDashboardData();
                     const selectedUserNames = selectedUserIds
@@ -1407,8 +1411,8 @@ const Analytics = () => {
                     fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
                   }}
                 >
-                  <RefreshCw size={16} className="mr-2" />
-                  Refresh
+                  <RefreshCw size={14} className="sm:mr-1.5" />
+                  <span className="hidden sm:inline">Refresh</span>
                 </Button>
               </div>
 
