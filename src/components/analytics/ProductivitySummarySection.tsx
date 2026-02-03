@@ -269,11 +269,11 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
               <p className="text-muted-foreground">Loading productivity data...</p>
             </div>
           ) : productivityData.length > 0 ? (
-            <div className={cn(
-              "border rounded-lg",
-              productivityData.length > 6 && isSingleUserMode && "max-h-[320px]",
-              userSummaries.length > 6 && !isSingleUserMode && "max-h-[320px]"
-            )} style={{ overflow: 'scroll' }}>
+            <div className="border rounded-lg overflow-x-auto" style={{ overflowX: 'scroll' }}>
+              <div className={cn(
+                (productivityData.length > 6 && isSingleUserMode) && "max-h-[320px] overflow-y-auto",
+                (userSummaries.length > 6 && !isSingleUserMode) && "max-h-[320px] overflow-y-auto"
+              )}>
               {isSingleUserMode ? (
                 // Single user: Day-wise breakdown (original view)
                 <Table>
@@ -393,6 +393,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                   </tfoot>
                 </Table>
               )}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
