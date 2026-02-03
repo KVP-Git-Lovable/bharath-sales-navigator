@@ -697,17 +697,69 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
   const totalOrderValue = summaryData.reduce((sum, item) => sum + item.total_order_value, 0);
 
-  const pieChartData = summaryData.map((item, index) => ({
+  // State for "Others" dialog
+  const [othersDialogOpen, setOthersDialogOpen] = useState(false);
+  const [othersData, setOthersData] = useState<{ name: string; value: number; percentage: string }[]>([]);
+
+  // Raw pie chart data (all users)
+  const rawPieChartData = summaryData.map((item, index) => ({
     name: item.full_name,
     value: item.total_order_value,
-    percentage: totalOrderValue > 0 ? ((item.total_order_value / totalOrderValue) * 100).toFixed(0) : 0,
+    percentage: totalOrderValue > 0 ? ((item.total_order_value / totalOrderValue) * 100).toFixed(0) : '0',
     color: COLORS[index % COLORS.length]
   }));
 
+  // Apply "Others" grouping when more than 8 users
+  const pieChartData = useMemo(() => {
+    if (rawPieChartData.length <= 8) {
+      return rawPieChartData;
+    }
+    
+    // Keep top entries (total - 5), club bottom 5 as "Others"
+    const topCount = rawPieChartData.length - 5;
+    const topUsers = rawPieChartData.slice(0, topCount);
+    const bottomUsers = rawPieChartData.slice(topCount);
+    
+    const othersValue = bottomUsers.reduce((sum, u) => sum + u.value, 0);
+    const othersPercentage = totalOrderValue > 0 ? ((othersValue / totalOrderValue) * 100).toFixed(0) : '0';
+    
+    return [
+      ...topUsers,
+      {
+        name: 'Others',
+        value: othersValue,
+        percentage: othersPercentage,
+        color: '#9ca3af', // gray-400 for "Others"
+        isOthers: true,
+        othersDetails: bottomUsers
+      }
+    ];
+  }, [rawPieChartData, totalOrderValue]);
+
   const handlePieClick = (data: any) => {
     if (data && data.name) {
+      // Check if this is the "Others" segment
+      if (data.name === 'Others' || data.isOthers) {
+        // Show "Others" dialog instead of drilling down
+        const othersItem = pieChartData.find(d => d.name === 'Others');
+        if (othersItem && (othersItem as any).othersDetails) {
+          setOthersData((othersItem as any).othersDetails);
+          setOthersDialogOpen(true);
+        }
+        return;
+      }
+      
+      // For regular users, show beat breakdown like handleSummaryRowClick
+      // Toggle off if same user clicked
+      if (selectedSummaryUser === data.name) {
+        setSelectedSummaryUser(null);
+        setBeatBreakdownData([]);
+      } else {
+        setSelectedSummaryUser(data.name);
+        fetchBeatBreakdown(data.name);
+      }
+      // Also show detailed section below and set SKU filter
       fetchUserDetails(data.name);
-      // Also set SKU filter to show this user's data in Revenue Summary by SKU
       setSkuFilterUser(data.name);
     }
   };
@@ -715,6 +767,17 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
   const handleRowClick = (userName: string) => {
     fetchUserDetails(userName);
     // Also set SKU filter to show this user's data in Revenue Summary by SKU
+    setSkuFilterUser(userName);
+  };
+
+  // Handle click on a user from "Others" dialog
+  const handleOthersUserClick = (userName: string) => {
+    setOthersDialogOpen(false);
+    // Show beat breakdown
+    setSelectedSummaryUser(userName);
+    fetchBeatBreakdown(userName);
+    // Show detailed section
+    fetchUserDetails(userName);
     setSkuFilterUser(userName);
   };
 
@@ -1334,7 +1397,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                       />
                       <Bar 
                         dataKey="value" 
-                        onClick={(data) => handleRowClick(data.name)}
+                        onClick={(data) => handlePieClick(data)}
                         style={{ cursor: 'pointer' }}
                       >
                         {pieChartData.map((entry, index) => (
@@ -1588,7 +1651,62 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         </DialogContent>
       </Dialog>
 
-      {/* All Users Summary Section (when no specific user is selected) */}
+      {/* "Others" Dialog - shows bottom 5 users when "Others" segment is clicked */}
+      <Dialog open={othersDialogOpen} onOpenChange={setOthersDialogOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Others - {othersData.length} Users
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              Click a user to view their details
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead>User Name</TableHead>
+                  <TableHead className="text-right">Order Value</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {othersData.map((user, index) => (
+                  <TableRow 
+                    key={index}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleOthersUserClick(user.name)}
+                  >
+                    <TableCell className="text-primary hover:underline">{user.name}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      ₹{user.value.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {user.percentage}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <tfoot className="bg-muted/30">
+                <TableRow>
+                  <TableCell className="font-semibold">Total</TableCell>
+                  <TableCell className="text-right font-bold text-primary">
+                    ₹{othersData.reduce((s, u) => s + u.value, 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground font-semibold">
+                    {othersData.length > 0 && totalOrderValue > 0 
+                      ? ((othersData.reduce((s, u) => s + u.value, 0) / totalOrderValue) * 100).toFixed(0)
+                      : 0}%
+                  </TableCell>
+                </TableRow>
+              </tfoot>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {!selectedUserDetails && allUsersSummary && summaryData.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader>
