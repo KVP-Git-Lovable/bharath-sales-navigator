@@ -1268,7 +1268,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         ))}
                       </Pie>
                       <Tooltip 
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
+                        formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
+                        labelFormatter={() => ''}
                       />
                       <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : (selectedSummaryUser ? '10px' : '12px') }} />
                     </PieChart>
@@ -1278,7 +1279,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                       <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
                       <YAxis type="category" dataKey="name" width={selectedSummaryUser ? 60 : 80} tick={{ fontSize: selectedSummaryUser ? 10 : 12 }} />
                       <Tooltip 
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Order Value']}
+                        formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
+                        labelFormatter={() => ''}
                       />
                       <Bar 
                         dataKey="value" 
