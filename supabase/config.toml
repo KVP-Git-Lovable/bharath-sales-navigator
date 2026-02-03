@@ -92,3 +92,9 @@ verify_jwt = false
 
 [functions.auto-end-day]
 verify_jwt = false
+
+[functions.elevenlabs-tts]
+verify_jwt = false
+
+[functions.report-voice-assistant]
+verify_jwt = false

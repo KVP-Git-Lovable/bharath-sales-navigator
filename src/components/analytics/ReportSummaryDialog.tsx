@@ -1,7 +1,12 @@
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Copy, Volume2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Copy, Volume2, VolumeX, Mic, MicOff, Send, Loader2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useReportVoiceChat } from "@/hooks/useReportVoiceChat";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface UserOrderSummary {
   full_name: string;
@@ -46,7 +51,40 @@ export const ReportSummaryDialog = ({
   skuData,
   productivityData
 }: ReportSummaryDialogProps) => {
+  const [textInput, setTextInput] = useState('');
+  const [showChat, setShowChat] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   
+  const reportContext = {
+    dateRange: {
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString(),
+    },
+    allUsersSummary,
+    orderSummaryData,
+    skuData,
+    productivityData,
+  };
+
+  const {
+    messages,
+    isRecording,
+    isProcessing,
+    isPlaying,
+    transcript,
+    startRecording,
+    stopRecording,
+    sendMessage,
+    playSummary,
+    stopAllAudio,
+  } = useReportVoiceChat(reportContext);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const generateSummary = (): string => {
     const lines: string[] = [];
     
@@ -147,6 +185,43 @@ export const ReportSummaryDialog = ({
     return lines.join('\n');
   };
 
+  // Generate spoken version (without emojis for TTS)
+  const generateSpokenSummary = (): string => {
+    const parts: string[] = [];
+    
+    const fromStr = dateRange.from.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const toStr = dateRange.to.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    parts.push(`Supervisor Report Summary from ${fromStr} to ${toStr}.`);
+    
+    if (allUsersSummary) {
+      parts.push(`Overall Summary: ${allUsersSummary.retailers} retailers, ${allUsersSummary.beats} beats, ${allUsersSummary.products} products, and ${allUsersSummary.totalKg.toFixed(2)} kilograms total quantity.`);
+    }
+    
+    if (orderSummaryData.length > 0) {
+      const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
+      const topOrderUser = orderSummaryData[0];
+      parts.push(`Order Summary: ${orderSummaryData.length} users with total order value of ${totalOrderValue.toLocaleString('en-IN')} rupees. Top performer is ${topOrderUser?.full_name} with ${topOrderUser?.total_order_value.toLocaleString('en-IN')} rupees.`);
+    }
+    
+    if (skuData.length > 0) {
+      const totalRevenue = skuData.reduce((sum, s) => sum + s.revenue, 0);
+      const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
+      parts.push(`SKU Revenue Summary: ${skuData.length} SKUs with total revenue of ${totalRevenue.toLocaleString('en-IN')} rupees. Best selling product is ${topProduct?.product_name}.`);
+    }
+    
+    if (productivityData.length > 0) {
+      const totalProductive = productivityData.reduce((sum, p) => sum + p.productive_visits, 0);
+      const totalVisits = productivityData.reduce((sum, p) => sum + p.total_visits, 0);
+      const avgProductivity = totalVisits > 0 ? (totalProductive / totalVisits) * 100 : 0;
+      const topProductiveUser = productivityData.reduce((max, p) => 
+        p.productivity_percentage > max.productivity_percentage ? p : max, productivityData[0]
+      );
+      parts.push(`Productivity Summary: ${totalProductive} productive visits out of ${totalVisits} total, with overall productivity of ${avgProductivity.toFixed(1)} percent. Most productive user is ${topProductiveUser?.full_name} with ${topProductiveUser?.productivity_percentage.toFixed(1)} percent.`);
+    }
+    
+    return parts.join(' ');
+  };
+
   const summary = generateSummary();
   
   const handleCopy = () => {
@@ -154,9 +229,40 @@ export const ReportSummaryDialog = ({
     toast.success('Summary copied to clipboard');
   };
 
+  const handlePlaySummary = () => {
+    if (isPlaying) {
+      stopAllAudio();
+    } else {
+      const spokenSummary = generateSpokenSummary();
+      playSummary(spokenSummary);
+    }
+  };
+
+  const handleSendText = () => {
+    if (textInput.trim()) {
+      sendMessage(textInput.trim());
+      setTextInput('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendText();
+    }
+  };
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className={`${isMobile ? 'max-w-[95vw]' : 'max-w-2xl'} max-h-[90vh] overflow-hidden flex flex-col`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Volume2 className="h-5 w-5" />
@@ -164,17 +270,139 @@ export const ReportSummaryDialog = ({
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-y-auto">
-          <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed p-4 bg-muted rounded-lg">
-            {summary}
-          </pre>
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          {/* Summary Section */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Summary</span>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handlePlaySummary}
+                  disabled={isProcessing}
+                >
+                  {isPlaying ? (
+                    <>
+                      <VolumeX className="h-4 w-4 mr-2" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="h-4 w-4 mr-2" />
+                      Play
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCopy}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+              </div>
+            </div>
+            
+            <ScrollArea className="h-[200px] rounded-lg border">
+              <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed p-4 bg-muted/50">
+                {summary}
+              </pre>
+            </ScrollArea>
+          </div>
+
+          {/* Chat Toggle */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowChat(!showChat)}
+            className="w-full flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <MessageCircle className="h-4 w-4" />
+            {showChat ? 'Hide Chat' : 'Ask questions about this report'}
+          </Button>
+
+          {/* Chat Section */}
+          {showChat && (
+            <div className="flex flex-col gap-3 flex-1 min-h-0">
+              {/* Messages Area */}
+              <ScrollArea className="flex-1 h-[150px] rounded-lg border bg-muted/30 p-3">
+                <div className="space-y-3">
+                  {messages.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Ask any question about the report data using voice or text
+                    </p>
+                  )}
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          msg.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-background border'
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isProcessing && (
+                    <div className="flex justify-start">
+                      <div className="bg-background border rounded-lg px-3 py-2 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm text-muted-foreground">Thinking...</span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+              </ScrollArea>
+
+              {/* Transcript Display */}
+              {transcript && (
+                <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 italic">
+                  "{transcript}"
+                </div>
+              )}
+
+              {/* Input Area */}
+              <div className="flex gap-2">
+                <Button
+                  variant={isRecording ? "destructive" : "outline"}
+                  size="icon"
+                  onClick={handleMicClick}
+                  disabled={isProcessing}
+                  className={`shrink-0 ${isRecording ? 'animate-pulse' : ''}`}
+                  title={isRecording ? "Stop recording" : "Start voice input"}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+                <Input
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your question..."
+                  disabled={isProcessing || isRecording}
+                  className="flex-1"
+                />
+                <Button
+                  size="icon"
+                  onClick={handleSendText}
+                  disabled={!textInput.trim() || isProcessing}
+                  className="shrink-0"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
         
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" size="sm" onClick={handleCopy}>
-            <Copy className="h-4 w-4 mr-2" />
-            Copy
-          </Button>
+        <div className="flex justify-end pt-4 border-t">
           <Button size="sm" onClick={onClose}>
             Close
           </Button>
