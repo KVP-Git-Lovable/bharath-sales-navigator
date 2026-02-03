@@ -1253,8 +1253,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         cx="50%"
                         cy="50%"
                         outerRadius={isMobile ? 70 : (selectedSummaryUser ? 90 : 120)}
-                        label={isMobile || selectedSummaryUser ? false : ({ name, percentage }) => `${name} (${percentage}%)`}
-                        labelLine={isMobile || selectedSummaryUser ? false : { stroke: '#888', strokeWidth: 1 }}
+                        label={isMobile || selectedSummaryUser ? false : ({ name, percentage, index }: { name: string; percentage: number; index: number }) => 
+                          pieChartData.length > 8 ? (index < 3 ? `${name} (${percentage}%)` : '') : `${name} (${percentage}%)`
+                        }
+                        labelLine={isMobile || selectedSummaryUser || pieChartData.length > 8 ? false : { stroke: '#888', strokeWidth: 1 }}
                         onClick={handlePieClick}
                         style={{ cursor: 'pointer' }}
                       >
