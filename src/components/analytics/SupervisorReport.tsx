@@ -22,6 +22,7 @@ import { ReportSummaryDialog } from './ReportSummaryDialog';
 interface UserOrderSummary {
   full_name: string;
   total_order_value: number;
+  total_kg: number;
 }
 
 interface UserOrderDetails {
@@ -286,13 +287,14 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Build query with optional user filtering at database level
+      // Build query with optional user filtering at database level - include order_items for KG calculation
       let query = supabase
         .from('orders')
         .select(`
           id,
           user_id,
-          total_amount
+          total_amount,
+          order_items(quantity, unit)
         `)
         .eq('status', 'confirmed')
         .gte('order_date', fromDate)
@@ -345,21 +347,43 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         userNameMap[p.id] = p.full_name || 'Unknown';
       });
 
-      // Group by user and calculate totals using total_amount directly
-      const userTotals: Record<string, number> = {};
+      // Group by user and calculate totals (total_amount and total_kg)
+      const userTotals: Record<string, { total_order_value: number; total_kg: number }> = {};
       ordersData.forEach((order) => {
         const userName = userNameMap[order.user_id] || 'Unknown';
         
         // Use total_amount directly (includes taxes and charges)
         const orderRevenue = Number(order.total_amount || 0);
         
-        userTotals[userName] = (userTotals[userName] || 0) + orderRevenue;
+        // Calculate KG from order_items
+        let orderKg = 0;
+        (order.order_items as any[])?.forEach((item: any) => {
+          const qty = Number(item.quantity || 0);
+          const unit = (item.unit || '').toLowerCase().trim();
+          
+          if (unit === 'kg' || unit.includes('kilo')) {
+            orderKg += qty;
+          } else if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+            orderKg += qty / 1000;
+          }
+          // Ignore pieces/pcs - not included in KG
+        });
+        
+        if (!userTotals[userName]) {
+          userTotals[userName] = { total_order_value: 0, total_kg: 0 };
+        }
+        userTotals[userName].total_order_value += orderRevenue;
+        userTotals[userName].total_kg += orderKg;
       });
 
-      // Convert to array and sort by total
+      // Convert to array and sort by total_kg (for ranking by quantity)
       const summaryArray = Object.entries(userTotals)
-        .map(([full_name, total_order_value]) => ({ full_name, total_order_value }))
-        .sort((a, b) => b.total_order_value - a.total_order_value);
+        .map(([full_name, data]) => ({ 
+          full_name, 
+          total_order_value: data.total_order_value,
+          total_kg: Math.round(data.total_kg * 100) / 100 
+        }))
+        .sort((a, b) => b.total_kg - a.total_kg);
 
       setSummaryData(summaryArray);
       setSelectedUserDetails(null);
@@ -717,16 +741,19 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
 
   const totalOrderValue = summaryData.reduce((sum, item) => sum + item.total_order_value, 0);
+  const totalKgAll = summaryData.reduce((sum, item) => sum + item.total_kg, 0);
 
   // State for "Others" dialog
   const [othersDialogOpen, setOthersDialogOpen] = useState(false);
-  const [othersData, setOthersData] = useState<{ name: string; value: number; percentage: string }[]>([]);
+  const [othersData, setOthersData] = useState<{ name: string; value: number; kg: number; percentage: string }[]>([]);
 
-  // Raw pie chart data (all users)
+  // Raw pie chart data (all users) - now ranked by total_kg
   const rawPieChartData = summaryData.map((item, index) => ({
     name: item.full_name,
-    value: item.total_order_value,
-    percentage: totalOrderValue > 0 ? ((item.total_order_value / totalOrderValue) * 100).toFixed(0) : '0',
+    value: item.total_kg, // Use KG as the chart value for ranking
+    orderValue: item.total_order_value,
+    kg: item.total_kg,
+    percentage: totalKgAll > 0 ? ((item.total_kg / totalKgAll) * 100).toFixed(0) : '0',
     color: COLORS[index % COLORS.length]
   }));
 
@@ -742,20 +769,23 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     const bottomUsers = rawPieChartData.slice(topCount);
     
     const othersValue = bottomUsers.reduce((sum, u) => sum + u.value, 0);
-    const othersPercentage = totalOrderValue > 0 ? ((othersValue / totalOrderValue) * 100).toFixed(0) : '0';
+    const othersKg = bottomUsers.reduce((sum, u) => sum + u.kg, 0);
+    const othersPercentage = totalKgAll > 0 ? ((othersKg / totalKgAll) * 100).toFixed(0) : '0';
     
     return [
       ...topUsers,
       {
         name: 'Others',
         value: othersValue,
+        orderValue: bottomUsers.reduce((sum, u) => sum + u.orderValue, 0),
+        kg: othersKg,
         percentage: othersPercentage,
         color: '#9ca3af', // gray-400 for "Others"
         isOthers: true,
         othersDetails: bottomUsers
       }
     ];
-  }, [rawPieChartData, totalOrderValue]);
+  }, [rawPieChartData, totalKgAll]);
 
   const handlePieClick = (data: any) => {
     if (data && data.name) {
@@ -1402,7 +1432,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         ))}
                       </Pie>
                       <Tooltip 
-                        formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
+                        formatter={(value: number, name: string, props: any) => {
+                          const entry = props.payload;
+                          return [`${value.toLocaleString()} KG`, name];
+                        }}
                         labelFormatter={() => ''}
                       />
                       <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : (selectedSummaryUser ? '10px' : '12px') }} />
@@ -1410,7 +1443,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                   ) : (
                     <BarChart data={pieChartData} layout="vertical" margin={{ left: isMobile ? 10 : 20, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                      <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                      <XAxis type="number" tickFormatter={(value) => `${value.toLocaleString()} KG`} />
                       <YAxis 
                         type="category" 
                         dataKey="name" 
@@ -1424,7 +1457,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         }}
                       />
                       <Tooltip 
-                        formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
+                        formatter={(value: number, name: string) => [`${value.toLocaleString()} KG`, name]}
                         labelFormatter={() => ''}
                       />
                       <Bar 
@@ -1467,6 +1500,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                       <TableHeader className="sticky top-0 bg-muted/50 z-10">
                         <TableRow className="bg-muted/50">
                           <TableHead>Full Name</TableHead>
+                          <TableHead className="text-right">Qty (KG)</TableHead>
                           <TableHead className="text-right">Total Order Value</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1487,6 +1521,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                               />
                               {row.full_name}
                             </TableCell>
+                            <TableCell className="text-right font-semibold text-primary">
+                              {row.total_kg.toLocaleString()}
+                            </TableCell>
                             <TableCell className="text-right font-semibold">
                               ₹{row.total_order_value.toLocaleString()}
                             </TableCell>
@@ -1497,6 +1534,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         <TableRow>
                           <TableCell className="font-semibold">Total</TableCell>
                           <TableCell className="text-right font-bold text-primary">
+                            {totalKgAll.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-bold">
                             ₹{totalOrderValue.toLocaleString()}
                           </TableCell>
                         </TableRow>
