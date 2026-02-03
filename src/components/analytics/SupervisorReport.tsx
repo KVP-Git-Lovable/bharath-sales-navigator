@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RevenueBySKUSection } from './RevenueBySKUSection';
 import { ProductivitySummarySection } from './ProductivitySummarySection';
+import { AttendanceMarketHoursSection } from './AttendanceMarketHoursSection';
 import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
 import { Badge } from '@/components/ui/badge';
 import { ReportSummaryDialog } from './ReportSummaryDialog';
@@ -2173,6 +2174,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         filteredUserName={skuFilterUser}
         onClearFilter={handleClearSkuFilter}
         onDataLoaded={handleSkuDataLoaded}
+      />
+
+      {/* Attendance & Market Hours Section */}
+      <AttendanceMarketHoursSection 
+        selectedUsers={selectedUserIds} 
+        dateRange={dateRange}
+        allUsers={users}
       />
 
       {/* Productivity Summary Section */}
