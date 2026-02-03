@@ -197,10 +197,19 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
   }, []);
 
   const stopAllAudio = useCallback(() => {
+    console.log('stopAllAudio called, currentAudio:', !!currentAudioRef.current);
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current.src = '';
       currentAudioRef.current = null;
     }
+    // Also clear any queued audio
+    audioQueueRef.current.forEach(audio => {
+      audio.pause();
+      audio.src = '';
+    });
+    audioQueueRef.current = [];
     setIsPlaying(false);
   }, []);
 
