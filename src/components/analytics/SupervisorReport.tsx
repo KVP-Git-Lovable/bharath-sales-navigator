@@ -1011,7 +1011,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     const resultArray = Object.entries(dateGroups)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, data]) => ({
-        order_date: format(new Date(date), 'MMMM dd, yyyy'),
+        order_date: format(new Date(date), 'dd MMM yy'),
         raw_date: date,
         quantity_kg: Math.round(data.quantity_kg * 100) / 100,
         revenue: data.revenue
@@ -1534,9 +1534,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                           <Table>
                             <TableHeader>
                               <TableRow className="bg-muted/30">
-                                <TableHead>Beat Name</TableHead>
-                                <TableHead className="text-right">Orders</TableHead>
-                                <TableHead className="text-right">Value</TableHead>
+                                <TableHead className="text-xs py-1.5 px-2">Beat Name</TableHead>
+                                <TableHead className="text-xs py-1.5 px-2 text-right w-[60px]">Orders</TableHead>
+                                <TableHead className="text-xs py-1.5 px-2 text-right w-[80px]">Value</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1546,9 +1546,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                                   onClick={() => fetchRetailerDetailsForBeat(beat.beat_name)}
                                 >
-                                  <TableCell className="text-primary underline-offset-2 hover:underline">{beat.beat_name}</TableCell>
-                                  <TableCell className="text-right">{beat.order_count}</TableCell>
-                                  <TableCell className="text-right font-semibold">
+                                  <TableCell className="text-xs py-1.5 px-2 text-primary underline-offset-2 hover:underline">{beat.beat_name}</TableCell>
+                                  <TableCell className="text-xs py-1.5 px-2 text-right">{beat.order_count}</TableCell>
+                                  <TableCell className="text-xs py-1.5 px-2 text-right font-semibold">
                                     ₹{beat.total_value.toLocaleString()}
                                   </TableCell>
                                 </TableRow>
@@ -1556,11 +1556,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                             </TableBody>
                             <tfoot className="bg-muted/30 sticky bottom-0">
                               <TableRow>
-                                <TableCell className="font-semibold">Total</TableCell>
-                                <TableCell className="text-right font-semibold">
+                                <TableCell className="text-xs py-1.5 px-2 font-semibold">Total</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right font-semibold">
                                   {beatBreakdownData.reduce((s, b) => s + b.order_count, 0)}
                                 </TableCell>
-                                <TableCell className="text-right font-bold text-primary">
+                                <TableCell className="text-xs py-1.5 px-2 text-right font-bold text-primary">
                                   ₹{beatBreakdownData.reduce((s, b) => s + b.total_value, 0).toLocaleString()}
                                 </TableCell>
                               </TableRow>
@@ -1970,9 +1970,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         <Table>
                           <TableHeader className="sticky top-0 bg-muted/50 z-10">
                             <TableRow>
-                              <TableHead>Order Date</TableHead>
-                              <TableHead className="text-right">Quantity (KG)</TableHead>
-                              <TableHead className="text-right">Revenue</TableHead>
+                              <TableHead className="text-xs py-1.5 px-2 whitespace-nowrap">Date</TableHead>
+                              <TableHead className="text-xs py-1.5 px-2 text-right whitespace-nowrap">Qty (KG)</TableHead>
+                              <TableHead className="text-xs py-1.5 px-2 text-right whitespace-nowrap">Revenue</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1987,11 +1987,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                                 )}
                                 onClick={() => handleProductDateClick(row.raw_date, row.order_date)}
                               >
-                                <TableCell className={row.order_date === 'TOTAL' ? 'font-bold' : ''}>
+                                <TableCell className={cn("text-xs py-1.5 px-2 whitespace-nowrap", row.order_date === 'TOTAL' ? 'font-bold' : '')}>
                                   {row.order_date}
                                 </TableCell>
-                                <TableCell className="text-right">{row.quantity_kg.toFixed(2)}</TableCell>
-                                <TableCell className="text-right">₹{row.revenue.toLocaleString()}</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">{row.quantity_kg.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">₹{row.revenue.toLocaleString()}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
