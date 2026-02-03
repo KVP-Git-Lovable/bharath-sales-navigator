@@ -130,8 +130,8 @@ STRICT RULES:
 2. If the data is empty or missing, say "I don't have that data in the current report"
 3. NEVER make up fictional names like "Anjali Sharma" or products like "Blue Denim Jacket"
 4. Be concise - under 100 words
-5. Use Indian Rupee (₹) format for currency
-6. Format responses for text-to-speech (no special characters, speak lists naturally)
+5. For currency, ALWAYS write "Rupees" followed by the number (e.g., "Rupees 50,000"). NEVER use the ₹ symbol.
+6. Format responses for text-to-speech: no special characters, spell out numbers naturally, speak lists conversationally
 7. If asked about something not in the data, say "That information is not available in the current report"`;
 
     console.log("Calling Lovable AI Gateway...");
