@@ -1220,46 +1220,6 @@ const Analytics = () => {
                   </PopoverContent>
                 </Popover>
 
-                {/* From Date Picker */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="min-w-[140px] justify-start">
-                      <CalendarIcon size={16} className="mr-2" />
-                      {format(dashboardDateRange.from, 'MMM dd, yyyy')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dashboardDateRange.from}
-                      onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, from: date }))}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
-
-                <span className="text-muted-foreground">to</span>
-
-                {/* To Date Picker */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="min-w-[140px] justify-start">
-                      <CalendarIcon size={16} className="mr-2" />
-                      {format(dashboardDateRange.to, 'MMM dd, yyyy')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dashboardDateRange.to}
-                      onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, to: date }))}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
-
                 {/* Period Selector */}
                 <Select
                   value={dashboardPeriod}
@@ -1319,31 +1279,40 @@ const Analytics = () => {
                       case 'this_fy':
                         from = getFYStart(today);
                         break;
-                      case 'last_week':
+                      case 'last_week': {
                         const lastWeekDate = new Date(today);
                         lastWeekDate.setDate(today.getDate() - 7);
                         from = getWeekStart(lastWeekDate);
                         to = new Date(from);
                         to.setDate(from.getDate() + 6);
+                        to.setHours(23, 59, 59, 999);
                         break;
-                      case 'last_month':
-                        const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                        from = lastMonthDate;
-                        to = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of prev month
+                      }
+                      case 'last_month': {
+                        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        from = lastMonth;
+                        to = new Date(today.getFullYear(), today.getMonth(), 0);
+                        to.setHours(23, 59, 59, 999);
                         break;
-                      case 'last_quarter':
+                      }
+                      case 'last_quarter': {
                         const currentQStart = getQuarterStart(today);
                         const lastQEnd = new Date(currentQStart);
                         lastQEnd.setDate(lastQEnd.getDate() - 1);
                         from = getQuarterStart(lastQEnd);
                         to = lastQEnd;
+                        to.setHours(23, 59, 59, 999);
                         break;
-                      case 'last_fy':
+                      }
+                      case 'last_fy': {
                         const currentFYStart = getFYStart(today);
-                        to = new Date(currentFYStart);
-                        to.setDate(to.getDate() - 1); // March 31st
-                        from = new Date(to.getFullYear() - 1, 3, 1); // Previous April 1st
+                        const lastFYEnd = new Date(currentFYStart);
+                        lastFYEnd.setDate(lastFYEnd.getDate() - 1);
+                        from = getFYStart(lastFYEnd);
+                        to = lastFYEnd;
+                        to.setHours(23, 59, 59, 999);
                         break;
+                      }
                       case 'last_60_days':
                         from = new Date(today);
                         from.setDate(today.getDate() - 60);
@@ -1360,28 +1329,15 @@ const Analytics = () => {
                         from.setHours(0, 0, 0, 0);
                         break;
                       default:
-                        return;
+                        from = new Date(today);
+                        from.setHours(0, 0, 0, 0);
                     }
 
                     setDashboardDateRange({ from, to });
                   }}
                 >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Select period">
-                      {dashboardPeriod === 'today' && 'Today'}
-                      {dashboardPeriod === 'yesterday' && 'Yesterday'}
-                      {dashboardPeriod === 'this_week' && 'This Week'}
-                      {dashboardPeriod === 'this_month' && 'This Month'}
-                      {dashboardPeriod === 'this_quarter' && 'This Quarter'}
-                      {dashboardPeriod === 'this_fy' && 'This FY'}
-                      {dashboardPeriod === 'last_week' && 'Last Week'}
-                      {dashboardPeriod === 'last_month' && 'Last Month'}
-                      {dashboardPeriod === 'last_quarter' && 'Last Quarter'}
-                      {dashboardPeriod === 'last_fy' && 'Last FY'}
-                      {dashboardPeriod === 'last_60_days' && 'Last 60 Days'}
-                      {dashboardPeriod === 'last_90_days' && 'Last 90 Days'}
-                      {dashboardPeriod === 'last_180_days' && 'Last 180 Days'}
-                    </SelectValue>
+                  <SelectTrigger className="min-w-[140px]">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="today">Today</SelectItem>
@@ -1399,6 +1355,46 @@ const Analytics = () => {
                     <SelectItem value="last_180_days">Last 180 Days</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {/* From Date Picker */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="min-w-[140px] justify-start">
+                      <CalendarIcon size={16} className="mr-2" />
+                      {format(dashboardDateRange.from, 'MMM dd, yyyy')}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dashboardDateRange.from}
+                      onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, from: date }))}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <span className="text-muted-foreground">to</span>
+
+                {/* To Date Picker */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="min-w-[140px] justify-start">
+                      <CalendarIcon size={16} className="mr-2" />
+                      {format(dashboardDateRange.to, 'MMM dd, yyyy')}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dashboardDateRange.to}
+                      onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, to: date }))}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
 
                 <Button 
                   variant="outline" 
