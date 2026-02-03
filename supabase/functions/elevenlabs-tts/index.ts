@@ -31,8 +31,8 @@ serve(async (req) => {
       );
     }
 
-    // Use George voice by default for professional narration
-    const selectedVoiceId = voiceId || "JBFqnCBsd6RMkjVDRZzb";
+    // Use custom voice for professional narration
+    const selectedVoiceId = voiceId || "HobRzuqtLputbKAXOdTj";
 
     console.log(`Converting text to speech. Length: ${text.length} chars, Voice: ${selectedVoiceId}`);
 
