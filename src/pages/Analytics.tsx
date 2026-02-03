@@ -1132,12 +1132,12 @@ const Analytics = () => {
         <div className="p-4 -mt-4 relative z-10">
           {/* Multi-Select User Filter with Date Range */}
           <Card className="mb-4 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap items-center gap-3">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto">
                 {/* Multi-select User Dropdown */}
                 <Popover open={userSelectOpen} onOpenChange={setUserSelectOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="min-w-[200px] justify-between">
+                    <Button variant="outline" className="min-w-[150px] justify-between">
                       <div className="flex items-center gap-2">
                         <Users size={16} />
                         <span>
@@ -1336,7 +1336,7 @@ const Analytics = () => {
                     setDashboardDateRange({ from, to });
                   }}
                 >
-                  <SelectTrigger className="min-w-[140px]">
+                  <SelectTrigger className="min-w-[120px] w-auto">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1359,9 +1359,9 @@ const Analytics = () => {
                 {/* From Date Picker */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="min-w-[140px] justify-start">
-                      <CalendarIcon size={16} className="mr-2" />
-                      {format(dashboardDateRange.from, 'MMM dd, yyyy')}
+                    <Button variant="outline" size="sm" className="min-w-[120px] justify-start h-9">
+                      <CalendarIcon size={14} className="mr-1" />
+                      {format(dashboardDateRange.from, 'dd MMM')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1375,14 +1375,14 @@ const Analytics = () => {
                   </PopoverContent>
                 </Popover>
 
-                <span className="text-muted-foreground">to</span>
+                <span className="text-muted-foreground text-sm">to</span>
 
                 {/* To Date Picker */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="min-w-[140px] justify-start">
-                      <CalendarIcon size={16} className="mr-2" />
-                      {format(dashboardDateRange.to, 'MMM dd, yyyy')}
+                    <Button variant="outline" size="sm" className="min-w-[120px] justify-start h-9">
+                      <CalendarIcon size={14} className="mr-1" />
+                      {format(dashboardDateRange.to, 'dd MMM')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
