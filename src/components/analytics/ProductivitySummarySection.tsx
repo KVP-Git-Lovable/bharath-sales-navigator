@@ -123,6 +123,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
   }, [productivityData]);
 
   // Notify parent when data is loaded
+  // Note: Removed onDataLoaded from deps to prevent infinite loops when parent doesn't memoize callback
   useEffect(() => {
     if (onDataLoaded && userSummaries.length > 0) {
       onDataLoaded(userSummaries.map(u => ({
@@ -132,7 +133,8 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
         total_visits: u.total_visits
       })));
     }
-  }, [userSummaries, onDataLoaded]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSummaries]);
 
   // Get day-wise data for selected user in drilldown
   const drilldownData = useMemo(() => {

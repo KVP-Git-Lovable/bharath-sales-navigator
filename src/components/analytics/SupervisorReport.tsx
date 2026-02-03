@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -167,6 +167,20 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     productive_visits: number;
     total_visits: number;
   }[]>([]);
+
+  // Memoized callbacks to prevent infinite loops in child components
+  const handleSkuDataLoaded = useCallback((data: typeof skuDataForSummary) => {
+    setSkuDataForSummary(data);
+  }, []);
+
+  const handleProductivityDataLoaded = useCallback((data: typeof productivityDataForSummary) => {
+    setProductivityDataForSummary(data);
+  }, []);
+
+  const handleClearSkuFilter = useCallback(() => {
+    setSkuFilterUser(null);
+  }, []);
+
   const aiInsights = useMemo(() => {
     if (summaryData.length === 0) return [];
 
@@ -2098,8 +2112,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         selectedUsers={skuFilterUser ? [skuFilterUser] : selectedUsers} 
         dateRange={dateRange}
         filteredUserName={skuFilterUser}
-        onClearFilter={() => setSkuFilterUser(null)}
-        onDataLoaded={(data) => setSkuDataForSummary(data)}
+        onClearFilter={handleClearSkuFilter}
+        onDataLoaded={handleSkuDataLoaded}
       />
 
       {/* Productivity Summary Section */}
@@ -2107,7 +2121,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         selectedUsers={selectedUsers} 
         dateRange={dateRange}
         allUsers={users}
-        onDataLoaded={(data) => setProductivityDataForSummary(data)}
+        onDataLoaded={handleProductivityDataLoaded}
       />
 
       {/* AI Insights Section - Moved to bottom */}
