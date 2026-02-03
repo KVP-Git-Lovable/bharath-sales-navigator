@@ -277,24 +277,24 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
           ) : productivityData.length > 0 ? (
             <ScrollAreaPrimitive.Root
               type="always"
-              className="relative overflow-hidden border rounded-lg"
+              className="relative border rounded-lg"
             >
               <ScrollAreaPrimitive.Viewport
-                className={cn('w-full overflow-auto', scrollViewportClassName)}
+                className={cn('w-full', scrollViewportClassName)}
               >
                 <div className="min-w-max">
                   {isSingleUserMode ? (
                 // Single user: Day-wise breakdown (original view)
                 <table className="w-full caption-bottom text-sm">
-                  <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                    <TableRow>
+                  <thead className="sticky top-0 bg-muted z-20">
+                    <TableRow className="border-b">
                       <TableHead className="py-1.5">Date</TableHead>
                       <TableHead className="text-right py-1.5">Productive</TableHead>
                       <TableHead className="text-right py-1.5">Unproductive</TableHead>
                       <TableHead className="text-right py-1.5">Total</TableHead>
                       <TableHead className="text-right py-1.5">Productivity %</TableHead>
                     </TableRow>
-                  </TableHeader>
+                  </thead>
                   <TableBody>
                     {productivityData.map((row, index) => (
                       <TableRow key={index} className="hover:bg-muted/30">
@@ -337,8 +337,8 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
               ) : (
                 // Multi-user: User-wise summary (click to drill down)
                 <table className="w-full caption-bottom text-sm">
-                  <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                    <TableRow>
+                  <thead className="sticky top-0 bg-muted z-20">
+                    <TableRow className="border-b">
                       <TableHead className="py-1.5">User</TableHead>
                       <TableHead className="text-right py-1.5">Productivity %</TableHead>
                       <TableHead className="text-right py-1.5">Planned</TableHead>
@@ -347,7 +347,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                       <TableHead className="text-right py-1.5">Total</TableHead>
                       <TableHead className="w-8 py-1.5"></TableHead>
                     </TableRow>
-                  </TableHeader>
+                  </thead>
                   <TableBody>
                     {userSummaries.map((row, index) => (
                       <TableRow 
