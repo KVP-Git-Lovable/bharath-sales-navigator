@@ -134,6 +134,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
         if (error) {
           console.error('Error fetching SKU data:', error);
           setSkuData([]);
+          setLoading(false);
           return;
         }
 
@@ -170,9 +171,11 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
   };
 
   // Fetch data when props change
+  // Using JSON.stringify on selectedUsers to ensure stable dependency comparison
   useEffect(() => {
     fetchSKUData();
-  }, [selectedUsers, dateRange.from, dateRange.to]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(selectedUsers), dateRange.from, dateRange.to]);
 
   // Notify parent when data is loaded
   // Note: Removed onDataLoaded from deps to prevent infinite loops when parent doesn't memoize callback
