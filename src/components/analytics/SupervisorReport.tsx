@@ -604,27 +604,48 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
   // Fetch summary for all users combined (no user selected)
   const fetchAllUsersSummary = async (fromDate: string, toDate: string) => {
     try {
-      // Fetch all retailers created in date range
-      const { count: retailersCount } = await supabase
+      // Use selectedUserIds to filter data - if empty, we still show aggregated data for all visible users
+      const userIdsToFilter = selectedUserIds.length > 0 ? selectedUserIds : [];
+      
+      // Fetch retailers created in date range (filtered by selected users if any)
+      let retailersQuery = supabase
         .from('retailers')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', `${fromDate}T00:00:00`)
         .lte('created_at', `${toDate}T23:59:59`);
+      
+      if (userIdsToFilter.length > 0) {
+        retailersQuery = retailersQuery.in('user_id', userIdsToFilter);
+      }
+      
+      const { count: retailersCount } = await retailersQuery;
 
-      // Fetch all beats created in date range
-      const { count: beatsCount } = await supabase
+      // Fetch beats created in date range (filtered by selected users if any)
+      let beatsQuery = supabase
         .from('beats')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', `${fromDate}T00:00:00`)
         .lte('created_at', `${toDate}T23:59:59`);
+      
+      if (userIdsToFilter.length > 0) {
+        beatsQuery = beatsQuery.in('created_by', userIdsToFilter);
+      }
+      
+      const { count: beatsCount } = await beatsQuery;
 
-      // Fetch all confirmed orders with order_items in date range
-      const { data: orders } = await supabase
+      // Fetch confirmed orders in date range (filtered by selected users if any)
+      let ordersQuery = supabase
         .from('orders')
         .select('id')
         .eq('status', 'confirmed')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
+      
+      if (userIdsToFilter.length > 0) {
+        ordersQuery = ordersQuery.in('user_id', userIdsToFilter);
+      }
+      
+      const { data: orders } = await ordersQuery;
 
       if (!orders || orders.length === 0) {
         setAllUsersSummary({
