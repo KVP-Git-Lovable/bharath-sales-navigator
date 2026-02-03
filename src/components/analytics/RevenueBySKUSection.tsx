@@ -175,11 +175,13 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
   }, [selectedUsers, dateRange.from, dateRange.to]);
 
   // Notify parent when data is loaded
+  // Note: Removed onDataLoaded from deps to prevent infinite loops when parent doesn't memoize callback
   useEffect(() => {
     if (onDataLoaded && skuData.length > 0) {
       onDataLoaded(skuData);
     }
-  }, [skuData, onDataLoaded]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skuData]);
 
   // Prepare chart data
   const chartData = useMemo(() => {
