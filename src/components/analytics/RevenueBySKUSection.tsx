@@ -22,11 +22,12 @@ interface RevenueBySKUSectionProps {
   dateRange: { from: Date; to: Date };
   filteredUserName?: string | null;
   onClearFilter?: () => void;
+  onDataLoaded?: (data: SKURevenue[]) => void;
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7'];
 
-export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName, onClearFilter }: RevenueBySKUSectionProps) => {
+export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName, onClearFilter, onDataLoaded }: RevenueBySKUSectionProps) => {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
@@ -172,6 +173,13 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
   useEffect(() => {
     fetchSKUData();
   }, [selectedUsers, dateRange.from, dateRange.to]);
+
+  // Notify parent when data is loaded
+  useEffect(() => {
+    if (onDataLoaded && skuData.length > 0) {
+      onDataLoaded(skuData);
+    }
+  }, [skuData, onDataLoaded]);
 
   // Prepare chart data
   const chartData = useMemo(() => {

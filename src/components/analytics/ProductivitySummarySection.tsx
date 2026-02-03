@@ -29,9 +29,10 @@ interface ProductivitySummarySectionProps {
   selectedUsers: string[];
   dateRange: { from: Date; to: Date };
   allUsers?: { id: string; full_name: string | null }[];
+  onDataLoaded?: (data: { full_name: string; productivity_percentage: number; productive_visits: number; total_visits: number }[]) => void;
 }
 
-export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers = [] }: ProductivitySummarySectionProps) => {
+export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers = [], onDataLoaded }: ProductivitySummarySectionProps) => {
   const [loading, setLoading] = useState(false);
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
   const [selectedUserForDrilldown, setSelectedUserForDrilldown] = useState<string | null>(null);
@@ -120,6 +121,18 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
 
     return Object.values(grouped).sort((a, b) => b.total_visits - a.total_visits);
   }, [productivityData]);
+
+  // Notify parent when data is loaded
+  useEffect(() => {
+    if (onDataLoaded && userSummaries.length > 0) {
+      onDataLoaded(userSummaries.map(u => ({
+        full_name: u.full_name,
+        productivity_percentage: u.productivity_percentage,
+        productive_visits: u.productive_visits,
+        total_visits: u.total_visits
+      })));
+    }
+  }, [userSummaries, onDataLoaded]);
 
   // Get day-wise data for selected user in drilldown
   const drilldownData = useMemo(() => {
