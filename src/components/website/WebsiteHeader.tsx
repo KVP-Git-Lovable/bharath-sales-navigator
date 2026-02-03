@@ -5,11 +5,12 @@ import { useState, useEffect, useRef } from "react";
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 const solutionLinks = [
-  { label: "Field Sales Automation", href: "/solutions/field-sales" },
-  { label: "Distributor Portal", href: "/solutions/distributor-portal" },
-  { label: "Institutional Sales CRM", href: "/solutions/institutional-sales" },
-  { label: "Van Sales", href: "/solutions/van-sales" },
-  { label: "Professional Services", href: "/solutions/professional-services" },
+  { label: "Field Sales Automation", href: "/solutions/field-sales", external: false },
+  { label: "Distributor Portal", href: "/solutions/distributor-portal", external: false },
+  { label: "Institutional Sales CRM", href: "/solutions/institutional-sales", external: false },
+  { label: "Van Sales", href: "/solutions/van-sales", external: false },
+  { label: "Store Operations", href: "https://storeops.quickapp.ai/", external: true },
+  { label: "Professional Services", href: "/solutions/professional-services", external: false },
 ];
 
 export const WebsiteHeader = () => {
@@ -79,11 +80,15 @@ export const WebsiteHeader = () => {
     }
   };
 
-  const handleSolutionClick = (href: string) => {
+  const handleSolutionClick = (href: string, external?: boolean) => {
     setSolutionsOpen(false);
     setMobileMenuOpen(false);
-    navigate(href);
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    if (external) {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    } else {
+      navigate(href);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
   };
 
   return (
@@ -123,7 +128,7 @@ export const WebsiteHeader = () => {
                     {solutionLinks.map((solution) => (
                       <button
                         key={solution.href}
-                        onClick={() => handleSolutionClick(solution.href)}
+                        onClick={() => handleSolutionClick(solution.href, solution.external)}
                         className="block w-full text-left px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       >
                         {solution.label}
@@ -181,7 +186,7 @@ export const WebsiteHeader = () => {
                       {solutionLinks.map((solution) => (
                         <button
                           key={solution.href}
-                          onClick={() => { handleSolutionClick(solution.href); setMobileMenuOpen(false); }}
+                          onClick={() => { handleSolutionClick(solution.href, solution.external); setMobileMenuOpen(false); }}
                           className="block text-sm text-muted-foreground hover:text-foreground"
                         >
                           {solution.label}
