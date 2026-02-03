@@ -312,40 +312,42 @@ export const ReportSummaryDialog = ({
           {showChat && (
             <div className="flex flex-col gap-3 flex-1 min-h-0">
               {/* Messages Area */}
-              <ScrollArea className="flex-1 min-h-[180px] max-h-[250px] rounded-lg border bg-muted/30 p-3">
-                <div className="space-y-3">
-                  {messages.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Ask any question about the report data using voice or text
-                    </p>
-                  )}
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
+              <div className="h-[200px] rounded-lg border bg-muted/30">
+                <ScrollArea className="h-full">
+                  <div className="space-y-3 p-3">
+                    {messages.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Ask any question about the report data using voice or text
+                      </p>
+                    )}
+                    {messages.map((msg) => (
                       <div
-                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                          msg.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-background border'
-                        }`}
+                        key={msg.id}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        {msg.content}
+                        <div
+                          className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                            msg.role === 'user'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-background border'
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {isProcessing && (
-                    <div className="flex justify-start">
-                      <div className="bg-background border rounded-lg px-3 py-2 flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Thinking...</span>
+                    ))}
+                    {isProcessing && (
+                      <div className="flex justify-start">
+                        <div className="bg-background border rounded-lg px-3 py-2 flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">Thinking...</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </ScrollArea>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                </ScrollArea>
+              </div>
 
               {/* Transcript Display */}
               {transcript && (
