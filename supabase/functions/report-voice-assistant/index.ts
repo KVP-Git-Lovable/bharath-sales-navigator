@@ -117,18 +117,22 @@ serve(async (req) => {
     }
 
     const reportData = contextParts.join('\n');
+    
+    console.log("Report data being sent to AI:", reportData);
 
-    const systemPrompt = `You are a helpful sales report assistant. You have access to the following report data and should answer questions about it accurately and concisely.
+    const systemPrompt = `You are a sales report assistant. You MUST answer questions ONLY using the exact data provided below. Do NOT invent, assume, or hallucinate any names, products, or numbers.
 
+REPORT DATA:
 ${reportData}
 
-Instructions:
-- Answer questions based only on the provided data
-- Be concise but complete
-- Use Indian Rupee (₹) format for currency
-- If asked about something not in the data, politely say you don't have that information
-- Keep responses suitable for text-to-speech (avoid special characters, lists should be spoken naturally)
-- Responses should be under 150 words`;
+STRICT RULES:
+1. ONLY use names, products, and numbers that appear EXACTLY in the report data above
+2. If the data is empty or missing, say "I don't have that data in the current report"
+3. NEVER make up fictional names like "Anjali Sharma" or products like "Blue Denim Jacket"
+4. Be concise - under 100 words
+5. Use Indian Rupee (₹) format for currency
+6. Format responses for text-to-speech (no special characters, speak lists naturally)
+7. If asked about something not in the data, say "That information is not available in the current report"`;
 
     console.log("Calling Lovable AI Gateway...");
 

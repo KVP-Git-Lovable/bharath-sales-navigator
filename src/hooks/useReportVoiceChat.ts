@@ -47,6 +47,23 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
   const audioQueueRef = useRef<HTMLAudioElement[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
+  
+  // Keep a ref to the latest reportContext to avoid stale closures
+  const reportContextRef = useRef<ReportContext>(reportContext);
+  
+  // Update the ref whenever reportContext changes
+  useEffect(() => {
+    reportContextRef.current = reportContext;
+    console.log('Report context updated:', {
+      hasAllUsersSummary: !!reportContext.allUsersSummary,
+      orderSummaryCount: reportContext.orderSummaryData?.length || 0,
+      skuCount: reportContext.skuData?.length || 0,
+      productivityCount: reportContext.productivityData?.length || 0,
+    });
+  }, [reportContext]);
+
+  // Ref for sendMessage to avoid stale closure in speech recognition
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
 
   // Initialize speech recognition
   useEffect(() => {
@@ -84,11 +101,11 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
           .join('');
         setTranscript(transcript);
 
-        // If final result, send the message
+        // If final result, send the message using the ref
         if (event.results[event.results.length - 1].isFinal) {
           const finalTranscript = transcript.trim();
           if (finalTranscript) {
-            sendMessage(finalTranscript);
+            sendMessageRef.current(finalTranscript);
           }
           setTranscript('');
         }
@@ -201,7 +218,17 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
     setIsProcessing(true);
 
     try {
+      // Use the ref to get the latest context
+      const currentContext = reportContextRef.current;
+      
       console.log('Sending question to assistant:', text);
+      console.log('Using report context:', {
+        dateRange: currentContext.dateRange,
+        allUsersSummary: currentContext.allUsersSummary,
+        orderSummaryDataCount: currentContext.orderSummaryData?.length || 0,
+        skuDataCount: currentContext.skuData?.length || 0,
+        productivityDataCount: currentContext.productivityData?.length || 0,
+      });
       
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/report-voice-assistant`,
@@ -215,11 +242,11 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
           body: JSON.stringify({
             question: text,
             reportContext: {
-              dateRange: reportContext.dateRange,
-              allUsersSummary: reportContext.allUsersSummary,
-              orderSummaryData: reportContext.orderSummaryData,
-              skuData: reportContext.skuData,
-              productivityData: reportContext.productivityData,
+              dateRange: currentContext.dateRange,
+              allUsersSummary: currentContext.allUsersSummary,
+              orderSummaryData: currentContext.orderSummaryData,
+              skuData: currentContext.skuData,
+              productivityData: currentContext.productivityData,
             },
           }),
         }
@@ -255,7 +282,12 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
       setIsProcessing(false);
       toast.error('Failed to get response. Please try again.');
     }
-  }, [reportContext, playAudio]);
+  }, [playAudio]);
+
+  // Keep the sendMessageRef updated with the latest sendMessage function
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
 
   const playSummary = useCallback(async (summaryText: string) => {
     try {
