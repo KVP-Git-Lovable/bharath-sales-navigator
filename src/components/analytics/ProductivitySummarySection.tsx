@@ -270,10 +270,10 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
             </div>
           ) : productivityData.length > 0 ? (
             <div className={cn(
-              "border rounded-lg overflow-hidden overflow-x-auto",
-              productivityData.length > 6 && isSingleUserMode && "max-h-[320px] overflow-y-auto",
-              userSummaries.length > 6 && !isSingleUserMode && "max-h-[320px] overflow-y-auto"
-            )} style={{ overflowX: 'scroll' }}>
+              "border rounded-lg",
+              productivityData.length > 6 && isSingleUserMode && "max-h-[320px]",
+              userSummaries.length > 6 && !isSingleUserMode && "max-h-[320px]"
+            )} style={{ overflow: 'scroll' }}>
               {isSingleUserMode ? (
                 // Single user: Day-wise breakdown (original view)
                 <Table>
