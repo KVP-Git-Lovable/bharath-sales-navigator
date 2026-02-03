@@ -223,7 +223,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
           <div className="flex items-center gap-2">
             <Package className="h-5 w-5 text-primary" />
             <div>
-              <CardTitle>Revenue Summary by SKU</CardTitle>
+              <CardTitle className="text-base sm:text-lg md:text-xl">Revenue Summary by SKU</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Product-wise revenue breakdown • {selectedUsers.length === 0 ? 'All Users' : selectedUsers.length === 1 ? selectedUsers[0] : `${selectedUsers.length} Users`} • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
               </p>
@@ -316,29 +316,29 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
 
             {/* Summary Table */}
             <div>
-              <h3 className="font-semibold mb-3">SKU Revenue Summary</h3>
-              <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-x-auto overflow-y-auto" style={{ overflowX: 'scroll' }}>
+              <h3 className="font-semibold text-sm sm:text-base mb-3">SKU Revenue Summary</h3>
+              <div className="border rounded-lg max-h-[400px]" style={{ overflow: 'scroll' }}>
                 <Table>
                   <TableHeader className="sticky top-0 bg-muted/50 z-10">
                     <TableRow>
-                      <TableHead className="py-1.5">Product</TableHead>
-                      <TableHead className="text-right py-1.5">Qty</TableHead>
-                      <TableHead className="text-right py-1.5">Revenue</TableHead>
+                      <TableHead className="text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3">Product</TableHead>
+                      <TableHead className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3">Qty</TableHead>
+                      <TableHead className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3">Revenue</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {skuData.map((row, index) => (
                       <TableRow key={index} className="hover:bg-muted/30">
-                        <TableCell className="flex items-center gap-2 py-1.5">
+                        <TableCell className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3">
                           <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                            className="w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0" 
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
-                          <span className="truncate max-w-[150px]" title={row.product_name}>
+                          <span className="truncate max-w-[100px] sm:max-w-[150px]" title={row.product_name}>
                             {row.product_name}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right py-1.5">
+                        <TableCell className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3">
                           {(() => {
                             const unit = (row.unit || '').toLowerCase();
                             if (unit === 'grams' || unit === 'gram' || unit === 'g') {
@@ -347,7 +347,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                             return `${row.quantity_sold.toFixed(1)} ${row.unit}`;
                           })()}
                         </TableCell>
-                        <TableCell className="text-right font-semibold py-1.5">
+                        <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">
                           ₹{row.revenue.toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -355,11 +355,11 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   </TableBody>
                   <tfoot className="bg-muted/30 sticky bottom-0">
                     <TableRow>
-                      <TableCell className="font-semibold py-1.5">Total ({skuData.length} SKUs)</TableCell>
-                      <TableCell className="text-right font-semibold py-1.5">
+                      <TableCell className="text-[10px] sm:text-xs font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">Total ({skuData.length} SKUs)</TableCell>
+                      <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">
                         {totalQuantityKG.toFixed(2)} KG
                       </TableCell>
-                      <TableCell className="text-right font-bold text-primary py-1.5">
+                      <TableCell className="text-[10px] sm:text-xs text-right font-bold text-primary py-1 px-1.5 sm:py-1.5 sm:px-3">
                         ₹{totalRevenue.toLocaleString()}
                       </TableCell>
                     </TableRow>

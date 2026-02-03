@@ -1342,7 +1342,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Order Summary by User</CardTitle>
+          <CardTitle className="text-base sm:text-lg md:text-xl">Order Summary by User</CardTitle>
           <p className="text-sm text-muted-foreground">
             View confirmed order totals grouped by user
           </p>
@@ -1743,7 +1743,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       {!selectedUserDetails && allUsersSummary && summaryData.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Summary - All Users</CardTitle>
+            <CardTitle className="text-base sm:text-lg md:text-xl">Summary - All Users</CardTitle>
             <p className="text-sm text-muted-foreground">
               Aggregated metrics for all users in the selected date range
             </p>
@@ -1787,7 +1787,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       {selectedUserDetails && (
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Order Details - {selectedUserDetails}</CardTitle>
+            <CardTitle className="text-base sm:text-lg md:text-xl">Order Details - {selectedUserDetails}</CardTitle>
             <Button variant="ghost" size="icon" onClick={() => {
               setSelectedUserDetails(null);
               setUserDetails([]);
@@ -1808,19 +1808,19 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
               <>
                 {/* Summary Cards */}
                 {detailsSummary && (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-4 mb-4 sm:mb-6">
                     <Card 
                       className={cn(
-                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        "p-1.5 sm:p-4 cursor-pointer transition-colors hover:bg-muted/50",
                         expandedBox === 'retailersBeats' && "ring-2 ring-primary"
                       )}
                       onClick={handleRetailersBoxClick}
                     >
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Store className="h-4 w-4" />
+                      <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground text-[10px] sm:text-sm mb-0.5 sm:mb-1">
+                        <Store className="h-3 w-3 sm:h-4 sm:w-4" />
                         Retailers
                       </div>
-                      <div className="text-2xl font-bold">
+                      <div className="text-sm sm:text-2xl font-bold">
                         {orderDetailsBeatBreakdown.length > 0 
                           ? orderDetailsBeatBreakdown.reduce((sum, b) => sum + b.total_retailers, 0)
                           : detailsSummary.retailers}
@@ -1828,16 +1828,16 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                     </Card>
                     <Card 
                       className={cn(
-                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        "p-1.5 sm:p-4 cursor-pointer transition-colors hover:bg-muted/50",
                         expandedBox === 'retailersBeats' && "ring-2 ring-primary"
                       )}
                       onClick={handleBeatsBoxClick}
                     >
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <MapPin className="h-4 w-4" />
+                      <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground text-[10px] sm:text-sm mb-0.5 sm:mb-1">
+                        <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
                         Beats
                       </div>
-                      <div className="text-2xl font-bold">
+                      <div className="text-sm sm:text-2xl font-bold">
                         {orderDetailsBeatBreakdown.length > 0 
                           ? orderDetailsBeatBreakdown.length
                           : detailsSummary.beats}
@@ -1845,39 +1845,39 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                     </Card>
                     <Card 
                       className={cn(
-                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        "p-1.5 sm:p-4 cursor-pointer transition-colors hover:bg-muted/50",
                         expandedBox === 'productsKg' && "ring-2 ring-primary"
                       )}
                       onClick={handleProductsKgBoxClick}
                     >
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Package className="h-4 w-4" />
+                      <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground text-[10px] sm:text-sm mb-0.5 sm:mb-1">
+                        <Package className="h-3 w-3 sm:h-4 sm:w-4" />
                         Products
                       </div>
-                      <div className="text-2xl font-bold">{detailsSummary.products}</div>
+                      <div className="text-sm sm:text-2xl font-bold">{detailsSummary.products}</div>
                     </Card>
                     <Card 
                       className={cn(
-                        "p-4 cursor-pointer transition-colors hover:bg-muted/50",
+                        "p-1.5 sm:p-4 cursor-pointer transition-colors hover:bg-muted/50",
                         expandedBox === 'productsKg' && "ring-2 ring-primary"
                       )}
                       onClick={handleProductsKgBoxClick}
                     >
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Scale className="h-4 w-4" />
+                      <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground text-[10px] sm:text-sm mb-0.5 sm:mb-1">
+                        <Scale className="h-3 w-3 sm:h-4 sm:w-4" />
                         Total KG
                       </div>
-                      <div className="text-2xl font-bold">{detailsSummary.totalKg.toFixed(1)}</div>
+                      <div className="text-sm sm:text-2xl font-bold">{detailsSummary.totalKg.toFixed(1)}</div>
                     </Card>
                     <Card 
-                      className="p-4 cursor-pointer transition-colors hover:bg-muted/50"
+                      className="p-1.5 sm:p-4 cursor-pointer transition-colors hover:bg-muted/50"
                       onClick={() => setProductivityDrilldownUser(selectedUserDetails)}
                     >
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <CheckCircle2 className="h-4 w-4" />
+                      <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground text-[10px] sm:text-sm mb-0.5 sm:mb-1">
+                        <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         Productivity
                       </div>
-                      <div className="text-2xl font-bold">
+                      <div className="text-sm sm:text-2xl font-bold">
                         {detailsSummary.productivityPercent !== null 
                           ? `${detailsSummary.productivityPercent}%` 
                           : 'N/A'}

@@ -204,7 +204,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
           <div className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
             <div>
-              <CardTitle>Productivity Summary</CardTitle>
+              <CardTitle className="text-base sm:text-lg md:text-xl">Productivity Summary</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Visit productivity {isSingleUserMode ? 'by date' : 'by user'} • {
                   hasNoData ? 'Loading users...' : 
