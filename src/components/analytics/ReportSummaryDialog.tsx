@@ -312,7 +312,7 @@ export const ReportSummaryDialog = ({
           {showChat && (
             <div className="flex flex-col gap-3 flex-1 min-h-0">
               {/* Messages Area */}
-              <ScrollArea className="flex-1 h-[150px] rounded-lg border bg-muted/30 p-3">
+              <ScrollArea className="flex-1 min-h-[180px] max-h-[250px] rounded-lg border bg-muted/30 p-3">
                 <div className="space-y-3">
                   {messages.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">
