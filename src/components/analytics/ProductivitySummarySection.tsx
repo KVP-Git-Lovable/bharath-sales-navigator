@@ -18,6 +18,7 @@ interface ProductivityData {
 
 interface UserProductivitySummary {
   full_name: string;
+  planned_visits: number;
   productive_visits: number;
   unproductive_visits: number;
   total_visits: number;
@@ -35,6 +36,7 @@ interface ProductivitySummarySectionProps {
 export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers = [], onDataLoaded }: ProductivitySummarySectionProps) => {
   const [loading, setLoading] = useState(false);
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
+  const [plannedVisitsData, setPlannedVisitsData] = useState<Record<string, number>>({});
   const [selectedUserForDrilldown, setSelectedUserForDrilldown] = useState<string | null>(null);
 
   // Determine if we're in single-user or multi-user mode
@@ -50,6 +52,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
   const fetchProductivityData = async () => {
     if (hasNoData) {
       setProductivityData([]);
+      setPlannedVisitsData({});
       return;
     }
 
@@ -58,7 +61,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch data for all effective users in parallel
+      // Fetch productivity summary data for all effective users in parallel
       const promises = effectiveUsers.map(userName => 
         supabase.rpc('get_productivity_summary', {
           user_full_name: userName,
@@ -78,9 +81,42 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
       });
 
       setProductivityData(allData);
+
+      // Fetch planned visits count separately (all visits including 'planned' status)
+      // Get user IDs for the effective users
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('full_name', effectiveUsers);
+
+      if (profilesData && profilesData.length > 0) {
+        const userIdMap: Record<string, string> = {};
+        profilesData.forEach(p => {
+          if (p.full_name) userIdMap[p.id] = p.full_name;
+        });
+
+        // Fetch all visits (including planned, productive, unproductive) to count total planned
+        const { data: visitsData } = await supabase
+          .from('visits')
+          .select('user_id')
+          .in('user_id', Object.keys(userIdMap))
+          .gte('planned_date', fromDate)
+          .lte('planned_date', toDate);
+
+        // Count visits per user
+        const plannedCounts: Record<string, number> = {};
+        visitsData?.forEach(visit => {
+          const userName = userIdMap[visit.user_id];
+          if (userName) {
+            plannedCounts[userName] = (plannedCounts[userName] || 0) + 1;
+          }
+        });
+        setPlannedVisitsData(plannedCounts);
+      }
     } catch (error) {
       console.error('Error in productivity fetch:', error);
       setProductivityData([]);
+      setPlannedVisitsData({});
     } finally {
       setLoading(false);
     }
@@ -99,6 +135,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
       if (!grouped[row.full_name]) {
         grouped[row.full_name] = {
           full_name: row.full_name,
+          planned_visits: plannedVisitsData[row.full_name] || 0,
           productive_visits: 0,
           unproductive_visits: 0,
           total_visits: 0,
@@ -112,15 +149,17 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
       grouped[row.full_name].days_count += 1;
     });
 
-    // Calculate productivity percentage for each user
+    // Calculate productivity percentage for each user (based on planned visits if available)
     Object.values(grouped).forEach(user => {
-      user.productivity_percentage = user.total_visits > 0 
-        ? Math.round((user.productive_visits / user.total_visits) * 100 * 100) / 100 
+      // Use planned visits as denominator if available, otherwise use total_visits
+      const denominator = user.planned_visits > 0 ? user.planned_visits : user.total_visits;
+      user.productivity_percentage = denominator > 0 
+        ? Math.round((user.productive_visits / denominator) * 100 * 100) / 100 
         : 0;
     });
 
     return Object.values(grouped).sort((a, b) => b.total_visits - a.total_visits);
-  }, [productivityData]);
+  }, [productivityData, plannedVisitsData]);
 
   // Notify parent when data is loaded
   // Note: Removed onDataLoaded from deps to prevent infinite loops when parent doesn't memoize callback
@@ -162,12 +201,16 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
 
   // Calculate totals for multi-user view
   const multiUserTotals = useMemo(() => {
+    const totalPlanned = userSummaries.reduce((sum, row) => sum + row.planned_visits, 0);
     const totalProductive = userSummaries.reduce((sum, row) => sum + row.productive_visits, 0);
     const totalUnproductive = userSummaries.reduce((sum, row) => sum + row.unproductive_visits, 0);
     const totalVisits = userSummaries.reduce((sum, row) => sum + row.total_visits, 0);
-    const avgProductivity = totalVisits > 0 ? Math.round((totalProductive / totalVisits) * 100 * 100) / 100 : 0;
+    const avgProductivity = totalPlanned > 0 
+      ? Math.round((totalProductive / totalPlanned) * 100 * 100) / 100 
+      : (totalVisits > 0 ? Math.round((totalProductive / totalVisits) * 100 * 100) / 100 : 0);
     
     return {
+      planned: totalPlanned,
       productive: totalProductive,
       unproductive: totalUnproductive,
       total: totalVisits,
@@ -288,11 +331,11 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                   <TableHeader className="sticky top-0 bg-muted/50 z-10">
                     <TableRow>
                       <TableHead className="py-1.5">User</TableHead>
-                      <TableHead className="text-right py-1.5">Days</TableHead>
+                      <TableHead className="text-right py-1.5">Productivity %</TableHead>
+                      <TableHead className="text-right py-1.5">Planned</TableHead>
                       <TableHead className="text-right py-1.5">Productive</TableHead>
                       <TableHead className="text-right py-1.5">Unproductive</TableHead>
                       <TableHead className="text-right py-1.5">Total</TableHead>
-                      <TableHead className="text-right py-1.5">Productivity %</TableHead>
                       <TableHead className="w-8 py-1.5"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -304,8 +347,13 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                         onClick={() => setSelectedUserForDrilldown(row.full_name)}
                       >
                         <TableCell className="font-medium py-1.5">{row.full_name}</TableCell>
-                        <TableCell className="text-right text-muted-foreground py-1.5">
-                          {row.days_count}
+                        <TableCell className="text-right font-semibold py-1.5">
+                          <span className={getProductivityColor(row.productivity_percentage)}>
+                            {row.productivity_percentage}%
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-blue-600 font-medium py-1.5">
+                          {row.planned_visits}
                         </TableCell>
                         <TableCell className="text-right text-green-600 font-medium py-1.5">
                           {row.productive_visits}
@@ -316,11 +364,6 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                         <TableCell className="text-right font-medium py-1.5">
                           {row.total_visits}
                         </TableCell>
-                        <TableCell className="text-right font-semibold py-1.5">
-                          <span className={getProductivityColor(row.productivity_percentage)}>
-                            {row.productivity_percentage}%
-                          </span>
-                        </TableCell>
                         <TableCell className="py-1.5">
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </TableCell>
@@ -330,7 +373,12 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                   <tfoot className="bg-muted/30 sticky bottom-0">
                     <TableRow>
                       <TableCell className="font-semibold py-1.5">Total ({multiUserTotals.usersCount} users)</TableCell>
-                      <TableCell className="text-right font-bold text-muted-foreground py-1.5">-</TableCell>
+                      <TableCell className="text-right font-bold text-primary py-1.5">
+                        {multiUserTotals.avgProductivity}%
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-blue-600 py-1.5">
+                        {multiUserTotals.planned}
+                      </TableCell>
                       <TableCell className="text-right font-bold text-green-600 py-1.5">
                         {multiUserTotals.productive}
                       </TableCell>
@@ -339,9 +387,6 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                       </TableCell>
                       <TableCell className="text-right font-bold py-1.5">
                         {multiUserTotals.total}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-primary py-1.5">
-                        {multiUserTotals.avgProductivity}%
                       </TableCell>
                       <TableCell className="py-1.5"></TableCell>
                     </TableRow>
