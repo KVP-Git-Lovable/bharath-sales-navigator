@@ -227,36 +227,36 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
             </div>
           ) : productivityData.length > 0 ? (
             <div className={cn(
-              "border rounded-lg overflow-hidden",
+              "border rounded-lg overflow-hidden overflow-x-auto",
               productivityData.length > 6 && isSingleUserMode && "max-h-[320px] overflow-y-auto",
               userSummaries.length > 6 && !isSingleUserMode && "max-h-[320px] overflow-y-auto"
-            )}>
+            )} style={{ overflowX: 'scroll' }}>
               {isSingleUserMode ? (
                 // Single user: Day-wise breakdown (original view)
                 <Table>
                   <TableHeader className="sticky top-0 bg-muted/50 z-10">
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Productive</TableHead>
-                      <TableHead className="text-right">Unproductive</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Productivity %</TableHead>
+                      <TableHead className="py-1.5">Date</TableHead>
+                      <TableHead className="text-right py-1.5">Productive</TableHead>
+                      <TableHead className="text-right py-1.5">Unproductive</TableHead>
+                      <TableHead className="text-right py-1.5">Total</TableHead>
+                      <TableHead className="text-right py-1.5">Productivity %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {productivityData.map((row, index) => (
                       <TableRow key={index} className="hover:bg-muted/30">
-                        <TableCell className="font-medium">{row.planned_date}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">
+                        <TableCell className="font-medium py-1.5">{row.planned_date}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium py-1.5">
                           {row.productive_visits}
                         </TableCell>
-                        <TableCell className="text-right text-orange-600 font-medium">
+                        <TableCell className="text-right text-orange-600 font-medium py-1.5">
                           {row.unproductive_visits}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className="text-right font-medium py-1.5">
                           {row.total_visits}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold py-1.5">
                           <span className={getProductivityColor(row.productivity_percentage)}>
                             {row.productivity_percentage}%
                           </span>
@@ -266,17 +266,17 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                   </TableBody>
                   <tfoot className="bg-muted/30 sticky bottom-0">
                     <TableRow>
-                      <TableCell className="font-semibold">Total ({productivityData.length} days)</TableCell>
-                      <TableCell className="text-right font-bold text-green-600">
+                      <TableCell className="font-semibold py-1.5">Total ({productivityData.length} days)</TableCell>
+                      <TableCell className="text-right font-bold text-green-600 py-1.5">
                         {singleUserTotals.productive}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-orange-600">
+                      <TableCell className="text-right font-bold text-orange-600 py-1.5">
                         {singleUserTotals.unproductive}
                       </TableCell>
-                      <TableCell className="text-right font-bold">
+                      <TableCell className="text-right font-bold py-1.5">
                         {singleUserTotals.total}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-primary">
+                      <TableCell className="text-right font-bold text-primary py-1.5">
                         {singleUserTotals.avgProductivity}%
                       </TableCell>
                     </TableRow>
@@ -287,13 +287,13 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                 <Table>
                   <TableHeader className="sticky top-0 bg-muted/50 z-10">
                     <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead className="text-right">Days</TableHead>
-                      <TableHead className="text-right">Productive</TableHead>
-                      <TableHead className="text-right">Unproductive</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Productivity %</TableHead>
-                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="py-1.5">User</TableHead>
+                      <TableHead className="text-right py-1.5">Days</TableHead>
+                      <TableHead className="text-right py-1.5">Productive</TableHead>
+                      <TableHead className="text-right py-1.5">Unproductive</TableHead>
+                      <TableHead className="text-right py-1.5">Total</TableHead>
+                      <TableHead className="text-right py-1.5">Productivity %</TableHead>
+                      <TableHead className="w-8 py-1.5"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -303,25 +303,25 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                         className="hover:bg-muted/30 cursor-pointer"
                         onClick={() => setSelectedUserForDrilldown(row.full_name)}
                       >
-                        <TableCell className="font-medium">{row.full_name}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">
+                        <TableCell className="font-medium py-1.5">{row.full_name}</TableCell>
+                        <TableCell className="text-right text-muted-foreground py-1.5">
                           {row.days_count}
                         </TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">
+                        <TableCell className="text-right text-green-600 font-medium py-1.5">
                           {row.productive_visits}
                         </TableCell>
-                        <TableCell className="text-right text-orange-600 font-medium">
+                        <TableCell className="text-right text-orange-600 font-medium py-1.5">
                           {row.unproductive_visits}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className="text-right font-medium py-1.5">
                           {row.total_visits}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold py-1.5">
                           <span className={getProductivityColor(row.productivity_percentage)}>
                             {row.productivity_percentage}%
                           </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-1.5">
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </TableCell>
                       </TableRow>
@@ -329,21 +329,21 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                   </TableBody>
                   <tfoot className="bg-muted/30 sticky bottom-0">
                     <TableRow>
-                      <TableCell className="font-semibold">Total ({multiUserTotals.usersCount} users)</TableCell>
-                      <TableCell className="text-right font-bold text-muted-foreground">-</TableCell>
-                      <TableCell className="text-right font-bold text-green-600">
+                      <TableCell className="font-semibold py-1.5">Total ({multiUserTotals.usersCount} users)</TableCell>
+                      <TableCell className="text-right font-bold text-muted-foreground py-1.5">-</TableCell>
+                      <TableCell className="text-right font-bold text-green-600 py-1.5">
                         {multiUserTotals.productive}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-orange-600">
+                      <TableCell className="text-right font-bold text-orange-600 py-1.5">
                         {multiUserTotals.unproductive}
                       </TableCell>
-                      <TableCell className="text-right font-bold">
+                      <TableCell className="text-right font-bold py-1.5">
                         {multiUserTotals.total}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-primary">
+                      <TableCell className="text-right font-bold text-primary py-1.5">
                         {multiUserTotals.avgProductivity}%
                       </TableCell>
-                      <TableCell></TableCell>
+                      <TableCell className="py-1.5"></TableCell>
                     </TableRow>
                   </tfoot>
                 </Table>

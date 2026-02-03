@@ -317,19 +317,19 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
             {/* Summary Table */}
             <div>
               <h3 className="font-semibold mb-3">SKU Revenue Summary</h3>
-              <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+              <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-x-auto overflow-y-auto" style={{ overflowX: 'scroll' }}>
                 <Table>
                   <TableHeader className="sticky top-0 bg-muted/50 z-10">
                     <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="py-1.5">Product</TableHead>
+                      <TableHead className="text-right py-1.5">Qty</TableHead>
+                      <TableHead className="text-right py-1.5">Revenue</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {skuData.map((row, index) => (
                       <TableRow key={index} className="hover:bg-muted/30">
-                        <TableCell className="flex items-center gap-2">
+                        <TableCell className="flex items-center gap-2 py-1.5">
                           <div 
                             className="w-3 h-3 rounded-full flex-shrink-0" 
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
@@ -338,7 +338,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                             {row.product_name}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right py-1.5">
                           {(() => {
                             const unit = (row.unit || '').toLowerCase();
                             if (unit === 'grams' || unit === 'gram' || unit === 'g') {
@@ -347,7 +347,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                             return `${row.quantity_sold.toFixed(1)} ${row.unit}`;
                           })()}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold py-1.5">
                           ₹{row.revenue.toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -355,11 +355,11 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   </TableBody>
                   <tfoot className="bg-muted/30 sticky bottom-0">
                     <TableRow>
-                      <TableCell className="font-semibold">Total ({skuData.length} SKUs)</TableCell>
-                      <TableCell className="text-right font-semibold">
+                      <TableCell className="font-semibold py-1.5">Total ({skuData.length} SKUs)</TableCell>
+                      <TableCell className="text-right font-semibold py-1.5">
                         {totalQuantityKG.toFixed(2)} KG
                       </TableCell>
-                      <TableCell className="text-right font-bold text-primary">
+                      <TableCell className="text-right font-bold text-primary py-1.5">
                         ₹{totalRevenue.toLocaleString()}
                       </TableCell>
                     </TableRow>

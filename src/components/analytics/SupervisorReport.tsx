@@ -1408,10 +1408,21 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                       <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : (selectedSummaryUser ? '10px' : '12px') }} />
                     </PieChart>
                   ) : (
-                    <BarChart data={pieChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                    <BarChart data={pieChartData} layout="vertical" margin={{ left: isMobile ? 10 : 20, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                       <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="name" width={selectedSummaryUser ? 60 : 80} tick={{ fontSize: selectedSummaryUser ? 10 : 12 }} />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        width={isMobile ? 70 : (selectedSummaryUser ? 60 : 80)} 
+                        tick={{ fontSize: isMobile ? 9 : (selectedSummaryUser ? 10 : 12) }}
+                        tickFormatter={(value) => {
+                          if (isMobile && value.length > 10) {
+                            return value.substring(0, 10) + '...';
+                          }
+                          return value;
+                        }}
+                      />
                       <Tooltip 
                         formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
                         labelFormatter={() => ''}
@@ -1420,6 +1431,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         dataKey="value" 
                         onClick={(data) => handlePieClick(data)}
                         style={{ cursor: 'pointer' }}
+                        label={isMobile ? undefined : undefined}
                       >
                         {pieChartData.map((entry, index) => (
                           <Cell 
