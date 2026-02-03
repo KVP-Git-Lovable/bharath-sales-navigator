@@ -670,31 +670,38 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         });
         return;
       }
-
       const orderIds = orders.map(o => o.id);
 
-      // Fetch order items for these orders
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('product_name, quantity, unit')
-        .in('order_id', orderIds);
-
-      // Calculate products count and total KG
+      // Fetch order items in batches to avoid URL length limits
+      const BATCH_SIZE = 200;
       const productSet = new Set<string>();
       let totalKg = 0;
 
-      (orderItems || []).forEach((item: any) => {
-        if (item.product_name) {
-          productSet.add(item.product_name);
+      for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+        const batchIds = orderIds.slice(i, i + BATCH_SIZE);
+        const { data: orderItems, error: itemsError } = await supabase
+          .from('order_items')
+          .select('product_name, quantity, unit')
+          .in('order_id', batchIds);
+
+        if (itemsError) {
+          console.error('Error fetching order items batch:', itemsError);
+          continue;
         }
-        const qty = Number(item.quantity || 0);
-        const unit = (item.unit || '').toLowerCase();
-        if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-          totalKg += qty / 1000;
-        } else {
-          totalKg += qty;
-        }
-      });
+
+        (orderItems || []).forEach((item: any) => {
+          if (item.product_name) {
+            productSet.add(item.product_name);
+          }
+          const qty = Number(item.quantity || 0);
+          const unit = (item.unit || '').toLowerCase();
+          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+            totalKg += qty / 1000;
+          } else {
+            totalKg += qty;
+          }
+        });
+      }
 
       setAllUsersSummary({
         retailers: retailersCount || 0,
