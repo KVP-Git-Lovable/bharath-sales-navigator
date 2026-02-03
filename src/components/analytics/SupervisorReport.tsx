@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity } from 'lucide-react';
+import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity, Volume2 } from 'lucide-react';
 import { fetchAndGenerateInvoice } from '@/utils/invoiceGenerator';
 import { downloadPDF } from '@/utils/fileDownloader';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { RevenueBySKUSection } from './RevenueBySKUSection';
 import { ProductivitySummarySection } from './ProductivitySummarySection';
 import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
 import { Badge } from '@/components/ui/badge';
+import { ReportSummaryDialog } from './ReportSummaryDialog';
 
 interface UserOrderSummary {
   full_name: string;
@@ -152,7 +153,20 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
   }[]>([]);
   const [productivityDrilldownLoading, setProductivityDrilldownLoading] = useState(false);
 
-  // Generate AI insights based on the summary data
+  // State for report summary dialog
+  const [reportSummaryOpen, setReportSummaryOpen] = useState(false);
+  const [skuDataForSummary, setSkuDataForSummary] = useState<{
+    product_name: string;
+    quantity_sold: number;
+    revenue: number;
+    unit: string;
+  }[]>([]);
+  const [productivityDataForSummary, setProductivityDataForSummary] = useState<{
+    full_name: string;
+    productivity_percentage: number;
+    productive_visits: number;
+    total_visits: number;
+  }[]>([]);
   const aiInsights = useMemo(() => {
     if (summaryData.length === 0) return [];
 
@@ -1208,6 +1222,19 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
   return (
     <div className="space-y-4">
+      {/* Summarize Report Button */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setReportSummaryOpen(true)}
+          className="gap-2"
+        >
+          <Volume2 className="h-4 w-4" />
+          Summarize Report
+        </Button>
+      </div>
+
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Order Summary by User</CardTitle>
@@ -1933,6 +1960,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         dateRange={dateRange}
         filteredUserName={skuFilterUser}
         onClearFilter={() => setSkuFilterUser(null)}
+        onDataLoaded={(data) => setSkuDataForSummary(data)}
       />
 
       {/* Productivity Summary Section */}
@@ -1940,6 +1968,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         selectedUsers={selectedUsers} 
         dateRange={dateRange}
         allUsers={users}
+        onDataLoaded={(data) => setProductivityDataForSummary(data)}
       />
 
       {/* AI Insights Section - Moved to bottom */}
@@ -2077,6 +2106,17 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Report Summary Dialog */}
+      <ReportSummaryDialog
+        open={reportSummaryOpen}
+        onClose={() => setReportSummaryOpen(false)}
+        dateRange={dateRange}
+        allUsersSummary={allUsersSummary}
+        orderSummaryData={summaryData}
+        skuData={skuDataForSummary}
+        productivityData={productivityDataForSummary}
+      />
     </div>
   );
 };
