@@ -85,6 +85,13 @@ export const ReportSummaryDialog = ({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Stop all audio when dialog closes
+  useEffect(() => {
+    if (!open) {
+      stopAllAudio();
+    }
+  }, [open, stopAllAudio]);
+
   const generateSummary = (): string => {
     const parts: string[] = [];
     
