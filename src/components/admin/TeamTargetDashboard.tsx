@@ -37,6 +37,7 @@ export function TeamTargetDashboard({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
 
   // Get all team member IDs - use effectiveUserIds if provided, else subordinates
   const teamUserIds = effectiveUserIds.length > 0 ? effectiveUserIds : subordinateIds;
@@ -61,6 +62,16 @@ export function TeamTargetDashboard({
       notAchieved: teamProgress.filter(m => m.status === 'not_achieved').length,
     };
   }, [teamProgress]);
+
+  // Filter team progress based on selected status
+  const filteredTeamProgress = useMemo(() => {
+    if (!teamProgress?.length || statusFilter === 'all') return teamProgress;
+    return teamProgress.filter(m => m.status === statusFilter);
+  }, [teamProgress, statusFilter]);
+
+  const handleStatusFilterClick = (filter: 'all' | 'achieved' | 'in_progress' | 'not_achieved') => {
+    setStatusFilter(prev => prev === filter ? 'all' : filter);
+  };
 
   const formatValue = (value: number): string => {
     if (basis === 'revenue') {
@@ -216,9 +227,15 @@ export function TeamTargetDashboard({
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Clickable Filters */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md",
+            statusFilter === 'all' && "ring-2 ring-blue-500 ring-offset-2"
+          )}
+          onClick={() => handleStatusFilterClick('all')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -232,7 +249,13 @@ export function TeamTargetDashboard({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md",
+            statusFilter === 'achieved' && "ring-2 ring-green-500 ring-offset-2"
+          )}
+          onClick={() => handleStatusFilterClick('achieved')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
@@ -246,7 +269,13 @@ export function TeamTargetDashboard({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md",
+            statusFilter === 'in_progress' && "ring-2 ring-yellow-500 ring-offset-2"
+          )}
+          onClick={() => handleStatusFilterClick('in_progress')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-100 rounded-lg">
@@ -260,7 +289,13 @@ export function TeamTargetDashboard({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md",
+            statusFilter === 'not_achieved' && "ring-2 ring-red-500 ring-offset-2"
+          )}
+          onClick={() => handleStatusFilterClick('not_achieved')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-100 rounded-lg">
@@ -285,9 +320,14 @@ export function TeamTargetDashboard({
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : !teamProgress?.length ? (
+          ) : !filteredTeamProgress?.length ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p>No data available for the selected period</p>
+              <p>{statusFilter === 'all' ? 'No data available for the selected period' : `No ${statusFilter.replace('_', ' ')} members found`}</p>
+              {statusFilter !== 'all' && (
+                <Button variant="link" onClick={() => setStatusFilter('all')} className="mt-2">
+                  Clear filter
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -303,7 +343,7 @@ export function TeamTargetDashboard({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teamProgress.map((member) => (
+                  {filteredTeamProgress.map((member) => (
                     <TableRow key={member.userId}>
                       <TableCell>
                         <div className="flex items-center gap-3">
