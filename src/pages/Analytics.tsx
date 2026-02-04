@@ -1786,14 +1786,14 @@ const Analytics = () => {
                 <BusinessSummaryCard
                   title="Total Beats"
                   value={businessSummary.totalBeats}
-                  icon={<MapPin size={18} className="text-primary" />}
+                  icon={<MapPin size={16} className="text-primary" />}
                   onClick={() => { fetchBeatDetails(selectedUserIds, dashboardDateRange); setShowBeatDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
                   title="Total Retailers"
                   value={businessSummary.totalRetailers}
-                  icon={<Store size={18} className="text-blue-600" />}
+                  icon={<Store size={16} className="text-blue-600" />}
                   iconBgClass="bg-blue-500/10"
                   onClick={() => { fetchRetailerDetails(selectedUserIds, dashboardDateRange); setShowRetailerDetails(true); }}
                   isLoading={businessLoading}
@@ -1801,7 +1801,7 @@ const Analytics = () => {
                 <BusinessSummaryCard
                   title="Total Orders"
                   value={businessSummary.totalOrders}
-                  icon={<ShoppingCart size={18} className="text-green-600" />}
+                  icon={<ShoppingCart size={16} className="text-green-600" />}
                   iconBgClass="bg-green-500/10"
                   onClick={() => { fetchOrderDetails(selectedUserIds, dashboardDateRange); setShowOrderDetails(true); }}
                   isLoading={businessLoading}
@@ -1809,7 +1809,7 @@ const Analytics = () => {
                 <BusinessSummaryCard
                   title="Total Qty"
                   value={`${businessSummary.totalKg.toFixed(1)} KG${businessSummary.totalPieces > 0 ? ` + ${businessSummary.totalPieces} pcs` : ''}`}
-                  icon={<Package size={18} className="text-orange-600" />}
+                  icon={<Package size={16} className="text-orange-600" />}
                   iconBgClass="bg-orange-500/10"
                   onClick={() => { fetchProductDetails(selectedUserIds, dashboardDateRange); setShowProductBreakdown(true); }}
                   isLoading={businessLoading}
@@ -1817,7 +1817,7 @@ const Analytics = () => {
                 <BusinessSummaryCard
                   title="Total Revenue"
                   value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
-                  icon={<IndianRupee size={18} className="text-purple-600" />}
+                  icon={<IndianRupee size={16} className="text-purple-600" />}
                   iconBgClass="bg-purple-500/10"
                   onClick={() => { fetchOrderDetails(selectedUserIds, dashboardDateRange); setShowOrderDetails(true); }}
                   isLoading={businessLoading}
@@ -1825,7 +1825,7 @@ const Analytics = () => {
                 <BusinessSummaryCard
                   title="Pending Payments"
                   value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
-                  icon={<CreditCard size={18} className="text-red-600" />}
+                  icon={<CreditCard size={16} className="text-red-600" />}
                   iconBgClass="bg-red-500/10"
                   onClick={() => { fetchPendingPaymentDetails(selectedUserIds, dashboardDateRange); setShowPendingPayments(true); }}
                   isLoading={businessLoading}
