@@ -204,16 +204,23 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
 
   // Prepare chart data
   const chartData = useMemo(() => {
-    const totalRevenue = filteredSkuData.reduce((sum, item) => sum + item.revenue, 0);
-    return filteredSkuData.slice(0, 10).map((item, index) => ({
-      name: item.product_name.length > 15 ? item.product_name.substring(0, 15) + '...' : item.product_name,
-      fullName: item.product_name,
-      value: item.revenue,
-      quantity: item.quantity_sold,
-      unit: item.unit,
-      percentage: totalRevenue > 0 ? ((item.revenue / totalRevenue) * 100).toFixed(1) : '0',
-      color: COLORS[index % COLORS.length]
-    }));
+    // Convert all quantities to KG for chart visualization
+    const dataWithKG = filteredSkuData.slice(0, 10).map((item, index) => {
+      const unit = (item.unit || '').toLowerCase();
+      const quantityKG = (unit === 'grams' || unit === 'gram' || unit === 'g') 
+        ? item.quantity_sold / 1000 
+        : item.quantity_sold;
+      return {
+        name: item.product_name.length > 15 ? item.product_name.substring(0, 15) + '...' : item.product_name,
+        fullName: item.product_name,
+        value: quantityKG, // Use quantity in KG for chart sizing
+        revenue: item.revenue,
+        quantity: item.quantity_sold,
+        unit: item.unit,
+        color: COLORS[index % COLORS.length]
+      };
+    });
+    return dataWithKG;
   }, [filteredSkuData]);
 
   const totalRevenue = useMemo(() => 
@@ -316,7 +323,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
               {/* Chart Section */}
               {!hideChart && (
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
+                  <p className="text-sm text-muted-foreground">Top 10 products by Qty (KG)</p>
                   <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
                     {chartType === 'pie' ? (
                       <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
@@ -336,7 +343,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                         </Pie>
                         <Tooltip 
                           formatter={(value: number, name: string, props: any) => [
-                            `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
+                            `${value.toFixed(2)} KG | ₹${props.payload.revenue.toLocaleString()}`,
                             props.payload.fullName
                           ]}
                         />
@@ -345,11 +352,11 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                     ) : (
                       <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                        <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                        <XAxis type="number" tickFormatter={(value) => `${value.toFixed(1)} KG`} />
                         <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
                         <Tooltip 
                           formatter={(value: number, name: string, props: any) => [
-                            `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
+                            `${value.toFixed(2)} KG | ₹${props.payload.revenue.toLocaleString()}`,
                             props.payload.fullName
                           ]}
                         />
@@ -389,7 +396,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                               {row.product_name}
                             </span>
                           </TableCell>
-                          <TableCell className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
+                          <TableCell className="text-[10px] sm:text-xs text-right font-bold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
                             {(() => {
                               const unit = (row.unit || '').toLowerCase();
                               if (unit === 'grams' || unit === 'gram' || unit === 'g') {
@@ -398,7 +405,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                               return `${row.quantity_sold.toFixed(1)} ${row.unit}`;
                             })()}
                           </TableCell>
-                          <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
+                          <TableCell className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
                             ₹{row.revenue.toLocaleString()}
                           </TableCell>
                         </TableRow>
