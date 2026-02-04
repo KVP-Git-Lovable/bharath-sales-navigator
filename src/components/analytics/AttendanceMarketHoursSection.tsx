@@ -131,6 +131,9 @@ export const AttendanceMarketHoursSection = ({
         });
 
         // Group by user and date, sum up retailer hours
+        // Using IST (UTC+5:30) and clamping times to the same day (00:00 - 23:59)
+        const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+        
         const dateUserMap: Record<string, { user_id: string; full_name: string; date: string; totalHours: number }> = {};
         
         (visitLogs || []).forEach(log => {
@@ -145,10 +148,28 @@ export const AttendanceMarketHoursSection = ({
           }
           
           if (log.start_time && log.end_time) {
-            const start = new Date(log.start_time);
-            const end = new Date(log.end_time);
-            const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-            dateUserMap[key].totalHours += Math.max(0, hours);
+            // Parse timestamps and convert to IST
+            const startUTC = new Date(log.start_time);
+            const endUTC = new Date(log.end_time);
+            
+            // Convert to IST
+            const startIST = new Date(startUTC.getTime() + IST_OFFSET_MS);
+            const endIST = new Date(endUTC.getTime() + IST_OFFSET_MS);
+            
+            // Get the visit date boundaries in IST (00:00 to 23:59:59.999)
+            const visitDateParts = log.visit_date.split('-').map(Number);
+            const dayStartIST = new Date(Date.UTC(visitDateParts[0], visitDateParts[1] - 1, visitDateParts[2], 0, 0, 0, 0));
+            const dayEndIST = new Date(Date.UTC(visitDateParts[0], visitDateParts[1] - 1, visitDateParts[2], 23, 59, 59, 999));
+            
+            // Clamp start and end times to the day boundaries
+            const clampedStart = new Date(Math.max(startIST.getTime(), dayStartIST.getTime()));
+            const clampedEnd = new Date(Math.min(endIST.getTime(), dayEndIST.getTime()));
+            
+            // Calculate hours only if clamped end is after clamped start
+            if (clampedEnd > clampedStart) {
+              const hours = (clampedEnd.getTime() - clampedStart.getTime()) / (1000 * 60 * 60);
+              dateUserMap[key].totalHours += Math.max(0, hours);
+            }
           }
         });
 
