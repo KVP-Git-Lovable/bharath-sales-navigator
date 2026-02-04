@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity, Volume2 } from 'lucide-react';
+import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity, Volume2, ShoppingCart, IndianRupee, CreditCard } from 'lucide-react';
 import { fetchAndGenerateInvoice } from '@/utils/invoiceGenerator';
 import { downloadPDF } from '@/utils/fileDownloader';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ import { AttendanceMarketHoursSection } from './AttendanceMarketHoursSection';
 import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
 import { Badge } from '@/components/ui/badge';
 import { ReportSummaryDialog } from './ReportSummaryDialog';
+import { BusinessSummaryCard, BeatDetailsDialog, RetailerDetailsDialog, OrderDetailsDialog, ProductBreakdownDialog, PendingPaymentsDialog, useBusinessMetrics } from '.';
 
 interface UserOrderSummary {
   full_name: string;
@@ -170,6 +171,31 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     total_visits: number;
   }[]>([]);
 
+  // Business metrics hook for dashboard summary
+  const {
+    summary: businessSummary,
+    isLoading: businessLoading,
+    fetchSummary: fetchBusinessSummary,
+    beatDetails,
+    retailerDetails: businessRetailerDetails,
+    orderDetails: businessOrderDetails,
+    productDetails,
+    pendingPaymentDetails,
+    detailsLoading: businessDetailsLoading,
+    fetchBeatDetails,
+    fetchRetailerDetails: fetchBusinessRetailerDetails,
+    fetchOrderDetails: fetchBusinessOrderDetails,
+    fetchProductDetails,
+    fetchPendingPaymentDetails
+  } = useBusinessMetrics();
+
+  // Dialog states for business summary cards
+  const [showBeatDetails, setShowBeatDetails] = useState(false);
+  const [showRetailerDetailsDialog, setShowRetailerDetailsDialog] = useState(false);
+  const [showOrderDetailsDialog, setShowOrderDetailsDialog] = useState(false);
+  const [showProductBreakdown, setShowProductBreakdown] = useState(false);
+  const [showPendingPayments, setShowPendingPayments] = useState(false);
+
   // Memoized callbacks to prevent infinite loops in child components
   const handleSkuDataLoaded = useCallback((data: typeof skuDataForSummary) => {
     setSkuDataForSummary(data);
@@ -242,6 +268,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
   useEffect(() => {
     if (users.length > 0) {
       fetchSummaryData();
+      // Also fetch business summary metrics
+      fetchBusinessSummary(selectedUserIds, dateRange);
     }
   }, [selectedUserIds, dateRange, users]);
 
@@ -1371,6 +1399,78 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         </Button>
       </div>
 
+      {/* Total Order Value Banner - Dashboard visualization */}
+      <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Total Order Value</p>
+              <p className="text-3xl md:text-4xl font-bold">
+                ₹{(businessSummary.totalRevenue / 100000).toFixed(2)} Lac
+              </p>
+              <p className="text-xs opacity-75 mt-1">
+                {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
+              </p>
+            </div>
+            <div className="text-right space-y-1">
+              <p className="text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
+              <p className="text-sm opacity-90">{Math.round(businessSummary.totalKg).toLocaleString()} Units</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Business Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <BusinessSummaryCard
+          title="Total Beats"
+          value={businessSummary.totalBeats}
+          icon={<MapPin size={18} className="text-primary" />}
+          onClick={() => { fetchBeatDetails(selectedUserIds, dateRange); setShowBeatDetails(true); }}
+          isLoading={businessLoading}
+        />
+        <BusinessSummaryCard
+          title="Total Retailers"
+          value={businessSummary.totalRetailers}
+          icon={<Store size={18} className="text-blue-600" />}
+          iconBgClass="bg-blue-500/10"
+          onClick={() => { fetchBusinessRetailerDetails(selectedUserIds, dateRange); setShowRetailerDetailsDialog(true); }}
+          isLoading={businessLoading}
+        />
+        <BusinessSummaryCard
+          title="Total Orders"
+          value={businessSummary.totalOrders}
+          icon={<ShoppingCart size={18} className="text-green-600" />}
+          iconBgClass="bg-green-500/10"
+          onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
+          isLoading={businessLoading}
+        />
+        <BusinessSummaryCard
+          title="Total Qty"
+          value={`${businessSummary.totalKg.toFixed(1)} KG${businessSummary.totalPieces > 0 ? ` + ${businessSummary.totalPieces} pcs` : ''}`}
+          icon={<Package size={18} className="text-orange-600" />}
+          iconBgClass="bg-orange-500/10"
+          onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}
+          isLoading={businessLoading}
+        />
+        <BusinessSummaryCard
+          title="Total Revenue"
+          value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
+          icon={<IndianRupee size={18} className="text-purple-600" />}
+          iconBgClass="bg-purple-500/10"
+          onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
+          isLoading={businessLoading}
+        />
+        <BusinessSummaryCard
+          title="Pending Payments"
+          value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
+          icon={<CreditCard size={18} className="text-red-600" />}
+          iconBgClass="bg-red-500/10"
+          onClick={() => { fetchPendingPaymentDetails(selectedUserIds, dateRange); setShowPendingPayments(true); }}
+          isLoading={businessLoading}
+        />
+      </div>
+
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-base sm:text-lg md:text-xl">Order Summary by User</CardTitle>
@@ -2336,6 +2436,48 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         orderSummaryData={summaryData}
         skuData={skuDataForSummary}
         productivityData={productivityDataForSummary}
+      />
+
+      {/* Business Summary Dialogs */}
+      <BeatDetailsDialog
+        open={showBeatDetails}
+        onOpenChange={setShowBeatDetails}
+        data={beatDetails}
+        isLoading={businessDetailsLoading}
+        selectedUsers={selectedUsers}
+        dateRange={dateRange}
+      />
+      <RetailerDetailsDialog
+        open={showRetailerDetailsDialog}
+        onOpenChange={setShowRetailerDetailsDialog}
+        data={businessRetailerDetails}
+        isLoading={businessDetailsLoading}
+        selectedUsers={selectedUsers}
+        dateRange={dateRange}
+      />
+      <OrderDetailsDialog
+        open={showOrderDetailsDialog}
+        onOpenChange={setShowOrderDetailsDialog}
+        data={businessOrderDetails}
+        isLoading={businessDetailsLoading}
+        selectedUsers={selectedUsers}
+        dateRange={dateRange}
+      />
+      <ProductBreakdownDialog
+        open={showProductBreakdown}
+        onOpenChange={setShowProductBreakdown}
+        data={productDetails}
+        isLoading={businessDetailsLoading}
+        selectedUsers={selectedUsers}
+        dateRange={dateRange}
+      />
+      <PendingPaymentsDialog
+        open={showPendingPayments}
+        onOpenChange={setShowPendingPayments}
+        data={pendingPaymentDetails}
+        isLoading={businessDetailsLoading}
+        selectedUsers={selectedUsers}
+        dateRange={dateRange}
       />
     </div>
   );
