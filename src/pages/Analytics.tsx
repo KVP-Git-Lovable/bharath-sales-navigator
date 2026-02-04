@@ -51,6 +51,7 @@ const Analytics = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [userSelectOpen, setUserSelectOpen] = useState(false);
+  const [showDatePickers, setShowDatePickers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [dashboardDateRange, setDashboardDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
@@ -1133,20 +1134,17 @@ const Analytics = () => {
           {/* Multi-Select User Filter with Date Range */}
           <Card className="mb-4 shadow-lg">
             <CardContent className="p-3">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {/* Multi-select User Dropdown */}
                 <Popover open={userSelectOpen} onOpenChange={setUserSelectOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="h-8 px-2 sm:px-3 min-w-0 sm:min-w-[150px] justify-between text-xs sm:text-sm">
+                    <Button variant="outline" className="h-8 px-2 sm:px-3 min-w-[100px] sm:min-w-[150px] justify-between text-xs sm:text-sm">
                       <div className="flex items-center gap-1 sm:gap-2">
                         <Users size={14} className="shrink-0" />
-                        <span className="hidden sm:inline">
+                        <span>
                           {selectedUserIds.length === 0 
                             ? 'All Users' 
                             : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}`}
-                        </span>
-                        <span className="sm:hidden">
-                          {selectedUserIds.length === 0 ? 'All' : selectedUserIds.length}
                         </span>
                       </div>
                       <ChevronDown size={14} className="shrink-0 ml-1" />
@@ -1359,45 +1357,59 @@ const Analytics = () => {
                   </SelectContent>
                 </Select>
 
-                {/* From Date Picker */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 w-[70px] sm:w-[100px] justify-start px-2 text-xs sm:text-sm">
-                      <CalendarIcon size={12} className="mr-0.5 sm:mr-1 shrink-0" />
-                      {format(dashboardDateRange.from, 'dd MMM')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dashboardDateRange.from}
-                      onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, from: date }))}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                {/* Select Dates Toggle Button */}
+                <Button 
+                  variant={showDatePickers ? "secondary" : "outline"} 
+                  size="sm" 
+                  className="h-8 px-2 sm:px-3 text-xs sm:text-sm"
+                  onClick={() => setShowDatePickers(!showDatePickers)}
+                >
+                  <CalendarIcon size={14} className="mr-1 shrink-0" />
+                  Select Dates
+                </Button>
 
-                <span className="text-muted-foreground text-xs shrink-0">-</span>
+                {/* From and To Date Pickers - shown when toggled */}
+                {showDatePickers && (
+                  <>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-[70px] sm:w-[100px] justify-start px-2 text-xs sm:text-sm">
+                          <CalendarIcon size={12} className="mr-0.5 sm:mr-1 shrink-0" />
+                          {format(dashboardDateRange.from, 'dd MMM')}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dashboardDateRange.from}
+                          onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, from: date }))}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
 
-                {/* To Date Picker */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 w-[70px] sm:w-[100px] justify-start px-2 text-xs sm:text-sm">
-                      <CalendarIcon size={12} className="mr-0.5 sm:mr-1 shrink-0" />
-                      {format(dashboardDateRange.to, 'dd MMM')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dashboardDateRange.to}
-                      onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, to: date }))}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                    <span className="text-muted-foreground text-xs shrink-0">-</span>
+
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-[70px] sm:w-[100px] justify-start px-2 text-xs sm:text-sm">
+                          <CalendarIcon size={12} className="mr-0.5 sm:mr-1 shrink-0" />
+                          {format(dashboardDateRange.to, 'dd MMM')}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dashboardDateRange.to}
+                          onSelect={(date) => date && setDashboardDateRange(prev => ({ ...prev, to: date }))}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </>
+                )}
 
                 <Button 
                   variant="outline" 
