@@ -127,7 +127,6 @@ const Analytics = () => {
   const [loading, setLoading] = useState(false);
   const [weeklyProgress, setWeeklyProgress] = useState<any[]>([]);
   const [productData, setProductData] = useState<any[]>([]);
-  const [productTrends, setProductTrends] = useState<any[]>([]);
   const [topRetailers, setTopRetailers] = useState<any[]>([]);
   const [bottomRetailers, setBottomRetailers] = useState<any[]>([]);
   const [retailerFeedback, setRetailerFeedback] = useState<any[]>([]);
@@ -815,7 +814,6 @@ const Analytics = () => {
 
       if (!orders || orders.length === 0) {
         setProductData([]);
-        setProductTrends([]);
         return;
       }
 
@@ -827,15 +825,10 @@ const Analytics = () => {
         .select('order_id, product_name, quantity, unit, total')
         .in('order_id', orderIds);
 
-      // Create a map of order_id to order_date
-      const orderDateMap = new Map(orders.map(o => [o.id, o.order_date]));
-
       const productMap: any = {};
-      const productTrendMap: any = {};
       
       orderItems?.forEach((item: any) => {
         const productName = item.product_name || 'Unknown';
-        const orderDate = orderDateMap.get(item.order_id);
         
         if (!productMap[productName]) {
           productMap[productName] = {
@@ -855,28 +848,10 @@ const Analytics = () => {
           productMap[productName].quantity += qty;
         }
         productMap[productName].revenue += Number(item.total || 0);
-
-        // Track trends by week
-        if (orderDate) {
-          const weekKey = format(startOfWeek(new Date(orderDate)), 'MMM dd');
-          if (!productTrendMap[weekKey]) {
-            productTrendMap[weekKey] = { week: weekKey };
-          }
-          if (!productTrendMap[weekKey][productName]) {
-            productTrendMap[weekKey][productName] = 0;
-          }
-          // Also convert to KG for trends
-          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-            productTrendMap[weekKey][productName] += qty / 1000;
-          } else {
-            productTrendMap[weekKey][productName] += qty;
-          }
-        }
       });
 
       const productArray = Object.values(productMap).sort((a: any, b: any) => b.revenue - a.revenue);
       setProductData(productArray);
-      setProductTrends(Object.values(productTrendMap));
     } catch (error) {
       console.error('Error fetching product data:', error);
     }
