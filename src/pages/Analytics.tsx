@@ -810,13 +810,16 @@ const Analytics = () => {
         }
       }
 
-      // Query orders for selected users and date range
+      const fromDate = format(dateRangeFilter.from, 'yyyy-MM-dd');
+      const toDate = format(dateRangeFilter.to, 'yyyy-MM-dd');
+
+      // Query orders for selected users and date range - using order_date like SKU Revenue Summary
       let query = supabase
         .from('orders')
-        .select('*, order_items(product_name, quantity, total), created_at')
-        .gte('created_at', dateRangeFilter.from.toISOString())
-        .lte('created_at', dateRangeFilter.to.toISOString())
-        .eq('status', 'confirmed');
+        .select('id, order_date')
+        .eq('status', 'confirmed')
+        .gte('order_date', fromDate)
+        .lte('order_date', toDate);
 
       // Apply user filter
       if (targetUserIds.length > 0) {
@@ -825,32 +828,65 @@ const Analytics = () => {
 
       const { data: orders } = await query;
 
+      if (!orders || orders.length === 0) {
+        setProductData([]);
+        setProductTrends([]);
+        return;
+      }
+
+      const orderIds = orders.map((o: any) => o.id);
+
+      // Fetch order items for these orders
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('order_id, product_name, quantity, unit, total')
+        .in('order_id', orderIds);
+
+      // Create a map of order_id to order_date
+      const orderDateMap = new Map(orders.map(o => [o.id, o.order_date]));
+
       const productMap: any = {};
       const productTrendMap: any = {};
       
-      orders?.forEach(order => {
-        const orderDate = order.created_at;
-        order.order_items?.forEach((item: any) => {
-          if (!productMap[item.product_name]) {
-            productMap[item.product_name] = {
-              name: item.product_name,
-              quantity: 0,
-              revenue: 0
-            };
-          }
-          productMap[item.product_name].quantity += Number(item.quantity || 0);
-          productMap[item.product_name].revenue += Number(item.total || 0);
+      orderItems?.forEach((item: any) => {
+        const productName = item.product_name || 'Unknown';
+        const orderDate = orderDateMap.get(item.order_id);
+        
+        if (!productMap[productName]) {
+          productMap[productName] = {
+            name: productName,
+            quantity: 0,
+            revenue: 0,
+            unit: 'KG'
+          };
+        }
+        
+        // Convert grams to KG - same logic as SKU Revenue Summary
+        const qty = Number(item.quantity || 0);
+        const unit = (item.unit || '').toLowerCase();
+        if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+          productMap[productName].quantity += qty / 1000;
+        } else {
+          productMap[productName].quantity += qty;
+        }
+        productMap[productName].revenue += Number(item.total || 0);
 
-          // Track trends by week
+        // Track trends by week
+        if (orderDate) {
           const weekKey = format(startOfWeek(new Date(orderDate)), 'MMM dd');
           if (!productTrendMap[weekKey]) {
             productTrendMap[weekKey] = { week: weekKey };
           }
-          if (!productTrendMap[weekKey][item.product_name]) {
-            productTrendMap[weekKey][item.product_name] = 0;
+          if (!productTrendMap[weekKey][productName]) {
+            productTrendMap[weekKey][productName] = 0;
           }
-          productTrendMap[weekKey][item.product_name] += Number(item.quantity || 0);
-        });
+          // Also convert to KG for trends
+          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+            productTrendMap[weekKey][productName] += qty / 1000;
+          } else {
+            productTrendMap[weekKey][productName] += qty;
+          }
+        }
       });
 
       const productArray = Object.values(productMap).sort((a: any, b: any) => b.revenue - a.revenue);
@@ -1843,9 +1879,6 @@ const Analytics = () => {
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle>Product-wise Business Analysis</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {format(dashboardDateRange.from, 'MMM dd, yyyy')} - {format(dashboardDateRange.to, 'MMM dd, yyyy')} • {selectedUserIds.length === 0 ? 'All Users' : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}`}
-                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
@@ -1853,7 +1886,7 @@ const Analytics = () => {
                       <thead>
                         <tr className="border-b">
                           <th className="text-left p-2 text-sm font-medium">Product Name</th>
-                          <th className="text-right p-2 text-sm font-medium">Quantity Sold</th>
+                          <th className="text-right p-2 text-sm font-medium">Quantity Sold (KG)</th>
                           <th className="text-right p-2 text-sm font-medium">Revenue</th>
                         </tr>
                       </thead>
@@ -1861,7 +1894,7 @@ const Analytics = () => {
                         {productData.map((product: any, index: number) => (
                           <tr key={index} className="border-b hover:bg-muted/50">
                             <td className="p-2 text-sm">{product.name}</td>
-                            <td className="p-2 text-sm text-right">{product.quantity.toLocaleString()}</td>
+                            <td className="p-2 text-sm text-right">{product.quantity.toFixed(2)}</td>
                             <td className="p-2 text-sm text-right font-semibold">₹{product.revenue.toLocaleString()}</td>
                           </tr>
                         ))}
