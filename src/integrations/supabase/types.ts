@@ -4339,6 +4339,53 @@ export type Database = {
         }
         Relationships: []
       }
+      fy_period_targets: {
+        Row: {
+          created_at: string | null
+          fy_config_id: string
+          id: string
+          period_name: string
+          period_number: number
+          period_type: string
+          quantity_target: number | null
+          revenue_target: number | null
+          updated_at: string | null
+          visits_target: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          fy_config_id: string
+          id?: string
+          period_name: string
+          period_number: number
+          period_type: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          visits_target?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          fy_config_id?: string
+          id?: string
+          period_name?: string
+          period_number?: number
+          period_type?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          visits_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fy_period_targets_fy_config_id_fkey"
+            columns: ["fy_config_id"]
+            isOneToOne: false
+            referencedRelation: "fy_target_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fy_target_config: {
         Row: {
           created_at: string | null
@@ -4352,6 +4399,7 @@ export type Database = {
           is_locked: boolean | null
           quantity_unit: string | null
           setup_completed: boolean | null
+          target_period_type: string | null
           target_plan_name: string | null
           total_quantity_target: number | null
           total_revenue_target: number | null
@@ -4370,6 +4418,7 @@ export type Database = {
           is_locked?: boolean | null
           quantity_unit?: string | null
           setup_completed?: boolean | null
+          target_period_type?: string | null
           target_plan_name?: string | null
           total_quantity_target?: number | null
           total_revenue_target?: number | null
@@ -4388,6 +4437,7 @@ export type Database = {
           is_locked?: boolean | null
           quantity_unit?: string | null
           setup_completed?: boolean | null
+          target_period_type?: string | null
           target_plan_name?: string | null
           total_quantity_target?: number | null
           total_revenue_target?: number | null
@@ -11378,6 +11428,53 @@ export type Database = {
           weighted_average_score?: number | null
         }
         Relationships: []
+      }
+      user_period_allocations: {
+        Row: {
+          business_plan_id: string
+          created_at: string | null
+          id: string
+          period_number: number
+          period_type: string
+          quantity_target: number | null
+          revenue_target: number | null
+          source: string | null
+          updated_at: string | null
+          visits_target: number | null
+        }
+        Insert: {
+          business_plan_id: string
+          created_at?: string | null
+          id?: string
+          period_number: number
+          period_type: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          source?: string | null
+          updated_at?: string | null
+          visits_target?: number | null
+        }
+        Update: {
+          business_plan_id?: string
+          created_at?: string | null
+          id?: string
+          period_number?: number
+          period_type?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          source?: string | null
+          updated_at?: string | null
+          visits_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_period_allocations_business_plan_id_fkey"
+            columns: ["business_plan_id"]
+            isOneToOne: false
+            referencedRelation: "user_business_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_period_targets: {
         Row: {

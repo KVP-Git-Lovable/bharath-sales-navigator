@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { PeriodTypeSelector, type PeriodType } from './target-config/PeriodTypeSelector';
+import { PeriodBreakdownGrid, generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
+import { useTargetPeriods } from '@/hooks/useTargetPeriods';
 
 interface TargetConfig {
   id?: string;
@@ -34,6 +37,7 @@ interface TargetConfig {
   total_visits_target: number;
   is_locked: boolean;
   setup_completed: boolean;
+  target_period_type: PeriodType;
 }
 
 interface TargetConfigTabProps {
@@ -62,6 +66,7 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   total_visits_target: 0,
   is_locked: false,
   setup_completed: false,
+  target_period_type: 'annual',
 };
 
 export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabProps) {
@@ -71,6 +76,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     fy_year: fyYear,
     ...DEFAULT_CONFIG,
   });
+  const [periodTargets, setPeriodTargets] = useState<PeriodTarget[]>([]);
 
   // Fetch existing config
   const { data: existingConfig, isLoading } = useQuery({
@@ -88,10 +94,16 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     enabled: !!user,
   });
 
+  // Use the target periods hook
+  const { periods: savedPeriods, savePeriods, isSaving, calculateRollups, applyEqualDistribution } = useTargetPeriods({
+    fyConfigId: config.id,
+  });
+
   // Update local state when data loads
   useEffect(() => {
     if (existingConfig) {
       const enabledParams = (existingConfig.enabled_parameters as TargetConfig['enabled_parameters']) ?? DEFAULT_CONFIG.enabled_parameters;
+      const periodType = (existingConfig.target_period_type as PeriodType) ?? 'annual';
       setConfig({
         id: existingConfig.id,
         fy_year: existingConfig.fy_year,
@@ -106,6 +118,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         total_visits_target: existingConfig.total_visits_target ?? 0,
         is_locked: existingConfig.is_locked ?? false,
         setup_completed: existingConfig.setup_completed ?? false,
+        target_period_type: periodType,
       });
     } else {
       setConfig({
@@ -114,6 +127,15 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
       });
     }
   }, [existingConfig, fyYear]);
+
+  // Load saved periods when they're fetched
+  useEffect(() => {
+    if (savedPeriods.length > 0) {
+      setPeriodTargets(savedPeriods);
+    } else if (config.target_period_type !== 'annual') {
+      setPeriodTargets(generateInitialPeriods(config.target_period_type));
+    }
+  }, [savedPeriods, config.target_period_type]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -133,9 +155,19 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
             total_visits_target: configData.total_visits_target,
             is_locked: configData.is_locked,
             setup_completed: configData.setup_completed,
+            target_period_type: configData.target_period_type,
           })
           .eq('id', configData.id);
         if (error) throw error;
+        
+        // Save period targets if not annual
+        if (configData.target_period_type !== 'annual' && periodTargets.length > 0) {
+          await savePeriods({
+            configId: configData.id,
+            periodType: configData.target_period_type,
+            periods: periodTargets,
+          });
+        }
       } else {
         const { data, error } = await supabase
           .from('fy_target_config')
@@ -152,6 +184,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
             total_visits_target: configData.total_visits_target,
             is_locked: configData.is_locked,
             setup_completed: configData.setup_completed,
+            target_period_type: configData.target_period_type,
             created_by: user?.id,
           })
           .select()
@@ -159,11 +192,21 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         if (error) throw error;
         if (data) {
           setConfig(prev => ({ ...prev, id: data.id }));
+          
+          // Save period targets if not annual
+          if (configData.target_period_type !== 'annual' && periodTargets.length > 0) {
+            await savePeriods({
+              configId: data.id,
+              periodType: configData.target_period_type,
+              periods: periodTargets,
+            });
+          }
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fy-target-config'] });
+      queryClient.invalidateQueries({ queryKey: ['fy-period-targets'] });
     },
     onError: (error: Error) => {
       toast.error('Failed to save configuration: ' + error.message);
@@ -182,6 +225,53 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         [param]: checked,
       },
     }));
+  };
+
+  const handlePeriodTypeChange = (periodType: PeriodType) => {
+    setConfig(prev => ({ ...prev, target_period_type: periodType }));
+    
+    // Generate initial periods for the new type
+    if (periodType !== 'annual') {
+      const newPeriods = generateInitialPeriods(periodType);
+      setPeriodTargets(newPeriods);
+    } else {
+      setPeriodTargets([]);
+    }
+  };
+
+  const handlePeriodChange = (periodNumber: number, field: 'quantityTarget' | 'revenueTarget' | 'visitsTarget', value: number) => {
+    setPeriodTargets(prev => 
+      prev.map(p => 
+        p.periodNumber === periodNumber 
+          ? { ...p, [field]: value }
+          : p
+      )
+    );
+    
+    // Update FY totals based on period totals when not in annual mode
+    if (config.target_period_type !== 'annual') {
+      const updatedPeriods = periodTargets.map(p =>
+        p.periodNumber === periodNumber ? { ...p, [field]: value } : p
+      );
+      const totals = calculateRollups(updatedPeriods, config.target_period_type);
+      setConfig(prev => ({
+        ...prev,
+        total_quantity_target: totals.quantity,
+        total_revenue_target: totals.revenue,
+        total_visits_target: totals.visits,
+      }));
+    }
+  };
+
+  const handleEqualDistribution = () => {
+    const distributed = applyEqualDistribution(
+      config.target_period_type,
+      config.total_quantity_target,
+      config.total_revenue_target,
+      config.total_visits_target
+    );
+    setPeriodTargets(distributed);
+    toast.success('Targets distributed equally across periods');
   };
 
   const formatNumber = (num: number) => {
@@ -439,50 +529,117 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
 
         <Separator />
 
-        {/* FY Totals */}
+        {/* Period Type Selector */}
+        <PeriodTypeSelector
+          value={config.target_period_type}
+          onChange={handlePeriodTypeChange}
+        />
+
+        <Separator />
+
+        {/* FY Totals - show inputs only for annual, otherwise read-only */}
         <div className="space-y-4">
-          <Label className="text-base font-semibold">FY Total Targets</Label>
-          <p className="text-sm text-muted-foreground">Define company-wide targets for the financial year</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-base font-semibold">FY Total Targets</Label>
+              <p className="text-sm text-muted-foreground">
+                {config.target_period_type === 'annual' 
+                  ? 'Define company-wide targets for the financial year'
+                  : 'Auto-calculated from period targets below'
+                }
+              </p>
+            </div>
+            {config.target_period_type !== 'annual' && config.total_quantity_target + config.total_revenue_target + config.total_visits_target > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleEqualDistribution}
+              >
+                Distribute Equally
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {config.enable_quantity && (
               <div className="space-y-2">
                 <Label>Quantity ({config.quantity_unit})</Label>
-                <Input
-                  type="text"
-                  value={config.total_quantity_target > 0 ? formatNumber(config.total_quantity_target) : ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, total_quantity_target: parseNumber(e.target.value) }))}
-                  placeholder={`e.g., 1,00,000 ${config.quantity_unit}`}
-                />
+                {config.target_period_type === 'annual' ? (
+                  <Input
+                    type="text"
+                    value={config.total_quantity_target > 0 ? formatNumber(config.total_quantity_target) : ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, total_quantity_target: parseNumber(e.target.value) }))}
+                    placeholder={`e.g., 1,00,000 ${config.quantity_unit}`}
+                  />
+                ) : (
+                  <div className="p-2 bg-muted rounded-md font-medium text-primary">
+                    {formatNumber(config.total_quantity_target) || '0'} {config.quantity_unit}
+                  </div>
+                )}
               </div>
             )}
             {config.enable_revenue && (
               <div className="space-y-2">
                 <Label>Revenue (₹)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                  <Input
-                    type="text"
-                    className="pl-7"
-                    value={config.total_revenue_target > 0 ? formatNumber(config.total_revenue_target) : ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, total_revenue_target: parseNumber(e.target.value) }))}
-                    placeholder="e.g., 55,00,00,000"
-                  />
-                </div>
+                {config.target_period_type === 'annual' ? (
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                    <Input
+                      type="text"
+                      className="pl-7"
+                      value={config.total_revenue_target > 0 ? formatNumber(config.total_revenue_target) : ''}
+                      onChange={(e) => setConfig(prev => ({ ...prev, total_revenue_target: parseNumber(e.target.value) }))}
+                      placeholder="e.g., 55,00,00,000"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-2 bg-muted rounded-md font-medium text-primary">
+                    ₹{formatNumber(config.total_revenue_target) || '0'}
+                  </div>
+                )}
               </div>
             )}
             {config.enable_visits && (
               <div className="space-y-2">
                 <Label>Productive Visits</Label>
-                <Input
-                  type="text"
-                  value={config.total_visits_target > 0 ? formatNumber(config.total_visits_target) : ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, total_visits_target: Math.round(parseNumber(e.target.value)) }))}
-                  placeholder="e.g., 12,000"
-                />
+                {config.target_period_type === 'annual' ? (
+                  <Input
+                    type="text"
+                    value={config.total_visits_target > 0 ? formatNumber(config.total_visits_target) : ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, total_visits_target: Math.round(parseNumber(e.target.value)) }))}
+                    placeholder="e.g., 12,000"
+                  />
+                ) : (
+                  <div className="p-2 bg-muted rounded-md font-medium text-primary">
+                    {formatNumber(config.total_visits_target) || '0'}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
+
+        {/* Period Breakdown Grid (only shown for non-annual) */}
+        {config.target_period_type !== 'annual' && (
+          <>
+            <Separator />
+            <div className="space-y-4">
+              <Label className="text-base font-semibold">
+                {config.target_period_type === 'biannual' && 'Bi-Annual Targets (H1 & H2)'}
+                {config.target_period_type === 'quarterly' && 'Quarterly Targets (Q1-Q4)'}
+                {config.target_period_type === 'monthly' && 'Monthly Targets (Apr-Mar)'}
+              </Label>
+              <PeriodBreakdownGrid
+                periodType={config.target_period_type}
+                periods={periodTargets}
+                onPeriodChange={handlePeriodChange}
+                enableQuantity={config.enable_quantity}
+                enableRevenue={config.enable_revenue}
+                enableVisits={config.enable_visits}
+                quantityUnit={config.quantity_unit}
+              />
+            </div>
+          </>
+        )}
 
         <Separator />
 
