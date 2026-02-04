@@ -159,7 +159,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
         : 0;
     });
 
-    return Object.values(grouped).sort((a, b) => b.total_visits - a.total_visits);
+    return Object.values(grouped).sort((a, b) => b.productivity_percentage - a.productivity_percentage);
   }, [productivityData, plannedVisitsData]);
 
   // Notify parent when data is loaded

@@ -323,24 +323,24 @@ export const AttendanceMarketHoursSection = ({
             </div>
           ) : userSummaries.length > 0 ? (
             <div className="space-y-4">
-              {/* Summary Cards */}
+              {/* Summary Cards - Dark Mode Style */}
               <div className="grid grid-cols-2 gap-4">
                 <Card 
                   className={cn(
-                    "cursor-pointer transition-all hover:shadow-md",
-                    selectedMetric === 'working' && "ring-2 ring-primary"
+                    "cursor-pointer transition-all hover:shadow-md bg-primary text-primary-foreground",
+                    selectedMetric === 'working' && "ring-2 ring-primary-foreground"
                   )}
                   onClick={() => setSelectedMetric(selectedMetric === 'working' ? null : 'working')}
                 >
                   <CardContent className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
-                      <Clock className="h-5 w-5 text-blue-600" />
-                      <span className="text-sm text-muted-foreground">Avg. Working Hours</span>
+                      <Clock className="h-5 w-5" />
+                      <span className="text-sm opacity-90">Avg. Working Hours</span>
                     </div>
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-2xl font-bold">
                       {formatHours(overallAverages.avgWorkingHours)}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs opacity-75 mt-1">
                       Between Start & End time
                     </p>
                   </CardContent>
@@ -348,20 +348,20 @@ export const AttendanceMarketHoursSection = ({
                 
                 <Card 
                   className={cn(
-                    "cursor-pointer transition-all hover:shadow-md",
-                    selectedMetric === 'retailer' && "ring-2 ring-primary"
+                    "cursor-pointer transition-all hover:shadow-md bg-primary text-primary-foreground",
+                    selectedMetric === 'retailer' && "ring-2 ring-primary-foreground"
                   )}
                   onClick={() => setSelectedMetric(selectedMetric === 'retailer' ? null : 'retailer')}
                 >
                   <CardContent className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
-                      <Store className="h-5 w-5 text-green-600" />
-                      <span className="text-sm text-muted-foreground">Avg. Time at Retailers</span>
+                      <Store className="h-5 w-5" />
+                      <span className="text-sm opacity-90">Avg. Time at Retailers</span>
                     </div>
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-2xl font-bold">
                       {formatHours(overallAverages.avgRetailerHours)}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs opacity-75 mt-1">
                       Time spent at stores
                     </p>
                   </CardContent>
