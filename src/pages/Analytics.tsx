@@ -1445,7 +1445,7 @@ const Analytics = () => {
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="progress" className="space-y-4">
+          <Tabs defaultValue="supervisor-report" className="space-y-4">
             <div className="relative flex items-center gap-1">
               <button
                 onClick={() => {
@@ -1463,13 +1463,12 @@ const Analytics = () => {
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 <TabsList className="inline-flex w-max gap-1 p-1">
-                  <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">KPI</TabsTrigger>
-                  <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Dashboard</TabsTrigger>
+                  <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Productivity</TabsTrigger>
+                  <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>
                   <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
                   <TabsTrigger value="retailers" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Retailers</TabsTrigger>
                   <TabsTrigger value="predictions" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Predictions</TabsTrigger>
                   <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
-                  <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Supervisor</TabsTrigger>
                 </TabsList>
               </div>
               <button
