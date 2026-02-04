@@ -269,37 +269,54 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
           </div>
         ) : skuData.length > 0 ? (
           <div className="space-y-4">
-            {/* Show/Hide Toggle - Always visible */}
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1"
-                onClick={() => setHideChart(!hideChart)}
-                title={hideChart ? "Show Visual" : "Hide Visual"}
-              >
-                {hideChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                <span className="text-xs">{hideChart ? "Show Chart" : "Hide Chart"}</span>
-              </Button>
+            {/* Unified Control Bar - matching Order Summary by User layout */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={skuFilter === 'top5' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  onClick={() => setSkuFilter(skuFilter === 'top5' ? 'all' : 'top5')}
+                >
+                  Top 5
+                </Button>
+                <Button
+                  variant={skuFilter === 'bottom5' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  onClick={() => setSkuFilter(skuFilter === 'bottom5' ? 'all' : 'bottom5')}
+                >
+                  Bottom 5
+                </Button>
+              </div>
+              <div className="flex items-center gap-1">
+                {!hideChart && (
+                  <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
+                    <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
+                      <PieChartIcon className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
+                      <BarChart3 className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setHideChart(!hideChart)}
+                  title={hideChart ? "Show Visual" : "Hide Visual"}
+                >
+                  {hideChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
             
             <div className={cn("grid grid-cols-1 gap-6", !hideChart && "lg:grid-cols-2")}>
               {/* Chart Section */}
               {!hideChart && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
-                    <div className="flex items-center gap-1">
-                      <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
-                        <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
-                          <PieChartIcon className="h-4 w-4" />
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
-                          <BarChart3 className="h-4 w-4" />
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                    </div>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
                   <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
                     {chartType === 'pie' ? (
                       <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
@@ -349,27 +366,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
               
               {/* Summary Table */}
               <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm sm:text-base">SKU Revenue Summary</h3>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant={skuFilter === 'top5' ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-7 text-xs px-2"
-                    onClick={() => setSkuFilter(skuFilter === 'top5' ? 'all' : 'top5')}
-                  >
-                    Top 5
-                  </Button>
-                  <Button
-                    variant={skuFilter === 'bottom5' ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-7 text-xs px-2"
-                    onClick={() => setSkuFilter(skuFilter === 'bottom5' ? 'all' : 'bottom5')}
-                  >
-                    Bottom 5
-                  </Button>
-                </div>
-              </div>
+              <h3 className="font-semibold text-sm sm:text-base mb-3">SKU Revenue Summary</h3>
               <div className="border rounded-lg max-h-[400px] scrollbar-always-visible">
                 <div className="min-w-max">
                   <Table>
