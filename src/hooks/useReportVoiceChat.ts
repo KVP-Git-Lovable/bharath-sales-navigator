@@ -142,10 +142,10 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
     }
   }, [isRecording]);
 
-  const playAudio = useCallback(async (text: string): Promise<void> => {
+  const playAudio = useCallback(async (text: string, voiceId?: string): Promise<void> => {
     return new Promise(async (resolve, reject) => {
       try {
-        console.log('Requesting TTS for text:', text.substring(0, 50) + '...');
+        console.log('Requesting TTS for text:', text.substring(0, 50) + '...', voiceId ? `with voice: ${voiceId}` : '');
         
         const response = await fetch(
           `${SUPABASE_URL}/functions/v1/elevenlabs-tts`,
@@ -156,7 +156,7 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
             },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({ text, voiceId }),
           }
         );
 
@@ -298,9 +298,9 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
     sendMessageRef.current = sendMessage;
   }, [sendMessage]);
 
-  const playSummary = useCallback(async (summaryText: string) => {
+  const playSummary = useCallback(async (summaryText: string, voiceId?: string) => {
     try {
-      await playAudio(summaryText);
+      await playAudio(summaryText, voiceId);
     } catch (error) {
       console.error('Failed to play summary:', error);
       toast.error('Failed to play summary audio');
