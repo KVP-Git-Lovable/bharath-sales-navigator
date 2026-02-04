@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface SKURevenue {
   product_name: string;
@@ -253,8 +254,9 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
             <p className="text-muted-foreground">Loading SKU data...</p>
           </div>
         ) : skuData.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={cn("grid grid-cols-1 gap-6", !hideChart && "lg:grid-cols-2")}>
             {/* Chart Section */}
+            {!hideChart && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
@@ -325,6 +327,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                 </ResponsiveContainer>
               )}
             </div>
+            )}
 
             {/* Summary Table */}
             <div>

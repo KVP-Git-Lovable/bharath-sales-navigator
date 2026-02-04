@@ -1489,9 +1489,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
           ) : summaryData.length > 0 ? (
             <div className={cn(
               "grid grid-cols-1 gap-6 transition-all duration-300",
-              selectedSummaryUser ? "lg:grid-cols-5" : "lg:grid-cols-2"
+              hideOrderChart ? "" : (selectedSummaryUser ? "lg:grid-cols-5" : "lg:grid-cols-2")
             )}>
-              {/* Chart Section - shrinks when beat split is open */}
+              {/* Chart Section - shrinks when beat split is open, hidden when hideOrderChart is true */}
+              {!hideOrderChart && (
               <div className={cn(
                 "space-y-2 transition-all duration-300",
                 selectedSummaryUser ? "lg:col-span-2" : "lg:col-span-1"
@@ -1592,11 +1593,12 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                   </ResponsiveContainer>
                 )}
               </div>
+              )}
 
-              {/* Summary Table with Beat-wise Split View - expands when beat split is open */}
+              {/* Summary Table with Beat-wise Split View - expands when beat split is open or chart is hidden */}
               <div className={cn(
                 "transition-all duration-300",
-                selectedSummaryUser ? "lg:col-span-3" : "lg:col-span-1"
+                hideOrderChart ? "" : (selectedSummaryUser ? "lg:col-span-3" : "lg:col-span-1")
               )}>
                 <h3 className="font-semibold mb-2">User Order Summary</h3>
                 <p className="text-xs text-muted-foreground mb-3">Click a row to see beat-wise breakdown</p>
@@ -1893,48 +1895,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         </DialogContent>
       </Dialog>
 
-      {selectedUserDetails && allUsersSummary && summaryData.length > 0 && (
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg md:text-xl">Summary - All Users</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Aggregated metrics for all users in the selected date range
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                  <Store className="h-4 w-4" />
-                  Total Retailers
-                </div>
-                <div className="text-2xl font-bold">{allUsersSummary.retailers}</div>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                  <MapPin className="h-4 w-4" />
-                  Total Beats
-                </div>
-                <div className="text-2xl font-bold">{allUsersSummary.beats}</div>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                  <Package className="h-4 w-4" />
-                  Total Products
-                </div>
-                <div className="text-2xl font-bold">{allUsersSummary.products}</div>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                  <Scale className="h-4 w-4" />
-                  Total KG
-                </div>
-                <div className="text-2xl font-bold">{allUsersSummary.totalKg.toFixed(1)}</div>
-              </Card>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* User Details Section */}
       {selectedUserDetails && (
