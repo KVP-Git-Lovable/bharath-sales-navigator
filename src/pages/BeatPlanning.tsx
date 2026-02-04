@@ -465,6 +465,10 @@ export const BeatPlanning = () => {
         .eq('user_id', user.id)
         .eq('plan_date', dateString);
 
+      // CRITICAL FIX: Clear snapshot when beat plans change to prevent stale retailer data
+      await clearMyVisitsSnapshot(user.id, dateString);
+      console.log('[BeatPlanning] Cleared snapshot for', dateString, 'due to plan update');
+
       // If no beats selected, we've cleared all - just show success message
       if (selectedBeatIds.length === 0) {
         toast.success(`Cleared all beats for ${format(selectedDate, 'MMMM d, yyyy')}`);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES, MIN_SYNC_INTERVAL_MS } from '@/lib/offlineStorage';
-import { loadMyVisitsSnapshot, saveMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
+import { loadMyVisitsSnapshot, saveMyVisitsSnapshot, clearMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { isSlowConnection, getConnectionQuality, getManualSlowMode } from '@/utils/internetSpeedCheck';
 import { getLastChangeTimestamp, clearChangeMarker } from '@/lib/visitChangeMarker';
@@ -459,10 +459,24 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       let uiUpdated = false;
 
       // Update beat plans granularly
-      const bpChanges = getChangedItems(currentCache.beatPlans, newBeatPlans);
-      if (bpChanges.changed.length > 0 || bpChanges.added.length > 0 || bpChanges.removed.length > 0) {
-        uiUpdated = applyGranularUpdate(setBeatPlans, bpChanges) || uiUpdated;
+      const bpChanges = getChangedItems(currentCache.beatPlans || [], newBeatPlans);
+      const beatPlansChanged = bpChanges.changed.length > 0 || bpChanges.added.length > 0 || bpChanges.removed.length > 0;
+      
+      // CRITICAL FIX: Track if beats themselves changed (not just content updates)
+      const oldBeatIdsFromCache = (currentCache.beatPlans || []).map((bp: any) => bp.beat_id).sort().join(',');
+      const newBeatIdsFromNetwork = newBeatPlans.map((bp: any) => bp.beat_id).sort().join(',');
+      const beatsSelectionChanged = oldBeatIdsFromCache !== newBeatIdsFromNetwork;
+      
+      if (beatPlansChanged) {
+        // When beat selection changes (beats added/removed), clear snapshot to force fresh load
+        if (beatsSelectionChanged && uid) {
+          console.log(`[SmartSync] Beat selection changed, clearing snapshot for ${date}`);
+          clearMyVisitsSnapshot(uid, date).catch(e => console.error('Failed to clear snapshot:', e));
+        }
+        
+        applyGranularUpdate(setBeatPlans, bpChanges);
         currentCache.beatPlans = newBeatPlans;
+        uiUpdated = true;
       }
 
       // FIX: ALWAYS replace visits with network data - visits are the source of truth for status
@@ -544,15 +558,30 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         }
       }
 
-      if (retailerMap.size > 0) {
-        const allRetailers = Array.from(retailerMap.values());
-        
-        const rChanges = getChangedItems(currentCache.retailers, allRetailers);
-        if (rChanges.changed.length > 0 || rChanges.added.length > 0 || rChanges.removed.length > 0) {
-          uiUpdated = applyGranularUpdate(setRetailers, rChanges) || uiUpdated;
-          currentCache.retailers = allRetailers;
-          console.log(`[SmartSync] Retailers updated: ${rChanges.added.length} added, ${rChanges.changed.length} changed`);
+      // CRITICAL FIX: Always update retailers based on current beat plans
+      // Even if retailerMap is empty (beat has no retailers), we must clear old retailers
+      const allRetailers = Array.from(retailerMap.values());
+      
+      const rChanges = getChangedItems(currentCache.retailers || [], allRetailers);
+      const retailersActuallyChanged = rChanges.changed.length > 0 || rChanges.added.length > 0 || rChanges.removed.length > 0;
+      
+      // FIX: Also detect if beats changed - if so, REPLACE retailers completely
+      const oldBeatIds = (currentCache.beatPlans || []).map((bp: any) => bp.beat_id).sort().join(',');
+      const newBeatIds = newBeatPlans.map((bp: any) => bp.beat_id).sort().join(',');
+      const beatsChanged = oldBeatIds !== newBeatIds;
+      
+      if (retailersActuallyChanged || beatsChanged) {
+        // When beats change, do a FULL REPLACEMENT instead of granular update
+        // This ensures retailers from removed beats are properly cleared
+        if (beatsChanged) {
+          console.log(`[SmartSync] Beats changed: "${oldBeatIds}" -> "${newBeatIds}", REPLACING retailers`);
+          setRetailers(allRetailers);
+        } else {
+          applyGranularUpdate(setRetailers, rChanges);
         }
+        currentCache.retailers = allRetailers;
+        uiUpdated = true;
+        console.log(`[SmartSync] Retailers updated: ${allRetailers.length} total (${rChanges.added.length} added, ${rChanges.removed.length} removed)`);
       }
 
       // Update cache with timestamp and points
@@ -719,14 +748,30 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         snapshot.orders?.length > 0
       );
       if (hasValidSnapshotData) {
+        // CRITICAL FIX: Filter snapshot retailers to ONLY those matching snapshot's beat plans
+        // This prevents stale retailers from removed beats appearing in the UI
+        const snapshotBeatIds = (snapshot.beatPlans || []).map((bp: any) => bp.beat_id);
+        const snapshotVisitRetailerIds = new Set((snapshot.visits || []).map((v: any) => v.retailer_id));
+        
+        // Filter retailers to only those from current beat plans or with visits today
+        const filteredSnapshotRetailers = (snapshot.retailers || []).filter((r: any) => 
+          snapshotBeatIds.includes(r.beat_id) || snapshotVisitRetailerIds.has(r.id)
+        );
+        
+        if (filteredSnapshotRetailers.length !== (snapshot.retailers || []).length) {
+          console.log(`[LoadData] Filtered snapshot retailers: ${snapshot.retailers?.length || 0} -> ${filteredSnapshotRetailers.length} (matching beat plans)`);
+        }
+        
         // FIX: Also check offline storage for NEW retailers that might not be in snapshot
         const offlineData = await loadFromOfflineStorage(effectiveUserId, selectedDate);
         
-        // Merge: Add any offline retailers not in snapshot
-        let mergedRetailers = [...(snapshot.retailers || [])];
+        // Merge: Add any offline retailers not in snapshot (only if they match beat plans)
+        let mergedRetailers = [...filteredSnapshotRetailers];
         if (offlineData?.retailers?.length) {
           const snapshotRetailerIds = new Set(mergedRetailers.map(r => r.id));
-          const newRetailers = offlineData.retailers.filter(r => !snapshotRetailerIds.has(r.id));
+          const newRetailers = offlineData.retailers.filter(r => 
+            !snapshotRetailerIds.has(r.id) && snapshotBeatIds.includes(r.beat_id)
+          );
           if (newRetailers.length > 0) {
             mergedRetailers = [...mergedRetailers, ...newRetailers];
             console.log('[LoadData] Merged', newRetailers.length, 'new retailers from offline storage');
@@ -1264,45 +1309,78 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         const snapshot = await loadMyVisitsSnapshot(currentUserId, currentDate);
         if (snapshot) {
           console.log('[LocalEvent] Reloaded from snapshot:', {
+            beatPlans: snapshot.beatPlans?.length || 0,
             visits: snapshot.visits?.length || 0,
+            retailers: snapshot.retailers?.length || 0,
             progressStats: snapshot.progressStats
           });
           
-          // Update state from snapshot
-          setBeatPlans(prev => snapshot.beatPlans?.length > 0 ? snapshot.beatPlans : prev);
+          // CRITICAL FIX: Filter retailers to only those matching snapshot's beat plans
+          // This prevents stale retailers from removed beats
+          const snapshotBeatIds = (snapshot.beatPlans || []).map((bp: any) => bp.beat_id);
+          const snapshotVisitRetailerIds = new Set((snapshot.visits || []).map((v: any) => v.retailer_id));
+          const filteredRetailers = (snapshot.retailers || []).filter((r: any) => 
+            snapshotBeatIds.includes(r.beat_id) || snapshotVisitRetailerIds.has(r.id)
+          );
+          
+          // Update state from snapshot - REPLACE instead of fallback to prev
+          // When beat plans change, we MUST use the new data, not keep old
+          setBeatPlans(snapshot.beatPlans || []);
           setVisits(snapshot.visits || []);
-          setRetailers(prev => snapshot.retailers?.length > 0 ? snapshot.retailers : prev);
+          setRetailers(filteredRetailers);
           setOrders(snapshot.orders || []);
           
           // Update cache
           cacheRef.current.set(currentDate, {
             beatPlans: snapshot.beatPlans || [],
             visits: snapshot.visits || [],
-            retailers: snapshot.retailers || [],
+            retailers: filteredRetailers,
             orders: snapshot.orders || [],
             timestamp: Date.now()
           });
           return;
+        } else {
+          console.log('[LocalEvent] No snapshot found - will trigger network sync');
         }
       } catch (e) {
         console.error('[LocalEvent] Snapshot load failed:', e);
       }
       
-      // Fallback: reload from offline storage
+      // Fallback: reload from offline storage (properly filtered by beat)
       const offlineData = await loadFromOfflineStorage(currentUserId, currentDate);
       if (offlineData) {
         console.log('[LocalEvent] Reloaded from offline storage:', {
-          visits: offlineData.visits.length
+          beatPlans: offlineData.beatPlans.length,
+          visits: offlineData.visits.length,
+          retailers: offlineData.retailers.length
         });
+        // CRITICAL: Use ALL offline data, not just visits/orders
+        // This ensures beat plan changes are reflected
+        setBeatPlans(offlineData.beatPlans);
         setVisits(offlineData.visits);
+        setRetailers(offlineData.retailers);
         setOrders(offlineData.orders);
         
         cacheRef.current.set(currentDate, {
-          ...cacheRef.current.get(currentDate),
+          beatPlans: offlineData.beatPlans,
           visits: offlineData.visits,
+          retailers: offlineData.retailers,
           orders: offlineData.orders,
           timestamp: Date.now()
         });
+      } else {
+        console.log('[LocalEvent] No offline data - clearing state and triggering network sync');
+        // No local data exists - clear state to show empty and trigger sync
+        setBeatPlans([]);
+        setVisits([]);
+        setRetailers([]);
+        setOrders([]);
+        cacheRef.current.delete(currentDate);
+        
+        // Trigger network sync to get fresh data
+        if (navigator.onLine && !isSlowConnection()) {
+          smartDeltaSync(currentUserId, currentDate);
+        }
       }
     };
 
