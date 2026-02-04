@@ -3,7 +3,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, PieChartIcon, BarChart3, Package, X } from 'lucide-react';
+import { RefreshCw, PieChartIcon, BarChart3, Package, X, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -32,6 +32,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
+  const [hideChart, setHideChart] = useState(false);
 
   // Fetch SKU revenue data
   const fetchSKUData = async () => {
@@ -257,61 +258,72 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
-                <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
-                  <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
-                    <PieChartIcon className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
-                    <BarChart3 className="h-4 w-4" />
-                  </ToggleGroupItem>
-                </ToggleGroup>
+                <div className="flex items-center gap-1">
+                  <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
+                    <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
+                      <PieChartIcon className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
+                      <BarChart3 className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setHideChart(!hideChart)}
+                    title={hideChart ? "Show Visual" : "Hide Visual"}
+                  >
+                    {hideChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
-                {chartType === 'pie' ? (
-                  <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
-                    <Pie
-                      data={chartData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={isMobile ? 70 : 120}
-                      label={isMobile ? false : ({ name, percentage, index }: { name: string; percentage: number; index: number }) => 
-                        chartData.length > 8 ? (index < 3 ? `${name} (${percentage}%)` : '') : `${name} (${percentage}%)`
-                      }
-                      labelLine={isMobile || chartData.length > 8 ? false : { stroke: '#888', strokeWidth: 1 }}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number, name: string, props: any) => [
-                        `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
-                        props.payload.fullName
-                      ]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : '12px' }} />
-                  </PieChart>
-                ) : (
-                  <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                    <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                    <Tooltip 
-                      formatter={(value: number, name: string, props: any) => [
-                        `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
-                        props.payload.fullName
-                      ]}
-                    />
-                    <Bar dataKey="value">
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                )}
-              </ResponsiveContainer>
+              {!hideChart && (
+                <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
+                  {chartType === 'pie' ? (
+                    <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
+                      <Pie
+                        data={chartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={isMobile ? 70 : 120}
+                        label={false}
+                        labelLine={false}
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => [
+                          `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
+                          props.payload.fullName
+                        ]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : '12px' }} />
+                    </PieChart>
+                  ) : (
+                    <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => [
+                          `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
+                          props.payload.fullName
+                        ]}
+                      />
+                      <Bar dataKey="value">
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              )}
             </div>
 
             {/* Summary Table */}
