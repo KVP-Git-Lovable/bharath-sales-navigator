@@ -68,8 +68,11 @@ export function TeamTargetDashboard({
       if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
       return `₹${value.toFixed(0)}`;
     } else {
-      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-      return value.toFixed(0);
+      // Quantity is always in KG - display with appropriate precision
+      if (value >= 1000) return `${value.toFixed(0)} KG`;
+      if (value >= 100) return `${value.toFixed(1)} KG`;
+      if (value >= 1) return `${value.toFixed(2)} KG`;
+      return `${value.toFixed(2)} KG`;
     }
   };
 

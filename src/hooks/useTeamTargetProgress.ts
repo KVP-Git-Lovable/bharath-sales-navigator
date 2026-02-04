@@ -125,7 +125,7 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
           user_id,
           total_amount,
           created_at,
-          order_items(quantity)
+          order_items(quantity, unit)
         `)
         .in('user_id', userIds)
         .gte('created_at', startDate.toISOString())
@@ -138,27 +138,34 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
         
         // Calculate target based on period
         let target = 0;
+        const monthTarget = monthlyTargets?.find(
+          m => m.business_plan_id === plan?.id && m.month_number === fyMonthNumber
+        );
+        
         if (plan) {
           const yearlyTarget = basis === 'revenue' ? plan.revenue_target : plan.quantity_target;
           
           if (periodType === 'year') {
             target = yearlyTarget || 0;
           } else if (periodType === 'month') {
-            const monthTarget = monthlyTargets?.find(
-              m => m.business_plan_id === plan.id && m.month_number === fyMonthNumber
-            );
             target = monthTarget 
               ? (basis === 'revenue' ? monthTarget.target_revenue : monthTarget.quantity_target) || 0
               : (yearlyTarget || 0) / 12;
           } else if (periodType === 'quarter') {
             target = (yearlyTarget || 0) / 4;
           } else if (periodType === 'week') {
-            const monthlyTarget = (yearlyTarget || 0) / 12;
-            target = monthlyTarget / 4; // Approximate 4 weeks per month
+            const monthlyTargetValue = monthTarget 
+              ? (basis === 'revenue' ? monthTarget.target_revenue : monthTarget.quantity_target) || 0
+              : (yearlyTarget || 0) / 12;
+            // Use 4.33 weeks per month for more accurate calculation
+            target = monthlyTargetValue / 4.33;
           } else if (periodType === 'day') {
-            const monthlyTarget = (yearlyTarget || 0) / 12;
-            const workingDays = getWorkingDaysInMonth(date);
-            target = monthlyTarget / workingDays;
+            const monthlyTargetValue = monthTarget 
+              ? (basis === 'revenue' ? monthTarget.target_revenue : monthTarget.quantity_target) || 0
+              : (yearlyTarget || 0) / 12;
+            // Use stored working_days from business plan, fallback to computed
+            const workingDays = (monthTarget as any)?.working_days || getWorkingDaysInMonth(date);
+            target = monthlyTargetValue / workingDays;
           }
         }
 
@@ -169,8 +176,17 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
         if (basis === 'revenue') {
           actual = userOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
         } else {
+          // Convert gram-based units to KG for quantity basis
           actual = userOrders.reduce((sum, o) => {
-            const orderQty = (o.order_items as any[])?.reduce((qSum: number, item: any) => qSum + (item.quantity || 0), 0) || 0;
+            const orderQty = (o.order_items as any[])?.reduce((qSum: number, item: any) => {
+              const qty = item.quantity || 0;
+              const unit = (item.unit || '').toLowerCase();
+              // Convert grams to KG
+              if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+                return qSum + (qty / 1000);
+              }
+              return qSum + qty;
+            }, 0) || 0;
             return sum + orderQty;
           }, 0);
         }
