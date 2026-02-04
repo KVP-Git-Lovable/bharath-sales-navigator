@@ -469,9 +469,9 @@ export const AttendanceMarketHoursSection = ({
                   <ScrollAreaPrimitive.ScrollAreaScrollbar
                     forceMount
                     orientation="horizontal"
-                    className="flex touch-none select-none transition-colors h-2.5 flex-col border-t border-t-transparent p-[1px]"
+                    className="flex touch-none select-none transition-colors h-3 flex-col border-t border-t-transparent p-[1px] bg-muted/50"
                   >
-                    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+                    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-primary/40 hover:bg-primary/60" />
                   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 
                   <ScrollAreaPrimitive.Corner />
