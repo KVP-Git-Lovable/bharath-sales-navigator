@@ -15,3 +15,4 @@ export {
   PendingPaymentsDialog 
 } from './AnalyticsDetailDialogs';
 export { useBusinessMetrics } from './useBusinessMetrics';
+export { AnalyticsTargetDashboard } from './AnalyticsTargetDashboard';
