@@ -354,9 +354,12 @@ export function AllocationTable({
                 />
               </div>
             )}
-            <span className="text-sm text-muted-foreground w-12 text-right">
-              ₹{user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : '0'}
-            </span>
+            {/* Only show revenue summary when revenue is enabled */}
+            {enabledMetrics.revenue && (
+              <span className="text-sm text-muted-foreground w-20 text-right">
+                {formatCurrency(user.revenueTarget)}
+              </span>
+            )}
           </div>
         </div>
 
