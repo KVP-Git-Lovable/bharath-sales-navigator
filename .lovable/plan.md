@@ -1,139 +1,204 @@
 
-# Plan: Fix Team Performance Display - KG Units and Proper Target Calculations
+# Plan: Enhanced AI Assistant with Voice Conversation using ElevenLabs
 
-## Problem Summary
-Based on the screenshot and code analysis, three issues need to be addressed:
+## Overview
+Transform the existing text-based AI Assistant into a dual-mode assistant that offers both **Text Chat** and **Voice Conversation** options. The Voice Conversation mode will use ElevenLabs Conversational AI with the specified Voice ID `1Z7Y8o9cvUeWq8oLKgMY`, supporting both English and Hindi speech recognition and responses.
 
-1. **Unit Display Issue**: Quantities are showing as "K" (e.g., "2.1K", "27.5K") instead of "KG" when the Target Basis is set to Quantity
-2. **Monthly Target Details**: When monthly period is selected, the system correctly fetches from `user_business_plan_months`, but the actual quantity needs unit-aware conversion (grams to KG)
-3. **Daily Target Calculation**: Daily targets should use the `working_days` stored in `user_business_plan_months` table rather than computing generically
+## Current State Analysis
+- **ChatWidget.tsx** displays a floating button that opens text chat (Sheet on desktop, Drawer on mobile)
+- **ChatDialog.tsx** handles text-based conversation with the `chat-assistant` edge function
+- **ElevenLabs TTS** already configured with `ELEVENLABS_API_KEY` secret
+- **Existing voice patterns** in `useReportVoiceChat.ts` and `VoiceOrderAssistant.tsx`
 
-## Root Cause Analysis
+## Implementation Architecture
 
-### Issue 1: Unit Display
-The `formatValue` function in `TeamTargetDashboard.tsx` (lines 65-74) uses generic "K" suffix for large numbers:
-```javascript
-// Current code
-if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-```
-This doesn't differentiate between quantity units (which should be KG) and generic counts.
-
-### Issue 2: Actual Quantity Calculation
-The `useTeamTargetProgress` hook (lines 171-175) sums raw quantities from `order_items` without converting gram-based units to KG:
-```javascript
-// Current - missing unit conversion
-actual = userOrders.reduce((sum, o) => {
-  const orderQty = (o.order_items as any[])?.reduce((qSum, item) => 
-    qSum + (item.quantity || 0), 0) || 0;
-  return sum + orderQty;
-}, 0);
-```
-
-### Issue 3: Daily Target Calculation
-The daily target calculation (lines 158-161) uses a computed working days count instead of the stored `working_days` from `user_business_plan_months`:
-```javascript
-// Current - uses computed working days
-const workingDays = getWorkingDaysInMonth(date);
-target = monthlyTarget / workingDays;
-```
-
-## Solution Overview
-
-### Step 1: Update useTeamTargetProgress Hook
-**File:** `src/hooks/useTeamTargetProgress.ts`
-
-Changes:
-1. Fetch unit information from `order_items` along with quantity
-2. Convert gram-based quantities to KG using the established pattern
-3. Use stored `working_days` from `user_business_plan_months` for daily target pro-rating
-4. Calculate weekly targets using actual weekly working days (6 days/week)
-
-### Step 2: Update TeamTargetDashboard Display
-**File:** `src/components/admin/TeamTargetDashboard.tsx`
-
-Changes:
-1. Update `formatValue` function to show "KG" suffix for quantity-based metrics instead of "K"
-2. Keep the "K" abbreviation only for very large numbers, converting to "KG" appropriately
-
-## Technical Implementation Details
-
-### Hook Changes (useTeamTargetProgress.ts)
-
+### User Flow
 ```text
-Query Enhancement:
-┌─────────────────────────────────────────┐
-│ Current: order_items(quantity)          │
-│ Updated: order_items(quantity, unit)    │
-└─────────────────────────────────────────┘
-
-Quantity Calculation:
-┌─────────────────────────────────────────┐
-│ For each order_item:                    │
-│   - If unit = 'grams'/'gram'/'g':       │
-│       quantity_kg = quantity / 1000     │
-│   - Else (kg, bag, etc):                │
-│       quantity_kg = quantity            │
-│   - Sum all quantity_kg                 │
-└─────────────────────────────────────────┘
-
-Daily Target Calculation:
-┌─────────────────────────────────────────┐
-│ Use: monthTarget.working_days           │
-│ Fallback: getWorkingDaysInMonth()       │
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                  Click AI Assistant Button                  │
+└────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│              "Choose how to interact" Dialog               │
+│  ┌──────────────────────┐  ┌──────────────────────────┐   │
+│  │   💬 Text Chat       │  │   🎤 Voice Conversation  │   │
+│  │                      │  │                          │   │
+│  │   Type your question │  │   Speak in English or    │   │
+│  │                      │  │   Hindi                  │   │
+│  └──────────────────────┘  └──────────────────────────┘   │
+└────────────────────────────────────────────────────────────┘
+                              │
+           ┌──────────────────┴──────────────────┐
+           ▼                                     ▼
+┌──────────────────────┐           ┌──────────────────────────┐
+│   Existing Text      │           │   Voice Conversation     │
+│   Chat Dialog        │           │   with ElevenLabs Agent  │
+└──────────────────────┘           └──────────────────────────┘
 ```
 
-### Display Changes (TeamTargetDashboard.tsx)
+## Files to Create
 
-```text
-formatValue Function Update:
-┌──────────────────────────────────────────────────────────────┐
-│ Quantity Basis:                                              │
-│   - Value >= 1000: Show "X.X KG" (no division needed, raw KG)│
-│   - Value < 1000:  Show "X.XX KG"                            │
-│                                                              │
-│ Revenue Basis (unchanged):                                   │
-│   - Value >= 100000: "₹X.XL"                                 │
-│   - Value >= 1000:   "₹X.XK"                                 │
-│   - Value < 1000:    "₹X"                                    │
-└──────────────────────────────────────────────────────────────┘
+### 1. Edge Function: `elevenlabs-conversation-token`
+**Path:** `supabase/functions/elevenlabs-conversation-token/index.ts`
+
+Server-side token generation for secure ElevenLabs WebRTC connection.
+
+```typescript
+// Generates a single-use conversation token for ElevenLabs agent
+const response = await fetch(
+  `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${AGENT_ID}`,
+  { headers: { "xi-api-key": ELEVENLABS_API_KEY } }
+);
 ```
+
+**Note:** Requires an ElevenLabs Conversational AI Agent to be created in the ElevenLabs web console with:
+- Voice ID: `1Z7Y8o9cvUeWq8oLKgMY`
+- Knowledge base about QuickApp features and navigation
+- Bilingual support (English/Hindi)
+
+### 2. React Hook: `useVoiceAssistant`
+**Path:** `src/hooks/useVoiceAssistant.ts`
+
+Manages ElevenLabs conversation using `@elevenlabs/react` SDK's `useConversation` hook.
+
+Key features:
+- Connects to ElevenLabs agent via WebRTC for low-latency voice
+- Handles microphone permissions
+- Tracks connection status and speaking state
+- Provides volume controls for audio visualization
+
+### 3. Component: `InteractionModeSelector`
+**Path:** `src/components/chat/InteractionModeSelector.tsx`
+
+The initial dialog showing two options:
+- **Text Chat**: Opens existing ChatDialog
+- **Voice Conversation**: Opens VoiceConversationDialog
+
+UI matches the reference image with card-style buttons.
+
+### 4. Component: `VoiceConversationDialog`
+**Path:** `src/components/chat/VoiceConversationDialog.tsx`
+
+Full-screen voice conversation interface featuring:
+- Connection status indicator
+- Animated microphone button (listening/speaking states)
+- Real-time transcript display
+- Stop/End conversation controls
+- Visual feedback when AI is speaking
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/hooks/useTeamTargetProgress.ts` | 1. Add `unit` to order_items query<br>2. Implement gram→KG conversion in actual calculation<br>3. Use stored `working_days` for daily target |
-| `src/components/admin/TeamTargetDashboard.tsx` | Update `formatValue` to show "KG" suffix for quantity basis |
+### 1. ChatWidget.tsx
+**Changes:**
+- Add state for interaction mode (`'selecting' | 'text' | 'voice'`)
+- When button clicked, show `InteractionModeSelector` first
+- Based on selection, render `ChatDialog` or `VoiceConversationDialog`
+
+### 2. package.json (dependencies)
+**Add:**
+- `@elevenlabs/react` - ElevenLabs React SDK for conversational AI
+
+## Technical Implementation Details
+
+### ElevenLabs Agent Configuration (Manual Step in ElevenLabs Console)
+
+Before the code works, an ElevenLabs Conversational AI Agent must be configured with:
+
+1. **Voice:** Use Voice ID `1Z7Y8o9cvUeWq8oLKgMY`
+2. **System Prompt:**
+```text
+You are a helpful AI assistant for QuickApp, a field sales management application. 
+You help users navigate the app and answer questions about features.
+
+The app includes these main sections:
+- Home Dashboard: Overview of daily activities
+- My Visits: Schedule and track retailer visits
+- My Retailers: Manage retailer database
+- Beat Planning: Plan daily routes
+- Order Entry: Create orders during visits
+- Analytics: View performance reports
+- Attendance: Track check-in/check-out
+- Schemes: View active promotions
+- Team (for managers): Monitor team performance
+
+When asked about navigation:
+- Be specific about which menu item to click
+- Describe the path step by step
+- Mention any buttons or tabs they need to find
+
+Respond naturally in the same language the user speaks (English or Hindi).
+Keep responses concise and actionable.
+```
+
+3. **Language Settings:** Enable both English and Hindi
+4. **First Message:** "Hello! I'm your QuickApp assistant. How can I help you today?"
+
+### Voice Conversation Flow
+
+```text
+1. User clicks Voice Conversation
+2. Frontend requests token from elevenlabs-conversation-token edge function
+3. Edge function returns WebRTC token
+4. Frontend connects to ElevenLabs agent using useConversation hook
+5. User speaks (English or Hindi)
+6. ElevenLabs processes speech, generates response
+7. AI responds in same language via voice
+8. Conversation continues until user ends
+```
+
+### Component Hierarchy
+
+```text
+ChatWidget (container)
+├── Floating Button
+├── InteractionModeSelector (initial choice)
+│   ├── Text Chat Card
+│   └── Voice Conversation Card
+├── ChatDialog (existing text chat)
+└── VoiceConversationDialog (new voice UI)
+    ├── Header with close button
+    ├── Status indicator (connecting/connected/speaking)
+    ├── Visual waveform/animation
+    ├── Transcript display area
+    └── Control buttons (mute, end call)
+```
+
+### Error Handling
+- Microphone permission denied: Show permission request dialog
+- Connection failure: Display retry option
+- Token expired: Automatically refresh and reconnect
+- Network issues: Graceful degradation with error message
+
+## New Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| @elevenlabs/react | ^0.0.x | ElevenLabs React SDK for useConversation hook |
+
+## Implementation Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/elevenlabs-conversation-token/index.ts` | Create | Edge function for secure token generation |
+| `src/hooks/useVoiceAssistant.ts` | Create | Hook wrapping ElevenLabs useConversation |
+| `src/components/chat/InteractionModeSelector.tsx` | Create | Mode selection dialog (Text/Voice) |
+| `src/components/chat/VoiceConversationDialog.tsx` | Create | Voice conversation UI |
+| `src/components/chat/ChatWidget.tsx` | Modify | Add mode selection state and routing |
+
+## User-Required Configuration
+
+After implementation, the user must:
+1. **Create an ElevenLabs Agent** in the ElevenLabs console
+2. **Configure the agent** with Voice ID `1Z7Y8o9cvUeWq8oLKgMY`, bilingual support, and QuickApp knowledge
+3. **Store the Agent ID** as a Supabase secret: `ELEVENLABS_AGENT_ID`
 
 ## Expected Outcome
 
 After implementation:
-1. **Quantity Display**: Values will show "2.1 KG", "27.5 KG", "74.0 KG" instead of "2.1K", "27.5K", "74.0K"
-2. **Accurate Actuals**: Gram-based product quantities will be correctly converted to KG matching the target units
-3. **Daily Targets**: Will use the configured working days from the business plan, ensuring accurate daily pro-rating
-4. **Weekly Targets**: Will calculate properly based on 6-day work weeks
-
-## Data Flow Summary
-
-```text
-Monthly Target Data:
-┌─────────────────────────────────────────────────────────────┐
-│ user_business_plan_months                                   │
-│ ├── quantity_target: 2100 (KG)                              │
-│ └── working_days: 24                                        │
-│                                                             │
-│ Daily Target = 2100 / 24 = 87.5 KG                          │
-│ Weekly Target = (2100 / 4) = 525 KG (approx 4 weeks/month)  │
-└─────────────────────────────────────────────────────────────┘
-
-Actual Calculation:
-┌─────────────────────────────────────────────────────────────┐
-│ order_items                                                 │
-│ ├── Product A: 500 grams → 0.5 KG                           │
-│ ├── Product B: 2 kg → 2 KG                                  │
-│ └── Product C: 1000 grams → 1 KG                            │
-│                                                             │
-│ Total Actual = 3.5 KG                                       │
-└─────────────────────────────────────────────────────────────┘
-```
+1. Clicking the AI Assistant button shows "Choose how to interact" dialog
+2. **Text Chat** opens the existing familiar text conversation
+3. **Voice Conversation** connects to ElevenLabs with microphone access
+4. Users can speak in English or Hindi
+5. AI responds vocally in the same language
+6. AI can answer questions about any QuickApp feature and provide navigation guidance
