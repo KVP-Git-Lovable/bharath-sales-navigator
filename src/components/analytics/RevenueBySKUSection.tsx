@@ -24,11 +24,12 @@ interface RevenueBySKUSectionProps {
   filteredUserName?: string | null;
   onClearFilter?: () => void;
   onDataLoaded?: (data: SKURevenue[]) => void;
+  allUsers?: { id: string; full_name: string | null }[];
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7'];
 
-export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName, onClearFilter, onDataLoaded }: RevenueBySKUSectionProps) => {
+export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName, onClearFilter, onDataLoaded, allUsers = [] }: RevenueBySKUSectionProps) => {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
@@ -174,10 +175,11 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
 
   // Fetch data when props change
   // Using JSON.stringify on selectedUsers to ensure stable dependency comparison
+  // Also include allUsers.length to re-trigger when users list becomes available
   useEffect(() => {
     fetchSKUData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(selectedUsers), dateRange.from, dateRange.to]);
+  }, [JSON.stringify(selectedUsers), dateRange.from, dateRange.to, allUsers.length]);
 
   // Notify parent when data is loaded
   // Note: Removed onDataLoaded from deps to prevent infinite loops when parent doesn't memoize callback

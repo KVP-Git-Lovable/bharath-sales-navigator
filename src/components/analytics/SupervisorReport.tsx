@@ -2246,6 +2246,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         filteredUserName={skuFilterUser}
         onClearFilter={handleClearSkuFilter}
         onDataLoaded={handleSkuDataLoaded}
+        allUsers={users}
       />
 
       {/* Attendance & Market Hours Section */}

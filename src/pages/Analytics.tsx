@@ -54,7 +54,7 @@ const Analytics = () => {
   const [showDatePickers, setShowDatePickers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [dashboardDateRange, setDashboardDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfMonth(new Date()),
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
     to: new Date()
   });
   const [dashboardDateOpen, setDashboardDateOpen] = useState(false);
@@ -70,10 +70,10 @@ const Analytics = () => {
   const [showCustomKpiDate, setShowCustomKpiDate] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter' | 'custom'>('week');
-  const [dashboardPeriod, setDashboardPeriod] = useState<string>('this_month');
+  const [dashboardPeriod, setDashboardPeriod] = useState<string>('this_week');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfWeek(new Date()),
-    to: endOfWeek(new Date())
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    to: new Date()
   });
   
   // Dialog states for business metrics
