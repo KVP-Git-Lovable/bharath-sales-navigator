@@ -1,4 +1,4 @@
-import { MapPin, Phone, Store, ShoppingCart, XCircle, BarChart3, Check, Users, MessageSquare, Paintbrush, Camera, LogIn, LogOut, Package, FileText, IndianRupee, Sparkles, Truck, UserCheck, Target, Gift } from "lucide-react";
+import { MapPin, Phone, Store, ShoppingCart, XCircle, BarChart3, Check, Users, MessageSquare, Paintbrush, Camera, LogIn, LogOut, Package, FileText, IndianRupee, Sparkles, Truck, UserCheck, Target, Gift, Ban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,6 +45,7 @@ import { FeedbackListView } from "./FeedbackListView";
 import { getLocalTodayDate } from "@/utils/dateUtils";
 import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
+import { CancelOrderDialog } from "./CancelOrderDialog";
 interface Visit {
   id: string;
   retailerId?: string;
@@ -231,6 +232,7 @@ export const VisitCard = ({
   const [retailerOverviewData, setRetailerOverviewData] = useState<any>(null);
   const [showCreditTalkingPoints, setShowCreditTalkingPoints] = useState(false);
   const [creditLimitData, setCreditLimitData] = useState<{ creditLimit: number; score: number; avgDso: number } | null>(null);
+  const [showCancelOrderDialog, setShowCancelOrderDialog] = useState(false);
   const {
     isVanSalesEnabled
   } = useVanSales();
@@ -2909,13 +2911,24 @@ export const VisitCard = ({
                   </div>
                   
                   {/* Invoice Generation Button */}
-                  {ordersTodayList.length > 0 && <div className="mt-3 pt-2 border-t">
+                  {ordersTodayList.length > 0 && <div className="mt-3 pt-2 border-t space-y-2">
                       <VisitInvoicePDFGenerator orders={ordersTodayList.map(o => ({
                         id: o.id,
                         invoice_number: o.invoice_number,
                         total_amount: o.total_amount,
                         created_at: o.created_at
                       }))} customerPhone={visit.phone} className="w-full" />
+                      
+                      {/* Cancel Order Button */}
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                        onClick={() => setShowCancelOrderDialog(true)}
+                      >
+                        <Ban size={14} className="mr-2" />
+                        Cancel Order
+                      </Button>
                     </div>}
                 </>}
             </div>}
@@ -3562,6 +3575,46 @@ export const VisitCard = ({
             />
           </DialogContent>
         </Dialog>
+
+        {/* Cancel Order Dialog */}
+        <CancelOrderDialog
+          isOpen={showCancelOrderDialog}
+          onClose={() => setShowCancelOrderDialog(false)}
+          orderId={lastOrderId}
+          invoiceNumber={ordersTodayList[0]?.invoice_number}
+          retailerName={visit.retailerName}
+          orderAmount={actualOrderValue}
+          isCreditOrder={isCreditOrder}
+          creditPendingAmount={creditPendingAmount}
+          onCancelled={async () => {
+            // Reset local state to show retailer as "fresh"
+            setHasOrderToday(false);
+            setActualOrderValue(0);
+            setCurrentStatus('planned');
+            setOrderPreviewOpen(false);
+            setOrderValueSource(null);
+            setOrdersTodayList([]);
+            setLastOrderItems([]);
+            setLastOrderId(null);
+            setCreditPendingAmount(0);
+            setPaidTodayAmount(0);
+            setIsCreditOrder(false);
+            
+            // Close dialog
+            setShowCancelOrderDialog(false);
+            
+            // Clear caches
+            const retailerId = (visit.retailerId || visit.id) as string;
+            const today = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
+            await visitStatusCache.invalidate(retailerId, userId, today);
+            
+            // Toast confirmation
+            toast({
+              title: "Order cancelled",
+              description: "The retailer now appears as a fresh visit."
+            });
+          }}
+        />
       </CardContent>
     </Card>;
 };
