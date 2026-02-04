@@ -260,7 +260,7 @@ export const ReportSummaryDialog = ({
       stopAllAudio();
     } else {
       const spokenSummary = generateSpokenSummary();
-      playSummary(spokenSummary);
+      playSummary(spokenSummary, 'RC0x4iZi3WQKkwkGubnK');
     }
   };
 
