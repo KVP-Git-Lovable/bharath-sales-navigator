@@ -2038,8 +2038,8 @@ export const Cart = () => {
                   </div>
                 )}
 
-                {/* Partial Payment Amount Input - Only for legacy flow */}
-                {paymentType === "partial" && !isOrderBasedDeliveryEnabled && <div className="space-y-1.5">
+                {/* Partial Payment Amount Input */}
+                {paymentType === "partial" && <div className="space-y-1.5">
                     <Label htmlFor="partial-amount" className="text-xs">Partial Payment Amount</Label>
                     <Input id="partial-amount" type="number" placeholder="Enter amount" value={partialAmount} onChange={e => setPartialAmount(e.target.value)} max={getFinalTotal() + pendingAmountFromPrevious} className="h-8 text-sm border-primary ring-2 ring-primary/20 focus:ring-primary/40" />
                     {partialAmount && parseFloat(partialAmount) > 0 && <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 space-y-1">
