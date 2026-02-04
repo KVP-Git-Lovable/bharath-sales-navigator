@@ -27,12 +27,12 @@ export const BusinessSummaryCard = ({
   if (isLoading) {
     return (
       <Card className={cn("shadow-md", className)}>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 rounded-lg" />
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-6 w-24" />
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-2.5 w-16" />
+              <Skeleton className="h-5 w-20" />
             </div>
           </div>
         </CardContent>
@@ -48,21 +48,21 @@ export const BusinessSummaryCard = ({
       )}
       onClick={onClick}
     >
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className={cn("p-2.5 rounded-lg", iconBgClass)}>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2">
+          <div className={cn("p-2 rounded-md flex-shrink-0", iconBgClass)}>
             {icon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground truncate">{title}</p>
-            <p className="text-lg font-bold truncate">{value}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">{title}</p>
+            <p className="text-base font-bold leading-tight">{value}</p>
           </div>
           {trend && (
             <div className={cn(
-              "flex items-center gap-1 text-xs font-medium",
+              "flex items-center gap-0.5 text-[10px] font-medium flex-shrink-0",
               trend.isPositive ? "text-green-600" : "text-red-600"
             )}>
-              {trend.isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {trend.isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               <span>{Math.abs(trend.value)}%</span>
             </div>
           )}

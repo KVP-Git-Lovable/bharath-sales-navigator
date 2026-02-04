@@ -48,6 +48,8 @@ interface PendingPaymentDetail {
   order_date: string;
   order_id: string;
   pending_amount: number;
+  user_id?: string;
+  user_name?: string;
 }
 
 export const useBusinessMetrics = () => {
@@ -446,7 +448,9 @@ export const useBusinessMetrics = () => {
           id,
           order_date,
           credit_pending_amount,
-          retailers(name)
+          user_id,
+          retailers(name),
+          profiles(full_name)
         `)
         .gte('order_date', fromDate)
         .lte('order_date', toDate)
@@ -464,7 +468,9 @@ export const useBusinessMetrics = () => {
           retailer_name: (order.retailers as any)?.name || 'Unknown',
           order_date: order.order_date,
           order_id: order.id,
-          pending_amount: Number(order.credit_pending_amount || 0)
+          pending_amount: Number(order.credit_pending_amount || 0),
+          user_id: order.user_id || '',
+          user_name: (order.profiles as any)?.full_name || 'Unknown User'
         }))
       );
     } catch (error) {

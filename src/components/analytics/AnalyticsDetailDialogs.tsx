@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { ChevronRight, ArrowLeft, User, Store } from "lucide-react";
 
 interface BeatDetail {
   beat_name: string;
@@ -40,6 +43,15 @@ interface PendingPaymentDetail {
   order_date: string;
   order_id: string;
   pending_amount: number;
+  user_id?: string;
+  user_name?: string;
+}
+
+interface UserPendingPaymentSummary {
+  user_id: string;
+  user_name: string;
+  total_pending: number;
+  retailer_count: number;
 }
 
 interface DialogProps {
@@ -297,7 +309,7 @@ export const ProductBreakdownDialog = ({
   );
 };
 
-// Pending Payments Dialog
+// Pending Payments Dialog with User-wise drill-down
 export const PendingPaymentsDialog = ({
   open,
   onOpenChange,
@@ -306,50 +318,158 @@ export const PendingPaymentsDialog = ({
   data,
   isLoading
 }: DialogProps & { data: PendingPaymentDetail[]; isLoading: boolean }) => {
+  const [selectedUser, setSelectedUser] = useState<UserPendingPaymentSummary | null>(null);
+
+  // Group data by user
+  const userSummaries: UserPendingPaymentSummary[] = data.reduce((acc, payment) => {
+    const userId = payment.user_id || 'unknown';
+    const userName = payment.user_name || 'Unknown User';
+    
+    const existing = acc.find(u => u.user_id === userId);
+    if (existing) {
+      existing.total_pending += payment.pending_amount;
+      existing.retailer_count += 1;
+    } else {
+      acc.push({
+        user_id: userId,
+        user_name: userName,
+        total_pending: payment.pending_amount,
+        retailer_count: 1
+      });
+    }
+    return acc;
+  }, [] as UserPendingPaymentSummary[]);
+
+  // Get retailer data for selected user
+  const retailerData = selectedUser 
+    ? data.filter(p => p.user_id === selectedUser.user_id)
+    : [];
+
+  // Reset selected user when dialog closes
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      setSelectedUser(null);
+    }
+    onOpenChange(isOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Pending Payments</DialogTitle>
-          <DialogDescription>
-            {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')} • {selectedUsers.length} user(s)
-          </DialogDescription>
+          <div className="flex items-center gap-2">
+            {selectedUser && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setSelectedUser(null)}
+              >
+                <ArrowLeft size={16} />
+              </Button>
+            )}
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedUser ? (
+                  <>
+                    <Store size={16} />
+                    Retailer-wise Pending - {selectedUser.user_name}
+                  </>
+                ) : (
+                  <>
+                    <User size={16} />
+                    User-wise Pending Payments
+                  </>
+                )}
+              </DialogTitle>
+              <DialogDescription>
+                {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')} • {selectedUsers.length} user(s)
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Retailer</TableHead>
-                <TableHead>Order Date</TableHead>
-                <TableHead className="text-right">Pending Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+          {!selectedUser ? (
+            // User-wise summary view
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                    Loading...
-                  </TableCell>
+                  <TableHead>User Name</TableHead>
+                  <TableHead className="text-center">Retailers</TableHead>
+                  <TableHead className="text-right">Pending Amount</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                    No pending payments
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((payment, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{payment.retailer_name}</TableCell>
-                    <TableCell>{format(new Date(payment.order_date), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell className="text-right font-semibold text-red-600">
-                      ₹{payment.pending_amount.toLocaleString()}
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      Loading...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : userSummaries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      No pending payments
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  userSummaries
+                    .sort((a, b) => b.total_pending - a.total_pending)
+                    .map((user) => (
+                      <TableRow 
+                        key={user.user_id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedUser(user)}
+                      >
+                        <TableCell className="font-medium">{user.user_name}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary">{user.retailer_count}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-destructive">
+                          ₹{user.total_pending.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <ChevronRight size={16} className="text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          ) : (
+            // Retailer-wise detail view for selected user
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Retailer</TableHead>
+                  <TableHead>Order Date</TableHead>
+                  <TableHead className="text-right">Pending Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {retailerData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      No retailers found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  retailerData
+                    .sort((a, b) => b.pending_amount - a.pending_amount)
+                    .map((payment, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{payment.retailer_name}</TableCell>
+                        <TableCell>{format(new Date(payment.order_date), 'MMM dd, yyyy')}</TableCell>
+                        <TableCell className="text-right font-semibold text-destructive">
+                          ₹{payment.pending_amount.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </ScrollArea>
       </DialogContent>
     </Dialog>
