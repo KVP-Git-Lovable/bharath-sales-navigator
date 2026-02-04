@@ -121,6 +121,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
   const [orderDetailsBeatLoading, setOrderDetailsBeatLoading] = useState(false);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
   const [hideOrderChart, setHideOrderChart] = useState(false);
+  const [orderUserFilter, setOrderUserFilter] = useState<'all' | 'top5' | 'bottom5'>('all');
 
   // State for beat-wise split view in User Order Summary
   const [selectedSummaryUser, setSelectedSummaryUser] = useState<string | null>(null);
@@ -787,35 +788,43 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     color: COLORS[index % COLORS.length]
   }));
 
-  // Apply "Others" grouping when more than 8 users
+  // Apply filtering and "Others" grouping
   const pieChartData = useMemo(() => {
-    if (rawPieChartData.length <= 8) {
-      return rawPieChartData;
+    // Apply top 5 / bottom 5 filter first
+    let filteredData = [...rawPieChartData];
+    if (orderUserFilter === 'top5' && rawPieChartData.length > 5) {
+      filteredData = rawPieChartData.slice(0, 5);
+    } else if (orderUserFilter === 'bottom5' && rawPieChartData.length > 5) {
+      filteredData = rawPieChartData.slice(-5);
     }
     
-    // Keep top entries (total - 5), club bottom 5 as "Others"
-    const topCount = rawPieChartData.length - 5;
-    const topUsers = rawPieChartData.slice(0, topCount);
-    const bottomUsers = rawPieChartData.slice(topCount);
+    // Apply "Others" grouping when more than 8 users (only in 'all' mode)
+    if (orderUserFilter === 'all' && filteredData.length > 8) {
+      const topCount = filteredData.length - 5;
+      const topUsers = filteredData.slice(0, topCount);
+      const bottomUsers = filteredData.slice(topCount);
+      
+      const othersValue = bottomUsers.reduce((sum, u) => sum + u.value, 0);
+      const othersKg = bottomUsers.reduce((sum, u) => sum + u.kg, 0);
+      const othersPercentage = totalKgAll > 0 ? ((othersKg / totalKgAll) * 100).toFixed(0) : '0';
+      
+      return [
+        ...topUsers,
+        {
+          name: 'Others',
+          value: othersValue,
+          orderValue: bottomUsers.reduce((sum, u) => sum + u.orderValue, 0),
+          kg: othersKg,
+          percentage: othersPercentage,
+          color: '#9ca3af', // gray-400 for "Others"
+          isOthers: true,
+          othersDetails: bottomUsers
+        }
+      ];
+    }
     
-    const othersValue = bottomUsers.reduce((sum, u) => sum + u.value, 0);
-    const othersKg = bottomUsers.reduce((sum, u) => sum + u.kg, 0);
-    const othersPercentage = totalKgAll > 0 ? ((othersKg / totalKgAll) * 100).toFixed(0) : '0';
-    
-    return [
-      ...topUsers,
-      {
-        name: 'Others',
-        value: othersValue,
-        orderValue: bottomUsers.reduce((sum, u) => sum + u.orderValue, 0),
-        kg: othersKg,
-        percentage: othersPercentage,
-        color: '#9ca3af', // gray-400 for "Others"
-        isOthers: true,
-        othersDetails: bottomUsers
-      }
-    ];
-  }, [rawPieChartData, totalKgAll]);
+    return filteredData;
+  }, [rawPieChartData, totalKgAll, orderUserFilter]);
 
   const handlePieClick = (data: any) => {
     if (data && data.name) {
@@ -1497,8 +1506,25 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                 "space-y-2 transition-all duration-300",
                 selectedSummaryUser ? "lg:col-span-2" : "lg:col-span-1"
               )}>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Click on a segment or row to view details</p>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={orderUserFilter === 'top5' ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => setOrderUserFilter(orderUserFilter === 'top5' ? 'all' : 'top5')}
+                    >
+                      Top 5
+                    </Button>
+                    <Button
+                      variant={orderUserFilter === 'bottom5' ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => setOrderUserFilter(orderUserFilter === 'bottom5' ? 'all' : 'bottom5')}
+                    >
+                      Bottom 5
+                    </Button>
+                  </div>
                   <div className="flex items-center gap-1">
                     <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
                       <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">

@@ -35,6 +35,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
   const [skuData, setSkuData] = useState<SKURevenue[]>([]);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
   const [hideChart, setHideChart] = useState(false);
+  const [skuFilter, setSkuFilter] = useState<'all' | 'top5' | 'bottom5'>('all');
 
   // Fetch SKU revenue data
   const fetchSKUData = async () => {
@@ -124,7 +125,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
           aggregated[key].revenue += Number(item.total || 0);
         });
 
-        const sortedData = Object.values(aggregated).sort((a, b) => b.revenue - a.revenue);
+        const sortedData = Object.values(aggregated).sort((a, b) => b.quantity_sold - a.quantity_sold);
         setSkuData(sortedData);
       } else {
         // Use the RPC for single user
@@ -158,8 +159,8 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
             aggregated[key].revenue += Number(item.revenue || 0);
           });
 
-          // Sort by revenue descending
-          const sortedData = Object.values(aggregated).sort((a, b) => b.revenue - a.revenue);
+          // Sort by quantity_sold descending (KG)
+          const sortedData = Object.values(aggregated).sort((a, b) => b.quantity_sold - a.quantity_sold);
           setSkuData(sortedData);
         } else {
           setSkuData([]);
@@ -190,10 +191,20 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skuData]);
 
+  // Apply filter to skuData for the table
+  const filteredSkuData = useMemo(() => {
+    if (skuFilter === 'top5' && skuData.length > 5) {
+      return skuData.slice(0, 5);
+    } else if (skuFilter === 'bottom5' && skuData.length > 5) {
+      return skuData.slice(-5);
+    }
+    return skuData;
+  }, [skuData, skuFilter]);
+
   // Prepare chart data
   const chartData = useMemo(() => {
-    const totalRevenue = skuData.reduce((sum, item) => sum + item.revenue, 0);
-    return skuData.slice(0, 10).map((item, index) => ({
+    const totalRevenue = filteredSkuData.reduce((sum, item) => sum + item.revenue, 0);
+    return filteredSkuData.slice(0, 10).map((item, index) => ({
       name: item.product_name.length > 15 ? item.product_name.substring(0, 15) + '...' : item.product_name,
       fullName: item.product_name,
       value: item.revenue,
@@ -202,22 +213,22 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
       percentage: totalRevenue > 0 ? ((item.revenue / totalRevenue) * 100).toFixed(1) : '0',
       color: COLORS[index % COLORS.length]
     }));
-  }, [skuData]);
+  }, [filteredSkuData]);
 
   const totalRevenue = useMemo(() => 
-    skuData.reduce((sum, item) => sum + item.revenue, 0), 
-    [skuData]
+    filteredSkuData.reduce((sum, item) => sum + item.revenue, 0), 
+    [filteredSkuData]
   );
 
   const totalQuantityKG = useMemo(() => 
-    skuData.reduce((sum, item) => {
+    filteredSkuData.reduce((sum, item) => {
       const unit = (item.unit || '').toLowerCase();
       if (unit === 'grams' || unit === 'gram' || unit === 'g') {
         return sum + (item.quantity_sold / 1000);
       }
       return sum + item.quantity_sold;
     }, 0), 
-    [skuData]
+    [filteredSkuData]
   );
 
   return (
@@ -333,7 +344,27 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
 
             {/* Summary Table */}
             <div>
-              <h3 className="font-semibold text-sm sm:text-base mb-3">SKU Revenue Summary</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm sm:text-base">SKU Revenue Summary</h3>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant={skuFilter === 'top5' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs px-2"
+                    onClick={() => setSkuFilter(skuFilter === 'top5' ? 'all' : 'top5')}
+                  >
+                    Top 5
+                  </Button>
+                  <Button
+                    variant={skuFilter === 'bottom5' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs px-2"
+                    onClick={() => setSkuFilter(skuFilter === 'bottom5' ? 'all' : 'bottom5')}
+                  >
+                    Bottom 5
+                  </Button>
+                </div>
+              </div>
               <div className="border rounded-lg max-h-[400px]" style={{ overflow: 'scroll' }}>
                 <Table>
                   <TableHeader className="sticky top-0 bg-muted/50 z-10">
@@ -344,7 +375,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {skuData.map((row, index) => (
+                    {filteredSkuData.map((row, index) => (
                       <TableRow key={index} className="hover:bg-muted/30">
                         <TableCell className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3">
                           <div 
@@ -372,7 +403,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   </TableBody>
                   <tfoot className="bg-background border-t sticky bottom-0 z-10">
                     <TableRow>
-                      <TableCell className="text-[10px] sm:text-xs font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">Total ({skuData.length} SKUs)</TableCell>
+                      <TableCell className="text-[10px] sm:text-xs font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">Total ({filteredSkuData.length} SKUs)</TableCell>
                       <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">
                         {totalQuantityKG.toFixed(2)} KG
                       </TableCell>
