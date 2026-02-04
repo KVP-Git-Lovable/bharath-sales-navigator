@@ -386,8 +386,8 @@ export const AttendanceMarketHoursSection = ({
                             <TableHead className={cn(isMobile ? "py-1 px-2" : "py-1.5")}>{isSingleUserMode ? 'Date' : 'User'}</TableHead>
                             <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Working Hours</TableHead>
                             <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Time at Retailers</TableHead>
-                            {!isSingleUserMode && <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Days</TableHead>}
-                            {!isSingleUserMode && <TableHead className={cn(isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>}
+                            {!isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Days</TableHead>}
+                            {!isSingleUserMode && <TableHead className={cn("whitespace-nowrap", isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>}
                           </TableRow>
                         </thead>
                         <TableBody>

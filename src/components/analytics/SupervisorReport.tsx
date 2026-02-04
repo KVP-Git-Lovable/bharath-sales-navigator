@@ -1685,7 +1685,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                               </tr>
                             ))}
                           </tbody>
-                          <tfoot className="bg-muted/30 sticky bottom-0">
+                          <tfoot className="bg-background sticky bottom-0 z-10">
                             <tr className="border-t">
                               <td className={cn("font-semibold align-middle", isMobile ? "py-1 px-2" : "p-4")}>Total</td>
                               <td className={cn("text-right font-bold text-primary align-middle", isMobile ? "py-1 px-2" : "p-4")}>

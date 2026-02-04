@@ -267,83 +267,87 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
             <p className="text-muted-foreground">Loading SKU data...</p>
           </div>
         ) : skuData.length > 0 ? (
-          <div className={cn("grid grid-cols-1 gap-6", !hideChart && "lg:grid-cols-2")}>
-            {/* Chart Section */}
-            <div className={cn("space-y-2", hideChart && "hidden lg:block lg:col-span-0")}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">{hideChart ? '' : 'Top 10 products by revenue'}</p>
-                <div className="flex items-center gap-1">
-                  {!hideChart && (
-                    <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
-                      <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
-                        <PieChartIcon className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
-                        <BarChart3 className="h-4 w-4" />
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setHideChart(!hideChart)}
-                    title={hideChart ? "Show Visual" : "Hide Visual"}
-                  >
-                    {hideChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              {!hideChart && (
-                <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
-                  {chartType === 'pie' ? (
-                    <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
-                      <Pie
-                        data={chartData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={isMobile ? 70 : 120}
-                        label={false}
-                        labelLine={false}
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value: number, name: string, props: any) => [
-                          `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
-                          props.payload.fullName
-                        ]}
-                      />
-                      <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : '12px' }} />
-                    </PieChart>
-                  ) : (
-                    <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                      <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                      <Tooltip 
-                        formatter={(value: number, name: string, props: any) => [
-                          `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
-                          props.payload.fullName
-                        ]}
-                      />
-                      <Bar dataKey="value">
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              )}
+          <div className="space-y-4">
+            {/* Show/Hide Toggle - Always visible */}
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1"
+                onClick={() => setHideChart(!hideChart)}
+                title={hideChart ? "Show Visual" : "Hide Visual"}
+              >
+                {hideChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                <span className="text-xs">{hideChart ? "Show Chart" : "Hide Chart"}</span>
+              </Button>
             </div>
-
-            {/* Summary Table */}
-            <div>
+            
+            <div className={cn("grid grid-cols-1 gap-6", !hideChart && "lg:grid-cols-2")}>
+              {/* Chart Section */}
+              {!hideChart && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
+                    <div className="flex items-center gap-1">
+                      <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
+                        <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
+                          <PieChartIcon className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
+                          <BarChart3 className="h-4 w-4" />
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
+                    {chartType === 'pie' ? (
+                      <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={isMobile ? 70 : 120}
+                          label={false}
+                          labelLine={false}
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
+                            props.payload.fullName
+                          ]}
+                        />
+                        <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : '12px' }} />
+                      </PieChart>
+                    ) : (
+                      <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                        <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                        <Tooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `₹${value.toLocaleString()} | ${props.payload.quantity.toFixed(1)} ${props.payload.unit}`,
+                            props.payload.fullName
+                          ]}
+                        />
+                        <Bar dataKey="value">
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              )}
+              
+              {/* Summary Table */}
+              <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm sm:text-base">SKU Revenue Summary</h3>
                 <div className="flex items-center gap-1">
@@ -414,6 +418,8 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   </tfoot>
                 </Table>
               </div>
+            </div>
+            {/* Close grid */}
             </div>
           </div>
         ) : (
