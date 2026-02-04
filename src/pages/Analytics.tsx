@@ -791,17 +791,38 @@ const Analytics = () => {
     }
   };
 
-  const fetchProductData = async () => {
+  const fetchProductData = async (userIds: string[], dateRangeFilter: { from: Date; to: Date }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: orders } = await supabase
+      // Determine which user IDs to query
+      let targetUserIds: string[] = userIds;
+      
+      // If no users selected, get all subordinates including self
+      if (targetUserIds.length === 0) {
+        const { data: subordinates } = await supabase.rpc('get_all_subordinates', { manager_user_id: user.id });
+        targetUserIds = subordinates?.map((s: any) => s.user_id) || [];
+        // Include self if not in list
+        if (!targetUserIds.includes(user.id)) {
+          targetUserIds.push(user.id);
+        }
+      }
+
+      // Query orders for selected users and date range
+      let query = supabase
         .from('orders')
         .select('*, order_items(product_name, quantity, total), created_at')
-        .eq('user_id', user.id)
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
+        .gte('created_at', dateRangeFilter.from.toISOString())
+        .lte('created_at', dateRangeFilter.to.toISOString())
+        .eq('status', 'confirmed');
+
+      // Apply user filter
+      if (targetUserIds.length > 0) {
+        query = query.in('user_id', targetUserIds);
+      }
+
+      const { data: orders } = await query;
 
       const productMap: any = {};
       const productTrendMap: any = {};
@@ -1002,9 +1023,13 @@ const Analytics = () => {
 
   useEffect(() => {
     fetchWeeklyProgress();
-    fetchProductData();
     fetchRetailerRankings();
   }, [dateRange]);
+
+  // Fetch product data when dashboard filters change
+  useEffect(() => {
+    fetchProductData(selectedUserIds, dashboardDateRange);
+  }, [selectedUserIds, dashboardDateRange]);
 
   useEffect(() => {
     if (kpiData.deliveredRevenue > 0) {
@@ -1818,7 +1843,7 @@ const Analytics = () => {
                 <CardHeader>
                   <CardTitle>Product-wise Business Analysis</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {format(dateRange.from, 'MMM dd, yyyy')} - {format(dateRange.to, 'MMM dd, yyyy')}
+                    {format(dashboardDateRange.from, 'MMM dd, yyyy')} - {format(dashboardDateRange.to, 'MMM dd, yyyy')} • {selectedUserIds.length === 0 ? 'All Users' : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}`}
                   </p>
                 </CardHeader>
                 <CardContent>
