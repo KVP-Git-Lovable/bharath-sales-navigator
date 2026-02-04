@@ -20,6 +20,7 @@ import { OrderDetailsAIInsights } from './OrderDetailsAIInsights';
 import { Badge } from '@/components/ui/badge';
 import { ReportSummaryDialog } from './ReportSummaryDialog';
 import { BusinessSummaryCard, BeatDetailsDialog, RetailerDetailsDialog, OrderDetailsDialog, ProductBreakdownDialog, PendingPaymentsDialog, useBusinessMetrics } from '.';
+import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 
 interface UserOrderSummary {
   full_name: string;
@@ -1636,57 +1637,87 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                   selectedSummaryUser ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
                 )}>
                   {/* Left: User Summary Table */}
-                  <div className={cn(
-                    "border rounded-lg overflow-hidden",
-                    summaryData.length > 6 && "max-h-[320px] overflow-y-auto"
-                  )}>
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Full Name</TableHead>
-                          <TableHead className="text-right">Qty (KG)</TableHead>
-                          <TableHead className="text-right">Total Order Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {summaryData.map((row, index) => (
-                          <TableRow 
-                            key={index} 
-                            className={cn(
-                              "cursor-pointer hover:bg-muted/50 transition-colors",
-                              selectedSummaryUser === row.full_name && "bg-primary/10 border-l-2 border-l-primary"
-                            )}
-                            onClick={() => handleSummaryRowClick(row.full_name)}
-                          >
-                            <TableCell className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                              />
-                              {row.full_name}
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-primary">
-                              {row.total_kg.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right font-semibold">
-                              ₹{row.total_order_value.toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                      <tfoot className="bg-muted/30 sticky bottom-0">
-                        <TableRow>
-                          <TableCell className="font-semibold">Total</TableCell>
-                          <TableCell className="text-right font-bold text-primary">
-                            {totalKgAll.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-bold">
-                            ₹{totalOrderValue.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      </tfoot>
-                    </Table>
-                  </div>
+                  <ScrollAreaPrimitive.Root
+                    type="always"
+                    className={cn(
+                      "border rounded-lg",
+                      summaryData.length > 6 && "max-h-[320px]",
+                      isMobile && "overflow-x-scroll"
+                    )}
+                  >
+                    <ScrollAreaPrimitive.Viewport
+                      className={cn("w-full", summaryData.length > 6 && "max-h-[320px]", isMobile && "overflow-x-scroll")}
+                    >
+                      <div className="min-w-max">
+                        <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
+                          <thead className="sticky top-0 bg-muted/50 z-10">
+                            <tr className="bg-muted/50 border-b">
+                              <th className={cn("text-left font-medium text-muted-foreground", isMobile ? "py-1 px-2" : "h-12 px-4")}>Full Name</th>
+                              <th className={cn("text-right font-medium text-muted-foreground", isMobile ? "py-1 px-2" : "h-12 px-4")}>Qty (KG)</th>
+                              <th className={cn("text-right font-medium text-muted-foreground", isMobile ? "py-1 px-2" : "h-12 px-4")}>Total Order Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {summaryData.map((row, index) => (
+                              <tr 
+                                key={index} 
+                                className={cn(
+                                  "cursor-pointer hover:bg-muted/50 transition-colors border-b",
+                                  selectedSummaryUser === row.full_name && "bg-primary/10 border-l-2 border-l-primary"
+                                )}
+                                onClick={() => handleSummaryRowClick(row.full_name)}
+                              >
+                                <td className={cn("align-middle", isMobile ? "py-0.5 px-2" : "p-4")}>
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className={cn(isMobile ? "w-2 h-2" : "w-3 h-3", "rounded-full shrink-0")}
+                                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                    />
+                                    {row.full_name}
+                                  </div>
+                                </td>
+                                <td className={cn("text-right font-semibold text-primary align-middle", isMobile ? "py-0.5 px-2" : "p-4")}>
+                                  {row.total_kg.toLocaleString()}
+                                </td>
+                                <td className={cn("text-right font-semibold align-middle", isMobile ? "py-0.5 px-2" : "p-4")}>
+                                  ₹{row.total_order_value.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-muted/30 sticky bottom-0">
+                            <tr className="border-t">
+                              <td className={cn("font-semibold align-middle", isMobile ? "py-1 px-2" : "p-4")}>Total</td>
+                              <td className={cn("text-right font-bold text-primary align-middle", isMobile ? "py-1 px-2" : "p-4")}>
+                                {totalKgAll.toLocaleString()}
+                              </td>
+                              <td className={cn("text-right font-bold align-middle", isMobile ? "py-1 px-2" : "p-4")}>
+                                ₹{totalOrderValue.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </ScrollAreaPrimitive.Viewport>
+
+                    <ScrollAreaPrimitive.ScrollAreaScrollbar
+                      forceMount
+                      orientation="vertical"
+                      className="flex touch-none select-none transition-colors h-full w-2.5 border-l border-l-transparent p-[1px]"
+                    >
+                      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+                    </ScrollAreaPrimitive.ScrollAreaScrollbar>
+
+                    <ScrollAreaPrimitive.ScrollAreaScrollbar
+                      forceMount
+                      orientation="horizontal"
+                      className="flex touch-none select-none transition-colors h-2.5 flex-col border-t border-t-transparent p-[1px]"
+                    >
+                      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+                    </ScrollAreaPrimitive.ScrollAreaScrollbar>
+
+                    <ScrollAreaPrimitive.Corner />
+                  </ScrollAreaPrimitive.Root>
 
                   {/* Right: Beat-wise Breakdown Panel */}
                   {selectedSummaryUser && (

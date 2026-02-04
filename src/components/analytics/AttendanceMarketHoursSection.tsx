@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AttendanceData {
   user_id: string;
@@ -43,6 +44,7 @@ export const AttendanceMarketHoursSection = ({
   dateRange, 
   allUsers = [] 
 }: AttendanceMarketHoursSectionProps) => {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [attendanceData, setAttendanceData] = useState<AttendanceData[]>([]);
   const [retailerTimeData, setRetailerTimeData] = useState<RetailerTimeData[]>([]);
@@ -372,20 +374,20 @@ export const AttendanceMarketHoursSection = ({
               {(selectedMetric || !isSingleUserMode) && (
                 <ScrollAreaPrimitive.Root
                   type="always"
-                  className="relative border rounded-lg"
+                  className={cn("relative border rounded-lg", isMobile && "overflow-x-scroll")}
                 >
                   <ScrollAreaPrimitive.Viewport
-                    className={cn('w-full', scrollViewportClassName)}
+                    className={cn('w-full', scrollViewportClassName, isMobile && "overflow-x-scroll")}
                   >
                     <div className="min-w-max">
-                      <table className="w-full caption-bottom text-sm">
+                      <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
                         <thead className="sticky top-0 bg-muted z-20">
                           <TableRow className="border-b">
-                            <TableHead className="py-1.5">{isSingleUserMode ? 'Date' : 'User'}</TableHead>
-                            <TableHead className="text-right py-1.5">Working Hours</TableHead>
-                            <TableHead className="text-right py-1.5">Time at Retailers</TableHead>
-                            {!isSingleUserMode && <TableHead className="text-right py-1.5">Days</TableHead>}
-                            {!isSingleUserMode && <TableHead className="w-8 py-1.5"></TableHead>}
+                            <TableHead className={cn(isMobile ? "py-1 px-2" : "py-1.5")}>{isSingleUserMode ? 'Date' : 'User'}</TableHead>
+                            <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Working Hours</TableHead>
+                            <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Time at Retailers</TableHead>
+                            {!isSingleUserMode && <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Days</TableHead>}
+                            {!isSingleUserMode && <TableHead className={cn(isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>}
                           </TableRow>
                         </thead>
                         <TableBody>
@@ -393,21 +395,21 @@ export const AttendanceMarketHoursSection = ({
                             // Single user: show day-wise breakdown
                             drilldownData.length > 0 ? drilldownData.map((row, index) => (
                               <TableRow key={index} className="hover:bg-muted/30">
-                                <TableCell className="font-medium py-1.5">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
-                                <TableCell className="text-right text-blue-600 font-medium py-1.5">
+                                <TableCell className={cn("font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                                <TableCell className={cn("text-right text-blue-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {formatHours(row.working_hours)}
                                 </TableCell>
-                                <TableCell className="text-right text-green-600 font-medium py-1.5">
+                                <TableCell className={cn("text-right text-green-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {formatHours(row.retailer_hours)}
                                 </TableCell>
                               </TableRow>
                             )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => (
                               <TableRow key={index} className="hover:bg-muted/30">
-                                <TableCell className="font-medium py-1.5">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
-                                <TableCell className="text-right text-blue-600 font-medium py-1.5">
+                                <TableCell className={cn("font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                                <TableCell className={cn("text-right text-blue-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {formatHours(row.working_hours)}
                                 </TableCell>
-                                <TableCell className="text-right text-green-600 font-medium py-1.5">
+                                <TableCell className={cn("text-right text-green-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {formatHours(retailerTimeData.find(r => r.user_id === row.user_id && r.date === row.date)?.retailer_hours || 0)}
                                 </TableCell>
                               </TableRow>
@@ -420,18 +422,18 @@ export const AttendanceMarketHoursSection = ({
                                 className="hover:bg-muted/30 cursor-pointer"
                                 onClick={() => setSelectedUserForDrilldown(row.full_name)}
                               >
-                                <TableCell className="font-medium py-1.5">{row.full_name}</TableCell>
-                                <TableCell className="text-right text-blue-600 font-medium py-1.5">
+                                <TableCell className={cn("font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>{row.full_name}</TableCell>
+                                <TableCell className={cn("text-right text-blue-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {formatHours(row.avg_working_hours)}
                                 </TableCell>
-                                <TableCell className="text-right text-green-600 font-medium py-1.5">
+                                <TableCell className={cn("text-right text-green-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {formatHours(row.avg_retailer_hours)}
                                 </TableCell>
-                                <TableCell className="text-right text-muted-foreground py-1.5">
+                                <TableCell className={cn("text-right text-muted-foreground", isMobile ? "py-1 px-2" : "py-1.5")}>
                                   {row.days_count}
                                 </TableCell>
-                                <TableCell className="py-1.5">
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}>
+                                  <ChevronRight className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
                                 </TableCell>
                               </TableRow>
                             ))
@@ -439,17 +441,17 @@ export const AttendanceMarketHoursSection = ({
                         </TableBody>
                         <tfoot className="bg-background border-t sticky bottom-0 z-10">
                           <TableRow>
-                            <TableCell className="font-semibold py-1.5">
+                            <TableCell className={cn("font-semibold", isMobile ? "py-1 px-2" : "py-1.5")}>
                               {isSingleUserMode ? `Total (${attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).length} days)` : `Average (${userSummaries.length} users)`}
                             </TableCell>
-                            <TableCell className="text-right font-bold text-blue-600 py-1.5">
+                            <TableCell className={cn("text-right font-bold text-blue-600", isMobile ? "py-1 px-2" : "py-1.5")}>
                               {formatHours(overallAverages.avgWorkingHours)}
                             </TableCell>
-                            <TableCell className="text-right font-bold text-green-600 py-1.5">
+                            <TableCell className={cn("text-right font-bold text-green-600", isMobile ? "py-1 px-2" : "py-1.5")}>
                               {formatHours(overallAverages.avgRetailerHours)}
                             </TableCell>
-                            {!isSingleUserMode && <TableCell className="py-1.5"></TableCell>}
-                            {!isSingleUserMode && <TableCell className="py-1.5"></TableCell>}
+                            {!isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
+                            {!isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}></TableCell>}
                           </TableRow>
                         </tfoot>
                       </table>
