@@ -1,434 +1,388 @@
 
-
-# Cancel Order Feature Implementation Plan
+# Multi-Period Target Plan Implementation
 
 ## Overview
-
-This plan implements a **Cancel Order** feature that allows users to reverse an order completely, restoring the system to its state before the order was placed. This includes updating the order status, reverting visit status, reversing credit impacts, and adjusting gamification/performance metrics.
+This implementation adds Monthly, Quarterly, and Bi-Annual target plans to the existing Annual FY target system. All periods will be interlinked with proper roll-up logic ensuring data consistency across dashboards and reports.
 
 ---
 
 ## Current State Analysis
 
-### Data Flow When Order is Placed
+### Existing Tables
+| Table | Purpose |
+|-------|---------|
+| `fy_target_config` | FY-level configuration (metrics, parameters, totals) |
+| `user_business_plans` | User annual targets with `year` field |
+| `user_business_plan_months` | Monthly breakdown (1-12) of annual targets |
 
-When an order is confirmed, the following database updates occur:
+### What's Already Working
+- Annual target configuration in Target Management
+- Monthly breakdown in user's "My Target" page
+- Dashboard filters for day/week/month/quarter/year (calculates targets proportionally)
+
+### Gaps to Fill
+1. No period type selector at FY configuration level
+2. Quarterly and Bi-Annual targets are calculated (not stored)
+3. No explicit roll-up validation between periods
+4. Hierarchy allocation only works at FY-total level
+
+---
+
+## Implementation Strategy
+
+### Approach: Enhanced Period Configuration
+Rather than creating new tables, we'll enhance the existing schema to support explicit period targets while maintaining backward compatibility.
+
+---
+
+## Phase 1: Database Schema Changes
+
+### 1.1 Modify `fy_target_config` Table
+Add a new column to specify the target entry granularity:
+
+```sql
+ALTER TABLE fy_target_config 
+ADD COLUMN target_period_type TEXT DEFAULT 'annual' 
+CHECK (target_period_type IN ('annual', 'biannual', 'quarterly', 'monthly'));
+```
+
+### 1.2 Create `fy_period_targets` Table
+Store period-specific targets for non-annual configurations:
+
+```sql
+CREATE TABLE fy_period_targets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fy_config_id UUID REFERENCES fy_target_config(id) ON DELETE CASCADE,
+  period_type TEXT NOT NULL CHECK (period_type IN ('biannual', 'quarterly', 'monthly')),
+  period_number INTEGER NOT NULL,
+  period_name TEXT NOT NULL,
+  quantity_target NUMERIC DEFAULT 0,
+  revenue_target NUMERIC DEFAULT 0,
+  visits_target INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(fy_config_id, period_type, period_number)
+);
+```
+
+**Period Mapping:**
+| Period Type | period_number | period_name |
+|-------------|---------------|-------------|
+| biannual    | 1             | H1 (Apr-Sep) |
+| biannual    | 2             | H2 (Oct-Mar) |
+| quarterly   | 1             | Q1 (Apr-Jun) |
+| quarterly   | 2             | Q2 (Jul-Sep) |
+| quarterly   | 3             | Q3 (Oct-Dec) |
+| quarterly   | 4             | Q4 (Jan-Mar) |
+| monthly     | 1-12          | April-March |
+
+### 1.3 Create `user_period_allocations` Table
+Store period-specific allocations for hierarchy cascade:
+
+```sql
+CREATE TABLE user_period_allocations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_plan_id UUID REFERENCES user_business_plans(id) ON DELETE CASCADE,
+  period_type TEXT NOT NULL,
+  period_number INTEGER NOT NULL,
+  quantity_target NUMERIC DEFAULT 0,
+  revenue_target NUMERIC DEFAULT 0,
+  visits_target INTEGER DEFAULT 0,
+  source TEXT DEFAULT 'manual' CHECK (source IN ('manual', 'rollup', 'hierarchy')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(business_plan_id, period_type, period_number)
+);
+```
+
+---
+
+## Phase 2: Roll-up Logic
+
+### Period Hierarchy
 
 ```text
-orders table
-├── status: 'confirmed'
-├── total_amount, credit_pending_amount, credit_paid_amount
-│
-├──► order_items table (linked via order_id)
-│
-├──► invoices table (linked via order_id)
-│    └── status: 'issued'
-│
-├──► visits table (via trigger: auto_update_visit_status_on_order)
-│    └── status: 'productive'
-│
-├──► retailers table (via trigger: update_retailer_last_order)
-│    ├── pending_amount += credit_pending_amount
-│    ├── last_order_date, last_order_value updated
-│
-├──► user_period_targets table (via trigger: update_revenue_actual)
-│    └── actual_value += order total
-│
-└──► gamification_points table (via awardPointsForOrder)
-     └── points awarded for the order
+Annual (FY Total)
+    |
+    +-- H1 (Apr-Sep)                    H2 (Oct-Mar)
+        |                               |
+        +-- Q1 (Apr-Jun)  Q2 (Jul-Sep) Q3 (Oct-Dec)  Q4 (Jan-Mar)
+            |             |            |              |
+            Apr May Jun   Jul Aug Sep  Oct Nov Dec    Jan Feb Mar
 ```
 
-### Database Tables Affected
-
-| Table | Column/Field | Impact |
-|-------|--------------|--------|
-| `orders` | `status` | Set to 'cancelled' |
-| `invoices` | `status` | Set to 'cancelled' |
-| `visits` | `status` | Revert from 'productive' to 'planned' |
-| `visits` | `no_order_reason` | Clear (set to NULL) |
-| `retailers` | `pending_amount` | Subtract `credit_pending_amount` |
-| `retailers` | `last_order_date`, `last_order_value` | Recalculate from remaining orders |
-| `user_period_targets` | `actual_value` | Recalculate revenue contribution |
-| `gamification_points` | records with `reference_id = order_id` | Delete |
-| `retailer_loyalty_points` | records linked to order | Delete |
-
----
-
-## Implementation Plan
-
-### Phase 1: Database Migration
-
-Add cancellation tracking columns to the `orders` table:
+### Roll-up Rules (Database Trigger)
+Create a trigger function that auto-calculates parent periods when child periods change:
 
 ```sql
-ALTER TABLE orders 
-  ADD COLUMN cancelled_at TIMESTAMPTZ,
-  ADD COLUMN cancellation_reason TEXT,
-  ADD COLUMN cancelled_by UUID REFERENCES profiles(id);
+CREATE OR REPLACE FUNCTION calculate_period_rollups()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Monthly -> Quarterly
+  IF NEW.period_type = 'monthly' THEN
+    -- Update Q1 if months 1,2,3 changed
+    -- Update Q2 if months 4,5,6 changed
+    -- etc.
+  END IF;
+  
+  -- Quarterly -> Bi-Annual
+  IF NEW.period_type = 'quarterly' THEN
+    -- Update H1 if Q1,Q2 changed
+    -- Update H2 if Q3,Q4 changed
+  END IF;
+  
+  -- Bi-Annual -> Annual
+  IF NEW.period_type = 'biannual' THEN
+    -- Update FY total in fy_target_config
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 ```
 
-### Phase 2: Create Cancel Order Dialog Component
+---
 
-**File**: `src/components/CancelOrderDialog.tsx` (new)
+## Phase 3: UI Components
 
-A modal dialog that:
-1. Displays the order details being cancelled
-2. Asks for a cancellation reason (dropdown + optional text)
-3. Shows a confirmation step with impact summary
-4. Handles the cancellation API call
+### 3.1 Period Type Selector (New Component)
+**File:** `src/components/admin/target-config/PeriodTypeSelector.tsx`
 
-**Reason Options**:
-- Wrong order details
-- Customer requested cancellation
-- Duplicate order
-- Pricing error
-- Other (free text)
-
-**UI Flow**:
-```
-┌─────────────────────────────────────────┐
-│ Cancel Order                        [X] │
-├─────────────────────────────────────────┤
-│ Order: INV2026-XXX                      │
-│ Retailer: रामदेव किराणा                   │
-│ Amount: ₹12,450                         │
-│                                         │
-│ Reason for cancellation:                │
-│ ┌───────────────────────────────────┐   │
-│ │ Select reason...              ▼   │   │
-│ └───────────────────────────────────┘   │
-│                                         │
-│ ┌───────────────────────────────────┐   │
-│ │ Additional notes (optional)...    │   │
-│ └───────────────────────────────────┘   │
-│                                         │
-│ ⚠️ This will:                           │
-│   • Mark order as Cancelled             │
-│   • Revert visit to Planned             │
-│   • Reverse credit amount               │
-│   • Remove gamification points          │
-│                                         │
-│     [Cancel]  [Confirm Cancellation]    │
-└─────────────────────────────────────────┘
+```text
++------------------------------------------------------------------+
+|  Target Entry Level                                               |
+|  ---------------------------------------------------------------- |
+|  [ Annual ]  [ Bi-Annual ]  [ Quarterly ]  [ Monthly ]           |
+|     ●                                                             |
+|  ---------------------------------------------------------------- |
+|  Select how granularly you want to define targets.               |
+|  Finer granularity (Monthly) rolls up to coarser levels.         |
++------------------------------------------------------------------+
 ```
 
-### Phase 3: Create Order Cancellation Utility
+**Behavior:**
+- **Annual**: Single FY total (current behavior)
+- **Bi-Annual**: H1/H2 entry, auto-sum to Annual
+- **Quarterly**: Q1-Q4 entry, auto-sum to H1/H2 and Annual
+- **Monthly**: 12 months entry, auto-sum to Q, H, and Annual
 
-**File**: `src/utils/orderCancellation.ts` (new)
+### 3.2 Period Breakdown Grid (New Component)
+**File:** `src/components/admin/target-config/PeriodBreakdownGrid.tsx`
 
-Core function that handles all data reversals:
+**Bi-Annual View:**
+```text
++----------------+---------------+---------------+---------------+
+|                | Quantity (Kg) | Revenue (Rs)  | Visits        |
++----------------+---------------+---------------+---------------+
+| H1 (Apr-Sep)   | [________]    | [________]    | [________]    |
+| H2 (Oct-Mar)   | [________]    | [________]    | [________]    |
++----------------+---------------+---------------+---------------+
+| FY Total       | 1,200         | 24,00,000     | 1,200         |
++----------------+---------------+---------------+---------------+
+```
+
+**Quarterly View:**
+```text
++----------------+---------------+---------------+---------------+
+|                | Quantity (Kg) | Revenue (Rs)  | Visits        |
++----------------+---------------+---------------+---------------+
+| Q1 (Apr-Jun)   | [________]    | [________]    | [________]    |
+| Q2 (Jul-Sep)   | [________]    | [________]    | [________]    |
++----------------+---------------+---------------+---------------+
+| H1 Total       | 600           | 12,00,000     | 600           |
++----------------+---------------+---------------+---------------+
+| Q3 (Oct-Dec)   | [________]    | [________]    | [________]    |
+| Q4 (Jan-Mar)   | [________]    | [________]    | [________]    |
++----------------+---------------+---------------+---------------+
+| H2 Total       | 600           | 12,00,000     | 600           |
++----------------+---------------+---------------+---------------+
+| FY Total       | 1,200         | 24,00,000     | 1,200         |
++----------------+---------------+---------------+---------------+
+```
+
+**Monthly View:**
+```text
++----------------+---------------+---------------+---------------+
+|                | Quantity (Kg) | Revenue (Rs)  | Visits        |
++================+===============+===============+===============+
+| April          | [________]    | [________]    | [________]    |
+| May            | [________]    | [________]    | [________]    |
+| June           | [________]    | [________]    | [________]    |
++----------------+---------------+---------------+---------------+
+| Q1 Total       | 300           | 6,00,000      | 300           |
++----------------+---------------+---------------+---------------+
+| July           | [________]    | [________]    | [________]    |
+| ... (continues for all 12 months)
++----------------+---------------+---------------+---------------+
+```
+
+### 3.3 Modify TargetConfigTab.tsx
+Add period type selector before FY Total Targets section:
+
+```text
+[Plan Name Input]
+[Metrics Selection: Quantity | Revenue | Visits]
+[Parameters Selection: Product | Retailer | Beat | etc.]
+---NEW SECTION---
+[Period Type Selector]
+[Period Breakdown Grid] (shown only if not Annual)
+[Equal Divide Checkbox] (divides FY total equally into selected periods)
+-----------------
+[FY Total Targets] (read-only when period type is not Annual)
+```
+
+### 3.4 Modify HierarchyAllocationTab.tsx
+Add period filter for allocation:
+
+```text
++------------------------------------------------------------------+
+| Allocate Targets For:                                             |
+| [Period: FY Total ▼] or [H1 ▼] or [Q1 ▼] or [April ▼]           |
++------------------------------------------------------------------+
+| (AllocationTable shows targets for selected period only)         |
++------------------------------------------------------------------+
+```
+
+---
+
+## Phase 4: Hooks and Data Layer
+
+### 4.1 New Hook: `useTargetPeriods`
+**File:** `src/hooks/useTargetPeriods.ts`
 
 ```typescript
-interface CancelOrderResult {
-  success: boolean;
-  error?: string;
-  reversedData: {
-    visitReverted: boolean;
-    creditReversed: number;
-    pointsRemoved: number;
-    invoiceCancelled: boolean;
-  };
+interface TargetPeriod {
+  id: string;
+  periodType: 'annual' | 'biannual' | 'quarterly' | 'monthly';
+  periodNumber: number;
+  periodName: string;
+  quantityTarget: number;
+  revenueTarget: number;
+  visitsTarget: number;
 }
 
-async function cancelOrder(
-  orderId: string, 
-  reason: string, 
-  userId: string
-): Promise<CancelOrderResult>
+const { 
+  periods, 
+  isLoading, 
+  updatePeriod, 
+  applyEqualDistribution,
+  recalculateRollups 
+} = useTargetPeriods(fyConfigId);
 ```
 
-**Cancellation Steps**:
-
-1. **Validate Order**
-   - Ensure order exists and is in 'confirmed' status
-   - Check that order hasn't been delivered (`delivery_status` is null)
-
-2. **Update Order Status**
-   ```sql
-   UPDATE orders 
-   SET status = 'cancelled',
-       cancelled_at = NOW(),
-       cancellation_reason = $reason,
-       cancelled_by = $userId
-   WHERE id = $orderId
-   ```
-
-3. **Update Invoice Status**
-   ```sql
-   UPDATE invoices 
-   SET status = 'cancelled' 
-   WHERE order_id = $orderId
-   ```
-
-4. **Revert Visit Status**
-   ```sql
-   UPDATE visits 
-   SET status = 'planned',
-       no_order_reason = NULL,
-       updated_at = NOW()
-   WHERE id = (SELECT visit_id FROM orders WHERE id = $orderId)
-   ```
-
-5. **Reverse Retailer Credit**
-   ```sql
-   UPDATE retailers 
-   SET pending_amount = pending_amount - $creditPendingAmount,
-       updated_at = NOW()
-   WHERE id = $retailerId
-   ```
-
-6. **Recalculate Retailer Analytics**
-   - Find previous confirmed order for `last_order_date`, `last_order_value`
-   - Update `avg_monthly_orders_3m` if needed
-
-7. **Remove Gamification Points**
-   ```sql
-   DELETE FROM gamification_points 
-   WHERE reference_type = 'order' 
-     AND reference_id = $retailerId
-     AND earned_at::date = $orderDate
-   ```
-
-8. **Remove Loyalty Points**
-   ```sql
-   DELETE FROM retailer_loyalty_points 
-   WHERE order_id = $orderId
-   ```
-
-9. **Recalculate User Period Targets**
-   - Trigger recalculation of `user_period_targets.actual_value` for revenue KPI
-
-10. **Update Local Caches**
-    - Clear `visitStatusCache` for this retailer
-    - Update `myVisitsSnapshot` to remove the order
-    - Dispatch `visitStatusChanged` event with `status: 'planned'`
-
-### Phase 4: Add Cancel Button to VisitCard
-
-**File**: `src/components/VisitCard.tsx`
-
-In the order preview section (around line 2848-2920), add a "Cancel Order" button next to the "View" button:
-
-```tsx
-{orderPreviewOpen && (
-  <>
-    {/* Existing order details */}
-    ...
-    
-    {/* Cancel Order Button */}
-    <Button 
-      variant="destructive" 
-      size="sm"
-      onClick={() => setShowCancelOrderDialog(true)}
-      className="w-full mt-2"
-    >
-      <XCircle size={14} className="mr-2" />
-      Cancel Order
-    </Button>
-  </>
-)}
-```
-
-Add state and dialog:
-```tsx
-const [showCancelOrderDialog, setShowCancelOrderDialog] = useState(false);
-
-// In render:
-<CancelOrderDialog
-  isOpen={showCancelOrderDialog}
-  onClose={() => setShowCancelOrderDialog(false)}
-  orderId={lastOrderId}
-  invoiceNumber={ordersTodayList[0]?.invoice_number}
-  retailerName={visit.retailerName}
-  orderAmount={actualOrderValue}
-  onCancelled={handleOrderCancelled}
-/>
-```
-
-Handle cancellation callback:
-```typescript
-const handleOrderCancelled = async () => {
-  // Reset local state to show retailer as "fresh"
-  setHasOrderToday(false);
-  setActualOrderValue(0);
-  setCurrentStatus('planned');
-  setOrderPreviewOpen(false);
-  
-  // Clear caches
-  await visitStatusCache.invalidate(retailerId, userId, today);
-  
-  // Dispatch event for parent components
-  window.dispatchEvent(new CustomEvent('orderCancelled', {
-    detail: { retailerId, visitId }
-  }));
-  
-  toast({ title: "Order cancelled successfully" });
-};
-```
-
-### Phase 5: Update Snapshot Functions
-
-**File**: `src/lib/myVisitsSnapshot.ts`
-
-Add new function to remove an order from snapshot:
+### 4.2 Update `useTeamTargetProgress.ts`
+Modify to fetch period-specific targets from `user_period_allocations` when available:
 
 ```typescript
-export const removeOrderFromSnapshot = async (
-  userId: string,
-  date: string,
-  orderId: string
-): Promise<void> => {
-  const snapshot = await loadMyVisitsSnapshot(userId, date);
-  if (!snapshot) return;
-  
-  // Remove the order
-  snapshot.orders = snapshot.orders.filter(o => o.id !== orderId);
-  
-  // Recalculate progress stats
-  const totalOrders = snapshot.orders.length;
-  const totalOrderValue = snapshot.orders.reduce((sum, o) => 
-    sum + Number(o.total_amount || 0), 0
-  );
-  const retailersWithOrders = new Set(snapshot.orders.map(o => o.retailer_id));
-  
-  snapshot.progressStats = {
-    ...snapshot.progressStats,
-    totalOrders,
-    totalOrderValue,
-    productive: retailersWithOrders.size
-  };
-  
-  // Save updated snapshot
-  await saveSnapshotToStorage(snapshot);
-};
-```
-
-### Phase 6: Update Today Summary
-
-**File**: `src/pages/TodaySummary.tsx`
-
-Ensure cancelled orders are excluded from totals:
-```typescript
-// Filter out cancelled orders when calculating totals
-const confirmedOrders = orders.filter(o => o.status !== 'cancelled');
-const totalOrderValue = confirmedOrders.reduce((sum, o) => sum + o.total_amount, 0);
+// Current: Calculates quarterly as yearlyTarget / 4
+// Updated: Fetches actual Q1-Q4 targets from user_period_allocations
 ```
 
 ---
 
-## Files to Create/Modify
+## Phase 5: Integration Points
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `src/components/CancelOrderDialog.tsx` | **Create** | Cancel order UI with reason input |
-| `src/utils/orderCancellation.ts` | **Create** | Cancel order business logic |
-| `src/components/VisitCard.tsx` | **Modify** | Add cancel button in order preview |
-| `src/lib/myVisitsSnapshot.ts` | **Modify** | Add `removeOrderFromSnapshot` function |
-| `src/lib/visitStatusCache.ts` | **Modify** | Add `invalidate` method (already exists) |
-| `src/pages/TodaySummary.tsx` | **Modify** | Exclude cancelled orders from stats |
-| Database migration | **Create** | Add cancellation columns to orders |
+### 5.1 My Target Page (`UserFYPlanTarget.tsx`)
+- Show period breakdown based on FY config's `target_period_type`
+- Display read-only rollup totals for higher periods
+- Monthly tab already exists - integrate with new data source
 
----
+### 5.2 Dashboard (`TeamTargetDashboard.tsx`)
+- Period selector already exists (day/week/month/quarter/year)
+- Update data fetching to use `user_period_allocations` for accurate targets
+- Show period-specific targets instead of calculated values
 
-## Edge Cases & Validation
-
-| Scenario | Handling |
-|----------|----------|
-| Order already delivered | Block cancellation, show error |
-| Order already cancelled | Block re-cancellation |
-| Partial delivery completed | Block cancellation (suggest return) |
-| Offline mode | Queue cancellation for sync |
-| Multiple orders same day | Only cancel selected order |
-| Credit already collected | Warn user, allow cancel anyway |
+### 5.3 Hierarchy Allocation (`AllocationTable.tsx`)
+- Add period filter dropdown
+- Load/save allocations for selected period
+- Validate that period allocations sum to parent period
 
 ---
 
-## Testing Checklist
+## Files to Create
 
-1. Cancel a cash order → verify visit returns to 'planned'
-2. Cancel a credit order → verify `pending_amount` is reversed
-3. Cancel order with gamification points → verify points removed
-4. Cancel order offline → verify syncs when online
-5. View cancelled order in retailer history → shows as cancelled
-6. Place new order after cancellation → works as fresh retailer
-7. Check Today Summary → cancelled orders excluded from totals
-8. Check Supervisor Report → cancelled orders excluded from analytics
+| File | Description |
+|------|-------------|
+| `src/components/admin/target-config/PeriodTypeSelector.tsx` | Period type toggle buttons |
+| `src/components/admin/target-config/PeriodBreakdownGrid.tsx` | Period-wise target entry grid |
+| `src/hooks/useTargetPeriods.ts` | Fetch and manage period targets |
 
----
+## Files to Modify
 
-## Technical Details
+| File | Changes |
+|------|---------|
+| `src/components/admin/TargetConfigTab.tsx` | Add period selector and breakdown grid |
+| `src/components/admin/HierarchyAllocationTab.tsx` | Add period filter for allocation |
+| `src/components/admin/AllocationTable.tsx` | Support period-specific allocation data |
+| `src/hooks/useTeamTargetProgress.ts` | Fetch from `user_period_allocations` |
+| `src/components/profile/UserFYPlanTarget.tsx` | Show period breakdown from hierarchy |
 
-### Database Migration SQL
+## Database Migration
 
 ```sql
--- Add cancellation tracking columns to orders table
-ALTER TABLE orders 
-  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
-  ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES profiles(id);
+-- 1. Add period type to FY config
+ALTER TABLE fy_target_config 
+ADD COLUMN target_period_type TEXT DEFAULT 'annual';
 
--- Create index for efficient cancelled order queries
-CREATE INDEX IF NOT EXISTS idx_orders_cancelled_at 
-  ON orders(cancelled_at) 
-  WHERE cancelled_at IS NOT NULL;
+-- 2. Create period targets table
+CREATE TABLE fy_period_targets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fy_config_id UUID REFERENCES fy_target_config(id) ON DELETE CASCADE,
+  period_type TEXT NOT NULL,
+  period_number INTEGER NOT NULL,
+  period_name TEXT NOT NULL,
+  quantity_target NUMERIC DEFAULT 0,
+  revenue_target NUMERIC DEFAULT 0,
+  visits_target INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(fy_config_id, period_type, period_number)
+);
+
+-- 3. Create user period allocations table
+CREATE TABLE user_period_allocations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_plan_id UUID REFERENCES user_business_plans(id) ON DELETE CASCADE,
+  period_type TEXT NOT NULL,
+  period_number INTEGER NOT NULL,
+  quantity_target NUMERIC DEFAULT 0,
+  revenue_target NUMERIC DEFAULT 0,
+  visits_target INTEGER DEFAULT 0,
+  source TEXT DEFAULT 'manual',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(business_plan_id, period_type, period_number)
+);
+
+-- 4. RLS Policies
+ALTER TABLE fy_period_targets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_period_allocations ENABLE ROW LEVEL SECURITY;
+
+-- Allow admins and system administrators full access
+CREATE POLICY "Admins can manage period targets"
+ON fy_period_targets FOR ALL
+USING (public.is_system_admin(auth.uid()));
+
+CREATE POLICY "Users can view their period allocations"
+ON user_period_allocations FOR SELECT
+USING (
+  business_plan_id IN (
+    SELECT id FROM user_business_plans WHERE user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Admins can manage period allocations"
+ON user_period_allocations FOR ALL
+USING (public.is_system_admin(auth.uid()));
 ```
 
-### CancelOrderDialog Component Structure
+---
 
-```typescript
-interface CancelOrderDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  orderId: string | null;
-  invoiceNumber?: string;
-  retailerName: string;
-  orderAmount: number;
-  onCancelled: () => void;
-}
-
-const CANCELLATION_REASONS = [
-  { value: 'wrong-details', label: 'Wrong order details' },
-  { value: 'customer-request', label: 'Customer requested' },
-  { value: 'duplicate-order', label: 'Duplicate order' },
-  { value: 'pricing-error', label: 'Pricing error' },
-  { value: 'other', label: 'Other' }
-];
-```
-
-### Order Cancellation Utility Flow
-
-```typescript
-export async function cancelOrder(
-  orderId: string,
-  reason: string,
-  userId: string
-): Promise<CancelOrderResult> {
-  // 1. Fetch order with related data
-  const order = await fetchOrderWithDetails(orderId);
-  
-  // 2. Validate cancellable
-  validateCancellable(order);
-  
-  // 3. Begin transaction-like operations
-  await updateOrderStatus(orderId, 'cancelled', reason, userId);
-  await updateInvoiceStatus(orderId, 'cancelled');
-  
-  if (order.visit_id) {
-    await revertVisitStatus(order.visit_id);
-  }
-  
-  if (order.is_credit_order && order.credit_pending_amount > 0) {
-    await reverseRetailerCredit(order.retailer_id, order.credit_pending_amount);
-  }
-  
-  await removeGamificationPoints(order.retailer_id, order.order_date);
-  await removeLoyaltyPoints(orderId);
-  await updateUserPeriodTargets(userId);
-  
-  // 4. Update local caches
-  await clearLocalCaches(order.retailer_id, userId, order.order_date);
-  
-  return { success: true, ... };
-}
-```
-
+## Validation Checklist
+- Monthly targets sum exactly to Quarterly totals
+- Quarterly targets (Q1+Q2) sum to H1, (Q3+Q4) sum to H2
+- H1 + H2 = Annual FY total
+- Dashboard filters show correct stored targets for each period
+- Hierarchy allocation supports period-specific assignment
+- Existing `user_business_plan_months` data continues to work
+- My Target page reflects hierarchy-assigned period targets
