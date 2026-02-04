@@ -1439,6 +1439,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
             <div className="text-right space-y-1">
               <p className="text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
               <p className="text-sm opacity-90">{Math.round(businessSummary.totalKg).toLocaleString()} Units</p>
+              <p className="text-sm opacity-90 font-medium">{Math.round(businessSummary.totalKg).toLocaleString()} KG</p>
             </div>
           </div>
         </CardContent>
