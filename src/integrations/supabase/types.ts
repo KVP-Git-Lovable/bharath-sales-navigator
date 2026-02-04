@@ -6397,17 +6397,77 @@ export type Database = {
           },
         ]
       }
+      leave_accrual_log: {
+        Row: {
+          accrual_type: string | null
+          balance_after: number
+          created_at: string | null
+          days_credited: number
+          days_debited: number | null
+          id: string
+          leave_type_id: string
+          month: number | null
+          notes: string | null
+          user_id: string
+          year: number
+        }
+        Insert: {
+          accrual_type?: string | null
+          balance_after: number
+          created_at?: string | null
+          days_credited?: number
+          days_debited?: number | null
+          id?: string
+          leave_type_id: string
+          month?: number | null
+          notes?: string | null
+          user_id: string
+          year: number
+        }
+        Update: {
+          accrual_type?: string | null
+          balance_after?: number
+          created_at?: string | null
+          days_credited?: number
+          days_debited?: number | null
+          id?: string
+          leave_type_id?: string
+          month?: number | null
+          notes?: string | null
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_accrual_log_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_applications: {
         Row: {
           applied_date: string
           approved_by: string | null
           approved_date: string | null
+          attendance_marked: boolean | null
           created_at: string
+          current_approval_level: number | null
+          days_requested: number | null
           end_date: string
+          final_approved_by: string | null
+          half_day_period: string | null
           id: string
+          is_half_day: boolean | null
+          is_lop: boolean | null
           leave_type_id: string
+          lop_days: number | null
+          proof_document_url: string | null
           reason: string
           rejection_reason: string | null
+          sandwich_days_added: number | null
           start_date: string
           status: string
           updated_at: string
@@ -6417,12 +6477,22 @@ export type Database = {
           applied_date?: string
           approved_by?: string | null
           approved_date?: string | null
+          attendance_marked?: boolean | null
           created_at?: string
+          current_approval_level?: number | null
+          days_requested?: number | null
           end_date: string
+          final_approved_by?: string | null
+          half_day_period?: string | null
           id?: string
+          is_half_day?: boolean | null
+          is_lop?: boolean | null
           leave_type_id: string
+          lop_days?: number | null
+          proof_document_url?: string | null
           reason: string
           rejection_reason?: string | null
+          sandwich_days_added?: number | null
           start_date: string
           status?: string
           updated_at?: string
@@ -6432,12 +6502,22 @@ export type Database = {
           applied_date?: string
           approved_by?: string | null
           approved_date?: string | null
+          attendance_marked?: boolean | null
           created_at?: string
+          current_approval_level?: number | null
+          days_requested?: number | null
           end_date?: string
+          final_approved_by?: string | null
+          half_day_period?: string | null
           id?: string
+          is_half_day?: boolean | null
+          is_lop?: boolean | null
           leave_type_id?: string
+          lop_days?: number | null
+          proof_document_url?: string | null
           reason?: string
           rejection_reason?: string | null
+          sandwich_days_added?: number | null
           start_date?: string
           status?: string
           updated_at?: string
@@ -6453,6 +6533,50 @@ export type Database = {
           },
           {
             foreignKeyName: "leave_applications_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_approval_workflow: {
+        Row: {
+          approval_level: number
+          approver_type: string | null
+          approver_user_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          leave_type_id: string | null
+          min_days_trigger: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          approval_level?: number
+          approver_type?: string | null
+          approver_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          leave_type_id?: string | null
+          min_days_trigger?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          approval_level?: number
+          approver_type?: string | null
+          approver_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          leave_type_id?: string | null
+          min_days_trigger?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_approval_workflow_leave_type_id_fkey"
             columns: ["leave_type_id"]
             isOneToOne: false
             referencedRelation: "leave_types"
@@ -6511,43 +6635,102 @@ export type Database = {
           },
         ]
       }
+      leave_holidays_bridge: {
+        Row: {
+          created_at: string | null
+          holiday_date: string
+          id: string
+          is_sandwich_day: boolean | null
+          leave_application_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          holiday_date: string
+          id?: string
+          is_sandwich_day?: boolean | null
+          leave_application_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          holiday_date?: string
+          id?: string
+          is_sandwich_day?: boolean | null
+          leave_application_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_holidays_bridge_leave_application_id_fkey"
+            columns: ["leave_application_id"]
+            isOneToOne: false
+            referencedRelation: "leave_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_policy: {
         Row: {
           accrual_type: string
           applicable_from: string | null
+          auto_approval_threshold: number | null
+          backdated_days_allowed: number | null
           carry_forward_allowed: boolean | null
           created_at: string
+          encashment_allowed: boolean | null
+          encashment_limit: number | null
           id: string
           is_active: boolean | null
           leave_type_id: string
           max_carry_forward: number | null
+          max_leaves_per_month: number | null
+          min_days_advance_notice: number | null
           monthly_accrual: number | null
+          negative_balance_allowed: boolean | null
+          probation_applicable: boolean | null
+          sandwich_rule_enabled: boolean | null
           updated_at: string
           yearly_entitlement: number
         }
         Insert: {
           accrual_type?: string
           applicable_from?: string | null
+          auto_approval_threshold?: number | null
+          backdated_days_allowed?: number | null
           carry_forward_allowed?: boolean | null
           created_at?: string
+          encashment_allowed?: boolean | null
+          encashment_limit?: number | null
           id?: string
           is_active?: boolean | null
           leave_type_id: string
           max_carry_forward?: number | null
+          max_leaves_per_month?: number | null
+          min_days_advance_notice?: number | null
           monthly_accrual?: number | null
+          negative_balance_allowed?: boolean | null
+          probation_applicable?: boolean | null
+          sandwich_rule_enabled?: boolean | null
           updated_at?: string
           yearly_entitlement?: number
         }
         Update: {
           accrual_type?: string
           applicable_from?: string | null
+          auto_approval_threshold?: number | null
+          backdated_days_allowed?: number | null
           carry_forward_allowed?: boolean | null
           created_at?: string
+          encashment_allowed?: boolean | null
+          encashment_limit?: number | null
           id?: string
           is_active?: boolean | null
           leave_type_id?: string
           max_carry_forward?: number | null
+          max_leaves_per_month?: number | null
+          min_days_advance_notice?: number | null
           monthly_accrual?: number | null
+          negative_balance_allowed?: boolean | null
+          probation_applicable?: boolean | null
+          sandwich_rule_enabled?: boolean | null
           updated_at?: string
           yearly_entitlement?: number
         }
@@ -6563,22 +6746,43 @@ export type Database = {
       }
       leave_types: {
         Row: {
+          allow_half_day: boolean | null
+          code: string | null
+          color: string | null
           created_at: string
           description: string | null
           id: string
+          is_active: boolean | null
           name: string
+          proof_required: boolean | null
+          sort_order: number | null
+          yearly_limit: number | null
         }
         Insert: {
+          allow_half_day?: boolean | null
+          code?: string | null
+          color?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean | null
           name: string
+          proof_required?: boolean | null
+          sort_order?: number | null
+          yearly_limit?: number | null
         }
         Update: {
+          allow_half_day?: boolean | null
+          code?: string | null
+          color?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean | null
           name?: string
+          proof_required?: boolean | null
+          sort_order?: number | null
+          yearly_limit?: number | null
         }
         Relationships: []
       }
@@ -12864,6 +13068,18 @@ export type Database = {
         Args: { p_end: string; p_start: string; p_user_id: string }
         Returns: number
       }
+      calculate_leave_days: {
+        Args: {
+          p_end_date: string
+          p_is_half_day?: boolean
+          p_leave_type_id: string
+          p_start_date: string
+        }
+        Returns: {
+          sandwich_days: number
+          total_days: number
+        }[]
+      }
       calculate_new_retailers: {
         Args: { p_end: string; p_start: string; p_user_id: string }
         Returns: number
@@ -13130,6 +13346,8 @@ export type Database = {
         Args: { _email: string; _user_id: string }
         Returns: boolean
       }
+      process_monthly_leave_accrual: { Args: never; Returns: undefined }
+      process_year_end_carry_forward: { Args: never; Returns: undefined }
       send_notification: {
         Args: {
           message_param: string
