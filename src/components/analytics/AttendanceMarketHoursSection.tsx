@@ -111,14 +111,14 @@ export const AttendanceMarketHoursSection = ({
       }
 
       // Fetch retailer visit logs for time at retailers
+      // Only require start_time (matching TodaySummary logic)
       const { data: visitLogs, error: visitError } = await supabase
         .from('retailer_visit_logs')
-        .select('user_id, visit_date, start_time, end_time')
+        .select('user_id, visit_date, start_time')
         .in('user_id', effectiveUserIds)
         .gte('visit_date', fromDate)
         .lte('visit_date', toDate)
-        .not('start_time', 'is', null)
-        .not('end_time', 'is', null);
+        .not('start_time', 'is', null);
 
       if (visitError) {
         console.error('Error fetching visit logs:', visitError);
@@ -130,55 +130,55 @@ export const AttendanceMarketHoursSection = ({
           if (u.full_name) userNames[u.id] = u.full_name;
         });
 
-        // Group by user and date, sum up retailer hours
-        // Using IST (UTC+5:30) and clamping times to the same day (00:00 - 23:59)
-        const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
-        
-        const dateUserMap: Record<string, { user_id: string; full_name: string; date: string; totalHours: number }> = {};
+        // Group by user and date, then calculate time as span from first to last start_time
+        // This matches TodaySummary logic exactly
+        const dateUserMap: Record<string, { 
+          user_id: string; 
+          full_name: string; 
+          date: string; 
+          startTimes: number[] 
+        }> = {};
         
         (visitLogs || []).forEach(log => {
+          if (!log.start_time) return;
+          
           const key = `${log.user_id}_${log.visit_date}`;
           if (!dateUserMap[key]) {
             dateUserMap[key] = {
               user_id: log.user_id,
               full_name: userNames[log.user_id] || 'Unknown',
               date: log.visit_date,
-              totalHours: 0
+              startTimes: []
             };
           }
           
-          if (log.start_time && log.end_time) {
-            // Parse timestamps and convert to IST
-            const startUTC = new Date(log.start_time);
-            const endUTC = new Date(log.end_time);
-            
-            // Convert to IST
-            const startIST = new Date(startUTC.getTime() + IST_OFFSET_MS);
-            const endIST = new Date(endUTC.getTime() + IST_OFFSET_MS);
-            
-            // Get the visit date boundaries in IST (00:00 to 23:59:59.999)
-            const visitDateParts = log.visit_date.split('-').map(Number);
-            const dayStartIST = new Date(Date.UTC(visitDateParts[0], visitDateParts[1] - 1, visitDateParts[2], 0, 0, 0, 0));
-            const dayEndIST = new Date(Date.UTC(visitDateParts[0], visitDateParts[1] - 1, visitDateParts[2], 23, 59, 59, 999));
-            
-            // Clamp start and end times to the day boundaries
-            const clampedStart = new Date(Math.max(startIST.getTime(), dayStartIST.getTime()));
-            const clampedEnd = new Date(Math.min(endIST.getTime(), dayEndIST.getTime()));
-            
-            // Calculate hours only if clamped end is after clamped start
-            if (clampedEnd > clampedStart) {
-              const hours = (clampedEnd.getTime() - clampedStart.getTime()) / (1000 * 60 * 60);
-              dateUserMap[key].totalHours += Math.max(0, hours);
-            }
-          }
+          // Store the start_time timestamp
+          const startTime = new Date(log.start_time).getTime();
+          dateUserMap[key].startTimes.push(startTime);
         });
 
-        const processedRetailerTime: RetailerTimeData[] = Object.values(dateUserMap).map(item => ({
-          user_id: item.user_id,
-          full_name: item.full_name,
-          date: item.date,
-          retailer_hours: item.totalHours
-        }));
+        // Calculate retailer hours as span from first to last start_time (matching TodaySummary)
+        const processedRetailerTime: RetailerTimeData[] = Object.values(dateUserMap).map(item => {
+          let retailerHours = 0;
+          
+          if (item.startTimes.length >= 2) {
+            // Find earliest and latest start times
+            const earliestStart = Math.min(...item.startTimes);
+            const latestStart = Math.max(...item.startTimes);
+            
+            // Time at retailers = span from first visit to last visit
+            retailerHours = (latestStart - earliestStart) / (1000 * 60 * 60);
+          }
+          // If only 1 visit, retailer hours = 0 (no span)
+          
+          return {
+            user_id: item.user_id,
+            full_name: item.full_name,
+            date: item.date,
+            retailer_hours: Math.max(0, retailerHours)
+          };
+        });
+        
         setRetailerTimeData(processedRetailerTime);
       }
     } catch (error) {
