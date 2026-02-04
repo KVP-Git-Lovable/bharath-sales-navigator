@@ -8,23 +8,28 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Users, Trophy, TrendingUp, TrendingDown, Calendar as CalendarIcon, Filter } from 'lucide-react';
+import { Users, Trophy, TrendingUp, TrendingDown, Calendar as CalendarIcon, Filter, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useTeamTargetProgress, PeriodType, TargetBasis } from '@/hooks/useTeamTargetProgress';
+import { UserScope } from '@/pages/admin/TargetVsActual';
 
 interface TeamTargetDashboardProps {
-  userScope?: string;
+  userScope?: UserScope;
+  onUserScopeChange?: (scope: UserScope) => void;
   effectiveUserIds?: string[];
   fyYear?: number;
+  hasAdminAccess?: boolean;
 }
 
 export function TeamTargetDashboard({
-  userScope,
+  userScope = 'team',
+  onUserScopeChange,
   effectiveUserIds = [],
   fyYear,
+  hasAdminAccess = false,
 }: TeamTargetDashboardProps = {}) {
   const { user } = useAuth();
   const { subordinateIds, isManager } = useSubordinates();
@@ -116,6 +121,32 @@ export function TeamTargetDashboard({
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
+            {/* User Scope - Only show for admins */}
+            {hasAdminAccess && onUserScopeChange && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-muted-foreground">User Scope</label>
+                <Select value={userScope} onValueChange={(v) => onUserScopeChange(v as UserScope)}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="team">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        My Team
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        All Users
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Period Type */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-muted-foreground">Period</label>
