@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Save, AlertCircle, Loader2, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { 
+  Save, AlertCircle, Loader2, ChevronDown, ChevronRight, Users, 
+  GitBranch, Table2, Equal, Percent, Edit3 
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +30,7 @@ interface SubordinateAllocation {
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
+  percentage: number;
   existingPlanId?: string;
   level: number;
   subordinateCount: number;
@@ -47,7 +52,10 @@ interface AllocationTableProps {
   fyYear: number;
 }
 
-// Level-based background colors (matching screenshot 2)
+type AllocationMethod = 'equal' | 'percentage' | 'manual';
+type ViewMode = 'tree' | 'table';
+
+// Level-based background colors
 const getLevelBackground = (level: number) => {
   switch (level) {
     case 0: return 'bg-background border-border';
@@ -71,19 +79,19 @@ export function AllocationTable({
   const queryClient = useQueryClient();
   const [allocations, setAllocations] = useState<Map<string, SubordinateAllocation>>(new Map());
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>('manual');
+  const [viewMode, setViewMode] = useState<ViewMode>('tree');
 
   // Fetch hierarchy recursively
   const { data: hierarchyData, isLoading } = useQuery({
     queryKey: ['hierarchy-allocations', parentUserId, fyYear],
     queryFn: async () => {
-      // Get all subordinates using the RPC
       const { data: subordinatesData, error: subError } = await supabase.rpc('get_all_subordinates', {
         manager_user_id: parentUserId,
       });
 
       if (subError) throw subError;
 
-      // Filter out the parent user (level 0), we want to show subordinates only
       const subordinatesOnly = (subordinatesData || []).filter(
         (s: { subordinate_user_id: string; level: number }) => s.level > 0
       );
@@ -92,20 +100,17 @@ export function AllocationTable({
 
       const userIds = subordinatesOnly.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
 
-      // Get profiles
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, profile_picture_url')
         .in('id', userIds);
 
-      // Get existing business plans
       const { data: plans } = await supabase
         .from('user_business_plans')
         .select('*')
         .in('user_id', userIds)
         .eq('year', fyYear);
 
-      // Get subordinate counts
       const { data: employees } = await supabase
         .from('employees')
         .select('manager_id, user_id');
@@ -126,7 +131,6 @@ export function AllocationTable({
         }
       });
 
-      // Build hierarchy tree - levels are relative to parentUserId (which is level 0)
       const nodeMap = new Map<string, SubordinateAllocation>();
 
       subordinatesOnly.forEach((sub: { subordinate_user_id: string; level: number }) => {
@@ -140,22 +144,20 @@ export function AllocationTable({
           quantityTarget: existingPlan?.quantity_target || 0,
           revenueTarget: existingPlan?.revenue_target || 0,
           visitsTarget: 0,
+          percentage: 0,
           existingPlanId: existingPlan?.id,
-          level: sub.level, // Level relative to parentUserId
+          level: sub.level,
           subordinateCount: subordinateCounts.get(sub.subordinate_user_id) || 0,
           children: [],
         });
       });
 
-      // Build tree structure - direct children of parentUserId are level 1
       const roots: SubordinateAllocation[] = [];
       nodeMap.forEach((node, userId) => {
         const managerId = managerMap.get(userId);
-        // If the manager is in our nodeMap, add as child; otherwise check if it's a direct report
         if (managerId && nodeMap.has(managerId)) {
           nodeMap.get(managerId)!.children.push(node);
         } else if (managerId === parentUserId || node.level === 1) {
-          // Direct child of the selected user
           roots.push(node);
         }
       });
@@ -179,8 +181,71 @@ export function AllocationTable({
       };
       flatten(hierarchyData);
       setAllocations(newAllocations);
+      // Auto-expand first level
+      setExpandedUsers(new Set(hierarchyData.map(u => u.userId)));
     }
   }, [hierarchyData]);
+
+  // Get direct reports only (level 1 users for allocation methods)
+  const directReports = useMemo(() => {
+    return hierarchyData || [];
+  }, [hierarchyData]);
+
+  // Apply equal distribution
+  const applyEqualDistribution = () => {
+    if (directReports.length === 0) return;
+    
+    const equalQty = Math.floor(totalQuantity / directReports.length);
+    const equalRev = Math.floor(totalRevenue / directReports.length);
+    const equalVisits = Math.floor(totalVisits / directReports.length);
+    const equalPercent = Math.round((100 / directReports.length) * 100) / 100;
+
+    setAllocations(prev => {
+      const next = new Map(prev);
+      directReports.forEach(user => {
+        const current = next.get(user.userId);
+        if (current) {
+          next.set(user.userId, {
+            ...current,
+            quantityTarget: enabledMetrics.quantity ? equalQty : 0,
+            revenueTarget: enabledMetrics.revenue ? equalRev : 0,
+            visitsTarget: enabledMetrics.visits ? equalVisits : 0,
+            percentage: equalPercent,
+          });
+        }
+      });
+      return next;
+    });
+    toast.success(`Targets distributed equally among ${directReports.length} members`);
+  };
+
+  // Apply percentage-based distribution
+  const applyPercentageDistribution = () => {
+    setAllocations(prev => {
+      const next = new Map(prev);
+      directReports.forEach(user => {
+        const current = next.get(user.userId);
+        if (current && current.percentage > 0) {
+          const pct = current.percentage / 100;
+          next.set(user.userId, {
+            ...current,
+            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity * pct) : 0,
+            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue * pct) : 0,
+            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits * pct) : 0,
+          });
+        }
+      });
+      return next;
+    });
+  };
+
+  // Handle allocation method change
+  const handleMethodChange = (method: AllocationMethod) => {
+    setAllocationMethod(method);
+    if (method === 'equal') {
+      applyEqualDistribution();
+    }
+  };
 
   // Save mutation
   const saveMutation = useMutation({
@@ -215,6 +280,24 @@ export function AllocationTable({
       const current = next.get(userId);
       if (current) {
         next.set(userId, { ...current, [field]: value });
+      }
+      return next;
+    });
+  };
+
+  const handlePercentageChange = (userId: string, percentage: number) => {
+    setAllocations(prev => {
+      const next = new Map(prev);
+      const current = next.get(userId);
+      if (current) {
+        const pct = percentage / 100;
+        next.set(userId, {
+          ...current,
+          percentage,
+          quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity * pct) : 0,
+          revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue * pct) : 0,
+          visitsTarget: enabledMetrics.visits ? Math.round(totalVisits * pct) : 0,
+        });
       }
       return next;
     });
@@ -260,14 +343,15 @@ export function AllocationTable({
       .slice(0, 2);
   };
 
-  // Render a single user card
+  // Render a single user card (Tree View)
   const renderUserCard = (user: SubordinateAllocation, depth: number = 0) => {
     const isExpanded = expandedUsers.has(user.userId);
     const hasChildren = user.children.length > 0;
     const levelBg = getLevelBackground(user.level);
+    const isDirectReport = user.level === 1;
 
     return (
-      <div key={user.userId} style={{ marginLeft: `${depth * 48}px` }}>
+      <div key={user.userId} style={{ marginLeft: `${depth * 24}px` }}>
         <div
           className={cn(
             'flex items-center gap-3 p-3 rounded-lg border transition-all mb-2',
@@ -291,7 +375,7 @@ export function AllocationTable({
           )}
 
           {/* Avatar */}
-          <Avatar className="h-10 w-10 shrink-0">
+          <Avatar className="h-9 w-9 shrink-0">
             <AvatarImage src={user.profilePictureUrl || undefined} alt={user.fullName} />
             <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
               {getInitials(user.fullName)}
@@ -299,68 +383,83 @@ export function AllocationTable({
           </Avatar>
 
           {/* Name and badges */}
-          <div className="flex items-center gap-2 min-w-[140px]">
+          <div className="flex items-center gap-2 min-w-[120px]">
             <span className="font-medium text-sm truncate">{user.fullName}</span>
-            <Badge variant="outline" className="text-xs shrink-0">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0">
               L{user.level}
             </Badge>
             {user.subordinateCount > 0 && (
-              <Badge variant="secondary" className="text-xs gap-0.5 shrink-0">
+              <Badge variant="secondary" className="text-[10px] gap-0.5 px-1.5 py-0 h-5 shrink-0">
                 <Users className="h-3 w-3" />
                 {user.subordinateCount}
               </Badge>
             )}
           </div>
 
-          {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Input fields */}
-          <div className="flex items-center gap-4">
-            {enabledMetrics.quantity && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground w-8">Qty</span>
-                <Input
-                  type="text"
-                  value={user.quantityTarget > 0 ? formatNumber(user.quantityTarget) : ''}
-                  onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))}
-                  placeholder="0"
-                  className="h-8 w-20 text-right text-sm"
-                />
-                <span className="text-xs text-muted-foreground w-8">{quantityUnit}</span>
-              </div>
-            )}
-            {enabledMetrics.revenue && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">₹</span>
-                <Input
-                  type="text"
-                  value={user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : ''}
-                  onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))}
-                  placeholder="Revenue"
-                  className="h-8 w-24 text-right text-sm"
-                />
-              </div>
-            )}
-            {enabledMetrics.visits && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">Visits</span>
-                <Input
-                  type="text"
-                  value={user.visitsTarget > 0 ? formatNumber(user.visitsTarget) : ''}
-                  onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
-                  placeholder="0"
-                  className="h-8 w-16 text-right text-sm"
-                />
-              </div>
-            )}
-            {/* Only show revenue summary when revenue is enabled */}
-            {enabledMetrics.revenue && (
-              <span className="text-sm text-muted-foreground w-20 text-right">
-                {formatCurrency(user.revenueTarget)}
-              </span>
-            )}
-          </div>
+          {/* Input fields - only for direct reports or when in manual mode */}
+          {(isDirectReport || allocationMethod === 'manual') && (
+            <div className="flex items-center gap-3">
+              {/* Percentage input (for percentage mode) */}
+              {allocationMethod === 'percentage' && isDirectReport && (
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    value={user.percentage || ''}
+                    onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="h-8 w-16 text-right text-sm"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                  />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              )}
+
+              {enabledMetrics.quantity && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground hidden sm:inline">Qty</span>
+                  <Input
+                    type="text"
+                    value={user.quantityTarget > 0 ? formatNumber(user.quantityTarget) : ''}
+                    onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))}
+                    placeholder="0"
+                    className="h-8 w-20 text-right text-sm"
+                    disabled={allocationMethod === 'equal'}
+                  />
+                  <span className="text-xs text-muted-foreground">{quantityUnit}</span>
+                </div>
+              )}
+              {enabledMetrics.revenue && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">₹</span>
+                  <Input
+                    type="text"
+                    value={user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : ''}
+                    onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))}
+                    placeholder="0"
+                    className="h-8 w-24 text-right text-sm"
+                    disabled={allocationMethod === 'equal'}
+                  />
+                </div>
+              )}
+              {enabledMetrics.visits && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Visits</span>
+                  <Input
+                    type="text"
+                    value={user.visitsTarget > 0 ? formatNumber(user.visitsTarget) : ''}
+                    onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                    placeholder="0"
+                    className="h-8 w-16 text-right text-sm"
+                    disabled={allocationMethod === 'equal'}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Children */}
@@ -373,15 +472,127 @@ export function AllocationTable({
     );
   };
 
+  // Render Table View
+  const renderTableView = () => {
+    const allUsers = Array.from(allocations.values()).sort((a, b) => a.level - b.level || a.fullName.localeCompare(b.fullName));
+
+    return (
+      <div className="overflow-x-auto scrollbar-always-visible">
+        <table className="w-full">
+          <thead className="sticky top-0 bg-muted z-10">
+            <tr className="border-b">
+              <th className="text-left p-3 text-sm font-medium">Team Member</th>
+              <th className="text-center p-3 text-sm font-medium w-16">Level</th>
+              {allocationMethod === 'percentage' && (
+                <th className="text-right p-3 text-sm font-medium w-20">%</th>
+              )}
+              {enabledMetrics.quantity && (
+                <th className="text-right p-3 text-sm font-medium">Qty ({quantityUnit})</th>
+              )}
+              {enabledMetrics.revenue && (
+                <th className="text-right p-3 text-sm font-medium">Revenue</th>
+              )}
+              {enabledMetrics.visits && (
+                <th className="text-right p-3 text-sm font-medium">Visits</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {allUsers.map(user => (
+              <tr key={user.userId} className="border-b hover:bg-muted/30 transition-colors">
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarImage src={user.profilePictureUrl || undefined} alt={user.fullName} />
+                      <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                        {getInitials(user.fullName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium">{user.fullName}</span>
+                    {user.subordinateCount > 0 && (
+                      <Badge variant="secondary" className="text-[10px] gap-0.5 px-1 py-0 h-4">
+                        <Users className="h-2.5 w-2.5" />
+                        {user.subordinateCount}
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3 text-center">
+                  <Badge variant="outline" className="text-[10px]">L{user.level}</Badge>
+                </td>
+                {allocationMethod === 'percentage' && (
+                  <td className="p-3">
+                    <Input
+                      type="number"
+                      value={user.percentage || ''}
+                      onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="h-7 w-16 text-right text-sm ml-auto"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      disabled={user.level !== 1}
+                    />
+                  </td>
+                )}
+                {enabledMetrics.quantity && (
+                  <td className="p-3">
+                    <Input
+                      type="text"
+                      value={user.quantityTarget > 0 ? formatNumber(user.quantityTarget) : ''}
+                      onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))}
+                      placeholder="0"
+                      className="h-7 w-24 text-right text-sm ml-auto"
+                      disabled={allocationMethod === 'equal' || (allocationMethod === 'percentage' && user.level === 1)}
+                    />
+                  </td>
+                )}
+                {enabledMetrics.revenue && (
+                  <td className="p-3">
+                    <Input
+                      type="text"
+                      value={user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : ''}
+                      onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))}
+                      placeholder="0"
+                      className="h-7 w-28 text-right text-sm ml-auto"
+                      disabled={allocationMethod === 'equal' || (allocationMethod === 'percentage' && user.level === 1)}
+                    />
+                  </td>
+                )}
+                {enabledMetrics.visits && (
+                  <td className="p-3">
+                    <Input
+                      type="text"
+                      value={user.visitsTarget > 0 ? formatNumber(user.visitsTarget) : ''}
+                      onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                      placeholder="0"
+                      className="h-7 w-20 text-right text-sm ml-auto"
+                      disabled={allocationMethod === 'equal' || (allocationMethod === 'percentage' && user.level === 1)}
+                    />
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   // Calculate totals
-  const allocatedQuantity = Array.from(allocations.values()).reduce((sum, a) => sum + a.quantityTarget, 0);
-  const allocatedRevenue = Array.from(allocations.values()).reduce((sum, a) => sum + a.revenueTarget, 0);
-  const allocatedVisits = Array.from(allocations.values()).reduce((sum, a) => sum + a.visitsTarget, 0);
+  const allocatedQuantity = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.quantityTarget || 0), 0);
+  const allocatedRevenue = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.revenueTarget || 0), 0);
+  const allocatedVisits = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.visitsTarget || 0), 0);
+  const totalPercentage = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.percentage || 0), 0);
 
   const remainingQuantity = totalQuantity - allocatedQuantity;
   const remainingRevenue = totalRevenue - allocatedRevenue;
   const remainingVisits = totalVisits - allocatedVisits;
-  const hasOverAllocation = remainingQuantity < 0 || remainingRevenue < 0 || remainingVisits < 0;
+  const hasOverAllocation = 
+    (enabledMetrics.quantity && remainingQuantity < 0) || 
+    (enabledMetrics.revenue && remainingRevenue < 0) || 
+    (enabledMetrics.visits && remainingVisits < 0) ||
+    (allocationMethod === 'percentage' && totalPercentage > 100);
 
   if (isLoading) {
     return (
@@ -407,23 +618,116 @@ export function AllocationTable({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <span className="border-b-2 border-primary/30 pb-0.5">Allocation Method</span>
-          <Badge variant="secondary" className="ml-auto">
-            {allocations.size} members
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Hierarchy Cards */}
-        <div className="space-y-0">
-          {hierarchyData.map(user => renderUserCard(user))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <span className="border-b-2 border-primary/30 pb-0.5">Allocation</span>
+            <Badge variant="secondary">
+              {allocations.size} members
+            </Badge>
+          </CardTitle>
+          
+          <div className="flex items-center gap-2 sm:ml-auto">
+            {/* View Mode Toggle */}
+            <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} size="sm">
+              <ToggleGroupItem value="tree" aria-label="Tree View" className="gap-1.5 px-2.5">
+                <GitBranch className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Tree</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="table" aria-label="Table View" className="gap-1.5 px-2.5">
+                <Table2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Table</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
         </div>
 
+        {/* Allocation Method Toggle */}
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+          <span className="text-sm text-muted-foreground">Method:</span>
+          <ToggleGroup 
+            type="single" 
+            value={allocationMethod} 
+            onValueChange={(v) => v && handleMethodChange(v as AllocationMethod)} 
+            size="sm"
+            className="bg-muted/50 p-0.5 rounded-lg"
+          >
+            <ToggleGroupItem 
+              value="equal" 
+              aria-label="Equal Distribution" 
+              className={cn(
+                "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              )}
+            >
+              <Equal className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Equal</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem 
+              value="percentage" 
+              aria-label="Percentage Based"
+              className={cn(
+                "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              )}
+            >
+              <Percent className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Percentage</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem 
+              value="manual" 
+              aria-label="Manual Entry"
+              className={cn(
+                "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              )}
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Manual</span>
+            </ToggleGroupItem>
+          </ToggleGroup>
+          
+          {allocationMethod === 'equal' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={applyEqualDistribution}
+              className="ml-2 h-7 text-xs"
+            >
+              Re-distribute
+            </Button>
+          )}
+          {allocationMethod === 'percentage' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={applyPercentageDistribution}
+              className="ml-2 h-7 text-xs"
+            >
+              Apply %
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* View Content */}
+        {viewMode === 'tree' ? (
+          <div className="space-y-0">
+            {hierarchyData.map(user => renderUserCard(user))}
+          </div>
+        ) : (
+          renderTableView()
+        )}
+
         {/* Remaining Summary */}
-        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-          <span className="font-medium">Remaining</span>
-          <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border">
+          <span className="font-medium text-sm">Remaining to allocate:</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {allocationMethod === 'percentage' && (
+              <Badge 
+                variant={totalPercentage > 100 ? 'destructive' : totalPercentage === 100 ? 'default' : 'secondary'}
+                className="font-mono"
+              >
+                {(100 - totalPercentage).toFixed(1)}%
+              </Badge>
+            )}
             {enabledMetrics.quantity && (
               <Badge 
                 variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}
@@ -454,12 +758,17 @@ export function AllocationTable({
         {/* Warning for over-allocation */}
         {hasOverAllocation && (
           <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-sm">Total allocations exceed the target. Please adjust.</span>
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span className="text-sm">
+              {allocationMethod === 'percentage' && totalPercentage > 100 
+                ? `Total percentage (${totalPercentage.toFixed(1)}%) exceeds 100%. Please adjust.`
+                : 'Total allocations exceed the target. Please adjust.'
+              }
+            </span>
           </div>
         )}
 
-        {/* Centered Save Button */}
+        {/* Save Button */}
         <div className="flex justify-center pt-2">
           <Button
             size="lg"
