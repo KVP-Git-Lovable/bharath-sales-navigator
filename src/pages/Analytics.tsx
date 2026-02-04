@@ -1138,13 +1138,18 @@ const Analytics = () => {
                 {/* Multi-select User Dropdown */}
                 <Popover open={userSelectOpen} onOpenChange={setUserSelectOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="h-8 px-2 sm:px-3 min-w-[100px] sm:min-w-[150px] justify-between text-xs sm:text-sm">
+                    <Button variant="outline" className="h-8 px-2 sm:px-3 min-w-0 sm:min-w-[150px] justify-between text-xs sm:text-sm">
                       <div className="flex items-center gap-1 sm:gap-2">
                         <Users size={14} className="shrink-0" />
-                        <span>
+                        <span className="hidden sm:inline">
                           {selectedUserIds.length === 0 
                             ? 'All Users' 
                             : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}`}
+                        </span>
+                        <span className="sm:hidden">
+                          {selectedUserIds.length === 0 
+                            ? '' 
+                            : selectedUserIds.length}
                         </span>
                       </div>
                       <ChevronDown size={14} className="shrink-0 ml-1" />
@@ -1364,8 +1369,8 @@ const Analytics = () => {
                   className="h-8 px-2 sm:px-3 text-xs sm:text-sm"
                   onClick={() => setShowDatePickers(!showDatePickers)}
                 >
-                  <CalendarIcon size={14} className="mr-1 shrink-0" />
-                  Select Dates
+                  <CalendarIcon size={14} className="sm:mr-1 shrink-0" />
+                  <span className="hidden sm:inline">Select Dates</span>
                 </Button>
 
                 {/* From and To Date Pickers - shown when toggled */}
@@ -1413,8 +1418,8 @@ const Analytics = () => {
 
                 <Button 
                   variant="outline" 
-                  size="sm"
-                  className="h-8 px-2 sm:px-3 shrink-0"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
                   onClick={() => {
                     fetchDashboardData();
                     const selectedUserNames = selectedUserIds
@@ -1423,8 +1428,7 @@ const Analytics = () => {
                     fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
                   }}
                 >
-                  <RefreshCw size={14} className="sm:mr-1.5" />
-                  <span className="hidden sm:inline">Refresh</span>
+                  <RefreshCw size={14} />
                 </Button>
               </div>
 

@@ -372,7 +372,7 @@ export const AttendanceMarketHoursSection = ({
                             // Single user: show day-wise breakdown
                             drilldownData.length > 0 ? drilldownData.map((row, index) => (
                               <TableRow key={index} className="hover:bg-muted/30">
-                                <TableCell className="font-medium py-1.5">{row.date}</TableCell>
+                                <TableCell className="font-medium py-1.5">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
                                 <TableCell className="text-right text-blue-600 font-medium py-1.5">
                                   {formatHours(row.working_hours)}
                                 </TableCell>
@@ -382,7 +382,7 @@ export const AttendanceMarketHoursSection = ({
                               </TableRow>
                             )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => (
                               <TableRow key={index} className="hover:bg-muted/30">
-                                <TableCell className="font-medium py-1.5">{row.date}</TableCell>
+                                <TableCell className="font-medium py-1.5">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
                                 <TableCell className="text-right text-blue-600 font-medium py-1.5">
                                   {formatHours(row.working_hours)}
                                 </TableCell>
@@ -488,7 +488,7 @@ export const AttendanceMarketHoursSection = ({
                 <TableBody>
                   {drilldownData.map((row, index) => (
                     <TableRow key={index} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{row.date}</TableCell>
+                      <TableCell className="font-medium">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
                       <TableCell className="text-right text-blue-600 font-medium">
                         {formatHours(row.working_hours)}
                       </TableCell>
