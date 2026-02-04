@@ -1,7 +1,9 @@
 import { useState, memo, useCallback } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatDialog } from './ChatDialog';
+import { InteractionModeSelector } from './InteractionModeSelector';
+import { VoiceConversationDialog } from './VoiceConversationDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -17,18 +19,73 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
+type InteractionMode = 'selecting' | 'text' | 'voice';
+
 export const ChatWidget = memo(() => {
   const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState<InteractionMode>('selecting');
   const isMobile = useIsMobile();
   const { user } = useAuth();
   
+  const handleOpen = useCallback(() => {
+    setMode('selecting');
+    setIsOpen(true);
+  }, []);
+  
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    setMode('selecting');
+  }, []);
+
+  const handleSelectText = useCallback(() => setMode('text'), []);
+  const handleSelectVoice = useCallback(() => setMode('voice'), []);
+  const handleBack = useCallback(() => setMode('selecting'), []);
+
   // Don't render chat widget if user is not logged in
   if (!user) {
     return null;
   }
-  
-  const handleOpen = useCallback(() => setIsOpen(true), []);
-  const handleClose = useCallback(() => setIsOpen(false), []);
+
+  const getTitle = () => {
+    switch (mode) {
+      case 'text': return 'Text Chat';
+      case 'voice': return 'Voice Assistant';
+      default: return 'AI Assistant';
+    }
+  };
+
+  const renderContent = () => {
+    switch (mode) {
+      case 'text':
+        return <ChatDialog onClose={handleClose} />;
+      case 'voice':
+        return <VoiceConversationDialog onClose={handleClose} />;
+      default:
+        return (
+          <InteractionModeSelector 
+            onSelectText={handleSelectText} 
+            onSelectVoice={handleSelectVoice} 
+          />
+        );
+    }
+  };
+
+  const renderHeader = () => (
+    <div className="flex items-center gap-2">
+      {mode !== 'selecting' && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
+          onClick={handleBack}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+      )}
+      <MessageCircle className="h-5 w-5" />
+      {getTitle()}
+    </div>
+  );
 
   return (
     <>
@@ -50,11 +107,10 @@ export const ChatWidget = memo(() => {
           <DrawerContent className="h-[85vh] max-h-[85vh]">
             <DrawerHeader className="border-b bg-primary text-primary-foreground">
               <DrawerTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                AI Assistant
+                {renderHeader()}
               </DrawerTitle>
             </DrawerHeader>
-            <ChatDialog onClose={handleClose} />
+            {renderContent()}
           </DrawerContent>
         </Drawer>
       ) : (
@@ -63,11 +119,10 @@ export const ChatWidget = memo(() => {
           <SheetContent side="right" className="w-[400px] sm:w-[500px] p-0 flex flex-col">
             <SheetHeader className="border-b bg-primary text-primary-foreground p-4">
               <SheetTitle className="flex items-center gap-2 text-primary-foreground">
-                <MessageCircle className="h-5 w-5" />
-                AI Assistant
+                {renderHeader()}
               </SheetTitle>
             </SheetHeader>
-            <ChatDialog onClose={handleClose} />
+            {renderContent()}
           </SheetContent>
         </Sheet>
       )}
