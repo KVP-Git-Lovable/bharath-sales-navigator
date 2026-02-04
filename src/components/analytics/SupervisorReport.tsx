@@ -827,6 +827,19 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     return filteredData;
   }, [rawPieChartData, totalKgAll, orderUserFilter]);
 
+  // Filtered summary data for the table - sorted by total_kg and filtered by Top 5 / Bottom 5
+  const filteredSummaryData = useMemo(() => {
+    // summaryData is already sorted by total_kg descending
+    const sortedData = [...summaryData].sort((a, b) => b.total_kg - a.total_kg);
+    
+    if (orderUserFilter === 'top5' && sortedData.length > 5) {
+      return sortedData.slice(0, 5);
+    } else if (orderUserFilter === 'bottom5' && sortedData.length > 5) {
+      return sortedData.slice(-5);
+    }
+    return sortedData;
+  }, [summaryData, orderUserFilter]);
+
   const handlePieClick = (data: any) => {
     if (data && data.name) {
       // Check if this is the "Others" segment
@@ -1646,7 +1659,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                     )}
                   >
                     <ScrollAreaPrimitive.Viewport
-                      className={cn("w-full", summaryData.length > 6 && "max-h-[320px]", isMobile && "overflow-x-scroll")}
+                      className={cn("w-full", filteredSummaryData.length > 6 && "max-h-[320px]", isMobile && "overflow-x-scroll")}
                     >
                       <div className="min-w-max">
                         <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
@@ -1658,7 +1671,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                             </tr>
                           </thead>
                           <tbody>
-                            {summaryData.map((row, index) => (
+                            {filteredSummaryData.map((row, index) => (
                               <tr 
                                 key={index} 
                                 className={cn(
@@ -1687,12 +1700,14 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                           </tbody>
                           <tfoot className="bg-background sticky bottom-0 z-10">
                             <tr className="border-t">
-                              <td className={cn("font-semibold align-middle", isMobile ? "py-1 px-2" : "p-4")}>Total</td>
+                              <td className={cn("font-semibold align-middle", isMobile ? "py-1 px-2" : "p-4")}>
+                                Total{orderUserFilter !== 'all' ? ` (${filteredSummaryData.length})` : ''}
+                              </td>
                               <td className={cn("text-right font-bold text-primary align-middle", isMobile ? "py-1 px-2" : "p-4")}>
-                                {totalKgAll.toLocaleString()}
+                                {filteredSummaryData.reduce((sum, r) => sum + r.total_kg, 0).toLocaleString()}
                               </td>
                               <td className={cn("text-right font-bold align-middle", isMobile ? "py-1 px-2" : "p-4")}>
-                                ₹{totalOrderValue.toLocaleString()}
+                                ₹{filteredSummaryData.reduce((sum, r) => sum + r.total_order_value, 0).toLocaleString()}
                               </td>
                             </tr>
                           </tfoot>
