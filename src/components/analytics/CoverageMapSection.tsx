@@ -47,7 +47,7 @@ export function CoverageMapSection({ selectedUserIds }: CoverageMapSectionProps)
     try {
       setIsLoading(true);
 
-      // Fetch current user
+      // Fetch current user for authentication check
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('User not authenticated');
@@ -55,29 +55,12 @@ export function CoverageMapSection({ selectedUserIds }: CoverageMapSectionProps)
         return;
       }
 
-      // Determine which user IDs to query
-      let targetUserIds: string[] = selectedUserIds;
-      
-      if (targetUserIds.length === 0) {
-        const { data: subordinates } = await supabase.rpc('get_all_subordinates', { manager_user_id: user.id });
-        targetUserIds = subordinates?.map((s: any) => s.user_id) || [];
-        if (!targetUserIds.includes(user.id)) {
-          targetUserIds.push(user.id);
-        }
-      }
-
-      // Fetch retailers with coordinates
-      let retailersQuery = supabase
+      // Fetch ALL retailers with coordinates (no owner_id filter to match 'All Retailers' page behavior)
+      const { data: retailers } = await supabase
         .from('retailers')
-        .select('id, name, latitude, longitude, owner_id')
+        .select('id, name, latitude, longitude')
         .not('latitude', 'is', null)
         .not('longitude', 'is', null);
-
-      if (targetUserIds.length > 0) {
-        retailersQuery = retailersQuery.in('owner_id', targetUserIds);
-      }
-
-      const { data: retailers } = await retailersQuery;
 
       // Fetch territories (will geocode by name)
       const { data: territories } = await supabase
