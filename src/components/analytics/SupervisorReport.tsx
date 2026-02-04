@@ -1496,36 +1496,29 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
               <p className="text-muted-foreground">Loading data...</p>
             </div>
           ) : summaryData.length > 0 ? (
-            <div className={cn(
-              "grid grid-cols-1 gap-6 transition-all duration-300",
-              hideOrderChart ? "" : (selectedSummaryUser ? "lg:grid-cols-5" : "lg:grid-cols-2")
-            )}>
-              {/* Chart Section - shrinks when beat split is open, hidden when hideOrderChart is true */}
-              {!hideOrderChart && (
-              <div className={cn(
-                "space-y-2 transition-all duration-300",
-                selectedSummaryUser ? "lg:col-span-2" : "lg:col-span-1"
-              )}>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant={orderUserFilter === 'top5' ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-7 text-xs px-2"
-                      onClick={() => setOrderUserFilter(orderUserFilter === 'top5' ? 'all' : 'top5')}
-                    >
-                      Top 5
-                    </Button>
-                    <Button
-                      variant={orderUserFilter === 'bottom5' ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-7 text-xs px-2"
-                      onClick={() => setOrderUserFilter(orderUserFilter === 'bottom5' ? 'all' : 'bottom5')}
-                    >
-                      Bottom 5
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-1">
+            <>
+              {/* Filter Buttons - Always visible */}
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant={orderUserFilter === 'top5' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs px-2"
+                    onClick={() => setOrderUserFilter(orderUserFilter === 'top5' ? 'all' : 'top5')}
+                  >
+                    Top 5
+                  </Button>
+                  <Button
+                    variant={orderUserFilter === 'bottom5' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs px-2"
+                    onClick={() => setOrderUserFilter(orderUserFilter === 'bottom5' ? 'all' : 'bottom5')}
+                  >
+                    Bottom 5
+                  </Button>
+                </div>
+                <div className="flex items-center gap-1">
+                  {!hideOrderChart && (
                     <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
                       <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
                         <PieChartIcon className="h-4 w-4" />
@@ -1534,90 +1527,100 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                         <BarChart3 className="h-4 w-4" />
                       </ToggleGroupItem>
                     </ToggleGroup>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setHideOrderChart(!hideOrderChart)}
-                      title={hideOrderChart ? "Show Visual" : "Hide Visual"}
-                    >
-                      {hideOrderChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setHideOrderChart(!hideOrderChart)}
+                    title={hideOrderChart ? "Show Visual" : "Hide Visual"}
+                  >
+                    {hideOrderChart ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </Button>
                 </div>
-                {!hideOrderChart && (
-                  <ResponsiveContainer width="100%" height={isMobile ? 280 : (selectedSummaryUser ? 280 : 350)}>
-                    {chartType === 'pie' ? (
-                      <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
-                        <Pie
-                          data={pieChartData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={isMobile ? 70 : (selectedSummaryUser ? 90 : 120)}
-                          label={false}
-                          labelLine={false}
-                          onClick={handlePieClick}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {pieChartData.map((entry, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill={entry.color}
-                              stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
-                              strokeWidth={selectedUserDetails === entry.name ? 3 : 0}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value: number, name: string, props: any) => {
-                            const entry = props.payload;
-                            return [`${value.toLocaleString()} KG`, name];
-                          }}
-                          labelFormatter={() => ''}
-                        />
-                        <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : (selectedSummaryUser ? '10px' : '12px') }} />
-                      </PieChart>
-                    ) : (
-                      <BarChart data={pieChartData} layout="vertical" margin={{ left: isMobile ? 10 : 20, right: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                        <XAxis type="number" tickFormatter={(value) => `${value.toLocaleString()} KG`} />
-                        <YAxis 
-                          type="category" 
-                          dataKey="name" 
-                          width={isMobile ? 70 : (selectedSummaryUser ? 60 : 80)} 
-                          tick={{ fontSize: isMobile ? 9 : (selectedSummaryUser ? 10 : 12) }}
-                          tickFormatter={(value) => {
-                            if (isMobile && value.length > 10) {
-                              return value.substring(0, 10) + '...';
-                            }
-                            return value;
-                          }}
-                        />
-                        <Tooltip 
-                          formatter={(value: number, name: string) => [`${value.toLocaleString()} KG`, name]}
-                          labelFormatter={() => ''}
-                        />
-                        <Bar 
-                          dataKey="value" 
-                          onClick={(data) => handlePieClick(data)}
-                          style={{ cursor: 'pointer' }}
-                          label={isMobile ? undefined : undefined}
-                        >
-                          {pieChartData.map((entry, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill={entry.color}
-                              stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
-                              strokeWidth={selectedUserDetails === entry.name ? 2 : 0}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    )}
-                  </ResponsiveContainer>
-                )}
+              </div>
+
+              <div className={cn(
+                "grid grid-cols-1 gap-6 transition-all duration-300",
+                hideOrderChart ? "" : (selectedSummaryUser ? "lg:grid-cols-5" : "lg:grid-cols-2")
+              )}>
+              {/* Chart Section - shrinks when beat split is open, hidden when hideOrderChart is true */}
+              {!hideOrderChart && (
+              <div className={cn(
+                "space-y-2 transition-all duration-300",
+                selectedSummaryUser ? "lg:col-span-2" : "lg:col-span-1"
+              )}>
+                <ResponsiveContainer width="100%" height={isMobile ? 280 : (selectedSummaryUser ? 280 : 350)}>
+                  {chartType === 'pie' ? (
+                    <PieChart margin={isMobile ? { top: 20, right: 20, bottom: 20, left: 20 } : undefined}>
+                      <Pie
+                        data={pieChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={isMobile ? 70 : (selectedSummaryUser ? 90 : 120)}
+                        label={false}
+                        labelLine={false}
+                        onClick={handlePieClick}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color}
+                            stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
+                            strokeWidth={selectedUserDetails === entry.name ? 3 : 0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => {
+                          const entry = props.payload;
+                          return [`${value.toLocaleString()} KG`, name];
+                        }}
+                        labelFormatter={() => ''}
+                      />
+                      <Legend wrapperStyle={{ fontSize: isMobile ? '6px' : (selectedSummaryUser ? '10px' : '12px') }} />
+                    </PieChart>
+                  ) : (
+                    <BarChart data={pieChartData} layout="vertical" margin={{ left: isMobile ? 10 : 20, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" tickFormatter={(value) => `${value.toLocaleString()} KG`} />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        width={isMobile ? 70 : (selectedSummaryUser ? 60 : 80)} 
+                        tick={{ fontSize: isMobile ? 9 : (selectedSummaryUser ? 10 : 12) }}
+                        tickFormatter={(value) => {
+                          if (isMobile && value.length > 10) {
+                            return value.substring(0, 10) + '...';
+                          }
+                          return value;
+                        }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [`${value.toLocaleString()} KG`, name]}
+                        labelFormatter={() => ''}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        onClick={(data) => handlePieClick(data)}
+                        style={{ cursor: 'pointer' }}
+                        label={isMobile ? undefined : undefined}
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color}
+                            stroke={selectedUserDetails === entry.name ? '#000' : 'transparent'}
+                            strokeWidth={selectedUserDetails === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
               </div>
               )}
 
@@ -1758,6 +1761,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                 </div>
               </div>
             </div>
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No data found for the selected filters
