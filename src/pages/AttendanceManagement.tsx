@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, X, Clock, User, UserCheck, Calendar, Users, ClipboardList, ArrowLeft, Settings, CalendarDays } from 'lucide-react';
+import { Check, X, Clock, User, UserCheck, Calendar, Users, ClipboardList, ArrowLeft, Settings, CalendarDays, FileText, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import LiveAttendanceMonitoring from '@/components/LiveAttendanceMonitoring';
@@ -14,6 +14,9 @@ import HolidayManagement from '@/components/HolidayManagement';
 import LeaveBalancesManager from '@/components/attendance/LeaveBalancesManager';
 import AttendancePolicyConfig from '@/components/attendance/AttendancePolicyConfig';
 import WorkingDaysConfig from '@/components/attendance/WorkingDaysConfig';
+import LeaveTypesManager from '@/components/attendance/LeaveTypesManager';
+import TeamLeaveCalendar from '@/components/attendance/TeamLeaveCalendar';
+import LeaveLedger from '@/components/attendance/LeaveLedger';
 import { Layout } from '@/components/Layout';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 
@@ -357,6 +360,39 @@ const AttendanceManagement = () => {
             Leave Balances
           </button>
           <button
+            onClick={() => setActiveTab('leave-types')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'leave-types'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <FileText className="w-4 h-4 mr-1.5" />
+            Leave Types
+          </button>
+          <button
+            onClick={() => setActiveTab('leave-calendar')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'leave-calendar'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Calendar className="w-4 h-4 mr-1.5" />
+            Leave Calendar
+          </button>
+          <button
+            onClick={() => setActiveTab('leave-ledger')}
+            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+              activeTab === 'leave-ledger'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 mr-1.5" />
+            Leave Ledger
+          </button>
+          <button
             onClick={() => setActiveTab('holidays')}
             className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
               activeTab === 'holidays'
@@ -610,6 +646,12 @@ const AttendanceManagement = () => {
       )}
 
       {activeTab === 'leave-balances' && <LeaveBalancesManager />}
+
+      {activeTab === 'leave-types' && <LeaveTypesManager />}
+
+      {activeTab === 'leave-calendar' && <TeamLeaveCalendar />}
+
+      {activeTab === 'leave-ledger' && <LeaveLedger />}
 
       {activeTab === 'holidays' && <HolidayManagement />}
 
