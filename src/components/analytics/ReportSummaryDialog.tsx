@@ -211,6 +211,43 @@ export const ReportSummaryDialog = ({
     return parts.join(' ');
   };
 
+  // Generate Hindi spoken version for TTS
+  const generateHindiSpokenSummary = (): string => {
+    const parts: string[] = [];
+    
+    const fromStr = dateRange.from.toLocaleDateString('hi-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const toStr = dateRange.to.toLocaleDateString('hi-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    parts.push(`सुपरवाइजर रिपोर्ट सारांश, ${fromStr} से ${toStr} तक।`);
+    
+    if (allUsersSummary) {
+      parts.push(`कुल सारांश: ${allUsersSummary.retailers} रिटेलर्स, ${allUsersSummary.beats} बीट्स, ${allUsersSummary.products} प्रोडक्ट्स, और कुल ${allUsersSummary.totalKg.toFixed(2)} किलोग्राम मात्रा।`);
+    }
+    
+    if (orderSummaryData.length > 0) {
+      const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
+      const topOrderUser = orderSummaryData[0];
+      parts.push(`ऑर्डर सारांश: ${orderSummaryData.length} यूजर्स ने कुल ${totalOrderValue.toLocaleString('hi-IN')} रुपये का ऑर्डर किया। सबसे अच्छा प्रदर्शन ${topOrderUser?.full_name} का रहा, जिन्होंने ${topOrderUser?.total_order_value.toLocaleString('hi-IN')} रुपये का ऑर्डर लिया।`);
+    }
+    
+    if (skuData.length > 0) {
+      const totalRevenue = skuData.reduce((sum, s) => sum + s.revenue, 0);
+      const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
+      parts.push(`SKU रेवेन्यू सारांश: ${skuData.length} SKUs से कुल ${totalRevenue.toLocaleString('hi-IN')} रुपये की आय हुई। सबसे ज्यादा बिकने वाला प्रोडक्ट ${topProduct?.product_name} है।`);
+    }
+    
+    if (productivityData.length > 0) {
+      const totalProductive = productivityData.reduce((sum, p) => sum + p.productive_visits, 0);
+      const totalVisits = productivityData.reduce((sum, p) => sum + p.total_visits, 0);
+      const avgProductivity = totalVisits > 0 ? (totalProductive / totalVisits) * 100 : 0;
+      const topProductiveUser = productivityData.reduce((max, p) => 
+        p.productivity_percentage > max.productivity_percentage ? p : max, productivityData[0]
+      );
+      parts.push(`प्रोडक्टिविटी सारांश: कुल ${totalVisits} विज़िट्स में से ${totalProductive} प्रोडक्टिव रहीं, जिसमें कुल प्रोडक्टिविटी ${avgProductivity.toFixed(1)} प्रतिशत रही। सबसे ज्यादा प्रोडक्टिव ${topProductiveUser?.full_name} रहे, जिनकी प्रोडक्टिविटी ${topProductiveUser?.productivity_percentage.toFixed(1)} प्रतिशत रही।`);
+    }
+    
+    return parts.join(' ');
+  };
+
   const summary = generateSummary();
   
   const handleCopy = () => {
@@ -224,6 +261,15 @@ export const ReportSummaryDialog = ({
     } else {
       const spokenSummary = generateSpokenSummary();
       playSummary(spokenSummary);
+    }
+  };
+
+  const handlePlayHindiSummary = () => {
+    if (isPlaying) {
+      stopAllAudio();
+    } else {
+      const hindiSummary = generateHindiSpokenSummary();
+      playSummary(hindiSummary, 'qsz5tTEjPvsiIJZIpM8S');
     }
   };
 
@@ -280,6 +326,24 @@ export const ReportSummaryDialog = ({
                     <>
                       <Volume2 className="h-4 w-4 mr-2" />
                       Play
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handlePlayHindiSummary}
+                  disabled={isProcessing}
+                >
+                  {isPlaying ? (
+                    <>
+                      <VolumeX className="h-4 w-4 mr-2" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="h-4 w-4 mr-2" />
+                      Play in Hindi
                     </>
                   )}
                 </Button>
