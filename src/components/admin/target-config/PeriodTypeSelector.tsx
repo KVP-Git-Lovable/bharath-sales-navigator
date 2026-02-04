@@ -15,7 +15,6 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string; description: string; i
   { value: 'annual', label: 'Annual', description: 'Single FY total', icon: Calendar },
   { value: 'biannual', label: 'Bi-Annual', description: 'H1 & H2 targets', icon: CalendarRange },
   { value: 'quarterly', label: 'Quarterly', description: 'Q1-Q4 targets', icon: CalendarDays },
-  { value: 'monthly', label: 'Monthly', description: '12 month targets', icon: Layers },
 ];
 
 export function PeriodTypeSelector({ value, onChange, disabled }: PeriodTypeSelectorProps) {
