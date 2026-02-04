@@ -39,6 +39,7 @@ import {
   useBusinessMetrics
 } from "@/components/analytics";
 import { SupervisorReport } from "@/components/analytics/SupervisorReport";
+import { CoverageMapSection } from "@/components/analytics/CoverageMapSection";
 interface UserProfile {
   id: string;
   full_name: string | null;
@@ -1511,7 +1512,7 @@ const Analytics = () => {
                   <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>
                   <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
                   <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
-                  <TabsTrigger value="retailers" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Retailers</TabsTrigger>
+                  <TabsTrigger value="coverage" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Coverage</TabsTrigger>
                 </TabsList>
               </div>
               <button
@@ -1949,139 +1950,9 @@ const Analytics = () => {
               </Card>
             </TabsContent>
 
-            {/* Retailers Tab */}
-            <TabsContent value="retailers" className="space-y-4">
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="text-green-500" />
-                    Top 10 Retailers
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Based on order value and productive visits
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2 text-sm font-medium">Rank</th>
-                          <th className="text-left p-2 text-sm font-medium">Retailer Name</th>
-                          <th className="text-left p-2 text-sm font-medium">Address</th>
-                          <th className="text-right p-2 text-sm font-medium">Productive Visits</th>
-                          <th className="text-right p-2 text-sm font-medium">Order Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {topRetailers.map((retailer: any, index: number) => (
-                          <tr key={retailer.id} className="border-b hover:bg-muted/50">
-                            <td className="p-2 text-sm font-bold text-primary">{index + 1}</td>
-                            <td className="p-2 text-sm font-medium">{retailer.name}</td>
-                            <td className="p-2 text-sm text-muted-foreground">{retailer.address}</td>
-                            <td className="p-2 text-sm text-right">{retailer.productiveVisits}</td>
-                            <td className="p-2 text-sm text-right font-semibold text-green-600">₹{retailer.orderValue.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                        {topRetailers.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="p-4 text-center text-muted-foreground">
-                              No data available for selected period
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingDown className="text-orange-500" />
-                    Bottom 10 Retailers
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Retailers needing attention
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2 text-sm font-medium">Retailer Name</th>
-                          <th className="text-left p-2 text-sm font-medium">Address</th>
-                          <th className="text-right p-2 text-sm font-medium">Productive Visits</th>
-                          <th className="text-right p-2 text-sm font-medium">Order Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bottomRetailers.map((retailer: any) => (
-                          <tr key={retailer.id} className="border-b hover:bg-muted/50">
-                            <td className="p-2 text-sm font-medium">{retailer.name}</td>
-                            <td className="p-2 text-sm text-muted-foreground">{retailer.address}</td>
-                            <td className="p-2 text-sm text-right">{retailer.productiveVisits}</td>
-                            <td className="p-2 text-sm text-right font-semibold text-orange-600">₹{retailer.orderValue.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                        {bottomRetailers.length === 0 && (
-                          <tr>
-                            <td colSpan={4} className="p-4 text-center text-muted-foreground">
-                              No data available for selected period
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="text-blue-500" />
-                    Retailer Feedback
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Feedback captured during visits
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {retailerFeedback.length > 0 ? (
-                      retailerFeedback.map((feedback: any, index: number) => (
-                        <div key={index} className="p-4 bg-muted/20 rounded-lg border">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <div className="font-semibold">{feedback.retailerName}</div>
-                              <div className="text-sm text-muted-foreground capitalize">{feedback.feedback_type}</div>
-                            </div>
-                            {feedback.rating && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-lg font-bold">{feedback.rating}</span>
-                                <span className="text-yellow-500">★</span>
-                              </div>
-                            )}
-                          </div>
-                          {feedback.comments && (
-                            <div className="text-sm mt-2">{feedback.comments}</div>
-                          )}
-                          <div className="text-xs text-muted-foreground mt-2">
-                            {format(new Date(feedback.created_at), 'MMM dd, yyyy')}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-4 text-center text-muted-foreground">
-                        No feedback available for selected period
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Coverage Tab */}
+            <TabsContent value="coverage" className="space-y-4">
+              <CoverageMapSection selectedUserIds={selectedUserIds} />
             </TabsContent>
 
             {/* Predictive Analytics Tab - Hidden */}
