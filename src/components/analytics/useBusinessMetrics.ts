@@ -449,8 +449,7 @@ export const useBusinessMetrics = () => {
           order_date,
           credit_pending_amount,
           user_id,
-          retailers(name),
-          profiles(full_name)
+          retailers(name)
         `)
         .gte('order_date', fromDate)
         .lte('order_date', toDate)
@@ -463,6 +462,22 @@ export const useBusinessMetrics = () => {
 
       const { data } = await query;
 
+      // Fetch profile names separately since there's no FK from orders.user_id to profiles
+      const orderUserIds = [...new Set((data || []).map(o => o.user_id).filter(Boolean))];
+      let profilesMap: Record<string, string> = {};
+      
+      if (orderUserIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', orderUserIds);
+        
+        profilesMap = (profilesData || []).reduce((acc, p) => {
+          acc[p.id] = p.full_name || 'Unknown User';
+          return acc;
+        }, {} as Record<string, string>);
+      }
+
       setPendingPaymentDetails(
         (data || []).map(order => ({
           retailer_name: (order.retailers as any)?.name || 'Unknown',
@@ -470,7 +485,7 @@ export const useBusinessMetrics = () => {
           order_id: order.id,
           pending_amount: Number(order.credit_pending_amount || 0),
           user_id: order.user_id || '',
-          user_name: (order.profiles as any)?.full_name || 'Unknown User'
+          user_name: profilesMap[order.user_id || ''] || 'Unknown User'
         }))
       );
     } catch (error) {
