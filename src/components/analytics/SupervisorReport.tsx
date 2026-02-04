@@ -1650,89 +1650,63 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                   selectedSummaryUser ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
                 )}>
                   {/* Left: User Summary Table */}
-                  <ScrollAreaPrimitive.Root
-                    type="always"
-                    className={cn(
-                      "border rounded-lg",
-                      summaryData.length > 6 && "max-h-[320px]",
-                      isMobile && "overflow-x-scroll"
-                    )}
-                  >
-                    <ScrollAreaPrimitive.Viewport
-                      className={cn("w-full", filteredSummaryData.length > 6 && "max-h-[320px]", isMobile && "overflow-x-scroll")}
-                    >
-                      <div className="min-w-max">
-                        <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
-                          <thead className="sticky top-0 bg-muted/50 z-10">
-                            <tr className="bg-muted/50 border-b">
-                              <th className={cn("text-left font-medium text-muted-foreground", isMobile ? "py-1 px-2" : "h-12 px-4")}>Full Name</th>
-                              <th className={cn("text-right font-medium text-muted-foreground", isMobile ? "py-1 px-2" : "h-12 px-4")}>Qty (KG)</th>
-                              <th className={cn("text-right font-medium text-muted-foreground", isMobile ? "py-1 px-2" : "h-12 px-4")}>Total Order Value</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredSummaryData.map((row, index) => (
-                              <tr 
-                                key={index} 
-                                className={cn(
-                                  "cursor-pointer hover:bg-muted/50 transition-colors border-b",
-                                  selectedSummaryUser === row.full_name && "bg-primary/10 border-l-2 border-l-primary"
-                                )}
-                                onClick={() => handleSummaryRowClick(row.full_name)}
-                              >
-                                <td className={cn("align-middle", isMobile ? "py-0.5 px-2" : "p-4")}>
-                                  <div className="flex items-center gap-2">
-                                    <div 
-                                      className={cn(isMobile ? "w-2 h-2" : "w-3 h-3", "rounded-full shrink-0")}
-                                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                                    />
-                                    {row.full_name}
-                                  </div>
-                                </td>
-                                <td className={cn("text-right font-semibold text-primary align-middle", isMobile ? "py-0.5 px-2" : "p-4")}>
-                                  {row.total_kg.toLocaleString()}
-                                </td>
-                                <td className={cn("text-right font-semibold align-middle", isMobile ? "py-0.5 px-2" : "p-4")}>
-                                  ₹{row.total_order_value.toLocaleString()}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-background sticky bottom-0 z-10">
-                            <tr className="border-t">
-                              <td className={cn("font-semibold align-middle", isMobile ? "py-1 px-2" : "p-4")}>
-                                Total{orderUserFilter !== 'all' ? ` (${filteredSummaryData.length})` : ''}
+                  <div className={cn(
+                    "border rounded-lg scrollbar-always-visible",
+                    filteredSummaryData.length > 6 && "max-h-[320px]"
+                  )}>
+                    <div className="min-w-max">
+                      <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
+                        <thead className="sticky top-0 bg-muted/50 z-10">
+                          <tr className="bg-muted/50 border-b">
+                            <th className={cn("text-left font-medium text-muted-foreground whitespace-nowrap", isMobile ? "py-1 px-2" : "h-12 px-4")}>Full Name</th>
+                            <th className={cn("text-right font-medium text-muted-foreground whitespace-nowrap", isMobile ? "py-1 px-2" : "h-12 px-4")}>Qty (KG)</th>
+                            <th className={cn("text-right font-medium text-muted-foreground whitespace-nowrap", isMobile ? "py-1 px-2" : "h-12 px-4")}>Total Order Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredSummaryData.map((row, index) => (
+                            <tr 
+                              key={index} 
+                              className={cn(
+                                "cursor-pointer hover:bg-muted/50 transition-colors border-b",
+                                selectedSummaryUser === row.full_name && "bg-primary/10 border-l-2 border-l-primary"
+                              )}
+                              onClick={() => handleSummaryRowClick(row.full_name)}
+                            >
+                              <td className={cn("align-middle whitespace-nowrap", isMobile ? "py-0.5 px-2" : "p-4")}>
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className={cn(isMobile ? "w-2 h-2" : "w-3 h-3", "rounded-full shrink-0")}
+                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                  />
+                                  {row.full_name}
+                                </div>
                               </td>
-                              <td className={cn("text-right font-bold text-primary align-middle", isMobile ? "py-1 px-2" : "p-4")}>
-                                {filteredSummaryData.reduce((sum, r) => sum + r.total_kg, 0).toLocaleString()}
+                              <td className={cn("text-right font-semibold text-primary align-middle whitespace-nowrap", isMobile ? "py-0.5 px-2" : "p-4")}>
+                                {row.total_kg.toLocaleString()}
                               </td>
-                              <td className={cn("text-right font-bold align-middle", isMobile ? "py-1 px-2" : "p-4")}>
-                                ₹{filteredSummaryData.reduce((sum, r) => sum + r.total_order_value, 0).toLocaleString()}
+                              <td className={cn("text-right font-semibold align-middle whitespace-nowrap", isMobile ? "py-0.5 px-2" : "p-4")}>
+                                ₹{row.total_order_value.toLocaleString()}
                               </td>
                             </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </ScrollAreaPrimitive.Viewport>
-
-                    <ScrollAreaPrimitive.ScrollAreaScrollbar
-                      forceMount
-                      orientation="vertical"
-                      className="flex touch-none select-none transition-colors h-full w-2.5 border-l border-l-transparent p-[1px]"
-                    >
-                      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
-                    </ScrollAreaPrimitive.ScrollAreaScrollbar>
-
-                    <ScrollAreaPrimitive.ScrollAreaScrollbar
-                      forceMount
-                      orientation="horizontal"
-                      className="flex touch-none select-none transition-colors h-3 flex-col border-t border-t-transparent p-[1px] bg-muted/50"
-                    >
-                      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-primary/40 hover:bg-primary/60" />
-                    </ScrollAreaPrimitive.ScrollAreaScrollbar>
-
-                    <ScrollAreaPrimitive.Corner />
-                  </ScrollAreaPrimitive.Root>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-background sticky bottom-0 z-10">
+                          <tr className="border-t">
+                            <td className={cn("font-semibold align-middle whitespace-nowrap", isMobile ? "py-1 px-2" : "p-4")}>
+                              Total{orderUserFilter !== 'all' ? ` (${filteredSummaryData.length})` : ''}
+                            </td>
+                            <td className={cn("text-right font-bold text-primary align-middle whitespace-nowrap", isMobile ? "py-1 px-2" : "p-4")}>
+                              {filteredSummaryData.reduce((sum, r) => sum + r.total_kg, 0).toLocaleString()}
+                            </td>
+                            <td className={cn("text-right font-bold align-middle whitespace-nowrap", isMobile ? "py-1 px-2" : "p-4")}>
+                              ₹{filteredSummaryData.reduce((sum, r) => sum + r.total_order_value, 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
 
                   {/* Right: Beat-wise Breakdown Panel */}
                   {selectedSummaryUser && (

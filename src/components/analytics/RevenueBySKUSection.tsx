@@ -370,80 +370,57 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                   </Button>
                 </div>
               </div>
-              <ScrollAreaPrimitive.Root
-                type="always"
-                className={cn("border rounded-lg max-h-[400px]", isMobile && "overflow-x-scroll")}
-              >
-                <ScrollAreaPrimitive.Viewport className={cn("w-full max-h-[400px]", isMobile && "overflow-x-scroll")}>
-                  <div className="min-w-max">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-muted/50 z-10">
-                        <TableRow>
-                          <TableHead className="text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Product</TableHead>
-                          <TableHead className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Qty</TableHead>
-                          <TableHead className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Revenue</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredSkuData.map((row, index) => (
-                          <TableRow key={index} className="hover:bg-muted/30">
-                            <TableCell className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3">
-                              <div 
-                                className="w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0" 
-                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                              />
-                              <span className="truncate max-w-[100px] sm:max-w-[150px]" title={row.product_name}>
-                                {row.product_name}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
-                              {(() => {
-                                const unit = (row.unit || '').toLowerCase();
-                                if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-                                  return `${(row.quantity_sold / 1000).toFixed(2)} KG`;
-                                }
-                                return `${row.quantity_sold.toFixed(1)} ${row.unit}`;
-                              })()}
-                            </TableCell>
-                            <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
-                              ₹{row.revenue.toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                      <tfoot className="bg-background border-t sticky bottom-0 z-10">
-                        <TableRow>
-                          <TableCell className="text-[10px] sm:text-xs font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Total ({filteredSkuData.length} SKUs)</TableCell>
+              <div className="border rounded-lg max-h-[400px] scrollbar-always-visible">
+                <div className="min-w-max">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                      <TableRow>
+                        <TableHead className="text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Product</TableHead>
+                        <TableHead className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Qty</TableHead>
+                        <TableHead className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Revenue</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSkuData.map((row, index) => (
+                        <TableRow key={index} className="hover:bg-muted/30">
+                          <TableCell className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs py-1 px-1.5 sm:py-1.5 sm:px-3">
+                            <div 
+                              className="w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            />
+                            <span className="truncate max-w-[100px] sm:max-w-[150px]" title={row.product_name}>
+                              {row.product_name}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-[10px] sm:text-xs text-right py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
+                            {(() => {
+                              const unit = (row.unit || '').toLowerCase();
+                              if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+                                return `${(row.quantity_sold / 1000).toFixed(2)} KG`;
+                              }
+                              return `${row.quantity_sold.toFixed(1)} ${row.unit}`;
+                            })()}
+                          </TableCell>
                           <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
-                            {totalQuantityKG.toFixed(2)} KG
-                          </TableCell>
-                          <TableCell className="text-[10px] sm:text-xs text-right font-bold text-primary py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
-                            ₹{totalRevenue.toLocaleString()}
+                            ₹{row.revenue.toLocaleString()}
                           </TableCell>
                         </TableRow>
-                      </tfoot>
-                    </Table>
-                  </div>
-                </ScrollAreaPrimitive.Viewport>
-
-                <ScrollAreaPrimitive.ScrollAreaScrollbar
-                  forceMount
-                  orientation="vertical"
-                  className="flex touch-none select-none transition-colors w-2.5 border-l border-l-transparent p-[1px]"
-                >
-                  <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
-                </ScrollAreaPrimitive.ScrollAreaScrollbar>
-
-                <ScrollAreaPrimitive.ScrollAreaScrollbar
-                  forceMount
-                  orientation="horizontal"
-                  className="flex touch-none select-none transition-colors h-3 flex-col border-t border-t-transparent p-[1px] bg-muted/50"
-                >
-                  <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-primary/40 hover:bg-primary/60" />
-                </ScrollAreaPrimitive.ScrollAreaScrollbar>
-
-                <ScrollAreaPrimitive.Corner />
-              </ScrollAreaPrimitive.Root>
+                      ))}
+                    </TableBody>
+                    <tfoot className="bg-background border-t sticky bottom-0 z-10">
+                      <TableRow>
+                        <TableCell className="text-[10px] sm:text-xs font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">Total ({filteredSkuData.length} SKUs)</TableCell>
+                        <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
+                          {totalQuantityKG.toFixed(2)} KG
+                        </TableCell>
+                        <TableCell className="text-[10px] sm:text-xs text-right font-bold text-primary py-1 px-1.5 sm:py-1.5 sm:px-3 whitespace-nowrap">
+                          ₹{totalRevenue.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    </tfoot>
+                  </Table>
+                </div>
+              </div>
             </div>
             {/* Close grid */}
             </div>

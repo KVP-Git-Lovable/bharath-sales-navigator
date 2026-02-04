@@ -277,154 +277,132 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
               <p className="text-muted-foreground">Loading productivity data...</p>
             </div>
           ) : productivityData.length > 0 ? (
-            <ScrollAreaPrimitive.Root
-              type="always"
-              className={cn("relative border rounded-lg", isMobile && "overflow-x-scroll")}
-            >
-              <ScrollAreaPrimitive.Viewport
-                className={cn('w-full', scrollViewportClassName, isMobile && "overflow-x-scroll")}
-              >
-                <div className="min-w-max">
-                  {isSingleUserMode ? (
-                // Single user: Day-wise breakdown (original view)
-                <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
-                  <thead className="sticky top-0 bg-muted z-20">
-                    <TableRow className="border-b">
-                      <TableHead className={cn(isMobile ? "py-1 px-2" : "py-1.5")}>Date</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Total</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
-                    </TableRow>
-                  </thead>
-                  <TableBody>
-                    {productivityData.map((row, index) => (
-                      <TableRow key={index} className="hover:bg-muted/30">
-                        <TableCell className={cn("font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>{row.planned_date}</TableCell>
-                        <TableCell className={cn("text-right text-green-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.productive_visits}
-                        </TableCell>
-                        <TableCell className={cn("text-right text-orange-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.unproductive_visits}
-                        </TableCell>
-                        <TableCell className={cn("text-right font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.total_visits}
-                        </TableCell>
-                        <TableCell className={cn("text-right font-semibold", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          <span className={getProductivityColor(row.productivity_percentage)}>
-                            {row.productivity_percentage}%
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <tfoot className="bg-background border-t sticky bottom-0 z-10">
-                    <TableRow>
-                      <TableCell className={cn("font-semibold", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({productivityData.length} days)</TableCell>
-                      <TableCell className={cn("text-right font-bold text-green-600", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {singleUserTotals.productive}
+            <div className={cn(
+              "relative border rounded-lg scrollbar-always-visible",
+              productivityData.length > 8 && "max-h-[400px]"
+            )}>
+              <div className="min-w-max">
+                {isSingleUserMode ? (
+              // Single user: Day-wise breakdown (original view)
+              <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
+                <thead className="sticky top-0 bg-muted z-20">
+                  <TableRow className="border-b">
+                    <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Date</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
+                  </TableRow>
+                </thead>
+                <TableBody>
+                  {productivityData.map((row, index) => (
+                    <TableRow key={index} className="hover:bg-muted/30">
+                      <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.planned_date}</TableCell>
+                      <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.productive_visits}
                       </TableCell>
-                      <TableCell className={cn("text-right font-bold text-orange-600", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {singleUserTotals.unproductive}
+                      <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.unproductive_visits}
                       </TableCell>
-                      <TableCell className={cn("text-right font-bold", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {singleUserTotals.total}
+                      <TableCell className={cn("text-right font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.total_visits}
                       </TableCell>
-                      <TableCell className={cn("text-right font-bold text-primary", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {singleUserTotals.avgProductivity}%
+                      <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        <span className={getProductivityColor(row.productivity_percentage)}>
+                          {row.productivity_percentage}%
+                        </span>
                       </TableCell>
                     </TableRow>
-                  </tfoot>
-                </table>
-              ) : (
-                // Multi-user: User-wise summary (click to drill down)
-                <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
-                  <thead className="sticky top-0 bg-muted z-20">
-                    <TableRow className="border-b">
-                      <TableHead className={cn(isMobile ? "py-1 px-2" : "py-1.5")}>User</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
-                      <TableHead className={cn("text-right", isMobile ? "py-1 px-2" : "py-1.5")}>Total</TableHead>
-                      <TableHead className={cn(isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>
+                  ))}
+                </TableBody>
+                <tfoot className="bg-background border-t sticky bottom-0 z-10">
+                  <TableRow>
+                    <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({productivityData.length} days)</TableCell>
+                    <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {singleUserTotals.productive}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {singleUserTotals.unproductive}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {singleUserTotals.total}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {singleUserTotals.avgProductivity}%
+                    </TableCell>
+                  </TableRow>
+                </tfoot>
+              </table>
+            ) : (
+              // Multi-user: User-wise summary (click to drill down)
+              <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
+                <thead className="sticky top-0 bg-muted z-20">
+                  <TableRow className="border-b">
+                    <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>User</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
+                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total</TableHead>
+                    <TableHead className={cn(isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>
+                  </TableRow>
+                </thead>
+                <TableBody>
+                  {userSummaries.map((row, index) => (
+                    <TableRow 
+                      key={index} 
+                      className="hover:bg-muted/30 cursor-pointer"
+                      onClick={() => setSelectedUserForDrilldown(row.full_name)}
+                    >
+                      <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.full_name}</TableCell>
+                      <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        <span className={getProductivityColor(row.productivity_percentage)}>
+                          {row.productivity_percentage}%
+                        </span>
+                      </TableCell>
+                      <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.planned_visits}
+                      </TableCell>
+                      <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.productive_visits}
+                      </TableCell>
+                      <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.unproductive_visits}
+                      </TableCell>
+                      <TableCell className={cn("text-right font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                        {row.total_visits}
+                      </TableCell>
+                      <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}>
+                        <ChevronRight className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
+                      </TableCell>
                     </TableRow>
-                  </thead>
-                  <TableBody>
-                    {userSummaries.map((row, index) => (
-                      <TableRow 
-                        key={index} 
-                        className="hover:bg-muted/30 cursor-pointer"
-                        onClick={() => setSelectedUserForDrilldown(row.full_name)}
-                      >
-                        <TableCell className={cn("font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>{row.full_name}</TableCell>
-                        <TableCell className={cn("text-right font-semibold", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          <span className={getProductivityColor(row.productivity_percentage)}>
-                            {row.productivity_percentage}%
-                          </span>
-                        </TableCell>
-                        <TableCell className={cn("text-right text-blue-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.planned_visits}
-                        </TableCell>
-                        <TableCell className={cn("text-right text-green-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.productive_visits}
-                        </TableCell>
-                        <TableCell className={cn("text-right text-orange-600 font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.unproductive_visits}
-                        </TableCell>
-                        <TableCell className={cn("text-right font-medium", isMobile ? "py-1 px-2" : "py-1.5")}>
-                          {row.total_visits}
-                        </TableCell>
-                        <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}>
-                          <ChevronRight className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <tfoot className="bg-background border-t sticky bottom-0 z-10">
-                    <TableRow>
-                      <TableCell className={cn("font-semibold", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({multiUserTotals.usersCount} users)</TableCell>
-                      <TableCell className={cn("text-right font-bold text-primary", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {multiUserTotals.avgProductivity}%
-                      </TableCell>
-                      <TableCell className={cn("text-right font-bold text-blue-600", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {multiUserTotals.planned}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-bold text-green-600", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {multiUserTotals.productive}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-bold text-orange-600", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {multiUserTotals.unproductive}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-bold", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {multiUserTotals.total}
-                      </TableCell>
-                      <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}></TableCell>
-                    </TableRow>
-                  </tfoot>
-                </table>
-              )}
-                </div>
-              </ScrollAreaPrimitive.Viewport>
-
-              <ScrollAreaPrimitive.ScrollAreaScrollbar
-                forceMount
-                orientation="vertical"
-                className="flex touch-none select-none transition-colors h-full w-2.5 border-l border-l-transparent p-[1px]"
-              >
-                <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
-              </ScrollAreaPrimitive.ScrollAreaScrollbar>
-
-              <ScrollAreaPrimitive.ScrollAreaScrollbar
-                forceMount
-                orientation="horizontal"
-                className="flex touch-none select-none transition-colors h-3 flex-col border-t border-t-transparent p-[1px] bg-muted/50"
-              >
-                <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-primary/40 hover:bg-primary/60" />
-              </ScrollAreaPrimitive.ScrollAreaScrollbar>
-
-              <ScrollAreaPrimitive.Corner />
-            </ScrollAreaPrimitive.Root>
+                  ))}
+                </TableBody>
+                <tfoot className="bg-background border-t sticky bottom-0 z-10">
+                  <TableRow>
+                    <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({multiUserTotals.usersCount} users)</TableCell>
+                    <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {multiUserTotals.avgProductivity}%
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {multiUserTotals.planned}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {multiUserTotals.productive}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {multiUserTotals.unproductive}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                      {multiUserTotals.total}
+                    </TableCell>
+                    <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}></TableCell>
+                  </TableRow>
+                </tfoot>
+              </table>
+            )}
+              </div>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No productivity data found for the selected filters
