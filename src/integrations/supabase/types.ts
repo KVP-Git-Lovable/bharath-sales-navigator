@@ -6728,6 +6728,9 @@ export type Database = {
           amount_collected: number | null
           assigned_agent_id: string | null
           assigned_van_id: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           credit_paid_amount: number | null
           credit_pending_amount: number | null
@@ -6768,6 +6771,9 @@ export type Database = {
           amount_collected?: number | null
           assigned_agent_id?: string | null
           assigned_van_id?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           credit_paid_amount?: number | null
           credit_pending_amount?: number | null
@@ -6808,6 +6814,9 @@ export type Database = {
           amount_collected?: number | null
           assigned_agent_id?: string | null
           assigned_van_id?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           credit_paid_amount?: number | null
           credit_pending_amount?: number | null
@@ -6845,6 +6854,13 @@ export type Database = {
           visit_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_retailer_id_fkey"
             columns: ["retailer_id"]

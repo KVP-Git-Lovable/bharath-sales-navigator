@@ -455,6 +455,86 @@ export const cleanupOldSnapshots = async (userId?: string): Promise<void> => {
   }
 };
 
+// Remove an order from snapshot (used when order is cancelled)
+export const removeOrderFromSnapshot = async (
+  userId: string,
+  date: string,
+  orderId: string
+): Promise<void> => {
+  try {
+    const snapshot = await loadMyVisitsSnapshot(userId, date);
+    if (!snapshot) {
+      console.log('📸 [SNAPSHOT] No snapshot to remove order from for', date);
+      return;
+    }
+
+    // Find the order to get retailer info before removing
+    const orderToRemove = snapshot.orders.find(o => o.id === orderId);
+    
+    if (!orderToRemove) {
+      console.log('📸 [SNAPSHOT] Order not found in snapshot:', orderId);
+      return;
+    }
+
+    // Remove the order
+    snapshot.orders = snapshot.orders.filter(o => o.id !== orderId);
+
+    // Recalculate progress stats
+    const totalOrders = snapshot.orders.length;
+    const totalOrderValue = Math.round(
+      snapshot.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+    );
+    const retailersWithOrders = new Set(snapshot.orders.map(o => o.retailer_id));
+    
+    // Update productive count based on remaining orders
+    // Also check if we need to update the visit for this retailer
+    const remainingOrderForRetailer = snapshot.orders.find(
+      o => o.retailer_id === orderToRemove.retailer_id
+    );
+    
+    // If no remaining orders for this retailer, decrement productive count
+    let productiveCount = retailersWithOrders.size;
+    let plannedCount = snapshot.progressStats.planned;
+    
+    if (!remainingOrderForRetailer) {
+      // Retailer no longer has orders, move back to planned
+      plannedCount += 1;
+      
+      // Also update the visit status in snapshot
+      const visitIndex = snapshot.visits.findIndex(
+        v => v.retailer_id === orderToRemove.retailer_id
+      );
+      if (visitIndex >= 0) {
+        snapshot.visits[visitIndex] = {
+          ...snapshot.visits[visitIndex],
+          status: 'planned',
+          no_order_reason: null,
+          updated_at: new Date().toISOString()
+        };
+      }
+    }
+
+    snapshot.progressStats = {
+      ...snapshot.progressStats,
+      totalOrders,
+      totalOrderValue,
+      productive: productiveCount,
+      planned: plannedCount
+    };
+
+    // Save updated snapshot
+    const key = getSnapshotKey(userId, date);
+    await Preferences.set({
+      key,
+      value: JSON.stringify({ ...snapshot, timestamp: Date.now() })
+    });
+
+    console.log('📸 [SNAPSHOT] Removed order from snapshot:', orderId, 'Remaining orders:', totalOrders);
+  } catch (error) {
+    console.error('[SNAPSHOT] Failed to remove order:', error);
+  }
+};
+
 // Clear snapshot for a specific date (when beats are cleared)
 export const clearMyVisitsSnapshot = async (
   userId: string,
