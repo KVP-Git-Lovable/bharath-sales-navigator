@@ -1362,6 +1362,9 @@ const Analytics = () => {
                   </SelectContent>
                 </Select>
 
+                {/* OR Text Separator */}
+                <span className="text-xs text-muted-foreground font-medium shrink-0">OR</span>
+
                 {/* Select Dates Toggle Button */}
                 <Button 
                   variant={showDatePickers ? "secondary" : "outline"} 
@@ -1481,10 +1484,9 @@ const Analytics = () => {
                 <TabsList className="inline-flex w-max gap-1 p-1">
                   <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Productivity</TabsTrigger>
                   <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>
+                  <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
                   <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
                   <TabsTrigger value="retailers" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Retailers</TabsTrigger>
-                  <TabsTrigger value="predictions" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Predictions</TabsTrigger>
-                  <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
                 </TabsList>
               </div>
               <button
@@ -1727,7 +1729,10 @@ const Analytics = () => {
                 </CardContent>
               </Card>
 
-              {/* Performance Calendar View */}
+            </TabsContent>
+
+            {/* Calendar Tab */}
+            <TabsContent value="calendar" className="space-y-4">
               <PerformanceCalendar />
             </TabsContent>
 
@@ -2054,160 +2059,7 @@ const Analytics = () => {
               </Card>
             </TabsContent>
 
-            {/* Predictive Analytics Tab */}
-            <TabsContent value="predictions" className="space-y-4">
-              <Card className="shadow-lg bg-gradient-to-br from-primary/5 to-secondary/5">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="text-primary" />
-                    Predictive Analytics
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    AI-powered insights based on current trends
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="p-6 bg-background rounded-lg border-2 border-primary/20">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">Target Achievement Probability</h3>
-                        <p className="text-sm text-muted-foreground">Based on current performance trend</p>
-                      </div>
-                      <Target className="text-primary" size={32} />
-                    </div>
-                    <div className="text-center">
-                      <div className="text-5xl font-bold text-primary mb-2">{predictions.targetChance}%</div>
-                      <Progress value={predictions.targetChance} className="h-4" />
-                      <div className="mt-3 text-sm">
-                        {predictions.targetChance >= 80 ? (
-                          <span className="text-green-600 font-medium">Excellent! On track to exceed target</span>
-                        ) : predictions.targetChance >= 60 ? (
-                          <span className="text-blue-600 font-medium">Good progress, maintain momentum</span>
-                        ) : predictions.targetChance >= 40 ? (
-                          <span className="text-yellow-600 font-medium">Needs improvement to meet target</span>
-                        ) : (
-                          <span className="text-orange-600 font-medium">Significant effort required</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Users size={18} />
-                          Top Potential Retailers
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {predictions.topRetailers.length > 0 ? (
-                            predictions.topRetailers.map((retailer: any, index: number) => (
-                              <div key={index} className="p-3 bg-muted/30 rounded-lg">
-                                <div className="font-medium text-sm">{retailer.name}</div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Current: ₹{retailer.currentValue.toLocaleString()}
-                                </div>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <TrendingUp size={14} className="text-green-500" />
-                                  <span className="text-xs font-semibold text-green-600">
-                                    +{retailer.predictedGrowth}% growth expected
-                                  </span>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-xs text-center text-muted-foreground p-4">
-                              Insufficient data for predictions
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <ShoppingCart size={18} />
-                          Trending Products
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {predictions.topProducts.length > 0 ? (
-                            predictions.topProducts.map((product: any, index: number) => (
-                              <div key={index} className="p-3 bg-muted/30 rounded-lg">
-                                <div className="font-medium text-sm">{product.name}</div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Current: {product.currentQuantity} units
-                                </div>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <TrendingUp size={14} className="text-blue-500" />
-                                  <span className="text-xs font-semibold text-blue-600">
-                                    Predicted: {product.predictedDemand} units
-                                  </span>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-xs text-center text-muted-foreground p-4">
-                              Insufficient data for predictions
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Target size={18} />
-                          High-Growth Territories
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {predictions.topTerritories.length > 0 ? (
-                            predictions.topTerritories.map((territory: any, index: number) => (
-                              <div key={index} className="p-3 bg-muted/30 rounded-lg">
-                                <div className="font-medium text-sm">{territory.name}</div>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <TrendingUp size={14} className="text-purple-500" />
-                                  <span className="text-xs font-semibold text-purple-600">
-                                    +{territory.predictedGrowth}% potential growth
-                                  </span>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-xs text-center text-muted-foreground p-4">
-                              Insufficient data for predictions
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <Card className="bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900">
-                    <CardContent className="p-4">
-                      <div className="flex gap-3">
-                        <AlertTriangle className="text-yellow-600 flex-shrink-0" size={20} />
-                        <div className="text-sm">
-                          <p className="font-medium text-yellow-900 dark:text-yellow-200 mb-1">
-                            Predictive Analytics Disclaimer
-                          </p>
-                          <p className="text-yellow-800 dark:text-yellow-300">
-                            These predictions are based on historical data and current trends. Actual results may vary based on market conditions, seasonality, and other external factors.
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </CardContent>
-              </Card>
-            </TabsContent>
+            {/* Predictive Analytics Tab - Hidden */}
 
             {/* Supervisor Report Tab */}
             <TabsContent value="supervisor-report" className="space-y-4">
