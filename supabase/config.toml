@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.report-voice-assistant]
 verify_jwt = false
+
+[functions.elevenlabs-conversation-token]
+verify_jwt = false
