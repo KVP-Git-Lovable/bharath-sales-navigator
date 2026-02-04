@@ -258,19 +258,20 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
         ) : skuData.length > 0 ? (
           <div className={cn("grid grid-cols-1 gap-6", !hideChart && "lg:grid-cols-2")}>
             {/* Chart Section */}
-            {!hideChart && (
-            <div className="space-y-2">
+            <div className={cn("space-y-2", hideChart && "hidden lg:block lg:col-span-0")}>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Top 10 products by revenue</p>
+                <p className="text-sm text-muted-foreground">{hideChart ? '' : 'Top 10 products by revenue'}</p>
                 <div className="flex items-center gap-1">
-                  <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
-                    <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
-                      <PieChartIcon className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
-                      <BarChart3 className="h-4 w-4" />
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+                  {!hideChart && (
+                    <ToggleGroup type="single" value={chartType} onValueChange={(v) => v && setChartType(v as 'pie' | 'bar')}>
+                      <ToggleGroupItem value="pie" aria-label="Pie Chart" className="h-8 w-8 p-0">
+                        <PieChartIcon className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="bar" aria-label="Bar Chart" className="h-8 w-8 p-0">
+                        <BarChart3 className="h-4 w-4" />
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -329,7 +330,6 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                 </ResponsiveContainer>
               )}
             </div>
-            )}
 
             {/* Summary Table */}
             <div>
@@ -370,7 +370,7 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
                       </TableRow>
                     ))}
                   </TableBody>
-                  <tfoot className="bg-muted/30 sticky bottom-0">
+                  <tfoot className="bg-background border-t sticky bottom-0 z-10">
                     <TableRow>
                       <TableCell className="text-[10px] sm:text-xs font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">Total ({skuData.length} SKUs)</TableCell>
                       <TableCell className="text-[10px] sm:text-xs text-right font-semibold py-1 px-1.5 sm:py-1.5 sm:px-3">

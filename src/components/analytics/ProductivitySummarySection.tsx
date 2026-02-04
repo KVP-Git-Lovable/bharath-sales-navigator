@@ -316,7 +316,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                       </TableRow>
                     ))}
                   </TableBody>
-                  <tfoot className="bg-muted/30 sticky bottom-0">
+                  <tfoot className="bg-background border-t sticky bottom-0 z-10">
                     <TableRow>
                       <TableCell className="font-semibold py-1.5">Total ({productivityData.length} days)</TableCell>
                       <TableCell className="text-right font-bold text-green-600 py-1.5">
@@ -379,7 +379,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                       </TableRow>
                     ))}
                   </TableBody>
-                  <tfoot className="bg-muted/30 sticky bottom-0">
+                  <tfoot className="bg-background border-t sticky bottom-0 z-10">
                     <TableRow>
                       <TableCell className="font-semibold py-1.5">Total ({multiUserTotals.usersCount} users)</TableCell>
                       <TableCell className="text-right font-bold text-primary py-1.5">

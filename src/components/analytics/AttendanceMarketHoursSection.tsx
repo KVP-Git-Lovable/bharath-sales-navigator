@@ -437,7 +437,7 @@ export const AttendanceMarketHoursSection = ({
                             ))
                           )}
                         </TableBody>
-                        <tfoot className="bg-muted/30 sticky bottom-0">
+                        <tfoot className="bg-background border-t sticky bottom-0 z-10">
                           <TableRow>
                             <TableCell className="font-semibold py-1.5">
                               {isSingleUserMode ? `Total (${attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).length} days)` : `Average (${userSummaries.length} users)`}
