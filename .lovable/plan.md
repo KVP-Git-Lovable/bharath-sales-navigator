@@ -1,89 +1,139 @@
 
-# Plan: Display Target vs Actual for All Users in Dashboard
+# Plan: Fix Team Performance Display - KG Units and Proper Target Calculations
 
 ## Problem Summary
-The Target Management Dashboard currently shows only one user's data by default (the logged-in user). Admins need the ability to view Target vs Actual performance for **all users** in the organization.
+Based on the screenshot and code analysis, three issues need to be addressed:
 
-## Root Cause
-- The `TeamTargetDashboard` component receives `effectiveUserIds` from the parent page
-- The parent page (`TargetVsActual.tsx`) defaults to `userScope='single'` with `selectedUserId='self'`
-- The fallback is `subordinateIds` from `useSubordinates()`, which only includes direct/indirect reports
-- There is no "All Users" option for admins to see the entire organization
+1. **Unit Display Issue**: Quantities are showing as "K" (e.g., "2.1K", "27.5K") instead of "KG" when the Target Basis is set to Quantity
+2. **Monthly Target Details**: When monthly period is selected, the system correctly fetches from `user_business_plan_months`, but the actual quantity needs unit-aware conversion (grams to KG)
+3. **Daily Target Calculation**: Daily targets should use the `working_days` stored in `user_business_plan_months` table rather than computing generically
+
+## Root Cause Analysis
+
+### Issue 1: Unit Display
+The `formatValue` function in `TeamTargetDashboard.tsx` (lines 65-74) uses generic "K" suffix for large numbers:
+```javascript
+// Current code
+if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+```
+This doesn't differentiate between quantity units (which should be KG) and generic counts.
+
+### Issue 2: Actual Quantity Calculation
+The `useTeamTargetProgress` hook (lines 171-175) sums raw quantities from `order_items` without converting gram-based units to KG:
+```javascript
+// Current - missing unit conversion
+actual = userOrders.reduce((sum, o) => {
+  const orderQty = (o.order_items as any[])?.reduce((qSum, item) => 
+    qSum + (item.quantity || 0), 0) || 0;
+  return sum + orderQty;
+}, 0);
+```
+
+### Issue 3: Daily Target Calculation
+The daily target calculation (lines 158-161) uses a computed working days count instead of the stored `working_days` from `user_business_plan_months`:
+```javascript
+// Current - uses computed working days
+const workingDays = getWorkingDaysInMonth(date);
+target = monthlyTarget / workingDays;
+```
 
 ## Solution Overview
 
-### Step 1: Update TeamTargetDashboard Component
+### Step 1: Update useTeamTargetProgress Hook
+**File:** `src/hooks/useTeamTargetProgress.ts`
+
+Changes:
+1. Fetch unit information from `order_items` along with quantity
+2. Convert gram-based quantities to KG using the established pattern
+3. Use stored `working_days` from `user_business_plan_months` for daily target pro-rating
+4. Calculate weekly targets using actual weekly working days (6 days/week)
+
+### Step 2: Update TeamTargetDashboard Display
 **File:** `src/components/admin/TeamTargetDashboard.tsx`
 
-Add a new "All Users" scope option for admin users:
-- Add a user scope filter dropdown with options: "My Team" and "All Users" (admin only)
-- Fetch all profile IDs using the existing `get_limited_profiles_for_admin` RPC when "All Users" is selected
-- Update the display to show organization-wide data when this option is chosen
+Changes:
+1. Update `formatValue` function to show "KG" suffix for quantity-based metrics instead of "K"
+2. Keep the "K" abbreviation only for very large numbers, converting to "KG" appropriately
 
-### Step 2: Create useAllUserIds Hook
-**File:** `src/hooks/useAllUserIds.ts` (new file)
+## Technical Implementation Details
 
-Create a reusable hook that:
-- Calls `get_limited_profiles_for_admin` RPC to get all user profiles
-- Extracts and returns an array of all user IDs
-- Only enables the query when the user has admin access
-- Caches results appropriately
+### Hook Changes (useTeamTargetProgress.ts)
 
-### Step 3: Update TargetVsActual Page
-**File:** `src/pages/admin/TargetVsActual.tsx`
+```text
+Query Enhancement:
+┌─────────────────────────────────────────┐
+│ Current: order_items(quantity)          │
+│ Updated: order_items(quantity, unit)    │
+└─────────────────────────────────────────┘
 
-- Add an "All Users" option to the `UserScope` type
-- Update `effectiveUserIds` calculation to support the "all" scope
-- Pass admin access status to TeamTargetDashboard for conditional rendering
+Quantity Calculation:
+┌─────────────────────────────────────────┐
+│ For each order_item:                    │
+│   - If unit = 'grams'/'gram'/'g':       │
+│       quantity_kg = quantity / 1000     │
+│   - Else (kg, bag, etc):                │
+│       quantity_kg = quantity            │
+│   - Sum all quantity_kg                 │
+└─────────────────────────────────────────┘
 
-## Implementation Details
-
-### New Hook: useAllUserIds
-```typescript
-// Returns all user IDs in the organization for admins
-export const useAllUserIds = () => {
-  const { hasAdminAccess } = useAdminAccess();
-  
-  return useQuery({
-    queryKey: ['all-user-ids-for-targets'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_limited_profiles_for_admin');
-      if (error) throw error;
-      return (data || []).map(p => p.id);
-    },
-    enabled: hasAdminAccess,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
-};
+Daily Target Calculation:
+┌─────────────────────────────────────────┐
+│ Use: monthTarget.working_days           │
+│ Fallback: getWorkingDaysInMonth()       │
+└─────────────────────────────────────────┘
 ```
 
-### TeamTargetDashboard Changes
-- Add "User Scope" filter with "My Team" and "All Users" options
-- Conditionally show "All Users" only for admin users
-- When "All Users" is selected, use all user IDs from the new hook
-- Update the summary statistics header to reflect the selected scope
+### Display Changes (TeamTargetDashboard.tsx)
 
-### UI Changes
-- Add a scope selector in the Filters card
-- Show "All Users" option only for admins (checked via `useAdminAccess`)
-- Default to "My Team" for managers, show "All Users" for pure admins
+```text
+formatValue Function Update:
+┌──────────────────────────────────────────────────────────────┐
+│ Quantity Basis:                                              │
+│   - Value >= 1000: Show "X.X KG" (no division needed, raw KG)│
+│   - Value < 1000:  Show "X.XX KG"                            │
+│                                                              │
+│ Revenue Basis (unchanged):                                   │
+│   - Value >= 100000: "₹X.XL"                                 │
+│   - Value >= 1000:   "₹X.XK"                                 │
+│   - Value < 1000:    "₹X"                                    │
+└──────────────────────────────────────────────────────────────┘
+```
 
-## Files to Create/Modify
-| File | Action | Description |
-|------|--------|-------------|
-| `src/hooks/useAllUserIds.ts` | Create | New hook to fetch all user IDs for admins |
-| `src/components/admin/TeamTargetDashboard.tsx` | Modify | Add scope selector and "All Users" support |
-| `src/pages/admin/TargetVsActual.tsx` | Modify | Add "all" to UserScope type and update effectiveUserIds logic |
+## Files to Modify
 
-## Technical Notes
-- Uses existing `get_limited_profiles_for_admin` RPC which is already secured for admin-only access
-- No database migrations required
-- Maintains backward compatibility with existing subordinate-based filtering
-- Performance consideration: For large organizations, the query fetches all profiles but only extracts IDs
+| File | Changes |
+|------|---------|
+| `src/hooks/useTeamTargetProgress.ts` | 1. Add `unit` to order_items query<br>2. Implement gram→KG conversion in actual calculation<br>3. Use stored `working_days` for daily target |
+| `src/components/admin/TeamTargetDashboard.tsx` | Update `formatValue` to show "KG" suffix for quantity basis |
 
 ## Expected Outcome
+
 After implementation:
-1. Admins will see a "User Scope" filter in the Dashboard tab
-2. Selecting "All Users" will display Target vs Actual for every user in the organization
-3. The summary cards will show totals across all selected users
-4. The table will list every user with their respective targets, actuals, and achievement percentages
+1. **Quantity Display**: Values will show "2.1 KG", "27.5 KG", "74.0 KG" instead of "2.1K", "27.5K", "74.0K"
+2. **Accurate Actuals**: Gram-based product quantities will be correctly converted to KG matching the target units
+3. **Daily Targets**: Will use the configured working days from the business plan, ensuring accurate daily pro-rating
+4. **Weekly Targets**: Will calculate properly based on 6-day work weeks
+
+## Data Flow Summary
+
+```text
+Monthly Target Data:
+┌─────────────────────────────────────────────────────────────┐
+│ user_business_plan_months                                   │
+│ ├── quantity_target: 2100 (KG)                              │
+│ └── working_days: 24                                        │
+│                                                             │
+│ Daily Target = 2100 / 24 = 87.5 KG                          │
+│ Weekly Target = (2100 / 4) = 525 KG (approx 4 weeks/month)  │
+└─────────────────────────────────────────────────────────────┘
+
+Actual Calculation:
+┌─────────────────────────────────────────────────────────────┐
+│ order_items                                                 │
+│ ├── Product A: 500 grams → 0.5 KG                           │
+│ ├── Product B: 2 kg → 2 KG                                  │
+│ └── Product C: 1000 grams → 1 KG                            │
+│                                                             │
+│ Total Actual = 3.5 KG                                       │
+└─────────────────────────────────────────────────────────────┘
+```
