@@ -794,26 +794,10 @@ const Analytics = () => {
 
   const fetchProductData = async (userIds: string[], dateRangeFilter: { from: Date; to: Date }) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Determine which user IDs to query
-      let targetUserIds: string[] = userIds;
-      
-      // If no users selected, get all subordinates including self
-      if (targetUserIds.length === 0) {
-        const { data: subordinates } = await supabase.rpc('get_all_subordinates', { manager_user_id: user.id });
-        targetUserIds = subordinates?.map((s: any) => s.user_id) || [];
-        // Include self if not in list
-        if (!targetUserIds.includes(user.id)) {
-          targetUserIds.push(user.id);
-        }
-      }
-
       const fromDate = format(dateRangeFilter.from, 'yyyy-MM-dd');
       const toDate = format(dateRangeFilter.to, 'yyyy-MM-dd');
 
-      // Query orders for selected users and date range - using order_date like SKU Revenue Summary
+      // Query orders for date range - same logic as SKU Revenue Summary
       let query = supabase
         .from('orders')
         .select('id, order_date')
@@ -821,9 +805,10 @@ const Analytics = () => {
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
 
-      // Apply user filter
-      if (targetUserIds.length > 0) {
-        query = query.in('user_id', targetUserIds);
+      // Only apply user filter if specific users are selected (not "All Users")
+      // This matches the SKU Revenue Summary logic
+      if (userIds.length > 0) {
+        query = query.in('user_id', userIds);
       }
 
       const { data: orders } = await query;
