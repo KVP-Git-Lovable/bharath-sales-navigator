@@ -10,7 +10,9 @@ import { useSubordinates } from '@/hooks/useSubordinates';
 import { TeamTargetDashboard } from '@/components/admin/TeamTargetDashboard';
 import { TargetConfigTab } from '@/components/admin/TargetConfigTab';
 import { HierarchyAllocationTab } from '@/components/admin/HierarchyAllocationTab';
-import { UserScope } from '@/components/admin/TopControlBar';
+import { useAllUserIds } from '@/hooks/useAllUserIds';
+
+export type UserScope = 'self' | 'single' | 'multiple' | 'team' | 'all';
 
 // Get current FY year
 const getCurrentFY = () => {
@@ -35,13 +37,14 @@ const generateFYOptions = () => {
 const TargetVsActual = () => {
   const { hasAdminAccess, loading, user } = useAdminAccess();
   const { subordinates, isManager, isLoading: subordinatesLoading } = useSubordinates();
+  const { allUserIds, isLoading: allUsersLoading } = useAllUserIds();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<'targets' | 'hierarchy' | 'dashboard'>('targets');
   const [fyYear, setFYYear] = useState(getCurrentFY());
   
-  // Dashboard tab state
-  const [userScope, setUserScope] = useState<UserScope>('single');
+  // Dashboard tab state - default to 'all' for admins
+  const [userScope, setUserScope] = useState<UserScope>(hasAdminAccess ? 'all' : 'team');
   const [selectedUserId, setSelectedUserId] = useState<string>('self');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
@@ -61,12 +64,14 @@ const TargetVsActual = () => {
         return selectedUserIds;
       case 'team':
         return subordinates.map(s => s.subordinate_user_id);
+      case 'all':
+        return allUserIds;
       default:
         return [];
     }
-  }, [userScope, user?.id, selectedUserId, selectedUserIds, subordinates]);
+  }, [userScope, user?.id, selectedUserId, selectedUserIds, subordinates, allUserIds]);
 
-  if (loading || subordinatesLoading) {
+  if (loading || subordinatesLoading || allUsersLoading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
@@ -156,8 +161,10 @@ const TargetVsActual = () => {
             <TabsContent value="dashboard" className="mt-6">
               <TeamTargetDashboard 
                 userScope={userScope}
+                onUserScopeChange={setUserScope}
                 effectiveUserIds={effectiveUserIds}
                 fyYear={fyYear}
+                hasAdminAccess={hasAdminAccess}
               />
             </TabsContent>
           </Tabs>
