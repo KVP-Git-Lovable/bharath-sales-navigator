@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Users, Trophy, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTeamTargetProgress, PeriodType, TargetBasis } from '@/hooks/useTeamTargetProgress';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AnalyticsTargetDashboardProps {
   selectedUserIds: string[];
@@ -18,6 +20,23 @@ interface AnalyticsTargetDashboardProps {
 export function AnalyticsTargetDashboard({ selectedUserIds, dateRange }: AnalyticsTargetDashboardProps) {
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
+
+  // Fetch all user IDs when no specific users are selected
+  const { data: allUserIds = [] } = useQuery({
+    queryKey: ['all-user-ids-for-analytics-targets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id');
+      if (error) throw error;
+      return (data || []).map((p: { id: string }) => p.id);
+    },
+    enabled: selectedUserIds.length === 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Use selected users if provided, otherwise use all users
+  const effectiveUserIds = selectedUserIds.length > 0 ? selectedUserIds : allUserIds;
 
   // Determine period type based on date range
   const periodType = useMemo((): PeriodType => {
@@ -30,7 +49,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange }: Analyti
   }, [dateRange]);
 
   const { data: teamProgress, isLoading } = useTeamTargetProgress({
-    userIds: selectedUserIds,
+    userIds: effectiveUserIds,
     periodType,
     date: dateRange.from,
     basis,
@@ -95,14 +114,13 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange }: Analyti
       .slice(0, 2);
   };
 
-  if (selectedUserIds.length === 0) {
+  // Show loading while fetching all user IDs
+  if (effectiveUserIds.length === 0 && selectedUserIds.length === 0) {
     return (
       <Card>
         <CardContent className="py-12">
-          <div className="text-center text-muted-foreground">
-            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">Select Users</p>
-            <p className="text-sm mt-1">Use the "All Users" filter above to select users</p>
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
