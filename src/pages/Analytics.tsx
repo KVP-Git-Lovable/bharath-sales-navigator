@@ -1866,9 +1866,9 @@ const Analytics = () => {
                   <CardTitle>Product-wise Business Analysis</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto scrollbar-always-visible">
                     <table className="w-full">
-                      <thead>
+                      <thead className="sticky top-0 bg-background z-10">
                         <tr className="border-b">
                           <th className="text-left p-2 text-sm font-medium">Product Name</th>
                           <th className="text-right p-2 text-sm font-medium">Quantity Sold (KG)</th>
@@ -1915,54 +1915,17 @@ const Analytics = () => {
 
               <Card className="shadow-lg">
                 <CardHeader>
-                  <CardTitle>Product Demand Trends (Weekly)</CardTitle>
+                  <CardTitle>Top Products by Quantity (KG)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={productTrends}>
+                    <BarChart data={productData.slice(0, 10)} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      {productData.slice(0, 5).map((product: any, index: number) => (
-                        <Line 
-                          key={product.name}
-                          type="monotone" 
-                          dataKey={product.name} 
-                          stroke={['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'][index]} 
-                          name={product.name}
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Product Quantity Distribution</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={productData.slice(0, 8)}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={(entry) => entry.name}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="quantity"
-                      >
-                        {productData.slice(0, 8).map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'][index % 8]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={150} />
+                      <Tooltip formatter={(value: any) => `${Number(value).toFixed(2)} KG`} />
+                      <Bar dataKey="quantity" fill="#10b981" name="Quantity (KG)" />
+                    </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
