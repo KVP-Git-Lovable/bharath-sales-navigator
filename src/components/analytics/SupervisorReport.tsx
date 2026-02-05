@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,9 +55,18 @@ const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'
 export const SupervisorReport = ({ users, selectedUserIds, dateRange }: SupervisorReportProps) => {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
+  
+  // Refs to track previous values and prevent duplicate fetches
+  const prevFetchKeyRef = useRef<string>('');
+  const isFetchingRef = useRef(false);
    
    // Hindi to English translation for retailer/beat names in Productivity section
    const { translateTexts, getTranslated } = useHindiToEnglish();
+
+  // Memoize stable keys to prevent unnecessary re-fetches
+  const userIdsKey = useMemo(() => selectedUserIds.slice().sort().join(','), [selectedUserIds]);
+  const dateRangeKey = useMemo(() => `${dateRange.from.getTime()}-${dateRange.to.getTime()}`, [dateRange.from, dateRange.to]);
+  const usersKey = useMemo(() => users.length.toString(), [users.length]);
 
   // Derive selected user names from IDs for filtering
   const selectedUsers = useMemo(() => {
@@ -273,12 +282,25 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
   // Auto-fetch data when props change
   useEffect(() => {
-    if (users.length > 0) {
+    const fetchKey = `${userIdsKey}-${dateRangeKey}-${usersKey}`;
+    
+    // Skip if already fetching or if the key hasn't changed
+    if (isFetchingRef.current || fetchKey === prevFetchKeyRef.current || users.length === 0) {
+      return;
+    }
+    
+    prevFetchKeyRef.current = fetchKey;
+    isFetchingRef.current = true;
+    
+    const doFetch = async () => {
       fetchSummaryData();
       // Also fetch business summary metrics
       fetchBusinessSummary(selectedUserIds, dateRange);
-    }
-  }, [selectedUserIds, dateRange, users]);
+      isFetchingRef.current = false;
+    };
+    
+    doFetch();
+  }, [userIdsKey, dateRangeKey, usersKey, selectedUserIds, dateRange, fetchBusinessSummary]);
 
   // Fetch productivity data for drilldown
   useEffect(() => {

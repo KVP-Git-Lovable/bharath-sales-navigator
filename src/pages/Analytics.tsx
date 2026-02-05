@@ -69,6 +69,12 @@ const Analytics = () => {
 
   const normalizeName = (name: string | null | undefined) => (name ?? '').trim().toUpperCase();
 
+  // Memoize date range to prevent unnecessary re-renders in child components
+  const stableDashboardDateRange = useMemo(() => dashboardDateRange, [
+    dashboardDateRange.from.getTime(),
+    dashboardDateRange.to.getTime()
+  ]);
+
   // Determine if scope is ready (subordinates loaded when needed)
   const isScopeReady = userScopeMode !== 'my_scope' || !subordinatesLoading;
 
@@ -143,8 +149,8 @@ const Analytics = () => {
       .map(id => users.find(u => u.id === id)?.full_name)
       .filter((name): name is string => !!name);
     
-    fetchBusinessSummary(effectiveUserIds, dashboardDateRange, selectedUserNames);
-  }, [effectiveUserIds, dashboardDateRange, fetchBusinessSummary, users, isScopeReady]);
+    fetchBusinessSummary(effectiveUserIds, stableDashboardDateRange, selectedUserNames);
+  }, [effectiveUserIds, stableDashboardDateRange, fetchBusinessSummary, users, isScopeReady]);
 
   const [kpiData, setKpiData] = useState({
     plannedCalls: 0,
@@ -1059,8 +1065,8 @@ const Analytics = () => {
 
   // Fetch product data when dashboard filters change
   useEffect(() => {
-    fetchProductData(selectedUserIds, dashboardDateRange);
-  }, [selectedUserIds, dashboardDateRange]);
+    fetchProductData(selectedUserIds, stableDashboardDateRange);
+  }, [selectedUserIds, stableDashboardDateRange]);
 
   useEffect(() => {
     if (kpiData.deliveredRevenue > 0) {
@@ -1529,7 +1535,7 @@ const Analytics = () => {
                     const selectedUserNames = effectiveUserIds
                       .map(id => users.find(u => u.id === id)?.full_name)
                       .filter((name): name is string => !!name);
-                    fetchBusinessSummary(effectiveUserIds, dashboardDateRange, selectedUserNames);
+                    fetchBusinessSummary(effectiveUserIds, stableDashboardDateRange, selectedUserNames);
                   }}
                 >
                   <RefreshCw size={14} />
@@ -1614,7 +1620,7 @@ const Analytics = () => {
             <TabsContent value="kpi" className="space-y-4">
               <AnalyticsTargetDashboard 
                 selectedUserIds={effectiveUserIds}
-                dateRange={dashboardDateRange}
+                dateRange={stableDashboardDateRange}
                 periodFilter={dashboardPeriod}
               />
             </TabsContent>
@@ -1636,7 +1642,7 @@ const Analytics = () => {
                         ₹{(businessSummary.totalRevenue / 100000).toFixed(2)} Lac
                       </p>
                       <p className="text-xs opacity-75 mt-1">
-                        {format(dashboardDateRange.from, 'MMM dd')} - {format(dashboardDateRange.to, 'MMM dd, yyyy')}
+                        {format(stableDashboardDateRange.from, 'MMM dd')} - {format(stableDashboardDateRange.to, 'MMM dd, yyyy')}
                       </p>
                     </div>
                     <div className="text-right space-y-1">
@@ -1653,7 +1659,7 @@ const Analytics = () => {
                   title="Total Beats"
                   value={businessSummary.totalBeats}
                   icon={<MapPin size={16} className="text-primary" />}
-                  onClick={() => { fetchBeatDetails(effectiveUserIds, dashboardDateRange); setShowBeatDetails(true); }}
+                  onClick={() => { fetchBeatDetails(effectiveUserIds, stableDashboardDateRange); setShowBeatDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1661,7 +1667,7 @@ const Analytics = () => {
                   value={businessSummary.totalRetailers}
                   icon={<Store size={16} className="text-blue-600" />}
                   iconBgClass="bg-blue-500/10"
-                  onClick={() => { fetchRetailerDetails(effectiveUserIds, dashboardDateRange); setShowRetailerDetails(true); }}
+                  onClick={() => { fetchRetailerDetails(effectiveUserIds, stableDashboardDateRange); setShowRetailerDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1669,7 +1675,7 @@ const Analytics = () => {
                   value={businessSummary.totalOrders}
                   icon={<ShoppingCart size={16} className="text-green-600" />}
                   iconBgClass="bg-green-500/10"
-                  onClick={() => { fetchOrderDetails(effectiveUserIds, dashboardDateRange); setShowOrderDetails(true); }}
+                  onClick={() => { fetchOrderDetails(effectiveUserIds, stableDashboardDateRange); setShowOrderDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1677,7 +1683,7 @@ const Analytics = () => {
                   value={`${businessSummary.totalKg.toFixed(1)} KG${businessSummary.totalPieces > 0 ? ` + ${businessSummary.totalPieces} pcs` : ''}`}
                   icon={<Package size={16} className="text-orange-600" />}
                   iconBgClass="bg-orange-500/10"
-                  onClick={() => { fetchProductDetails(effectiveUserIds, dashboardDateRange); setShowProductBreakdown(true); }}
+                  onClick={() => { fetchProductDetails(effectiveUserIds, stableDashboardDateRange); setShowProductBreakdown(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1685,7 +1691,7 @@ const Analytics = () => {
                   value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
                   icon={<IndianRupee size={16} className="text-purple-600" />}
                   iconBgClass="bg-purple-500/10"
-                  onClick={() => { fetchOrderDetails(effectiveUserIds, dashboardDateRange); setShowOrderDetails(true); }}
+                  onClick={() => { fetchOrderDetails(effectiveUserIds, stableDashboardDateRange); setShowOrderDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1693,7 +1699,7 @@ const Analytics = () => {
                   value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
                   icon={<CreditCard size={16} className="text-red-600" />}
                   iconBgClass="bg-red-500/10"
-                  onClick={() => { fetchPendingPaymentDetails(effectiveUserIds, dashboardDateRange); setShowPendingPayments(true); }}
+                  onClick={() => { fetchPendingPaymentDetails(effectiveUserIds, stableDashboardDateRange); setShowPendingPayments(true); }}
                   isLoading={businessLoading}
                 />
               </div>
@@ -1784,7 +1790,7 @@ const Analytics = () => {
               <SupervisorReport 
                 users={users}
                 selectedUserIds={effectiveUserIds}
-                dateRange={dashboardDateRange}
+                dateRange={stableDashboardDateRange}
               />
             </TabsContent>
           </Tabs>
@@ -1794,7 +1800,7 @@ const Analytics = () => {
             open={showBeatDetails}
             onOpenChange={setShowBeatDetails}
             selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
-            dateRange={dashboardDateRange}
+            dateRange={stableDashboardDateRange}
             data={beatDetails}
             isLoading={detailsLoading}
           />
@@ -1802,7 +1808,7 @@ const Analytics = () => {
             open={showRetailerDetails}
             onOpenChange={setShowRetailerDetails}
             selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
-            dateRange={dashboardDateRange}
+            dateRange={stableDashboardDateRange}
             data={retailerDetails}
             isLoading={detailsLoading}
           />
@@ -1810,7 +1816,7 @@ const Analytics = () => {
             open={showOrderDetails}
             onOpenChange={setShowOrderDetails}
             selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
-            dateRange={dashboardDateRange}
+            dateRange={stableDashboardDateRange}
             data={orderDetails}
             isLoading={detailsLoading}
           />
@@ -1818,7 +1824,7 @@ const Analytics = () => {
             open={showProductBreakdown}
             onOpenChange={setShowProductBreakdown}
             selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
-            dateRange={dashboardDateRange}
+            dateRange={stableDashboardDateRange}
             data={productDetails}
             isLoading={detailsLoading}
           />
@@ -1826,7 +1832,7 @@ const Analytics = () => {
             open={showPendingPayments}
             onOpenChange={setShowPendingPayments}
             selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
-            dateRange={dashboardDateRange}
+            dateRange={stableDashboardDateRange}
             data={pendingPaymentDetails}
             isLoading={detailsLoading}
           />
