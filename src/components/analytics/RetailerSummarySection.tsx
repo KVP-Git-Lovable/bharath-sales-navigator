@@ -61,8 +61,20 @@
  
        const { data: retailers } = await retailersQuery;
  
-       // Fetch orders within date range for these retailers
-       let ordersQuery = supabase
+       // Fetch ALL confirmed orders for these retailers (to identify retailers with NO orders ever)
+       let allOrdersQuery = supabase
+         .from('orders')
+         .select('id, retailer_id')
+         .eq('status', 'confirmed');
+
+       if (userIds.length > 0) {
+         allOrdersQuery = allOrdersQuery.in('user_id', userIds);
+       }
+
+       const { data: allOrders } = await allOrdersQuery;
+
+       // Fetch orders within date range for "Most Orders" calculation
+       let periodOrdersQuery = supabase
          .from('orders')
          .select('id, retailer_id, total_amount, user_id')
          .eq('status', 'confirmed')
@@ -70,10 +82,10 @@
          .lte('order_date', toDate);
  
        if (userIds.length > 0) {
-         ordersQuery = ordersQuery.in('user_id', userIds);
+         periodOrdersQuery = periodOrdersQuery.in('user_id', userIds);
        }
  
-       const { data: orders } = await ordersQuery;
+       const { data: periodOrders } = await periodOrdersQuery;
  
        // Create a map of user IDs to names
        const userNameMap: Record<string, string> = {};
@@ -81,14 +93,22 @@
          if (u.full_name) userNameMap[u.id] = u.full_name;
        });
  
-       // Build retailer order counts
-       const retailerOrderMap = new Map<string, { count: number; revenue: number }>();
-       orders?.forEach(order => {
+       // Build set of retailers who have EVER placed a confirmed order
+       const retailersWithAnyOrder = new Set<string>();
+       allOrders?.forEach(order => {
+         if (order.retailer_id) {
+           retailersWithAnyOrder.add(order.retailer_id);
+         }
+       });
+
+       // Build retailer order counts for the selected period
+       const retailerPeriodOrderMap = new Map<string, { count: number; revenue: number }>();
+       periodOrders?.forEach(order => {
          if (!order.retailer_id) return;
-         const existing = retailerOrderMap.get(order.retailer_id) || { count: 0, revenue: 0 };
+         const existing = retailerPeriodOrderMap.get(order.retailer_id) || { count: 0, revenue: 0 };
          existing.count += 1;
          existing.revenue += Number(order.total_amount || 0);
-         retailerOrderMap.set(order.retailer_id, existing);
+         retailerPeriodOrderMap.set(order.retailer_id, existing);
        });
  
        // Classify retailers
@@ -96,20 +116,26 @@
        const withOrders: RetailerOrderSummary[] = [];
  
        retailers?.forEach(retailer => {
-         const orderData = retailerOrderMap.get(retailer.id);
+         const hasAnyOrderEver = retailersWithAnyOrder.has(retailer.id);
+         const periodOrderData = retailerPeriodOrderMap.get(retailer.id);
+         
          const summary: RetailerOrderSummary = {
            id: retailer.id,
            name: retailer.name || 'Unknown',
            beat_name: retailer.beat_name || '-',
            user_id: retailer.user_id,
            user_name: retailer.user_id ? (userNameMap[retailer.user_id] || 'Unknown') : '-',
-           orders_count: orderData?.count || 0,
-           revenue: orderData?.revenue || 0
+           orders_count: periodOrderData?.count || 0,
+           revenue: periodOrderData?.revenue || 0
          };
  
-         if (!orderData || orderData.count === 0) {
+         // "No Orders" = retailers who have NEVER placed any confirmed order
+         if (!hasAnyOrderEver) {
            noOrders.push(summary);
-         } else {
+         }
+         
+         // "Most Orders" = retailers with orders in the selected period
+         if (periodOrderData && periodOrderData.count > 0) {
            withOrders.push(summary);
          }
        });
