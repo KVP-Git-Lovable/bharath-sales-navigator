@@ -1,4 +1,4 @@
-import { useState } from "react";
+ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ChevronRight, ArrowLeft, User, Store } from "lucide-react";
+ import { useHindiToEnglish } from "@/hooks/useHindiToEnglish";
 
 interface BeatDetail {
   beat_name: string;
@@ -129,6 +130,19 @@ export const RetailerDetailsDialog = ({
   data,
   isLoading
 }: DialogProps & { data: RetailerDetail[]; isLoading: boolean }) => {
+   const { translateTexts, getTranslated } = useHindiToEnglish();
+ 
+   // Translate Hindi retailer and beat names when data changes
+   useEffect(() => {
+     if (data.length > 0) {
+       const textsToTranslate = [
+         ...data.map(r => r.name),
+         ...data.map(r => r.beat_name).filter(Boolean)
+       ];
+       translateTexts(textsToTranslate);
+     }
+   }, [data]);
+ 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">
@@ -165,8 +179,8 @@ export const RetailerDetailsDialog = ({
               ) : (
                 data.map((retailer) => (
                   <TableRow key={retailer.id}>
-                    <TableCell className="font-medium">{retailer.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{retailer.beat_name || '-'}</TableCell>
+                     <TableCell className="font-medium">{getTranslated(retailer.name)}</TableCell>
+                     <TableCell className="text-muted-foreground">{retailer.beat_name ? getTranslated(retailer.beat_name) : '-'}</TableCell>
                     <TableCell className="text-right">{retailer.orders_count}</TableCell>
                     <TableCell className="text-right font-semibold">₹{retailer.revenue.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
