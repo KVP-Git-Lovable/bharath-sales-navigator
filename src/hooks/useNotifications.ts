@@ -31,6 +31,7 @@ export function useNotifications() {
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
+        .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -62,9 +63,8 @@ export function useNotifications() {
         return;
       }
 
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-      );
+      // Remove the notification from the list
+      setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -85,7 +85,8 @@ export function useNotifications() {
         return;
       }
 
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      // Remove all notifications from the list
+      setNotifications([]);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
