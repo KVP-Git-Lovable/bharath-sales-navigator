@@ -377,18 +377,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', data.user.id)
         .maybeSingle();
       
-      // Get the redirect URL: priority is URL query param > sessionStorage > default
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirectParam = urlParams.get('redirect');
-      const sessionRedirect = sessionStorage.getItem('auth_redirect_url');
-      sessionStorage.removeItem('auth_redirect_url');
-      const targetUrl = redirectParam || sessionRedirect || '/dashboard';
-      
       if (profileData?.must_change_password) {
         setMustChangePassword(true);
         toast.info('Please change your password to continue');
-        // Still redirect, but the modal will show
-        window.location.href = targetUrl;
+        // Don't redirect here - let RoleBasedAuthPage handle it with query params preserved
         return;
       }
       
@@ -413,8 +405,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }, 1000); // Small delay to let the success toast show first
 
-      // Redirect to the originally requested URL or dashboard
-      window.location.href = targetUrl;
+      // Don't use window.location.href here - it causes a full page reload
+      // which loses the query params. Let RoleBasedAuthPage handle the redirect
+      // via React Router's Navigate component, which preserves the URL params.
     }
   };
 
