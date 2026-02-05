@@ -42,7 +42,23 @@
        const workbook = XLSX.read(data, { type: 'array' });
        const sheetName = workbook.SheetNames[0];
        const worksheet = workbook.Sheets[sheetName];
-       const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      let jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      // Check if first row looks like a title row (not actual data)
+      // This handles CSVs with a title line before the actual headers
+      if (jsonData.length > 0) {
+        const firstRow = jsonData[0] as Record<string, unknown>;
+        const keys = Object.keys(firstRow);
+        // If first row has a single key or no 'pincode' field, it might be a title row
+        // Check if second row has proper structure
+        if (keys.length === 1 || (!firstRow.pincode && !firstRow.Pincode)) {
+          // Re-read skipping the first row by using range option
+          const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+          range.s.r = 1; // Start from row 2 (0-indexed = 1)
+          worksheet['!ref'] = XLSX.utils.encode_range(range);
+          jsonData = XLSX.utils.sheet_to_json(worksheet);
+        }
+      }
  
        setTotalRecords(jsonData.length);
        setStatusMessage(`Found ${jsonData.length.toLocaleString()} records. Starting import...`);
