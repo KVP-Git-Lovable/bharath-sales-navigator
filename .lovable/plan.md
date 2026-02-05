@@ -1,164 +1,75 @@
 
-# AI Assistant Updates - ElevenLabs Text Agent + Hindi Localization
+# Update Total Quantity Styling in Productivity Section
 
-## Overview
-Two changes to the AI Assistant widget:
-1. Switch Text Chat from the current edge function to use ElevenLabs Agent ID `agent_9301kgp19jzyf72rrtkshfdzbf11` in text-only mode
-2. Add Hindi text to the Voice Conversation option in the interaction selector
+## Problem
+The "Total Quantity" and KG value in the Productivity section uses a smaller `BusinessSummaryCard` component, while "Total Order Value" uses a large gradient banner card with prominent typography. The user wants both to have consistent, prominent styling.
 
----
+## Solution
+Create a new gradient banner card for "Total Quantity" that matches the visual style of the "Total Order Value" banner.
 
-## Change 1: Text Chat with ElevenLabs Agent
+## Implementation
 
-### Current Behavior
-Text Chat uses the `chat-assistant` edge function with Lovable AI gateway for responses.
+### File to Modify
+`src/components/analytics/SupervisorReport.tsx`
 
-### New Behavior
-Text Chat will use ElevenLabs Conversational AI in **text-only mode** with Agent ID `agent_9301kgp19jzyf72rrtkshfdzbf11`.
+### Changes
 
-### Implementation
+#### 1. Add a New "Total Quantity" Banner Card
+Create a second gradient banner card positioned next to or below the "Total Order Value" banner with matching styling:
 
-#### Step 1: Create a new hook for text-based ElevenLabs agent
-**New File: `src/hooks/useTextAssistant.ts`**
+- Background: `bg-gradient-to-r from-orange-600 to-orange-500` (using orange to match the quantity icon color theme)
+- Title: `text-sm opacity-90` - "Total Quantity"
+- Main Value: `text-3xl md:text-4xl font-bold` - The KG value prominently displayed
+- Subtext: `text-xs opacity-75` - Date range
 
+#### 2. Layout Options
+Two banner cards side-by-side in a grid layout:
+- On desktop: Two equal-width cards in a row
+- On mobile: Stack vertically
+
+#### 3. Code Structure
 ```tsx
-// Uses @elevenlabs/react useConversation with textOnly: true
-// Connects to agent via signed URL from edge function
-// Provides sendUserMessage() for text input
-// Handles agent_response events for display
+{/* Two-column banner layout */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {/* Total Order Value Banner */}
+  <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg">
+    <CardContent className="p-6">
+      <div>
+        <p className="text-sm opacity-90">Total Order Value</p>
+        <p className="text-3xl md:text-4xl font-bold">
+          ₹{...} Lac
+        </p>
+        <p className="text-xs opacity-75 mt-1">
+          {date range}
+        </p>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Total Quantity Banner - NEW with matching style */}
+  <Card className="bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg">
+    <CardContent className="p-6">
+      <div>
+        <p className="text-sm opacity-90">Total Quantity</p>
+        <p className="text-3xl md:text-4xl font-bold">
+          {kg value} KG
+        </p>
+        <p className="text-xs opacity-75 mt-1">
+          {date range}
+        </p>
+      </div>
+    </CardContent>
+  </Card>
+</div>
 ```
 
-Key features:
-- Uses `textOnly: true` mode (no microphone needed)
-- Connects via WebSocket signed URL
-- Sends text with `conversation.sendUserMessage(text)`
-- Receives responses via `onMessage` callback
+#### 4. Remove from BusinessSummaryCard Grid
+Remove the "Total Qty" entry from the 6-card grid since it will now be displayed in the prominent banner.
 
-#### Step 2: Modify edge function to support text agent
-**File: `supabase/functions/elevenlabs-conversation-token/index.ts`**
-
-Update to accept an optional `agentType` parameter:
-- `agentType: 'voice'` → Uses existing `ELEVENLABS_AGENT_ID` from env
-- `agentType: 'text'` → Uses hardcoded `agent_9301kgp19jzyf72rrtkshfdzbf11`
-
-```typescript
-const agentId = agentType === 'text' 
-  ? 'agent_9301kgp19jzyf72rrtkshfdzbf11' 
-  : ELEVENLABS_AGENT_ID;
-```
-
-#### Step 3: Create new TextChatDialog component
-**New File: `src/components/chat/TextChatDialog.tsx`**
-
-A simpler chat interface that:
-- Connects to ElevenLabs agent on mount
-- Shows message history (user + agent)
-- Provides text input field
-- Displays connection status
-- Uses the new `useTextAssistant` hook
-
-#### Step 4: Update ChatWidget to use new component
-**File: `src/components/chat/ChatWidget.tsx`**
-
-Replace `ChatDialog` with `TextChatDialog` when mode is `'text'`.
-
----
-
-## Change 2: Hindi Text in Voice Conversation Card
-
-### Current Text
-- Heading: "Voice Conversation"
-- Subtext: "Speak in English or Hindi for a natural conversation"
-
-### New Text (Bilingual)
-- Heading: "Voice Conversation / ध्वनि वार्तालाप"
-- Subtext: "Speak in English or Hindi for a natural conversation / अपने प्रश्न अंग्रेजी या हिंदी में पूछें।"
-
-### Implementation
-**File: `src/components/chat/InteractionModeSelector.tsx`**
-
-```tsx
-<h3 className="font-medium text-base">
-  Voice Conversation / ध्वनि वार्तालाप
-</h3>
-<p className="text-sm text-muted-foreground">
-  Speak in English or Hindi for a natural conversation
-  <br />
-  <span className="text-xs">अपने प्रश्न अंग्रेजी या हिंदी में पूछें।</span>
-</p>
-```
-
----
-
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `src/hooks/useTextAssistant.ts` | **Create** - New hook for text-only ElevenLabs agent |
-| `src/components/chat/TextChatDialog.tsx` | **Create** - New text chat UI component |
-| `supabase/functions/elevenlabs-conversation-token/index.ts` | **Modify** - Support both text and voice agent IDs |
-| `src/components/chat/ChatWidget.tsx` | **Modify** - Import and use TextChatDialog |
-| `src/components/chat/InteractionModeSelector.tsx` | **Modify** - Add Hindi text to Voice option |
-
----
-
-## Technical Details
-
-### useTextAssistant Hook Structure
-```typescript
-export function useTextAssistant() {
-  const conversation = useConversation({
-    textOnly: true,
-    onMessage: (message) => {
-      // Handle agent_response events
-    },
-    onConnect: () => { /* ... */ },
-    onError: (error) => { /* ... */ },
-  });
-
-  const connect = async () => {
-    const { data } = await supabase.functions.invoke(
-      'elevenlabs-conversation-token',
-      { body: { agentType: 'text' } }
-    );
-    await conversation.startSession({ signedUrl: data.signed_url });
-  };
-
-  const sendMessage = (text: string) => {
-    conversation.sendUserMessage(text);
-  };
-
-  return { status, messages, connect, sendMessage, disconnect };
-}
-```
-
-### Edge Function Update
-```typescript
-// Parse request body for agentType
-const { agentType } = await req.json().catch(() => ({}));
-
-// Select agent ID based on type
-const agentId = agentType === 'text' 
-  ? 'agent_9301kgp19jzyf72rrtkshfdzbf11' 
-  : ELEVENLABS_AGENT_ID;
-
-// Use selected agent ID in API call
-const response = await fetch(
-  `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
-  // ...
-);
-```
-
----
-
-## User Experience
-
-### Text Chat Flow (After Change)
-1. User opens AI Assistant → Sees mode selection
-2. User selects "Text Chat"
-3. System connects to ElevenLabs agent (text-only mode)
-4. User types message → Agent responds
-5. Conversation continues until user closes
-
-### Voice Conversation Card (After Change)
-The card will display bilingual text making it clear that Hindi is supported.
+## Visual Result
+- Two equally-styled banner cards at the top of the Productivity section
+- "Total Order Value" in primary/blue gradient (left/top)
+- "Total Quantity" in orange gradient (right/bottom)
+- Both using large `text-3xl/text-4xl` fonts for values
+- Consistent date range subtext
+- Responsive: side-by-side on desktop, stacked on mobile
