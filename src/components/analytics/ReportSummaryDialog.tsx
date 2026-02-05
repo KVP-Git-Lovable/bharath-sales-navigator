@@ -109,9 +109,9 @@ export const ReportSummaryDialog = ({
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
       const topOrderUser = orderSummaryData[0];
-      let orderText = `\n🛒 Order Summary\nA total of ${orderSummaryData.length} team members generated orders worth ₹${totalOrderValue.toLocaleString('en-IN')}.`;
+      let orderText = `\n🛒 Order Summary\nA total of ${orderSummaryData.length} team members generated orders worth ₹${totalOrderValue.toFixed(2)}.`;
       if (topOrderUser) {
-        orderText += ` The top performer in orders was ${topOrderUser.full_name} with ₹${topOrderUser.total_order_value.toLocaleString('en-IN')}.`;
+        orderText += ` The top performer in orders was ${topOrderUser.full_name} with ₹${topOrderUser.total_order_value.toFixed(2)}.`;
       }
       parts.push(orderText);
     }
@@ -128,9 +128,9 @@ export const ReportSummaryDialog = ({
       }, 0);
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
       
-      let skuText = `\n📦 Product Performance\nAcross ${skuData.length} SKUs, the team achieved ₹${totalRevenue.toLocaleString('en-IN')} in revenue with ${totalKg.toFixed(2)} KG sold.`;
+      let skuText = `\n📦 Product Performance\nAcross ${skuData.length} SKUs, the team achieved ₹${totalRevenue.toFixed(2)} in revenue with ${totalKg.toFixed(2)} KG sold.`;
       if (topProduct) {
-        skuText += ` The best-selling product was ${topProduct.product_name}, contributing ₹${topProduct.revenue.toLocaleString('en-IN')} in revenue.`;
+        skuText += ` The best-selling product was ${topProduct.product_name}, contributing ₹${topProduct.revenue.toFixed(2)} in revenue.`;
       }
       parts.push(skuText);
     }
@@ -189,13 +189,13 @@ export const ReportSummaryDialog = ({
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
       const topOrderUser = orderSummaryData[0];
-      parts.push(`Order Summary: ${orderSummaryData.length} users with total order value of ${totalOrderValue.toLocaleString('en-IN')} rupees. Top performer is ${topOrderUser?.full_name} with ${topOrderUser?.total_order_value.toLocaleString('en-IN')} rupees.`);
+      parts.push(`Order Summary: ${orderSummaryData.length} users with total order value of ${totalOrderValue.toFixed(2)} rupees. Top performer is ${topOrderUser?.full_name} with ${topOrderUser?.total_order_value.toFixed(2)} rupees.`);
     }
     
     if (skuData.length > 0) {
       const totalRevenue = skuData.reduce((sum, s) => sum + s.revenue, 0);
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
-      parts.push(`SKU Revenue Summary: ${skuData.length} SKUs with total revenue of ${totalRevenue.toLocaleString('en-IN')} rupees. Best selling product is ${topProduct?.product_name}.`);
+      parts.push(`SKU Revenue Summary: ${skuData.length} SKUs with total revenue of ${totalRevenue.toFixed(2)} rupees. Best selling product is ${topProduct?.product_name}.`);
     }
     
     if (productivityData.length > 0) {
@@ -226,13 +226,13 @@ export const ReportSummaryDialog = ({
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
       const topOrderUser = orderSummaryData[0];
-      parts.push(`ऑर्डर सारांश: ${orderSummaryData.length} यूजर्स ने कुल ${totalOrderValue.toLocaleString('hi-IN')} रुपये का ऑर्डर किया। सबसे अच्छा प्रदर्शन ${topOrderUser?.full_name} का रहा, जिन्होंने ${topOrderUser?.total_order_value.toLocaleString('hi-IN')} रुपये का ऑर्डर लिया।`);
+      parts.push(`ऑर्डर सारांश: ${orderSummaryData.length} यूजर्स ने कुल ${totalOrderValue.toFixed(2)} रुपये का ऑर्डर किया। सबसे अच्छा प्रदर्शन ${topOrderUser?.full_name} का रहा, जिन्होंने ${topOrderUser?.total_order_value.toFixed(2)} रुपये का ऑर्डर लिया।`);
     }
     
     if (skuData.length > 0) {
       const totalRevenue = skuData.reduce((sum, s) => sum + s.revenue, 0);
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
-      parts.push(`SKU रेवेन्यू सारांश: ${skuData.length} SKUs से कुल ${totalRevenue.toLocaleString('hi-IN')} रुपये की आय हुई। सबसे ज्यादा बिकने वाला प्रोडक्ट ${topProduct?.product_name} है।`);
+      parts.push(`SKU रेवेन्यू सारांश: ${skuData.length} SKUs से कुल ${totalRevenue.toFixed(2)} रुपये की आय हुई। सबसे ज्यादा बिकने वाला प्रोडक्ट ${topProduct?.product_name} है।`);
     }
     
     if (productivityData.length > 0) {
