@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -41,6 +41,8 @@ import {
 } from "@/components/analytics";
 import { SupervisorReport } from "@/components/analytics/SupervisorReport";
 import { CoverageMapSection } from "@/components/analytics/CoverageMapSection";
+import { useSubordinates } from "@/hooks/useSubordinates";
+import { useAuth } from "@/hooks/useAuth";
 interface UserProfile {
   id: string;
   full_name: string | null;
@@ -49,9 +51,12 @@ interface UserProfile {
 
 const Analytics = () => {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const { subordinateIds, isLoading: subordinatesLoading } = useSubordinates();
   const [hasLiked, setHasLiked] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [userScopeMode, setUserScopeMode] = useState<'my_scope' | 'all' | 'custom'>('my_scope');
   const [userSelectOpen, setUserSelectOpen] = useState(false);
   const [showDatePickers, setShowDatePickers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -63,6 +68,23 @@ const Analytics = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
 
   const normalizeName = (name: string | null | undefined) => (name ?? '').trim().toUpperCase();
+
+  // Calculate effective user IDs based on scope mode (matching Target Management logic)
+  const effectiveUserIds = useMemo(() => {
+    switch (userScopeMode) {
+      case 'my_scope':
+        // Self + all subordinates (same as Target Management "team" scope)
+        return currentUser?.id ? [currentUser.id, ...subordinateIds] : [];
+      case 'all':
+        // All users (empty array means "All Users" in the existing logic)
+        return [];
+      case 'custom':
+        // Manually selected users
+        return selectedUserIds;
+      default:
+        return [];
+    }
+  }, [userScopeMode, currentUser?.id, subordinateIds, selectedUserIds]);
 
   const [kpiPeriod, setKpiPeriod] = useState<string>('current_month');
   const [kpiDateRange, setKpiDateRange] = useState<{ from: Date; to: Date }>({
@@ -105,13 +127,13 @@ const Analytics = () => {
 
   // Auto-refresh business metrics when filters change
   useEffect(() => {
-    // Get user names for selected user IDs to use with RPC
-    const selectedUserNames = selectedUserIds
+    // Get user names for effective user IDs to use with RPC
+    const selectedUserNames = effectiveUserIds
       .map(id => users.find(u => u.id === id)?.full_name)
       .filter((name): name is string => !!name);
     
-    fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
-  }, [selectedUserIds, dashboardDateRange, fetchBusinessSummary, users]);
+    fetchBusinessSummary(effectiveUserIds, dashboardDateRange, selectedUserNames);
+  }, [effectiveUserIds, dashboardDateRange, fetchBusinessSummary, users]);
 
   const [kpiData, setKpiData] = useState({
     plannedCalls: 0,
@@ -1165,13 +1187,17 @@ const Analytics = () => {
                       <div className="flex items-center gap-1 sm:gap-2">
                         <Users size={14} className="shrink-0" />
                         <span className="hidden sm:inline">
-                          {selectedUserIds.length === 0 
-                            ? 'All Users' 
+                          {userScopeMode === 'my_scope' 
+                            ? 'My Scope' 
+                            : userScopeMode === 'all'
+                            ? 'All Users'
                             : `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}`}
                         </span>
                         <span className="sm:hidden">
-                          {selectedUserIds.length === 0 
-                            ? '' 
+                          {userScopeMode === 'my_scope' 
+                            ? 'My' 
+                            : userScopeMode === 'all'
+                            ? 'All'
                             : selectedUserIds.length}
                         </span>
                       </div>
@@ -1180,6 +1206,54 @@ const Analytics = () => {
                   </PopoverTrigger>
                   <PopoverContent className="w-[280px] p-0" align="start">
                     <div className="p-2 border-b space-y-2">
+                      {/* Scope Options */}
+                      <div className="flex flex-col gap-1">
+                        <div
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                            userScopeMode === 'my_scope' ? "bg-primary/10 border border-primary" : "hover:bg-muted"
+                          )}
+                          onClick={() => {
+                            setUserScopeMode('my_scope');
+                            setSelectedUserIds([]);
+                            setUserSelectOpen(false);
+                            setUserSearchQuery('');
+                          }}
+                        >
+                          <Checkbox 
+                            checked={userScopeMode === 'my_scope'}
+                            className="pointer-events-none"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">My Scope</span>
+                            <span className="text-xs text-muted-foreground">You + your team</span>
+                          </div>
+                        </div>
+                        <div
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                            userScopeMode === 'all' ? "bg-primary/10 border border-primary" : "hover:bg-muted"
+                          )}
+                          onClick={() => {
+                            setUserScopeMode('all');
+                            setSelectedUserIds([]);
+                            setUserSelectOpen(false);
+                            setUserSearchQuery('');
+                          }}
+                        >
+                          <Checkbox 
+                            checked={userScopeMode === 'all'}
+                            className="pointer-events-none"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">All Users</span>
+                            <span className="text-xs text-muted-foreground">Everyone in the organization</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-t pt-2 mt-2">
+                        <span className="text-xs text-muted-foreground font-medium px-1">Or select specific users:</span>
+                      </div>
                       <div className="relative">
                         <input
                           type="text"
@@ -1189,19 +1263,6 @@ const Analytics = () => {
                           className="w-full h-9 px-3 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full justify-start text-xs"
-                        onClick={() => {
-                          setSelectedUserIds([]);
-                          setUserSelectOpen(false);
-                          setUserSearchQuery('');
-                        }}
-                      >
-                        <X size={14} className="mr-2" />
-                        Clear Selection (All Users)
-                      </Button>
                     </div>
                     <ScrollArea className="h-[250px]">
                       <div className="p-2 space-y-1">
@@ -1215,20 +1276,26 @@ const Analytics = () => {
                             key={user.id}
                             className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer"
                             onClick={() => {
+                              setUserScopeMode('custom');
                               const groupIds = users
                                 .filter(u => normalizeName(u.full_name) === normalizeName(user.full_name))
                                 .map(u => u.id);
 
                               setSelectedUserIds(prev => {
                                 const hasAll = groupIds.every(id => prev.includes(id));
-                                return hasAll
+                                const newSelection = hasAll
                                   ? prev.filter(id => !groupIds.includes(id))
                                   : Array.from(new Set([...prev, ...groupIds]));
+                                // If no users selected after removal, default back to my_scope
+                                if (newSelection.length === 0) {
+                                  setUserScopeMode('my_scope');
+                                }
+                                return newSelection;
                               });
                             }}
                           >
                             <Checkbox 
-                              checked={selectedUserIds.includes(user.id)}
+                              checked={userScopeMode === 'custom' && selectedUserIds.includes(user.id)}
                               className="pointer-events-none"
                             />
                             <span className="text-sm truncate">{user.full_name || 'Unknown'}</span>
@@ -1448,10 +1515,10 @@ const Analytics = () => {
                   className="h-8 w-8 shrink-0"
                   onClick={() => {
                     fetchDashboardData();
-                    const selectedUserNames = selectedUserIds
+                    const selectedUserNames = effectiveUserIds
                       .map(id => users.find(u => u.id === id)?.full_name)
                       .filter((name): name is string => !!name);
-                    fetchBusinessSummary(selectedUserIds, dashboardDateRange, selectedUserNames);
+                    fetchBusinessSummary(effectiveUserIds, dashboardDateRange, selectedUserNames);
                   }}
                 >
                   <RefreshCw size={14} />
@@ -1461,7 +1528,9 @@ const Analytics = () => {
               {/* Selected Filters Summary */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground font-medium">Showing:</span>
-                {selectedUserIds.length === 0 ? (
+                {userScopeMode === 'my_scope' ? (
+                  <Badge variant="secondary" className="text-xs">My Scope ({effectiveUserIds.length} users)</Badge>
+                ) : userScopeMode === 'all' ? (
                   <Badge variant="secondary" className="text-xs">All Users</Badge>
                 ) : (
                   <>
@@ -1473,7 +1542,13 @@ const Analytics = () => {
                           <X 
                             size={12} 
                             className="cursor-pointer hover:text-destructive"
-                            onClick={() => setSelectedUserIds(prev => prev.filter(uid => uid !== id))}
+                            onClick={() => {
+                              const newSelection = selectedUserIds.filter(uid => uid !== id);
+                              setSelectedUserIds(newSelection);
+                              if (newSelection.length === 0) {
+                                setUserScopeMode('my_scope');
+                              }
+                            }}
                           />
                         </Badge>
                       );
@@ -1527,7 +1602,7 @@ const Analytics = () => {
             {/* KPI Dashboard */}
             <TabsContent value="kpi" className="space-y-4">
               <AnalyticsTargetDashboard 
-                selectedUserIds={selectedUserIds}
+                selectedUserIds={effectiveUserIds}
                 dateRange={dashboardDateRange}
                 periodFilter={dashboardPeriod}
               />
@@ -1567,7 +1642,7 @@ const Analytics = () => {
                   title="Total Beats"
                   value={businessSummary.totalBeats}
                   icon={<MapPin size={16} className="text-primary" />}
-                  onClick={() => { fetchBeatDetails(selectedUserIds, dashboardDateRange); setShowBeatDetails(true); }}
+                  onClick={() => { fetchBeatDetails(effectiveUserIds, dashboardDateRange); setShowBeatDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1575,7 +1650,7 @@ const Analytics = () => {
                   value={businessSummary.totalRetailers}
                   icon={<Store size={16} className="text-blue-600" />}
                   iconBgClass="bg-blue-500/10"
-                  onClick={() => { fetchRetailerDetails(selectedUserIds, dashboardDateRange); setShowRetailerDetails(true); }}
+                  onClick={() => { fetchRetailerDetails(effectiveUserIds, dashboardDateRange); setShowRetailerDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1583,7 +1658,7 @@ const Analytics = () => {
                   value={businessSummary.totalOrders}
                   icon={<ShoppingCart size={16} className="text-green-600" />}
                   iconBgClass="bg-green-500/10"
-                  onClick={() => { fetchOrderDetails(selectedUserIds, dashboardDateRange); setShowOrderDetails(true); }}
+                  onClick={() => { fetchOrderDetails(effectiveUserIds, dashboardDateRange); setShowOrderDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1591,7 +1666,7 @@ const Analytics = () => {
                   value={`${businessSummary.totalKg.toFixed(1)} KG${businessSummary.totalPieces > 0 ? ` + ${businessSummary.totalPieces} pcs` : ''}`}
                   icon={<Package size={16} className="text-orange-600" />}
                   iconBgClass="bg-orange-500/10"
-                  onClick={() => { fetchProductDetails(selectedUserIds, dashboardDateRange); setShowProductBreakdown(true); }}
+                  onClick={() => { fetchProductDetails(effectiveUserIds, dashboardDateRange); setShowProductBreakdown(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1599,7 +1674,7 @@ const Analytics = () => {
                   value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
                   icon={<IndianRupee size={16} className="text-purple-600" />}
                   iconBgClass="bg-purple-500/10"
-                  onClick={() => { fetchOrderDetails(selectedUserIds, dashboardDateRange); setShowOrderDetails(true); }}
+                  onClick={() => { fetchOrderDetails(effectiveUserIds, dashboardDateRange); setShowOrderDetails(true); }}
                   isLoading={businessLoading}
                 />
                 <BusinessSummaryCard
@@ -1607,7 +1682,7 @@ const Analytics = () => {
                   value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
                   icon={<CreditCard size={16} className="text-red-600" />}
                   iconBgClass="bg-red-500/10"
-                  onClick={() => { fetchPendingPaymentDetails(selectedUserIds, dashboardDateRange); setShowPendingPayments(true); }}
+                  onClick={() => { fetchPendingPaymentDetails(effectiveUserIds, dashboardDateRange); setShowPendingPayments(true); }}
                   isLoading={businessLoading}
                 />
               </div>
@@ -1688,7 +1763,7 @@ const Analytics = () => {
 
             {/* Coverage Tab */}
             <TabsContent value="coverage" className="space-y-4">
-              <CoverageMapSection selectedUserIds={selectedUserIds} />
+              <CoverageMapSection selectedUserIds={effectiveUserIds} />
             </TabsContent>
 
             {/* Predictive Analytics Tab - Hidden */}
@@ -1697,7 +1772,7 @@ const Analytics = () => {
             <TabsContent value="supervisor-report" className="space-y-4">
               <SupervisorReport 
                 users={users}
-                selectedUserIds={selectedUserIds}
+                selectedUserIds={effectiveUserIds}
                 dateRange={dashboardDateRange}
               />
             </TabsContent>
@@ -1707,7 +1782,7 @@ const Analytics = () => {
           <BeatDetailsDialog
             open={showBeatDetails}
             onOpenChange={setShowBeatDetails}
-            selectedUsers={selectedUserIds.length > 0 ? selectedUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
+            selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
             dateRange={dashboardDateRange}
             data={beatDetails}
             isLoading={detailsLoading}
@@ -1715,7 +1790,7 @@ const Analytics = () => {
           <RetailerDetailsDialog
             open={showRetailerDetails}
             onOpenChange={setShowRetailerDetails}
-            selectedUsers={selectedUserIds.length > 0 ? selectedUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
+            selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
             dateRange={dashboardDateRange}
             data={retailerDetails}
             isLoading={detailsLoading}
@@ -1723,7 +1798,7 @@ const Analytics = () => {
           <OrderDetailsDialog
             open={showOrderDetails}
             onOpenChange={setShowOrderDetails}
-            selectedUsers={selectedUserIds.length > 0 ? selectedUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
+            selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
             dateRange={dashboardDateRange}
             data={orderDetails}
             isLoading={detailsLoading}
@@ -1731,7 +1806,7 @@ const Analytics = () => {
           <ProductBreakdownDialog
             open={showProductBreakdown}
             onOpenChange={setShowProductBreakdown}
-            selectedUsers={selectedUserIds.length > 0 ? selectedUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
+            selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
             dateRange={dashboardDateRange}
             data={productDetails}
             isLoading={detailsLoading}
@@ -1739,7 +1814,7 @@ const Analytics = () => {
           <PendingPaymentsDialog
             open={showPendingPayments}
             onOpenChange={setShowPendingPayments}
-            selectedUsers={selectedUserIds.length > 0 ? selectedUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
+            selectedUsers={effectiveUserIds.length > 0 ? effectiveUserIds.map(id => users.find(u => u.id === id)?.full_name || 'Unknown') : ['All Users']}
             dateRange={dashboardDateRange}
             data={pendingPaymentDetails}
             isLoading={detailsLoading}
