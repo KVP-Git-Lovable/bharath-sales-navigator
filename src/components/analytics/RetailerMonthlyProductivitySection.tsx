@@ -221,37 +221,43 @@
              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
              <p className="text-sm">No retailers found matching criteria</p>
            </div>
-         ) : (
-           <div className="overflow-x-auto">
-             <Table>
-               <TableHeader>
-                 <TableRow>
-                   <TableHead className="text-xs">Retailer Name</TableHead>
-                   <TableHead className="text-xs text-center">Planned Visits</TableHead>
-                   <TableHead className="text-xs text-center">Productive</TableHead>
-                   <TableHead className="text-xs text-center">Unproductive</TableHead>
-                 </TableRow>
-               </TableHeader>
-               <TableBody>
-                 {data.map((row) => (
-                   <TableRow key={row.retailer_id}>
-                     <TableCell className="text-sm font-medium">{row.retailer_name}</TableCell>
-                     <TableCell className="text-sm text-center">{row.planned_visits}</TableCell>
-                    <TableCell className="text-sm text-center text-primary">{row.productive_visits}</TableCell>
-                    <TableCell className="text-sm text-center text-destructive">{row.unproductive_visits}</TableCell>
-                   </TableRow>
-                 ))}
-                 {/* Total Row */}
-                 <TableRow className="bg-muted/50 font-semibold">
-                   <TableCell className="text-sm">Total ({data.length} retailers)</TableCell>
-                   <TableCell className="text-sm text-center">{totals.planned}</TableCell>
-                  <TableCell className="text-sm text-center text-primary">{totals.productive}</TableCell>
-                  <TableCell className="text-sm text-center text-destructive">{totals.unproductive}</TableCell>
-                 </TableRow>
-               </TableBody>
-             </Table>
-           </div>
-         )}
+          ) : (
+            <div className="scrollbar-always-visible overflow-x-auto">
+              <div className={`${data.length > 10 ? 'max-h-[400px] overflow-y-auto scrollbar-always-visible' : ''}`}>
+                <Table className="min-w-[400px]">
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="text-[10px] md:text-xs whitespace-nowrap">Retailer Name</TableHead>
+                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Planned</TableHead>
+                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Productive</TableHead>
+                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Unproductive</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.map((row) => (
+                      <TableRow key={row.retailer_id}>
+                        <TableCell className="text-[10px] md:text-sm font-medium whitespace-nowrap py-2">{row.retailer_name}</TableCell>
+                        <TableCell className="text-[10px] md:text-sm text-center py-2">{row.planned_visits}</TableCell>
+                        <TableCell className="text-[10px] md:text-sm text-center text-primary py-2">{row.productive_visits}</TableCell>
+                        <TableCell className="text-[10px] md:text-sm text-center text-destructive py-2">{row.unproductive_visits}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Sticky Total Row */}
+              <Table className="min-w-[400px] border-t">
+                <TableBody>
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-2">Total ({data.length})</TableCell>
+                    <TableCell className="text-[10px] md:text-sm text-center py-2">{totals.planned}</TableCell>
+                    <TableCell className="text-[10px] md:text-sm text-center text-primary py-2">{totals.productive}</TableCell>
+                    <TableCell className="text-[10px] md:text-sm text-center text-destructive py-2">{totals.unproductive}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
        </CardContent>
      </Card>
    );
