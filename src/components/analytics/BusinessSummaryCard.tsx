@@ -49,13 +49,13 @@ export const BusinessSummaryCard = ({
       onClick={onClick}
     >
       <CardContent className="p-3">
-        <div className="flex items-center gap-2">
-          <div className={cn("p-2 rounded-md flex-shrink-0", iconBgClass)}>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <div className={cn("p-1.5 md:p-2 rounded-md flex-shrink-0", iconBgClass)}>
             {icon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-muted-foreground leading-tight">{title}</p>
-            <p className="text-base font-bold leading-tight">{value}</p>
+            <p className="text-[8px] md:text-[10px] text-muted-foreground leading-tight truncate">{title}</p>
+            <p className="text-sm md:text-base font-bold leading-tight">{value}</p>
           </div>
           {trend && (
             <div className={cn(

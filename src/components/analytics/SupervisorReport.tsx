@@ -1471,47 +1471,75 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
        </div>
 
       {/* Business Summary Cards */}
-       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <BusinessSummaryCard
-          title="Total Beats"
-          value={businessSummary.totalBeats}
-          icon={<MapPin size={18} className="text-primary" />}
-          onClick={() => { fetchBeatDetails(selectedUserIds, dateRange); setShowBeatDetails(true); }}
-          isLoading={businessLoading}
-        />
-        <BusinessSummaryCard
-          title="Total Retailers"
-          value={businessSummary.totalRetailers}
-          icon={<Store size={18} className="text-blue-600" />}
-          iconBgClass="bg-blue-500/10"
-          onClick={() => { fetchBusinessRetailerDetails(selectedUserIds, dateRange); setShowRetailerDetailsDialog(true); }}
-          isLoading={businessLoading}
-        />
-        <BusinessSummaryCard
-          title="Total Orders"
-          value={businessSummary.totalOrders}
-          icon={<ShoppingCart size={18} className="text-green-600" />}
-          iconBgClass="bg-green-500/10"
-          onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
-          isLoading={businessLoading}
-        />
-        <BusinessSummaryCard
-          title="Total Revenue"
-          value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
-          icon={<IndianRupee size={18} className="text-purple-600" />}
-          iconBgClass="bg-purple-500/10"
-          onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
-          isLoading={businessLoading}
-        />
-        <BusinessSummaryCard
-          title="Pending Payments"
-          value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
-          icon={<CreditCard size={18} className="text-red-600" />}
-          iconBgClass="bg-red-500/10"
-          onClick={() => { fetchPendingPaymentDetails(selectedUserIds, dateRange); setShowPendingPayments(true); }}
-          isLoading={businessLoading}
-        />
-      </div>
+       <div className="space-y-2">
+         {/* Row 1: Total Beats, Total Retailers, Total Orders */}
+         <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
+           <BusinessSummaryCard
+             title="Total Beats"
+             value={businessSummary.totalBeats}
+             icon={<MapPin size={14} className="text-primary md:w-[18px] md:h-[18px]" />}
+             onClick={() => { fetchBeatDetails(selectedUserIds, dateRange); setShowBeatDetails(true); }}
+             isLoading={businessLoading}
+             className="md:col-span-1"
+           />
+           <BusinessSummaryCard
+             title="Total Retailers"
+             value={businessSummary.totalRetailers}
+             icon={<Store size={14} className="text-blue-600 md:w-[18px] md:h-[18px]" />}
+             iconBgClass="bg-blue-500/10"
+             onClick={() => { fetchBusinessRetailerDetails(selectedUserIds, dateRange); setShowRetailerDetailsDialog(true); }}
+             isLoading={businessLoading}
+             className="md:col-span-1"
+           />
+           <BusinessSummaryCard
+             title="Total Orders"
+             value={businessSummary.totalOrders}
+             icon={<ShoppingCart size={14} className="text-green-600 md:w-[18px] md:h-[18px]" />}
+             iconBgClass="bg-green-500/10"
+             onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
+             isLoading={businessLoading}
+             className="md:col-span-1"
+           />
+           {/* These two are hidden on mobile, shown on md+ */}
+           <BusinessSummaryCard
+             title="Total Revenue"
+             value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
+             icon={<IndianRupee size={14} className="text-purple-600 md:w-[18px] md:h-[18px]" />}
+             iconBgClass="bg-purple-500/10"
+             onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
+             isLoading={businessLoading}
+             className="hidden md:block"
+           />
+           <BusinessSummaryCard
+             title="Pending Payments"
+             value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
+             icon={<CreditCard size={14} className="text-red-600 md:w-[18px] md:h-[18px]" />}
+             iconBgClass="bg-red-500/10"
+             onClick={() => { fetchPendingPaymentDetails(selectedUserIds, dateRange); setShowPendingPayments(true); }}
+             isLoading={businessLoading}
+             className="hidden md:block"
+           />
+         </div>
+         {/* Row 2: Total Revenue, Pending Payments (mobile only) */}
+         <div className="grid grid-cols-2 gap-2 md:hidden">
+           <BusinessSummaryCard
+             title="Total Revenue"
+             value={`₹${(businessSummary.totalRevenue / 1000).toFixed(0)}K`}
+             icon={<IndianRupee size={14} className="text-purple-600" />}
+             iconBgClass="bg-purple-500/10"
+             onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
+             isLoading={businessLoading}
+           />
+           <BusinessSummaryCard
+             title="Pending Payments"
+             value={`₹${(businessSummary.pendingPayments / 1000).toFixed(0)}K`}
+             icon={<CreditCard size={14} className="text-red-600" />}
+             iconBgClass="bg-red-500/10"
+             onClick={() => { fetchPendingPaymentDetails(selectedUserIds, dateRange); setShowPendingPayments(true); }}
+             isLoading={businessLoading}
+           />
+         </div>
+       </div>
 
       <Card className="shadow-lg">
         <CardHeader>
