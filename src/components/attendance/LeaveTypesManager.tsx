@@ -11,6 +11,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Save, FileText, CheckCircle, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface LeaveType {
   id: string;
@@ -44,6 +54,7 @@ const LeaveTypesManager = () => {
   const [editingType, setEditingType] = useState<LeaveType | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [archivePromptId, setArchivePromptId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -173,7 +184,9 @@ const LeaveTypesManager = () => {
 
       if (error) {
         if (error.code === '23503') {
-          toast.error('Cannot delete: This leave type is in use');
+          // FK constraint - prompt to archive instead
+          setDeleteConfirmId(null);
+          setArchivePromptId(id);
           return;
         }
         throw error;
@@ -185,6 +198,24 @@ const LeaveTypesManager = () => {
     } catch (error) {
       console.error('Error deleting leave type:', error);
       toast.error('Failed to delete leave type');
+    }
+  };
+
+  const handleArchive = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('leave_types')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Leave type archived successfully. It will no longer appear for new applications.');
+      setArchivePromptId(null);
+      fetchLeaveTypes();
+    } catch (error) {
+      console.error('Error archiving leave type:', error);
+      toast.error('Failed to archive leave type');
     }
   };
 
@@ -462,6 +493,26 @@ const LeaveTypesManager = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Archive Prompt Dialog */}
+      <AlertDialog open={!!archivePromptId} onOpenChange={() => setArchivePromptId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cannot Delete Leave Type</AlertDialogTitle>
+            <AlertDialogDescription>
+              This leave type has associated applications, balances, or policies and cannot be deleted. 
+              Would you like to archive it instead? Archived leave types are hidden from new applications 
+              but historical data is preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => archivePromptId && handleArchive(archivePromptId)}>
+              Archive Instead
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
