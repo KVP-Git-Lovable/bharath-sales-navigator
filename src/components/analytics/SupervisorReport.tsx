@@ -23,6 +23,7 @@ import { BusinessSummaryCard, BeatDetailsDialog, RetailerDetailsDialog, OrderDet
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
  import { useHindiToEnglish } from '@/hooks/useHindiToEnglish';
  import { RetailerSummarySection } from './RetailerSummarySection';
+import { RetailerMonthlyProductivitySection } from './RetailerMonthlyProductivitySection';
 
 interface UserOrderSummary {
   full_name: string;
@@ -2393,6 +2394,12 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       )}
 
       {/* Revenue Summary by SKU Section */}
+      <RetailerMonthlyProductivitySection 
+        selectedUsers={selectedUsers} 
+        dateRange={dateRange}
+        allUsers={users}
+      />
+
       <RevenueBySKUSection 
         selectedUsers={skuFilterUser ? [skuFilterUser] : selectedUsers} 
         dateRange={dateRange}
