@@ -48,17 +48,19 @@ interface SupervisorReportProps {
   users: UserProfile[];
   selectedUserIds: string[];
   dateRange: { from: Date; to: Date };
+  isScopeReady?: boolean;
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16'];
 
-export const SupervisorReport = ({ users, selectedUserIds, dateRange }: SupervisorReportProps) => {
+export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeReady = true }: SupervisorReportProps) => {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   
   // Refs to track previous values and prevent duplicate fetches
   const prevFetchKeyRef = useRef<string>('');
   const isFetchingRef = useRef(false);
+  const prevScopeReadyRef = useRef(isScopeReady);
    
    // Hindi to English translation for retailer/beat names in Productivity section
    const { translateTexts, getTranslated } = useHindiToEnglish();
@@ -282,10 +284,16 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
   // Auto-fetch data when props change
   useEffect(() => {
+    // Reset fetch key when scope transitions from not ready to ready
+    if (isScopeReady && !prevScopeReadyRef.current) {
+      prevFetchKeyRef.current = '';
+    }
+    prevScopeReadyRef.current = isScopeReady;
+    
     const fetchKey = `${userIdsKey}-${dateRangeKey}-${usersKey}`;
     
-    // Skip if already fetching or if the key hasn't changed
-    if (isFetchingRef.current || fetchKey === prevFetchKeyRef.current || users.length === 0) {
+    // Skip if already fetching, if the key hasn't changed, if users not loaded, or if scope not ready
+    if (isFetchingRef.current || fetchKey === prevFetchKeyRef.current || users.length === 0 || !isScopeReady) {
       return;
     }
     
@@ -300,7 +308,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
     };
     
     doFetch();
-  }, [userIdsKey, dateRangeKey, usersKey, selectedUserIds, dateRange, fetchBusinessSummary]);
+  }, [userIdsKey, dateRangeKey, usersKey, selectedUserIds, dateRange, fetchBusinessSummary, isScopeReady]);
 
   // Fetch productivity data for drilldown
   useEffect(() => {
@@ -1445,6 +1453,18 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
   return (
     <div className="space-y-4">
+      {/* Show loading while scope is being determined */}
+      {!isScopeReady ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex items-center justify-center gap-2">
+              <RefreshCw className="animate-spin h-6 w-6 text-primary" />
+              <span className="text-muted-foreground">Loading team data...</span>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+      <>
       {/* Summarize Report Button */}
       <div className="flex justify-end">
         <Button
@@ -2583,6 +2603,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         selectedUsers={selectedUsers}
         dateRange={dateRange}
       />
+      </>
+      )}
     </div>
   );
 };

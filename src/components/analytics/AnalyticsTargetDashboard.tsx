@@ -16,9 +16,10 @@ interface AnalyticsTargetDashboardProps {
   selectedUserIds: string[];
   dateRange: { from: Date; to: Date };
   periodFilter?: string;
+  isScopeReady?: boolean;
 }
 
-export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFilter }: AnalyticsTargetDashboardProps) {
+export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFilter, isScopeReady = true }: AnalyticsTargetDashboardProps) {
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
 
@@ -32,7 +33,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
       if (error) throw error;
       return (data || []).map((p: { id: string }) => p.id);
     },
-    enabled: selectedUserIds.length === 0,
+    enabled: selectedUserIds.length === 0 && isScopeReady,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -100,6 +101,19 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
   const handleStatusFilterClick = (filter: 'all' | 'achieved' | 'in_progress' | 'not_achieved') => {
     setStatusFilter(prev => prev === filter ? 'all' : filter);
   };
+
+  // Show loading while scope is being determined
+  if (!isScopeReady) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const formatValue = (value: number): string => {
     if (basis === 'revenue') {
