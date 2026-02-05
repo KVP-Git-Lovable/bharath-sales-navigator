@@ -2417,12 +2417,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         onDataLoaded={handleProductivityDataLoaded}
       />
 
-       {/* Retailer Summary Section */}
+       {/* Retailer Summary Section - Hidden
        <RetailerSummarySection 
          selectedUsers={selectedUsers} 
          dateRange={dateRange}
          allUsers={users}
        />
+       */}
 
       {/* AI Insights Section - Moved to bottom */}
       {aiInsights.length > 0 && (
