@@ -1,5 +1,5 @@
  import { useConversation } from '@elevenlabs/react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
  
@@ -15,6 +15,7 @@ import { useState, useCallback, useRef } from 'react';
    const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const lastResponseTime = useRef<number>(0);
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
  
    const conversation = useConversation({
      textOnly: true,
@@ -29,6 +30,7 @@ import { useState, useCallback, useRef } from 'react';
      },
      onMessage: (message: any) => {
        console.log('Text message:', message);
+      console.log('Message type:', message?.type, 'Source:', message?.source);
        
        // Handle agent responses - ElevenLabs sends messages in different formats
        // Format 1: { source: 'ai', role: 'agent', message: '...' }
@@ -48,6 +50,14 @@ import { useState, useCallback, useRef } from 'react';
        else if (message?.type === 'agent_response_correction') {
          agentResponse = message?.agent_response_correction_event?.corrected_agent_response;
        }
+      // Check for plain text response format
+      else if (message?.text && typeof message.text === 'string') {
+        agentResponse = message.text;
+      }
+      // Check for content field
+      else if (message?.content && typeof message.content === 'string') {
+        agentResponse = message.content;
+      }
        
        if (agentResponse) {
          setMessages(prev => [...prev, {
@@ -57,15 +67,45 @@ import { useState, useCallback, useRef } from 'react';
          }]);
         setIsProcessing(false);
         lastResponseTime.current = Date.now();
+        // Clear any pending timeout
+        if (processingTimeoutRef.current) {
+          clearTimeout(processingTimeoutRef.current);
+          processingTimeoutRef.current = null;
+        }
        }
+      
+      // Also reset on certain completion events
+      if (message?.type === 'response.done' || 
+          message?.type === 'conversation.item.completed' ||
+          message?.type === 'audio.done') {
+        console.log('Received completion event, resetting processing state');
+        setIsProcessing(false);
+        if (processingTimeoutRef.current) {
+          clearTimeout(processingTimeoutRef.current);
+          processingTimeoutRef.current = null;
+        }
+      }
      },
      onError: (error) => {
        console.error('Text conversation error:', error);
        setError('Connection error. Please try again.');
       setIsProcessing(false);
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+        processingTimeoutRef.current = null;
+      }
        toast.error('Text chat connection failed. Please try again.');
      },
    });
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+    };
+  }, []);
  
    const connect = useCallback(async () => {
      setIsConnecting(true);
@@ -126,16 +166,22 @@ import { useState, useCallback, useRef } from 'react';
      // Send to the agent
      conversation.sendUserMessage(text.trim());
     
-    // Safety timeout - if no response in 30 seconds, reset processing state
-    setTimeout(() => {
+    // Clear any existing timeout
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current);
+    }
+    
+    // Safety timeout - if no response in 15 seconds, reset processing state
+    processingTimeoutRef.current = setTimeout(() => {
       setIsProcessing(prev => {
-        if (prev && Date.now() - lastResponseTime.current > 25000) {
+        if (prev) {
           console.log('Response timeout - resetting processing state');
           return false;
         }
         return prev;
       });
-    }, 30000);
+      processingTimeoutRef.current = null;
+    }, 15000);
    }, [conversation]);
  
    const disconnect = useCallback(async () => {
