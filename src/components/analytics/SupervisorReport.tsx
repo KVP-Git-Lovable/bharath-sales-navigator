@@ -1424,23 +1424,23 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       </div>
 
       {/* Total Order Value Banner - Dashboard visualization */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div className="grid grid-cols-2 gap-2 md:gap-4">
          {/* Total Order Value Banner */}
          <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
+        <CardContent className="p-3 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm opacity-90">Total Order Value</p>
-              <p className="text-3xl md:text-4xl font-bold">
+              <p className="text-[10px] md:text-sm opacity-90">Total Order Value</p>
+              <p className="text-xl md:text-3xl lg:text-4xl font-bold">
                 ₹{(businessSummary.totalRevenue / 100000).toFixed(2)} Lac
               </p>
-              <p className="text-xs opacity-75 mt-1">
+              <p className="text-[8px] md:text-xs opacity-75 mt-0.5 md:mt-1">
                 {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
               </p>
             </div>
-            <div className="text-right space-y-1">
-              <p className="text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
-                 <p className="text-sm opacity-90">{businessSummary.totalRetailers} Retailers</p>
+            <div className="md:text-right space-y-0.5 md:space-y-1 mt-1 md:mt-0">
+              <p className="text-[9px] md:text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
+              <p className="text-[9px] md:text-sm opacity-90">{businessSummary.totalRetailers} Retailers</p>
             </div>
           </div>
         </CardContent>
@@ -1448,22 +1448,22 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
 
          {/* Total Quantity Banner - Matching prominent style */}
          <Card className="bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}>
-           <CardContent className="p-6">
-             <div className="flex items-center justify-between">
+           <CardContent className="p-3 md:p-6">
+             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                <div>
-                 <p className="text-sm opacity-90">Total Quantity</p>
-                 <p className="text-3xl md:text-4xl font-bold">
+                 <p className="text-[10px] md:text-sm opacity-90">Total Quantity</p>
+                 <p className="text-xl md:text-3xl lg:text-4xl font-bold">
                    {businessSummary.totalKg.toFixed(1)} KG
                  </p>
-                 <p className="text-xs opacity-75 mt-1">
+                 <p className="text-[8px] md:text-xs opacity-75 mt-0.5 md:mt-1">
                    {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
                  </p>
                </div>
-               <div className="text-right space-y-1">
+               <div className="md:text-right space-y-0.5 md:space-y-1 mt-1 md:mt-0">
                  {businessSummary.totalPieces > 0 && (
-                   <p className="text-sm opacity-90">+ {businessSummary.totalPieces} pcs</p>
+                   <p className="text-[9px] md:text-sm opacity-90">+ {businessSummary.totalPieces} pcs</p>
                  )}
-                 <p className="text-sm opacity-90">{businessSummary.totalBeats} Beats</p>
+                 <p className="text-[9px] md:text-sm opacity-90">{businessSummary.totalBeats} Beats</p>
                </div>
              </div>
            </CardContent>
