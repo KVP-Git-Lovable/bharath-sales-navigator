@@ -2,6 +2,7 @@ import { useState, memo, useCallback } from 'react';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatDialog } from './ChatDialog';
+import { TextChatDialog } from './TextChatDialog';
 import { InteractionModeSelector } from './InteractionModeSelector';
 import { VoiceConversationDialog } from './VoiceConversationDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -57,7 +58,7 @@ export const ChatWidget = memo(() => {
   const renderContent = () => {
     switch (mode) {
       case 'text':
-        return <ChatDialog onClose={handleClose} />;
+        return <TextChatDialog onClose={handleClose} />;
       case 'voice':
         return <VoiceConversationDialog onClose={handleClose} />;
       default:

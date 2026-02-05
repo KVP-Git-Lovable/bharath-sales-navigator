@@ -49,9 +49,11 @@ export const InteractionModeSelector = memo(({ onSelectText, onSelectVoice }: In
               <Mic className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-base">Voice Conversation</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="font-medium text-base">Voice Conversation / ध्वनि वार्तालाप</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Speak in English or Hindi for a natural conversation
+                <br />
+                <span className="text-xs">अपने प्रश्न अंग्रेजी या हिंदी में पूछें।</span>
               </p>
             </div>
           </CardContent>
