@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { PeriodTypeSelector, type PeriodType } from './target-config/PeriodTypeSelector';
 import { PeriodBreakdownGrid, generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
 import { useTargetPeriods } from '@/hooks/useTargetPeriods';
+ import { AnnualMonthlyBreakdown, generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
 
 interface TargetConfig {
   id?: string;
@@ -77,6 +78,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     ...DEFAULT_CONFIG,
   });
   const [periodTargets, setPeriodTargets] = useState<PeriodTarget[]>([]);
+   const [annualMonthlyTargets, setAnnualMonthlyTargets] = useState(generateInitialMonthlyTargets());
+   const [showAnnualMonthlyBreakdown, setShowAnnualMonthlyBreakdown] = useState(false);
 
   // Fetch existing config
   const { data: existingConfig, isLoading } = useQuery({
@@ -618,7 +621,27 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
           </div>
         </div>
 
-        {/* Period Breakdown Grid (only shown for non-annual) */}
+        {/* Annual Monthly Breakdown (shown for annual mode) */}
+        {config.target_period_type === 'annual' && (
+          <>
+            <Separator />
+            <AnnualMonthlyBreakdown
+              totalQuantity={config.total_quantity_target}
+              totalRevenue={config.total_revenue_target}
+              totalVisits={config.total_visits_target}
+              enableQuantity={config.enable_quantity}
+              enableRevenue={config.enable_revenue}
+              enableVisits={config.enable_visits}
+              quantityUnit={config.quantity_unit}
+              monthlyTargets={annualMonthlyTargets}
+              onMonthlyTargetsChange={setAnnualMonthlyTargets}
+              showBreakdown={showAnnualMonthlyBreakdown}
+              onToggleBreakdown={setShowAnnualMonthlyBreakdown}
+            />
+          </>
+        )}
+
+        {/* Period Breakdown Grid (shown for non-annual modes) */}
         {config.target_period_type !== 'annual' && (
           <>
             <Separator />
