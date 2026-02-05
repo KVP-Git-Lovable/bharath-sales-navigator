@@ -65,6 +65,7 @@
        let ordersQuery = supabase
          .from('orders')
          .select('id, retailer_id, total_amount, user_id')
+         .eq('status', 'confirmed')
          .gte('order_date', fromDate)
          .lte('order_date', toDate);
  
