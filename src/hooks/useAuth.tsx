@@ -377,11 +377,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', data.user.id)
         .maybeSingle();
       
+      // Get the redirect URL from sessionStorage (saved by ProtectedRoute)
+      const redirectUrl = sessionStorage.getItem('auth_redirect_url');
+      sessionStorage.removeItem('auth_redirect_url');
+      const targetUrl = redirectUrl || '/dashboard';
+      
       if (profileData?.must_change_password) {
         setMustChangePassword(true);
         toast.info('Please change your password to continue');
-        // Still redirect to dashboard, but the modal will show
-        window.location.href = '/dashboard';
+        // Still redirect, but the modal will show
+        window.location.href = targetUrl;
         return;
       }
       
@@ -406,8 +411,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }, 1000); // Small delay to let the success toast show first
 
-      // Redirect to dashboard for all users
-      window.location.href = '/dashboard';
+      // Redirect to the originally requested URL or dashboard
+      window.location.href = targetUrl;
     }
   };
 
