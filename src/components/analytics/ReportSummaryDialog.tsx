@@ -7,8 +7,6 @@ import { Copy, Volume2, VolumeX, Mic, MicOff, Send, Loader2, MessageCircle } fro
 import { toast } from "sonner";
 import { useReportVoiceChat } from "@/hooks/useReportVoiceChat";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
-import { useConversation } from '@elevenlabs/react';
 
 interface UserOrderSummary {
   full_name: string;
@@ -55,26 +53,8 @@ export const ReportSummaryDialog = ({
 }: ReportSummaryDialogProps) => {
   const [textInput, setTextInput] = useState('');
   const [showChat, setShowChat] = useState(false);
-  const [isHindiConnecting, setIsHindiConnecting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-
-  // ElevenLabs Conversational AI for Hindi
-  const hindiConversation = useConversation({
-    onConnect: () => {
-      console.log('Connected to Hindi ElevenLabs agent');
-      setIsHindiConnecting(false);
-    },
-    onDisconnect: () => {
-      console.log('Disconnected from Hindi ElevenLabs agent');
-      setIsHindiConnecting(false);
-    },
-    onError: (error) => {
-      console.error('Hindi voice conversation error:', error);
-      toast.error('Hindi voice connection failed');
-      setIsHindiConnecting(false);
-    },
-  });
   
   const reportContext = {
     dateRange: {
@@ -109,12 +89,8 @@ export const ReportSummaryDialog = ({
   useEffect(() => {
     if (!open) {
       stopAllAudio();
-      // Also disconnect Hindi conversation if active
-      if (hindiConversation.status === 'connected') {
-        hindiConversation.endSession();
-      }
     }
-  }, [open, stopAllAudio, hindiConversation]);
+  }, [open, stopAllAudio]);
 
   const generateSummary = (): string => {
     const parts: string[] = [];
@@ -288,62 +264,12 @@ export const ReportSummaryDialog = ({
     }
   };
 
-  const handlePlayHindiSummary = async () => {
-    // If already connected, disconnect
-    if (hindiConversation.status === 'connected') {
-      await hindiConversation.endSession();
-      return;
-    }
-    
-    // If TTS is playing, stop it first
+  const handlePlayHindiSummary = () => {
     if (isPlaying) {
       stopAllAudio();
-    }
-    
-    setIsHindiConnecting(true);
-    
-    try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Get signed URL from edge function with Hindi agent ID
-      const { data, error: fnError } = await supabase.functions.invoke(
-        'elevenlabs-conversation-token',
-        {
-          body: { agentId: 'agent_6001kgnzz6bkfc0ve5ytzr06qhd2' }
-        }
-      );
-
-      if (fnError) {
-        console.error('Token fetch error:', fnError);
-        throw new Error('Failed to get voice connection token');
-      }
-
-      if (!data?.signed_url) {
-        console.error('No signed URL received:', data);
-        throw new Error('No connection URL received');
-      }
-
-      console.log('Starting Hindi voice session with signed URL');
-
-      // Start the conversation with WebSocket
-      await hindiConversation.startSession({
-        signedUrl: data.signed_url,
-      });
-
-    } catch (err) {
-      console.error('Failed to start Hindi voice conversation:', err);
-      setIsHindiConnecting(false);
-      
-      if (err instanceof Error) {
-        if (err.name === 'NotAllowedError' || err.message.includes('Permission')) {
-          toast.error('Please allow microphone access for Hindi voice chat');
-        } else {
-          toast.error(err.message);
-        }
-      } else {
-        toast.error('Failed to start Hindi voice conversation');
-      }
+    } else {
+      const hindiSummary = generateHindiSpokenSummary();
+      playSummary(hindiSummary, 'qsz5tTEjPvsiIJZIpM8S');
     }
   };
 
@@ -407,17 +333,12 @@ export const ReportSummaryDialog = ({
                   variant="outline" 
                   size="sm" 
                   onClick={handlePlayHindiSummary}
-                  disabled={isProcessing || isHindiConnecting}
+                  disabled={isProcessing}
                 >
-                  {isHindiConnecting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : hindiConversation.status === 'connected' ? (
+                  {isPlaying ? (
                     <>
                       <VolumeX className="h-4 w-4 mr-2" />
-                      End Hindi Call
+                      Stop
                     </>
                   ) : (
                     <>
