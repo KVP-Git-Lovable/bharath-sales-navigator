@@ -71,6 +71,16 @@ export const BeatDetailsDialog = ({
   data,
   isLoading
 }: DialogProps & { data: BeatDetail[]; isLoading: boolean }) => {
+   const { translateTexts, getTranslated } = useHindiToEnglish();
+ 
+   // Translate Hindi beat names when data changes
+   useEffect(() => {
+     if (data.length > 0) {
+       const textsToTranslate = data.map(b => b.beat_name).filter(Boolean);
+       translateTexts(textsToTranslate);
+     }
+   }, [data]);
+ 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
@@ -106,7 +116,7 @@ export const BeatDetailsDialog = ({
               ) : (
                 data.map((beat, idx) => (
                   <TableRow key={idx}>
-                    <TableCell className="font-medium">{beat.beat_name}</TableCell>
+                    <TableCell className="font-medium">{getTranslated(beat.beat_name)}</TableCell>
                     <TableCell className="text-right">{beat.visits_count}</TableCell>
                     <TableCell className="text-right">{beat.orders_count}</TableCell>
                     <TableCell className="text-right font-semibold">₹{beat.revenue.toLocaleString()}</TableCell>
