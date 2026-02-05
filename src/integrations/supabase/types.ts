@@ -7466,6 +7466,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pincode_master: {
+        Row: {
+          created_at: string | null
+          district: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          officename: string
+          pincode: string
+          statename: string | null
+          territory_po: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          district?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          officename: string
+          pincode: string
+          statename?: string | null
+          territory_po?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          district?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          officename?: string
+          pincode?: string
+          statename?: string | null
+          territory_po?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       price_book_entries: {
         Row: {
           created_at: string

@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, Settings, Package, ArrowLeft, CalendarDays, MapPin, DollarSign, BarChart3, MessageSquareText, Navigation, Store, Truck, Flag, Trophy, FileText, CreditCard, Lock, Bell, Trash2, Building2, Gift, Target } from 'lucide-react';
+import { Shield, Users, Settings, Package, ArrowLeft, CalendarDays, MapPin, DollarSign, BarChart3, MessageSquareText, Navigation, Store, Truck, Flag, Trophy, FileText, CreditCard, Lock, Bell, Trash2, Building2, Gift, Target, Map } from 'lucide-react';
 import { SearchInput } from '@/components/SearchInput';
 
 const AdminControls = () => {
@@ -56,6 +56,7 @@ const AdminControls = () => {
     { title: "Recycle Bin Master", description: "Configure recycle bin settings and view permanent deletion logs", icon: Trash2, color: "rose", path: "/admin/recycle-bin" },
     { title: "Distributor Portal Admin", description: "Manage distributor portal users, orders, claims, support, and ideas", icon: Building2, color: "cyan", path: "/admin/distributor-portal" },
     { title: "Target Management", description: "Configure, assign, and track team targets with hierarchy cascade", icon: Target, color: "blue", path: "/admin/target-vs-actual" },
+    { title: "Pincode Master", description: "Import and manage India PIN code reference data", icon: Map, color: "teal", path: "/admin/pincode-master" },
   ];
 
   const filteredModules = adminModules.filter(module => 
