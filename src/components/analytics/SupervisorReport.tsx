@@ -1424,7 +1424,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
       </div>
 
       {/* Total Order Value Banner - Dashboard visualization */}
-      <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg">
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+         {/* Total Order Value Banner */}
+         <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -1438,15 +1440,38 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
             </div>
             <div className="text-right space-y-1">
               <p className="text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
-              <p className="text-sm opacity-90">{Math.round(businessSummary.totalKg).toLocaleString()} Units</p>
-              <p className="text-sm opacity-90 font-medium">{Math.round(businessSummary.totalKg).toLocaleString()} KG</p>
+                 <p className="text-sm opacity-90">{businessSummary.totalRetailers} Retailers</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
+         {/* Total Quantity Banner - Matching prominent style */}
+         <Card className="bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}>
+           <CardContent className="p-6">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm opacity-90">Total Quantity</p>
+                 <p className="text-3xl md:text-4xl font-bold">
+                   {businessSummary.totalKg.toFixed(1)} KG
+                 </p>
+                 <p className="text-xs opacity-75 mt-1">
+                   {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
+                 </p>
+               </div>
+               <div className="text-right space-y-1">
+                 {businessSummary.totalPieces > 0 && (
+                   <p className="text-sm opacity-90">+ {businessSummary.totalPieces} pcs</p>
+                 )}
+                 <p className="text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+       </div>
+
       {/* Business Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <BusinessSummaryCard
           title="Total Beats"
           value={businessSummary.totalBeats}
@@ -1468,14 +1493,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
           icon={<ShoppingCart size={18} className="text-green-600" />}
           iconBgClass="bg-green-500/10"
           onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}
-          isLoading={businessLoading}
-        />
-        <BusinessSummaryCard
-          title="Total Qty"
-          value={`${businessSummary.totalKg.toFixed(1)} KG${businessSummary.totalPieces > 0 ? ` + ${businessSummary.totalPieces} pcs` : ''}`}
-          icon={<Package size={18} className="text-orange-600" />}
-          iconBgClass="bg-orange-500/10"
-          onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}
           isLoading={businessLoading}
         />
         <BusinessSummaryCard
