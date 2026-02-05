@@ -1,9 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, format } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, format, getMonth, getYear } from 'date-fns';
+import { EnabledParameters } from './useFYTargetConfig';
 
 export type PeriodType = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type TargetBasis = 'quantity' | 'revenue';
+
+export interface ProductMonthProgress {
+  productId: string;
+  productName: string;
+  monthNumber: number;
+  monthName: string;
+  target: number;
+  actual: number;
+  achievementPercentage: number;
+}
 
 export interface TeamMemberProgress {
   userId: string;
@@ -20,6 +31,7 @@ export interface TeamMemberProgress {
     workingDays: number;
     totalDays: number;
   };
+  productMonthBreakdown?: ProductMonthProgress[];
 }
 
 interface UseTeamTargetProgressParams {
@@ -27,6 +39,7 @@ interface UseTeamTargetProgressParams {
   periodType: PeriodType;
   date: Date;
   basis: TargetBasis;
+  enabledParameters?: EnabledParameters | null;
 }
 
 // Helper to get current FY year (April to March)
@@ -59,9 +72,17 @@ const getWorkingDaysInMonth = (date: Date): number => {
   return daysInMonth - sundays;
 };
 
-export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseTeamTargetProgressParams) => {
+// Get FY month name
+const FY_MONTH_NAMES: Record<number, string> = {
+  1: 'April', 2: 'May', 3: 'June', 4: 'July', 5: 'August', 6: 'September',
+  7: 'October', 8: 'November', 9: 'December', 10: 'January', 11: 'February', 12: 'March'
+};
+
+export const useTeamTargetProgress = ({ userIds, periodType, date, basis, enabledParameters }: UseTeamTargetProgressParams) => {
+  const hasProductAndMonthly = enabledParameters?.product && enabledParameters?.monthly;
+
   return useQuery({
-    queryKey: ['team-target-progress', userIds, periodType, format(date, 'yyyy-MM-dd'), basis],
+    queryKey: ['team-target-progress', userIds, periodType, format(date, 'yyyy-MM-dd'), basis, hasProductAndMonthly],
     queryFn: async (): Promise<TeamMemberProgress[]> => {
       if (!userIds.length) return [];
 
@@ -117,6 +138,16 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
             .in('business_plan_id', planIds)
         : { data: [] };
 
+      // Fetch product-month targets if both product and monthly parameters are enabled
+      let productMonthTargets: any[] = [];
+      if (hasProductAndMonthly && planIds.length > 0) {
+        const { data: pmt } = await supabase
+          .from('user_business_plan_month_products')
+          .select('*')
+          .in('business_plan_id', planIds);
+        productMonthTargets = pmt || [];
+      }
+
       // Fetch actual orders for the period
       const { data: orders } = await supabase
         .from('orders')
@@ -125,11 +156,18 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
           user_id,
           total_amount,
           created_at,
-          order_items(quantity, unit)
+          order_items(quantity, unit, product_id)
         `)
         .in('user_id', userIds)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
+
+      // Helper to get FY month number from a date
+      const getDateFYMonth = (dateStr: string): number => {
+        const d = new Date(dateStr);
+        const month = d.getMonth(); // 0-11
+        return month >= 3 ? month - 2 : month + 10;
+      };
 
       // Build progress data for each user
       const progressData: TeamMemberProgress[] = userIds.map(userId => {
@@ -205,6 +243,59 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
           status = 'not_achieved';
         }
 
+        // Build product-month breakdown if applicable
+        let productMonthBreakdown: ProductMonthProgress[] | undefined;
+        if (hasProductAndMonthly && plan) {
+          const userProductMonthTargets = productMonthTargets.filter(
+            pmt => pmt.business_plan_id === plan.id
+          );
+          
+          if (userProductMonthTargets.length > 0) {
+            // Group user orders by product and month
+            const productMonthActuals: Record<string, number> = {};
+            userOrders.forEach(o => {
+              const orderMonth = getDateFYMonth(o.created_at);
+              (o.order_items as any[])?.forEach((item: any) => {
+                if (item.product_id) {
+                  const key = `${item.product_id}-${orderMonth}`;
+                  const qty = item.quantity || 0;
+                  const unit = (item.unit || '').toLowerCase();
+                  
+                  if (basis === 'revenue') {
+                    // We don't have item-level revenue easily, use qty as proxy or skip
+                    productMonthActuals[key] = (productMonthActuals[key] || 0) + qty;
+                  } else {
+                    // Convert grams to KG
+                    const normalizedQty = (unit === 'grams' || unit === 'gram' || unit === 'g') 
+                      ? qty / 1000 
+                      : qty;
+                    productMonthActuals[key] = (productMonthActuals[key] || 0) + normalizedQty;
+                  }
+                }
+              });
+            });
+
+            productMonthBreakdown = userProductMonthTargets.map(pmt => {
+              const targetValue = basis === 'revenue' 
+                ? (pmt.revenue_target || 0) 
+                : (pmt.quantity_target || 0);
+              const actualKey = `${pmt.product_id}-${pmt.month_number}`;
+              const actualValue = productMonthActuals[actualKey] || 0;
+              const achievementPct = targetValue > 0 ? (actualValue / targetValue) * 100 : 0;
+
+              return {
+                productId: pmt.product_id,
+                productName: pmt.product_name || 'Unknown Product',
+                monthNumber: pmt.month_number,
+                monthName: FY_MONTH_NAMES[pmt.month_number] || `Month ${pmt.month_number}`,
+                target: targetValue,
+                actual: actualValue,
+                achievementPercentage: achievementPct,
+              };
+            });
+          }
+        }
+
         return {
           userId,
           fullName: (profile as any)?.full_name || 'Unknown User',
@@ -214,6 +305,7 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis }: UseT
           achievementPercentage,
           gap,
           status,
+          productMonthBreakdown,
         };
       });
 

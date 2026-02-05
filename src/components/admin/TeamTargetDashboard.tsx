@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,13 +9,17 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Users, Trophy, TrendingUp, TrendingDown, Calendar as CalendarIcon, Filter, Globe } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Users, Trophy, TrendingUp, TrendingDown, Calendar as CalendarIcon, Filter, Globe, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useTeamTargetProgress, PeriodType, TargetBasis } from '@/hooks/useTeamTargetProgress';
+import { useFYTargetConfig } from '@/hooks/useFYTargetConfig';
+import { ProductMonthBreakdownTable } from './ProductMonthBreakdownTable';
 import { UserScope } from '@/pages/admin/TargetVsActual';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TeamTargetDashboardProps {
   userScope?: UserScope;
@@ -38,6 +43,12 @@ export function TeamTargetDashboard({
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // Fetch FY config to get enabled parameters
+  const { data: fyConfig } = useFYTargetConfig(fyYear || new Date().getFullYear());
+  const enabledParameters = fyConfig?.enabled_parameters;
+  const hasProductAndMonthly = enabledParameters?.product && enabledParameters?.monthly;
 
   // Get all team member IDs - use effectiveUserIds if provided, else subordinates
   const teamUserIds = effectiveUserIds.length > 0 ? effectiveUserIds : subordinateIds;
@@ -47,6 +58,7 @@ export function TeamTargetDashboard({
     periodType,
     date: selectedDate,
     basis,
+    enabledParameters,
   });
 
   // Calculate summary stats
@@ -71,6 +83,18 @@ export function TeamTargetDashboard({
 
   const handleStatusFilterClick = (filter: 'all' | 'achieved' | 'in_progress' | 'not_achieved') => {
     setStatusFilter(prev => prev === filter ? 'all' : filter);
+  };
+
+  const toggleRowExpanded = (userId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
   };
 
   const formatValue = (value: number): string => {
@@ -334,6 +358,7 @@ export function TeamTargetDashboard({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {hasProductAndMonthly && <TableHead className="w-10"></TableHead>}
                     <TableHead>Team Member</TableHead>
                     <TableHead className="text-right">Target</TableHead>
                     <TableHead className="text-right">Actual</TableHead>
@@ -343,47 +368,97 @@ export function TeamTargetDashboard({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTeamProgress.map((member) => (
-                    <TableRow key={member.userId}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.avatarUrl || undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(member.fullName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{member.fullName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatValue(member.target)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatValue(member.actual)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={Math.min(member.achievementPercentage, 100)} 
-                            className="h-2 w-20"
-                          />
-                          <span className="text-sm font-medium w-12 text-right">
-                            {member.achievementPercentage.toFixed(0)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-medium",
-                        member.gap >= 0 ? "text-green-600" : "text-red-600"
-                      )}>
-                        {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getStatusBadge(member.status)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredTeamProgress.map((member) => {
+                    const isExpanded = expandedRows.has(member.userId);
+                    const hasBreakdown = hasProductAndMonthly && member.productMonthBreakdown && member.productMonthBreakdown.length > 0;
+                    
+                    return (
+                      <React.Fragment key={member.userId}>
+                        <TableRow 
+                          className={cn(
+                            hasBreakdown && "cursor-pointer hover:bg-muted/50",
+                            isExpanded && "bg-muted/30"
+                          )}
+                          onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
+                        >
+                          {hasProductAndMonthly && (
+                            <TableCell className="p-2 w-10">
+                              {hasBreakdown ? (
+                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              ) : null}
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={member.avatarUrl || undefined} />
+                                <AvatarFallback className="text-xs">
+                                  {getInitials(member.fullName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{member.fullName}</span>
+                                {hasBreakdown && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Package className="h-3 w-3" />
+                                    {member.productMonthBreakdown!.length} product-month entries
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatValue(member.target)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatValue(member.actual)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress 
+                                value={Math.min(member.achievementPercentage, 100)} 
+                                className="h-2 w-20"
+                              />
+                              <span className="text-sm font-medium w-12 text-right">
+                                {member.achievementPercentage.toFixed(0)}%
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className={cn(
+                            "text-right font-medium",
+                            member.gap >= 0 ? "text-green-600" : "text-red-600"
+                          )}>
+                            {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(member.status)}
+                          </TableCell>
+                        </TableRow>
+                        {hasBreakdown && isExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={hasProductAndMonthly ? 7 : 6} className="p-0 bg-muted/20">
+                              <div className="p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Package className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm font-medium">Product × Month Breakdown</span>
+                                </div>
+                                <ProductMonthBreakdownTable 
+                                  data={member.productMonthBreakdown!} 
+                                  basis={basis}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
