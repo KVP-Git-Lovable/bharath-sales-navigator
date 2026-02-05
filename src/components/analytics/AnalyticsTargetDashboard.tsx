@@ -15,9 +15,10 @@ import { supabase } from '@/integrations/supabase/client';
 interface AnalyticsTargetDashboardProps {
   selectedUserIds: string[];
   dateRange: { from: Date; to: Date };
+  periodFilter?: string;
 }
 
-export function AnalyticsTargetDashboard({ selectedUserIds, dateRange }: AnalyticsTargetDashboardProps) {
+export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFilter }: AnalyticsTargetDashboardProps) {
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
 
@@ -38,15 +39,36 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange }: Analyti
   // Use selected users if provided, otherwise use all users
   const effectiveUserIds = selectedUserIds.length > 0 ? selectedUserIds : allUserIds;
 
-  // Determine period type based on date range
+  // Determine period type based on periodFilter or date range
   const periodType = useMemo((): PeriodType => {
+    // Use explicit period mapping if periodFilter is provided
+    if (periodFilter) {
+      switch (periodFilter) {
+        case 'today':
+        case 'yesterday':
+          return 'day';
+        case 'this_week':
+        case 'last_week':
+          return 'week';
+        case 'this_month':
+        case 'last_month':
+          return 'month';
+        case 'this_quarter':
+        case 'last_quarter':
+          return 'quarter';
+        case 'this_fy':
+        case 'last_fy':
+          return 'year';
+      }
+    }
+    // Fallback to date range calculation
     const diffDays = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays <= 1) return 'day';
     if (diffDays <= 7) return 'week';
     if (diffDays <= 31) return 'month';
     if (diffDays <= 92) return 'quarter';
     return 'year';
-  }, [dateRange]);
+  }, [dateRange, periodFilter]);
 
   const { data: teamProgress, isLoading } = useTeamTargetProgress({
     userIds: effectiveUserIds,

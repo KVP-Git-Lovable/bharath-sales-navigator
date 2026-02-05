@@ -1529,6 +1529,7 @@ const Analytics = () => {
               <AnalyticsTargetDashboard 
                 selectedUserIds={selectedUserIds}
                 dateRange={dashboardDateRange}
+                periodFilter={dashboardPeriod}
               />
             </TabsContent>
 
