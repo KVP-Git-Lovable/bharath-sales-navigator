@@ -1,75 +1,73 @@
 
-# Update Total Quantity Styling in Productivity Section
+# Plan: Dynamic Target Parameter Tab Rendering
 
-## Problem
-The "Total Quantity" and KG value in the Productivity section uses a smaller `BusinessSummaryCard` component, while "Total Order Value" uses a large gradient banner card with prominent typography. The user wants both to have consistent, prominent styling.
+## Overview
+Update the `UserFYPlanTarget` component to dynamically render only the tabs corresponding to the enabled target parameters from the FY configuration. Currently, all 5 tabs (Products, Retailers, Distributors, Monthly, Territory) are always displayed regardless of the configuration.
 
-## Solution
-Create a new gradient banner card for "Total Quantity" that matches the visual style of the "Total Order Value" banner.
+## Technical Analysis
 
-## Implementation
+### Current State
+- `UserFYPlanTarget` component accepts an `enabledParameters` prop (lines 196-203)
+- The prop structure matches the FY config: `{ product, retailer, beat, distributor, territory, monthly }`
+- However, the tabs section (lines 1927-1949) renders a static 5-column grid with all tabs visible
+- When used via `ApplyToUsersStep` or `HierarchyUserTargetNode`, the parameters are passed correctly
 
-### File to Modify
-`src/components/analytics/SupervisorReport.tsx`
+### Issue
+The tabs are hardcoded and don't respect the `enabledParameters` configuration. The component should:
+1. Only show tabs for enabled parameters
+2. Default to the first available enabled tab
+3. Adjust the grid layout based on the number of visible tabs
 
-### Changes
+## Implementation Plan
 
-#### 1. Add a New "Total Quantity" Banner Card
-Create a second gradient banner card positioned next to or below the "Total Order Value" banner with matching styling:
+### Step 1: Create a Computed Enabled Tabs Array
+Add a `useMemo` hook to compute which tabs should be visible:
 
-- Background: `bg-gradient-to-r from-orange-600 to-orange-500` (using orange to match the quantity icon color theme)
-- Title: `text-sm opacity-90` - "Total Quantity"
-- Main Value: `text-3xl md:text-4xl font-bold` - The KG value prominently displayed
-- Subtext: `text-xs opacity-75` - Date range
-
-#### 2. Layout Options
-Two banner cards side-by-side in a grid layout:
-- On desktop: Two equal-width cards in a row
-- On mobile: Stack vertically
-
-#### 3. Code Structure
-```tsx
-{/* Two-column banner layout */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  {/* Total Order Value Banner */}
-  <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg">
-    <CardContent className="p-6">
-      <div>
-        <p className="text-sm opacity-90">Total Order Value</p>
-        <p className="text-3xl md:text-4xl font-bold">
-          ₹{...} Lac
-        </p>
-        <p className="text-xs opacity-75 mt-1">
-          {date range}
-        </p>
-      </div>
-    </CardContent>
-  </Card>
-
-  {/* Total Quantity Banner - NEW with matching style */}
-  <Card className="bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg">
-    <CardContent className="p-6">
-      <div>
-        <p className="text-sm opacity-90">Total Quantity</p>
-        <p className="text-3xl md:text-4xl font-bold">
-          {kg value} KG
-        </p>
-        <p className="text-xs opacity-75 mt-1">
-          {date range}
-        </p>
-      </div>
-    </CardContent>
-  </Card>
-</div>
+```text
+┌─────────────────────────────────────────────────────────┐
+│ enabledParameters?.product  → Products tab             │
+│ enabledParameters?.retailer → Retailers tab            │
+│ enabledParameters?.distributor → Distributors tab      │
+│ enabledParameters?.monthly → Monthly tab               │
+│ enabledParameters?.territory → Territory tab           │
+└─────────────────────────────────────────────────────────┘
 ```
 
-#### 4. Remove from BusinessSummaryCard Grid
-Remove the "Total Qty" entry from the 6-card grid since it will now be displayed in the prominent banner.
+### Step 2: Update TabsList Grid Columns
+Change from static `grid-cols-5` to dynamic grid columns based on the number of enabled tabs:
+- 1 tab: `grid-cols-1`
+- 2 tabs: `grid-cols-2`
+- 3 tabs: `grid-cols-3`
+- 4 tabs: `grid-cols-4`
+- 5 tabs: `grid-cols-5`
 
-## Visual Result
-- Two equally-styled banner cards at the top of the Productivity section
-- "Total Order Value" in primary/blue gradient (left/top)
-- "Total Quantity" in orange gradient (right/bottom)
-- Both using large `text-3xl/text-4xl` fonts for values
-- Consistent date range subtext
-- Responsive: side-by-side on desktop, stacked on mobile
+### Step 3: Conditionally Render Tab Triggers and Content
+Wrap each `TabsTrigger` and `TabsContent` in conditional blocks:
+- `{shouldShowTab.products && <TabsTrigger value="products">...}`
+- Same pattern for all 5 tabs
+
+### Step 4: Dynamic Default Tab Selection
+Set the default tab value to the first enabled tab instead of hardcoded "products":
+- If product enabled → "products"
+- Else if retailer enabled → "retailers"
+- And so on...
+
+### Step 5: Fallback Behavior
+When `enabledParameters` is undefined (self-use mode), show all tabs for backward compatibility.
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/profile/UserFYPlanTarget.tsx` | Add conditional tab rendering logic based on `enabledParameters` prop |
+
+## Edge Cases
+- **No parameters passed**: Show all tabs (backward compatibility for My Target page)
+- **All parameters disabled**: Show empty state with message
+- **Single parameter**: Show single tab without grid (or minimal grid)
+
+## Visual Outcome
+When user enables "Product-wise" and "Monthly-wise" only:
+- Only 2 tabs visible: Products and Monthly
+- TabsList renders as `grid-cols-2`
+- Default tab is "products"
