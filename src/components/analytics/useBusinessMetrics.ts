@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -64,6 +64,10 @@ export const useBusinessMetrics = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   
+  // Ref to prevent duplicate fetches
+  const lastFetchKeyRef = useRef<string>('');
+  const isFetchingRef = useRef(false);
+
   // Detail data states
   const [beatDetails, setBeatDetails] = useState<BeatDetail[]>([]);
   const [retailerDetails, setRetailerDetails] = useState<RetailerDetail[]>([]);
@@ -73,7 +77,23 @@ export const useBusinessMetrics = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   const fetchSummary = useCallback(async (userIds: string[], dateRange: { from: Date; to: Date }, userNames?: string[]) => {
+    // Create a fetch key to prevent duplicate requests
+    const fetchKey = `${userIds.slice().sort().join(',')}-${dateRange.from.getTime()}-${dateRange.to.getTime()}`;
+    
+    // Skip if already fetching with the same parameters
+    if (isFetchingRef.current && fetchKey === lastFetchKeyRef.current) {
+      return;
+    }
+    
+    // Skip if this exact fetch was already completed
+    if (fetchKey === lastFetchKeyRef.current && !isLoading) {
+      return;
+    }
+    
+    lastFetchKeyRef.current = fetchKey;
+    isFetchingRef.current = true;
     setIsLoading(true);
+    
     try {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -101,32 +121,37 @@ export const useBusinessMetrics = () => {
       if (ordersError) throw ordersError;
 
       // Fetch beats created by selected users within date range
-      let beatsQuery = supabase
-        .from('beats')
-        .select('id, created_by')
-        .gte('created_at', `${fromDate}T00:00:00`)
-        .lte('created_at', `${toDate}T23:59:59`);
+      // Fetch beats and retailers in parallel
+      const [beatsResult, retailersResult] = await Promise.all([
+        (async () => {
+          let beatsQuery = supabase
+            .from('beats')
+            .select('id, created_by')
+            .gte('created_at', `${fromDate}T00:00:00`)
+            .lte('created_at', `${toDate}T23:59:59`);
+          if (userIds.length > 0) {
+            beatsQuery = beatsQuery.in('created_by', userIds);
+          }
+          return beatsQuery;
+        })(),
+        (async () => {
+          let retailersQuery = supabase
+            .from('retailers')
+            .select('id, user_id')
+            .gte('created_at', `${fromDate}T00:00:00`)
+            .lte('created_at', `${toDate}T23:59:59`);
+          if (userIds.length > 0) {
+            retailersQuery = retailersQuery.in('user_id', userIds);
+          }
+          return retailersQuery;
+        })()
+      ]);
 
-      if (userIds.length > 0) {
-        beatsQuery = beatsQuery.in('created_by', userIds);
-      }
+      if (beatsResult.error) throw beatsResult.error;
+      if (retailersResult.error) throw retailersResult.error;
 
-      const { data: beats, error: beatsError } = await beatsQuery;
-      if (beatsError) throw beatsError;
-
-      // Fetch retailers created by selected users within date range
-      let retailersQuery = supabase
-        .from('retailers')
-        .select('id, user_id')
-        .gte('created_at', `${fromDate}T00:00:00`)
-        .lte('created_at', `${toDate}T23:59:59`);
-
-      if (userIds.length > 0) {
-        retailersQuery = retailersQuery.in('user_id', userIds);
-      }
-
-      const { data: retailers, error: retailersError } = await retailersQuery;
-      if (retailersError) throw retailersError;
+      const beats = beatsResult.data;
+      const retailers = retailersResult.data;
 
       const totalBeatsCount = beats?.length || 0;
       const totalRetailersCount = retailers?.length || 0;
@@ -199,6 +224,7 @@ export const useBusinessMetrics = () => {
       console.error('Error fetching business summary:', error);
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   }, []);
 
