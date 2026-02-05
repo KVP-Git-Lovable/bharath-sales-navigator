@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
-
-interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
-}
+import { useState, useEffect, useCallback } from "react";
+import { 
+  getDeferredPrompt, 
+  clearDeferredPrompt, 
+  wasPromptCaptured,
+  type BeforeInstallPromptEvent 
+} from "@/utils/pwaInstallCapture";
 
 export const usePWAInstall = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
+    // Initialize with any already-captured prompt
+    getDeferredPrompt()
+  );
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [dismissCount, setDismissCount] = useState(() => {
@@ -24,96 +24,139 @@ export const usePWAInstall = () => {
     const isInstalledApp = isStandalone || isIOSStandalone;
     setIsInstalled(isInstalledApp);
 
-    // Only show install option if dismissed less than 2 times
-    if (!isInstalledApp && dismissCount < 2) {
-      // Check if browser supports PWA installation
-      const supportsInstall = 'serviceWorker' in navigator && 'PushManager' in window;
+    // Check for already captured prompt from global handler
+    const existingPrompt = getDeferredPrompt();
+    if (existingPrompt) {
+      console.log('📱 Using previously captured install prompt');
+      setDeferredPrompt(existingPrompt);
+      setIsInstallable(true);
+    } else if (!isInstalledApp && dismissCount < 2) {
+      // Show install option based on browser support
+      const supportsInstall = 'serviceWorker' in navigator;
       setIsInstallable(supportsInstall);
     }
 
-    const handler = (e: Event) => {
-      console.log('beforeinstallprompt event fired');
+    // Listen for new prompt captures
+    const handlePromptReady = () => {
+      const prompt = getDeferredPrompt();
+      if (prompt) {
+        console.log('📱 Install prompt ready from global capture');
+        setDeferredPrompt(prompt);
+        setIsInstallable(true);
+      }
+    };
+
+    // Also listen for the original event in case it fires after mount
+    const handleBeforeInstall = (e: Event) => {
+      console.log('📱 beforeinstallprompt event fired (hook listener)');
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setIsInstallable(true);
     };
 
     const appInstalledHandler = () => {
-      console.log('App was installed');
+      console.log('✅ App was installed');
       setIsInstalled(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
+      clearDeferredPrompt();
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     window.addEventListener('appinstalled', appInstalledHandler);
 
     // Log current state for debugging
-    console.log('PWA Install Hook initialized:', {
+    console.log('📱 PWA Install Hook initialized:', {
       isStandalone,
       isIOSStandalone,
       isInstalled: isInstalledApp,
-      userAgent: navigator.userAgent
+      hasExistingPrompt: !!existingPrompt,
+      wasPromptCaptured: wasPromptCaptured(),
+      userAgent: navigator.userAgent.substring(0, 50)
     });
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('appinstalled', appInstalledHandler);
     };
-  }, []);
+  }, [dismissCount]);
 
-  const installApp = async () => {
-    console.log('Install button clicked, deferredPrompt:', !!deferredPrompt);
+  const installApp = useCallback(async (): Promise<{ success: boolean; method: 'native' | 'manual'; platform: string }> => {
+    console.log('📱 Install button clicked, deferredPrompt:', !!deferredPrompt);
     
-    if (deferredPrompt) {
+    // Try to use the native prompt first
+    const prompt = deferredPrompt || getDeferredPrompt();
+    
+    if (prompt) {
       try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
+        console.log('📱 Triggering native install prompt...');
+        await prompt.prompt();
+        const { outcome } = await prompt.userChoice;
         
-        console.log('User response to install prompt:', outcome);
+        console.log('📱 User response to install prompt:', outcome);
         
         if (outcome === 'accepted') {
           setIsInstalled(true);
+          clearDeferredPrompt();
+          return { success: true, method: 'native', platform: 'chromium' };
         }
         
         setDeferredPrompt(null);
+        clearDeferredPrompt();
         setIsInstallable(false);
-        return;
+        return { success: false, method: 'native', platform: 'chromium' };
       } catch (error) {
-        console.error('Install failed:', error);
+        console.error('📱 Native install failed:', error);
       }
     }
 
-    // Fallback for browsers that don't support beforeinstallprompt
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // Detect platform for manual instructions
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const isAndroid = /Android/.test(navigator.userAgent);
+    const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge|Edg/.test(navigator.userAgent);
+    const isSamsungBrowser = /SamsungBrowser/.test(navigator.userAgent);
     
-    if (isIOS) {
-      const isInApp = (window.navigator as any).standalone === true;
-      if (!isInApp) {
-        alert('To install this app on iOS:\n\n1. Tap the Share button (⎋) at the bottom\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm\n\nThis will create a native app icon on your home screen!');
-      }
-    } else if (isAndroid) {
-      // Try to trigger Chrome's install banner manually
-      alert('To install this app:\n\n1. Tap the menu (⋮) in your browser\n2. Look for "Install app" or "Add to Home Screen"\n3. Follow the prompts\n\nThis will install the app as a native application!');
-    } else {
-      // Desktop browsers
-      alert('To install this app:\n\n1. Look for an install icon (⬇) in your address bar\n2. Or check browser menu for "Install app"\n3. Follow the installation prompts\n\nThis will install the app to your desktop!');
-    }
-  };
+    let platform = 'desktop';
+    if (isIOS) platform = 'ios';
+    else if (isAndroid) platform = 'android';
+    
+    // Return info about what manual method is needed
+    return { success: false, method: 'manual', platform };
+  }, [deferredPrompt]);
 
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     const newCount = dismissCount + 1;
     setDismissCount(newCount);
     localStorage.setItem('pwa-dismiss-count', newCount.toString());
     setIsInstallable(false);
-  };
+  }, [dismissCount]);
+
+  const getPlatformInfo = useCallback(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isAndroid = /Android/.test(navigator.userAgent);
+    const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge|Edg/.test(navigator.userAgent);
+    const isSamsungBrowser = /SamsungBrowser/.test(navigator.userAgent);
+    const isFirefox = /Firefox/.test(navigator.userAgent);
+    
+    return {
+      isIOS,
+      isAndroid,
+      isChrome,
+      isSamsungBrowser,
+      isFirefox,
+      isMobile: isIOS || isAndroid
+    };
+  }, []);
 
   return {
     isInstallable: isInstallable && !isInstalled && dismissCount < 2,
     isInstalled,
     installApp,
-    canPrompt: !!deferredPrompt,
-    handleDismiss
+    canPrompt: !!(deferredPrompt || getDeferredPrompt()),
+    handleDismiss,
+    getPlatformInfo
   };
 };

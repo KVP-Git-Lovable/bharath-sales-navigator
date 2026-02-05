@@ -1,5 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+// Import PWA capture FIRST to catch beforeinstallprompt event early
+import './utils/pwaInstallCapture';
 import App from './App.tsx';
 import './index.css';
 // Import i18n BEFORE app renders to ensure translations are available
