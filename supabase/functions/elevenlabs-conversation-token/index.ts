@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const TEXT_AGENT_ID = 'agent_9301kgp19jzyf72rrtkshfdzbf11';
+const TEXT_AGENT_ID = 'agent_5501kgp3n62zfc0sfdgmrz2j2xqc';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
