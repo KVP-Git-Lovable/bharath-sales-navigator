@@ -1,125 +1,154 @@
 
-# Plan: Display Combined Product-wise + Month-wise Target Data in Target vs Actual View
 
-## Problem Summary
-The "Target vs Actual" tab in Target Management only shows Month-wise target data. When both "Product-wise" and "Monthly-wise" parameters are enabled in the configuration, users expect to see combined data showing targets broken down by both product AND month - matching the structure already implemented in the Target allocation module (`UserFYPlanTarget`).
+# Plan: Create `pincode_master` Table and Import CSV Data
 
-## Technical Analysis
+## Overview
+Create a new database table `pincode_master` to store India's PIN code and territory master data from the uploaded CSV file (165,627 records). This will serve as a reference lookup table for validating and enriching address data across the application.
 
-### Current Data Flow
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Current Target vs Actual View                    │
-├─────────────────────────────────────────────────────────────────────┤
-│  useTeamTargetProgress hook fetches:                                │
-│    - user_business_plans (yearly totals)                            │
-│    - user_business_plan_months (monthly breakdowns)                 │
-│    - orders (actual performance)                                    │
-│                                                                     │
-│  Does NOT fetch:                                                    │
-│    - fy_target_config (to check enabled_parameters)                 │
-│    - user_business_plan_month_products (product + month combined)   │
-└─────────────────────────────────────────────────────────────────────┘
-```
+## CSV Data Analysis
 
-### Target Data Tables
-| Table | Purpose |
-|-------|---------|
-| `fy_target_config` | Stores enabled_parameters (product, monthly, etc.) |
-| `user_business_plans` | User's annual targets |
-| `user_business_plan_months` | Monthly breakdown of targets |
-| `user_business_plan_products` | Product-wise breakdown |
-| `user_business_plan_month_products` | Combined product + month targets |
+| Column | Sample Data | Database Type |
+|--------|-------------|---------------|
+| `officename` | "Kothimir B.O", "Papanpet B.O" | `TEXT` |
+| `Territory_PO` | "Kothimir", "Papanpet" | `TEXT` |
+| `pincode` | 504273, 504299 | `TEXT` (preserve leading zeros) |
+| `district` | "KUMURAM BHEEM ASIFABAD" | `TEXT` |
+| `statename` | "TELANGANA", "WEST BENGAL" | `TEXT` |
+| `latitude` | 19.3638689, "NA" | `NUMERIC(10,7)` nullable |
+| `longitude` | 79.5376658, "NA" | `NUMERIC(10,7)` nullable |
 
-### Where Combined Data is Already Implemented
-The `UserFYPlanTarget` component (lines 661-700) already handles the combined product-month data:
-- Fetches from `user_business_plan_month_products`
-- Creates `MonthProductTarget` objects with both month and product info
-- Renders the Monthly tab with product breakdown inside each month
+**Data Notes:**
+- Total records: 165,627 rows
+- Some coordinates have "NA" values (will be stored as NULL)
+- PIN codes should be stored as TEXT to preserve any leading zeros
+- Covers all Indian states and union territories
 
 ## Implementation Plan
 
-### Step 1: Enhance useTeamTargetProgress Hook
-Modify `src/hooks/useTeamTargetProgress.ts` to:
-1. Accept an optional `enabledParameters` configuration
-2. Fetch `user_business_plan_month_products` when both `product` and `monthly` are enabled
-3. Return product-level breakdown data alongside the existing aggregated data
+### Step 1: Create Database Migration
+Create a new migration file to define the `pincode_master` table:
 
-### Step 2: Create Product-Month Progress Interface
-Add new interface to represent combined product-month progress:
-```text
-interface ProductMonthProgress {
-  productId: string;
-  productName: string;
-  monthNumber: number;
-  monthName: string;
-  target: number;
-  actual: number;
-  achievementPercentage: number;
+```sql
+CREATE TABLE public.pincode_master (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    officename TEXT NOT NULL,
+    territory_po TEXT,
+    pincode TEXT NOT NULL,
+    district TEXT,
+    statename TEXT,
+    latitude NUMERIC(10,7),
+    longitude NUMERIC(10,7),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Indexes for common lookups
+CREATE INDEX idx_pincode_master_pincode ON public.pincode_master(pincode);
+CREATE INDEX idx_pincode_master_district ON public.pincode_master(district);
+CREATE INDEX idx_pincode_master_statename ON public.pincode_master(statename);
+
+-- Enable RLS
+ALTER TABLE public.pincode_master ENABLE ROW LEVEL SECURITY;
+
+-- Read-only policy for all authenticated users (reference data)
+CREATE POLICY "Anyone can read pincode_master"
+    ON public.pincode_master FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- Admin-only write policy
+CREATE POLICY "Admins can manage pincode_master"
+    ON public.pincode_master FOR ALL
+    TO authenticated
+    USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+```
+
+### Step 2: Create Edge Function for Bulk Import
+Due to the large dataset (165K+ rows), create an edge function `import-pincode-master` that:
+1. Accepts CSV data in chunks
+2. Parses and validates each row
+3. Handles "NA" values for latitude/longitude
+4. Uses batch inserts for performance
+
+### Step 3: Create Admin Import UI Component
+Add a component in the Admin Controls section to:
+1. Upload the CSV file
+2. Parse with the existing XLSX library
+3. Send data to the edge function in batches (1000 rows per batch)
+4. Show progress and completion status
+
+### Step 4: Update TypeScript Types
+The Supabase types will auto-generate after migration. The expected interface:
+
+```typescript
+interface PincodeMaster {
+  id: string;
+  officename: string;
+  territory_po: string | null;
+  pincode: string;
+  district: string | null;
+  statename: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string;
+  updated_at: string;
 }
 ```
 
-### Step 3: Update TeamTargetDashboard Component
-Modify `src/components/admin/TeamTargetDashboard.tsx` to:
-1. Fetch `fy_target_config` for the selected FY year to get `enabled_parameters`
-2. Pass the configuration to `useTeamTargetProgress`
-3. Add a expandable/drill-down view for users that shows product-month breakdown when applicable
-4. Display a "Product + Monthly" combined table when both parameters are enabled
+## Files to Create/Modify
 
-### Step 4: Create ProductMonthBreakdownTable Component
-Create a new component `src/components/admin/ProductMonthBreakdownTable.tsx` that:
-- Displays a matrix/grid of products vs months
-- Shows target, actual, and achievement for each cell
-- Matches the visual style used in `UserFYPlanTarget`'s Monthly tab
+| File | Action | Description |
+|------|--------|-------------|
+| Migration SQL | Create | New table schema with indexes and RLS |
+| `supabase/functions/import-pincode-master/index.ts` | Create | Edge function for bulk data import |
+| `src/components/admin/PincodeMasterImport.tsx` | Create | Admin UI for CSV upload and import |
+| `src/pages/AdminControls.tsx` | Modify | Add Pincode Master import section |
 
-### Step 5: Calculate Actual Sales by Product-Month
-Enhance the actual sales calculation to:
-- Join `orders` → `order_items` → `products`
-- Group actuals by product_id and month
-- Match against the product-month targets
+## Data Flow Architecture
 
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/hooks/useTeamTargetProgress.ts` | Add product-month data fetching and processing |
-| `src/components/admin/TeamTargetDashboard.tsx` | Add FY config fetch, pass to hook, add drill-down UI |
-| `src/components/admin/ProductMonthBreakdownTable.tsx` | New component for product-month matrix view |
-
-## UI Changes
-
-### Current View (Only Monthly)
 ```text
-┌────────────────────────────────────────────┐
-│ Team Performance (aggregated by user)      │
-├────────────────────────────────────────────┤
-│ User | Target | Actual | Progress | Status │
-└────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Pincode Master Import Flow                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐ │
+│   │   CSV File   │───>│  Admin UI    │───>│  Edge Function       │ │
+│   │  (165K rows) │    │  (Chunking)  │    │  (Batch Insert)      │ │
+│   └──────────────┘    └──────────────┘    └──────────────────────┘ │
+│                                                  │                  │
+│                                                  ▼                  │
+│                                           ┌──────────────┐         │
+│                                           │ pincode_     │         │
+│                                           │ master table │         │
+│                                           └──────────────┘         │
+│                                            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Enhanced View (Product + Monthly)
-```text
-┌────────────────────────────────────────────────────────────┐
-│ Team Performance                                           │
-├────────────────────────────────────────────────────────────┤
-│ ▶ User A | Target | Actual | Progress | Status            │
-│   └─ Product-Month Breakdown (expandable)                  │
-│      ┌────────┬────────┬────────┬────────┐                │
-│      │Product │  Apr   │  May   │  Jun   │ ...            │
-│      ├────────┼────────┼────────┼────────┤                │
-│      │Prod 1  │ 100/80 │ 120/90 │ 110/85 │                │
-│      │Prod 2  │ 200/180│ 220/200│ 210/190│                │
-│      └────────┴────────┴────────┴────────┘                │
-└────────────────────────────────────────────────────────────┘
+## Technical Details
+
+### Edge Function Logic
+```typescript
+// Handle batch processing
+const BATCH_SIZE = 500;
+
+// Parse coordinates, handling "NA" values
+const parseCoordinate = (val: string): number | null => {
+  if (!val || val === 'NA' || val === 'na') return null;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? null : parsed;
+};
+
+// Batch insert for performance
+for (let i = 0; i < records.length; i += BATCH_SIZE) {
+  const batch = records.slice(i, i + BATCH_SIZE);
+  await supabase.from('pincode_master').insert(batch);
+}
 ```
 
-## Edge Cases
-- If only "monthly" is enabled without "product": Show only monthly breakdown (current behavior)
-- If only "product" is enabled without "monthly": Show only product breakdown (yearly totals)
-- If neither is enabled: Show only aggregated user totals
-- If no data exists in `user_business_plan_month_products`: Fallback to calculated splits from monthly totals
+### RLS Policies Rationale
+- **Read access for all authenticated users**: This is reference data needed by sales users, retailers lookup, and territory management
+- **Write access only for admins**: Prevents accidental modifications to master data
 
-## Technical Notes
-- The order_items table contains `product_id` which allows grouping actuals by product
-- Working days calculation should use the same logic as `UserFYPlanTarget`
-- Match the visual styling with emerald/green accents for achieved targets
+#Don't integrate with any module. Just upload to database and keep
+
