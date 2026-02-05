@@ -13,7 +13,18 @@ serve(async (req) => {
 
   try {
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    const ELEVENLABS_AGENT_ID = Deno.env.get("ELEVENLABS_AGENT_ID");
+    const DEFAULT_AGENT_ID = Deno.env.get("ELEVENLABS_AGENT_ID");
+
+    // Parse request body to check for custom agent ID
+    let customAgentId: string | null = null;
+    try {
+      const body = await req.json();
+      customAgentId = body?.agentId || null;
+    } catch {
+      // No body or invalid JSON, use default
+    }
+
+    const ELEVENLABS_AGENT_ID = customAgentId || DEFAULT_AGENT_ID;
 
     if (!ELEVENLABS_API_KEY) {
       console.error("ELEVENLABS_API_KEY is not configured");
