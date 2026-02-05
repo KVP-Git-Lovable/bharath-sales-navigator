@@ -1463,7 +1463,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                  {businessSummary.totalPieces > 0 && (
                    <p className="text-sm opacity-90">+ {businessSummary.totalPieces} pcs</p>
                  )}
-                 <p className="text-sm opacity-90">{businessSummary.totalOrders} Orders</p>
+                 <p className="text-sm opacity-90">{businessSummary.totalBeats} Beats</p>
                </div>
              </div>
            </CardContent>
