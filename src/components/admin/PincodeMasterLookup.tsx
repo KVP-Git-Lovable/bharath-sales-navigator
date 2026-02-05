@@ -25,15 +25,10 @@
    useEffect(() => {
      const fetchStates = async () => {
        setLoadingStates(true);
-       const { data, error } = await supabase
-         .from('pincode_master')
-         .select('statename')
-         .not('statename', 'is', null)
-         .order('statename');
+       const { data, error } = await supabase.rpc('get_distinct_states');
        
        if (!error && data) {
-         const uniqueStates = [...new Set(data.map(d => d.statename).filter(Boolean))] as string[];
-         setStates(uniqueStates);
+         setStates(data.map((d: { statename: string }) => d.statename));
        }
        setLoadingStates(false);
      };
@@ -55,16 +50,12 @@
        setSelectedDistrict('');
        setPincodes([]);
        
-       const { data, error } = await supabase
-         .from('pincode_master')
-         .select('district')
-         .eq('statename', selectedState)
-         .not('district', 'is', null)
-         .order('district');
+       const { data, error } = await supabase.rpc('get_distinct_districts', {
+         selected_state: selectedState
+       });
        
        if (!error && data) {
-         const uniqueDistricts = [...new Set(data.map(d => d.district).filter(Boolean))] as string[];
-         setDistricts(uniqueDistricts);
+         setDistricts(data.map((d: { district: string }) => d.district));
        }
        setLoadingDistricts(false);
      };
