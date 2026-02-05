@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+const TEXT_AGENT_ID = 'agent_9301kgp19jzyf72rrtkshfdzbf11';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -23,7 +25,21 @@ serve(async (req) => {
       );
     }
 
-    if (!ELEVENLABS_AGENT_ID) {
+    // Parse request body for agentType
+    let agentType = 'voice';
+    try {
+      const body = await req.json();
+      if (body?.agentType === 'text') {
+        agentType = 'text';
+      }
+    } catch {
+      // No body or invalid JSON - default to voice
+    }
+
+    // Select agent ID based on type
+    const agentId = agentType === 'text' ? TEXT_AGENT_ID : ELEVENLABS_AGENT_ID;
+
+    if (!agentId) {
       console.error("ELEVENLABS_AGENT_ID is not configured");
       return new Response(
         JSON.stringify({ error: "ElevenLabs Agent ID not configured" }),
@@ -31,11 +47,11 @@ serve(async (req) => {
       );
     }
 
-    console.log("Requesting conversation token for agent:", ELEVENLABS_AGENT_ID);
+    console.log(`Requesting conversation token for ${agentType} agent:`, agentId);
 
     // Request conversation token from ElevenLabs
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${ELEVENLABS_AGENT_ID}`,
+      `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
       {
         method: "GET",
         headers: {
@@ -54,7 +70,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Successfully obtained signed URL for voice conversation");
+    console.log(`Successfully obtained signed URL for ${agentType} conversation`);
 
     return new Response(
       JSON.stringify({ signed_url: data.signed_url }),
