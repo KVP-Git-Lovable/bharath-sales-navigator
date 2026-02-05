@@ -36,13 +36,8 @@
        const fromDate = format(dateRange.from, 'yyyy-MM-dd');
        const toDate = format(dateRange.to, 'yyyy-MM-dd');
  
-       // Get user IDs from selected user names
-       let userIds: string[] = [];
-       if (selectedUsers.length > 0 && allUsers.length > 0) {
-         userIds = allUsers
-           .filter(u => selectedUsers.includes(u.full_name || ''))
-           .map(u => u.id);
-       }
+      // selectedUsers are already user IDs
+      const userIds = selectedUsers;
  
        // Fetch visits within date range with pagination
        const BATCH_SIZE = 500;

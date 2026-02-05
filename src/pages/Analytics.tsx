@@ -39,6 +39,7 @@ import {
   PendingPaymentsDialog,
   useBusinessMetrics
 } from "@/components/analytics";
+import { RetailerMonthlyProductivitySection } from "@/components/analytics/RetailerMonthlyProductivitySection";
 import { SupervisorReport } from "@/components/analytics/SupervisorReport";
 import { CoverageMapSection } from "@/components/analytics/CoverageMapSection";
 import { useSubordinates } from "@/hooks/useSubordinates";
@@ -1709,6 +1710,12 @@ const Analytics = () => {
 
             {/* Products Tab */}
             <TabsContent value="products" className="space-y-4">
+              <RetailerMonthlyProductivitySection 
+                selectedUsers={effectiveUserIds} 
+                dateRange={stableDashboardDateRange}
+                allUsers={users}
+              />
+
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle>Product-wise Business Analysis</CardTitle>
