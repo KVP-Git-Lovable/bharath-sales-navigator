@@ -26,6 +26,40 @@
    allUsers?: { id: string; full_name: string | null }[];
  }
  
+// Batch size for pagination
+const BATCH_SIZE = 500;
+
+// Helper function to fetch all rows with pagination
+async function fetchAllRows<T>(
+  queryBuilder: any,
+  selectColumns: string
+): Promise<T[]> {
+  const allRows: T[] = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await queryBuilder
+      .select(selectColumns)
+      .range(offset, offset + BATCH_SIZE - 1);
+
+    if (error) {
+      console.error('Error fetching batch:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allRows.push(...data);
+      offset += BATCH_SIZE;
+      hasMore = data.length === BATCH_SIZE;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allRows;
+}
+
  export const RetailerSummarySection = ({ selectedUsers, dateRange, allUsers = [] }: RetailerSummarySectionProps) => {
    const isMobile = useIsMobile();
    const [loading, setLoading] = useState(false);
@@ -50,42 +84,99 @@
        const toDate = format(dateRange.to, 'yyyy-MM-dd');
        const userIds = effectiveUserIds.length > 0 ? effectiveUserIds : allUsers.map(u => u.id);
  
-       // Fetch all retailers belonging to selected users
-       let retailersQuery = supabase
-         .from('retailers')
-         .select('id, name, beat_name, user_id');
-       
-       if (userIds.length > 0) {
-         retailersQuery = retailersQuery.in('user_id', userIds);
+       // Fetch all retailers with batch pagination
+       const retailers: { id: string; name: string; beat_name: string; user_id: string | null }[] = [];
+       let retailerOffset = 0;
+       let hasMoreRetailers = true;
+
+       while (hasMoreRetailers) {
+         let query = supabase
+           .from('retailers')
+           .select('id, name, beat_name, user_id');
+         
+         if (userIds.length > 0) {
+           query = query.in('user_id', userIds);
+         }
+
+         const { data, error } = await query.range(retailerOffset, retailerOffset + BATCH_SIZE - 1);
+
+         if (error) {
+           console.error('Error fetching retailers batch:', error);
+           break;
+         }
+
+         if (data && data.length > 0) {
+           retailers.push(...data);
+           retailerOffset += BATCH_SIZE;
+           hasMoreRetailers = data.length === BATCH_SIZE;
+         } else {
+           hasMoreRetailers = false;
+         }
        }
  
-       const { data: retailers } = await retailersQuery;
+       // Fetch ALL confirmed orders with batch pagination (to identify retailers with NO orders ever)
+       const allOrders: { id: string; retailer_id: string | null }[] = [];
+       let allOrdersOffset = 0;
+       let hasMoreAllOrders = true;
  
-       // Fetch ALL confirmed orders for these retailers (to identify retailers with NO orders ever)
-       let allOrdersQuery = supabase
-         .from('orders')
-         .select('id, retailer_id')
-         .eq('status', 'confirmed');
+       while (hasMoreAllOrders) {
+         let query = supabase
+           .from('orders')
+           .select('id, retailer_id')
+           .eq('status', 'confirmed');
 
-       if (userIds.length > 0) {
-         allOrdersQuery = allOrdersQuery.in('user_id', userIds);
+         if (userIds.length > 0) {
+           query = query.in('user_id', userIds);
+         }
+
+         const { data, error } = await query.range(allOrdersOffset, allOrdersOffset + BATCH_SIZE - 1);
+
+         if (error) {
+           console.error('Error fetching all orders batch:', error);
+           break;
+         }
+ 
+         if (data && data.length > 0) {
+           allOrders.push(...data);
+           allOrdersOffset += BATCH_SIZE;
+           hasMoreAllOrders = data.length === BATCH_SIZE;
+         } else {
+           hasMoreAllOrders = false;
+         }
        }
-
-       const { data: allOrders } = await allOrdersQuery;
-
-       // Fetch orders within date range for "Most Orders" calculation
-       let periodOrdersQuery = supabase
-         .from('orders')
-         .select('id, retailer_id, total_amount, user_id')
-         .eq('status', 'confirmed')
-         .gte('order_date', fromDate)
-         .lte('order_date', toDate);
  
-       if (userIds.length > 0) {
-         periodOrdersQuery = periodOrdersQuery.in('user_id', userIds);
+       // Fetch orders within date range for "Most Orders" calculation with batch pagination
+       const periodOrders: { id: string; retailer_id: string | null; total_amount: number | null; user_id: string | null }[] = [];
+       let periodOrdersOffset = 0;
+       let hasMorePeriodOrders = true;
+
+       while (hasMorePeriodOrders) {
+         let query = supabase
+           .from('orders')
+           .select('id, retailer_id, total_amount, user_id')
+           .eq('status', 'confirmed')
+           .gte('order_date', fromDate)
+           .lte('order_date', toDate);
+
+         if (userIds.length > 0) {
+           query = query.in('user_id', userIds);
+         }
+
+         const { data, error } = await query.range(periodOrdersOffset, periodOrdersOffset + BATCH_SIZE - 1);
+
+         if (error) {
+           console.error('Error fetching period orders batch:', error);
+           break;
+         }
+
+         if (data && data.length > 0) {
+           periodOrders.push(...data);
+           periodOrdersOffset += BATCH_SIZE;
+           hasMorePeriodOrders = data.length === BATCH_SIZE;
+         } else {
+           hasMorePeriodOrders = false;
+         }
        }
- 
-       const { data: periodOrders } = await periodOrdersQuery;
  
        // Create a map of user IDs to names
        const userNameMap: Record<string, string> = {};
@@ -95,7 +186,7 @@
  
        // Build set of retailers who have EVER placed a confirmed order
        const retailersWithAnyOrder = new Set<string>();
-       allOrders?.forEach(order => {
+       allOrders.forEach(order => {
          if (order.retailer_id) {
            retailersWithAnyOrder.add(order.retailer_id);
          }
@@ -103,7 +194,7 @@
 
        // Build retailer order counts for the selected period
        const retailerPeriodOrderMap = new Map<string, { count: number; revenue: number }>();
-       periodOrders?.forEach(order => {
+       periodOrders.forEach(order => {
          if (!order.retailer_id) return;
          const existing = retailerPeriodOrderMap.get(order.retailer_id) || { count: 0, revenue: 0 };
          existing.count += 1;
@@ -115,7 +206,7 @@
        const noOrders: RetailerOrderSummary[] = [];
        const withOrders: RetailerOrderSummary[] = [];
  
-       retailers?.forEach(retailer => {
+       retailers.forEach(retailer => {
          const hasAnyOrderEver = retailersWithAnyOrder.has(retailer.id);
          const periodOrderData = retailerPeriodOrderMap.get(retailer.id);
          
