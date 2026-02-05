@@ -25,7 +25,10 @@ export const RoleBasedAuthPage = () => {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    // Redirect to saved URL or dashboard
+    const redirectUrl = sessionStorage.getItem('auth_redirect_url');
+    sessionStorage.removeItem('auth_redirect_url');
+    return <Navigate to={redirectUrl || "/dashboard"} replace />;
   }
 
   const handleRoleSelection = (role: UserType) => {

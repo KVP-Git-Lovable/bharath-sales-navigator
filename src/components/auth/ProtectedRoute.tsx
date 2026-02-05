@@ -28,6 +28,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       return <>{children}</>;
     }
     
+    // Save the originally requested URL for redirect after login
+    const currentPath = window.location.pathname + window.location.search;
+    if (currentPath !== '/' && currentPath !== '/auth') {
+      sessionStorage.setItem('auth_redirect_url', currentPath);
+    }
+    
     // Clear any invalid cached data
     clearCachedAuth();
     return <Navigate to="/auth" replace />;
