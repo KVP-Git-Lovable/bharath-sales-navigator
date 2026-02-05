@@ -26,16 +26,31 @@
      onMessage: (message: any) => {
        console.log('Text message:', message);
        
-       // Handle agent responses
-       if (message?.type === 'agent_response') {
-         const agentResponse = message?.agent_response_event?.agent_response;
-         if (agentResponse) {
-           setMessages(prev => [...prev, {
-             role: 'assistant',
-             content: agentResponse,
-             timestamp: new Date()
-           }]);
-         }
+       // Handle agent responses - ElevenLabs sends messages in different formats
+       // Format 1: { source: 'ai', role: 'agent', message: '...' }
+       // Format 2: { type: 'agent_response', agent_response_event: { agent_response: '...' } }
+       
+       let agentResponse: string | null = null;
+       
+       // Check for direct message format (source: 'ai')
+       if (message?.source === 'ai' && message?.role === 'agent' && message?.message) {
+         agentResponse = message.message;
+       }
+       // Check for agent_response event format
+       else if (message?.type === 'agent_response') {
+         agentResponse = message?.agent_response_event?.agent_response;
+       }
+       // Check for transcript format
+       else if (message?.type === 'agent_response_correction') {
+         agentResponse = message?.agent_response_correction_event?.corrected_agent_response;
+       }
+       
+       if (agentResponse) {
+         setMessages(prev => [...prev, {
+           role: 'assistant',
+           content: agentResponse,
+           timestamp: new Date()
+         }]);
        }
      },
      onError: (error) => {
