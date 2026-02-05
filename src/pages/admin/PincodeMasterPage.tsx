@@ -2,10 +2,9 @@
  import { Layout } from '@/components/Layout';
  import { Button } from '@/components/ui/button';
  import { ArrowLeft } from 'lucide-react';
- import { useNavigate } from 'react-router-dom';
+ import { useNavigate, Navigate } from 'react-router-dom';
  import { useAdminAccess } from '@/hooks/useAdminAccess';
- import { Navigate } from 'react-router-dom';
- import { PincodeMasterImport } from '@/components/admin/PincodeMasterImport';
+ import { PincodeMasterLookup } from '@/components/admin/PincodeMasterLookup';
  
  const PincodeMasterPage: React.FC = () => {
    const navigate = useNavigate();
@@ -41,12 +40,12 @@
              </Button>
              <div className="flex-1">
                <h1 className="text-2xl font-bold text-foreground">Pincode Master</h1>
-               <p className="text-muted-foreground">Import and manage India PIN code reference data</p>
+               <p className="text-muted-foreground">Browse India PIN code reference data</p>
              </div>
            </div>
  
-           {/* Import Component */}
-           <PincodeMasterImport />
+           {/* Lookup Component */}
+           <PincodeMasterLookup />
          </div>
        </div>
      </Layout>
