@@ -13203,6 +13203,18 @@ export type Database = {
           subordinate_user_id: string
         }[]
       }
+      get_distinct_districts: {
+        Args: { selected_state: string }
+        Returns: {
+          district: string
+        }[]
+      }
+      get_distinct_states: {
+        Args: never
+        Returns: {
+          statename: string
+        }[]
+      }
       get_employee_basic_info: {
         Args: { employee_user_id: string }
         Returns: {
