@@ -9,9 +9,49 @@ interface CoverageMapSectionProps {
   selectedUserIds: string[];
 }
 
+interface RetailerMapData {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 // India center coordinates
 const INDIA_CENTER = { lat: 20.5937, lng: 78.9629 };
 const DEFAULT_ZOOM = 5;
+const BATCH_SIZE = 500;
+
+// Fetch all retailers with pagination to bypass 1000-row limit
+async function fetchAllRetailersWithCoordinates(): Promise<RetailerMapData[]> {
+  const allRetailers: RetailerMapData[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('retailers')
+      .select('id, name, latitude, longitude')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .range(from, from + BATCH_SIZE - 1);
+
+    if (error) {
+      console.error('Error fetching retailers batch:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allRetailers.push(...(data as RetailerMapData[]));
+      from += BATCH_SIZE;
+      hasMore = data.length === BATCH_SIZE;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  console.log(`Fetched ${allRetailers.length} retailers with coordinates`);
+  return allRetailers;
+}
 
 export function CoverageMapSection({ selectedUserIds }: CoverageMapSectionProps) {
   const navigate = useNavigate();
@@ -55,12 +95,8 @@ export function CoverageMapSection({ selectedUserIds }: CoverageMapSectionProps)
         return;
       }
 
-      // Fetch ALL retailers with coordinates (no owner_id filter to match 'All Retailers' page behavior)
-      const { data: retailers } = await supabase
-        .from('retailers')
-        .select('id, name, latitude, longitude')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
+      // Fetch ALL retailers with coordinates using batch pagination
+      const retailers = await fetchAllRetailersWithCoordinates();
 
       // Fetch territories (will geocode by name)
       const { data: territories } = await supabase
