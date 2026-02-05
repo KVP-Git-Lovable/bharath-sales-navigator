@@ -30,8 +30,13 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     
     // Save the originally requested URL for redirect after login
     const currentPath = window.location.pathname + window.location.search;
-    if (currentPath !== '/' && currentPath !== '/auth') {
+    if (currentPath !== '/' && currentPath !== '/auth' && !currentPath.startsWith('/auth')) {
       sessionStorage.setItem('auth_redirect_url', currentPath);
+      // Clear any invalid cached data
+      clearCachedAuth();
+      // Include redirect URL as query parameter for robustness
+      const encodedPath = encodeURIComponent(currentPath);
+      return <Navigate to={`/auth?redirect=${encodedPath}`} replace />;
     }
     
     // Clear any invalid cached data

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { SignInForm } from './SignInForm';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
@@ -13,6 +13,7 @@ type UserType = 'admin' | 'user';
 
 export const RoleBasedAuthPage = () => {
   const { user, loading } = useAuth();
+  const [searchParams] = useSearchParams();
   const [authMode, setAuthMode] = useState<AuthMode>('user-signin');
   const [selectedUserType, setSelectedUserType] = useState<UserType | null>('user');
 
@@ -25,10 +26,12 @@ export const RoleBasedAuthPage = () => {
   }
 
   if (user) {
-    // Redirect to saved URL or dashboard
-    const redirectUrl = sessionStorage.getItem('auth_redirect_url');
+    // Priority: URL query param > sessionStorage > default
+    const redirectParam = searchParams.get('redirect');
+    const sessionRedirect = sessionStorage.getItem('auth_redirect_url');
     sessionStorage.removeItem('auth_redirect_url');
-    return <Navigate to={redirectUrl || "/dashboard"} replace />;
+    const targetUrl = redirectParam || sessionRedirect || '/dashboard';
+    return <Navigate to={targetUrl} replace />;
   }
 
   const handleRoleSelection = (role: UserType) => {

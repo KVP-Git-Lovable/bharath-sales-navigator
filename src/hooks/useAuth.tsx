@@ -377,10 +377,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', data.user.id)
         .maybeSingle();
       
-      // Get the redirect URL from sessionStorage (saved by ProtectedRoute)
-      const redirectUrl = sessionStorage.getItem('auth_redirect_url');
+      // Get the redirect URL: priority is URL query param > sessionStorage > default
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectParam = urlParams.get('redirect');
+      const sessionRedirect = sessionStorage.getItem('auth_redirect_url');
       sessionStorage.removeItem('auth_redirect_url');
-      const targetUrl = redirectUrl || '/dashboard';
+      const targetUrl = redirectParam || sessionRedirect || '/dashboard';
       
       if (profileData?.must_change_password) {
         setMustChangePassword(true);
