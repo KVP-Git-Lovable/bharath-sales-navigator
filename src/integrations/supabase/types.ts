@@ -13177,10 +13177,6 @@ export type Database = {
         Returns: undefined
       }
       generate_invoice_number: { Args: never; Returns: string }
-      get_all_subordinate_ids: {
-        Args: { manager_id: string }
-        Returns: string[]
-      }
       get_all_subordinates: {
         Args: { manager_user_id: string }
         Returns: {
