@@ -178,13 +178,14 @@ export const useBusinessMetrics = () => {
           if (productData) {
             productData.forEach((row: any) => {
               const qty = Number(row.quantity_sold || 0);
-              const unit = (row.unit || '').toLowerCase();
-              // Same logic as SQL Report: grams converted to KG, others treated as KG directly
-              if (unit === 'grams') {
-                totalKg += qty / 1000;
-              } else {
+              const unit = (row.unit || '').toLowerCase().trim();
+              // Same logic as SQL Report: only convert weight-based units to KG
+              if (unit === 'kg' || unit.includes('kilo')) {
                 totalKg += qty;
+              } else if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+                totalKg += qty / 1000;
               }
+              // Ignore pieces/pcs - not included in KG calculation
               // Sum revenue from RPC
               rpcTotalRevenue += Number(row.revenue || 0);
             });

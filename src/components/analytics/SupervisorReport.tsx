@@ -784,12 +784,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
             productSet.add(item.product_name);
           }
           const qty = Number(item.quantity || 0);
-          const unit = (item.unit || '').toLowerCase();
-          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-            totalKg += qty / 1000;
-          } else {
+          const unit = (item.unit || '').toLowerCase().trim();
+          if (unit === 'kg' || unit.includes('kilo')) {
             totalKg += qty;
+          } else if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+            totalKg += qty / 1000;
           }
+          // Ignore pieces/pcs - not included in KG calculation
         });
       }
 
