@@ -51,6 +51,15 @@ import { useHierarchyTargetAllocation } from "@/hooks/useHierarchyTargetAllocati
 
 const QUANTITY_UNITS = ['Units', 'Kg', 'Liters', 'Pcs', 'Boxes', 'Cartons', 'Tonnes', 'Quintals'];
 
+// Tab configuration for dynamic rendering
+const TAB_CONFIG = [
+  { value: 'products', label: 'Products', icon: Package, paramKey: 'product' as const },
+  { value: 'retailers', label: 'Retailers', icon: Store, paramKey: 'retailer' as const },
+  { value: 'distributors', label: 'Distributors', icon: Truck, paramKey: 'distributor' as const },
+  { value: 'months', label: 'Monthly', icon: Calendar, paramKey: 'monthly' as const },
+  { value: 'territory', label: 'Territory', icon: MapPin, paramKey: 'territory' as const },
+] as const;
+
 interface BusinessPlan {
   id: string;
   year: number;
@@ -261,6 +270,34 @@ export function UserFYPlanTarget({
   const [monthTotalRevenue, setMonthTotalRevenue] = useState(0);
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
   const [monthBreakdownView, setMonthBreakdownView] = useState<MonthBreakdownView>('products');
+
+  // Compute which tabs should be visible based on enabledParameters
+  const visibleTabs = useMemo(() => {
+    // If no enabledParameters provided (self-use mode), show all tabs
+    if (!enabledParameters) {
+      return TAB_CONFIG;
+    }
+    
+    return TAB_CONFIG.filter(tab => enabledParameters[tab.paramKey]);
+  }, [enabledParameters]);
+
+  // Get the default tab value (first enabled tab)
+  const defaultTabValue = useMemo(() => {
+    return visibleTabs.length > 0 ? visibleTabs[0].value : 'products';
+  }, [visibleTabs]);
+
+  // Get grid columns class based on number of visible tabs
+  const gridColsClass = useMemo(() => {
+    const count = visibleTabs.length;
+    switch (count) {
+      case 1: return 'grid-cols-1';
+      case 2: return 'grid-cols-2';
+      case 3: return 'grid-cols-3';
+      case 4: return 'grid-cols-4';
+      case 5: return 'grid-cols-5';
+      default: return 'grid-cols-5';
+    }
+  }, [visibleTabs]);
 
   // Distributor targets state
   const [distributors, setDistributors] = useState<Distributor[]>([]);
@@ -1924,31 +1961,25 @@ export function UserFYPlanTarget({
               </AlertDialog>
 
               {/* Tabs for Product, Retailer, Month, Territory and Distributor Targets */}
-              <Tabs defaultValue="products">
-                <TabsList className="grid grid-cols-5 w-full">
-                  <TabsTrigger value="products" className="text-xs gap-1 px-1 sm:px-3">
-                    <Package className="h-3 w-3" />
-                    <span className="hidden xs:inline">Products</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="retailers" className="text-xs gap-1 px-1 sm:px-3">
-                    <Store className="h-3 w-3" />
-                    <span className="hidden xs:inline">Retailers</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="distributors" className="text-xs gap-1 px-1 sm:px-3">
-                    <Truck className="h-3 w-3" />
-                    <span className="hidden xs:inline">Distributors</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="months" className="text-xs gap-1 px-1 sm:px-3">
-                    <Calendar className="h-3 w-3" />
-                    <span className="hidden xs:inline">Monthly</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="territory" className="text-xs gap-1 px-1 sm:px-3">
-                    <MapPin className="h-3 w-3" />
-                    <span className="hidden xs:inline">Territory</span>
-                  </TabsTrigger>
+              {visibleTabs.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-sm text-muted-foreground">No target parameters are enabled for this plan</p>
+                  </CardContent>
+                </Card>
+              ) : (
+              <Tabs defaultValue={defaultTabValue}>
+                <TabsList className={`grid ${gridColsClass} w-full`}>
+                  {visibleTabs.map(tab => (
+                    <TabsTrigger key={tab.value} value={tab.value} className="text-xs gap-1 px-1 sm:px-3">
+                      <tab.icon className="h-3 w-3" />
+                      <span className="hidden xs:inline">{tab.label}</span>
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
 
-                {/* PRODUCT TARGETS TAB */}
+                {/* PRODUCT TARGETS TAB - only render if visible */}
+                {visibleTabs.some(t => t.value === 'products') && (
                 <TabsContent value="products" className="mt-4 space-y-3">
                   {categoryTargets.length === 0 ? (
                     <Card>
@@ -2090,7 +2121,10 @@ export function UserFYPlanTarget({
                   </Card>
                 </TabsContent>
 
-                {/* RETAILER TARGETS TAB */}
+                )}
+
+                {/* RETAILER TARGETS TAB - only render if visible */}
+                {visibleTabs.some(t => t.value === 'retailers') && (
                 <TabsContent value="retailers" className="mt-4 space-y-3">
                   {retailerCategoryTargets.length === 0 ? (
                     <Card>
@@ -2232,7 +2266,10 @@ export function UserFYPlanTarget({
                   </Card>
                 </TabsContent>
 
-                {/* DISTRIBUTOR TARGETS TAB */}
+                )}
+
+                {/* DISTRIBUTOR TARGETS TAB - only render if visible */}
+                {visibleTabs.some(t => t.value === 'distributors') && (
                 <TabsContent value="distributors" className="mt-4 space-y-3">
                   {distributorTargets.length === 0 ? (
                     <Card>
@@ -2325,7 +2362,10 @@ export function UserFYPlanTarget({
                   </Card>
                 </TabsContent>
 
-                {/* MONTHLY TARGETS TAB */}
+                )}
+
+                {/* MONTHLY TARGETS TAB - only render if visible */}
+                {visibleTabs.some(t => t.value === 'months') && (
                 <TabsContent value="months" className="mt-4 space-y-3">
                   <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
                     <CardContent className="p-3 sm:p-4 space-y-4">
@@ -2601,7 +2641,10 @@ export function UserFYPlanTarget({
                   </Card>
                 </TabsContent>
 
-                {/* TERRITORY TARGETS TAB */}
+                )}
+
+                {/* TERRITORY TARGETS TAB - only render if visible */}
+                {visibleTabs.some(t => t.value === 'territory') && (
                 <TabsContent value="territory" className="mt-4">
                   <TerritoryTargets
                     selectedPlanId={selectedPlan?.id || null}
@@ -2609,7 +2652,9 @@ export function UserFYPlanTarget({
                     quantityUnit={quantityUnit}
                   />
                 </TabsContent>
+                )}
               </Tabs>
+              )}
             </>
           )}
         </>
