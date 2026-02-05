@@ -54,12 +54,6 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
   // Update the ref whenever reportContext changes
   useEffect(() => {
     reportContextRef.current = reportContext;
-    console.log('Report context updated:', {
-      hasAllUsersSummary: !!reportContext.allUsersSummary,
-      orderSummaryCount: reportContext.orderSummaryData?.length || 0,
-      skuCount: reportContext.skuData?.length || 0,
-      productivityCount: reportContext.productivityData?.length || 0,
-    });
   }, [reportContext]);
 
   // Ref for sendMessage to avoid stale closure in speech recognition

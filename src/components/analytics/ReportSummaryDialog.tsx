@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,8 @@ export const ReportSummaryDialog = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   
-  const reportContext = {
+  // Memoize report context to prevent unnecessary re-renders
+  const reportContext = useMemo(() => ({
     dateRange: {
       from: dateRange.from.toISOString(),
       to: dateRange.to.toISOString(),
@@ -65,7 +66,17 @@ export const ReportSummaryDialog = ({
     orderSummaryData,
     skuData,
     productivityData,
-  };
+  }), [
+    dateRange.from.getTime(),
+    dateRange.to.getTime(),
+    allUsersSummary?.retailers,
+    allUsersSummary?.beats,
+    allUsersSummary?.products,
+    allUsersSummary?.totalKg,
+    orderSummaryData.length,
+    skuData.length,
+    productivityData.length,
+  ]);
 
   const {
     messages,
