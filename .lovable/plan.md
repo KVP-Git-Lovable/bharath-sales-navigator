@@ -1,163 +1,164 @@
 
-# Fix Leave Type Deletion - Implement Soft-Delete Strategy
+# AI Assistant Updates - ElevenLabs Text Agent + Hindi Localization
 
-## Problem Statement
-When attempting to delete a leave type from the admin panel, the system shows an error "Cannot delete: This leave type is in use". This occurs because leave types are referenced by foreign keys in multiple related tables:
+## Overview
+Two changes to the AI Assistant widget:
+1. Switch Text Chat from the current edge function to use ElevenLabs Agent ID `agent_9301kgp19jzyf72rrtkshfdzbf11` in text-only mode
+2. Add Hindi text to the Voice Conversation option in the interaction selector
 
-- `leave_applications` - Contains leave requests submitted by employees
-- `leave_balance` - Contains balance records per user/leave type
-- `leave_policy` - Contains policy settings per leave type
-- `leave_approval_workflow` - Contains workflow configuration
-- `leave_accrual_log` - Contains accrual transaction history
-- `user_leave_policy` - Contains user-specific policy overrides
+---
 
-## Solution Approach
-Implement a **soft-delete (archive) strategy** as documented in the project's memory. Instead of hard-deleting leave types with associated data, offer the admin an option to **archive** the leave type by setting `is_active = false`.
+## Change 1: Text Chat with ElevenLabs Agent
 
-## Implementation Steps
+### Current Behavior
+Text Chat uses the `chat-assistant` edge function with Lovable AI gateway for responses.
 
-### 1. Enhance Delete Handler Logic
-Modify the `handleDelete` function in `LeaveTypesManager.tsx` to:
-- First attempt a hard delete
-- If foreign key error (23503) is encountered, prompt the user with an option to archive instead
-- Archive sets `is_active = false` to preserve historical data integrity
+### New Behavior
+Text Chat will use ElevenLabs Conversational AI in **text-only mode** with Agent ID `agent_9301kgp19jzyf72rrtkshfdzbf11`.
 
-### 2. Add Archive Confirmation Dialog
-Create a two-stage confirmation flow:
-- **Initial delete click**: Show delete confirmation with Confirm/Cancel
-- **If FK error occurs**: Show a new dialog explaining the leave type is in use and offering "Archive Instead" option
+### Implementation
 
-### 3. Implement Archive Function
-Add a new `handleArchive` function that:
-- Updates the leave type to set `is_active = false`
-- Shows success message "Leave type archived successfully"
-- Refreshes the list
+#### Step 1: Create a new hook for text-based ElevenLabs agent
+**New File: `src/hooks/useTextAssistant.ts`**
 
-### 4. Update UI State Management
-Add new state variables:
-- `archivePromptId` - Track which leave type triggered archive prompt
-- `archiveInProgress` - Loading state for archive action
+```tsx
+// Uses @elevenlabs/react useConversation with textOnly: true
+// Connects to agent via signed URL from edge function
+// Provides sendUserMessage() for text input
+// Handles agent_response events for display
+```
+
+Key features:
+- Uses `textOnly: true` mode (no microphone needed)
+- Connects via WebSocket signed URL
+- Sends text with `conversation.sendUserMessage(text)`
+- Receives responses via `onMessage` callback
+
+#### Step 2: Modify edge function to support text agent
+**File: `supabase/functions/elevenlabs-conversation-token/index.ts`**
+
+Update to accept an optional `agentType` parameter:
+- `agentType: 'voice'` → Uses existing `ELEVENLABS_AGENT_ID` from env
+- `agentType: 'text'` → Uses hardcoded `agent_9301kgp19jzyf72rrtkshfdzbf11`
+
+```typescript
+const agentId = agentType === 'text' 
+  ? 'agent_9301kgp19jzyf72rrtkshfdzbf11' 
+  : ELEVENLABS_AGENT_ID;
+```
+
+#### Step 3: Create new TextChatDialog component
+**New File: `src/components/chat/TextChatDialog.tsx`**
+
+A simpler chat interface that:
+- Connects to ElevenLabs agent on mount
+- Shows message history (user + agent)
+- Provides text input field
+- Displays connection status
+- Uses the new `useTextAssistant` hook
+
+#### Step 4: Update ChatWidget to use new component
+**File: `src/components/chat/ChatWidget.tsx`**
+
+Replace `ChatDialog` with `TextChatDialog` when mode is `'text'`.
+
+---
+
+## Change 2: Hindi Text in Voice Conversation Card
+
+### Current Text
+- Heading: "Voice Conversation"
+- Subtext: "Speak in English or Hindi for a natural conversation"
+
+### New Text (Bilingual)
+- Heading: "Voice Conversation / ध्वनि वार्तालाप"
+- Subtext: "Speak in English or Hindi for a natural conversation / अपने प्रश्न अंग्रेजी या हिंदी में पूछें।"
+
+### Implementation
+**File: `src/components/chat/InteractionModeSelector.tsx`**
+
+```tsx
+<h3 className="font-medium text-base">
+  Voice Conversation / ध्वनि वार्तालाप
+</h3>
+<p className="text-sm text-muted-foreground">
+  Speak in English or Hindi for a natural conversation
+  <br />
+  <span className="text-xs">अपने प्रश्न अंग्रेजी या हिंदी में पूछें।</span>
+</p>
+```
+
+---
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `src/hooks/useTextAssistant.ts` | **Create** - New hook for text-only ElevenLabs agent |
+| `src/components/chat/TextChatDialog.tsx` | **Create** - New text chat UI component |
+| `supabase/functions/elevenlabs-conversation-token/index.ts` | **Modify** - Support both text and voice agent IDs |
+| `src/components/chat/ChatWidget.tsx` | **Modify** - Import and use TextChatDialog |
+| `src/components/chat/InteractionModeSelector.tsx` | **Modify** - Add Hindi text to Voice option |
+
+---
 
 ## Technical Details
 
-### Modified Component: `src/components/attendance/LeaveTypesManager.tsx`
+### useTextAssistant Hook Structure
+```typescript
+export function useTextAssistant() {
+  const conversation = useConversation({
+    textOnly: true,
+    onMessage: (message) => {
+      // Handle agent_response events
+    },
+    onConnect: () => { /* ... */ },
+    onError: (error) => { /* ... */ },
+  });
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Delete Flow Diagram                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  User clicks Delete → Show Confirm/Cancel                   │
-│                              │                               │
-│                              ▼                               │
-│                    Attempt hard delete                       │
-│                              │                               │
-│              ┌───────────────┴───────────────┐               │
-│              │                               │               │
-│              ▼                               ▼               │
-│         Success                    FK Error (23503)          │
-│              │                               │               │
-│              ▼                               ▼               │
-│      Show success toast          Show Archive Prompt         │
-│                                              │               │
-│                              ┌───────────────┴───────────────┐
-│                              │                               │
-│                              ▼                               ▼
-│                    User clicks Archive           User Cancels
-│                              │                               │
-│                              ▼                               │
-│                    Set is_active=false                       │
-│                              │                               │
-│                              ▼                               │
-│                    Show archive success                      │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+  const connect = async () => {
+    const { data } = await supabase.functions.invoke(
+      'elevenlabs-conversation-token',
+      { body: { agentType: 'text' } }
+    );
+    await conversation.startSession({ signedUrl: data.signed_url });
+  };
+
+  const sendMessage = (text: string) => {
+    conversation.sendUserMessage(text);
+  };
+
+  return { status, messages, connect, sendMessage, disconnect };
+}
 ```
 
-### New AlertDialog Component
-Add an AlertDialog that appears when delete fails due to FK constraint:
+### Edge Function Update
+```typescript
+// Parse request body for agentType
+const { agentType } = await req.json().catch(() => ({}));
 
-```tsx
-// Archive prompt dialog structure
-<AlertDialog open={!!archivePromptId} onOpenChange={() => setArchivePromptId(null)}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Cannot Delete Leave Type</AlertDialogTitle>
-      <AlertDialogDescription>
-        This leave type has associated applications, balances, or policies 
-        and cannot be deleted. Would you like to archive it instead? 
-        Archived leave types are hidden from new applications but 
-        historical data is preserved.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction onClick={() => handleArchive(archivePromptId)}>
-        Archive Instead
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+// Select agent ID based on type
+const agentId = agentType === 'text' 
+  ? 'agent_9301kgp19jzyf72rrtkshfdzbf11' 
+  : ELEVENLABS_AGENT_ID;
+
+// Use selected agent ID in API call
+const response = await fetch(
+  `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
+  // ...
+);
 ```
 
-### Updated handleDelete Function
-```tsx
-const handleDelete = async (id: string) => {
-  try {
-    const { error } = await supabase
-      .from('leave_types')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      if (error.code === '23503') {
-        // FK constraint - prompt to archive instead
-        setDeleteConfirmId(null);
-        setArchivePromptId(id);
-        return;
-      }
-      throw error;
-    }
-
-    toast.success('Leave type deleted successfully');
-    setDeleteConfirmId(null);
-    fetchLeaveTypes();
-  } catch (error) {
-    console.error('Error deleting leave type:', error);
-    toast.error('Failed to delete leave type');
-  }
-};
-```
-
-### New handleArchive Function
-```tsx
-const handleArchive = async (id: string) => {
-  try {
-    const { error } = await supabase
-      .from('leave_types')
-      .update({ is_active: false })
-      .eq('id', id);
-
-    if (error) throw error;
-
-    toast.success('Leave type archived successfully. It will no longer appear for new applications.');
-    setArchivePromptId(null);
-    fetchLeaveTypes();
-  } catch (error) {
-    console.error('Error archiving leave type:', error);
-    toast.error('Failed to archive leave type');
-  }
-};
-```
-
-## Files to Modify
-1. **`src/components/attendance/LeaveTypesManager.tsx`**
-   - Import AlertDialog components from `@/components/ui/alert-dialog`
-   - Add `archivePromptId` state
-   - Update `handleDelete` to prompt archive on FK error
-   - Add `handleArchive` function
-   - Add AlertDialog for archive confirmation
+---
 
 ## User Experience
-- **Before**: Delete fails with cryptic error "Cannot delete: This leave type is in use"
-- **After**: Delete gracefully offers archive option with clear explanation that historical data will be preserved
+
+### Text Chat Flow (After Change)
+1. User opens AI Assistant → Sees mode selection
+2. User selects "Text Chat"
+3. System connects to ElevenLabs agent (text-only mode)
+4. User types message → Agent responds
+5. Conversation continues until user closes
+
+### Voice Conversation Card (After Change)
+The card will display bilingual text making it clear that Hindi is supported.
