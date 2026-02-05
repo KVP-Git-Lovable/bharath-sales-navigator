@@ -18,6 +18,7 @@
    const {
      status,
      isConnecting,
+    isProcessing,
      messages,
      error,
      connect,
@@ -36,7 +37,7 @@
    // Scroll to bottom when messages change
    useEffect(() => {
      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-   }, [messages]);
+  }, [messages, isProcessing]);
  
    // Focus input when connected
    useEffect(() => {
@@ -53,7 +54,8 @@
      setInputValue('');
    };
  
-   const isLoading = isConnecting || status === 'connecting';
+  const isLoading = isConnecting || status === 'connecting' || status === 'disconnecting';
+  const canSendMessage = status === 'connected' && !isProcessing;
  
    return (
      <div className="flex flex-col h-full">
@@ -94,7 +96,7 @@
          )}
  
          {/* Messages */}
-         <div className="space-y-4">
+          <div className="space-y-4 pb-2">
            {messages.map((message, index) => (
              <div
                key={index}
@@ -117,6 +119,18 @@
                </div>
              </div>
            ))}
+            {/* Show typing indicator when processing */}
+            {isProcessing && (
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-lg px-4 py-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
            <div ref={messagesEndRef} />
          </div>
        </ScrollArea>
@@ -128,16 +142,26 @@
              ref={inputRef}
              value={inputValue}
              onChange={(e) => setInputValue(e.target.value)}
-             placeholder={status === 'connected' ? "Type your message..." : "Connecting..."}
-             disabled={status !== 'connected'}
+              placeholder={
+                status !== 'connected' 
+                  ? "Connecting..." 
+                  : isProcessing 
+                    ? "Waiting for response..." 
+                    : "Type your message..."
+              }
+              disabled={!canSendMessage}
              className="flex-1"
            />
            <Button 
              type="submit" 
              size="icon"
-             disabled={!inputValue.trim() || status !== 'connected'}
+              disabled={!inputValue.trim() || !canSendMessage}
            >
-             <Send className="h-4 w-4" />
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
            </Button>
          </div>
        </form>
