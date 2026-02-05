@@ -74,6 +74,23 @@ export const AttendanceMarketHoursSection = ({
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
+      // Fetch user profiles directly to ensure we always have names
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', effectiveUserIds);
+      
+      // Build user names map from fetched profiles (primary) and allUsers (fallback)
+      const userNames: Record<string, string> = {};
+      // First add from allUsers prop
+      allUsers.forEach(u => {
+        if (u.full_name) userNames[u.id] = u.full_name;
+      });
+      // Then override with directly fetched profiles (more reliable)
+      (profiles || []).forEach(p => {
+        if (p.full_name) userNames[p.id] = p.full_name;
+      });
+
       // Fetch attendance data
       const { data: attendance, error: attError } = await supabase
         .from('attendance')
@@ -87,12 +104,6 @@ export const AttendanceMarketHoursSection = ({
         console.error('Error fetching attendance:', attError);
         setAttendanceData([]);
       } else {
-        // Get user names
-        const userNames: Record<string, string> = {};
-        allUsers.forEach(u => {
-          if (u.full_name) userNames[u.id] = u.full_name;
-        });
-
         const processedAttendance: AttendanceData[] = (attendance || []).map(record => {
           let workingHours = 0;
           if (record.check_in_time && record.check_out_time) {
@@ -126,12 +137,6 @@ export const AttendanceMarketHoursSection = ({
         console.error('Error fetching visit logs:', visitError);
         setRetailerTimeData([]);
       } else {
-        // Get user names
-        const userNames: Record<string, string> = {};
-        allUsers.forEach(u => {
-          if (u.full_name) userNames[u.id] = u.full_name;
-        });
-
         // Group by user and date, then calculate time as span from first to last start_time
         // This matches TodaySummary logic exactly
         const dateUserMap: Record<string, { 

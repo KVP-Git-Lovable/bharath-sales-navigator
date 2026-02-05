@@ -69,8 +69,16 @@ const Analytics = () => {
 
   const normalizeName = (name: string | null | undefined) => (name ?? '').trim().toUpperCase();
 
+  // Determine if scope is ready (subordinates loaded when needed)
+  const isScopeReady = userScopeMode !== 'my_scope' || !subordinatesLoading;
+
   // Calculate effective user IDs based on scope mode (matching Target Management logic)
   const effectiveUserIds = useMemo(() => {
+    // Don't compute until subordinates are loaded for my_scope
+    if (userScopeMode === 'my_scope' && subordinatesLoading) {
+      return [];
+    }
+    
     switch (userScopeMode) {
       case 'my_scope':
         // Self + all subordinates (same as Target Management "team" scope)
@@ -84,7 +92,7 @@ const Analytics = () => {
       default:
         return [];
     }
-  }, [userScopeMode, currentUser?.id, subordinateIds, selectedUserIds]);
+  }, [userScopeMode, currentUser?.id, subordinateIds, selectedUserIds, subordinatesLoading]);
 
   const [kpiPeriod, setKpiPeriod] = useState<string>('current_month');
   const [kpiDateRange, setKpiDateRange] = useState<{ from: Date; to: Date }>({
@@ -127,13 +135,16 @@ const Analytics = () => {
 
   // Auto-refresh business metrics when filters change
   useEffect(() => {
+    // Don't fetch until scope is ready (subordinates loaded for my_scope)
+    if (!isScopeReady) return;
+    
     // Get user names for effective user IDs to use with RPC
     const selectedUserNames = effectiveUserIds
       .map(id => users.find(u => u.id === id)?.full_name)
       .filter((name): name is string => !!name);
     
     fetchBusinessSummary(effectiveUserIds, dashboardDateRange, selectedUserNames);
-  }, [effectiveUserIds, dashboardDateRange, fetchBusinessSummary, users]);
+  }, [effectiveUserIds, dashboardDateRange, fetchBusinessSummary, users, isScopeReady]);
 
   const [kpiData, setKpiData] = useState({
     plannedCalls: 0,
