@@ -1622,6 +1622,7 @@ const Analytics = () => {
                 selectedUserIds={effectiveUserIds}
                 dateRange={stableDashboardDateRange}
                 periodFilter={dashboardPeriod}
+                isScopeReady={isScopeReady}
               />
             </TabsContent>
 
@@ -1791,6 +1792,7 @@ const Analytics = () => {
                 users={users}
                 selectedUserIds={effectiveUserIds}
                 dateRange={stableDashboardDateRange}
+                isScopeReady={isScopeReady}
               />
             </TabsContent>
           </Tabs>
