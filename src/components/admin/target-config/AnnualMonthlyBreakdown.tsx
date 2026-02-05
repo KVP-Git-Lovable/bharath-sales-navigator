@@ -57,17 +57,48 @@
    onToggleBreakdown,
  }: AnnualMonthlyBreakdownProps) {
    const [isManualMode, setIsManualMode] = useState(false);
+  const [localInputs, setLocalInputs] = useState<Record<string, string>>({});
  
    const formatNumber = (num: number) => {
      return num > 0 ? new Intl.NumberFormat('en-IN').format(Math.round(num * 100) / 100) : '';
    };
  
    const parseNumber = (value: string) => {
-     const cleaned = value.replace(/,/g, '');
-     const num = parseFloat(cleaned);
-     return isNaN(num) ? 0 : num;
+    if (!value || value === '') return 0;
+    // Remove thousand separators (commas) but keep decimal point
+    const cleaned = value.replace(/,/g, '').trim();
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
    };
  
+  // Handle input change - store raw value for typing
+  const handleInputChange = (monthNumber: number, field: string, value: string) => {
+    const key = `${monthNumber}-${field}`;
+    setLocalInputs(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Handle blur - parse and update actual value
+  const handleInputBlur = (monthNumber: number, field: 'quantityTarget' | 'revenueTarget' | 'visitsTarget', value: string) => {
+    const key = `${monthNumber}-${field}`;
+    const parsedValue = field === 'visitsTarget' ? Math.round(parseNumber(value)) : parseNumber(value);
+    handleMonthChange(monthNumber, field, parsedValue);
+    // Clear local input after blur
+    setLocalInputs(prev => {
+      const newInputs = { ...prev };
+      delete newInputs[key];
+      return newInputs;
+    });
+  };
+
+  // Get display value - show local input if typing, otherwise formatted value
+  const getDisplayValue = (monthNumber: number, field: string, actualValue: number) => {
+    const key = `${monthNumber}-${field}`;
+    if (localInputs[key] !== undefined) {
+      return localInputs[key];
+    }
+    return formatNumber(actualValue);
+  };
+
    // Initialize or update monthly targets when toggling breakdown ON or when totals change
    useEffect(() => {
      if (showBreakdown && !isManualMode) {
@@ -291,8 +322,9 @@
                          {enableQuantity && (
                            <Input
                              type="text"
-                             value={formatNumber(monthData?.quantityTarget || 0)}
-                             onChange={(e) => handleMonthChange(monthNum, 'quantityTarget', parseNumber(e.target.value))}
+                            value={getDisplayValue(monthNum, 'quantityTarget', monthData?.quantityTarget || 0)}
+                            onChange={(e) => handleInputChange(monthNum, 'quantityTarget', e.target.value)}
+                            onBlur={(e) => handleInputBlur(monthNum, 'quantityTarget', e.target.value)}
                              disabled={!isManualMode}
                              className={cn(!isManualMode && "bg-muted")}
                            />
@@ -300,8 +332,9 @@
                          {enableRevenue && (
                            <Input
                              type="text"
-                             value={formatNumber(monthData?.revenueTarget || 0)}
-                             onChange={(e) => handleMonthChange(monthNum, 'revenueTarget', parseNumber(e.target.value))}
+                            value={getDisplayValue(monthNum, 'revenueTarget', monthData?.revenueTarget || 0)}
+                            onChange={(e) => handleInputChange(monthNum, 'revenueTarget', e.target.value)}
+                            onBlur={(e) => handleInputBlur(monthNum, 'revenueTarget', e.target.value)}
                              disabled={!isManualMode}
                              className={cn(!isManualMode && "bg-muted")}
                            />
@@ -309,8 +342,9 @@
                          {enableVisits && (
                            <Input
                              type="text"
-                             value={formatNumber(monthData?.visitsTarget || 0)}
-                             onChange={(e) => handleMonthChange(monthNum, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                            value={getDisplayValue(monthNum, 'visitsTarget', monthData?.visitsTarget || 0)}
+                            onChange={(e) => handleInputChange(monthNum, 'visitsTarget', e.target.value)}
+                            onBlur={(e) => handleInputBlur(monthNum, 'visitsTarget', e.target.value)}
                              disabled={!isManualMode}
                              className={cn(!isManualMode && "bg-muted")}
                            />
