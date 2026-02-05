@@ -71,22 +71,15 @@ export function NotificationBell() {
               {notifications.slice(0, 20).map((notification) => (
                 <button
                   key={notification.id}
-                  onClick={() => !notification.is_read && markAsRead(notification.id)}
+                  onClick={() => markAsRead(notification.id)}
                   className={cn(
-                    "w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors",
-                    !notification.is_read && "bg-primary/5"
+                    "w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors bg-primary/5"
                   )}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={cn(
-                      "mt-1.5 h-2 w-2 rounded-full flex-shrink-0",
-                      notification.is_read ? "bg-transparent" : "bg-primary"
-                    )} />
+                    <div className="mt-1.5 h-2 w-2 rounded-full flex-shrink-0 bg-primary" />
                     <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "text-sm leading-tight",
-                        !notification.is_read && "font-medium"
-                      )}>
+                      <p className="text-sm leading-tight font-medium">
                         {notification.title}
                       </p>
                       {notification.message && (
@@ -98,9 +91,6 @@ export function NotificationBell() {
                         {formatTime(notification.created_at)}
                       </p>
                     </div>
-                    {notification.is_read && (
-                      <Check className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-1" />
-                    )}
                   </div>
                 </button>
               ))}
