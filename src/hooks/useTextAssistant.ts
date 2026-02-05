@@ -1,5 +1,5 @@
  import { useConversation } from '@elevenlabs/react';
- import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
  
@@ -13,15 +13,19 @@
    const [isConnecting, setIsConnecting] = useState(false);
    const [messages, setMessages] = useState<TextMessage[]>([]);
    const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const lastResponseTime = useRef<number>(0);
  
    const conversation = useConversation({
      textOnly: true,
      onConnect: () => {
        console.log('Connected to ElevenLabs text agent');
        setError(null);
+      setIsProcessing(false);
      },
      onDisconnect: () => {
        console.log('Disconnected from ElevenLabs text agent');
+      setIsProcessing(false);
      },
      onMessage: (message: any) => {
        console.log('Text message:', message);
@@ -48,14 +52,17 @@
        if (agentResponse) {
          setMessages(prev => [...prev, {
            role: 'assistant',
-           content: agentResponse,
+          content: agentResponse!,
            timestamp: new Date()
          }]);
+        setIsProcessing(false);
+        lastResponseTime.current = Date.now();
        }
      },
      onError: (error) => {
        console.error('Text conversation error:', error);
        setError('Connection error. Please try again.');
+      setIsProcessing(false);
        toast.error('Text chat connection failed. Please try again.');
      },
    });
@@ -107,6 +114,8 @@
    const sendMessage = useCallback((text: string) => {
      if (!text.trim()) return;
      
+    setIsProcessing(true);
+    
      // Add user message to the list
      setMessages(prev => [...prev, {
        role: 'user',
@@ -116,6 +125,17 @@
      
      // Send to the agent
      conversation.sendUserMessage(text.trim());
+    
+    // Safety timeout - if no response in 30 seconds, reset processing state
+    setTimeout(() => {
+      setIsProcessing(prev => {
+        if (prev && Date.now() - lastResponseTime.current > 25000) {
+          console.log('Response timeout - resetting processing state');
+          return false;
+        }
+        return prev;
+      });
+    }, 30000);
    }, [conversation]);
  
    const disconnect = useCallback(async () => {
@@ -129,6 +149,7 @@
    return {
      status: conversation.status,
      isConnecting,
+    isProcessing,
      messages,
      error,
      connect,
