@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { ReportSummaryDialog } from './ReportSummaryDialog';
 import { BusinessSummaryCard, BeatDetailsDialog, RetailerDetailsDialog, OrderDetailsDialog, ProductBreakdownDialog, PendingPaymentsDialog, useBusinessMetrics } from '.';
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
+ import { useHindiToEnglish } from '@/hooks/useHindiToEnglish';
 
 interface UserOrderSummary {
   full_name: string;
@@ -54,6 +55,9 @@ const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'
 export const SupervisorReport = ({ users, selectedUserIds, dateRange }: SupervisorReportProps) => {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
+   
+   // Hindi to English translation for retailer/beat names in Productivity section
+   const { translateTexts, getTranslated } = useHindiToEnglish();
 
   // Derive selected user names from IDs for filtering
   const selectedUsers = useMemo(() => {
@@ -966,6 +970,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         .sort((a, b) => b.total_value - a.total_value);
 
       setOrderDetailsBeatBreakdown(breakdownData);
+       
+       // Trigger translation for Hindi beat names
+       translateTexts(breakdownData.map(b => b.beat_name));
     } catch (error) {
       console.error('Error fetching order details beat breakdown:', error);
       setOrderDetailsBeatBreakdown([]);
@@ -1292,6 +1299,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         .sort((a, b) => b.total_value - a.total_value);
 
       setBeatBreakdownData(breakdown);
+       
+       // Trigger translation for Hindi beat names
+       translateTexts(breakdown.map(b => b.beat_name));
     } catch (error) {
       console.error('Error fetching beat breakdown:', error);
       setBeatBreakdownData([]);
@@ -1400,6 +1410,9 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
         .sort((a, b) => b.total_value - a.total_value);
 
       setRetailerDetailsData(details);
+       
+       // Trigger translation for Hindi retailer names  
+       translateTexts(details.map(r => r.retailer_name));
     } catch (error) {
       console.error('Error fetching retailer details:', error);
       setRetailerDetailsData([]);
@@ -1796,7 +1809,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                                   onClick={() => fetchRetailerDetailsForBeat(beat.beat_name)}
                                 >
-                                  <TableCell className="text-xs py-1.5 px-2 text-primary underline-offset-2 hover:underline">{beat.beat_name}</TableCell>
+                                   <TableCell className="text-xs py-1.5 px-2 text-primary underline-offset-2 hover:underline">{getTranslated(beat.beat_name)}</TableCell>
                                   <TableCell className="text-xs py-1.5 px-2 text-right">{beat.order_count}</TableCell>
                                   <TableCell className="text-xs py-1.5 px-2 text-right font-semibold">
                                     ₹{beat.total_value.toLocaleString()}
@@ -1888,7 +1901,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                     
                     return (
                       <TableRow key={index}>
-                        <TableCell>{retailer.retailer_name}</TableCell>
+                         <TableCell>{getTranslated(retailer.retailer_name)}</TableCell>
                         <TableCell className="text-right">{retailer.order_count}</TableCell>
                         <TableCell className="text-right font-semibold">
                           ₹{retailer.total_value.toLocaleString()}
@@ -2127,7 +2140,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange }: Supervis
                           <TableBody>
                             {orderDetailsBeatBreakdown.map((beat, index) => (
                               <TableRow key={index} className="hover:bg-muted/30">
-                                <TableCell className="font-medium">{beat.beat_name}</TableCell>
+                                 <TableCell className="font-medium">{getTranslated(beat.beat_name)}</TableCell>
                                 <TableCell className="text-right">{beat.order_count}</TableCell>
                                 <TableCell className="text-right">{beat.total_retailers}</TableCell>
                                 <TableCell className="text-right font-semibold">
