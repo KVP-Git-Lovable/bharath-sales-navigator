@@ -269,7 +269,7 @@ export const ReportSummaryDialog = ({
       stopAllAudio();
     } else {
       const hindiSummary = generateHindiSpokenSummary();
-      playSummary(hindiSummary, 'qsz5tTEjPvsiIJZIpM8S');
+      playSummary(hindiSummary, 'yRis6UiS4dtT4Aqv72DC');
     }
   };
 
