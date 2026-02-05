@@ -235,36 +235,10 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Get beat plans
-      let beatsQuery = supabase
-        .from('beat_plans')
-        .select('id, beat_id, beat_name, user_id, plan_date')
-        .gte('plan_date', fromDate)
-        .lte('plan_date', toDate);
-
-      if (userIds.length > 0) {
-        beatsQuery = beatsQuery.in('user_id', userIds);
-      }
-
-      const { data: beatPlans } = await beatsQuery;
-
-      // Get visits
-      let visitsQuery = supabase
-        .from('visits')
-        .select('id, user_id, planned_date')
-        .gte('planned_date', fromDate)
-        .lte('planned_date', toDate);
-
-      if (userIds.length > 0) {
-        visitsQuery = visitsQuery.in('user_id', userIds);
-      }
-
-      const { data: visits } = await visitsQuery;
-
-      // Get orders
+      // Get orders with retailer beat_name - this is the primary source of beat performance data
       let ordersQuery = supabase
         .from('orders')
-        .select('id, total_amount, visit_id, user_id, order_date')
+        .select('id, total_amount, user_id, order_date, retailer_id, retailers!inner(id, name, beat_name)')
         .gte('order_date', fromDate)
         .lte('order_date', toDate);
 
@@ -274,11 +248,25 @@ export const useBusinessMetrics = () => {
 
       const { data: orders } = await ordersQuery;
 
-      // Group by beat using beat_plans
+      // Get visits for the date range to count visits per beat
+      let visitsQuery = supabase
+        .from('visits')
+        .select('id, user_id, planned_date, retailer_id, retailers!inner(id, name, beat_name)')
+        .gte('planned_date', fromDate)
+        .lte('planned_date', toDate);
+
+      if (userIds.length > 0) {
+        visitsQuery = visitsQuery.in('user_id', userIds);
+      }
+
+      const { data: visits } = await visitsQuery;
+
+      // Group by beat using retailer's beat_name from both visits and orders
       const beatMap = new Map<string, BeatDetail>();
-      
-      beatPlans?.forEach(plan => {
-        const beatName = plan.beat_name || 'Unknown';
+
+      // Process visits to count visits per beat
+      visits?.forEach(visit => {
+        const beatName = (visit.retailers as any)?.beat_name || 'Unknown';
         if (!beatMap.has(beatName)) {
           beatMap.set(beatName, {
             beat_name: beatName,
@@ -288,19 +276,23 @@ export const useBusinessMetrics = () => {
           });
         }
         const beat = beatMap.get(beatName)!;
-        
-        // Count visits for this beat plan date
-        const beatVisits = visits?.filter(v => 
-          v.planned_date === plan.plan_date && v.user_id === plan.user_id
-        ) || [];
-        beat.visits_count += beatVisits.length;
-        
-        // Find orders for these visits
-        beatVisits.forEach(visit => {
-          const visitOrders = orders?.filter(o => o.visit_id === visit.id) || [];
-          beat.orders_count += visitOrders.length;
-          beat.revenue += visitOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-        });
+        beat.visits_count += 1;
+      });
+
+      // Process orders to count orders and revenue per beat
+      orders?.forEach(order => {
+        const beatName = (order.retailers as any)?.beat_name || 'Unknown';
+        if (!beatMap.has(beatName)) {
+          beatMap.set(beatName, {
+            beat_name: beatName,
+            visits_count: 0,
+            orders_count: 0,
+            revenue: 0
+          });
+        }
+        const beat = beatMap.get(beatName)!;
+        beat.orders_count += 1;
+        beat.revenue += Number(order.total_amount || 0);
       });
 
       setBeatDetails(Array.from(beatMap.values()).sort((a, b) => b.revenue - a.revenue));
