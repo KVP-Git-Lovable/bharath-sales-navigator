@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isUserArchive } from "./userArchiveUtils";
 
 interface MoveToRecycleBinParams {
   tableName: string;
@@ -38,6 +39,10 @@ export const moveToRecycleBin = async ({
   }
 };
 
+/**
+ * Restore a record from recycle bin
+ * Handles both single-table records and combined user archives
+ */
 export const restoreFromRecycleBin = async (
   recycleBinId: string,
   originalTable: string,
@@ -45,6 +50,65 @@ export const restoreFromRecycleBin = async (
   originalId: string
 ): Promise<boolean> => {
   try {
+    // Check if this is a combined user archive
+    if (originalTable === 'profiles' && isUserArchive(recordData)) {
+      // This is a combined user archive - restore just the core profile for now
+      // Full restoration would require restoring all archived tables
+      const profileData = recordData.profile;
+      if (!profileData) {
+        throw new Error('No profile data found in archive');
+      }
+
+      // Remove metadata fields
+      const { created_at, updated_at, ...dataToRestore } = profileData;
+
+      // Restore profile
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ ...dataToRestore, id: originalId });
+
+      if (insertError) throw insertError;
+
+      // Restore user_role if exists
+      if (recordData.user_role) {
+        const { id: roleId, created_at: roleCreatedAt, ...roleData } = recordData.user_role;
+        await supabase.from('user_roles').insert({ ...roleData, user_id: originalId });
+      }
+
+      // Restore user_profile if exists
+      if (recordData.user_profile) {
+        const { id: upId, created_at: upCreatedAt, updated_at: upUpdatedAt, ...upData } = recordData.user_profile;
+        await supabase.from('user_profiles').insert({ ...upData, user_id: originalId });
+      }
+
+      // Restore employee if exists
+      if (recordData.employee) {
+        const { id: empId, created_at: empCreatedAt, updated_at: empUpdatedAt, ...empData } = recordData.employee;
+        await supabase.from('employees').insert({ ...empData, user_id: originalId });
+      }
+
+      // Restore territory assignments
+      if (recordData.territory_assignments && Array.isArray(recordData.territory_assignments)) {
+        for (const ta of recordData.territory_assignments) {
+          await supabase
+            .from('territories')
+            .update({ assigned_user_id: ta.assigned_user_id })
+            .eq('id', ta.territory_id);
+        }
+      }
+
+      // Delete from recycle bin
+      const { error: deleteError } = await supabase
+        .from('recycle_bin')
+        .delete()
+        .eq('id', recycleBinId);
+
+      if (deleteError) throw deleteError;
+
+      return true;
+    }
+
+    // Standard single-table restoration
     // Remove metadata fields that shouldn't be restored
     const { created_at, updated_at, ...dataToRestoreUnsafe } = recordData;
     // Never attempt to restore a raw `id` from record_data (tables differ)
@@ -64,9 +128,9 @@ export const restoreFromRecycleBin = async (
           };
 
     // Insert back to original table
-    const { error: insertError } = await supabase
-      .from(originalTable as any)
-      .insert(insertPayload as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: insertError } = await (supabase.from(originalTable as any) as any)
+      .insert(insertPayload);
 
     if (insertError) throw insertError;
 

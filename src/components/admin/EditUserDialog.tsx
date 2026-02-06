@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, Trash2, Eye, EyeOff, Copy, Key, Check, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
-import { moveToRecycleBin } from '@/utils/recycleBinUtils';
+import { moveUserToRecycleBin, getUserDataSummary } from '@/utils/userArchiveUtils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -330,64 +330,20 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
 
     setDeleting(true);
     try {
-      // Fetch full user data for recycle bin
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      // Use the comprehensive user archive utility that:
+      // 1. Collects ALL user data from 50+ tables into one archive
+      // 2. Stores as a single combined record in recycle bin
+      // 3. Cascade deletes all related data in correct order
+      const success = await moveUserToRecycleBin(
+        user.id, 
+        user.full_name || user.username || user.email
+      );
 
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      const { data: userRoleData } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      // Combine all user data for recycle bin
-      const recordData = {
-        profile: profileData,
-        employee: employeeData,
-        user_role: userRoleData,
-        email: user.email,
-      };
-
-      // Move to recycle bin
-      const movedToRecycleBin = await moveToRecycleBin({
-        tableName: 'profiles',
-        recordId: user.id,
-        recordData,
-        moduleName: 'Users & Roles',
-        recordName: user.full_name || user.username || user.email,
-      });
-
-      if (!movedToRecycleBin) {
+      if (!success) {
         throw new Error('Failed to move user to recycle bin');
       }
 
-      // Delete from employees table first (if exists)
-      await supabase.from('employees').delete().eq('user_id', user.id);
-
-      // Delete from user_profiles (security profile assignment)
-      await supabase.from('user_profiles').delete().eq('user_id', user.id);
-
-      // Delete from user_roles
-      await supabase.from('user_roles').delete().eq('user_id', user.id);
-
-      // Delete from profiles
-      const { error: profileDeleteError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
-
-      if (profileDeleteError) throw profileDeleteError;
-
-      toast.success('User moved to recycle bin');
+      toast.success('User and all related data moved to recycle bin');
       setShowDeleteConfirm(false);
       onSuccess();
       onOpenChange(false);
