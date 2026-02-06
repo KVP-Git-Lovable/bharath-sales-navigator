@@ -340,24 +340,6 @@ export const ReportSummaryDialog = ({
                     </>
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handlePlayHindiSummary}
-                  disabled={isProcessing}
-                >
-                  {isPlaying ? (
-                    <>
-                      <VolumeX className="h-4 w-4 mr-2" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Volume2 className="h-4 w-4 mr-2" />
-                      Play in Hindi
-                    </>
-                  )}
-                </Button>
                 <Button variant="outline" size="sm" onClick={handleCopy}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy
