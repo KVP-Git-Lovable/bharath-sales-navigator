@@ -503,13 +503,10 @@ export const ALL_USER_TABLES = [
   
   // Sales & Orders
   { name: 'orders', column: 'user_id', category: 'Sales' },
-  { name: 'order_items', column: 'user_id', category: 'Sales' },
   { name: 'visits', column: 'user_id', category: 'Sales' },
-  { name: 'retailer_visit_logs', column: 'user_id', category: 'Sales' },
   { name: 'retailers', column: 'user_id', category: 'Sales' },
   { name: 'invoices', column: 'created_by', category: 'Sales' },
   { name: 'packing_lists', column: 'created_by', category: 'Sales' },
-  { name: 'packing_list_items', column: 'created_by', category: 'Sales' },
   
   // Beat & Territory
   { name: 'beats', column: 'created_by', category: 'Territory' },
@@ -533,8 +530,6 @@ export const ALL_USER_TABLES = [
   { name: 'user_period_targets', column: 'user_id', category: 'Targets' },
   { name: 'hierarchy_target_allocations', column: 'user_id', category: 'Targets' },
   { name: 'user_business_plans', column: 'user_id', category: 'Targets' },
-  { name: 'user_business_plan_months', column: 'user_id', category: 'Targets' },
-  { name: 'user_business_plan_month_products', column: 'user_id', category: 'Targets' },
   { name: 'fy_target_config', column: 'created_by', category: 'Targets' },
   { name: 'hierarchy_targets', column: 'created_by', category: 'Targets' },
   
@@ -543,6 +538,7 @@ export const ALL_USER_TABLES = [
   { name: 'gamification_daily_tracking', column: 'user_id', category: 'Gamification' },
   { name: 'gamification_retailer_sequences', column: 'user_id', category: 'Gamification' },
   { name: 'gamification_games', column: 'created_by', category: 'Gamification' },
+  { name: 'gamification_redemptions', column: 'user_id', category: 'Gamification' },
   
   // Employee Data
   { name: 'employee_badges', column: 'user_id', category: 'Employee' },
@@ -561,8 +557,9 @@ export const ALL_USER_TABLES = [
   { name: 'notifications', column: 'user_id', category: 'Communication' },
   { name: 'notification_preferences', column: 'user_id', category: 'Communication' },
   { name: 'chat_conversations', column: 'user_id', category: 'Communication' },
-  { name: 'chat_messages', column: 'user_id', category: 'Communication' },
   { name: 'push_content_templates', column: 'created_by', category: 'Communication' },
+  { name: 'push_content_posts', column: 'user_id', category: 'Communication' },
+  { name: 'push_content_execution_log', column: 'user_id', category: 'Communication' },
   
   // AI & Insights
   { name: 'ai_insights', column: 'user_id', category: 'AI' },
@@ -583,6 +580,7 @@ export const ALL_USER_TABLES = [
   
   // Competition
   { name: 'competition_insights', column: 'user_id', category: 'Competition' },
+  { name: 'competition_data', column: 'user_id', category: 'Competition' },
   
   // Branding
   { name: 'branding_requests', column: 'user_id', category: 'Branding' },
@@ -596,14 +594,15 @@ export const ALL_USER_TABLES = [
   { name: 'competency_coaching_notes', column: 'user_id', category: 'Performance' },
   { name: 'performance_comments', column: 'user_id', category: 'Performance' },
   
-  // Joint Sales
-  { name: 'joint_sales_sessions', column: 'user_id', category: 'Joint Sales' },
-  { name: 'joint_sales_feedback', column: 'user_id', category: 'Joint Sales' },
+  // Joint Sales (uses fse_user_id, not user_id)
+  { name: 'joint_sales_sessions', column: 'fse_user_id', category: 'Joint Sales' },
+  { name: 'joint_sales_feedback', column: 'fse_user_id', category: 'Joint Sales' },
   
   // Distributor
-  { name: 'distributor_credit_notes', column: 'created_by', category: 'Distributor' },
   { name: 'distributor_inventory_transactions', column: 'created_by', category: 'Distributor' },
   { name: 'distributor_returns', column: 'created_by', category: 'Distributor' },
+  { name: 'distributor_company_returns', column: 'created_by', category: 'Distributor' },
+  { name: 'distributor_retailer_mappings', column: 'user_id', category: 'Distributor' },
   
   // Institutional
   { name: 'inst_invoices', column: 'created_by', category: 'Institutional' },
@@ -611,10 +610,16 @@ export const ALL_USER_TABLES = [
   { name: 'inst_order_commitments', column: 'created_by', category: 'Institutional' },
   { name: 'inst_quotes', column: 'created_by', category: 'Institutional' },
   
-  // Other
+  // Security & Other
+  { name: 'sensitive_data_access_log', column: 'user_id', category: 'Security' },
+  { name: 'password_reset_tokens', column: 'user_id', category: 'Security' },
+  { name: 'user_object_permissions', column: 'user_id', category: 'Security' },
   { name: 'price_books', column: 'created_by', category: 'Other' },
   { name: 'retailer_loyalty_plans', column: 'created_by', category: 'Other' },
   { name: 'custom_invoice_templates', column: 'created_by', category: 'Other' },
+  { name: 'recommendations', column: 'user_id', category: 'Other' },
+  { name: 'recommendation_feedback', column: 'user_id', category: 'Other' },
+  { name: 'retailer_feedback', column: 'user_id', category: 'Other' },
 ];
 
 /**
