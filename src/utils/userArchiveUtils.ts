@@ -492,39 +492,168 @@ export const moveUserToRecycleBin = async (userId: string, userName: string): Pr
 };
 
 /**
- * Get a summary of what will be deleted for a user
+ * Complete list of all tables that reference user data
  */
-export const getUserDataSummary = async (userId: string): Promise<{ tableName: string; count: number }[]> => {
-  const summary: { tableName: string; count: number }[] = [];
+export const ALL_USER_TABLES = [
+  // Core user tables
+  { name: 'profiles', column: 'id', category: 'Core' },
+  { name: 'employees', column: 'user_id', category: 'Core' },
+  { name: 'user_roles', column: 'user_id', category: 'Core' },
+  { name: 'user_profiles', column: 'user_id', category: 'Core' },
+  
+  // Sales & Orders
+  { name: 'orders', column: 'user_id', category: 'Sales' },
+  { name: 'order_items', column: 'user_id', category: 'Sales' },
+  { name: 'visits', column: 'user_id', category: 'Sales' },
+  { name: 'retailer_visit_logs', column: 'user_id', category: 'Sales' },
+  { name: 'retailers', column: 'user_id', category: 'Sales' },
+  { name: 'invoices', column: 'created_by', category: 'Sales' },
+  { name: 'packing_lists', column: 'created_by', category: 'Sales' },
+  { name: 'packing_list_items', column: 'created_by', category: 'Sales' },
+  
+  // Beat & Territory
+  { name: 'beats', column: 'created_by', category: 'Territory' },
+  { name: 'beat_plans', column: 'user_id', category: 'Territory' },
+  { name: 'beat_allowances', column: 'user_id', category: 'Territory' },
+  { name: 'territories', column: 'assigned_user_id', category: 'Territory' },
+  
+  // Attendance & Leave
+  { name: 'attendance', column: 'user_id', category: 'Attendance' },
+  { name: 'leave_applications', column: 'user_id', category: 'Attendance' },
+  { name: 'leave_balance', column: 'user_id', category: 'Attendance' },
+  { name: 'leave_accrual_log', column: 'user_id', category: 'Attendance' },
+  { name: 'regularization_requests', column: 'user_id', category: 'Attendance' },
+  { name: 'holidays', column: 'created_by', category: 'Attendance' },
+  
+  // GPS & Tracking
+  { name: 'gps_tracking', column: 'user_id', category: 'Tracking' },
+  { name: 'gps_tracking_stops', column: 'user_id', category: 'Tracking' },
+  
+  // Targets & Business Planning
+  { name: 'user_period_targets', column: 'user_id', category: 'Targets' },
+  { name: 'hierarchy_target_allocations', column: 'user_id', category: 'Targets' },
+  { name: 'user_business_plans', column: 'user_id', category: 'Targets' },
+  { name: 'user_business_plan_months', column: 'user_id', category: 'Targets' },
+  { name: 'user_business_plan_month_products', column: 'user_id', category: 'Targets' },
+  { name: 'fy_target_config', column: 'created_by', category: 'Targets' },
+  { name: 'hierarchy_targets', column: 'created_by', category: 'Targets' },
+  
+  // Gamification
+  { name: 'gamification_points', column: 'user_id', category: 'Gamification' },
+  { name: 'gamification_daily_tracking', column: 'user_id', category: 'Gamification' },
+  { name: 'gamification_retailer_sequences', column: 'user_id', category: 'Gamification' },
+  { name: 'gamification_games', column: 'created_by', category: 'Gamification' },
+  
+  // Employee Data
+  { name: 'employee_badges', column: 'user_id', category: 'Employee' },
+  { name: 'employee_competencies', column: 'user_id', category: 'Employee' },
+  { name: 'employee_documents', column: 'user_id', category: 'Employee' },
+  { name: 'employee_recommendations', column: 'user_id', category: 'Employee' },
+  { name: 'profile_attachments', column: 'user_id', category: 'Employee' },
+  { name: 'education_history', column: 'user_id', category: 'Employee' },
+  { name: 'emergency_contacts', column: 'user_id', category: 'Employee' },
+  { name: 'aspirations_and_preferences', column: 'user_id', category: 'Employee' },
+  
+  // Expenses
+  { name: 'additional_expenses', column: 'user_id', category: 'Expenses' },
+  
+  // Communication
+  { name: 'notifications', column: 'user_id', category: 'Communication' },
+  { name: 'notification_preferences', column: 'user_id', category: 'Communication' },
+  { name: 'chat_conversations', column: 'user_id', category: 'Communication' },
+  { name: 'chat_messages', column: 'user_id', category: 'Communication' },
+  { name: 'push_content_templates', column: 'created_by', category: 'Communication' },
+  
+  // AI & Insights
+  { name: 'ai_insights', column: 'user_id', category: 'AI' },
+  { name: 'ai_autonomous_actions', column: 'user_id', category: 'AI' },
+  { name: 'ai_feature_feedback', column: 'user_id', category: 'AI' },
+  
+  // Coach & Learning
+  { name: 'coach_user_progress', column: 'user_id', category: 'Learning' },
+  { name: 'coach_user_badges', column: 'user_id', category: 'Learning' },
+  { name: 'coach_user_streaks', column: 'user_id', category: 'Learning' },
+  { name: 'coach_chat_messages', column: 'user_id', category: 'Learning' },
+  { name: 'coach_daily_nudges', column: 'user_id', category: 'Learning' },
+  { name: 'coach_feedback', column: 'user_id', category: 'Learning' },
+  { name: 'coach_quiz_attempts', column: 'user_id', category: 'Learning' },
+  { name: 'coach_scenario_attempts', column: 'user_id', category: 'Learning' },
+  { name: 'coach_user_competency_scores', column: 'user_id', category: 'Learning' },
+  { name: 'coach_user_overall_scores', column: 'user_id', category: 'Learning' },
+  
+  // Competition
+  { name: 'competition_insights', column: 'user_id', category: 'Competition' },
+  
+  // Branding
+  { name: 'branding_requests', column: 'user_id', category: 'Branding' },
+  
+  // Analytics
+  { name: 'analytics_views', column: 'user_id', category: 'Analytics' },
+  { name: 'analytics_likes', column: 'user_id', category: 'Analytics' },
+  
+  // Performance
+  { name: 'user_monthly_scorecards', column: 'user_id', category: 'Performance' },
+  { name: 'competency_coaching_notes', column: 'user_id', category: 'Performance' },
+  { name: 'performance_comments', column: 'user_id', category: 'Performance' },
+  
+  // Joint Sales
+  { name: 'joint_sales_sessions', column: 'user_id', category: 'Joint Sales' },
+  { name: 'joint_sales_feedback', column: 'user_id', category: 'Joint Sales' },
+  
+  // Distributor
+  { name: 'distributor_credit_notes', column: 'created_by', category: 'Distributor' },
+  { name: 'distributor_inventory_transactions', column: 'created_by', category: 'Distributor' },
+  { name: 'distributor_returns', column: 'created_by', category: 'Distributor' },
+  
+  // Institutional
+  { name: 'inst_invoices', column: 'created_by', category: 'Institutional' },
+  { name: 'inst_leads', column: 'created_by', category: 'Institutional' },
+  { name: 'inst_order_commitments', column: 'created_by', category: 'Institutional' },
+  { name: 'inst_quotes', column: 'created_by', category: 'Institutional' },
+  
+  // Other
+  { name: 'price_books', column: 'created_by', category: 'Other' },
+  { name: 'retailer_loyalty_plans', column: 'created_by', category: 'Other' },
+  { name: 'custom_invoice_templates', column: 'created_by', category: 'Other' },
+];
 
-  const tables = [
-    { name: 'orders', column: 'user_id' },
-    { name: 'visits', column: 'user_id' },
-    { name: 'retailers', column: 'user_id' },
-    { name: 'attendance', column: 'user_id' },
-    { name: 'beat_plans', column: 'user_id' },
-    { name: 'leave_applications', column: 'user_id' },
-    { name: 'invoices', column: 'created_by' },
-    { name: 'gps_tracking', column: 'user_id' },
-    { name: 'notifications', column: 'user_id' },
-  ];
+/**
+ * Get a comprehensive summary of what will be deleted for a user
+ */
+export const getUserDataSummary = async (userId: string): Promise<{ tableName: string; count: number; category: string }[]> => {
+  const summary: { tableName: string; count: number; category: string }[] = [];
 
-  for (const table of tables) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { count } = await (supabase.from(table.name as any) as any)
-        .select('*', { count: 'exact', head: true })
-        .eq(table.column, userId);
-      
-      if (count && count > 0) {
-        summary.push({ tableName: table.name, count });
+  // Fetch counts in parallel batches for efficiency
+  const batchSize = 10;
+  for (let i = 0; i < ALL_USER_TABLES.length; i += batchSize) {
+    const batch = ALL_USER_TABLES.slice(i, i + batchSize);
+    const promises = batch.map(async (table) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { count } = await (supabase.from(table.name as any) as any)
+          .select('*', { count: 'exact', head: true })
+          .eq(table.column, userId);
+        
+        if (count && count > 0) {
+          return { tableName: table.name, count, category: table.category };
+        }
+        return null;
+      } catch {
+        return null;
       }
-    } catch {
-      // Skip tables that fail
-    }
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(result => {
+      if (result) summary.push(result);
+    });
   }
 
-  return summary;
+  // Sort by category then by count
+  return summary.sort((a, b) => {
+    if (a.category !== b.category) return a.category.localeCompare(b.category);
+    return b.count - a.count;
+  });
 };
 
 /**
