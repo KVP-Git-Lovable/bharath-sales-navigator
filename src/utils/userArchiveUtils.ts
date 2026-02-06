@@ -139,7 +139,7 @@ export const collectUserData = async (userId: string): Promise<UserArchiveData> 
   if (userRole) { archive.user_role = userRole; tablesWithData.push('user_roles'); totalRecords++; }
   if (userProfile) { archive.user_profile = userProfile; tablesWithData.push('user_profiles'); totalRecords++; }
 
-  // Tables to fetch with user_id column
+  // Tables to fetch with user_id column (comprehensive list from schema)
   const userIdTables = [
     'attendance', 'orders', 'visits', 'retailers', 'beat_plans', 'beat_allowances',
     'gps_tracking', 'gps_tracking_stops', 'leave_applications', 'leave_balance',
@@ -151,11 +151,29 @@ export const collectUserData = async (userId: string): Promise<UserArchiveData> 
     'ai_insights', 'chat_conversations', 'coach_user_progress', 'coach_user_badges',
     'coach_user_streaks', 'competition_insights', 'branding_requests',
     'regularization_requests', 'profile_attachments', 'education_history',
-    'emergency_contacts', 'aspirations_and_preferences'
+    'emergency_contacts', 'aspirations_and_preferences',
+    // Additional tables from schema scan
+    'ai_autonomous_actions', 'ai_feature_feedback', 'analytics_likes', 'analytics_views',
+    'approvers', 'chat_feedback', 'coach_chat_messages', 'coach_daily_nudges',
+    'coach_feedback', 'coach_quiz_attempts', 'coach_scenario_attempts',
+    'coach_user_competency_scores', 'coach_user_overall_scores', 'competition_data',
+    'competency_coaching_notes', 'distributor_retailer_mappings', 'gamification_redemptions',
+    'hierarchy_target_history', 'joint_sales_feedback', 'joint_sales_sessions',
+    'password_reset_tokens', 'performance_comments', 'push_content_execution_log',
+    'push_content_posts', 'recommendation_feedback', 'recommendations', 'retailer_feedback',
+    'sensitive_data_access_log', 'user_monthly_scorecard_competencies', 'user_monthly_scorecards',
+    'user_object_permissions'
   ];
 
   // Tables with created_by column
-  const createdByTables = ['beats', 'invoices', 'packing_lists'];
+  const createdByTables = [
+    'beats', 'invoices', 'packing_lists', 'custom_invoice_templates',
+    'distributor_beat_mappings', 'distributor_company_returns', 'distributor_evaluation_tasks',
+    'distributor_inventory_transactions', 'distributor_returns', 'fy_target_config',
+    'gamification_games', 'hierarchy_targets', 'holidays', 'inst_invoices', 'inst_leads',
+    'inst_order_commitments', 'inst_quotes', 'price_books', 'push_content_templates',
+    'retailer_loyalty_plans'
+  ];
 
   // Fetch user_id tables
   for (const tableName of userIdTables) {
@@ -310,11 +328,23 @@ export const deleteUserDataCascade = async (userId: string): Promise<boolean> =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('territories') as any).update({ assigned_user_id: null }).eq('assigned_user_id', userId);
 
-    // Phase 4: Clear manager references
+    // Phase 4: Clear manager references and other FK references pointing to this user
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('employees') as any).update({ manager_id: null }).eq('manager_id', userId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('employees') as any).update({ secondary_manager_id: null }).eq('secondary_manager_id', userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('branding_requests') as any).update({ manager_id: null }).eq('manager_id', userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('competency_coaching_notes') as any).update({ manager_id: null }).eq('manager_id', userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('hierarchy_target_allocations') as any).update({ manager_id: null }).eq('manager_id', userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('joint_sales_sessions') as any).update({ manager_id: null }).eq('manager_id', userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('joint_sales_feedback') as any).update({ manager_id: null }).eq('manager_id', userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('performance_comments') as any).update({ manager_id: null }).eq('manager_id', userId);
 
     // Phase 5: Delete remaining user data tables
     const tablesToDelete = [
@@ -352,6 +382,54 @@ export const deleteUserDataCascade = async (userId: string): Promise<boolean> =>
       { name: 'education_history', column: 'user_id' },
       { name: 'emergency_contacts', column: 'user_id' },
       { name: 'aspirations_and_preferences', column: 'user_id' },
+      // Additional tables from schema scan
+      { name: 'ai_autonomous_actions', column: 'user_id' },
+      { name: 'ai_feature_feedback', column: 'user_id' },
+      { name: 'analytics_likes', column: 'user_id' },
+      { name: 'analytics_views', column: 'user_id' },
+      { name: 'approvers', column: 'user_id' },
+      { name: 'chat_feedback', column: 'user_id' },
+      { name: 'coach_chat_messages', column: 'user_id' },
+      { name: 'coach_daily_nudges', column: 'user_id' },
+      { name: 'coach_feedback', column: 'user_id' },
+      { name: 'coach_quiz_attempts', column: 'user_id' },
+      { name: 'coach_scenario_attempts', column: 'user_id' },
+      { name: 'coach_user_competency_scores', column: 'user_id' },
+      { name: 'coach_user_overall_scores', column: 'user_id' },
+      { name: 'competition_data', column: 'user_id' },
+      { name: 'competency_coaching_notes', column: 'user_id' },
+      { name: 'distributor_retailer_mappings', column: 'user_id' },
+      { name: 'gamification_redemptions', column: 'user_id' },
+      { name: 'hierarchy_target_history', column: 'user_id' },
+      { name: 'password_reset_tokens', column: 'user_id' },
+      { name: 'performance_comments', column: 'user_id' },
+      { name: 'push_content_execution_log', column: 'user_id' },
+      { name: 'push_content_posts', column: 'user_id' },
+      { name: 'recommendation_feedback', column: 'user_id' },
+      { name: 'recommendations', column: 'user_id' },
+      { name: 'retailer_feedback', column: 'user_id' },
+      { name: 'sensitive_data_access_log', column: 'user_id' },
+      { name: 'user_monthly_scorecard_competencies', column: 'user_id' },
+      { name: 'user_monthly_scorecards', column: 'user_id' },
+      { name: 'user_object_permissions', column: 'user_id' },
+      // created_by tables
+      { name: 'custom_invoice_templates', column: 'created_by' },
+      { name: 'distributor_beat_mappings', column: 'created_by' },
+      { name: 'distributor_company_returns', column: 'created_by' },
+      { name: 'distributor_evaluation_tasks', column: 'created_by' },
+      { name: 'distributor_inventory_transactions', column: 'created_by' },
+      { name: 'distributor_returns', column: 'created_by' },
+      { name: 'fy_target_config', column: 'created_by' },
+      { name: 'gamification_games', column: 'created_by' },
+      { name: 'hierarchy_targets', column: 'created_by' },
+      { name: 'holidays', column: 'created_by' },
+      { name: 'inst_invoices', column: 'created_by' },
+      { name: 'inst_leads', column: 'created_by' },
+      { name: 'inst_order_commitments', column: 'created_by' },
+      { name: 'inst_quotes', column: 'created_by' },
+      { name: 'price_books', column: 'created_by' },
+      { name: 'push_content_templates', column: 'created_by' },
+      { name: 'retailer_loyalty_plans', column: 'created_by' },
     ];
 
     for (const table of tablesToDelete) {
