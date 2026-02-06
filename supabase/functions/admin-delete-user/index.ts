@@ -66,7 +66,7 @@ const DELETE_BY_USER_ID = [
   'attendance', 'leave_applications', 'leave_balance', 'leave_accrual_log',
   'user_roles', 'approvers', 'user_approvals', 'notifications', 'notification_preferences',
   'regularization_requests', 'gps_tracking', 'gps_tracking_stops',
-  'employee_competencies', 'employee_connections', 'employee_badges',
+  'employee_competencies', 'employee_badges',
   'employee_recommendations', 'employee_documents', 'support_requests',
   'sensitive_data_access_log', 'recommendations', 'recommendation_feedback',
   'visit_ai_insights', 'ai_feature_feedback', 'ai_insights', 'ai_autonomous_actions',
@@ -93,9 +93,13 @@ const DELETE_BY_USER_ID = [
 ]
 
 // Tables where we DELETE rows by other columns (fse_user_id, follower_id, etc.)
+// NOTE: joint_sales_feedback & joint_sales_sessions have NOT NULL manager_id FK to auth.users
+// so we must DELETE (not nullify) rows where manager_id = userId
 const DELETE_BY_OTHER_COLUMNS = [
   { table: 'joint_sales_sessions', column: 'fse_user_id' },
+  { table: 'joint_sales_sessions', column: 'manager_id' },
   { table: 'joint_sales_feedback', column: 'fse_user_id' },
+  { table: 'joint_sales_feedback', column: 'manager_id' },
   { table: 'employee_connections', column: 'follower_id' },
   { table: 'employee_connections', column: 'following_id' },
   { table: 'user_approvals', column: 'approver_id' },
@@ -114,6 +118,8 @@ const DELETE_BY_CREATED_BY = [
 ]
 
 // Tables where we NULLIFY reference columns (these reference the user but don't belong to them)
+// NOTE: joint_sales_feedback.manager_id and joint_sales_sessions.manager_id are NOT NULL
+// so they are handled via DELETE in DELETE_BY_OTHER_COLUMNS above
 const NULLIFY_COLUMNS = [
   { table: 'employees', column: 'manager_id' },
   { table: 'employees', column: 'secondary_manager_id' },
@@ -123,8 +129,6 @@ const NULLIFY_COLUMNS = [
   { table: 'territories', column: 'last_updated_by' },
   { table: 'distributors', column: 'owner_id' },
   { table: 'beat_plans', column: 'joint_sales_manager_id' },
-  { table: 'joint_sales_sessions', column: 'manager_id' },
-  { table: 'joint_sales_feedback', column: 'manager_id' },
   { table: 'employee_competencies', column: 'assessed_by' },
   { table: 'employee_badges', column: 'issued_by' },
   { table: 'employee_recommendations', column: 'recommender_id' },
@@ -333,13 +337,20 @@ Deno.serve(async (req) => {
         await safeDeleteByIds(supabaseAdmin, 'social_reactions', 'post_id', socialPostIds)
       }
 
-      // Phase 2: Nullify all reference columns that point to this user
+      // Phase 2: Delete by other columns FIRST (handles NOT NULL FK columns like
+      // joint_sales_feedback.manager_id and joint_sales_sessions.manager_id)
+      console.log('Deleting records by other columns (NOT NULL FKs)...')
+      for (const { table, column } of DELETE_BY_OTHER_COLUMNS) {
+        await safeDelete(supabaseAdmin, table, column, userId)
+      }
+
+      // Phase 3: Nullify all nullable reference columns that point to this user
       console.log('Nullifying reference columns...')
       for (const { table, column } of NULLIFY_COLUMNS) {
         await safeNullify(supabaseAdmin, table, column, userId)
       }
 
-      // Phase 3: Delete parent records (orders, visits, etc.)
+      // Phase 4: Delete parent records (orders, visits, etc.)
       console.log('Deleting parent records...')
       await safeDelete(supabaseAdmin, 'orders', 'user_id', userId)
       await safeDelete(supabaseAdmin, 'visits', 'user_id', userId)
@@ -350,15 +361,10 @@ Deno.serve(async (req) => {
       await safeDelete(supabaseAdmin, 'retailers', 'user_id', userId)
       await safeDelete(supabaseAdmin, 'beat_plans', 'user_id', userId)
 
-      // Phase 4: Delete all user_id tables
+      // Phase 5: Delete all user_id tables
       console.log('Deleting all user data tables...')
       for (const table of DELETE_BY_USER_ID) {
         await safeDelete(supabaseAdmin, table, 'user_id', userId)
-      }
-
-      // Delete by other columns
-      for (const { table, column } of DELETE_BY_OTHER_COLUMNS) {
-        await safeDelete(supabaseAdmin, table, column, userId)
       }
 
       // Delete created_by tables
