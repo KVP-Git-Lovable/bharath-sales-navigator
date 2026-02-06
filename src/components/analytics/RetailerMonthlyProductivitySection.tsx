@@ -207,9 +207,9 @@
              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
            </button>
          </div>
-         <p className="text-xs text-muted-foreground mt-1">
-           Retailers with visits but no confirmed orders in selected period
-         </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Retailers with visits but no confirmed orders
+          </p>
        </CardHeader>
        <CardContent className="pt-0">
          {loading ? (
@@ -228,7 +228,7 @@
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead className="text-[10px] md:text-xs whitespace-nowrap">Retailer Name</TableHead>
-                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Planned</TableHead>
+                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Visits</TableHead>
                       <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Productive</TableHead>
                       <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Unproductive</TableHead>
                     </TableRow>
