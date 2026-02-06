@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Trash2, UserCheck, AlertTriangle, Database, ArrowRight, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { moveUserToRecycleBin, getUserDataSummary, transferUserData } from '@/utils/userArchiveUtils';
+import { getUserDataSummary } from '@/utils/userArchiveUtils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface User {
@@ -111,37 +111,46 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const handleConfirm = async () => {
     if (!user) return;
 
+    if (deleteOption === 'transfer' && !transferToUserId) {
+      toast.error('Please select a user to transfer data to');
+      return;
+    }
+
     setProcessing(true);
     try {
-      if (deleteOption === 'transfer') {
-        if (!transferToUserId) {
-          toast.error('Please select a user to transfer data to');
-          setProcessing(false);
-          return;
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        // Transfer data to another user first
-        const transferSuccess = await transferUserData(user.id, transferToUserId);
-        if (!transferSuccess) {
-          throw new Error('Failed to transfer user data');
+      const response = await fetch(
+        `https://etabpbfokzhhfuybeieu.supabase.co/functions/v1/admin-delete-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            deleteOption,
+            transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
+          }),
         }
-        toast.success('User data transferred successfully');
-      }
-
-      // Move user to recycle bin (with or without data based on option)
-      const success = await moveUserToRecycleBin(
-        user.id,
-        user.full_name || user.username || user.email
       );
 
-      if (!success) {
-        throw new Error('Failed to move user to recycle bin');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete user');
+      }
+
+      if (result.warning) {
+        toast.warning(result.warning);
       }
 
       toast.success(
         deleteOption === 'transfer'
           ? 'User deleted and data transferred to selected user'
-          : 'User and all related data moved to recycle bin'
+          : 'User and all related data deleted and archived to recycle bin'
       );
       onSuccess();
       onOpenChange(false);
