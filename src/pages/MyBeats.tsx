@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { AddRetailerInlineToBeat } from "@/components/AddRetailerInlineToBeat";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { useConnectivity } from "@/hooks/useConnectivity";
-import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
@@ -806,7 +806,7 @@ export const MyBeats = () => {
     openDeleteDialog(beatId, beatName);
   };
 
-  const handleConfirmDeleteBeat = async () => {
+  const handleConfirmDeleteBeat = async (deleteOption: 'delete' | 'transfer', targetBeatId?: string) => {
     if (!deleteItemId || !deleteItemName || !user) {
       closeDeleteDialog();
       return;
@@ -827,19 +827,73 @@ export const MyBeats = () => {
         });
       }
 
-      // Update retailers to remove beat assignment (retailers.beat_id is NOT NULL, use 'unassigned')
-      const { error: retailerError } = await supabase
-        .from('retailers')
-        .update({ 
-          beat_id: 'unassigned',
-          beat_name: null
-        })
-        .eq('beat_id', deleteItemId)
-        .eq('user_id', user.id);
+      // Handle retailers based on selected option
+      if (deleteOption === 'delete') {
+        // Option 1: Delete all retailers (move each to recycle bin first)
+        const { data: retailersToDelete } = await supabase
+          .from('retailers')
+          .select('*')
+          .eq('beat_id', deleteItemId)
+          .eq('user_id', user.id);
 
-      if (retailerError) throw retailerError;
+        if (retailersToDelete && retailersToDelete.length > 0) {
+          for (const retailer of retailersToDelete) {
+            await moveToRecycleBin({
+              tableName: 'retailers',
+              recordId: retailer.id,
+              recordData: retailer,
+              moduleName: 'Retailers',
+              recordName: retailer.name || 'Unknown Retailer'
+            });
+          }
 
-      // Delete ALL beat plans for this beat (not just for current user)
+          // Hard delete from retailers table
+          const { error: deleteRetailersError } = await supabase
+            .from('retailers')
+            .delete()
+            .eq('beat_id', deleteItemId)
+            .eq('user_id', user.id);
+
+          if (deleteRetailersError) throw deleteRetailersError;
+
+          // Remove from offline cache
+          const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
+          const retailerIdsToDelete = new Set(retailersToDelete.map(r => r.id));
+          for (const r of cachedRetailers as any[]) {
+            if (retailerIdsToDelete.has(r.id)) {
+              await offlineStorage.delete(STORES.RETAILERS, r.id);
+            }
+          }
+        }
+      } else if (deleteOption === 'transfer' && targetBeatId) {
+        // Option 2: Transfer retailers to another beat
+        const targetBeat = beats.find(b => b.id === targetBeatId);
+        const { error: transferError } = await supabase
+          .from('retailers')
+          .update({
+            beat_id: targetBeatId,
+            beat_name: targetBeat?.name || null
+          })
+          .eq('beat_id', deleteItemId)
+          .eq('user_id', user.id);
+
+        if (transferError) throw transferError;
+
+        // Update offline cache
+        const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
+        const retailersToUpdate = (cachedRetailers as any[]).filter(
+          (r: any) => r.beat_id === deleteItemId && r.user_id === user.id
+        );
+        for (const retailer of retailersToUpdate) {
+          await offlineStorage.save(STORES.RETAILERS, {
+            ...retailer,
+            beat_id: targetBeatId,
+            beat_name: targetBeat?.name || null
+          });
+        }
+      }
+
+      // Delete ALL beat plans for this beat
       const { error: planError } = await supabase
         .from('beat_plans')
         .delete()
@@ -856,7 +910,7 @@ export const MyBeats = () => {
 
       if (allowanceError) console.error('Error deleting beat allowance:', allowanceError);
 
-      // Mark beat as inactive in shared beats table (soft delete)
+      // Mark beat as inactive (soft delete)
       const { error: beatError } = await supabase
         .from('beats')
         .update({ is_active: false })
@@ -865,10 +919,10 @@ export const MyBeats = () => {
 
       if (beatError) throw beatError;
 
-      // IMMEDIATE UI UPDATE - remove from state right away
+      // IMMEDIATE UI UPDATE
       setBeats(prev => prev.filter(b => b.id !== deleteItemId));
 
-      // Clear offline cache for this beat's plans
+      // Clear offline cache for beat plans
       const cachedPlans = await offlineStorage.getAll(STORES.BEAT_PLANS);
       const plansToDelete = (cachedPlans as any[]).filter((plan: any) => plan.beat_id === deleteItemId);
       for (const plan of plansToDelete) {
@@ -878,19 +932,7 @@ export const MyBeats = () => {
       // Clear the deleted beat from cache
       await offlineStorage.delete(STORES.BEATS, deleteItemId);
 
-      // Update cached retailers to remove beat assignment
-      const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
-      const retailersToUpdate = (cachedRetailers as any[]).filter((r: any) => r.beat_id === deleteItemId && r.user_id === user.id);
-      for (const retailer of retailersToUpdate) {
-        const retailerData = retailer as any;
-        await offlineStorage.save(STORES.RETAILERS, {
-          ...retailerData,
-          beat_id: 'unassigned',
-          beat_name: null
-        });
-      }
-
-      // Clear My Visits snapshots for today and upcoming days (beat plans may span multiple dates)
+      // Clear My Visits snapshots
       const today = new Date();
       for (let i = 0; i < 7; i++) {
         const date = new Date(today);
@@ -900,19 +942,24 @@ export const MyBeats = () => {
         await clearMyVisitsSnapshot(user.id, dateStr);
       }
 
-      toast.success(`Beat "${deleteItemName}" deleted successfully`);
+      const actionText = deleteOption === 'delete'
+        ? `and ${affectedRetailerCount} retailer(s) deleted`
+        : deleteOption === 'transfer'
+          ? `and retailers transferred`
+          : '';
+      toast.success(`Beat "${deleteItemName}" deleted ${actionText}`.trim());
       
-      // Dispatch events to refresh other components - force full reload
+      // Dispatch events to refresh other components
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       window.dispatchEvent(new CustomEvent('beatDeleted', { detail: { beatId: deleteItemId } }));
       window.dispatchEvent(new CustomEvent('forceVisitsRefresh'));
       
-      // Reload retailers to update unassigned count
+      // Reload data
       loadAllRetailers();
+      loadBeats();
     } catch (error) {
       console.error('Error deleting beat:', error);
       toast.error('Failed to delete beat');
-      // Reload to ensure consistent state
       loadBeats();
     } finally {
       setIsDeleting(false);
@@ -1981,12 +2028,15 @@ export const MyBeats = () => {
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <DeleteConfirmDialog
+        <BeatDeleteDialog
           open={isDeleteOpen}
           onOpenChange={setDeleteOpen}
+          beatName={deleteItemName}
+          affectedRetailerCount={affectedRetailerCount}
+          availableBeats={beats
+            .filter(b => b.id !== deleteItemId)
+            .map(b => ({ id: b.id, name: b.name, retailer_count: b.retailer_count }))}
           onConfirm={handleConfirmDeleteBeat}
-          title="Delete Beat"
-          description={`Are you sure you want to delete "${deleteItemName}"?${affectedRetailerCount > 0 ? ` ${affectedRetailerCount} retailer(s) will be unassigned from this beat.` : ''} It will be moved to the recycle bin and can be restored later.`}
           isLoading={isDeleting}
         />
       </div>

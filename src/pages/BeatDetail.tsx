@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { BeatVisitCalendar } from "@/components/BeatVisitCalendar";
 import { useBeatMetrics } from "@/hooks/useBeatMetrics";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
+import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
 import { EditBeatModal } from "@/components/EditBeatModal";
 import { BeatAnalyticsModal } from "@/components/BeatAnalyticsModal";
 import { useRecommendations, Recommendation } from "@/hooks/useRecommendations";
@@ -64,6 +65,9 @@ export const BeatDetail = () => {
   const [selectedRetailer, setSelectedRetailer] = useState<any>(null);
   const [showRetailerModal, setShowRetailerModal] = useState(false);
   const [beatQueryId, setBeatQueryId] = useState<string>(id || "");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [availableBeats, setAvailableBeats] = useState<{ id: string; name: string; retailer_count?: number }[]>([]);
 
   const filteredRetailers = useMemo(() => {
     if (!beatData?.retailers) return [];
@@ -494,13 +498,50 @@ export const BeatDetail = () => {
     setSwot({ strengths, weaknesses, opportunities, threats });
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = async () => {
     if (!beatData || !user) return;
     
-    const confirmed = window.confirm(`Are you sure you want to delete "${beatData.beat_name}"?`);
-    if (!confirmed) return;
-
+    // Fetch available beats for transfer option
     try {
+      const { data: allBeats } = await supabase
+        .from('beats')
+        .select('beat_id, beat_name')
+        .eq('is_active', true)
+        .eq('created_by', user.id)
+        .neq('beat_id', beatData.beat_id);
+
+      if (allBeats) {
+        // Get retailer counts for each beat
+        const { data: retailerCounts } = await supabase
+          .from('retailers')
+          .select('beat_id')
+          .eq('user_id', user.id)
+          .in('beat_id', allBeats.map(b => b.beat_id));
+
+        const countMap = new Map<string, number>();
+        retailerCounts?.forEach(r => {
+          countMap.set(r.beat_id, (countMap.get(r.beat_id) || 0) + 1);
+        });
+
+        setAvailableBeats(allBeats.map(b => ({
+          id: b.beat_id,
+          name: b.beat_name,
+          retailer_count: countMap.get(b.beat_id) || 0
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching available beats:', error);
+    }
+    
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async (deleteOption: 'delete' | 'transfer', targetBeatId?: string) => {
+    if (!beatData || !user) return;
+
+    setIsDeleting(true);
+    try {
+      // Move beat to recycle bin
       await moveToRecycleBin({
         tableName: 'beats',
         recordId: beatData.beat_id,
@@ -511,18 +552,65 @@ export const BeatDetail = () => {
         moduleName: 'beats',
         recordName: beatData.beat_name
       });
-      
+
+      // Handle retailers
+      if (deleteOption === 'delete') {
+        // Delete all retailers (move to recycle bin first)
+        const { data: retailersToDelete } = await supabase
+          .from('retailers')
+          .select('*')
+          .eq('beat_id', beatData.beat_id)
+          .eq('user_id', user.id);
+
+        if (retailersToDelete && retailersToDelete.length > 0) {
+          for (const retailer of retailersToDelete) {
+            await moveToRecycleBin({
+              tableName: 'retailers',
+              recordId: retailer.id,
+              recordData: retailer,
+              moduleName: 'Retailers',
+              recordName: retailer.name || 'Unknown Retailer'
+            });
+          }
+
+          await supabase
+            .from('retailers')
+            .delete()
+            .eq('beat_id', beatData.beat_id)
+            .eq('user_id', user.id);
+        }
+      } else if (deleteOption === 'transfer' && targetBeatId) {
+        // Transfer retailers to target beat
+        const targetBeat = availableBeats.find(b => b.id === targetBeatId);
+        await supabase
+          .from('retailers')
+          .update({
+            beat_id: targetBeatId,
+            beat_name: targetBeat?.name || null
+          })
+          .eq('beat_id', beatData.beat_id)
+          .eq('user_id', user.id);
+      }
+
       // Deactivate the beat
       await supabase
         .from('beats')
         .update({ is_active: false })
         .eq('beat_id', beatData.beat_id);
 
-      toast.success('Beat moved to recycle bin');
+      toast.success('Beat deleted successfully');
+      
+      // Dispatch events
+      window.dispatchEvent(new CustomEvent('visitDataChanged'));
+      window.dispatchEvent(new CustomEvent('beatDeleted', { detail: { beatId: beatData.beat_id } }));
+      
       navigate('/my-beats');
     } catch (error) {
       console.error('Error deleting beat:', error);
       toast.error('Failed to delete beat');
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -617,7 +705,7 @@ export const BeatDetail = () => {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               className="flex items-center gap-2"
             >
               <Trash2 size={16} />
@@ -1221,6 +1309,17 @@ export const BeatDetail = () => {
           setSelectedRetailer(null);
           window.location.reload();
         }}
+      />
+
+      {/* Beat Delete Dialog */}
+      <BeatDeleteDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        beatName={beatData?.beat_name || null}
+        affectedRetailerCount={beatData?.retailers?.length || 0}
+        availableBeats={availableBeats}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
       />
     </Layout>
   );
