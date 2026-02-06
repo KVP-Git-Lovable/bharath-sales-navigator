@@ -536,3 +536,108 @@ export const isUserArchive = (recordData: Record<string, unknown>): boolean => {
          recordData._meta !== null &&
          'total_records' in recordData._meta;
 };
+
+// Helper to update user_id in a table
+const updateTableUserId = async (
+  tableName: string,
+  column: string,
+  fromUserId: string,
+  toUserId: string
+): Promise<void> => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from(tableName as any) as any)
+      .update({ [column]: toUserId })
+      .eq(column, fromUserId);
+  } catch (error) {
+    console.warn(`Failed to transfer ${tableName}:`, error);
+  }
+};
+
+/**
+ * Transfer all user data from one user to another
+ * This reassigns ownership of records like retailers, orders, visits, etc.
+ */
+export const transferUserData = async (
+  fromUserId: string,
+  toUserId: string
+): Promise<boolean> => {
+  try {
+    // Tables with user_id column to transfer
+    const userIdTables = [
+      'retailers',
+      'orders',
+      'visits',
+      'beat_plans',
+      'attendance',
+      'gps_tracking',
+      'gps_tracking_stops',
+      'leave_applications',
+      'leave_balance',
+      'leave_accrual_log',
+      'additional_expenses',
+      'user_period_targets',
+      'hierarchy_target_allocations',
+      'user_business_plans',
+      'gamification_points',
+      'gamification_daily_tracking',
+      'gamification_retailer_sequences',
+      'employee_badges',
+      'employee_competencies',
+      'employee_documents',
+      'employee_recommendations',
+      'notifications',
+      'notification_preferences',
+      'ai_insights',
+      'coach_user_progress',
+      'coach_user_badges',
+      'coach_user_streaks',
+      'competition_insights',
+      'branding_requests',
+      'regularization_requests',
+      'profile_attachments',
+      'education_history',
+      'emergency_contacts',
+      'aspirations_and_preferences',
+    ];
+
+    // Tables with created_by column
+    const createdByTables = [
+      'beats',
+      'invoices',
+      'packing_lists',
+    ];
+
+    // Transfer user_id tables
+    for (const tableName of userIdTables) {
+      await updateTableUserId(tableName, 'user_id', fromUserId, toUserId);
+    }
+
+    // Transfer created_by tables
+    for (const tableName of createdByTables) {
+      await updateTableUserId(tableName, 'created_by', fromUserId, toUserId);
+    }
+
+    // Transfer territory assignments
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('territories') as any)
+      .update({ assigned_user_id: toUserId })
+      .eq('assigned_user_id', fromUserId);
+
+    // Transfer manager relationships in employees table
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('employees') as any)
+      .update({ manager_id: toUserId })
+      .eq('manager_id', fromUserId);
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('employees') as any)
+      .update({ secondary_manager_id: toUserId })
+      .eq('secondary_manager_id', fromUserId);
+
+    return true;
+  } catch (error) {
+    console.error('Error transferring user data:', error);
+    return false;
+  }
+};

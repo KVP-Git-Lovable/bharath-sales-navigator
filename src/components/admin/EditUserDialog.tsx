@@ -9,11 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, Trash2, Eye, EyeOff, Copy, Key, Check, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
-import { moveUserToRecycleBin, getUserDataSummary } from '@/utils/userArchiveUtils';
+import { UserDeleteDialog } from './UserDeleteDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
 interface User {
   id: string;
   email: string;
@@ -56,7 +54,6 @@ interface EditUserDialogProps {
 
 const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChange, onSuccess }) => {
   const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [securityProfiles, setSecurityProfiles] = useState<SecurityProfile[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
@@ -325,34 +322,10 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
     }
   };
 
-  const handleDelete = async () => {
-    if (!user) return;
-
-    setDeleting(true);
-    try {
-      // Use the comprehensive user archive utility that:
-      // 1. Collects ALL user data from 50+ tables into one archive
-      // 2. Stores as a single combined record in recycle bin
-      // 3. Cascade deletes all related data in correct order
-      const success = await moveUserToRecycleBin(
-        user.id, 
-        user.full_name || user.username || user.email
-      );
-
-      if (!success) {
-        throw new Error('Failed to move user to recycle bin');
-      }
-
-      toast.success('User and all related data moved to recycle bin');
-      setShowDeleteConfirm(false);
-      onSuccess();
-      onOpenChange(false);
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      toast.error(error.message || 'Failed to delete user');
-    } finally {
-      setDeleting(false);
-    }
+  const handleDeleteSuccess = () => {
+    setShowDeleteConfirm(false);
+    onSuccess();
+    onOpenChange(false);
   };
 
   if (!user) return null;
@@ -549,7 +522,7 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
           <Button 
             variant="destructive" 
             onClick={() => setShowDeleteConfirm(true)}
-            disabled={loading || deleting}
+            disabled={loading}
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Delete User
@@ -558,7 +531,7 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={loading || deleting}>
+            <Button onClick={handleSave} disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
             </Button>
@@ -566,14 +539,11 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
         </DialogFooter>
       </DialogContent>
 
-      <DeleteConfirmDialog
+      <UserDeleteDialog
+        user={user}
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
-        onConfirm={handleDelete}
-        title="Delete User"
-        description={`Are you sure you want to delete "${user.full_name || user.username || user.email}"? The user will be moved to the Recycle Bin and can be restored later.`}
-        confirmText="Yes, Delete"
-        isLoading={deleting}
+        onSuccess={handleDeleteSuccess}
       />
     </Dialog>
   );
