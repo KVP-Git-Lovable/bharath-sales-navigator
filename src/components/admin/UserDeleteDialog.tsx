@@ -12,10 +12,13 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trash2, UserCheck, AlertTriangle, Database, ArrowRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2, Trash2, UserCheck, AlertTriangle, Database, ArrowRight, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { moveUserToRecycleBin, getUserDataSummary, transferUserData } from '@/utils/userArchiveUtils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface User {
   id: string;
@@ -34,6 +37,7 @@ interface UserDeleteDialogProps {
 interface DataSummary {
   tableName: string;
   count: number;
+  category: string;
 }
 
 interface AvailableUser {
@@ -52,9 +56,12 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const [transferToUserId, setTransferToUserId] = useState<string>('');
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [dataSummary, setDataSummary] = useState<DataSummary[]>([]);
+  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [showAllTables, setShowAllTables] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (open && user) {
@@ -62,6 +69,8 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       fetchAvailableUsers();
       setDeleteOption('delete');
       setTransferToUserId('');
+      setShowAllTables(false);
+      setExpandedCategories(new Set());
     }
   }, [open, user]);
 
@@ -71,6 +80,8 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
     try {
       const summary = await getUserDataSummary(user.id);
       setDataSummary(summary);
+      // Select all tables by default
+      setSelectedTables(new Set(summary.map(s => s.tableName)));
     } catch (error) {
       console.error('Error fetching data summary:', error);
     } finally {
@@ -142,13 +153,65 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
     }
   };
 
+  const toggleTable = (tableName: string) => {
+    const newSelected = new Set(selectedTables);
+    if (newSelected.has(tableName)) {
+      newSelected.delete(tableName);
+    } else {
+      newSelected.add(tableName);
+    }
+    setSelectedTables(newSelected);
+  };
+
+  const selectAll = () => {
+    setSelectedTables(new Set(dataSummary.map(s => s.tableName)));
+  };
+
+  const deselectAll = () => {
+    setSelectedTables(new Set());
+  };
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const selectCategory = (category: string, select: boolean) => {
+    const newSelected = new Set(selectedTables);
+    dataSummary.filter(s => s.category === category).forEach(s => {
+      if (select) {
+        newSelected.add(s.tableName);
+      } else {
+        newSelected.delete(s.tableName);
+      }
+    });
+    setSelectedTables(newSelected);
+  };
+
+  // Group data by category
+  const groupedData = dataSummary.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, DataSummary[]>);
+
   const totalRecords = dataSummary.reduce((sum, item) => sum + item.count, 0);
+  const selectedRecords = dataSummary
+    .filter(s => selectedTables.has(s.tableName))
+    .reduce((sum, item) => sum + item.count, 0);
 
   if (!user) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-destructive flex items-center gap-2">
             <Trash2 className="h-5 w-5" />
@@ -159,28 +222,142 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 flex-1 overflow-hidden flex flex-col">
           {/* Data Summary */}
           {loadingData ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              <span className="text-sm text-muted-foreground">Loading user data summary...</span>
+              <span className="text-sm text-muted-foreground">Scanning all tables for user data...</span>
             </div>
           ) : dataSummary.length > 0 ? (
-            <Alert>
-              <Database className="h-4 w-4" />
-              <AlertDescription>
-                <p className="font-medium mb-2">This user has {totalRecords} records across {dataSummary.length} tables:</p>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  {dataSummary.map((item) => (
-                    <div key={item.tableName} className="flex justify-between">
-                      <span className="text-muted-foreground capitalize">{item.tableName.replace(/_/g, ' ')}:</span>
-                      <span className="font-medium">{item.count}</span>
+            <div className="space-y-3">
+              <Alert>
+                <Database className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">
+                      Found {totalRecords.toLocaleString()} records across {dataSummary.length} tables
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllTables(!showAllTables)}
+                      className="text-xs"
+                    >
+                      {showAllTables ? 'Hide Details' : 'Show All Tables'}
+                      {showAllTables ? <ChevronUp className="ml-1 h-3 w-3" /> : <ChevronDown className="ml-1 h-3 w-3" />}
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+
+              {showAllTables && (
+                <div className="border rounded-lg p-3 space-y-3">
+                  {/* Selection Controls */}
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={selectAll} className="text-xs h-7">
+                        <CheckSquare className="h-3 w-3 mr-1" />
+                        Select All
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={deselectAll} className="text-xs h-7">
+                        <Square className="h-3 w-3 mr-1" />
+                        Deselect All
+                      </Button>
                     </div>
-                  ))}
+                    <span className="text-xs text-muted-foreground">
+                      {selectedTables.size} of {dataSummary.length} tables selected ({selectedRecords.toLocaleString()} records)
+                    </span>
+                  </div>
+
+                  {/* Table List by Category */}
+                  <ScrollArea className="h-[250px] pr-4">
+                    <div className="space-y-2">
+                      {Object.entries(groupedData).map(([category, items]) => {
+                        const categorySelected = items.every(item => selectedTables.has(item.tableName));
+                        const categoryPartial = items.some(item => selectedTables.has(item.tableName)) && !categorySelected;
+                        const categoryRecords = items.reduce((sum, item) => sum + item.count, 0);
+
+                        return (
+                          <Collapsible
+                            key={category}
+                            open={expandedCategories.has(category)}
+                            onOpenChange={() => toggleCategory(category)}
+                          >
+                            <div className="flex items-center gap-2 py-1 px-2 rounded hover:bg-muted/50">
+                              <Checkbox
+                                checked={categorySelected}
+                                ref={(el) => {
+                                  if (el && categoryPartial) {
+                                    el.dataset.state = 'indeterminate';
+                                  }
+                                }}
+                                onCheckedChange={(checked) => selectCategory(category, !!checked)}
+                              />
+                              <CollapsibleTrigger className="flex items-center justify-between flex-1 text-sm font-medium">
+                                <span>{category}</span>
+                                <span className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {items.length} tables, {categoryRecords.toLocaleString()} records
+                                  </span>
+                                  {expandedCategories.has(category) ? (
+                                    <ChevronUp className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4" />
+                                  )}
+                                </span>
+                              </CollapsibleTrigger>
+                            </div>
+                            <CollapsibleContent>
+                              <div className="pl-8 space-y-1 py-1">
+                                {items.map((item) => (
+                                  <div
+                                    key={item.tableName}
+                                    className="flex items-center gap-2 py-1 px-2 rounded hover:bg-muted/30 cursor-pointer"
+                                    onClick={() => toggleTable(item.tableName)}
+                                  >
+                                    <Checkbox
+                                      checked={selectedTables.has(item.tableName)}
+                                      onCheckedChange={() => toggleTable(item.tableName)}
+                                    />
+                                    <span className="text-xs flex-1 capitalize">
+                                      {item.tableName.replace(/_/g, ' ')}
+                                    </span>
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {item.count.toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
                 </div>
-              </AlertDescription>
-            </Alert>
+              )}
+
+              {/* Quick Summary when collapsed */}
+              {!showAllTables && (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {Object.entries(groupedData).slice(0, 6).map(([category, items]) => {
+                    const categoryRecords = items.reduce((sum, item) => sum + item.count, 0);
+                    return (
+                      <div key={category} className="flex justify-between bg-muted/30 p-2 rounded">
+                        <span className="text-muted-foreground">{category}:</span>
+                        <span className="font-medium">{categoryRecords.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                  {Object.keys(groupedData).length > 6 && (
+                    <div className="col-span-3 text-center text-muted-foreground">
+                      +{Object.keys(groupedData).length - 6} more categories...
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <Alert>
               <Database className="h-4 w-4" />
