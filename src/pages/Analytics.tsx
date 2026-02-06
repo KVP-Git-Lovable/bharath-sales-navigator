@@ -1602,7 +1602,7 @@ const Analytics = () => {
                   <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>
                   <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
                   <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
-                  <TabsTrigger value="coverage" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Coverage</TabsTrigger>
+                  {/* Coverage tab hidden per user request */}
                 </TabsList>
               </div>
               <button
@@ -1786,10 +1786,7 @@ const Analytics = () => {
               </Card>
             </TabsContent>
 
-            {/* Coverage Tab */}
-            <TabsContent value="coverage" className="space-y-4">
-              <CoverageMapSection selectedUserIds={effectiveUserIds} />
-            </TabsContent>
+            {/* Coverage Tab - Hidden per user request */}
 
             {/* Predictive Analytics Tab - Hidden */}
 
