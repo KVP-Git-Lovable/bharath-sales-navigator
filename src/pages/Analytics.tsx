@@ -1600,7 +1600,7 @@ const Analytics = () => {
                 <TabsList className="inline-flex w-max gap-1 p-1">
                   <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Productivity</TabsTrigger>
                   <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>
-                  <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Calendar</TabsTrigger>
+                  {/* Calendar tab hidden per user request */}
                   <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
                   {/* Coverage tab hidden per user request */}
                 </TabsList>
