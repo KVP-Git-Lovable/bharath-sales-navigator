@@ -7,13 +7,15 @@
  import { useIsMobile } from '@/hooks/use-mobile';
  import { Badge } from '@/components/ui/badge';
  
- interface RetailerProductivity {
-   retailer_id: string;
-   retailer_name: string;
-   planned_visits: number;
-   productive_visits: number;
-   unproductive_visits: number;
- }
+interface RetailerProductivity {
+  retailer_id: string;
+  retailer_name: string;
+  user_id: string | null;
+  user_name: string;
+  planned_visits: number;
+  productive_visits: number;
+  unproductive_visits: number;
+}
  
  interface RetailerMonthlyProductivitySectionProps {
    selectedUsers: string[];
@@ -108,14 +110,18 @@
        // Create set of retailer IDs with confirmed orders
        const retailersWithOrders = new Set(allOrders.map(o => o.retailer_id));
  
-       // Fetch retailer details
-       const { data: retailers } = await supabase
-         .from('retailers')
-         .select('id, name')
-         .in('id', retailerIdsWithVisits);
- 
-       const retailerMap = new Map<string, string>();
-       retailers?.forEach(r => retailerMap.set(r.id, r.name || 'Unknown'));
+        // Fetch retailer details including user_id
+        const { data: retailers } = await supabase
+          .from('retailers')
+          .select('id, name, user_id')
+          .in('id', retailerIdsWithVisits);
+
+        const retailerMap = new Map<string, { name: string; user_id: string | null }>();
+        retailers?.forEach(r => retailerMap.set(r.id, { name: r.name || 'Unknown', user_id: r.user_id }));
+
+        // Create user name map from allUsers prop
+        const userNameMap = new Map<string, string>();
+        allUsers.forEach(u => userNameMap.set(u.id, u.full_name || 'Unknown'));
  
        // Aggregate visits by retailer
        const retailerVisitMap = new Map<string, { planned: number; productive: number; unproductive: number }>();
@@ -140,18 +146,22 @@
        // Filter: retailers with visits but NO confirmed orders
        const results: RetailerProductivity[] = [];
  
-       retailerVisitMap.forEach((stats, retailerId) => {
-         // Only include if no confirmed orders and at least one visit
-         if (!retailersWithOrders.has(retailerId) && stats.planned > 0) {
-           results.push({
-             retailer_id: retailerId,
-             retailer_name: retailerMap.get(retailerId) || 'Unknown',
-             planned_visits: stats.planned,
-             productive_visits: stats.productive,
-             unproductive_visits: stats.unproductive
-           });
-         }
-       });
+        retailerVisitMap.forEach((stats, retailerId) => {
+          // Only include if no confirmed orders and at least one visit
+          if (!retailersWithOrders.has(retailerId) && stats.planned > 0) {
+            const retailerInfo = retailerMap.get(retailerId);
+            const userId = retailerInfo?.user_id || null;
+            results.push({
+              retailer_id: retailerId,
+              retailer_name: retailerInfo?.name || 'Unknown',
+              user_id: userId,
+              user_name: userId ? (userNameMap.get(userId) || 'Unknown') : 'Unassigned',
+              planned_visits: stats.planned,
+              productive_visits: stats.productive,
+              unproductive_visits: stats.unproductive
+            });
+          }
+        });
  
        // Sort by unproductive DESC, planned DESC, name ASC
        results.sort((a, b) => {
@@ -224,10 +234,11 @@
           ) : (
             <div className="scrollbar-always-visible overflow-x-auto">
               <div className={`${data.length > 10 ? 'max-h-[400px] overflow-y-auto scrollbar-always-visible' : ''}`}>
-                <Table className="min-w-[400px]">
+                <Table className="min-w-[500px]">
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead className="text-[10px] md:text-xs whitespace-nowrap">Retailer Name</TableHead>
+                      <TableHead className="text-[10px] md:text-xs whitespace-nowrap">User</TableHead>
                       <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Visits</TableHead>
                       <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Productive</TableHead>
                       <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap">Unproductive</TableHead>
@@ -237,6 +248,7 @@
                     {data.map((row) => (
                       <TableRow key={row.retailer_id}>
                         <TableCell className="text-[10px] md:text-sm font-medium whitespace-nowrap py-2">{row.retailer_name}</TableCell>
+                        <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-2 text-muted-foreground">{row.user_name}</TableCell>
                         <TableCell className="text-[10px] md:text-sm text-center py-2">{row.planned_visits}</TableCell>
                         <TableCell className="text-[10px] md:text-sm text-center text-primary py-2">{row.productive_visits}</TableCell>
                         <TableCell className="text-[10px] md:text-sm text-center text-destructive py-2">{row.unproductive_visits}</TableCell>
@@ -246,10 +258,11 @@
                 </Table>
               </div>
               {/* Sticky Total Row */}
-              <Table className="min-w-[400px] border-t">
+              <Table className="min-w-[500px] border-t">
                 <TableBody>
                   <TableRow className="bg-muted/50 font-semibold">
                     <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-2">Total ({data.length})</TableCell>
+                    <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-2"></TableCell>
                     <TableCell className="text-[10px] md:text-sm text-center py-2">{totals.planned}</TableCell>
                     <TableCell className="text-[10px] md:text-sm text-center text-primary py-2">{totals.productive}</TableCell>
                     <TableCell className="text-[10px] md:text-sm text-center text-destructive py-2">{totals.unproductive}</TableCell>
