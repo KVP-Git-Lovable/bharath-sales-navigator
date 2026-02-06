@@ -121,6 +121,7 @@ const DELETE_BY_CREATED_BY = [
 // NOTE: joint_sales_feedback.manager_id and joint_sales_sessions.manager_id are NOT NULL
 // so they are handled via DELETE in DELETE_BY_OTHER_COLUMNS above
 const NULLIFY_COLUMNS = [
+  { table: 'beats', column: 'owner_id' },
   { table: 'employees', column: 'manager_id' },
   { table: 'employees', column: 'secondary_manager_id' },
   { table: 'territories', column: 'assigned_user_id' },
