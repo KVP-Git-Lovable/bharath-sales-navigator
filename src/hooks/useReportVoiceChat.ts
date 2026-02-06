@@ -195,6 +195,9 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
   const stopAllAudio = useCallback(() => {
     console.log('stopAllAudio called, currentAudio:', !!currentAudioRef.current);
     if (currentAudioRef.current) {
+      // Remove error handler before clearing src to prevent false error toasts
+      currentAudioRef.current.onerror = null;
+      currentAudioRef.current.onended = null;
       currentAudioRef.current.pause();
       currentAudioRef.current.currentTime = 0;
       currentAudioRef.current.src = '';
