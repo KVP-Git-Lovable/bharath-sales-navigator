@@ -48,7 +48,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { restoreFromRecycleBin, permanentlyDelete, clearRecycleBin } from "@/utils/recycleBinUtils";
-
+import { isUserArchive } from "@/utils/userArchiveUtils";
 interface RecycleBinItem {
   id: string;
   original_table: string;
@@ -394,13 +394,34 @@ const RecycleBin = () => {
             </DialogHeader>
             <ScrollArea className="max-h-[50vh]">
               <div className="space-y-3">
-                {viewItem && Object.entries(viewItem.record_data).map(([key, value]) => (
+                {/* Show archive summary for combined user archives */}
+                {viewItem && isUserArchive(viewItem.record_data) && viewItem.record_data._meta && (
+                  <div className="bg-muted/50 p-3 rounded-lg mb-4">
+                    <p className="text-sm font-medium mb-2">Combined User Archive</p>
+                    <p className="text-xs text-muted-foreground">
+                      Total Records: {viewItem.record_data._meta.total_records}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Tables with data: {viewItem.record_data._meta.tables_with_data?.join(', ') || 'None'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Archived: {format(new Date(viewItem.record_data._meta.archived_at), 'PPpp')}
+                    </p>
+                  </div>
+                )}
+                {viewItem && Object.entries(viewItem.record_data)
+                  .filter(([key]) => key !== '_meta') // Hide meta from main display
+                  .map(([key, value]) => (
                   <div key={key} className="border-b pb-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase">
                       {key.replace(/_/g, ' ')}
                     </p>
                     <p className="text-sm mt-0.5 break-words">
-                      {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '-')}
+                      {Array.isArray(value) 
+                        ? `${value.length} records` 
+                        : typeof value === 'object' && value !== null
+                          ? JSON.stringify(value, null, 2).substring(0, 200) + '...'
+                          : String(value ?? '-')}
                     </p>
                   </div>
                 ))}
