@@ -6,6 +6,7 @@ export interface ActivityEvent {
   id: string;
   visit_id: string;
   user_id: string;
+  activity_name: string | null;
   activity_type: string;
   duration_type: string;
   activity_date: string;
@@ -22,6 +23,7 @@ export interface ActivityEvent {
 }
 
 interface CreateActivityParams {
+  activity_name?: string;
   activity_type: string;
   duration_type: string;
   activity_date: string;
@@ -109,6 +111,7 @@ export const useActivityEvents = () => {
       const activityInsert: Record<string, unknown> = {
         visit_id: visitId,
         user_id: user.id,
+        activity_name: params.activity_name || null,
         activity_type: params.activity_type,
         duration_type: params.duration_type,
         activity_date: params.activity_date,
@@ -146,12 +149,29 @@ export const useActivityEvents = () => {
     }
   };
 
+  const fetchActivitiesForDate = async (userId: string, date: string): Promise<ActivityEvent[]> => {
+    const { data, error } = await supabase
+      .from('activity_events')
+      .select('*')
+      .eq('user_id', userId)
+      .or(`activity_date.eq.${date},and(from_date.lte.${date},to_date.gte.${date})`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[useActivityEvents] Error fetching activities for date:', error);
+      return [];
+    }
+
+    return (data || []) as unknown as ActivityEvent[];
+  };
+
   const clearCache = () => {
     activityCache.clear();
   };
 
   return {
     fetchActivityForVisit,
+    fetchActivitiesForDate,
     createActivity,
     clearCache,
   };

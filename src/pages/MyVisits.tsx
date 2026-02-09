@@ -40,6 +40,7 @@ import { SyncDataModal } from "@/components/SyncDataModal";
 import { InsightsPanel } from "@/components/visits/InsightsPanel";
 import { StartBeatButton } from "@/components/StartBeatButton";
 import { AddActivityModal } from "@/components/AddActivityModal";
+import { ActivityEventsTable } from "@/components/ActivityEventsTable";
 
 interface Visit {
   id: string;
@@ -1450,6 +1451,11 @@ export const MyVisits = () => {
               </CardContent>
             </Card> : filteredVisits.length > 0 && <VirtualizedVisitList visits={filteredVisits} onViewDetails={handleViewDetails} selectedDate={selectedDate} />}
         </div>
+
+        {/* Activity Events Table */}
+        {user?.id && (
+          <ActivityEventsTable userId={user.id} selectedDate={selectedDate} />
+        )}
 
         {/* Create New Visit Modal */}
         <CreateNewVisitModal isOpen={isCreateVisitModalOpen} onClose={() => setIsCreateVisitModalOpen(false)} initialDate={selectedDate} onVisitCreated={() => {
