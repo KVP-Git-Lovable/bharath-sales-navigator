@@ -6,16 +6,17 @@ import { RefreshCw, Activity, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-interface ProductivityData {
-  full_name: string;
-  planned_date: string;
-  productive_visits: number;
-  unproductive_visits: number;
-  total_visits: number;
-  productivity_percentage: number;
+interface DayProductivity {
+  date: string;
+  displayDate: string;
+  userName: string;
+  userId: string;
+  planned: number;
+  productive: number;
+  unproductive: number;
+  pending: number;
 }
 
 interface UserProductivitySummary {
@@ -23,39 +24,51 @@ interface UserProductivitySummary {
   planned_visits: number;
   productive_visits: number;
   unproductive_visits: number;
+  pending_visits: number;
   total_visits: number;
   productivity_percentage: number;
   days_count: number;
 }
 
 interface ProductivitySummarySectionProps {
-  selectedUsers: string[];
+  selectedUsers: string[]; // user names (for backward compat display)
+  selectedUserIds?: string[]; // user IDs for querying
   dateRange: { from: Date; to: Date };
   allUsers?: { id: string; full_name: string | null }[];
   onDataLoaded?: (data: { full_name: string; productivity_percentage: number; productive_visits: number; total_visits: number }[]) => void;
 }
 
-export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers = [], onDataLoaded }: ProductivitySummarySectionProps) => {
+export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dateRange, allUsers = [], onDataLoaded }: ProductivitySummarySectionProps) => {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
-  const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
-  const [plannedVisitsData, setPlannedVisitsData] = useState<Record<string, number>>({});
+  const [dayData, setDayData] = useState<DayProductivity[]>([]);
   const [selectedUserForDrilldown, setSelectedUserForDrilldown] = useState<string | null>(null);
 
-  // Determine if we're in single-user or multi-user mode
-  // When selectedUsers is empty, it means "All Users" - so we fetch all
-  const effectiveUsers = selectedUsers.length === 0 
-    ? [...new Set(allUsers.map(u => u.full_name).filter((name): name is string => !!name))]
-    : selectedUsers;
-  
-  const isSingleUserMode = effectiveUsers.length === 1;
-  const hasNoData = effectiveUsers.length === 0 && allUsers.length === 0;
+  // Resolve effective user IDs
+  const effectiveUserIds = useMemo(() => {
+    if (selectedUserIds && selectedUserIds.length > 0) return selectedUserIds;
+    // Fallback: resolve from names
+    if (selectedUsers.length > 0) {
+      return allUsers
+        .filter(u => u.full_name && selectedUsers.includes(u.full_name))
+        .map(u => u.id);
+    }
+    // All users
+    return allUsers.map(u => u.id);
+  }, [selectedUserIds, selectedUsers, allUsers]);
 
-  // Fetch productivity data for all selected users
+  const userNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allUsers.forEach(u => map.set(u.id, u.full_name || 'Unknown'));
+    return map;
+  }, [allUsers]);
+
+  const isSingleUserMode = effectiveUserIds.length === 1;
+  const hasNoData = effectiveUserIds.length === 0;
+
   const fetchProductivityData = async () => {
     if (hasNoData) {
-      setProductivityData([]);
-      setPlannedVisitsData({});
+      setDayData([]);
       return;
     }
 
@@ -64,177 +77,250 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch productivity summary data for all effective users in parallel
-      const promises = effectiveUsers.map(userName => 
-        supabase.rpc('get_productivity_summary', {
-          user_full_name: userName,
-          start_date: fromDate,
-          end_date: toDate
-        })
-      );
+      // Generate all dates in range
+      const datesInRange: string[] = [];
+      const current = new Date(dateRange.from);
+      current.setHours(0, 0, 0, 0);
+      const end = new Date(dateRange.to);
+      end.setHours(23, 59, 59, 999);
+      while (current <= end) {
+        datesInRange.push(format(current, 'yyyy-MM-dd'));
+        current.setDate(current.getDate() + 1);
+      }
 
-      const results = await Promise.all(promises);
-      
-      // Combine all results
-      const allData: ProductivityData[] = [];
-      results.forEach((result, index) => {
-        if (result.data && result.data.length > 0) {
-          allData.push(...result.data);
+      // Fetch all data in parallel (same as TodaySummary logic)
+      const [beatPlansRes, visitsRes, ordersRes] = await Promise.all([
+        // Beat plans for the period
+        supabase
+          .from('beat_plans')
+          .select('beat_id, beat_name, plan_date, user_id, beat_data')
+          .in('user_id', effectiveUserIds)
+          .gte('plan_date', fromDate)
+          .lte('plan_date', toDate),
+
+        // Visits for the period
+        supabase
+          .from('visits')
+          .select('id, retailer_id, status, user_id, planned_date')
+          .in('user_id', effectiveUserIds)
+          .gte('planned_date', fromDate)
+          .lte('planned_date', toDate),
+
+        // Confirmed orders for the period
+        supabase
+          .from('orders')
+          .select('retailer_id, user_id, created_at')
+          .eq('status', 'confirmed')
+          .in('user_id', effectiveUserIds)
+          .gte('created_at', `${fromDate}T00:00:00`)
+          .lte('created_at', `${toDate}T23:59:59`),
+      ]);
+
+      const beatPlans = beatPlansRes.data || [];
+      const visits = visitsRes.data || [];
+      const orders = ordersRes.data || [];
+
+      // Get all beat IDs and fetch retailers for those beats (same as TodaySummary)
+      const beatIds = [...new Set(beatPlans.map(bp => bp.beat_id).filter(Boolean))];
+
+      let beatRetailers: { id: string; beat_id: string; user_id: string }[] = [];
+      if (beatIds.length > 0) {
+        const { data } = await supabase
+          .from('retailers')
+          .select('id, beat_id, user_id')
+          .in('user_id', effectiveUserIds)
+          .in('beat_id', beatIds);
+        beatRetailers = data || [];
+      }
+
+      // Build per-user per-date planned retailers (from beat_plans → retailers)
+      // Key: `userId_date` → Set of retailer IDs
+      const plannedMap = new Map<string, Set<string>>();
+
+      beatPlans.forEach(bp => {
+        const key = `${bp.user_id}_${bp.plan_date}`;
+        if (!plannedMap.has(key)) plannedMap.set(key, new Set());
+        const set = plannedMap.get(key)!;
+
+        // Get retailers that belong to this beat and this user
+        const retailersForBeat = beatRetailers.filter(r => r.beat_id === bp.beat_id && r.user_id === bp.user_id);
+        retailersForBeat.forEach(r => set.add(r.id));
+      });
+
+      // Build per-user per-date order retailers
+      const orderMap = new Map<string, Set<string>>();
+      orders.forEach(o => {
+        if (!o.retailer_id) return;
+        const orderDate = format(new Date(o.created_at), 'yyyy-MM-dd');
+        const key = `${o.user_id}_${orderDate}`;
+        if (!orderMap.has(key)) orderMap.set(key, new Set());
+        orderMap.get(key)!.add(o.retailer_id);
+      });
+
+      // Build per-user per-date visit status maps
+      // For each user+date, track retailer statuses with priority: productive > unproductive/store_closed/canceled
+      const visitStatusMap = new Map<string, Map<string, string>>();
+      visits.forEach(v => {
+        if (!v.retailer_id || !v.planned_date) return;
+        const key = `${v.user_id}_${v.planned_date}`;
+        if (!visitStatusMap.has(key)) visitStatusMap.set(key, new Map());
+        const retailerStatuses = visitStatusMap.get(key)!;
+        
+        const existing = retailerStatuses.get(v.retailer_id);
+        // Priority: productive wins over everything
+        if (v.status === 'productive') {
+          retailerStatuses.set(v.retailer_id, 'productive');
+        } else if (!existing || existing === 'planned') {
+          retailerStatuses.set(v.retailer_id, v.status);
         }
       });
 
-      setProductivityData(allData);
+      // Calculate per-user per-date metrics
+      const results: DayProductivity[] = [];
 
-      // Fetch planned visits count separately (all visits including 'planned' status)
-      // Get user IDs for the effective users
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('full_name', effectiveUsers);
+      for (const userId of effectiveUserIds) {
+        for (const dateStr of datesInRange) {
+          const key = `${userId}_${dateStr}`;
+          const plannedRetailers = plannedMap.get(key) || new Set();
+          const orderRetailers = orderMap.get(key) || new Set();
+          const retailerStatuses = visitStatusMap.get(key) || new Map();
 
-      if (profilesData && profilesData.length > 0) {
-        const userIdMap: Record<string, string> = {};
-        profilesData.forEach(p => {
-          if (p.full_name) userIdMap[p.id] = p.full_name;
-        });
+          const planned = plannedRetailers.size;
+          if (planned === 0 && retailerStatuses.size === 0 && orderRetailers.size === 0) continue; // Skip empty days
 
-        // Fetch all visits (including planned, productive, unproductive) to count total planned
-        const { data: visitsData } = await supabase
-          .from('visits')
-          .select('user_id')
-          .in('user_id', Object.keys(userIdMap))
-          .gte('planned_date', fromDate)
-          .lte('planned_date', toDate);
+          // Productive: unique retailers with order OR productive visit status
+          const productiveSet = new Set<string>();
+          orderRetailers.forEach(rid => productiveSet.add(rid));
+          retailerStatuses.forEach((status, rid) => {
+            if (status === 'productive') productiveSet.add(rid);
+          });
 
-        // Count visits per user
-        const plannedCounts: Record<string, number> = {};
-        visitsData?.forEach(visit => {
-          const userName = userIdMap[visit.user_id];
-          if (userName) {
-            plannedCounts[userName] = (plannedCounts[userName] || 0) + 1;
-          }
-        });
-        setPlannedVisitsData(plannedCounts);
+          // Unproductive: retailers with unproductive/store_closed/canceled visit, NOT in productive
+          const unproductiveSet = new Set<string>();
+          retailerStatuses.forEach((status, rid) => {
+            if (!productiveSet.has(rid) && (status === 'unproductive' || status === 'store_closed' || status === 'canceled')) {
+              unproductiveSet.add(rid);
+            }
+          });
+
+          const productive = productiveSet.size;
+          const unproductive = unproductiveSet.size;
+          const pending = Math.max(0, planned - productive - unproductive);
+
+          results.push({
+            date: dateStr,
+            displayDate: format(new Date(dateStr + 'T00:00:00'), 'MMMM d, yyyy'),
+            userName: userNameMap.get(userId) || 'Unknown',
+            userId,
+            planned,
+            productive,
+            unproductive,
+            pending,
+          });
+        }
       }
+
+      setDayData(results);
     } catch (error) {
-      console.error('Error in productivity fetch:', error);
-      setProductivityData([]);
-      setPlannedVisitsData({});
+      console.error('Error fetching productivity data:', error);
+      setDayData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch data when props change
   useEffect(() => {
     fetchProductivityData();
-  }, [effectiveUsers.join(','), dateRange.from, dateRange.to]);
+  }, [effectiveUserIds.join(','), dateRange.from.getTime(), dateRange.to.getTime()]);
 
   // Group data by user for multi-user mode
   const userSummaries = useMemo((): UserProductivitySummary[] => {
     const grouped: Record<string, UserProductivitySummary> = {};
-    
-    productivityData.forEach(row => {
-      if (!grouped[row.full_name]) {
-        grouped[row.full_name] = {
-          full_name: row.full_name,
-          planned_visits: plannedVisitsData[row.full_name] || 0,
+
+    dayData.forEach(row => {
+      if (!grouped[row.userName]) {
+        grouped[row.userName] = {
+          full_name: row.userName,
+          planned_visits: 0,
           productive_visits: 0,
           unproductive_visits: 0,
+          pending_visits: 0,
           total_visits: 0,
           productivity_percentage: 0,
-          days_count: 0
+          days_count: 0,
         };
       }
-      grouped[row.full_name].productive_visits += row.productive_visits;
-      grouped[row.full_name].unproductive_visits += row.unproductive_visits;
-      grouped[row.full_name].total_visits += row.total_visits;
-      grouped[row.full_name].days_count += 1;
+      const g = grouped[row.userName];
+      g.planned_visits += row.planned;
+      g.productive_visits += row.productive;
+      g.unproductive_visits += row.unproductive;
+      g.pending_visits += row.pending;
+      g.total_visits += row.productive + row.unproductive;
+      g.days_count += 1;
     });
 
-    // Calculate productivity percentage for each user (based on planned visits if available)
     Object.values(grouped).forEach(user => {
-      // Use planned visits as denominator if available, otherwise use total_visits
-      const denominator = user.planned_visits > 0 ? user.planned_visits : user.total_visits;
-      user.productivity_percentage = denominator > 0 
-        ? Math.round((user.productive_visits / denominator) * 100 * 100) / 100 
+      user.productivity_percentage = user.planned_visits > 0
+        ? Math.round((user.productive_visits / user.planned_visits) * 100 * 100) / 100
         : 0;
     });
 
     return Object.values(grouped).sort((a, b) => b.productivity_percentage - a.productivity_percentage);
-  }, [productivityData, plannedVisitsData]);
+  }, [dayData]);
 
-  // Notify parent when data is loaded
-  // Note: Removed onDataLoaded from deps to prevent infinite loops when parent doesn't memoize callback
+  // Notify parent
   useEffect(() => {
     if (onDataLoaded && userSummaries.length > 0) {
       onDataLoaded(userSummaries.map(u => ({
         full_name: u.full_name,
         productivity_percentage: u.productivity_percentage,
         productive_visits: u.productive_visits,
-        total_visits: u.total_visits
+        total_visits: u.total_visits,
       })));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userSummaries]);
 
-  // Get day-wise data for selected user in drilldown
+  // Single-user day-wise data
+  const singleUserData = useMemo(() => {
+    if (!isSingleUserMode) return [];
+    return dayData.sort((a, b) => a.date.localeCompare(b.date));
+  }, [dayData, isSingleUserMode]);
+
+  // Drilldown data for multi-user mode
   const drilldownData = useMemo(() => {
     if (!selectedUserForDrilldown) return [];
-    return productivityData
-      .filter(row => row.full_name === selectedUserForDrilldown)
-      .sort((a, b) => a.planned_date.localeCompare(b.planned_date));
-  }, [productivityData, selectedUserForDrilldown]);
+    return dayData
+      .filter(row => row.userName === selectedUserForDrilldown)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [dayData, selectedUserForDrilldown]);
 
-  // Calculate totals for single-user view
+  // Calculate totals
   const singleUserTotals = useMemo(() => {
-    const data = isSingleUserMode ? productivityData : [];
-    const totalProductive = data.reduce((sum, row) => sum + row.productive_visits, 0);
-    const totalUnproductive = data.reduce((sum, row) => sum + row.unproductive_visits, 0);
-    const totalVisits = data.reduce((sum, row) => sum + row.total_visits, 0);
-    const avgProductivity = totalVisits > 0 ? Math.round((totalProductive / totalVisits) * 100 * 100) / 100 : 0;
-    
-    return {
-      productive: totalProductive,
-      unproductive: totalUnproductive,
-      total: totalVisits,
-      avgProductivity
-    };
-  }, [productivityData, isSingleUserMode]);
+    const totalPlanned = singleUserData.reduce((s, r) => s + r.planned, 0);
+    const totalProductive = singleUserData.reduce((s, r) => s + r.productive, 0);
+    const totalUnproductive = singleUserData.reduce((s, r) => s + r.unproductive, 0);
+    const totalPending = singleUserData.reduce((s, r) => s + r.pending, 0);
+    const avgProductivity = totalPlanned > 0 ? Math.round((totalProductive / totalPlanned) * 100 * 100) / 100 : 0;
+    return { planned: totalPlanned, productive: totalProductive, unproductive: totalUnproductive, pending: totalPending, avgProductivity };
+  }, [singleUserData]);
 
-  // Calculate totals for multi-user view
   const multiUserTotals = useMemo(() => {
-    const totalPlanned = userSummaries.reduce((sum, row) => sum + row.planned_visits, 0);
-    const totalProductive = userSummaries.reduce((sum, row) => sum + row.productive_visits, 0);
-    const totalUnproductive = userSummaries.reduce((sum, row) => sum + row.unproductive_visits, 0);
-    const totalVisits = userSummaries.reduce((sum, row) => sum + row.total_visits, 0);
-    const avgProductivity = totalPlanned > 0 
-      ? Math.round((totalProductive / totalPlanned) * 100 * 100) / 100 
-      : (totalVisits > 0 ? Math.round((totalProductive / totalVisits) * 100 * 100) / 100 : 0);
-    
-    return {
-      planned: totalPlanned,
-      productive: totalProductive,
-      unproductive: totalUnproductive,
-      total: totalVisits,
-      avgProductivity,
-      usersCount: userSummaries.length
-    };
+    const totalPlanned = userSummaries.reduce((s, r) => s + r.planned_visits, 0);
+    const totalProductive = userSummaries.reduce((s, r) => s + r.productive_visits, 0);
+    const totalUnproductive = userSummaries.reduce((s, r) => s + r.unproductive_visits, 0);
+    const totalPending = userSummaries.reduce((s, r) => s + r.pending_visits, 0);
+    const avgProductivity = totalPlanned > 0 ? Math.round((totalProductive / totalPlanned) * 100 * 100) / 100 : 0;
+    return { planned: totalPlanned, productive: totalProductive, unproductive: totalUnproductive, pending: totalPending, avgProductivity, usersCount: userSummaries.length };
   }, [userSummaries]);
 
-  // Calculate drilldown totals
   const drilldownTotals = useMemo(() => {
-    const totalProductive = drilldownData.reduce((sum, row) => sum + row.productive_visits, 0);
-    const totalUnproductive = drilldownData.reduce((sum, row) => sum + row.unproductive_visits, 0);
-    const totalVisits = drilldownData.reduce((sum, row) => sum + row.total_visits, 0);
-    const avgProductivity = totalVisits > 0 ? Math.round((totalProductive / totalVisits) * 100 * 100) / 100 : 0;
-    
-    return {
-      productive: totalProductive,
-      unproductive: totalUnproductive,
-      total: totalVisits,
-      avgProductivity
-    };
+    const totalPlanned = drilldownData.reduce((s, r) => s + r.planned, 0);
+    const totalProductive = drilldownData.reduce((s, r) => s + r.productive, 0);
+    const totalUnproductive = drilldownData.reduce((s, r) => s + r.unproductive, 0);
+    const totalPending = drilldownData.reduce((s, r) => s + r.pending, 0);
+    const avgProductivity = totalPlanned > 0 ? Math.round((totalProductive / totalPlanned) * 100 * 100) / 100 : 0;
+    return { planned: totalPlanned, productive: totalProductive, unproductive: totalUnproductive, pending: totalPending, avgProductivity };
   }, [drilldownData]);
 
   const getProductivityColor = (percentage: number) => {
@@ -243,10 +329,9 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
     return 'text-red-600';
   };
 
-  const scrollViewportClassName = cn(
-    (productivityData.length > 6 && isSingleUserMode) && 'max-h-[320px]',
-    (userSummaries.length > 6 && !isSingleUserMode) && 'max-h-[320px]'
-  );
+  const effectiveUserDisplay = isSingleUserMode
+    ? (userNameMap.get(effectiveUserIds[0]) || selectedUsers[0] || 'Unknown')
+    : `${effectiveUserIds.length} users`;
 
   return (
     <>
@@ -258,9 +343,7 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
               <CardTitle className="text-base sm:text-lg md:text-xl">Productivity Summary</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Visit productivity {isSingleUserMode ? 'by date' : 'by user'} • {
-                  hasNoData ? 'Loading users...' : 
-                  isSingleUserMode ? effectiveUsers[0] : 
-                  `${effectiveUsers.length} users`
+                  hasNoData ? 'Loading users...' : effectiveUserDisplay
                 } • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
               </p>
             </div>
@@ -276,131 +359,101 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
               <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
               <p className="text-muted-foreground">Loading productivity data...</p>
             </div>
-          ) : productivityData.length > 0 ? (
+          ) : dayData.length > 0 ? (
             <div className={cn(
               "relative border rounded-lg scrollbar-always-visible",
-              productivityData.length > 8 && "max-h-[400px]"
+              dayData.length > 8 && "max-h-[400px]"
             )}>
               <div className="min-w-max">
                 {isSingleUserMode ? (
-              // Single user: Day-wise breakdown (original view)
-              <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
-                <thead className="sticky top-0 bg-muted z-20">
-                  <TableRow className="border-b">
-                    <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Date</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
-                  </TableRow>
-                </thead>
-                <TableBody>
-                  {productivityData.map((row, index) => (
-                    <TableRow key={index} className="hover:bg-muted/30">
-                      <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.planned_date}</TableCell>
-                      <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.productive_visits}
-                      </TableCell>
-                      <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.unproductive_visits}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.total_visits}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        <span className={getProductivityColor(row.productivity_percentage)}>
-                          {row.productivity_percentage}%
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <tfoot className="bg-background border-t sticky bottom-0 z-10">
-                  <TableRow>
-                    <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({productivityData.length} days)</TableCell>
-                    <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {singleUserTotals.productive}
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {singleUserTotals.unproductive}
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {singleUserTotals.total}
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {singleUserTotals.avgProductivity}%
-                    </TableCell>
-                  </TableRow>
-                </tfoot>
-              </table>
-            ) : (
-              // Multi-user: User-wise summary (click to drill down)
-              <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
-                <thead className="sticky top-0 bg-muted z-20">
-                  <TableRow className="border-b">
-                    <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>User</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
-                    <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total</TableHead>
-                    <TableHead className={cn(isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>
-                  </TableRow>
-                </thead>
-                <TableBody>
-                  {userSummaries.map((row, index) => (
-                    <TableRow 
-                      key={index} 
-                      className="hover:bg-muted/30 cursor-pointer"
-                      onClick={() => setSelectedUserForDrilldown(row.full_name)}
-                    >
-                      <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.full_name}</TableCell>
-                      <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        <span className={getProductivityColor(row.productivity_percentage)}>
-                          {row.productivity_percentage}%
-                        </span>
-                      </TableCell>
-                      <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.planned_visits}
-                      </TableCell>
-                      <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.productive_visits}
-                      </TableCell>
-                      <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.unproductive_visits}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                        {row.total_visits}
-                      </TableCell>
-                      <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}>
-                        <ChevronRight className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <tfoot className="bg-background border-t sticky bottom-0 z-10">
-                  <TableRow>
-                    <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({multiUserTotals.usersCount} users)</TableCell>
-                    <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {multiUserTotals.avgProductivity}%
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {multiUserTotals.planned}
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {multiUserTotals.productive}
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {multiUserTotals.unproductive}
-                    </TableCell>
-                    <TableCell className={cn("text-right font-bold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                      {multiUserTotals.total}
-                    </TableCell>
-                    <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}></TableCell>
-                  </TableRow>
-                </tfoot>
-              </table>
-            )}
+                  // Single user: Day-wise breakdown
+                  <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
+                    <thead className="sticky top-0 bg-muted z-20">
+                      <TableRow className="border-b">
+                        <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Date</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Pending</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
+                      </TableRow>
+                    </thead>
+                    <TableBody>
+                      {singleUserData.map((row, index) => {
+                        const pct = row.planned > 0 ? Math.round((row.productive / row.planned) * 100 * 100) / 100 : 0;
+                        return (
+                          <TableRow key={index} className="hover:bg-muted/30">
+                            <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.displayDate}</TableCell>
+                            <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.planned}</TableCell>
+                            <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.productive}</TableCell>
+                            <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.unproductive}</TableCell>
+                            <TableCell className={cn("text-right text-yellow-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.pending}</TableCell>
+                            <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                              <span className={getProductivityColor(pct)}>{pct}%</span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                    <tfoot className="bg-background border-t sticky bottom-0 z-10">
+                      <TableRow>
+                        <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({singleUserData.length} days)</TableCell>
+                        <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.planned}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.productive}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.unproductive}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-yellow-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.pending}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.avgProductivity}%</TableCell>
+                      </TableRow>
+                    </tfoot>
+                  </table>
+                ) : (
+                  // Multi-user: User-wise summary
+                  <table className={cn("w-full caption-bottom", isMobile ? "text-[9px]" : "text-sm")}>
+                    <thead className="sticky top-0 bg-muted z-20">
+                      <TableRow className="border-b">
+                        <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>User</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Pending</TableHead>
+                        <TableHead className={cn(isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>
+                      </TableRow>
+                    </thead>
+                    <TableBody>
+                      {userSummaries.map((row, index) => (
+                        <TableRow
+                          key={index}
+                          className="hover:bg-muted/30 cursor-pointer"
+                          onClick={() => setSelectedUserForDrilldown(row.full_name)}
+                        >
+                          <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.full_name}</TableCell>
+                          <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                            <span className={getProductivityColor(row.productivity_percentage)}>{row.productivity_percentage}%</span>
+                          </TableCell>
+                          <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.planned_visits}</TableCell>
+                          <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.productive_visits}</TableCell>
+                          <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.unproductive_visits}</TableCell>
+                          <TableCell className={cn("text-right text-yellow-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.pending_visits}</TableCell>
+                          <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}>
+                            <ChevronRight className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <tfoot className="bg-background border-t sticky bottom-0 z-10">
+                      <TableRow>
+                        <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({multiUserTotals.usersCount} users)</TableCell>
+                        <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.avgProductivity}%</TableCell>
+                        <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.planned}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.productive}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.unproductive}</TableCell>
+                        <TableCell className={cn("text-right font-bold text-yellow-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.pending}</TableCell>
+                        <TableCell className={cn(isMobile ? "py-1 px-1" : "py-1.5")}></TableCell>
+                      </TableRow>
+                    </tfoot>
+                  </table>
+                )}
               </div>
             </div>
           ) : (
@@ -429,48 +482,38 @@ export const ProductivitySummarySection = ({ selectedUsers, dateRange, allUsers 
                 <TableHeader className="sticky top-0 bg-muted/50 z-10">
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Planned</TableHead>
                     <TableHead className="text-right">Productive</TableHead>
                     <TableHead className="text-right">Unproductive</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Pending</TableHead>
                     <TableHead className="text-right">Productivity %</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {drilldownData.map((row, index) => (
-                    <TableRow key={index} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{row.planned_date}</TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">
-                        {row.productive_visits}
-                      </TableCell>
-                      <TableCell className="text-right text-orange-600 font-medium">
-                        {row.unproductive_visits}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {row.total_visits}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        <span className={getProductivityColor(row.productivity_percentage)}>
-                          {row.productivity_percentage}%
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {drilldownData.map((row, index) => {
+                    const pct = row.planned > 0 ? Math.round((row.productive / row.planned) * 100 * 100) / 100 : 0;
+                    return (
+                      <TableRow key={index} className="hover:bg-muted/30">
+                        <TableCell className="font-medium">{row.displayDate}</TableCell>
+                        <TableCell className="text-right text-blue-600 font-medium">{row.planned}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">{row.productive}</TableCell>
+                        <TableCell className="text-right text-orange-600 font-medium">{row.unproductive}</TableCell>
+                        <TableCell className="text-right text-yellow-600 font-medium">{row.pending}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          <span className={getProductivityColor(pct)}>{pct}%</span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
                 <tfoot className="bg-muted/30 sticky bottom-0">
                   <TableRow>
                     <TableCell className="font-semibold">Total ({drilldownData.length} days)</TableCell>
-                    <TableCell className="text-right font-bold text-green-600">
-                      {drilldownTotals.productive}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-orange-600">
-                      {drilldownTotals.unproductive}
-                    </TableCell>
-                    <TableCell className="text-right font-bold">
-                      {drilldownTotals.total}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-primary">
-                      {drilldownTotals.avgProductivity}%
-                    </TableCell>
+                    <TableCell className="text-right font-bold text-blue-600">{drilldownTotals.planned}</TableCell>
+                    <TableCell className="text-right font-bold text-green-600">{drilldownTotals.productive}</TableCell>
+                    <TableCell className="text-right font-bold text-orange-600">{drilldownTotals.unproductive}</TableCell>
+                    <TableCell className="text-right font-bold text-yellow-600">{drilldownTotals.pending}</TableCell>
+                    <TableCell className="text-right font-bold text-primary">{drilldownTotals.avgProductivity}%</TableCell>
                   </TableRow>
                 </tfoot>
               </table>
