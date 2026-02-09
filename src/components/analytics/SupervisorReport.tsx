@@ -1508,7 +1508,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       </Card>
 
          {/* Total Quantity Banner - Matching prominent style */}
-         <Card className="bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}>
+         <Card className="bg-gradient-to-r from-indigo-700 to-indigo-600 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}>
            <CardContent className="p-3 md:p-6">
              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                <div>
