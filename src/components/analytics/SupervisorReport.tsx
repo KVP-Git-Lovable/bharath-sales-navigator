@@ -61,6 +61,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   const prevFetchKeyRef = useRef<string>('');
   const isFetchingRef = useRef(false);
   const prevScopeReadyRef = useRef(isScopeReady);
+  const reportContentRef = useRef<HTMLDivElement>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
    
    // Hindi to English translation for retailer/beat names in Productivity section
    const { translateTexts, getTranslated } = useHindiToEnglish();
@@ -1457,6 +1459,75 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!reportContentRef.current) return;
+    setDownloadingPDF(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      
+      const element = reportContentRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // A4 dimensions in points
+      const pdfWidth = 595.28;
+      const pdfHeight = 841.89;
+      const margin = 20;
+      const contentWidth = pdfWidth - margin * 2;
+      const scaledHeight = (imgHeight * contentWidth) / imgWidth;
+      
+      const pdf = new jsPDF('p', 'pt', 'a4');
+      
+      // If content fits on one page
+      if (scaledHeight <= pdfHeight - margin * 2) {
+        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
+      } else {
+        // Multi-page: slice the canvas
+        const pageContentHeight = pdfHeight - margin * 2;
+        const sourceSliceHeight = (pageContentHeight / contentWidth) * imgWidth;
+        let yOffset = 0;
+        let page = 0;
+        
+        while (yOffset < imgHeight) {
+          if (page > 0) pdf.addPage();
+          
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = imgWidth;
+          const remainingHeight = Math.min(sourceSliceHeight, imgHeight - yOffset);
+          sliceCanvas.height = remainingHeight;
+          const ctx = sliceCanvas.getContext('2d')!;
+          ctx.drawImage(canvas, 0, -yOffset);
+          
+          const sliceData = sliceCanvas.toDataURL('image/png');
+          const sliceScaledHeight = (remainingHeight * contentWidth) / imgWidth;
+          pdf.addImage(sliceData, 'PNG', margin, margin, contentWidth, sliceScaledHeight);
+          
+          yOffset += sourceSliceHeight;
+          page++;
+        }
+      }
+      
+      const pdfBlob = pdf.output('blob');
+      await downloadPDF(pdfBlob, `Analytics_Report_${format(dateRange.from, 'yyyy-MM-dd')}_to_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`);
+      toast.success('Report PDF downloaded');
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Show loading while scope is being determined */}
@@ -1471,8 +1542,18 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </Card>
       ) : (
       <>
-      {/* Summarize Report Button */}
-      <div className="flex justify-end">
+      {/* Summarize Report & Download PDF Buttons */}
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadPDF}
+          disabled={downloadingPDF}
+          className="gap-2"
+        >
+          {downloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {downloadingPDF ? 'Generating...' : 'Download PDF'}
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -1484,10 +1565,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </Button>
       </div>
 
+      <div ref={reportContentRef} className="space-y-4">
       {/* Total Order Value Banner - Dashboard visualization */}
        <div className="grid grid-cols-2 gap-2 md:gap-4">
          {/* Total Order Value Banner */}
-         <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}>
+         <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg cursor-pointer hover:shadow-xl transition-shadow border-2 border-yellow-400/70" onClick={() => { fetchBusinessOrderDetails(selectedUserIds, dateRange); setShowOrderDetailsDialog(true); }}>
         <CardContent className="p-3 md:p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
@@ -1508,7 +1590,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       </Card>
 
          {/* Total Quantity Banner - Matching prominent style */}
-         <Card className="bg-gradient-to-r from-indigo-700 to-indigo-600 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}>
+         <Card className="bg-gradient-to-r from-indigo-700 to-indigo-600 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow border-2 border-yellow-400/70" onClick={() => { fetchProductDetails(selectedUserIds, dateRange); setShowProductBreakdown(true); }}>
            <CardContent className="p-3 md:p-6">
              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                <div>
@@ -2615,6 +2697,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           </div>
         </DialogContent>
       </Dialog>
+
+      </div>{/* end reportContentRef */}
 
       {/* Report Summary Dialog */}
       <ReportSummaryDialog
