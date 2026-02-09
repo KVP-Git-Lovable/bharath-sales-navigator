@@ -1,82 +1,86 @@
 
 
-# Fix Activity Display on My Visit Page
+# Add Date Range Presets to GPS Track - Day Tracking
 
 ## Problem
 
-Activities are created successfully (confirmed in database), but they are invisible on the My Visit page. This happens because the page only displays retailers from beat plans -- activity visits (with `visit_type = 'activity'`) are not part of any beat plan, so they never appear in the list.
+Currently, the Day Tracking tab only supports selecting a single date via a calendar picker. Users want quick preset options like "This Week" and "This Month" to view aggregated GPS tracking data across a date range.
 
 ## Solution
 
-Add a dedicated **Activity Table/Section** on the My Visit page below the main visit list, and add an **Activity Name** field to the creation form.
+Add date range preset buttons (Today, This Week, This Month) alongside the existing date picker. When a range is selected, the system fetches GPS data, visit stats, and distance for all dates in that range and displays combined results.
 
 ---
 
-## Changes Overview
+## Changes
 
-### 1. Database: Add `activity_name` column to `activity_events` table
+### 1. Update `src/pages/GPSTrack.tsx`
 
-Add a new `activity_name` text column (nullable) to let users give each activity a custom name.
+**Add date range state and preset buttons:**
+- Add state for `dateRangeMode` ('single' | 'week' | 'month') and computed `startDate`/`endDate` based on selection
+- Add three toggle buttons above/alongside the date picker: **Today**, **This Week**, **This Month**
+  - Today: sets single date to today
+  - This Week: calculates Monday-to-Sunday (or Sunday-to-Saturday) of the current week using `date-fns` helpers (`startOfWeek`, `endOfWeek`)
+  - This Month: uses `startOfMonth` and `endOfMonth` from `date-fns`
+- Show the selected range label (e.g., "Feb 3 - Feb 9, 2026") beneath the buttons
 
-### 2. New Component: `ActivityEventsTable` (`src/components/ActivityEventsTable.tsx`)
+**Update data loading functions to support date ranges:**
+- `loadGPSData`: modify query to use `.gte('date', startDateStr).lte('date', endDateStr)` instead of `.eq('date', dateStr)`
+- `loadVisitStats`: modify query to use `.gte('planned_date', startDateStr).lte('planned_date', endDateStr)`
+- `loadBeatInfo`: for ranges, either skip or show "Multiple beats" label
+- `loadRetailerLocations`: modify beat_plans and visits queries to use date range filters
 
-A standalone section displayed on the My Visit page that:
-- Fetches activity events for the current user and selected date directly from the `activity_events` table (joined with retailer info)
-- Displays them in a card-based table with columns: Activity Name, Activity Type, Duration, Customer/Outlet, Status, and Remarks
-- Shows an amber-themed header to distinguish it from the regular visit list
-- Auto-refreshes when a new activity is created (listens for `visitDataChanged` event)
-- For multi-day activities, shows them on all dates within the range (from_date to to_date)
-- Each row shows the activity badge, formatted duration, and a link to view the linked visit
+**Update distance calculation:**
+- The existing Haversine-based total KM calculation already works on the full `gpsData` array, so it will automatically sum distance across all days in the range
 
-### 3. Update `AddActivityModal` (`src/components/AddActivityModal.tsx`)
+**Update GPS info card at bottom:**
+- Show date range instead of single date
+- Show total GPS points across all days
 
-- Add an **"Activity Name"** text input field at the top of the form (e.g., "Diwali Celebration", "Product Launch Demo")
-- Pass the activity name to the create function
+### 2. UI Layout for Day Tracking Filters
 
-### 4. Update `useActivityEvents` hook (`src/hooks/useActivityEvents.ts`)
+```text
++--------------------------------------------------+
+| Select Date Range                                 |
+| [Today] [This Week] [This Month] [Calendar Icon] |
+|                                                   |
+| Showing: Feb 3 - Feb 9, 2026                     |
+|                                                   |
+| Select Team Member (if manager)                   |
+| [UserSelector dropdown]                           |
++--------------------------------------------------+
+```
 
-- Add `activity_name` to the `ActivityEvent` interface and `CreateActivityParams`
-- Include `activity_name` in the insert payload
-- Add a new function `fetchActivitiesForDate` that queries activities by user_id and date (handles both single-day and multi-day ranges)
+- The three preset buttons use the existing `Button` component with `variant="outline"` (active = `variant="default"`)
+- The calendar picker remains available for custom single-date selection; selecting a calendar date switches mode back to "single"
 
-### 5. Update My Visit Page (`src/pages/MyVisits.tsx`)
+### 3. Imports to Add
 
-- Import and render `ActivityEventsTable` below the visits list
-- Pass `selectedDate` and `userId` as props so it fetches the right data
+- `startOfWeek`, `endOfWeek`, `startOfMonth`, `endOfMonth` from `date-fns`
 
 ---
 
 ## Technical Details
 
-### ActivityEventsTable query logic
+### Date range calculation
 
 ```text
-Fetch activities where:
-  - user_id = current user
-  - AND (
-      activity_date = selectedDate                           -- single day activities
-      OR (from_date <= selectedDate AND to_date >= selectedDate)  -- multi-day range
-    )
-Order by created_at DESC
+Today:      startDate = today, endDate = today
+This Week:  startDate = startOfWeek(today, { weekStartsOn: 1 }), endDate = endOfWeek(today, { weekStartsOn: 1 })
+This Month: startDate = startOfMonth(today), endDate = endOfMonth(today)
 ```
 
-### Activity Table display columns
+### Modified queries (conceptual)
 
-| Column | Source |
-|--------|--------|
-| Activity Name | activity_name (new field) or activity_type as fallback |
-| Type | activity_type (Celebration, Event, Promotion, Demo, Other) |
-| Duration | Formatted via formatActivityDuration() |
-| Customer | retailer_name |
-| Remarks | remarks |
+```text
+GPS:    .gte('date', startDateStr).lte('date', endDateStr)
+Visits: .gte('planned_date', startDateStr).lte('planned_date', endDateStr)
+Beats:  .gte('plan_date', startDateStr).lte('plan_date', endDateStr)
+```
 
-### File changes summary
+### Files changed
 
 | File | Action | What Changes |
 |------|--------|-------------|
-| Database migration | Create | Add `activity_name` column to `activity_events` |
-| `src/components/ActivityEventsTable.tsx` | Create | New activity table component for My Visit page |
-| `src/components/AddActivityModal.tsx` | Edit | Add Activity Name input field |
-| `src/hooks/useActivityEvents.ts` | Edit | Add activity_name support + fetchActivitiesForDate |
-| `src/pages/MyVisits.tsx` | Edit | Render ActivityEventsTable below visit list |
+| `src/pages/GPSTrack.tsx` | Edit | Add date range state, preset buttons, update all queries to support ranges |
 
