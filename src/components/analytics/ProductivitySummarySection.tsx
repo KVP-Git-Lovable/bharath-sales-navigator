@@ -88,9 +88,8 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
         current.setDate(current.getDate() + 1);
       }
 
-      // Fetch all data in parallel (same as TodaySummary logic)
-      const [beatPlansRes, visitsRes] = await Promise.all([
-        // Beat plans for the period
+      // Fetch all data in parallel (matching My Visits / Today's Progress logic)
+      const [beatPlansRes, visitsRes, ordersRes] = await Promise.all([
         supabase
           .from('beat_plans')
           .select('beat_id, beat_name, plan_date, user_id, beat_data')
@@ -98,19 +97,27 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
           .gte('plan_date', fromDate)
           .lte('plan_date', toDate),
 
-        // Visits for the period
         supabase
           .from('visits')
           .select('id, retailer_id, status, user_id, planned_date')
           .in('user_id', effectiveUserIds)
           .gte('planned_date', fromDate)
           .lte('planned_date', toDate),
+
+        supabase
+          .from('orders')
+          .select('retailer_id, user_id, order_date')
+          .eq('status', 'confirmed')
+          .in('user_id', effectiveUserIds)
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate),
       ]);
 
       const beatPlans = beatPlansRes.data || [];
       const visits = visitsRes.data || [];
+      const orders = ordersRes.data || [];
 
-      // Get all beat IDs and fetch retailers for those beats (same as TodaySummary)
+      // Get all beat IDs and fetch retailers for those beats
       const beatIds = [...new Set(beatPlans.map(bp => bp.beat_id).filter(Boolean))];
 
       let beatRetailers: { id: string; beat_id: string; user_id: string }[] = [];
@@ -123,44 +130,78 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
         beatRetailers = data || [];
       }
 
-      // Build per-user per-date planned retailers (from beat_plans → retailers)
-      // Key: `userId_date` → Set of retailer IDs
-      const plannedMap = new Map<string, Set<string>>();
-
+      // Build per-user per-date: beat plan retailers
+      const beatPlanRetailersMap = new Map<string, Set<string>>();
       beatPlans.forEach(bp => {
         const key = `${bp.user_id}_${bp.plan_date}`;
-        if (!plannedMap.has(key)) plannedMap.set(key, new Set());
-        const set = plannedMap.get(key)!;
-
-        // Get retailers that belong to this beat and this user
-        const retailersForBeat = beatRetailers.filter(r => r.beat_id === bp.beat_id && r.user_id === bp.user_id);
-        retailersForBeat.forEach(r => set.add(r.id));
+        if (!beatPlanRetailersMap.has(key)) beatPlanRetailersMap.set(key, new Set());
+        const set = beatPlanRetailersMap.get(key)!;
+        beatRetailers.filter(r => r.beat_id === bp.beat_id && r.user_id === bp.user_id)
+          .forEach(r => set.add(r.id));
       });
 
-      // Calculate per-user per-date metrics using same logic as TodaySummary day-wise
-      // TodaySummary counts raw visit records (not unique retailers) for productive/unproductive
+      // Build per-user per-date: visit retailers grouped by retailer with best status
+      // Key: `userId_date` → Map<retailerId, bestStatus>
+      const visitRetailerStatusMap = new Map<string, Map<string, string>>();
+      visits.forEach(v => {
+        if (!v.retailer_id || !v.planned_date) return;
+        const key = `${v.user_id}_${v.planned_date}`;
+        if (!visitRetailerStatusMap.has(key)) visitRetailerStatusMap.set(key, new Map());
+        const retailerStatuses = visitRetailerStatusMap.get(key)!;
+        const existing = retailerStatuses.get(v.retailer_id);
+        // Priority: productive wins over everything
+        if (v.status === 'productive') {
+          retailerStatuses.set(v.retailer_id, 'productive');
+        } else if (!existing || existing === 'planned') {
+          retailerStatuses.set(v.retailer_id, v.status);
+        }
+      });
+
+      // Build per-user per-date: order retailers
+      const orderRetailersMap = new Map<string, Set<string>>();
+      orders.forEach(o => {
+        if (!o.retailer_id) return;
+        const key = `${o.user_id}_${o.order_date}`;
+        if (!orderRetailersMap.has(key)) orderRetailersMap.set(key, new Set());
+        orderRetailersMap.get(key)!.add(o.retailer_id);
+      });
+
+      // Calculate per-user per-date metrics using unique-retailer logic (matching My Visits Today's Progress)
       const results: DayProductivity[] = [];
 
       for (const userId of effectiveUserIds) {
         for (const dateStr of datesInRange) {
           const key = `${userId}_${dateStr}`;
-          const plannedRetailers = plannedMap.get(key) || new Set();
+          const beatRetailerIds = beatPlanRetailersMap.get(key) || new Set<string>();
+          const retailerStatuses = visitRetailerStatusMap.get(key) || new Map<string, string>();
+          const orderRetailerIds = orderRetailersMap.get(key) || new Set<string>();
 
-          const planned = plannedRetailers.size;
+          // All unique retailers involved (beat plans + visits + orders) = "Planned"
+          const allRetailerIds = new Set<string>();
+          beatRetailerIds.forEach(id => allRetailerIds.add(id));
+          retailerStatuses.forEach((_, id) => allRetailerIds.add(id));
+          orderRetailerIds.forEach(id => allRetailerIds.add(id));
 
-          // Productive: count of visit records with status='productive' (same as TodaySummary line 1405)
-          const productive = visits.filter(v => 
-            v.user_id === userId && v.planned_date === dateStr && v.status === 'productive'
-          ).length;
+          const planned = allRetailerIds.size;
+          if (planned === 0) continue;
 
-          // Unproductive: count of visit records with unproductive/store_closed/canceled (same as TodaySummary line 1408-1411)
-          const unproductive = visits.filter(v => 
-            v.user_id === userId && v.planned_date === dateStr && 
-            (v.status === 'unproductive' || v.status === 'store_closed' || v.status === 'canceled')
-          ).length;
+          // Productive: unique retailers with confirmed order OR productive visit
+          const productiveSet = new Set<string>();
+          orderRetailerIds.forEach(rid => productiveSet.add(rid));
+          retailerStatuses.forEach((status, rid) => {
+            if (status === 'productive') productiveSet.add(rid);
+          });
 
-          if (planned === 0 && productive === 0 && unproductive === 0) continue; // Skip empty days
+          // Unproductive: retailers with any visit (not productive), NOT in productive set
+          const unproductiveSet = new Set<string>();
+          retailerStatuses.forEach((status, rid) => {
+            if (!productiveSet.has(rid)) {
+              unproductiveSet.add(rid);
+            }
+          });
 
+          const productive = productiveSet.size;
+          const unproductive = unproductiveSet.size;
           const pending = Math.max(0, planned - productive - unproductive);
 
           results.push({
