@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,19 +6,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, Trophy, TrendingUp, TrendingDown, Calendar as CalendarIcon, Filter, Globe, ChevronDown, ChevronRight, Package } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns';
+import { Users, Trophy, TrendingUp, TrendingDown, Filter, Globe, ChevronDown, ChevronRight, Package, Network } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays, subWeeks, subMonths, subQuarters } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
-import { useTeamTargetProgress, PeriodType, TargetBasis } from '@/hooks/useTeamTargetProgress';
+import { useTeamTargetProgress, PeriodType, TargetBasis, TeamMemberProgress } from '@/hooks/useTeamTargetProgress';
 import { useFYTargetConfig } from '@/hooks/useFYTargetConfig';
 import { ProductMonthBreakdownTable } from './ProductMonthBreakdownTable';
 import { UserScope } from '@/pages/admin/TargetVsActual';
-import { supabase } from '@/integrations/supabase/client';
+import { useHierarchyTeamStructure, HierarchyGroup } from '@/hooks/useHierarchyTeamProgress';
 
 interface TeamTargetDashboardProps {
   userScope?: UserScope;
@@ -29,62 +26,180 @@ interface TeamTargetDashboardProps {
   hasAdminAccess?: boolean;
 }
 
+// Analytics-style period options
+type DashboardPeriod = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_fy' | 'last_week' | 'last_month' | 'last_quarter' | 'last_fy' | 'last_60_days';
+
+const getWeekStart = (d: Date) => {
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  const start = new Date(d);
+  start.setDate(d.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+const getFYStart = (d: Date) => {
+  const year = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+  return new Date(year, 3, 1);
+};
+
+const getFYEnd = (d: Date) => {
+  const year = d.getMonth() >= 3 ? d.getFullYear() + 1 : d.getFullYear();
+  const end = new Date(year, 2, 31);
+  end.setHours(23, 59, 59, 999);
+  return end;
+};
+
+const getQuarterStart = (d: Date) => {
+  const month = d.getMonth();
+  if (month >= 3 && month <= 5) return new Date(d.getFullYear(), 3, 1);
+  if (month >= 6 && month <= 8) return new Date(d.getFullYear(), 6, 1);
+  if (month >= 9 && month <= 11) return new Date(d.getFullYear(), 9, 1);
+  return new Date(d.getFullYear(), 0, 1);
+};
+
+const getQuarterEnd = (d: Date) => {
+  const month = d.getMonth();
+  if (month >= 3 && month <= 5) return new Date(d.getFullYear(), 5, 30, 23, 59, 59, 999);
+  if (month >= 6 && month <= 8) return new Date(d.getFullYear(), 8, 30, 23, 59, 59, 999);
+  if (month >= 9 && month <= 11) return new Date(d.getFullYear(), 11, 31, 23, 59, 59, 999);
+  return new Date(d.getFullYear(), 2, 31, 23, 59, 59, 999);
+};
+
+const computeDateRange = (period: DashboardPeriod): { from: Date; to: Date } => {
+  const today = new Date();
+  switch (period) {
+    case 'today': {
+      const from = new Date(today);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(today);
+      to.setHours(23, 59, 59, 999);
+      return { from, to };
+    }
+    case 'yesterday': {
+      const from = new Date(today);
+      from.setDate(today.getDate() - 1);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(from);
+      to.setHours(23, 59, 59, 999);
+      return { from, to };
+    }
+    case 'this_week':
+      return { from: getWeekStart(today), to: today };
+    case 'this_month':
+      return { from: startOfMonth(today), to: today };
+    case 'this_quarter':
+      return { from: getQuarterStart(today), to: today };
+    case 'this_fy':
+      return { from: getFYStart(today), to: today };
+    case 'last_week': {
+      const lastWeekDate = new Date(today);
+      lastWeekDate.setDate(today.getDate() - 7);
+      const from = getWeekStart(lastWeekDate);
+      const to = new Date(from);
+      to.setDate(from.getDate() + 6);
+      to.setHours(23, 59, 59, 999);
+      return { from, to };
+    }
+    case 'last_month': {
+      const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const to = new Date(today.getFullYear(), today.getMonth(), 0);
+      to.setHours(23, 59, 59, 999);
+      return { from, to };
+    }
+    case 'last_quarter': {
+      const currentQStart = getQuarterStart(today);
+      const lastQEnd = new Date(currentQStart);
+      lastQEnd.setDate(lastQEnd.getDate() - 1);
+      lastQEnd.setHours(23, 59, 59, 999);
+      const from = getQuarterStart(lastQEnd);
+      return { from, to: lastQEnd };
+    }
+    case 'last_fy': {
+      const currentFYStart = getFYStart(today);
+      const lastFYEnd = new Date(currentFYStart);
+      lastFYEnd.setDate(lastFYEnd.getDate() - 1);
+      lastFYEnd.setHours(23, 59, 59, 999);
+      const from = getFYStart(lastFYEnd);
+      return { from, to: lastFYEnd };
+    }
+    case 'last_60_days': {
+      const from = new Date(today);
+      from.setDate(today.getDate() - 60);
+      from.setHours(0, 0, 0, 0);
+      return { from, to: today };
+    }
+    default:
+      return { from: startOfMonth(today), to: today };
+  }
+};
+
+const periodToPeriodType = (period: DashboardPeriod): PeriodType => {
+  switch (period) {
+    case 'today':
+    case 'yesterday':
+      return 'day';
+    case 'this_week':
+    case 'last_week':
+      return 'week';
+    case 'this_month':
+    case 'last_month':
+    case 'last_60_days':
+      return 'month';
+    case 'this_quarter':
+    case 'last_quarter':
+      return 'quarter';
+    case 'this_fy':
+    case 'last_fy':
+      return 'year';
+    default:
+      return 'month';
+  }
+};
+
 export function TeamTargetDashboard({
   userScope = 'team',
   onUserScopeChange,
   effectiveUserIds = [],
   fyYear,
   hasAdminAccess = false,
-}: TeamTargetDashboardProps = {}) {
+}: TeamTargetDashboardProps) {
   const { user } = useAuth();
   const { subordinateIds, isManager } = useSubordinates();
-  const [periodType, setPeriodType] = useState<PeriodType>('month');
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('this_month');
   const [basis, setBasis] = useState<TargetBasis>('quantity');
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Fetch FY config to get enabled parameters
   const { data: fyConfig } = useFYTargetConfig(fyYear || new Date().getFullYear());
   const enabledParameters = fyConfig?.enabled_parameters;
   const hasProductAndMonthly = enabledParameters?.product && enabledParameters?.monthly;
 
-  // Get all team member IDs - use effectiveUserIds if provided, else subordinates
+  // Get all team member IDs
   const teamUserIds = effectiveUserIds.length > 0 ? effectiveUserIds : subordinateIds;
+
+  // Compute period type and date from the dashboard period
+  const periodType = useMemo(() => periodToPeriodType(dashboardPeriod), [dashboardPeriod]);
+  const dateRange = useMemo(() => computeDateRange(dashboardPeriod), [dashboardPeriod]);
 
   const { data: teamProgress, isLoading } = useTeamTargetProgress({
     userIds: teamUserIds,
     periodType,
-    date: selectedDate,
+    date: dateRange.from,
     basis,
     enabledParameters,
   });
 
-  // Compute date range based on period type
-  const dateRange = useMemo(() => {
-    switch (periodType) {
-      case 'day':
-        return { from: selectedDate, to: selectedDate };
-      case 'week':
-        return { from: startOfWeek(selectedDate, { weekStartsOn: 1 }), to: endOfWeek(selectedDate, { weekStartsOn: 1 }) };
-      case 'month':
-        return { from: startOfMonth(selectedDate), to: endOfMonth(selectedDate) };
-      case 'quarter':
-        return { from: startOfQuarter(selectedDate), to: endOfQuarter(selectedDate) };
-      case 'year':
-        return { from: startOfYear(selectedDate), to: endOfYear(selectedDate) };
-      default:
-        return { from: selectedDate, to: selectedDate };
-    }
-  }, [periodType, selectedDate]);
+  // Fetch hierarchy structure for grouping
+  const { data: hierarchyGroups } = useHierarchyTeamStructure(teamUserIds);
 
   // Calculate summary stats
   const stats = useMemo(() => {
     if (!teamProgress?.length) {
       return { total: 0, achieved: 0, inProgress: 0, notAchieved: 0 };
     }
-
     return {
       total: teamProgress.length,
       achieved: teamProgress.filter(m => m.status === 'achieved').length,
@@ -99,6 +214,44 @@ export function TeamTargetDashboard({
     return teamProgress.filter(m => m.status === statusFilter);
   }, [teamProgress, statusFilter]);
 
+  // Build progress lookup map
+  const progressMap = useMemo(() => {
+    const map = new Map<string, TeamMemberProgress>();
+    filteredTeamProgress?.forEach(m => map.set(m.userId, m));
+    return map;
+  }, [filteredTeamProgress]);
+
+  // Build hierarchy groups with aggregated data
+  const groupedData = useMemo(() => {
+    if (!hierarchyGroups?.length || !filteredTeamProgress?.length) {
+      return null;
+    }
+
+    return hierarchyGroups.map(group => {
+      // Get members that exist in filteredTeamProgress
+      const members = group.memberIds
+        .map(id => progressMap.get(id))
+        .filter(Boolean) as TeamMemberProgress[];
+
+      // Also get the manager's own data if present
+      const managerProgress = group.managerId ? progressMap.get(group.managerId) : null;
+
+      // Aggregate team totals
+      const teamTarget = members.reduce((sum, m) => sum + m.target, 0);
+      const teamActual = members.reduce((sum, m) => sum + m.actual, 0);
+      const teamAchievement = teamTarget > 0 ? (teamActual / teamTarget) * 100 : 0;
+
+      return {
+        ...group,
+        members,
+        managerProgress,
+        teamTarget,
+        teamActual,
+        teamAchievement,
+      };
+    }).filter(g => g.members.length > 0 || g.managerProgress);
+  }, [hierarchyGroups, filteredTeamProgress, progressMap]);
+
   const handleStatusFilterClick = (filter: 'all' | 'achieved' | 'in_progress' | 'not_achieved') => {
     setStatusFilter(prev => prev === filter ? 'all' : filter);
   };
@@ -106,11 +259,17 @@ export function TeamTargetDashboard({
   const toggleRowExpanded = (userId: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleGroupCollapsed = (managerId: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(managerId)) next.delete(managerId);
+      else next.add(managerId);
       return next;
     });
   };
@@ -121,7 +280,6 @@ export function TeamTargetDashboard({
       if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
       return `₹${value.toFixed(0)}`;
     } else {
-      // Quantity is always in KG - display with appropriate precision
       if (value >= 1000) return `${value.toFixed(0)} KG`;
       if (value >= 100) return `${value.toFixed(1)} KG`;
       if (value >= 1) return `${value.toFixed(2)} KG`;
@@ -143,12 +301,76 @@ export function TeamTargetDashboard({
   };
 
   const getInitials = (name: string): string => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const renderMemberRow = (member: TeamMemberProgress) => {
+    const isExpanded = expandedRows.has(member.userId);
+    const hasBreakdown = hasProductAndMonthly && member.productMonthBreakdown && member.productMonthBreakdown.length > 0;
+
+    return (
+      <React.Fragment key={member.userId}>
+        <TableRow
+          className={cn(
+            hasBreakdown && "cursor-pointer hover:bg-muted/50",
+            isExpanded && "bg-muted/30"
+          )}
+          onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
+        >
+          {hasProductAndMonthly && (
+            <TableCell className="p-2 w-10">
+              {hasBreakdown ? (
+                <Button variant="ghost" size="icon" className="h-6 w-6">
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </Button>
+              ) : null}
+            </TableCell>
+          )}
+          <TableCell>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={member.avatarUrl || undefined} />
+                <AvatarFallback className="text-xs">{getInitials(member.fullName)}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="font-medium">{member.fullName}</span>
+                {hasBreakdown && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    {member.productMonthBreakdown!.length} product-month entries
+                  </span>
+                )}
+              </div>
+            </div>
+          </TableCell>
+          <TableCell className="text-right font-medium">{formatValue(member.target)}</TableCell>
+          <TableCell className="text-right font-medium">{formatValue(member.actual)}</TableCell>
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <Progress value={Math.min(member.achievementPercentage, 100)} className="h-2 w-20" />
+              <span className="text-sm font-medium w-12 text-right">{member.achievementPercentage.toFixed(0)}%</span>
+            </div>
+          </TableCell>
+          <TableCell className={cn("text-right font-medium", member.gap >= 0 ? "text-green-600" : "text-red-600")}>
+            {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
+          </TableCell>
+          <TableCell className="text-center">{getStatusBadge(member.status)}</TableCell>
+        </TableRow>
+        {hasBreakdown && isExpanded && (
+          <TableRow>
+            <TableCell colSpan={hasProductAndMonthly ? 7 : 6} className="p-0 bg-muted/20">
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Product × Month Breakdown</span>
+                </div>
+                <ProductMonthBreakdownTable data={member.productMonthBreakdown!} basis={basis} />
+              </div>
+            </TableCell>
+          </TableRow>
+        )}
+      </React.Fragment>
+    );
   };
 
   if (!isManager && teamUserIds.length === 0) {
@@ -164,6 +386,8 @@ export function TeamTargetDashboard({
       </Card>
     );
   }
+
+  const colSpan = hasProductAndMonthly ? 7 : 6;
 
   return (
     <div className="space-y-6">
@@ -203,64 +427,36 @@ export function TeamTargetDashboard({
               </div>
             )}
 
-            {/* Period Type */}
+            {/* Period - Analytics-style dropdown */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-muted-foreground">Period</label>
-              <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
-                <SelectTrigger className="w-[140px]">
+              <Select value={dashboardPeriod} onValueChange={(v) => setDashboardPeriod(v as DashboardPeriod)}>
+                <SelectTrigger className="w-[160px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="day">Daily</SelectItem>
-                  <SelectItem value="week">Weekly</SelectItem>
-                  <SelectItem value="month">Monthly</SelectItem>
-                  <SelectItem value="quarter">Quarterly</SelectItem>
-                  <SelectItem value="year">Yearly</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="this_quarter">This Quarter</SelectItem>
+                  <SelectItem value="this_fy">This FY</SelectItem>
+                  <SelectItem value="last_week">Last Week</SelectItem>
+                  <SelectItem value="last_month">Last Month</SelectItem>
+                  <SelectItem value="last_quarter">Last Quarter</SelectItem>
+                  <SelectItem value="last_fy">Last FY</SelectItem>
+                  <SelectItem value="last_60_days">Last 60 Days</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Date Picker */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-muted-foreground">Date</label>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[180px] justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(selectedDate, "PPP")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setSelectedDate(date);
-                        setCalendarOpen(false);
-                      }
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
             {/* Date Range Display */}
-            {periodType !== 'day' && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-muted-foreground">Date Range</label>
-                <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
-                  {format(dateRange.from, "dd MMM yyyy")} – {format(dateRange.to, "dd MMM yyyy")}
-                </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Date Range</label>
+              <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
+                {format(dateRange.from, "dd MMM yyyy")} – {format(dateRange.to, "dd MMM yyyy")}
               </div>
-            )}
+            </div>
 
             {/* Basis Toggle */}
             <div className="flex flex-col gap-1.5">
@@ -279,20 +475,15 @@ export function TeamTargetDashboard({
         </CardContent>
       </Card>
 
-      {/* Summary Cards - Clickable Filters */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:shadow-md",
-            statusFilter === 'all' && "ring-2 ring-blue-500 ring-offset-2"
-          )}
+        <Card
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'all' && "ring-2 ring-blue-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('all')}
         >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="h-5 w-5 text-blue-600" />
-              </div>
+              <div className="p-2 bg-blue-100 rounded-lg"><Users className="h-5 w-5 text-blue-600" /></div>
               <div>
                 <p className="text-2xl font-bold">{stats.total}</p>
                 <p className="text-xs text-muted-foreground">Total Members</p>
@@ -301,18 +492,13 @@ export function TeamTargetDashboard({
           </CardContent>
         </Card>
 
-        <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:shadow-md",
-            statusFilter === 'achieved' && "ring-2 ring-green-500 ring-offset-2"
-          )}
+        <Card
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'achieved' && "ring-2 ring-green-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('achieved')}
         >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Trophy className="h-5 w-5 text-green-600" />
-              </div>
+              <div className="p-2 bg-green-100 rounded-lg"><Trophy className="h-5 w-5 text-green-600" /></div>
               <div>
                 <p className="text-2xl font-bold text-green-600">{stats.achieved}</p>
                 <p className="text-xs text-muted-foreground">Achieved</p>
@@ -322,18 +508,13 @@ export function TeamTargetDashboard({
           </CardContent>
         </Card>
 
-        <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:shadow-md",
-            statusFilter === 'in_progress' && "ring-2 ring-yellow-500 ring-offset-2"
-          )}
+        <Card
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'in_progress' && "ring-2 ring-yellow-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('in_progress')}
         >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-yellow-600" />
-              </div>
+              <div className="p-2 bg-yellow-100 rounded-lg"><TrendingUp className="h-5 w-5 text-yellow-600" /></div>
               <div>
                 <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
                 <p className="text-xs text-muted-foreground">In Progress</p>
@@ -343,18 +524,13 @@ export function TeamTargetDashboard({
           </CardContent>
         </Card>
 
-        <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:shadow-md",
-            statusFilter === 'not_achieved' && "ring-2 ring-red-500 ring-offset-2"
-          )}
+        <Card
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'not_achieved' && "ring-2 ring-red-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('not_achieved')}
         >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <TrendingDown className="h-5 w-5 text-red-600" />
-              </div>
+              <div className="p-2 bg-red-100 rounded-lg"><TrendingDown className="h-5 w-5 text-red-600" /></div>
               <div>
                 <p className="text-2xl font-bold text-red-600">{stats.notAchieved}</p>
                 <p className="text-xs text-muted-foreground">Not Achieved</p>
@@ -365,10 +541,15 @@ export function TeamTargetDashboard({
         </Card>
       </div>
 
-      {/* Team Progress Table */}
+      {/* Team Performance Table - Hierarchy Grouped */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Team Performance</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Network className="h-5 w-5" />
+              Team Performance (Hierarchy View)
+            </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -379,12 +560,83 @@ export function TeamTargetDashboard({
             <div className="text-center py-12 text-muted-foreground">
               <p>{statusFilter === 'all' ? 'No data available for the selected period' : `No ${statusFilter.replace('_', ' ')} members found`}</p>
               {statusFilter !== 'all' && (
-                <Button variant="link" onClick={() => setStatusFilter('all')} className="mt-2">
-                  Clear filter
-                </Button>
+                <Button variant="link" onClick={() => setStatusFilter('all')} className="mt-2">Clear filter</Button>
               )}
             </div>
+          ) : groupedData && groupedData.length > 0 ? (
+            <div className="space-y-4">
+              {groupedData.map((group, idx) => {
+                const groupKey = group.managerId || `other-${idx}`;
+                const isCollapsed = collapsedGroups.has(groupKey);
+                const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 50 ? 'in_progress' : 'not_achieved';
+
+                return (
+                  <div key={groupKey} className="border rounded-lg overflow-hidden">
+                    {/* Group Header */}
+                    <div
+                      className={cn(
+                        "flex items-center justify-between p-3 cursor-pointer transition-colors",
+                        "bg-muted/50 hover:bg-muted/70"
+                      )}
+                      onClick={() => toggleGroupCollapsed(groupKey)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {group.managerId && (
+                          <Avatar className="h-7 w-7">
+                            <AvatarImage src={group.managerAvatar || undefined} />
+                            <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          <span className="font-semibold text-sm">{group.managerName}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({group.members.length} members)</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right text-xs hidden sm:block">
+                          <div className="text-muted-foreground">Team Target</div>
+                          <div className="font-semibold">{formatValue(group.teamTarget)}</div>
+                        </div>
+                        <div className="text-right text-xs hidden sm:block">
+                          <div className="text-muted-foreground">Team Actual</div>
+                          <div className="font-semibold">{formatValue(group.teamActual)}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
+                          <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
+                        </div>
+                        {getStatusBadge(teamStatus)}
+                      </div>
+                    </div>
+
+                    {/* Group Members */}
+                    {!isCollapsed && (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {hasProductAndMonthly && <TableHead className="w-10"></TableHead>}
+                              <TableHead>Team Member</TableHead>
+                              <TableHead className="text-right">Target</TableHead>
+                              <TableHead className="text-right">Actual</TableHead>
+                              <TableHead className="text-center">Progress</TableHead>
+                              <TableHead className="text-right">Gap</TableHead>
+                              <TableHead className="text-center">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.members.map(member => renderMemberRow(member))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            // Fallback flat table when no hierarchy data
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -399,97 +651,7 @@ export function TeamTargetDashboard({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTeamProgress.map((member) => {
-                    const isExpanded = expandedRows.has(member.userId);
-                    const hasBreakdown = hasProductAndMonthly && member.productMonthBreakdown && member.productMonthBreakdown.length > 0;
-                    
-                    return (
-                      <React.Fragment key={member.userId}>
-                        <TableRow 
-                          className={cn(
-                            hasBreakdown && "cursor-pointer hover:bg-muted/50",
-                            isExpanded && "bg-muted/30"
-                          )}
-                          onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
-                        >
-                          {hasProductAndMonthly && (
-                            <TableCell className="p-2 w-10">
-                              {hasBreakdown ? (
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              ) : null}
-                            </TableCell>
-                          )}
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={member.avatarUrl || undefined} />
-                                <AvatarFallback className="text-xs">
-                                  {getInitials(member.fullName)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{member.fullName}</span>
-                                {hasBreakdown && (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Package className="h-3 w-3" />
-                                    {member.productMonthBreakdown!.length} product-month entries
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatValue(member.target)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatValue(member.actual)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress 
-                                value={Math.min(member.achievementPercentage, 100)} 
-                                className="h-2 w-20"
-                              />
-                              <span className="text-sm font-medium w-12 text-right">
-                                {member.achievementPercentage.toFixed(0)}%
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className={cn(
-                            "text-right font-medium",
-                            member.gap >= 0 ? "text-green-600" : "text-red-600"
-                          )}>
-                            {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {getStatusBadge(member.status)}
-                          </TableCell>
-                        </TableRow>
-                        {hasBreakdown && isExpanded && (
-                          <TableRow>
-                            <TableCell colSpan={hasProductAndMonthly ? 7 : 6} className="p-0 bg-muted/20">
-                              <div className="p-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <Package className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium">Product × Month Breakdown</span>
-                                </div>
-                                <ProductMonthBreakdownTable 
-                                  data={member.productMonthBreakdown!} 
-                                  basis={basis}
-                                />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                  {filteredTeamProgress.map(member => renderMemberRow(member))}
                 </TableBody>
               </Table>
             </div>
