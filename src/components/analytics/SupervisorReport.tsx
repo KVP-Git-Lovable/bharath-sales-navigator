@@ -2411,6 +2411,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       {/* Productivity Summary Section */}
       <ProductivitySummarySection 
         selectedUsers={selectedUsers} 
+        selectedUserIds={selectedUserIds}
         dateRange={dateRange}
         allUsers={users}
         onDataLoaded={handleProductivityDataLoaded}
