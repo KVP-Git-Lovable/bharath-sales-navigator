@@ -168,7 +168,7 @@ export function TeamTargetDashboard({
   const { subordinateIds, isManager } = useSubordinates();
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('this_month');
   const [basis, setBasis] = useState<TargetBasis>('quantity');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'achieved' | 'in_progress' | 'not_achieved'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved'>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -198,13 +198,15 @@ export function TeamTargetDashboard({
   // Calculate summary stats
   const stats = useMemo(() => {
     if (!teamProgress?.length) {
-      return { total: 0, achieved: 0, inProgress: 0, notAchieved: 0 };
+      return { total: 0, achieved: 0, goodToGo: 0, almostThere: 0, inProgress: 0, notStarted: 0 };
     }
     return {
       total: teamProgress.length,
       achieved: teamProgress.filter(m => m.status === 'achieved').length,
+      goodToGo: teamProgress.filter(m => m.status === 'good_to_go').length,
+      almostThere: teamProgress.filter(m => m.status === 'almost_there').length,
       inProgress: teamProgress.filter(m => m.status === 'in_progress').length,
-      notAchieved: teamProgress.filter(m => m.status === 'not_achieved').length,
+      notStarted: teamProgress.filter(m => m.status === 'not_started').length,
     };
   }, [teamProgress]);
 
@@ -252,7 +254,7 @@ export function TeamTargetDashboard({
     }).filter(g => g.members.length > 0 || g.managerProgress);
   }, [hierarchyGroups, filteredTeamProgress, progressMap]);
 
-  const handleStatusFilterClick = (filter: 'all' | 'achieved' | 'in_progress' | 'not_achieved') => {
+  const handleStatusFilterClick = (filter: 'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved') => {
     setStatusFilter(prev => prev === filter ? 'all' : filter);
   };
 
@@ -291,10 +293,14 @@ export function TeamTargetDashboard({
     switch (status) {
       case 'achieved':
         return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Achieved</Badge>;
+      case 'good_to_go':
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Good to Go</Badge>;
+      case 'almost_there':
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Almost There</Badge>;
       case 'in_progress':
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">In Progress</Badge>;
-      case 'not_achieved':
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Not Achieved</Badge>;
+        return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">In Progress</Badge>;
+      case 'not_started':
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Not Started</Badge>;
       default:
         return null;
     }
@@ -476,17 +482,17 @@ export function TeamTargetDashboard({
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card
           className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'all' && "ring-2 ring-blue-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('all')}
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg"><Users className="h-5 w-5 text-blue-600" /></div>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-100 rounded-lg"><Users className="h-4 w-4 text-blue-600" /></div>
               <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-xs text-muted-foreground">Total Members</p>
+                <p className="text-xl font-bold">{stats.total}</p>
+                <p className="text-[10px] text-muted-foreground">Total</p>
               </div>
             </div>
           </CardContent>
@@ -496,47 +502,74 @@ export function TeamTargetDashboard({
           className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'achieved' && "ring-2 ring-green-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('achieved')}
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg"><Trophy className="h-5 w-5 text-green-600" /></div>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-green-100 rounded-lg"><Trophy className="h-4 w-4 text-green-600" /></div>
               <div>
-                <p className="text-2xl font-bold text-green-600">{stats.achieved}</p>
-                <p className="text-xs text-muted-foreground">Achieved</p>
+                <p className="text-xl font-bold text-green-600">{stats.achieved}</p>
+                <p className="text-[10px] text-muted-foreground">Achieved ≥100%</p>
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">Achievement ≥ 100%</p>
           </CardContent>
         </Card>
 
         <Card
-          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'in_progress' && "ring-2 ring-yellow-500 ring-offset-2")}
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'good_to_go' && "ring-2 ring-emerald-500 ring-offset-2")}
+          onClick={() => handleStatusFilterClick('good_to_go')}
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-emerald-100 rounded-lg"><TrendingUp className="h-4 w-4 text-emerald-600" /></div>
+              <div>
+                <p className="text-xl font-bold text-emerald-600">{stats.goodToGo}</p>
+                <p className="text-[10px] text-muted-foreground">Good to Go 90-99%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'almost_there' && "ring-2 ring-yellow-500 ring-offset-2")}
+          onClick={() => handleStatusFilterClick('almost_there')}
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-yellow-100 rounded-lg"><TrendingUp className="h-4 w-4 text-yellow-600" /></div>
+              <div>
+                <p className="text-xl font-bold text-yellow-600">{stats.almostThere}</p>
+                <p className="text-[10px] text-muted-foreground">Almost There 50-89%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'in_progress' && "ring-2 ring-orange-500 ring-offset-2")}
           onClick={() => handleStatusFilterClick('in_progress')}
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg"><TrendingUp className="h-5 w-5 text-yellow-600" /></div>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-orange-100 rounded-lg"><TrendingDown className="h-4 w-4 text-orange-600" /></div>
               <div>
-                <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
-                <p className="text-xs text-muted-foreground">In Progress</p>
+                <p className="text-xl font-bold text-orange-600">{stats.inProgress}</p>
+                <p className="text-[10px] text-muted-foreground">In Progress 1-49%</p>
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">Achievement between 50% – 99%</p>
           </CardContent>
         </Card>
 
         <Card
-          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'not_achieved' && "ring-2 ring-red-500 ring-offset-2")}
-          onClick={() => handleStatusFilterClick('not_achieved')}
+          className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === 'not_started' && "ring-2 ring-red-500 ring-offset-2")}
+          onClick={() => handleStatusFilterClick('not_started')}
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg"><TrendingDown className="h-5 w-5 text-red-600" /></div>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-red-100 rounded-lg"><TrendingDown className="h-4 w-4 text-red-600" /></div>
               <div>
-                <p className="text-2xl font-bold text-red-600">{stats.notAchieved}</p>
-                <p className="text-xs text-muted-foreground">Not Achieved</p>
+                <p className="text-xl font-bold text-red-600">{stats.notStarted}</p>
+                <p className="text-[10px] text-muted-foreground">Not Started 0%</p>
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">Achievement below 50%</p>
           </CardContent>
         </Card>
       </div>
@@ -568,7 +601,7 @@ export function TeamTargetDashboard({
               {groupedData.map((group, idx) => {
                 const groupKey = group.managerId || `other-${idx}`;
                 const isCollapsed = collapsedGroups.has(groupKey);
-                const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 50 ? 'in_progress' : 'not_achieved';
+                const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
 
                 return (
                   <div key={groupKey} className="border rounded-lg overflow-hidden">
