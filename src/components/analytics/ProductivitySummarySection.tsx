@@ -99,7 +99,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
 
         supabase
           .from('visits')
-          .select('id, retailer_id, status, user_id, planned_date')
+          .select('id, retailer_id, status, no_order_reason, user_id, planned_date')
           .in('user_id', effectiveUserIds)
           .gte('planned_date', fromDate)
           .lte('planned_date', toDate),
@@ -140,9 +140,9 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
           .forEach(r => set.add(r.id));
       });
 
-      // Build per-user per-date: visit retailers grouped by retailer with best status
-      // Key: `userId_date` → Map<retailerId, bestStatus>
-      const visitRetailerStatusMap = new Map<string, Map<string, string>>();
+      // Build per-user per-date: visit retailers grouped by retailer with best status + no_order_reason
+      // Key: `userId_date` → Map<retailerId, { status, hasNoOrderReason }>
+      const visitRetailerStatusMap = new Map<string, Map<string, { status: string; hasNoOrderReason: boolean }>>();
       visits.forEach(v => {
         if (!v.retailer_id || !v.planned_date) return;
         const key = `${v.user_id}_${v.planned_date}`;
@@ -151,9 +151,17 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
         const existing = retailerStatuses.get(v.retailer_id);
         // Priority: productive wins over everything
         if (v.status === 'productive') {
-          retailerStatuses.set(v.retailer_id, 'productive');
-        } else if (!existing || existing === 'planned') {
-          retailerStatuses.set(v.retailer_id, v.status);
+          retailerStatuses.set(v.retailer_id, { status: 'productive', hasNoOrderReason: false });
+        } else if (!existing || existing.status === 'planned') {
+          retailerStatuses.set(v.retailer_id, { 
+            status: v.status, 
+            hasNoOrderReason: !!(v as any).no_order_reason 
+          });
+        } else {
+          // Merge: if any visit has no_order_reason, mark it
+          if ((v as any).no_order_reason && !existing.hasNoOrderReason) {
+            retailerStatuses.set(v.retailer_id, { ...existing, hasNoOrderReason: true });
+          }
         }
       });
 
@@ -188,15 +196,18 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
           // Productive: unique retailers with confirmed order OR productive visit
           const productiveSet = new Set<string>();
           orderRetailerIds.forEach(rid => productiveSet.add(rid));
-          retailerStatuses.forEach((status, rid) => {
-            if (status === 'productive') productiveSet.add(rid);
+          retailerStatuses.forEach((info, rid) => {
+            if (info.status === 'productive') productiveSet.add(rid);
           });
 
-          // Unproductive: retailers with any visit (not productive), NOT in productive set
+          // Unproductive: retailers with visit status 'unproductive' OR has no_order_reason
+          // (matching useVisitsData/calculateStats logic - cancelled/store-closed without reason = pending)
           const unproductiveSet = new Set<string>();
-          retailerStatuses.forEach((status, rid) => {
+          retailerStatuses.forEach((info, rid) => {
             if (!productiveSet.has(rid)) {
-              unproductiveSet.add(rid);
+              if (info.status === 'unproductive' || info.hasNoOrderReason) {
+                unproductiveSet.add(rid);
+              }
             }
           });
 
