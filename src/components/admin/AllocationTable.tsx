@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { TargetStrategySelector, TargetStrategy } from './TargetStrategySelector';
 
 interface EnabledParameters {
   product: boolean;
@@ -81,6 +82,41 @@ export function AllocationTable({
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>('manual');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
+  const [targetStrategy, setTargetStrategy] = useState<TargetStrategy>('roll_down');
+  const [managerOwnQuantity, setManagerOwnQuantity] = useState<number>(0);
+  const [managerOwnRevenue, setManagerOwnRevenue] = useState<number>(0);
+
+  // Fetch parent user's business plan to get their strategy
+  const { data: parentPlan } = useQuery({
+    queryKey: ['parent-business-plan', parentUserId, fyYear],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_business_plans')
+        .select('*')
+        .eq('user_id', parentUserId)
+        .eq('year', fyYear)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!parentUserId,
+  });
+
+  // Initialize strategy from saved data
+  useEffect(() => {
+    if (parentPlan) {
+      setTargetStrategy((parentPlan.target_strategy as TargetStrategy) || 'roll_down');
+      setManagerOwnQuantity(parentPlan.manager_own_quantity_target || 0);
+      setManagerOwnRevenue(parentPlan.manager_own_revenue_target || 0);
+    }
+  }, [parentPlan]);
+
+  // When strategy changes to roll_up, force manual allocation method
+  useEffect(() => {
+    if (targetStrategy === 'roll_up') {
+      setAllocationMethod('manual');
+    }
+  }, [targetStrategy]);
 
   // Fetch hierarchy recursively
   const { data: hierarchyData, isLoading } = useQuery({
@@ -247,9 +283,33 @@ export function AllocationTable({
     }
   };
 
+  // Computed roll-up totals (sum of direct reports' targets)
+  const rollUpTotals = useMemo(() => {
+    const qty = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.quantityTarget || 0), 0);
+    const rev = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.revenueTarget || 0), 0);
+    const vis = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.visitsTarget || 0), 0);
+    return { quantity: qty, revenue: rev, visits: vis };
+  }, [directReports, allocations]);
+
+  // The effective total for "Roll Down" mode is the parent's total target
+  // For "Roll Up" mode, the manager's target = sum of subordinates
+  // For "Independent" mode, manager has separate target
+  const effectiveManagerTarget = useMemo(() => {
+    switch (targetStrategy) {
+      case 'roll_up':
+        return { quantity: rollUpTotals.quantity, revenue: rollUpTotals.revenue, visits: rollUpTotals.visits };
+      case 'independent':
+        return { quantity: managerOwnQuantity, revenue: managerOwnRevenue, visits: 0 };
+      case 'roll_down':
+      default:
+        return { quantity: totalQuantity, revenue: totalRevenue, visits: totalVisits };
+    }
+  }, [targetStrategy, rollUpTotals, managerOwnQuantity, managerOwnRevenue, totalQuantity, totalRevenue, totalVisits]);
+
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Save subordinate allocations
       const upserts = Array.from(allocations.values()).map(alloc => ({
         id: alloc.existingPlanId || undefined,
         user_id: alloc.userId,
@@ -264,9 +324,38 @@ export function AllocationTable({
         .upsert(upserts, { onConflict: 'user_id,year' });
 
       if (error) throw error;
+
+      // Save the manager's own plan with strategy and own targets
+      const managerPlanData: Record<string, unknown> = {
+        user_id: parentUserId,
+        year: fyYear,
+        target_strategy: targetStrategy,
+        quantity_unit: quantityUnit,
+      };
+
+      if (targetStrategy === 'roll_up') {
+        managerPlanData.quantity_target = rollUpTotals.quantity;
+        managerPlanData.revenue_target = rollUpTotals.revenue;
+      } else if (targetStrategy === 'independent') {
+        managerPlanData.quantity_target = managerOwnQuantity;
+        managerPlanData.revenue_target = managerOwnRevenue;
+        managerPlanData.manager_own_quantity_target = managerOwnQuantity;
+        managerPlanData.manager_own_revenue_target = managerOwnRevenue;
+      } else {
+        // roll_down: manager target remains the org-level total
+        managerPlanData.quantity_target = totalQuantity;
+        managerPlanData.revenue_target = totalRevenue;
+      }
+
+      const { error: managerError } = await supabase
+        .from('user_business_plans')
+        .upsert(managerPlanData as any, { onConflict: 'user_id,year' });
+
+      if (managerError) throw managerError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hierarchy-allocations', parentUserId] });
+      queryClient.invalidateQueries({ queryKey: ['parent-business-plan', parentUserId, fyYear] });
       toast.success('Allocations saved successfully');
     },
     onError: (error: Error) => {
@@ -585,14 +674,17 @@ export function AllocationTable({
   const allocatedVisits = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.visitsTarget || 0), 0);
   const totalPercentage = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.percentage || 0), 0);
 
+  // In Roll Down mode, remaining = total - allocated. In Roll Up / Independent, no "remaining" concept.
+  const showRemaining = targetStrategy === 'roll_down';
   const remainingQuantity = totalQuantity - allocatedQuantity;
   const remainingRevenue = totalRevenue - allocatedRevenue;
   const remainingVisits = totalVisits - allocatedVisits;
-  const hasOverAllocation = 
+  const hasOverAllocation = showRemaining && (
     (enabledMetrics.quantity && remainingQuantity < 0) || 
     (enabledMetrics.revenue && remainingRevenue < 0) || 
     (enabledMetrics.visits && remainingVisits < 0) ||
-    (allocationMethod === 'percentage' && totalPercentage > 100);
+    (allocationMethod === 'percentage' && totalPercentage > 100)
+  );
 
   if (isLoading) {
     return (
@@ -641,69 +733,140 @@ export function AllocationTable({
           </div>
         </div>
 
-        {/* Allocation Method Toggle */}
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t">
-          <span className="text-sm text-muted-foreground">Method:</span>
-          <ToggleGroup 
-            type="single" 
-            value={allocationMethod} 
-            onValueChange={(v) => v && handleMethodChange(v as AllocationMethod)} 
-            size="sm"
-            className="bg-muted/50 p-0.5 rounded-lg"
-          >
-            <ToggleGroupItem 
-              value="equal" 
-              aria-label="Equal Distribution" 
-              className={cn(
-                "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-              )}
-            >
-              <Equal className="h-3.5 w-3.5" />
-              <span className="text-xs font-medium">Equal</span>
-            </ToggleGroupItem>
-            <ToggleGroupItem 
-              value="percentage" 
-              aria-label="Percentage Based"
-              className={cn(
-                "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-              )}
-            >
-              <Percent className="h-3.5 w-3.5" />
-              <span className="text-xs font-medium">Percentage</span>
-            </ToggleGroupItem>
-            <ToggleGroupItem 
-              value="manual" 
-              aria-label="Manual Entry"
-              className={cn(
-                "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-              )}
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-              <span className="text-xs font-medium">Manual</span>
-            </ToggleGroupItem>
-          </ToggleGroup>
-          
-          {allocationMethod === 'equal' && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={applyEqualDistribution}
-              className="ml-2 h-7 text-xs"
-            >
-              Re-distribute
-            </Button>
-          )}
-          {allocationMethod === 'percentage' && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={applyPercentageDistribution}
-              className="ml-2 h-7 text-xs"
-            >
-              Apply %
-            </Button>
-          )}
+        {/* Target Strategy Selector */}
+        <div className="mt-3 pt-3 border-t">
+          <TargetStrategySelector
+            value={targetStrategy}
+            onChange={setTargetStrategy}
+          />
         </div>
+
+        {/* Manager's Own Target (for Independent mode) */}
+        {targetStrategy === 'independent' && (
+          <div className="mt-3 p-3 bg-muted/30 rounded-lg border space-y-2">
+            <span className="text-sm font-medium">Manager's Own Target</span>
+            <div className="flex flex-wrap items-center gap-3">
+              {enabledMetrics.quantity && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Qty</span>
+                  <Input
+                    type="text"
+                    value={managerOwnQuantity > 0 ? formatNumber(managerOwnQuantity) : ''}
+                    onChange={(e) => setManagerOwnQuantity(parseNumber(e.target.value))}
+                    placeholder="0"
+                    className="h-8 w-24 text-right text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground">{quantityUnit}</span>
+                </div>
+              )}
+              {enabledMetrics.revenue && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">₹</span>
+                  <Input
+                    type="text"
+                    value={managerOwnRevenue > 0 ? formatNumber(managerOwnRevenue) : ''}
+                    onChange={(e) => setManagerOwnRevenue(parseNumber(e.target.value))}
+                    placeholder="0"
+                    className="h-8 w-28 text-right text-sm"
+                  />
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              This is the manager's personal target. Subordinate targets below are set independently.
+            </p>
+          </div>
+        )}
+
+        {/* Roll Up Summary (for Roll Up mode) */}
+        {targetStrategy === 'roll_up' && (
+          <div className="mt-3 p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-1">
+            <span className="text-sm font-medium text-primary">Manager's Target (Auto-calculated from subordinates)</span>
+            <div className="flex flex-wrap items-center gap-3">
+              {enabledMetrics.quantity && (
+                <Badge variant="outline" className="font-mono text-sm border-primary/30">
+                  {formatNumber(rollUpTotals.quantity)} {quantityUnit}
+                </Badge>
+              )}
+              {enabledMetrics.revenue && (
+                <Badge variant="outline" className="font-mono text-sm border-primary/30">
+                  {formatCurrency(rollUpTotals.revenue)}
+                </Badge>
+              )}
+              {enabledMetrics.visits && (
+                <Badge variant="outline" className="font-mono text-sm border-primary/30">
+                  {formatNumber(rollUpTotals.visits)} visits
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Allocation Method Toggle - visible for Roll Down and Independent modes */}
+        {targetStrategy !== 'roll_up' && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+            <span className="text-sm text-muted-foreground">Method:</span>
+            <ToggleGroup 
+              type="single" 
+              value={allocationMethod} 
+              onValueChange={(v) => v && handleMethodChange(v as AllocationMethod)} 
+              size="sm"
+              className="bg-muted/50 p-0.5 rounded-lg"
+            >
+              <ToggleGroupItem 
+                value="equal" 
+                aria-label="Equal Distribution" 
+                className={cn(
+                  "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                )}
+              >
+                <Equal className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">Equal</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="percentage" 
+                aria-label="Percentage Based"
+                className={cn(
+                  "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                )}
+              >
+                <Percent className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">Percentage</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="manual" 
+                aria-label="Manual Entry"
+                className={cn(
+                  "gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                )}
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">Manual</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+            
+            {allocationMethod === 'equal' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={applyEqualDistribution}
+                className="ml-2 h-7 text-xs"
+              >
+                Re-distribute
+              </Button>
+            )}
+            {allocationMethod === 'percentage' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={applyPercentageDistribution}
+                className="ml-2 h-7 text-xs"
+              >
+                Apply %
+              </Button>
+            )}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -716,11 +879,15 @@ export function AllocationTable({
           renderTableView()
         )}
 
-        {/* Remaining Summary */}
+        {/* Summary Section */}
         <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border">
-          <span className="font-medium text-sm">Remaining to allocate:</span>
+          <span className="font-medium text-sm">
+            {targetStrategy === 'roll_up' ? 'Total from subordinates:' 
+              : targetStrategy === 'independent' ? 'Subordinate totals:'
+              : 'Remaining to allocate:'}
+          </span>
           <div className="flex flex-wrap items-center gap-2">
-            {allocationMethod === 'percentage' && (
+            {showRemaining && allocationMethod === 'percentage' && (
               <Badge 
                 variant={totalPercentage > 100 ? 'destructive' : totalPercentage === 100 ? 'default' : 'secondary'}
                 className="font-mono"
@@ -730,26 +897,32 @@ export function AllocationTable({
             )}
             {enabledMetrics.quantity && (
               <Badge 
-                variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}
+                variant={showRemaining 
+                  ? (remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary')
+                  : 'outline'}
                 className="font-mono"
               >
-                {formatNumber(remainingQuantity)} {quantityUnit}
+                {showRemaining ? formatNumber(remainingQuantity) : formatNumber(allocatedQuantity)} {quantityUnit}
               </Badge>
             )}
             {enabledMetrics.revenue && (
               <Badge 
-                variant={remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary'}
+                variant={showRemaining 
+                  ? (remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary')
+                  : 'outline'}
                 className="font-mono"
               >
-                {formatCurrency(remainingRevenue)}
+                {showRemaining ? formatCurrency(remainingRevenue) : formatCurrency(allocatedRevenue)}
               </Badge>
             )}
             {enabledMetrics.visits && (
               <Badge 
-                variant={remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary'}
+                variant={showRemaining 
+                  ? (remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary')
+                  : 'outline'}
                 className="font-mono"
               >
-                {formatNumber(remainingVisits)} visits
+                {showRemaining ? formatNumber(remainingVisits) : formatNumber(allocatedVisits)} visits
               </Badge>
             )}
           </div>
