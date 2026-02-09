@@ -1463,12 +1463,40 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       const { jsPDF } = await import('jspdf');
       
       const element = reportContentRef.current;
+
+      // Temporarily expand all scrollable/overflow-hidden containers so ALL rows render
+      const overflowEls = element.querySelectorAll<HTMLElement>('[class*="max-h-"], [class*="overflow-y"], [class*="overflow-hidden"], [class*="overflow-x"]');
+      const savedStyles: { el: HTMLElement; overflow: string; maxHeight: string; height: string }[] = [];
+      overflowEls.forEach(el => {
+        savedStyles.push({
+          el,
+          overflow: el.style.overflow,
+          maxHeight: el.style.maxHeight,
+          height: el.style.height,
+        });
+        el.style.overflow = 'visible';
+        el.style.maxHeight = 'none';
+        el.style.height = 'auto';
+      });
+
+      // Wait for layout to settle
+      await new Promise(r => setTimeout(r, 300));
+
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
         logging: false,
+        windowHeight: element.scrollHeight,
+        height: element.scrollHeight,
+      });
+
+      // Restore original styles
+      savedStyles.forEach(({ el, overflow, maxHeight, height }) => {
+        el.style.overflow = overflow;
+        el.style.maxHeight = maxHeight;
+        el.style.height = height;
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -1484,7 +1512,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       
       const pdf = new jsPDF('p', 'pt', 'a4');
       
-      // If content fits on one page
       if (scaledHeight <= pdfHeight - margin * 2) {
         pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
       } else {
