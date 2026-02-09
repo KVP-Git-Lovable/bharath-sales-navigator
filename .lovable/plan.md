@@ -1,125 +1,109 @@
 
+# Fix Roll Up / Roll Down Target Strategy
 
-# Add "Delete Data" Button to Edit User Dialog
+## Problem Summary
 
-## Overview
-Add a "Delete Data" button to the Edit User screen that allows administrators to selectively delete a user's data by module **without deleting the user account itself**. This is separate from the existing "Delete User" button which removes the entire user.
+Three interconnected bugs in the Organization Hierarchy target allocation:
 
-## How It Works
+1. **Roll-up does not auto-calculate from subordinates** -- When Roll Up is selected, the manager's target should be the sum of their subordinates' targets, but currently it just reads the stored value from the database without computing.
 
-The admin clicks "Delete Data" in the Edit User dialog, which opens a new confirmation dialog with two options:
-1. **Delete All Data** -- Removes all records belonging to the user across every module (but keeps the user account active)
-2. **Selective Deletion (Module-wise)** -- Lets the admin pick specific modules (Orders, Retailers, Beats, etc.) and only deletes data from the chosen modules
+2. **No per-manager strategy selection** -- You cannot select Roll Up for a specific manager (e.g., Girish) while viewing from the parent level. The strategy currently applies only to the selected org tree node.
 
-A final confirmation step prevents accidental data loss.
+3. **Girish shows incorrect value (25,000)** -- Girish's stored target is from an earlier equal distribution. With Roll Up active, his target should auto-calculate as **256,000 Kg** (sum of his 10 subordinates' targets).
+
+## Root Cause
+
+The current architecture stores a single `target_strategy` per user in `user_business_plans`, but:
+- The allocation table only computes roll-up for the TOP-LEVEL selected user's direct reports
+- It does NOT cascade downward (Girish's subordinates are not summed into Girish's target)
+- Each subordinate-manager's strategy is ignored when viewed from a higher level
+- The same `quantity_target` field is used for both "what the boss allocated" and "team roll-up total"
+
+## Solution
+
+### 1. Per-Manager Strategy Indicator in Allocation Table
+
+Add a small strategy toggle (Roll Up / Roll Down / Independent) next to each subordinate who is a manager (has subordinates). This allows setting the strategy per-user from the parent view without needing to navigate the org tree.
+
+```text
++---------------------------------------------------+
+| Girish  [L1] [10 subs]  [Roll Up v]   256,000 Kg  |
+|   (auto-calculated from subordinates)              |
++---------------------------------------------------+
+| Kumar   [L1] [0 subs]               25,000 Kg     |
++---------------------------------------------------+
+```
+
+### 2. Cascading Roll-Up Computation
+
+When loading the allocation table data, after fetching all subordinates and their existing plans:
+
+- Check each subordinate's `target_strategy` from their `user_business_plans` record
+- For any user with `roll_up` strategy who has subordinates in the tree, compute their target as the **sum of their direct subordinates' targets**
+- This cascades recursively (if a sub-manager also has roll_up, their target is computed first from their subordinates, then rolls up to the parent)
+- The computed value is displayed as read-only (since it's derived, not manually set)
+
+### 3. Fix Save Logic
+
+When saving allocations:
+- For each user with `roll_up` strategy, save the computed sum as their `quantity_target` and `revenue_target`
+- For each user with `roll_down` or `independent` strategy, save the manually entered value
+- Save each user's `target_strategy` in their own `user_business_plans` record (not just the parent's)
+
+### 4. Visual Indicators
+
+- Show a strategy badge next to each manager-user in both Tree and Table views
+- When a user has `roll_up`, their target input becomes **read-only** with a label "Auto-calculated"
+- Show the breakdown tooltip: "Sum of 10 subordinates = 256,000 Kg"
+
+## Files to Modify
+
+### `src/components/admin/AllocationTable.tsx`
+- Load each subordinate's `target_strategy` from their business plan (already fetched via `plans` query)
+- Add recursive `computeRollUpTargets()` function that traverses the tree bottom-up
+- Add per-user strategy dropdown for manager-users (users with `subordinateCount > 0`)
+- Make target inputs read-only for users with `roll_up` strategy
+- Update save mutation to persist each user's strategy alongside their targets
+- Fix `rollUpTotals` to use cascaded computed values instead of raw stored values
+
+### `src/components/admin/TargetStrategySelector.tsx`
+- Create a compact inline variant for per-row usage (small dropdown instead of 3 card layout)
+- Keep the existing card-based selector for the top-level strategy
+
+### `src/components/admin/OrganizationTree.tsx`
+- Show strategy badge (arrow-up / arrow-down icon) next to manager nodes
+- Helps users visually see which strategy each manager uses
 
 ## Technical Details
 
-### 1. New Component: `UserDeleteDataDialog.tsx`
-
-Create `src/components/admin/UserDeleteDataDialog.tsx` with:
-
-- **Two radio options**: "Delete All Data" and "Selective Deletion"
-- **Module checklist** (visible when Selective is chosen) grouped by category:
-  - **Orders** (orders, order_items, invoices, packing_lists)
-  - **Retailers** (retailers, retailer_visit_logs, retailer_feedback)
-  - **Beats** (beats, beat_plans, beat_allowances)
-  - **Visits** (visits)
-  - **Attendance** (attendance, leave_applications, leave_balance, regularization_requests)
-  - **Targets** (user_period_targets, user_business_plans, hierarchy_target_allocations)
-  - **Gamification** (gamification_points, gamification_daily_tracking, etc.)
-  - **GPS Tracking** (gps_tracking, gps_tracking_stops)
-  - **Communication** (notifications, chat_conversations, push_content_posts)
-  - **Learning** (coach_user_progress, coach_chat_messages, etc.)
-  - **Expenses** (additional_expenses)
-  - **Performance** (user_monthly_scorecards, competency_coaching_notes)
-
-- **Data summary**: Reuses the existing `getUserDataSummary()` utility to show record counts per module
-- **Final confirmation**: A two-step confirm -- first select modules, then a warning alert before execution
-- Deleted data is archived to the recycle bin before removal (same pattern as user deletion)
-
-### 2. New Edge Function: `admin-delete-user-data`
-
-Create `supabase/functions/admin-delete-user-data/index.ts` that:
-
-- Accepts `{ userId, deleteMode: 'all' | 'selective', selectedModules?: string[] }`
-- Verifies admin access (same auth pattern as `admin-delete-user`)
-- Uses the service-role Supabase client to bypass RLS
-- Archives selected data to recycle bin before deletion
-- Handles cascading deletes (e.g., order_items before orders, chat_messages before chat_conversations)
-- Does **NOT** delete the user account, profile, employee record, or auth user -- only the module data
-- Returns a summary of what was deleted
-
-### 3. Update `EditUserDialog.tsx`
-
-- Add a "Delete Data" button (orange/warning color) in the footer, next to the existing "Delete User" button
-- Add state `showDeleteDataDialog` to control the new dialog
-- Import and render the new `UserDeleteDataDialog` component
-
-### 4. Update `supabase/config.toml`
-
-- Add the new `admin-delete-user-data` function entry with `verify_jwt = false` (auth handled in code)
-
-### Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/admin/UserDeleteDataDialog.tsx` | **CREATE** | New dialog with delete all / selective module options |
-| `supabase/functions/admin-delete-user-data/index.ts` | **CREATE** | Edge function for selective data deletion |
-| `src/components/admin/EditUserDialog.tsx` | **MODIFY** | Add "Delete Data" button and wire up new dialog |
-| `supabase/config.toml` | **MODIFY** | Register new edge function |
-
-### UI Layout (Edit User Footer)
+### Cascading Roll-Up Algorithm
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  [Delete Data]  [Delete User]     [Cancel]  [Save]       │
-│  (orange)       (red)             (outline)  (primary)   │
-└──────────────────────────────────────────────────────────┘
+function computeEffectiveTarget(node):
+    if node has no children:
+        return node.storedTarget  // leaf user
+
+    if node.strategy == 'roll_up':
+        total = 0
+        for each child in node.children:
+            total += computeEffectiveTarget(child)
+        node.displayTarget = total  // auto-calculated
+        return total
+    else:
+        return node.storedTarget  // manually set or from DB
 ```
 
-### Delete Data Dialog Flow
+### Per-User Strategy Storage
 
-```text
-Step 1: Choose deletion mode
-┌─────────────────────────────────────────────────┐
-│  Delete User Data                               │
-│                                                  │
-│  Delete data for "John Smith"                    │
-│  (The user account will remain active)           │
-│                                                  │
-│  Found 245 records across 15 tables              │
-│                                                  │
-│  ○ Delete All Data                               │
-│    Remove all 245 records across all modules     │
-│                                                  │
-│  ○ Selective Deletion (Module-wise)              │
-│    Choose specific modules to delete             │
-│                                                  │
-│  [When selective is chosen:]                     │
-│  ☑ Orders (42 records)                          │
-│  ☑ Retailers (15 records)                       │
-│  ☐ Beats (5 records)                            │
-│  ☑ Visits (80 records)                          │
-│  ☐ Attendance (30 records)                      │
-│  ...                                             │
-│                                                  │
-│  [Cancel]  [Continue to Confirm]                 │
-└─────────────────────────────────────────────────┘
+Each user's `user_business_plans` row already has the `target_strategy` column. The fix ensures:
+- When saving from a parent view, each subordinate-manager's strategy is persisted in THEIR row
+- The `quantity_target` for roll-up users is saved as the computed sum (for reporting consistency)
 
-Step 2: Final confirmation
-┌─────────────────────────────────────────────────┐
-│  ⚠ Confirm Data Deletion                        │
-│                                                  │
-│  You are about to permanently delete:            │
-│  • Orders: 42 records                            │
-│  • Retailers: 15 records                         │
-│  • Visits: 80 records                            │
-│                                                  │
-│  This will archive data to the Recycle Bin.      │
-│  This action cannot be easily undone.            │
-│                                                  │
-│  [Go Back]  [Confirm Delete]                     │
-└─────────────────────────────────────────────────┘
-```
+### Data Fix for Girish
 
+After the code fix, when Girish's strategy is set to `roll_up`:
+- His displayed target will auto-compute as: 27,000 + 3,000 + 9,000 + 30,000 + 18,000 + 18,000 + 42,000 + 25,000 + 72,000 + 12,000 = **256,000 Kg**
+- This value replaces the incorrect 25,000 Kg
+- On save, this computed value is written to his `quantity_target`
+
+No database migration is needed -- the `target_strategy`, `manager_own_quantity_target`, and `manager_own_revenue_target` columns already exist.
