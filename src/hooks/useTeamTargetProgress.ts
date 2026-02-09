@@ -24,7 +24,7 @@ export interface TeamMemberProgress {
   actual: number;
   achievementPercentage: number;
   gap: number;
-  status: 'achieved' | 'in_progress' | 'not_achieved';
+  status: 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved';
   adjustments?: {
     holidays: number;
     leaves: number;
@@ -233,14 +233,18 @@ export const useTeamTargetProgress = ({ userIds, periodType, date, basis, enable
         const achievementPercentage = target > 0 ? (actual / target) * 100 : 0;
         const gap = actual - target;
 
-        // Determine status
-        let status: 'achieved' | 'in_progress' | 'not_achieved';
+        // Determine status based on achievement percentage
+        let status: 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved';
         if (achievementPercentage >= 100) {
           status = 'achieved';
+        } else if (achievementPercentage >= 90) {
+          status = 'good_to_go';
         } else if (achievementPercentage >= 50) {
+          status = 'almost_there';
+        } else if (achievementPercentage >= 1) {
           status = 'in_progress';
         } else {
-          status = 'not_achieved';
+          status = 'not_started';
         }
 
         // Build product-month breakdown if applicable
