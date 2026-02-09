@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarIcon, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { JourneyMap } from '@/components/JourneyMap';
@@ -32,6 +32,8 @@ interface VisitStats {
   pending: number;
 }
 
+type DateRangeMode = 'today' | 'week' | 'month' | 'custom';
+
 export default function GPSTrack() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -46,6 +48,31 @@ export default function GPSTrack() {
     }
     return new Date();
   });
+  const [dateRangeMode, setDateRangeMode] = useState<DateRangeMode>('today');
+  
+  // Compute date range based on mode
+  const { startDate, endDate } = useMemo(() => {
+    switch (dateRangeMode) {
+      case 'week':
+        return {
+          startDate: startOfWeek(date, { weekStartsOn: 1 }),
+          endDate: endOfWeek(date, { weekStartsOn: 1 }),
+        };
+      case 'month':
+        return {
+          startDate: startOfMonth(date),
+          endDate: endOfMonth(date),
+        };
+      case 'today':
+      case 'custom':
+      default:
+        return { startDate: date, endDate: date };
+    }
+  }, [date, dateRangeMode]);
+
+  const startDateStr = useMemo(() => format(startDate, 'yyyy-MM-dd'), [startDate]);
+  const endDateStr = useMemo(() => format(endDate, 'yyyy-MM-dd'), [endDate]);
+  const isRange = dateRangeMode === 'week' || dateRangeMode === 'month';
   const [gpsData, setGpsData] = useState<GPSData[]>([]);
   const [retailers, setRetailers] = useState<EnhancedRetailerLocation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,13 +144,13 @@ export default function GPSTrack() {
     if (!selectedMember) return;
 
     setLoading(true);
-    const dateStr = date.toISOString().split('T')[0];
 
     const { data, error } = await supabase
       .from('gps_tracking')
       .select('*')
       .eq('user_id', selectedMember)
-      .eq('date', dateStr)
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
       .order('timestamp', { ascending: true });
 
     if (error) {
@@ -150,15 +177,15 @@ export default function GPSTrack() {
   const loadRetailerLocations = async () => {
     if (!selectedMember) return;
 
-    const dateStr = date.toISOString().split('T')[0];
-    console.log('Loading ALL retailer locations for date:', dateStr, 'user:', selectedMember);
+    console.log('Loading ALL retailer locations for range:', startDateStr, '-', endDateStr, 'user:', selectedMember);
 
-    // First, get all beat plans for the day
+    // First, get all beat plans for the date range
     const { data: beatPlans, error: beatPlansError } = await supabase
       .from('beat_plans')
       .select('beat_id')
       .eq('user_id', selectedMember)
-      .eq('plan_date', dateStr);
+      .gte('plan_date', startDateStr)
+      .lte('plan_date', endDateStr);
 
     if (beatPlansError) {
       console.error('Error loading beat plans:', beatPlansError);
@@ -190,24 +217,26 @@ export default function GPSTrack() {
       return;
     }
 
-    // Get visits for this date
+    // Get visits for this date range
     const { data: visitsData, error: visitsError } = await supabase
       .from('visits')
       .select('id, check_in_time, check_out_time, status, retailer_id, no_order_reason, check_in_location, check_in_address')
       .eq('user_id', selectedMember)
-      .eq('planned_date', dateStr)
+      .gte('planned_date', startDateStr)
+      .lte('planned_date', endDateStr)
       .not('retailer_id', 'is', null);
 
     if (visitsError) {
       console.error('Error loading visits:', visitsError);
     }
 
-    // Get orders for this date
+    // Get orders for this date range
     const { data: ordersData, error: ordersError } = await supabase
       .from('orders')
       .select('retailer_id')
       .eq('user_id', selectedMember)
-      .eq('order_date', dateStr)
+      .gte('order_date', startDateStr)
+      .lte('order_date', endDateStr)
       .eq('status', 'confirmed');
 
     if (ordersError) {
@@ -346,13 +375,16 @@ export default function GPSTrack() {
   const loadBeatInfo = async () => {
     if (!selectedMember) return;
 
-    const dateStr = date.toISOString().split('T')[0];
+    if (isRange) {
+      setBeatName('Multiple beats');
+      return;
+    }
     
     const { data, error } = await supabase
       .from('beat_plans')
       .select('beat_name')
       .eq('user_id', selectedMember)
-      .eq('plan_date', dateStr)
+      .eq('plan_date', startDateStr)
       .maybeSingle();
 
     if (error) {
@@ -366,14 +398,13 @@ export default function GPSTrack() {
   const loadVisitStats = useCallback(async () => {
     if (!selectedMember) return;
 
-    const dateStr = date.toISOString().split('T')[0];
-    
     // Calculate stats directly from visits table (not dependent on retailer coordinates)
     const { data: visits, error } = await supabase
       .from('visits')
       .select('id, status, no_order_reason')
       .eq('user_id', selectedMember)
-      .eq('planned_date', dateStr);
+      .gte('planned_date', startDateStr)
+      .lte('planned_date', endDateStr);
 
     if (error) {
       console.error('Error loading visit stats:', error);
@@ -395,7 +426,7 @@ export default function GPSTrack() {
     } else {
       setVisitStats({ planned: 0, productive: 0, unproductive: 0, pending: 0 });
     }
-  }, [selectedMember, date]);
+  }, [selectedMember, startDateStr, endDateStr]);
 
   // Data loading effect - called after all functions are defined
   useEffect(() => {
@@ -405,7 +436,7 @@ export default function GPSTrack() {
       loadBeatInfo();
       loadVisitStats();
     }
-  }, [selectedMember, date, loadVisitStats]);
+  }, [selectedMember, startDateStr, endDateStr, loadVisitStats]);
 
   const isViewingOtherUser = currentLocationUser !== user?.id;
 
@@ -476,21 +507,49 @@ export default function GPSTrack() {
           <TabsContent value="day" className="space-y-6 mt-6">
             {/* Filters */}
             <Card className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Date Selector */}
+              <div className="space-y-4">
+                {/* Date Range Presets */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Date</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(date, 'PPP')}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} />
-                    </PopoverContent>
-                  </Popover>
+                  <label className="text-sm font-medium">Select Date Range</label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={dateRangeMode === 'today' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => { setDateRangeMode('today'); setDate(new Date()); }}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      variant={dateRangeMode === 'week' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => { setDateRangeMode('week'); setDate(new Date()); }}
+                    >
+                      This Week
+                    </Button>
+                    <Button
+                      variant={dateRangeMode === 'month' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => { setDateRangeMode('month'); setDate(new Date()); }}
+                    >
+                      This Month
+                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant={dateRangeMode === 'custom' ? 'default' : 'outline'} size="sm">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRangeMode === 'custom' ? format(date, 'PPP') : 'Pick Date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setDateRangeMode('custom'); } }} />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {isRange
+                      ? `Showing: ${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d, yyyy')}`
+                      : `Showing: ${format(date, 'PPP')}`}
+                  </p>
                 </div>
 
                 {/* Team Member Selector - For Managers with subordinates */}
@@ -557,7 +616,15 @@ export default function GPSTrack() {
               {/* GPS Tracking Info */}
               {gpsData.length > 0 && (
                 <Card className="p-4">
-                  <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Period</div>
+                      <div className="text-base font-semibold">
+                        {isRange
+                          ? `${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d')}`
+                          : format(date, 'MMM d, yyyy')}
+                      </div>
+                    </div>
                     <div>
                       <div className="text-sm text-muted-foreground">GPS Points</div>
                       <div className="text-xl font-bold">{gpsData.length}</div>
