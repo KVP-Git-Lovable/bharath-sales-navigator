@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, MapPin } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +50,8 @@ export default function GPSTrack() {
     return new Date();
   });
   const [dateRangeMode, setDateRangeMode] = useState<DateRangeMode>('today');
+  const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
+  const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
   
   // Compute date range based on mode
   const { startDate, endDate } = useMemo(() => {
@@ -63,16 +66,17 @@ export default function GPSTrack() {
           startDate: startOfMonth(date),
           endDate: endOfMonth(date),
         };
-      case 'today':
       case 'custom':
+        return { startDate: customStartDate, endDate: customEndDate };
+      case 'today':
       default:
         return { startDate: date, endDate: date };
     }
-  }, [date, dateRangeMode]);
+  }, [date, dateRangeMode, customStartDate, customEndDate]);
 
   const startDateStr = useMemo(() => format(startDate, 'yyyy-MM-dd'), [startDate]);
   const endDateStr = useMemo(() => format(endDate, 'yyyy-MM-dd'), [endDate]);
-  const isRange = dateRangeMode === 'week' || dateRangeMode === 'month';
+  const isRange = dateRangeMode === 'week' || dateRangeMode === 'month' || dateRangeMode === 'custom';
   const [gpsData, setGpsData] = useState<GPSData[]>([]);
   const [retailers, setRetailers] = useState<EnhancedRetailerLocation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -508,43 +512,81 @@ export default function GPSTrack() {
             {/* Filters */}
             <Card className="p-6">
               <div className="space-y-4">
-                {/* Date Range Presets */}
-                <div className="space-y-2">
+                {/* Date Range Selection */}
+                <div className="space-y-3">
                   <label className="text-sm font-medium">Select Date Range</label>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={dateRangeMode === 'today' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => { setDateRangeMode('today'); setDate(new Date()); }}
-                    >
-                      Today
-                    </Button>
-                    <Button
-                      variant={dateRangeMode === 'week' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => { setDateRangeMode('week'); setDate(new Date()); }}
-                    >
-                      This Week
-                    </Button>
-                    <Button
-                      variant={dateRangeMode === 'month' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => { setDateRangeMode('month'); setDate(new Date()); }}
-                    >
-                      This Month
-                    </Button>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant={dateRangeMode === 'custom' ? 'default' : 'outline'} size="sm">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRangeMode === 'custom' ? format(date, 'PPP') : 'Pick Date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setDateRangeMode('custom'); } }} />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <Select
+                    value={dateRangeMode}
+                    onValueChange={(value: DateRangeMode) => {
+                      setDateRangeMode(value);
+                      if (value !== 'custom') {
+                        setDate(new Date());
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select range" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background z-50">
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="custom">Custom Date Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Custom date range pickers */}
+                  {dateRangeMode === 'custom' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">From</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal text-sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {format(customStartDate, 'MMM d, yyyy')}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-50" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={customStartDate}
+                              onSelect={(d) => {
+                                if (d) {
+                                  setCustomStartDate(d);
+                                  if (d > customEndDate) setCustomEndDate(d);
+                                }
+                              }}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">To</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal text-sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {format(customEndDate, 'MMM d, yyyy')}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-50" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={customEndDate}
+                              onSelect={(d) => {
+                                if (d && d >= customStartDate) setCustomEndDate(d);
+                              }}
+                              disabled={(d) => d < customStartDate}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  )}
+
                   <p className="text-sm text-muted-foreground">
                     {isRange
                       ? `Showing: ${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d, yyyy')}`
