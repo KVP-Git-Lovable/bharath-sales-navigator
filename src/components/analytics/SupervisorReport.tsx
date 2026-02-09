@@ -161,10 +161,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   }[]>([]);
   const [retailerDetailsLoading, setRetailerDetailsLoading] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
-  const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
-  const [invoiceViewerUrl, setInvoiceViewerUrl] = useState<string | null>(null);
-  const [invoiceViewerName, setInvoiceViewerName] = useState('');
-  const [invoiceViewerBlob, setInvoiceViewerBlob] = useState<Blob | null>(null);
   const [loadingInvoiceView, setLoadingInvoiceView] = useState<string | null>(null);
 
   // State for SKU filter from chart clicks - when a user is clicked in Order Summary charts
@@ -2018,10 +2014,15 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
                         setLoadingInvoiceView(orderId);
                         const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
                         const url = URL.createObjectURL(blob);
-                        setInvoiceViewerUrl(url);
-                        setInvoiceViewerBlob(blob);
-                        setInvoiceViewerName(`Invoice-${invoiceNumber}.pdf`);
-                        setInvoiceViewerOpen(true);
+                        // Open PDF in new tab instead of iframe (Chrome blocks blob iframes)
+                        const newTab = window.open(url, '_blank', 'noopener,noreferrer');
+                        if (!newTab) {
+                          // Fallback: download directly
+                          await downloadPDF(blob, `Invoice-${invoiceNumber}.pdf`);
+                          toast.success('Invoice downloaded');
+                        }
+                        // Clean up blob URL after a delay
+                        setTimeout(() => URL.revokeObjectURL(url), 60000);
                       } catch (error) {
                         console.error('Error generating invoice:', error);
                         toast.error('Failed to generate invoice');
@@ -2079,54 +2080,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </DialogContent>
       </Dialog>
 
-      {/* Invoice Viewer Dialog */}
-      <Dialog open={invoiceViewerOpen} onOpenChange={(open) => {
-        if (!open) {
-          setInvoiceViewerOpen(false);
-          if (invoiceViewerUrl) {
-            URL.revokeObjectURL(invoiceViewerUrl);
-            setInvoiceViewerUrl(null);
-          }
-          setInvoiceViewerBlob(null);
-        }
-      }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                {invoiceViewerName}
-              </DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (invoiceViewerBlob) {
-                    await downloadPDF(invoiceViewerBlob, invoiceViewerName);
-                    toast.success('Invoice downloaded');
-                  }
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 min-h-[60vh]">
-            {invoiceViewerUrl ? (
-              <iframe
-                src={invoiceViewerUrl}
-                className="w-full h-[60vh] border rounded-lg"
-                title={invoiceViewerName}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-[60vh]">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+
+
 
 
       <Dialog open={othersDialogOpen} onOpenChange={setOthersDialogOpen}>
