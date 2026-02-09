@@ -11,7 +11,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Users, Trophy, TrendingUp, TrendingDown, Calendar as CalendarIcon, Filter, Globe, ChevronDown, ChevronRight, Package } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
@@ -60,6 +60,24 @@ export function TeamTargetDashboard({
     basis,
     enabledParameters,
   });
+
+  // Compute date range based on period type
+  const dateRange = useMemo(() => {
+    switch (periodType) {
+      case 'day':
+        return { from: selectedDate, to: selectedDate };
+      case 'week':
+        return { from: startOfWeek(selectedDate, { weekStartsOn: 1 }), to: endOfWeek(selectedDate, { weekStartsOn: 1 }) };
+      case 'month':
+        return { from: startOfMonth(selectedDate), to: endOfMonth(selectedDate) };
+      case 'quarter':
+        return { from: startOfQuarter(selectedDate), to: endOfQuarter(selectedDate) };
+      case 'year':
+        return { from: startOfYear(selectedDate), to: endOfYear(selectedDate) };
+      default:
+        return { from: selectedDate, to: selectedDate };
+    }
+  }, [periodType, selectedDate]);
 
   // Calculate summary stats
   const stats = useMemo(() => {
@@ -233,6 +251,16 @@ export function TeamTargetDashboard({
                 </PopoverContent>
               </Popover>
             </div>
+
+            {/* Date Range Display */}
+            {periodType !== 'day' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-muted-foreground">Date Range</label>
+                <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
+                  {format(dateRange.from, "dd MMM yyyy")} – {format(dateRange.to, "dd MMM yyyy")}
+                </div>
+              </div>
+            )}
 
             {/* Basis Toggle */}
             <div className="flex flex-col gap-1.5">
