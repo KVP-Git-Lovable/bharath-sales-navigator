@@ -488,6 +488,24 @@ const TerritoriesManagement = () => {
     if (!territoryToDelete) return;
     
     try {
+      // Check if retailers are assigned to this territory
+      const { count, error: countError } = await supabase
+        .from('retailers')
+        .select('id', { count: 'exact', head: true })
+        .eq('territory_id', territoryToDelete.id);
+
+      if (countError) throw countError;
+
+      if (count && count > 0) {
+        toast.error(
+          `Cannot delete "${territoryToDelete.name}" — ${count} retailer${count > 1 ? 's are' : ' is'} still assigned to this territory. Please reassign them first.`,
+          { duration: 5000 }
+        );
+        setTerritoryToDelete(null);
+        setDeleteConfirmOpen(false);
+        return;
+      }
+
       await moveToRecycleBin({
         tableName: 'territories',
         recordId: territoryToDelete.id,
