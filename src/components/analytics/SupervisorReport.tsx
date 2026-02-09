@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity, Volume2, ShoppingCart, IndianRupee, CreditCard, Eye, EyeOff } from 'lucide-react';
+import { RefreshCw, X, Store, MapPin, Package, Scale, PieChartIcon, BarChart3, Sparkles, TrendingUp, AlertTriangle, Target, CheckCircle2, ChevronDown, Users, Download, Loader2, Activity, Volume2, ShoppingCart, IndianRupee, CreditCard, Eye, EyeOff, FileText } from 'lucide-react';
 import { fetchAndGenerateInvoice } from '@/utils/invoiceGenerator';
 import { downloadPDF } from '@/utils/fileDownloader';
 import { toast } from 'sonner';
@@ -159,6 +159,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   }[]>([]);
   const [retailerDetailsLoading, setRetailerDetailsLoading] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
+  const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
+  const [invoiceViewerUrl, setInvoiceViewerUrl] = useState<string | null>(null);
+  const [invoiceViewerName, setInvoiceViewerName] = useState('');
+  const [invoiceViewerBlob, setInvoiceViewerBlob] = useState<Blob | null>(null);
+  const [loadingInvoiceView, setLoadingInvoiceView] = useState<string | null>(null);
 
   // State for SKU filter from chart clicks - when a user is clicked in Order Summary charts
   const [skuFilterUser, setSkuFilterUser] = useState<string | null>(null);
@@ -1921,24 +1926,25 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
                 </TableHeader>
                 <TableBody>
                   {retailerDetailsData.map((retailer, index) => {
-                    const isDownloading = retailer.order_ids.some(id => downloadingInvoice === id);
+                    const isLoading = retailer.order_ids.some(id => loadingInvoiceView === id);
                     
-                    const handleDownloadInvoices = async () => {
+                    const handleShowInvoice = async () => {
                       if (retailer.order_ids.length === 0) return;
                       
                       try {
-                        // Download all invoices for this retailer
-                        for (const orderId of retailer.order_ids) {
-                          setDownloadingInvoice(orderId);
-                          const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
-                          await downloadPDF(blob, `invoice-${invoiceNumber}.pdf`);
-                        }
-                        toast.success(`${retailer.order_ids.length > 1 ? `${retailer.order_ids.length} invoices` : 'Invoice'} downloaded`);
+                        const orderId = retailer.order_ids[0];
+                        setLoadingInvoiceView(orderId);
+                        const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
+                        const url = URL.createObjectURL(blob);
+                        setInvoiceViewerUrl(url);
+                        setInvoiceViewerBlob(blob);
+                        setInvoiceViewerName(`Invoice-${invoiceNumber}.pdf`);
+                        setInvoiceViewerOpen(true);
                       } catch (error) {
-                        console.error('Error downloading invoice:', error);
-                        toast.error('Failed to download invoice');
+                        console.error('Error generating invoice:', error);
+                        toast.error('Failed to generate invoice');
                       } finally {
-                        setDownloadingInvoice(null);
+                        setLoadingInvoiceView(null);
                       }
                     };
                     
@@ -1954,14 +1960,14 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0"
-                            onClick={handleDownloadInvoices}
-                            disabled={isDownloading}
-                            title={`Download ${retailer.order_count} invoice(s)`}
+                            onClick={handleShowInvoice}
+                            disabled={isLoading}
+                            title={`Show invoice`}
                           >
-                            {isDownloading ? (
+                            {isLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Download className="h-4 w-4" />
+                              <FileText className="h-4 w-4" />
                             )}
                           </Button>
                         </TableCell>
@@ -1991,7 +1997,56 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </DialogContent>
       </Dialog>
 
-      {/* "Others" Dialog - shows bottom 5 users when "Others" segment is clicked */}
+      {/* Invoice Viewer Dialog */}
+      <Dialog open={invoiceViewerOpen} onOpenChange={(open) => {
+        if (!open) {
+          setInvoiceViewerOpen(false);
+          if (invoiceViewerUrl) {
+            URL.revokeObjectURL(invoiceViewerUrl);
+            setInvoiceViewerUrl(null);
+          }
+          setInvoiceViewerBlob(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                {invoiceViewerName}
+              </DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (invoiceViewerBlob) {
+                    await downloadPDF(invoiceViewerBlob, invoiceViewerName);
+                    toast.success('Invoice downloaded');
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 min-h-[60vh]">
+            {invoiceViewerUrl ? (
+              <iframe
+                src={invoiceViewerUrl}
+                className="w-full h-[60vh] border rounded-lg"
+                title={invoiceViewerName}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[60vh]">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={othersDialogOpen} onOpenChange={setOthersDialogOpen}>
         <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
