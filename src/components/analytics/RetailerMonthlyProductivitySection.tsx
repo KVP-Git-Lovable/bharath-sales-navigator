@@ -254,21 +254,17 @@ interface RetailerProductivity {
                          <TableCell className="text-[10px] md:text-sm text-center text-destructive py-1 md:py-2 px-1 md:px-4">{row.unproductive_visits}</TableCell>
                        </TableRow>
                     ))}
+                    {/* Total Row */}
+                    <TableRow className="bg-muted/50 font-semibold sticky bottom-0 z-10 border-t">
+                       <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4 bg-muted/50">Total ({data.length})</TableCell>
+                       <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4 bg-muted/50"></TableCell>
+                       <TableCell className="text-[10px] md:text-sm text-center py-1 md:py-2 px-1 md:px-4 bg-muted/50">{totals.planned}</TableCell>
+                       <TableCell className="text-[10px] md:text-sm text-center text-primary py-1 md:py-2 px-1 md:px-4 bg-muted/50">{totals.productive}</TableCell>
+                       <TableCell className="text-[10px] md:text-sm text-center text-destructive py-1 md:py-2 px-1 md:px-4 bg-muted/50">{totals.unproductive}</TableCell>
+                     </TableRow>
                   </TableBody>
                 </Table>
               </div>
-              {/* Sticky Total Row */}
-              <Table className="min-w-[500px] border-t">
-                <TableBody>
-                  <TableRow className="bg-muted/50 font-semibold">
-                     <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4">Total ({data.length})</TableCell>
-                     <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4"></TableCell>
-                     <TableCell className="text-[10px] md:text-sm text-center py-1 md:py-2 px-1 md:px-4">{totals.planned}</TableCell>
-                     <TableCell className="text-[10px] md:text-sm text-center text-primary py-1 md:py-2 px-1 md:px-4">{totals.productive}</TableCell>
-                     <TableCell className="text-[10px] md:text-sm text-center text-destructive py-1 md:py-2 px-1 md:px-4">{totals.unproductive}</TableCell>
-                   </TableRow>
-                </TableBody>
-              </Table>
             </div>
           )}
        </CardContent>
