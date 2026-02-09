@@ -8,6 +8,23 @@ import { toast } from "sonner";
 import { useReportVoiceChat } from "@/hooks/useReportVoiceChat";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+// Indian number formatting helpers
+const formatINR = (value: number): string => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
+const formatKG = (value: number): string => {
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value) + ' KG';
+};
+
 interface UserOrderSummary {
   full_name: string;
   total_order_value: number;
@@ -113,16 +130,16 @@ export const ReportSummaryDialog = ({
     
     // Summary - All Users
     if (allUsersSummary) {
-      parts.push(`\n📈 Overall Summary\nThe team covered ${allUsersSummary.retailers} retailers across ${allUsersSummary.beats} beats, handling ${allUsersSummary.products} products with a total quantity of ${allUsersSummary.totalKg.toFixed(2)} KG.`);
+      parts.push(`\n📈 Overall Summary\nThe team covered ${allUsersSummary.retailers} retailers across ${allUsersSummary.beats} beats, handling ${allUsersSummary.products} products with a total quantity of ${formatKG(allUsersSummary.totalKg)}.`);
     }
     
     // Total Order Summary
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
       const topOrderUser = orderSummaryData[0];
-      let orderText = `\n🛒 Order Summary\nA total of ${orderSummaryData.length} team members generated orders worth ₹${totalOrderValue.toFixed(2)}.`;
+      let orderText = `\n🛒 Order Summary\nA total of ${orderSummaryData.length} team members generated orders worth ${formatINR(totalOrderValue)}.`;
       if (topOrderUser) {
-        orderText += ` The top performer in orders was ${topOrderUser.full_name} with ₹${topOrderUser.total_order_value.toFixed(2)}.`;
+        orderText += ` The top performer in orders was ${topOrderUser.full_name} with ${formatINR(topOrderUser.total_order_value)}.`;
       }
       parts.push(orderText);
     }
@@ -139,9 +156,9 @@ export const ReportSummaryDialog = ({
       }, 0);
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
       
-      let skuText = `\n📦 Product Performance\nAcross ${skuData.length} SKUs, the team achieved ₹${totalRevenue.toFixed(2)} in revenue with ${totalKg.toFixed(2)} KG sold.`;
+      let skuText = `\n📦 Product Performance\nAcross ${skuData.length} SKUs, the team achieved ${formatINR(totalRevenue)} in revenue with ${formatKG(totalKg)} sold.`;
       if (topProduct) {
-        skuText += ` The best-selling product was ${topProduct.product_name}, contributing ₹${topProduct.revenue.toFixed(2)} in revenue.`;
+        skuText += ` The best-selling product was ${topProduct.product_name}, contributing ${formatINR(topProduct.revenue)} in revenue.`;
       }
       parts.push(skuText);
     }
@@ -194,19 +211,19 @@ export const ReportSummaryDialog = ({
     parts.push(`Supervisor Report Summary from ${fromStr} to ${toStr}.`);
     
     if (allUsersSummary) {
-      parts.push(`Overall Summary: ${allUsersSummary.retailers} retailers, ${allUsersSummary.beats} beats, ${allUsersSummary.products} products, and ${allUsersSummary.totalKg.toFixed(2)} kilograms total quantity.`);
+      parts.push(`Overall Summary: ${allUsersSummary.retailers} retailers, ${allUsersSummary.beats} beats, ${allUsersSummary.products} products, and ${formatKG(allUsersSummary.totalKg)} total quantity.`);
     }
     
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
       const topOrderUser = orderSummaryData[0];
-      parts.push(`Order Summary: ${orderSummaryData.length} users with total order value of ${totalOrderValue.toFixed(2)} rupees. Top performer is ${topOrderUser?.full_name} with ${topOrderUser?.total_order_value.toFixed(2)} rupees.`);
+      parts.push(`Order Summary: ${orderSummaryData.length} users with total order value of ${formatINR(totalOrderValue)}. Top performer is ${topOrderUser?.full_name} with ${formatINR(topOrderUser?.total_order_value || 0)}.`);
     }
     
     if (skuData.length > 0) {
       const totalRevenue = skuData.reduce((sum, s) => sum + s.revenue, 0);
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
-      parts.push(`SKU Revenue Summary: ${skuData.length} SKUs with total revenue of ${totalRevenue.toFixed(2)} rupees. Best selling product is ${topProduct?.product_name}.`);
+      parts.push(`SKU Revenue Summary: ${skuData.length} SKUs with total revenue of ${formatINR(totalRevenue)}. Best selling product is ${topProduct?.product_name}.`);
     }
     
     if (productivityData.length > 0) {
@@ -231,19 +248,19 @@ export const ReportSummaryDialog = ({
     parts.push(`सुपरवाइजर रिपोर्ट सारांश, ${fromStr} से ${toStr} तक।`);
     
     if (allUsersSummary) {
-      parts.push(`कुल सारांश: ${allUsersSummary.retailers} रिटेलर्स, ${allUsersSummary.beats} बीट्स, ${allUsersSummary.products} प्रोडक्ट्स, और कुल ${allUsersSummary.totalKg.toFixed(2)} किलोग्राम मात्रा।`);
+      parts.push(`कुल सारांश: ${allUsersSummary.retailers} रिटेलर्स, ${allUsersSummary.beats} बीट्स, ${allUsersSummary.products} प्रोडक्ट्स, और कुल ${formatKG(allUsersSummary.totalKg)} मात्रा।`);
     }
     
     if (orderSummaryData.length > 0) {
       const totalOrderValue = orderSummaryData.reduce((sum, u) => sum + u.total_order_value, 0);
       const topOrderUser = orderSummaryData[0];
-      parts.push(`ऑर्डर सारांश: ${orderSummaryData.length} यूजर्स ने कुल ${totalOrderValue.toFixed(2)} रुपये का ऑर्डर किया। सबसे अच्छा प्रदर्शन ${topOrderUser?.full_name} का रहा, जिन्होंने ${topOrderUser?.total_order_value.toFixed(2)} रुपये का ऑर्डर लिया।`);
+      parts.push(`ऑर्डर सारांश: ${orderSummaryData.length} यूजर्स ने कुल ${formatINR(totalOrderValue)} का ऑर्डर किया। सबसे अच्छा प्रदर्शन ${topOrderUser?.full_name} का रहा, जिन्होंने ${formatINR(topOrderUser?.total_order_value || 0)} का ऑर्डर लिया।`);
     }
     
     if (skuData.length > 0) {
       const totalRevenue = skuData.reduce((sum, s) => sum + s.revenue, 0);
       const topProduct = skuData.reduce((max, s) => s.revenue > max.revenue ? s : max, skuData[0]);
-      parts.push(`SKU रेवेन्यू सारांश: ${skuData.length} SKUs से कुल ${totalRevenue.toFixed(2)} रुपये की आय हुई। सबसे ज्यादा बिकने वाला प्रोडक्ट ${topProduct?.product_name} है।`);
+      parts.push(`SKU रेवेन्यू सारांश: ${skuData.length} SKUs से कुल ${formatINR(totalRevenue)} की आय हुई। सबसे ज्यादा बिकने वाला प्रोडक्ट ${topProduct?.product_name} है।`);
     }
     
     if (productivityData.length > 0) {
@@ -308,7 +325,7 @@ export const ReportSummaryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={`${isMobile ? 'max-w-[95vw]' : 'max-w-2xl'} max-h-[90vh] overflow-hidden flex flex-col`}>
+      <DialogContent className={`${isMobile ? 'max-w-[95vw]' : 'max-w-2xl'} max-h-[90vh] overflow-y-auto flex flex-col`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Volume2 className="h-5 w-5" />
