@@ -1,4 +1,4 @@
- import { useState, useEffect } from "react";
+ import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,6 +30,8 @@ interface OrderDetail {
   retailer_name: string;
   total_amount: number;
   status: string;
+  user_id?: string;
+  user_name?: string;
 }
 
 interface ProductDetail {
@@ -211,7 +213,7 @@ export const RetailerDetailsDialog = ({
   );
 };
 
-// Order Details Dialog
+// Order Details Dialog - grouped by user
 export const OrderDetailsDialog = ({
   open,
   onOpenChange,
@@ -220,54 +222,113 @@ export const OrderDetailsDialog = ({
   data,
   isLoading
 }: DialogProps & { data: OrderDetail[]; isLoading: boolean }) => {
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+
+  // Group by user
+  const userSummaries = useMemo(() => {
+    const map = new Map<string, { user_name: string; order_count: number; total_amount: number }>();
+    data.forEach(order => {
+      const uid = order.user_id || 'unknown';
+      const existing = map.get(uid);
+      if (existing) {
+        existing.order_count += 1;
+        existing.total_amount += order.total_amount;
+      } else {
+        map.set(uid, {
+          user_name: order.user_name || 'Unknown',
+          order_count: 1,
+          total_amount: order.total_amount
+        });
+      }
+    });
+    return Array.from(map.entries())
+      .map(([user_id, info]) => ({ user_id, ...info }))
+      .sort((a, b) => b.total_amount - a.total_amount);
+  }, [data]);
+
+  const userOrders = useMemo(() => {
+    if (!selectedUser) return [];
+    return data.filter(o => (o.user_id || 'unknown') === selectedUser);
+  }, [data, selectedUser]);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) setSelectedUser(null);
+    onOpenChange(isOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Order Details</DialogTitle>
-          <DialogDescription>
-            {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')} • {selectedUsers.length} user(s)
-          </DialogDescription>
+          <div className="flex items-center gap-2">
+            {selectedUser && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedUser(null)}>
+                <ArrowLeft size={16} />
+              </Button>
+            )}
+            <div>
+              <DialogTitle>{selectedUser ? `Orders – ${userSummaries.find(u => u.user_id === selectedUser)?.user_name}` : 'Order Details'}</DialogTitle>
+              <DialogDescription>
+                {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')} • {selectedUsers.length} user(s)
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Retailer</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+          {!selectedUser ? (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    Loading...
-                  </TableCell>
+                  <TableHead>User</TableHead>
+                  <TableHead className="text-center">Orders</TableHead>
+                  <TableHead className="text-right">Total Amount</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
-              ) : data.length === 0 ? (
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Loading...</TableCell>
+                  </TableRow>
+                ) : userSummaries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No order data available</TableCell>
+                  </TableRow>
+                ) : (
+                  userSummaries.map((user) => (
+                    <TableRow key={user.user_id} className="cursor-pointer" onClick={() => setSelectedUser(user.user_id)}>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        <User size={14} className="text-muted-foreground" />
+                        {user.user_name}
+                      </TableCell>
+                      <TableCell className="text-center">{user.order_count}</TableCell>
+                      <TableCell className="text-right font-semibold">₹{user.total_amount.toLocaleString()}</TableCell>
+                      <TableCell><ChevronRight size={14} className="text-muted-foreground" /></TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    No order data available
-                  </TableCell>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Retailer</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
-              ) : (
-                data.map((order) => (
+              </TableHeader>
+              <TableBody>
+                {userOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>{format(new Date(order.order_date), 'MMM dd, yyyy')}</TableCell>
                     <TableCell className="font-medium">{order.retailer_name}</TableCell>
                     <TableCell className="text-right font-semibold">₹{order.total_amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={order.status === 'confirmed' ? 'default' : 'secondary'} className="text-xs">
-                        {order.status}
-                      </Badge>
-                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </ScrollArea>
       </DialogContent>
     </Dialog>
