@@ -39,6 +39,7 @@ import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
 import { InsightsPanel } from "@/components/visits/InsightsPanel";
 import { StartBeatButton } from "@/components/StartBeatButton";
+import { AddActivityModal } from "@/components/AddActivityModal";
 
 interface Visit {
   id: string;
@@ -185,6 +186,7 @@ export const MyVisits = () => {
   const [timelineVisits, setTimelineVisits] = useState<any[]>([]);
   const [timelineDayStart, setTimelineDayStart] = useState<string>('08:00 AM');
   const [isVanStockOpen, setIsVanStockOpen] = useState(false);
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [initialRetailerOrder, setInitialRetailerOrder] = useState<string[]>([]);
   const [pointsEarnedToday, setPointsEarnedToday] = useState(0);
   const [pointsDetailsList, setPointsDetailsList] = useState<Array<{ retailerName: string; points: number; visitId: string | null }>>([]);
@@ -1243,22 +1245,26 @@ export const MyVisits = () => {
               </Button>
             </div>
             
-            {/* Timeline View, GPS Track, and Van Stock Buttons */}
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3" onClick={() => {
+            {/* Timeline View, GPS Track, Van Stock, and Activity Buttons */}
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
+              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => {
               setTimelineDate(selectedDate ? new Date(selectedDate) : new Date());
               setIsTimelineOpen(true);
             }}>
-                <Clock size={14} className="mr-1.5" />
-                {t('visits.timeline')}
+                <Clock size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                <span className="truncate">{t('visits.timeline')}</span>
               </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3" onClick={() => navigate('/gps-track')}>
-                <MapPin size={14} className="mr-1.5" />
-                {t('visits.gpsTrack')}
+              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => navigate('/gps-track')}>
+                <MapPin size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                <span className="truncate">{t('visits.gpsTrack')}</span>
               </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3" onClick={() => setIsVanStockOpen(true)}>
-                <Truck size={14} className="mr-1.5" />
-                {t('visits.vanStock')}
+              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsVanStockOpen(true)}>
+                <Truck size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                <span className="truncate">{t('visits.vanStock')}</span>
+              </Button>
+              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsActivityModalOpen(true)}>
+                <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                <span className="truncate">Activity</span>
               </Button>
             </div>
           </CardContent>
@@ -1541,6 +1547,9 @@ export const MyVisits = () => {
 
         {/* Van Stock Management Dialog */}
         <VanStockManagement open={isVanStockOpen} onOpenChange={setIsVanStockOpen} selectedDate={selectedDate} />
+
+        {/* Activity Modal */}
+        <AddActivityModal open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen} />
 
         {/* Clear Cache Confirmation Dialog */}
         <AlertDialog open={showClearCacheDialog} onOpenChange={setShowClearCacheDialog}>

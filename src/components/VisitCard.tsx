@@ -46,6 +46,7 @@ import { getLocalTodayDate } from "@/utils/dateUtils";
 import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
 import { CancelOrderDialog } from "./CancelOrderDialog";
+import { useActivityEvents, formatActivityDuration, type ActivityEvent } from "@/hooks/useActivityEvents";
 interface Visit {
   id: string;
   retailerId?: string;
@@ -120,7 +121,9 @@ export const VisitCard = ({
   const [feedbackListType, setFeedbackListType] = useState<'retailer' | 'branding' | 'competition' | 'joint-sales' | null>(null);
   const [feedbackEditId, setFeedbackEditId] = useState<string | null>(null);
   const [feedbackEditData, setFeedbackEditData] = useState<any>(null);
+  const [activityEvent, setActivityEvent] = useState<ActivityEvent | null>(null);
   const { user } = useAuth();
+  const { fetchActivityForVisit } = useActivityEvents();
   // SOURCE PRIORITY for order values: db (4) > snapshot (3) > cache (2) > props (1)
   // This prevents lower-priority sources from overwriting higher-priority ones
   type OrderValueSource = 'db' | 'snapshot' | 'cache' | 'props' | null;
@@ -434,6 +437,17 @@ export const VisitCard = ({
   // REMOVED: Do NOT call endTracking on unmount - it was incorrectly updating end_time to "now"
   // Unmount happens for UI reasons (navigation, scroll) and must not affect visit tracking times
   // The visit log's end_time is correctly updated only on actual user interactions via recordAction()
+
+  // Load activity event data if this is an activity visit
+  useEffect(() => {
+    if (visit.visitType !== 'activity') return;
+    const loadActivity = async () => {
+      const visitId = currentVisitId || visit.id;
+      const activity = await fetchActivityForVisit(visitId);
+      if (activity) setActivityEvent(activity);
+    };
+    loadActivity();
+  }, [visit.visitType, visit.id, currentVisitId]);
 
   // Load retailer data for overview modal
   useEffect(() => {
@@ -2629,7 +2643,20 @@ export const VisitCard = ({
                   <Package size={12} className="mr-1" />
                   {stockRecordCount} Stock{stockRecordCount !== 1 ? 's' : ''}
                 </Badge>}
+              {/* Activity Badge */}
+              {visit.visitType === 'activity' && activityEvent && (
+                <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs px-2 py-1">
+                  <Sparkles size={12} className="mr-1" />
+                  {activityEvent.activity_type}
+                </Badge>
+              )}
             </div>
+            {/* Activity duration info */}
+            {visit.visitType === 'activity' && activityEvent && (
+              <div className="text-xs text-amber-600 font-medium">
+                {formatActivityDuration(activityEvent)}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">{visit.retailerCategory}</div>
           </div>
         </div>
