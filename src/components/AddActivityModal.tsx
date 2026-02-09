@@ -31,6 +31,7 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
+  const [activityName, setActivityName] = useState('');
   const [durationType, setDurationType] = useState<DurationType>('full_day');
   const [activityDate, setActivityDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState('09:00');
@@ -67,6 +68,7 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
     : null;
 
   const resetForm = () => {
+    setActivityName('');
     setDurationType('full_day');
     setActivityDate(new Date());
     setStartTime('09:00');
@@ -104,6 +106,7 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
       }
 
       const result = await createActivity({
+        activity_name: activityName || undefined,
         activity_type: activityType,
         duration_type: durationType,
         activity_date: dateStr,
@@ -148,6 +151,17 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
+          {/* Activity Name */}
+          <div>
+            <Label className="text-sm">Activity Name</Label>
+            <Input
+              value={activityName}
+              onChange={(e) => setActivityName(e.target.value)}
+              placeholder="e.g., Diwali Celebration, Product Launch"
+              className="mt-1"
+            />
+          </div>
+
           {/* Duration Type Selection */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Duration Type</Label>
