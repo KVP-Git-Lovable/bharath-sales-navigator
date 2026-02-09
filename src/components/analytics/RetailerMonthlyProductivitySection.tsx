@@ -220,9 +220,9 @@ interface RetailerProductivity {
            <p className="text-xs text-muted-foreground mt-1">
              Retailers with visits but no confirmed orders
            </p>
-           <p className="text-[10px] text-destructive/80 mt-0.5">
-             This shows monthly data only. Select "This month" in the dropdown.
-           </p>
+            <p className="text-[10px] text-blue-600 mt-0.5">
+              This shows monthly data only. Select "Last month" in the dropdown.
+            </p>
        </CardHeader>
        <CardContent className="pt-0">
          {loading ? (

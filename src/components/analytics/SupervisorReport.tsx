@@ -571,18 +571,48 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         }
       });
 
-      // Calculate productivity percentage from RPC result
+      // Calculate Overall Productivity % (productive / planned) using beat_plans
       const productivityData = productivityResult.data || [];
       let productivityPercent: number | null = null;
-      if (productivityData.length > 0) {
-        // Calculate overall productivity across all days
-        const totals = productivityData.reduce((acc: { productive: number; total: number }, row: any) => ({
-          productive: acc.productive + Number(row.productive_visits || 0),
-          total: acc.total + Number(row.total_visits || 0)
-        }), { productive: 0, total: 0 });
+      
+      const totalProductive = productivityData.reduce((sum: number, row: any) => 
+        sum + Number(row.productive_visits || 0), 0);
+
+      // Fetch beat_plans for this user in the date range to compute planned visits
+      const { data: userBeatPlans } = await supabase
+        .from('beat_plans')
+        .select('beat_id, plan_date')
+        .eq('user_id', userId)
+        .gte('plan_date', fromDate)
+        .lte('plan_date', toDate);
+
+      if (userBeatPlans && userBeatPlans.length > 0) {
+        const uniqueBeatIds = [...new Set(userBeatPlans.map(bp => bp.beat_id))];
         
-        if (totals.total > 0) {
-          productivityPercent = Math.round((totals.productive / totals.total) * 100 * 100) / 100;
+        // Fetch retailers assigned to these beats
+        const { data: beatRetailers } = await supabase
+          .from('retailers')
+          .select('id, beat_id')
+          .in('beat_id', uniqueBeatIds);
+
+        if (beatRetailers && beatRetailers.length > 0) {
+          // Group retailers by beat
+          const retailersByBeat = new Map<string, string[]>();
+          beatRetailers.forEach(r => {
+            if (!retailersByBeat.has(r.beat_id)) retailersByBeat.set(r.beat_id, []);
+            retailersByBeat.get(r.beat_id)!.push(r.id);
+          });
+
+          // Count planned visits: for each plan_date, count retailers in that beat
+          let totalPlanned = 0;
+          userBeatPlans.forEach(bp => {
+            const retailers = retailersByBeat.get(bp.beat_id) || [];
+            totalPlanned += retailers.length;
+          });
+
+          if (totalPlanned > 0) {
+            productivityPercent = Math.round((totalProductive / totalPlanned) * 100 * 100) / 100;
+          }
         }
       }
 
