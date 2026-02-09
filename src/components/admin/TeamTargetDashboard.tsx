@@ -290,6 +290,7 @@ export function TeamTargetDashboard({
                 <p className="text-xs text-muted-foreground">Achieved</p>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-2">Achievement ≥ 100%</p>
           </CardContent>
         </Card>
 
@@ -310,6 +311,7 @@ export function TeamTargetDashboard({
                 <p className="text-xs text-muted-foreground">In Progress</p>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-2">Achievement between 50% – 99%</p>
           </CardContent>
         </Card>
 
@@ -330,6 +332,7 @@ export function TeamTargetDashboard({
                 <p className="text-xs text-muted-foreground">Not Achieved</p>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-2">Achievement below 50%</p>
           </CardContent>
         </Card>
       </div>
