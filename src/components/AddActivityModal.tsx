@@ -86,6 +86,10 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
       toast.error('Please log in first');
       return;
     }
+    if (!selectedRetailerId) {
+      toast.error('Please select a customer/outlet');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -337,39 +341,50 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
 
           {/* Customer / Outlet */}
           <div>
-            <Label className="text-sm">Customer / Outlet (Optional)</Label>
-            <Select
-              value={selectedRetailerId}
-              onValueChange={(val) => {
-                setSelectedRetailerId(val);
-                const retailer = retailers.find(r => r.id === val);
-                setSelectedRetailerName(retailer?.name || '');
-              }}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select customer..." />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="p-2">
+            <Label className="text-sm">Customer / Outlet <span className="text-destructive">*</span></Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between text-left font-normal mt-1">
+                  {selectedRetailerName || 'Select customer...'}
+                  <CalendarIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[calc(100vw-4rem)] max-w-md p-0" align="start">
+                <div className="p-2 border-b">
                   <Input
-                    placeholder="Search..."
+                    placeholder="Search customers..."
                     value={retailerSearch}
                     onChange={(e) => setRetailerSearch(e.target.value)}
                     className="h-8 text-sm"
+                    autoFocus
                   />
                 </div>
-                {filteredRetailers.slice(0, 50).map((retailer) => (
-                  <SelectItem key={retailer.id} value={retailer.id}>
-                    {retailer.name}
-                  </SelectItem>
-                ))}
-                {filteredRetailers.length === 0 && (
-                  <div className="p-2 text-sm text-muted-foreground text-center">
-                    No customers found
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredRetailers.slice(0, 50).map((retailer) => (
+                    <button
+                      key={retailer.id}
+                      type="button"
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors",
+                        selectedRetailerId === retailer.id && "bg-primary/10 text-primary font-medium"
+                      )}
+                      onClick={() => {
+                        setSelectedRetailerId(retailer.id);
+                        setSelectedRetailerName(retailer.name);
+                        setRetailerSearch('');
+                      }}
+                    >
+                      {retailer.name}
+                    </button>
+                  ))}
+                  {filteredRetailers.length === 0 && (
+                    <div className="p-3 text-sm text-muted-foreground text-center">
+                      No customers found
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Remarks */}
