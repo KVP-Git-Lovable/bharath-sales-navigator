@@ -371,6 +371,7 @@ export const useBusinessMetrics = () => {
           order_date,
           total_amount,
           status,
+          user_id,
           retailers(name)
         `)
         .gte('order_date', fromDate)
@@ -383,13 +384,26 @@ export const useBusinessMetrics = () => {
 
       const { data } = await query;
 
+      // Fetch user names for all unique user_ids
+      const uniqueUserIds = [...new Set((data || []).map(o => o.user_id).filter(Boolean))];
+      let userNameMap = new Map<string, string>();
+      if (uniqueUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', uniqueUserIds);
+        profiles?.forEach(p => userNameMap.set(p.id, p.full_name || 'Unknown'));
+      }
+
       setOrderDetails(
         (data || []).map(order => ({
           id: order.id,
           order_date: order.order_date,
           retailer_name: (order.retailers as any)?.name || 'Unknown',
           total_amount: Number(order.total_amount || 0),
-          status: order.status || 'pending'
+          status: order.status || 'pending',
+          user_id: order.user_id || '',
+          user_name: userNameMap.get(order.user_id) || 'Unknown'
         }))
       );
     } catch (error) {
