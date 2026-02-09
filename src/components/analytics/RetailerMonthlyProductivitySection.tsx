@@ -231,42 +231,42 @@ interface RetailerProductivity {
              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
              <p className="text-sm">No retailers found matching criteria</p>
            </div>
-          ) : (
-            <div className="scrollbar-always-visible overflow-x-auto">
-              <div className={`${data.length > 10 ? 'max-h-[400px] overflow-y-auto scrollbar-always-visible' : ''}`}>
-                <Table className="min-w-[500px]">
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                    <TableHead className="text-[10px] md:text-xs whitespace-nowrap px-1.5 md:px-4">Retailer Name</TableHead>
-                      <TableHead className="text-[10px] md:text-xs whitespace-nowrap px-1.5 md:px-4">User</TableHead>
-                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap px-1 md:px-4">Visits</TableHead>
-                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap px-1 md:px-4">Productive</TableHead>
-                      <TableHead className="text-[10px] md:text-xs text-center whitespace-nowrap px-1 md:px-4">Unproductive</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.map((row) => (
-                      <TableRow key={row.retailer_id}>
-                        <TableCell className="text-[10px] md:text-sm font-medium whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4">{row.retailer_name}</TableCell>
-                         <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4 text-muted-foreground">{row.user_name}</TableCell>
-                         <TableCell className="text-[10px] md:text-sm text-center py-1 md:py-2 px-1 md:px-4">{row.planned_visits}</TableCell>
-                         <TableCell className="text-[10px] md:text-sm text-center text-primary py-1 md:py-2 px-1 md:px-4">{row.productive_visits}</TableCell>
-                         <TableCell className="text-[10px] md:text-sm text-center text-destructive py-1 md:py-2 px-1 md:px-4">{row.unproductive_visits}</TableCell>
-                       </TableRow>
-                    ))}
-                    {/* Total Row */}
-                    <TableRow className="bg-muted/50 font-semibold sticky bottom-0 z-10 border-t">
-                       <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4 bg-muted/50">Total ({data.length})</TableCell>
-                       <TableCell className="text-[10px] md:text-sm whitespace-nowrap py-1 md:py-2 px-1.5 md:px-4 bg-muted/50"></TableCell>
-                       <TableCell className="text-[10px] md:text-sm text-center py-1 md:py-2 px-1 md:px-4 bg-muted/50">{totals.planned}</TableCell>
-                       <TableCell className="text-[10px] md:text-sm text-center text-primary py-1 md:py-2 px-1 md:px-4 bg-muted/50">{totals.productive}</TableCell>
-                       <TableCell className="text-[10px] md:text-sm text-center text-destructive py-1 md:py-2 px-1 md:px-4 bg-muted/50">{totals.unproductive}</TableCell>
-                     </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
+           ) : (
+             <div className="scrollbar-always-visible overflow-x-auto">
+               <div className={`${data.length > 10 ? 'max-h-[400px] overflow-y-auto scrollbar-always-visible' : ''}`}>
+                 <table className="w-full caption-bottom text-sm min-w-[500px]">
+                   <thead className="[&_tr]:border-b sticky top-0 bg-background z-10">
+                     <tr className="border-b transition-colors hover:bg-muted/50">
+                       <th className="h-12 px-1.5 md:px-4 text-left align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Retailer Name</th>
+                       <th className="h-12 px-1.5 md:px-4 text-left align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">User</th>
+                       <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Visits</th>
+                       <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Productive</th>
+                       <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Unproductive</th>
+                     </tr>
+                   </thead>
+                   <tbody className="[&_tr:last-child]:border-0">
+                     {data.map((row) => (
+                       <tr key={row.retailer_id} className="border-b transition-colors hover:bg-muted/50">
+                         <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm font-medium whitespace-nowrap">{row.retailer_name}</td>
+                         <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap text-muted-foreground">{row.user_name}</td>
+                         <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center">{row.planned_visits}</td>
+                         <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-primary">{row.productive_visits}</td>
+                         <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-destructive">{row.unproductive_visits}</td>
+                       </tr>
+                     ))}
+                     {/* Total Row */}
+                     <tr className="bg-muted/50 font-semibold sticky bottom-0 z-10 border-t">
+                       <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap bg-muted/50">Total ({data.length})</td>
+                       <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap bg-muted/50"></td>
+                       <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center bg-muted/50">{totals.planned}</td>
+                       <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-primary bg-muted/50">{totals.productive}</td>
+                       <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-destructive bg-muted/50">{totals.unproductive}</td>
+                     </tr>
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+           )}
        </CardContent>
      </Card>
    );
