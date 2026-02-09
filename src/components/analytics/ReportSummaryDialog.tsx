@@ -325,7 +325,7 @@ export const ReportSummaryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={`${isMobile ? 'max-w-[95vw]' : 'max-w-2xl'} max-h-[90vh] overflow-y-auto flex flex-col`}>
+      <DialogContent className={`${isMobile ? 'max-w-[95vw]' : 'max-w-2xl'} max-h-[90vh] flex flex-col overflow-hidden`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Volume2 className="h-5 w-5" />
@@ -333,7 +333,7 @@ export const ReportSummaryDialog = ({
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-4 min-h-0">
           {/* Summary Section */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
