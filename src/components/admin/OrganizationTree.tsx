@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ChevronRight, ChevronDown, Loader2, Users, Circle, Building2, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { StrategyBadge, type TargetStrategy } from './TargetStrategySelector';
 
 interface TreeNode {
   userId: string;
@@ -13,6 +14,7 @@ interface TreeNode {
   level: number;
   children: TreeNode[];
   isManager: boolean;
+  targetStrategy?: TargetStrategy;
 }
 
 interface OrganizationTreeProps {
@@ -49,14 +51,26 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
 
       if (error) throw error;
 
+      // Fetch strategies for all users in the tree
+      const userIds = (data || []).map((d: any) => d.subordinate_user_id);
+      const { data: plans } = await supabase
+        .from('user_business_plans')
+        .select('user_id, target_strategy')
+        .in('user_id', userIds);
+
+      const strategyMap = new Map<string, TargetStrategy>();
+      plans?.forEach((p: any) => {
+        if (p.target_strategy) strategyMap.set(p.user_id, p.target_strategy as TargetStrategy);
+      });
+
       // Build tree structure
-      const tree = buildTree(data || []);
+      const tree = buildTree(data || [], strategyMap);
       return tree;
     },
     enabled: !!user?.id,
   });
 
-  const buildTree = (flatData: Array<{ subordinate_user_id: string; full_name: string; level: number }>): TreeNode[] => {
+  const buildTree = (flatData: Array<{ subordinate_user_id: string; full_name: string; level: number }>, strategyMap: Map<string, TargetStrategy>): TreeNode[] => {
     if (flatData.length === 0) return [];
 
     // Group by level
@@ -85,6 +99,7 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
         level: item.level,
         children: [],
         isManager: false,
+        targetStrategy: strategyMap.get(item.subordinate_user_id),
       });
     });
 
@@ -200,9 +215,14 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
             {node.fullName}
           </span>
 
-          {/* Manager indicator */}
+          {/* Manager indicator + Strategy badge */}
           {node.isManager && (
-            <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <div className="flex items-center gap-1 shrink-0">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              {node.targetStrategy && (
+                <StrategyBadge strategy={node.targetStrategy} />
+              )}
+            </div>
           )}
         </div>
 
