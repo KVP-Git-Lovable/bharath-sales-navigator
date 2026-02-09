@@ -11312,11 +11312,14 @@ export type Database = {
           created_at: string
           hierarchy_allocation_id: string | null
           id: string
+          manager_own_quantity_target: number | null
+          manager_own_revenue_target: number | null
           notes: string | null
           quantity_target: number | null
           quantity_unit: string | null
           revenue_target: number | null
           source: string | null
+          target_strategy: string
           updated_at: string
           user_id: string
           year: number
@@ -11325,11 +11328,14 @@ export type Database = {
           created_at?: string
           hierarchy_allocation_id?: string | null
           id?: string
+          manager_own_quantity_target?: number | null
+          manager_own_revenue_target?: number | null
           notes?: string | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
           source?: string | null
+          target_strategy?: string
           updated_at?: string
           user_id: string
           year: number
@@ -11338,11 +11344,14 @@ export type Database = {
           created_at?: string
           hierarchy_allocation_id?: string | null
           id?: string
+          manager_own_quantity_target?: number | null
+          manager_own_revenue_target?: number | null
           notes?: string | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
           source?: string | null
+          target_strategy?: string
           updated_at?: string
           user_id?: string
           year?: number
