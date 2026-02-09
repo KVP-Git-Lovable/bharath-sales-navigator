@@ -14,6 +14,85 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_events: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          created_at: string
+          duration_type: string
+          end_time: string | null
+          from_date: string | null
+          half_day_type: string | null
+          id: string
+          remarks: string | null
+          retailer_id: string | null
+          retailer_name: string | null
+          start_time: string | null
+          to_date: string | null
+          total_days: number | null
+          user_id: string
+          visit_id: string | null
+        }
+        Insert: {
+          activity_date?: string
+          activity_type?: string
+          created_at?: string
+          duration_type?: string
+          end_time?: string | null
+          from_date?: string | null
+          half_day_type?: string | null
+          id?: string
+          remarks?: string | null
+          retailer_id?: string | null
+          retailer_name?: string | null
+          start_time?: string | null
+          to_date?: string | null
+          total_days?: number | null
+          user_id: string
+          visit_id?: string | null
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          created_at?: string
+          duration_type?: string
+          end_time?: string | null
+          from_date?: string | null
+          half_day_type?: string | null
+          id?: string
+          remarks?: string | null
+          retailer_id?: string | null
+          retailer_name?: string | null
+          start_time?: string | null
+          to_date?: string | null
+          total_days?: number | null
+          user_id?: string
+          visit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_events_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       additional_expenses: {
         Row: {
           amount: number
