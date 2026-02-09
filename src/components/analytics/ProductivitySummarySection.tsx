@@ -383,12 +383,14 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Pending</TableHead>
-                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Overall Productivity %</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Actual Productivity %</TableHead>
                       </TableRow>
                     </thead>
                     <TableBody>
                       {singleUserData.map((row, index) => {
                         const pct = row.planned > 0 ? Math.round((row.productive / row.planned) * 100 * 100) / 100 : 0;
+                        const actualPct = (row.productive + row.unproductive) > 0 ? Math.round((row.productive / (row.productive + row.unproductive)) * 100 * 100) / 100 : 0;
                         return (
                           <TableRow key={index} className="hover:bg-muted/30">
                             <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.displayDate}</TableCell>
@@ -398,6 +400,9 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                             <TableCell className={cn("text-right text-yellow-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.pending}</TableCell>
                             <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                               <span className={getProductivityColor(pct)}>{pct}%</span>
+                            </TableCell>
+                            <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                              <span className={getProductivityColor(actualPct)}>{actualPct}%</span>
                             </TableCell>
                           </TableRow>
                         );
@@ -411,6 +416,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                         <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.unproductive}</TableCell>
                         <TableCell className={cn("text-right font-bold text-yellow-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.pending}</TableCell>
                         <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{singleUserTotals.avgProductivity}%</TableCell>
+                        <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{(singleUserTotals.productive + singleUserTotals.unproductive) > 0 ? Math.round((singleUserTotals.productive / (singleUserTotals.productive + singleUserTotals.unproductive)) * 100 * 100) / 100 : 0}%</TableCell>
                       </TableRow>
                     </tfoot>
                   </table>
@@ -420,7 +426,8 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                     <thead className="sticky top-0 bg-muted z-20">
                       <TableRow className="border-b">
                         <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>User</TableHead>
-                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productivity %</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Overall Productivity %</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Actual Productivity %</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
@@ -439,6 +446,9 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                           <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             <span className={getProductivityColor(row.productivity_percentage)}>{row.productivity_percentage}%</span>
                           </TableCell>
+                          <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                            {(() => { const ap = (row.productive_visits + row.unproductive_visits) > 0 ? Math.round((row.productive_visits / (row.productive_visits + row.unproductive_visits)) * 100 * 100) / 100 : 0; return <span className={getProductivityColor(ap)}>{ap}%</span>; })()}
+                          </TableCell>
                           <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.planned_visits}</TableCell>
                           <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.productive_visits}</TableCell>
                           <TableCell className={cn("text-right text-orange-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.unproductive_visits}</TableCell>
@@ -453,6 +463,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                       <TableRow>
                         <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Total ({multiUserTotals.usersCount} users)</TableCell>
                         <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.avgProductivity}%</TableCell>
+                        <TableCell className={cn("text-right font-bold text-primary whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{(multiUserTotals.productive + multiUserTotals.unproductive) > 0 ? Math.round((multiUserTotals.productive / (multiUserTotals.productive + multiUserTotals.unproductive)) * 100 * 100) / 100 : 0}%</TableCell>
                         <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.planned}</TableCell>
                         <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.productive}</TableCell>
                         <TableCell className={cn("text-right font-bold text-orange-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{multiUserTotals.unproductive}</TableCell>
@@ -494,12 +505,14 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                     <TableHead className="text-right">Productive</TableHead>
                     <TableHead className="text-right">Unproductive</TableHead>
                     <TableHead className="text-right">Pending</TableHead>
-                    <TableHead className="text-right">Productivity %</TableHead>
+                    <TableHead className="text-right">Overall Productivity %</TableHead>
+                    <TableHead className="text-right">Actual Productivity %</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {drilldownData.map((row, index) => {
                     const pct = row.planned > 0 ? Math.round((row.productive / row.planned) * 100 * 100) / 100 : 0;
+                    const actualPct = (row.productive + row.unproductive) > 0 ? Math.round((row.productive / (row.productive + row.unproductive)) * 100 * 100) / 100 : 0;
                     return (
                       <TableRow key={index} className="hover:bg-muted/30">
                         <TableCell className="font-medium">{row.displayDate}</TableCell>
@@ -509,6 +522,9 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                         <TableCell className="text-right text-yellow-600 font-medium">{row.pending}</TableCell>
                         <TableCell className="text-right font-semibold">
                           <span className={getProductivityColor(pct)}>{pct}%</span>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          <span className={getProductivityColor(actualPct)}>{actualPct}%</span>
                         </TableCell>
                       </TableRow>
                     );
@@ -522,6 +538,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                     <TableCell className="text-right font-bold text-orange-600">{drilldownTotals.unproductive}</TableCell>
                     <TableCell className="text-right font-bold text-yellow-600">{drilldownTotals.pending}</TableCell>
                     <TableCell className="text-right font-bold text-primary">{drilldownTotals.avgProductivity}%</TableCell>
+                    <TableCell className="text-right font-bold text-primary">{(drilldownTotals.productive + drilldownTotals.unproductive) > 0 ? Math.round((drilldownTotals.productive / (drilldownTotals.productive + drilldownTotals.unproductive)) * 100 * 100) / 100 : 0}%</TableCell>
                   </TableRow>
                 </tfoot>
               </table>
