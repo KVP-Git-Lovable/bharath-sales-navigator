@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -149,7 +149,7 @@ export const useActivityEvents = () => {
     }
   };
 
-  const fetchActivitiesForDate = async (userId: string, date: string): Promise<ActivityEvent[]> => {
+  const fetchActivitiesForDate = useCallback(async (userId: string, date: string): Promise<ActivityEvent[]> => {
     const { data, error } = await supabase
       .from('activity_events')
       .select('*')
@@ -163,7 +163,7 @@ export const useActivityEvents = () => {
     }
 
     return (data || []) as unknown as ActivityEvent[];
-  };
+  }, []);
 
   const clearCache = () => {
     activityCache.clear();
