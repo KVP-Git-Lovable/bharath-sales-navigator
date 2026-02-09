@@ -245,25 +245,21 @@ export const AttendanceMarketHoursSection = ({
     return Object.values(summaryMap).map(item => ({
       full_name: item.full_name,
       user_id: item.user_id,
-      avg_working_hours: item.workingDays.size > 0 
-        ? Math.round((item.totalWorkingHours / item.workingDays.size) * 100) / 100 
-        : 0,
-      avg_retailer_hours: item.retailerDays.size > 0 
-        ? Math.round((item.totalRetailerHours / item.retailerDays.size) * 100) / 100 
-        : 0,
+      avg_working_hours: Math.round(item.totalWorkingHours * 100) / 100,
+      avg_retailer_hours: Math.round(item.totalRetailerHours * 100) / 100,
       days_count: Math.max(item.workingDays.size, item.retailerDays.size)
     })).sort((a, b) => b.avg_working_hours - a.avg_working_hours);
   }, [attendanceData, retailerTimeData]);
 
-  // Overall averages
+  // Overall totals and averages
   const overallAverages = useMemo(() => {
     const totalWorkingHours = userSummaries.reduce((sum, u) => sum + u.avg_working_hours, 0);
     const totalRetailerHours = userSummaries.reduce((sum, u) => sum + u.avg_retailer_hours, 0);
     const userCount = userSummaries.length;
     
     return {
-      avgWorkingHours: userCount > 0 ? Math.round((totalWorkingHours / userCount) * 100) / 100 : 0,
-      avgRetailerHours: userCount > 0 ? Math.round((totalRetailerHours / userCount) * 100) / 100 : 0,
+      avgWorkingHours: Math.round(totalWorkingHours * 100) / 100,
+      avgRetailerHours: Math.round(totalRetailerHours * 100) / 100,
       userCount
     };
   }, [userSummaries]);
@@ -314,7 +310,7 @@ export const AttendanceMarketHoursSection = ({
             <div>
               <CardTitle className="text-base sm:text-lg md:text-xl">Attendance & Market Hours</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Average working hours and time at retailers • {
+                Total working hours and time at retailers • {
                   isSingleUserMode ? userSummaries[0]?.full_name || 'Loading...' : 
                   `${userSummaries.length} users`
                 } • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
@@ -342,7 +338,7 @@ export const AttendanceMarketHoursSection = ({
                   <CardContent className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <Clock className="h-5 w-5" />
-                      <span className="text-sm opacity-90">Avg. Working Hours</span>
+                      <span className="text-sm opacity-90">Total Working Hours</span>
                     </div>
                     <div className="text-2xl font-bold">
                       {formatHours(overallAverages.avgWorkingHours)}
@@ -363,7 +359,7 @@ export const AttendanceMarketHoursSection = ({
                   <CardContent className="p-4 text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <Store className="h-5 w-5" />
-                      <span className="text-sm opacity-90">Avg. Time at Retailers</span>
+                      <span className="text-sm opacity-90">Total Time at Retailers</span>
                     </div>
                     <div className="text-2xl font-bold">
                       {formatHours(overallAverages.avgRetailerHours)}
@@ -444,7 +440,7 @@ export const AttendanceMarketHoursSection = ({
                       <tfoot className="bg-background border-t sticky bottom-0 z-10">
                         <TableRow>
                           <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                            {isSingleUserMode ? `Total (${attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).length} days)` : `Average (${userSummaries.length} users)`}
+                            {isSingleUserMode ? `Total (${attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).length} days)` : `Total (${userSummaries.length} users)`}
                           </TableCell>
                           <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {formatHours(overallAverages.avgWorkingHours)}
