@@ -147,8 +147,8 @@ interface RetailerProductivity {
        const results: RetailerProductivity[] = [];
  
         retailerVisitMap.forEach((stats, retailerId) => {
-          // Only include if no confirmed orders and at least one visit
-          if (!retailersWithOrders.has(retailerId) && stats.planned > 0) {
+          // Only include if no confirmed orders, zero productive visits, and at least one visit
+          if (!retailersWithOrders.has(retailerId) && stats.productive === 0 && stats.planned > 0) {
             const retailerInfo = retailerMap.get(retailerId);
             const userId = retailerInfo?.user_id || null;
             results.push({
