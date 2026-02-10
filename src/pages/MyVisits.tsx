@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
+import { UserSelector } from "@/components/UserSelector";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, differenceInDays } from "date-fns";
 import { SearchInput } from "@/components/SearchInput";
@@ -195,6 +196,7 @@ export const MyVisits = () => {
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [selectedViewUserId, setSelectedViewUserId] = useState<string>('self');
   const {
     user,
     userProfile
@@ -204,8 +206,8 @@ export const MyVisits = () => {
   const isOnline = networkStatus === 'online';
 
   // NOTE: AI Recommendations hooks moved below after plannedBeats is defined
-  
   const { isLocationEnabled } = useLocationFeature();
+  const isViewingSelf = selectedViewUserId === 'self' || selectedViewUserId === user?.id;
 
   // One-time fix: Restore cancelled visits to planned if day hasn't ended
   useEffect(() => {
@@ -257,6 +259,7 @@ export const MyVisits = () => {
   } = useVisitsDataOptimized({
     userId: user?.id,
     selectedDate,
+    viewUserId: selectedViewUserId,
   });
 
   // DERIVED VALUES - using useMemo to prevent double state and unnecessary re-renders
@@ -1170,6 +1173,12 @@ export const MyVisits = () => {
                 <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
                 <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
               </div>
+              <UserSelector
+                selectedUserId={selectedViewUserId}
+                onUserChange={setSelectedViewUserId}
+                showAllOption={false}
+                variant="onDark"
+              />
             </div>
           </CardHeader>
           <CardContent className="space-y-2 sm:space-y-4 px-2 sm:px-6 pb-2 sm:pb-6">
@@ -1215,8 +1224,8 @@ export const MyVisits = () => {
                 </button>)}
             </div>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-2">
+            {/* Quick Actions - Only show for own data */}
+            {isViewingSelf && <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-2">
               <Button 
                 variant="secondary" 
                 size="sm" 
@@ -1244,10 +1253,10 @@ export const MyVisits = () => {
                 <FileText size={10} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                 <span className="truncate">{t('visits.summary')}</span>
               </Button>
-            </div>
+            </div>}
             
-            {/* Timeline View, GPS Track, Van Stock, and Activity Buttons */}
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
+            {/* Timeline View, GPS Track, Van Stock, and Activity Buttons - Only for own data */}
+            {isViewingSelf && <div className="grid grid-cols-4 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
               <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => {
               setTimelineDate(selectedDate ? new Date(selectedDate) : new Date());
               setIsTimelineOpen(true);
@@ -1267,7 +1276,7 @@ export const MyVisits = () => {
                 <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                 <span className="truncate">Activity</span>
               </Button>
-            </div>
+            </div>}
           </CardContent>
         </Card>
 
