@@ -98,27 +98,45 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch confirmed orders with items
-      let ordersQuery = supabase
-        .from('orders')
-        .select(`
-          id,
-          total_amount,
-          credit_pending_amount,
-          retailer_id,
-          user_id,
-          order_items(quantity, unit)
-        `)
-        .eq('status', 'confirmed')
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate);
+      // Fetch confirmed orders with items - paginated to avoid 1000-row default limit
+      const BATCH_SIZE = 1000;
+      let allOrders: any[] = [];
+      let offset = 0;
+      let hasMore = true;
 
-      if (userIds.length > 0) {
-        ordersQuery = ordersQuery.in('user_id', userIds);
+      while (hasMore) {
+        let ordersQuery = supabase
+          .from('orders')
+          .select(`
+            id,
+            total_amount,
+            credit_pending_amount,
+            retailer_id,
+            user_id,
+            order_items(quantity, unit)
+          `)
+          .eq('status', 'confirmed')
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate)
+          .range(offset, offset + BATCH_SIZE - 1);
+
+        if (userIds.length > 0) {
+          ordersQuery = ordersQuery.in('user_id', userIds);
+        }
+
+        const { data: batch, error: ordersError } = await ordersQuery;
+        if (ordersError) throw ordersError;
+
+        if (batch && batch.length > 0) {
+          allOrders = allOrders.concat(batch);
+          offset += BATCH_SIZE;
+          hasMore = batch.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data: orders, error: ordersError } = await ordersQuery;
-      if (ordersError) throw ordersError;
+      const orders = allOrders;
 
       // Fetch beats created by selected users within date range
       // Fetch beats and retailers in parallel
@@ -235,18 +253,31 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Get orders with retailer beat_name - this is the primary source of beat performance data
-      let ordersQuery = supabase
-        .from('orders')
-        .select('id, total_amount, user_id, order_date, retailer_id, retailers!inner(id, name, beat_name)')
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate);
-
-      if (userIds.length > 0) {
-        ordersQuery = ordersQuery.in('user_id', userIds);
+      // Get orders with retailer beat_name - paginated
+      const BATCH_SIZE = 1000;
+      let allOrders: any[] = [];
+      let ordersOffset = 0;
+      let ordersHasMore = true;
+      while (ordersHasMore) {
+        let ordersQuery = supabase
+          .from('orders')
+          .select('id, total_amount, user_id, order_date, retailer_id, retailers!inner(id, name, beat_name)')
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate)
+          .range(ordersOffset, ordersOffset + BATCH_SIZE - 1);
+        if (userIds.length > 0) {
+          ordersQuery = ordersQuery.in('user_id', userIds);
+        }
+        const { data: batch } = await ordersQuery;
+        if (batch && batch.length > 0) {
+          allOrders = allOrders.concat(batch);
+          ordersOffset += BATCH_SIZE;
+          ordersHasMore = batch.length === BATCH_SIZE;
+        } else {
+          ordersHasMore = false;
+        }
       }
-
-      const { data: orders } = await ordersQuery;
+      const orders = allOrders;
 
       // Get visits for the date range to count visits per beat
       let visitsQuery = supabase
@@ -309,23 +340,36 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      let ordersQuery = supabase
-        .from('orders')
-        .select(`
-          id,
-          retailer_id,
-          total_amount,
-          credit_pending_amount,
-          retailers(id, name, beat_name)
-        `)
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate);
-
-      if (userIds.length > 0) {
-        ordersQuery = ordersQuery.in('user_id', userIds);
+      const BATCH_SIZE = 1000;
+      let allOrders: any[] = [];
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        let ordersQuery = supabase
+          .from('orders')
+          .select(`
+            id,
+            retailer_id,
+            total_amount,
+            credit_pending_amount,
+            retailers(id, name, beat_name)
+          `)
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate)
+          .range(offset, offset + BATCH_SIZE - 1);
+        if (userIds.length > 0) {
+          ordersQuery = ordersQuery.in('user_id', userIds);
+        }
+        const { data: batch } = await ordersQuery;
+        if (batch && batch.length > 0) {
+          allOrders = allOrders.concat(batch);
+          offset += BATCH_SIZE;
+          hasMore = batch.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
       }
-
-      const { data: orders } = await ordersQuery;
+      const orders = allOrders;
 
       // Group by retailer
       const retailerMap = new Map<string, RetailerDetail>();
@@ -364,25 +408,38 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      let query = supabase
-        .from('orders')
-        .select(`
-          id,
-          order_date,
-          total_amount,
-          status,
-          user_id,
-          retailers(name)
-        `)
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate)
-        .order('order_date', { ascending: false });
-
-      if (userIds.length > 0) {
-        query = query.in('user_id', userIds);
+      const BATCH_SIZE = 1000;
+      let allOrders: any[] = [];
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        let query = supabase
+          .from('orders')
+          .select(`
+            id,
+            order_date,
+            total_amount,
+            status,
+            user_id,
+            retailers(name)
+          `)
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate)
+          .order('order_date', { ascending: false })
+          .range(offset, offset + BATCH_SIZE - 1);
+        if (userIds.length > 0) {
+          query = query.in('user_id', userIds);
+        }
+        const { data: batch } = await query;
+        if (batch && batch.length > 0) {
+          allOrders = allOrders.concat(batch);
+          offset += BATCH_SIZE;
+          hasMore = batch.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
       }
-
-      const { data } = await query;
+      const data = allOrders;
 
       // Fetch user names for all unique user_ids
       const uniqueUserIds = [...new Set((data || []).map(o => o.user_id).filter(Boolean))];
