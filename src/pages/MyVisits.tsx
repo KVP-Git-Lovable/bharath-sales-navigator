@@ -41,8 +41,6 @@ import { InsightsPanel } from "@/components/visits/InsightsPanel";
 import { StartBeatButton } from "@/components/StartBeatButton";
 import { AddActivityModal } from "@/components/AddActivityModal";
 import { ActivityEventsTable } from "@/components/ActivityEventsTable";
-import { TeamHierarchyVisitsView } from "@/components/TeamHierarchyVisitsView";
-import { useSubordinates } from "@/hooks/useSubordinates";
 
 interface Visit {
   id: string;
@@ -197,12 +195,10 @@ export const MyVisits = () => {
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [showTeamView, setShowTeamView] = useState(false);
   const {
     user,
     userProfile
   } = useAuth();
-  const { isManager: hasTeamMembers } = useSubordinates();
   const navigate = useNavigate();
   const networkStatus = useConnectivity();
   const isOnline = networkStatus === 'online';
@@ -1251,7 +1247,7 @@ export const MyVisits = () => {
             </div>
             
             {/* Timeline View, GPS Track, Van Stock, and Activity Buttons */}
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
               <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => {
               setTimelineDate(selectedDate ? new Date(selectedDate) : new Date());
               setIsTimelineOpen(true);
@@ -1271,22 +1267,6 @@ export const MyVisits = () => {
                 <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                 <span className="truncate">Activity</span>
               </Button>
-              {hasTeamMembers && (
-                <Button 
-                  variant="secondary" 
-                  size="sm" 
-                  className={cn(
-                    "text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3",
-                    showTeamView 
-                      ? "bg-primary-foreground text-primary border-primary-foreground" 
-                      : "bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20"
-                  )}
-                  onClick={() => setShowTeamView(prev => !prev)}
-                >
-                  <Users size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                  <span className="truncate">Team</span>
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -1373,11 +1353,6 @@ export const MyVisits = () => {
           beatId={currentBeatId}
           hasBeat={plannedBeats.length > 0 && !!currentBeatId}
         />
-
-        {/* Team Hierarchy View */}
-        {showTeamView && hasTeamMembers && (
-          <TeamHierarchyVisitsView selectedDate={selectedDate} />
-        )}
 
         {/* Enhanced Search and Filter Bar - Mobile Optimized */}
         <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
