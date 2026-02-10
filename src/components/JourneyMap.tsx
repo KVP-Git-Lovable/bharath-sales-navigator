@@ -10,11 +10,20 @@ interface Position {
   timestamp: Date;
 }
 
+export interface DayGroup {
+  date: string;           // 'yyyy-MM-dd'
+  dayLabel: string;       // 'Mon', 'Tue', etc.
+  color: string;          // hex color
+  retailers: EnhancedRetailerLocation[];
+  startLocation?: { latitude: number; longitude: number };
+}
+
 interface JourneyMapProps {
   positions: Position[];
   retailers?: EnhancedRetailerLocation[];
+  dayGroups?: DayGroup[];
   height?: string;
-  totalGpsDistance?: number; // Actual distance traveled from GPS tracking
+  totalGpsDistance?: number;
 }
 
 // Fix for default marker icons
@@ -35,10 +44,10 @@ const markerColors: Record<RetailerStatus, string> = {
 
 // Calculate distance between two points using Haversine formula
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371; // Earth's radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -49,18 +58,17 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 // Nearest-neighbor algorithm for route optimization
 const optimizeRoute = (retailers: EnhancedRetailerLocation[], startLat?: number, startLon?: number): EnhancedRetailerLocation[] => {
   if (retailers.length <= 1) return retailers;
-  
+
   const unvisited = [...retailers];
   const optimized: EnhancedRetailerLocation[] = [];
-  
-  // Start from the first retailer or a provided start point
+
   let currentLat = startLat ?? unvisited[0].latitude;
   let currentLon = startLon ?? unvisited[0].longitude;
-  
+
   while (unvisited.length > 0) {
     let nearestIdx = 0;
     let nearestDist = Infinity;
-    
+
     for (let i = 0; i < unvisited.length; i++) {
       const dist = calculateDistance(currentLat, currentLon, unvisited[i].latitude, unvisited[i].longitude);
       if (dist < nearestDist) {
@@ -68,64 +76,88 @@ const optimizeRoute = (retailers: EnhancedRetailerLocation[], startLat?: number,
         nearestIdx = i;
       }
     }
-    
+
     const nearest = unvisited.splice(nearestIdx, 1)[0];
     optimized.push({ ...nearest, sequenceNumber: optimized.length + 1 });
     currentLat = nearest.latitude;
     currentLon = nearest.longitude;
   }
-  
+
   return optimized;
 };
 
-export const JourneyMap: React.FC<JourneyMapProps> = ({ 
-  positions, 
-  retailers = [], 
+// Sort and optimize a day's retailers: completed by check-in time, pending by nearest-neighbor
+const buildDayRoute = (
+  retailers: EnhancedRetailerLocation[],
+  startLat?: number,
+  startLon?: number
+): EnhancedRetailerLocation[] => {
+  const completed = retailers
+    .filter(r => r.status === 'productive' || r.status === 'unproductive')
+    .sort((a, b) => {
+      if (!a.checkInTime) return 1;
+      if (!b.checkInTime) return -1;
+      return new Date(a.checkInTime).getTime() - new Date(b.checkInTime).getTime();
+    });
+
+  const pending = retailers.filter(r => r.status === 'pending' || r.status === 'planned');
+
+  // Optimize pending from last completed or start point
+  const lastCompleted = completed[completed.length - 1];
+  const optimizeLat = lastCompleted?.latitude ?? startLat;
+  const optimizeLon = lastCompleted?.longitude ?? startLon;
+  const optimizedPending = optimizeRoute(pending, optimizeLat, optimizeLon);
+
+  const all = [...completed, ...optimizedPending];
+  return all.map((r, idx) => ({ ...r, sequenceNumber: idx + 1 }));
+};
+
+export const JourneyMap: React.FC<JourneyMapProps> = ({
+  positions,
+  retailers = [],
+  dayGroups,
   height = '500px',
   totalGpsDistance
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const [optimizedRetailers, setOptimizedRetailers] = useState<EnhancedRetailerLocation[]>([]);
   const [totalRouteDistance, setTotalRouteDistance] = useState<number>(0);
 
-  // Optimize route when retailers change
+  const isMultiDay = dayGroups && dayGroups.length > 0;
+
+  // Optimize route for single-day mode
   useEffect(() => {
+    if (isMultiDay) return; // Skip for multi-day mode
+
     if (retailers.length > 0) {
-      // Get pending retailers for route optimization
       const pendingAndPlanned = retailers.filter(r => r.status === 'pending' || r.status === 'planned');
       const completedRetailers = retailers.filter(r => r.status === 'productive' || r.status === 'unproductive');
-      
-      // Optimize route for pending/planned retailers
-      const startPoint = positions.length > 0 
+
+      const startPoint = positions.length > 0
         ? { lat: positions[positions.length - 1].latitude, lon: positions[positions.length - 1].longitude }
         : undefined;
-      
+
       const optimizedPending = optimizeRoute(pendingAndPlanned, startPoint?.lat, startPoint?.lon);
-      
-      // Combine: completed first (in check-in order), then optimized pending
+
       const sortedCompleted = [...completedRetailers].sort((a, b) => {
         if (!a.checkInTime) return 1;
         if (!b.checkInTime) return -1;
         return new Date(a.checkInTime).getTime() - new Date(b.checkInTime).getTime();
       }).map((r, idx) => ({ ...r, sequenceNumber: idx + 1 }));
-      
+
       const allOptimized = [
         ...sortedCompleted,
         ...optimizedPending.map((r, idx) => ({ ...r, sequenceNumber: sortedCompleted.length + idx + 1 }))
       ];
-      
+
       setOptimizedRetailers(allOptimized);
-      
-      // Calculate total route distance
+
       let distance = 0;
       for (let i = 0; i < allOptimized.length - 1; i++) {
         distance += calculateDistance(
-          allOptimized[i].latitude,
-          allOptimized[i].longitude,
-          allOptimized[i + 1].latitude,
-          allOptimized[i + 1].longitude
+          allOptimized[i].latitude, allOptimized[i].longitude,
+          allOptimized[i + 1].latitude, allOptimized[i + 1].longitude
         );
       }
       setTotalRouteDistance(distance);
@@ -133,7 +165,7 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
       setOptimizedRetailers([]);
       setTotalRouteDistance(0);
     }
-  }, [retailers, positions]);
+  }, [retailers, positions, isMultiDay]);
 
   // Create status-based marker icon
   const createRetailerIcon = (status: RetailerStatus) => {
@@ -146,25 +178,22 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
       shadowSize: [41, 41]
     });
   };
+
   // Initialize map only once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    
-    const initialCenter: [number, number] = [20.5937, 78.9629]; // Default to India center
-    
+
     mapRef.current = L.map(containerRef.current, {
-      center: initialCenter,
+      center: [20.5937, 78.9629],
       zoom: 13,
-      // Disable animations to prevent _leaflet_pos errors during cleanup
       zoomAnimation: true,
       fadeAnimation: true,
     });
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapRef.current);
 
     return () => {
       if (mapRef.current) {
-        // Stop any ongoing animations before removing
         mapRef.current.stop();
         mapRef.current.remove();
         mapRef.current = null;
@@ -172,10 +201,23 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
     };
   }, []);
 
+  // Status labels for popups
+  const statusLabels: Record<RetailerStatus, { label: string; color: string }> = {
+    planned: { label: 'Planned', color: '#3b82f6' },
+    productive: { label: 'Productive', color: '#22c55e' },
+    unproductive: { label: 'Unproductive', color: '#ef4444' },
+    pending: { label: 'Pending', color: '#f97316' },
+  };
+
   // Update map layers when data changes
   useEffect(() => {
     if (!mapRef.current) return;
-    if (positions.length === 0 && optimizedRetailers.length === 0) return;
+
+    const hasData = isMultiDay
+      ? dayGroups.some(dg => dg.retailers.length > 0 || dg.startLocation)
+      : (positions.length > 0 || optimizedRetailers.length > 0);
+
+    if (!hasData) return;
 
     // Clear existing layers except tile layer
     mapRef.current.eachLayer((layer) => {
@@ -183,152 +225,182 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
         mapRef.current?.removeLayer(layer);
       }
     });
-    
-    // Clear markers reference
-    markersRef.current.clear();
 
-    // Status labels and colors for popup
-    const statusLabels: Record<RetailerStatus, { label: string; color: string }> = {
-      planned: { label: 'Planned', color: '#3b82f6' },
-      productive: { label: 'Productive', color: '#22c55e' },
-      unproductive: { label: 'Unproductive', color: '#ef4444' },
-      pending: { label: 'Pending', color: '#f97316' },
-    };
+    const allCoordinates: L.LatLngExpression[] = [];
 
-    // Add retailer markers and route
-    if (optimizedRetailers.length > 0) {
-      // Draw optimized route connecting all retailers
-      const routeCoordinates: L.LatLngExpression[] = optimizedRetailers.map((retailer) => [
-        retailer.latitude,
-        retailer.longitude,
-      ]);
+    if (isMultiDay) {
+      // ===== MULTI-DAY MODE =====
+      dayGroups.forEach((dayGroup) => {
+        const route = buildDayRoute(
+          dayGroup.retailers,
+          dayGroup.startLocation?.latitude,
+          dayGroup.startLocation?.longitude
+        );
 
-      L.polyline(routeCoordinates, {
-        color: '#8b5cf6',
-        weight: 4,
-        opacity: 0.8,
-        dashArray: '10, 10'
-      }).addTo(mapRef.current);
+        // Build polyline coordinates: start location -> retailers in order
+        const routeCoords: L.LatLngExpression[] = [];
 
-      // Add retailer markers with sequence numbers
-      optimizedRetailers.forEach((retailer) => {
-        const icon = createRetailerIcon(retailer.status);
-        const statusInfo = statusLabels[retailer.status];
-        
-        const marker = L.marker([retailer.latitude, retailer.longitude], { icon })
-          .addTo(mapRef.current!)
-          .bindPopup(`
-            <div style="min-width: 200px;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="background: ${statusInfo.color}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">
-                  ${retailer.sequenceNumber || ''}
-                </span>
-                <strong style="color: ${statusInfo.color}; font-size: 16px;">
-                  ${retailer.name}
-                </strong>
+        if (dayGroup.startLocation) {
+          routeCoords.push([dayGroup.startLocation.latitude, dayGroup.startLocation.longitude]);
+          allCoordinates.push([dayGroup.startLocation.latitude, dayGroup.startLocation.longitude]);
+
+          // Add start marker with day label
+          L.marker([dayGroup.startLocation.latitude, dayGroup.startLocation.longitude], {
+            icon: L.divIcon({
+              className: 'day-start-marker',
+              html: `<div style="background: ${dayGroup.color}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid white;">
+                ▶ ${dayGroup.dayLabel}
+              </div>`,
+              iconSize: [60, 24],
+              iconAnchor: [30, 12],
+            })
+          }).addTo(mapRef.current!);
+        }
+
+        route.forEach((retailer) => {
+          routeCoords.push([retailer.latitude, retailer.longitude]);
+          allCoordinates.push([retailer.latitude, retailer.longitude]);
+
+          // Add retailer marker with status color
+          const icon = createRetailerIcon(retailer.status);
+          const statusInfo = statusLabels[retailer.status];
+
+          L.marker([retailer.latitude, retailer.longitude], { icon })
+            .addTo(mapRef.current!)
+            .bindPopup(`
+              <div style="min-width: 200px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="background: ${dayGroup.color}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">
+                    ${retailer.sequenceNumber || ''}
+                  </span>
+                  <strong style="font-size: 14px;">${retailer.name}</strong>
+                </div>
+                <div style="color: #666; font-size: 12px;">
+                  <div><strong>Day:</strong> ${dayGroup.dayLabel} (${dayGroup.date})</div>
+                  <div><strong>Address:</strong> ${retailer.address || 'N/A'}</div>
+                  <div><strong>Status:</strong> <span style="color: ${statusInfo.color}">${statusInfo.label}</span></div>
+                  ${retailer.checkInTime ? `<div><strong>Check-in:</strong> ${new Date(retailer.checkInTime).toLocaleTimeString()}</div>` : ''}
+                  ${retailer.hasOrder ? '<div style="color: #22c55e; font-weight: bold;">✓ Order Placed</div>' : ''}
+                </div>
               </div>
-              <div style="color: #666;">
-                <div><strong>Address:</strong> ${retailer.address || 'N/A'}</div>
-                <div><strong>Status:</strong> <span style="color: ${statusInfo.color}">${statusInfo.label}</span></div>
-                ${retailer.checkInTime ? `<div><strong>Check-in:</strong> ${new Date(retailer.checkInTime).toLocaleTimeString()}</div>` : ''}
-                ${retailer.hasOrder ? '<div style="color: #22c55e; font-weight: bold;">✓ Order Placed</div>' : ''}
-              </div>
-            </div>
-          `);
-        
-        markersRef.current.set(retailer.id, marker);
+            `);
+        });
+
+        // Draw day's polyline
+        if (routeCoords.length >= 2) {
+          L.polyline(routeCoords, {
+            color: dayGroup.color,
+            weight: 4,
+            opacity: 0.85,
+          }).addTo(mapRef.current!);
+        }
       });
+    } else {
+      // ===== SINGLE-DAY MODE (existing behavior) =====
+      if (optimizedRetailers.length > 0) {
+        const routeCoordinates: L.LatLngExpression[] = optimizedRetailers.map((retailer) => [
+          retailer.latitude, retailer.longitude,
+        ]);
 
-      // Add distance label - prefer GPS distance if available
-      const distanceToShow = totalGpsDistance !== undefined && totalGpsDistance > 0 
-        ? totalGpsDistance 
-        : totalRouteDistance;
-      const distanceLabel = totalGpsDistance !== undefined && totalGpsDistance > 0 
-        ? 'Traveled' 
-        : 'Route';
-      
-      if (distanceToShow > 0) {
-        const midIdx = Math.floor(optimizedRetailers.length / 2);
-        const midPoint = optimizedRetailers[midIdx];
-        L.marker([midPoint.latitude, midPoint.longitude], {
-          icon: L.divIcon({
-            className: 'route-distance-label',
-            html: `<div style="background: #8b5cf6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-              ${distanceLabel}: ${distanceToShow.toFixed(1)} km
-            </div>`,
-            iconSize: [100, 24],
-            iconAnchor: [50, 12],
-          })
+        L.polyline(routeCoordinates, {
+          color: '#8b5cf6', weight: 4, opacity: 0.8, dashArray: '10, 10'
         }).addTo(mapRef.current);
+
+        optimizedRetailers.forEach((retailer) => {
+          const icon = createRetailerIcon(retailer.status);
+          const statusInfo = statusLabels[retailer.status];
+
+          L.marker([retailer.latitude, retailer.longitude], { icon })
+            .addTo(mapRef.current!)
+            .bindPopup(`
+              <div style="min-width: 200px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="background: ${statusInfo.color}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">
+                    ${retailer.sequenceNumber || ''}
+                  </span>
+                  <strong style="color: ${statusInfo.color}; font-size: 16px;">${retailer.name}</strong>
+                </div>
+                <div style="color: #666;">
+                  <div><strong>Address:</strong> ${retailer.address || 'N/A'}</div>
+                  <div><strong>Status:</strong> <span style="color: ${statusInfo.color}">${statusInfo.label}</span></div>
+                  ${retailer.checkInTime ? `<div><strong>Check-in:</strong> ${new Date(retailer.checkInTime).toLocaleTimeString()}</div>` : ''}
+                  ${retailer.hasOrder ? '<div style="color: #22c55e; font-weight: bold;">✓ Order Placed</div>' : ''}
+                </div>
+              </div>
+            `);
+        });
+
+        const distanceToShow = totalGpsDistance !== undefined && totalGpsDistance > 0
+          ? totalGpsDistance : totalRouteDistance;
+        const distanceLabel = totalGpsDistance !== undefined && totalGpsDistance > 0
+          ? 'Traveled' : 'Route';
+
+        if (distanceToShow > 0) {
+          const midIdx = Math.floor(optimizedRetailers.length / 2);
+          const midPoint = optimizedRetailers[midIdx];
+          L.marker([midPoint.latitude, midPoint.longitude], {
+            icon: L.divIcon({
+              className: 'route-distance-label',
+              html: `<div style="background: #8b5cf6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                ${distanceLabel}: ${distanceToShow.toFixed(1)} km
+              </div>`,
+              iconSize: [100, 24],
+              iconAnchor: [50, 12],
+            })
+          }).addTo(mapRef.current);
+        }
+      }
+
+      // Add GPS tracking path
+      if (positions.length > 0) {
+        const pathCoordinates: L.LatLngExpression[] = positions.map((pos) => [pos.latitude, pos.longitude]);
+
+        L.polyline(pathCoordinates, { color: '#3b82f6', weight: 2, opacity: 0.5 }).addTo(mapRef.current);
+
+        const blueIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+          iconSize: [15, 25], iconAnchor: [7, 25], popupAnchor: [1, -20], shadowSize: [25, 25]
+        });
+
+        L.marker([positions[0].latitude, positions[0].longitude], {
+          icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33]
+          })
+        })
+          .addTo(mapRef.current)
+          .bindPopup(`<strong>GPS Start</strong><br/>${positions[0].timestamp.toLocaleTimeString()}`);
+
+        const waypointInterval = Math.max(1, Math.floor(positions.length / 10));
+        positions.forEach((pos, index) => {
+          if (index > 0 && index < positions.length - 1 && index % waypointInterval === 0) {
+            L.marker([pos.latitude, pos.longitude], { icon: blueIcon })
+              .addTo(mapRef.current!)
+              .bindPopup(`<strong>GPS Point</strong><br/>${pos.timestamp.toLocaleTimeString()}`);
+          }
+        });
       }
     }
 
-    // Add GPS tracking path (if available)
-    if (positions.length > 0) {
-      const pathCoordinates: L.LatLngExpression[] = positions.map((pos) => [
-        pos.latitude,
-        pos.longitude,
-      ]);
-
-      L.polyline(pathCoordinates, {
-        color: '#3b82f6',
-        weight: 2,
-        opacity: 0.5,
-      }).addTo(mapRef.current);
-
-      // Create small blue icon for waypoints
-      const blueIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        iconSize: [15, 25],
-        iconAnchor: [7, 25],
-        popupAnchor: [1, -20],
-        shadowSize: [25, 25]
-      });
-
-      // Add start marker (green/default)
-      L.marker([positions[0].latitude, positions[0].longitude], {
-        icon: L.icon({
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-          iconSize: [20, 33],
-          iconAnchor: [10, 33],
-          popupAnchor: [1, -28],
-          shadowSize: [33, 33]
-        })
-      })
-        .addTo(mapRef.current)
-        .bindPopup(`<strong>GPS Start</strong><br/>${positions[0].timestamp.toLocaleTimeString()}`);
-
-      // Add waypoint markers along the route (sample every 10-20 points to avoid clutter)
-      const waypointInterval = Math.max(1, Math.floor(positions.length / 10));
-      positions.forEach((pos, index) => {
-        if (index > 0 && index < positions.length - 1 && index % waypointInterval === 0) {
-          L.marker([pos.latitude, pos.longitude], { icon: blueIcon })
-            .addTo(mapRef.current!)
-            .bindPopup(`<strong>GPS Point</strong><br/>${pos.timestamp.toLocaleTimeString()}`);
-        }
-      });
+    // Fit bounds for single-day (allCoordinates already populated for multi-day)
+    if (!isMultiDay) {
+      if (optimizedRetailers.length > 0) {
+        optimizedRetailers.forEach(r => allCoordinates.push([r.latitude, r.longitude]));
+      }
+      if (positions.length > 0) {
+        positions.forEach(p => allCoordinates.push([p.latitude, p.longitude]));
+      }
     }
 
-    // Fit bounds to show all markers
-    const allCoordinates: L.LatLngExpression[] = [];
-    
-    if (optimizedRetailers.length > 0) {
-      optimizedRetailers.forEach(r => allCoordinates.push([r.latitude, r.longitude]));
-    }
-    
-    if (positions.length > 0) {
-      positions.forEach(p => allCoordinates.push([p.latitude, p.longitude]));
-    }
-    
     if (allCoordinates.length > 0) {
       const bounds = L.latLngBounds(allCoordinates as L.LatLngTuple[]);
       mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
     }
-  }, [positions, optimizedRetailers, totalRouteDistance]);
+  }, [positions, optimizedRetailers, totalRouteDistance, dayGroups, isMultiDay]);
 
-  if (positions.length === 0 && retailers.length === 0) {
+  if (positions.length === 0 && retailers.length === 0 && (!dayGroups || dayGroups.length === 0)) {
     return (
       <div className="flex items-center justify-center h-full bg-muted rounded-lg" style={{ height }}>
         <div className="text-center space-y-2">
@@ -342,34 +414,68 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
   return (
     <div className="space-y-2">
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 px-2 py-1.5 bg-muted/50 rounded-lg text-xs">
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-          <span>Planned</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-          <span>Productive</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span>Unproductive</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-          <span>Pending</span>
-        </div>
-        {(totalGpsDistance !== undefined && totalGpsDistance > 0) ? (
-          <div className="flex items-center gap-1 ml-auto">
-            <span className="text-purple-600 font-medium">Traveled: {totalGpsDistance.toFixed(1)} km</span>
+      {isMultiDay ? (
+        /* Multi-day legend: day colors + status colors */
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2 px-2 py-1.5 bg-muted/50 rounded-lg text-xs">
+            {dayGroups.map((dg) => (
+              <div key={dg.date} className="flex items-center gap-1.5">
+                <div className="w-6 h-1.5 rounded-full" style={{ backgroundColor: dg.color }}></div>
+                <span className="font-medium">{dg.dayLabel}</span>
+                <span className="text-muted-foreground">({dg.retailers.length})</span>
+              </div>
+            ))}
           </div>
-        ) : totalRouteDistance > 0 ? (
-          <div className="flex items-center gap-1 ml-auto">
-            <span className="text-purple-600 font-medium">Route: {totalRouteDistance.toFixed(1)} km</span>
+          <div className="flex flex-wrap gap-3 px-2 py-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+              <span>Planned</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+              <span>Productive</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+              <span>Unproductive</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+              <span>Pending</span>
+            </div>
           </div>
-        ) : null}
-      </div>
-      
+        </div>
+      ) : (
+        /* Single-day legend (existing) */
+        <div className="flex flex-wrap gap-3 px-2 py-1.5 bg-muted/50 rounded-lg text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            <span>Planned</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <span>Productive</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <span>Unproductive</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+            <span>Pending</span>
+          </div>
+          {(totalGpsDistance !== undefined && totalGpsDistance > 0) ? (
+            <div className="flex items-center gap-1 ml-auto">
+              <span className="text-purple-600 font-medium">Traveled: {totalGpsDistance.toFixed(1)} km</span>
+            </div>
+          ) : totalRouteDistance > 0 ? (
+            <div className="flex items-center gap-1 ml-auto">
+              <span className="text-purple-600 font-medium">Route: {totalRouteDistance.toFixed(1)} km</span>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       <div
         ref={containerRef}
         style={{ height, width: '100%' }}
