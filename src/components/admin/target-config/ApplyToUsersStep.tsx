@@ -27,6 +27,8 @@ interface TargetConfig {
     territory: boolean;
     monthly: boolean;
   };
+  target_start_month?: number;
+  target_end_month?: number;
 }
 
 interface FYTargets {
@@ -518,6 +520,8 @@ export function ApplyToUsersStep({
                         fyYear={fyYear}
                         selectedTargetType={selectedTargetType}
                         onTargetChange={handleTargetChange}
+                        targetStartMonth={config.target_start_month ?? 1}
+                        targetEndMonth={config.target_end_month ?? 12}
                       />
                     ))}
                   </div>
