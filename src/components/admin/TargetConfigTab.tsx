@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -633,50 +633,61 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
 
         <Separator />
 
-        {/* Step 4: FY Total Targets - only show enabled metrics */}
+        {/* Step 4: FY Total Targets */}
         {hasAtLeastOneBasis && (
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-semibold text-foreground">FY Total Targets</Label>
-              <p className="text-xs text-muted-foreground mt-1">Define company-wide targets for the financial year</p>
+          <div className="rounded-xl border bg-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold text-base text-foreground">
+                  FY {fyYear} Overview
+                </h3>
+                <Badge variant="outline" className="text-xs gap-1 text-primary border-primary/30 bg-primary/5">
+                  <Users className="h-3 w-3" />
+                  From Hierarchy
+                </Badge>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {config.enable_quantity && (
-                <div className="p-4 rounded-xl border bg-card space-y-2">
-                  <Label className="text-xs text-muted-foreground">Quantity ({config.quantity_unit})</Label>
+                <div className="rounded-xl border bg-muted/30 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-foreground whitespace-nowrap">
+                    Qty Target ({config.quantity_unit})
+                  </Label>
                   <Input
                     type="text"
                     value={config.total_quantity_target > 0 ? formatNumber(config.total_quantity_target) : ''}
                     onChange={(e) => setConfig(prev => ({ ...prev, total_quantity_target: parseNumber(e.target.value) }))}
-                    placeholder={`e.g., 10,000 ${config.quantity_unit}`}
-                    className="text-lg font-semibold"
+                    placeholder="0"
+                    className="w-32 text-right font-semibold bg-background"
                   />
                 </div>
               )}
               {config.enable_revenue && (
-                <div className="p-4 rounded-xl border bg-card space-y-2">
-                  <Label className="text-xs text-muted-foreground">Revenue (₹)</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
-                    <Input
-                      type="text"
-                      className="pl-7 text-lg font-semibold"
-                      value={config.total_revenue_target > 0 ? formatNumber(config.total_revenue_target) : ''}
-                      onChange={(e) => setConfig(prev => ({ ...prev, total_revenue_target: parseNumber(e.target.value) }))}
-                      placeholder="e.g., 55,00,000"
-                    />
-                  </div>
+                <div className="rounded-xl border bg-success/10 border-success/20 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-success whitespace-nowrap">
+                    Revenue Target (₹)
+                  </Label>
+                  <Input
+                    type="text"
+                    value={config.total_revenue_target > 0 ? formatNumber(config.total_revenue_target) : ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, total_revenue_target: parseNumber(e.target.value) }))}
+                    placeholder="0"
+                    className="w-32 text-right font-semibold bg-background"
+                  />
                 </div>
               )}
               {config.enable_visits && (
-                <div className="p-4 rounded-xl border bg-card space-y-2">
-                  <Label className="text-xs text-muted-foreground">Productive Visits</Label>
+                <div className="rounded-xl border bg-primary/5 border-primary/20 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-primary whitespace-nowrap">
+                    Visits Target
+                  </Label>
                   <Input
                     type="text"
                     value={config.total_visits_target > 0 ? formatNumber(config.total_visits_target) : ''}
                     onChange={(e) => setConfig(prev => ({ ...prev, total_visits_target: Math.round(parseNumber(e.target.value)) }))}
-                    placeholder="e.g., 12,000"
-                    className="text-lg font-semibold"
+                    placeholder="0"
+                    className="w-32 text-right font-semibold bg-background"
                   />
                 </div>
               )}
