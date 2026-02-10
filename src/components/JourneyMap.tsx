@@ -123,8 +123,16 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [optimizedRetailers, setOptimizedRetailers] = useState<EnhancedRetailerLocation[]>([]);
   const [totalRouteDistance, setTotalRouteDistance] = useState<number>(0);
+  const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
 
   const isMultiDay = dayGroups && dayGroups.length > 0;
+
+  // Initialize visibleDays when dayGroups changes
+  useEffect(() => {
+    if (dayGroups && dayGroups.length > 0) {
+      setVisibleDays(new Set(dayGroups.map(dg => dg.date)));
+    }
+  }, [dayGroups]);
 
   // Optimize route for single-day mode
   useEffect(() => {
@@ -230,7 +238,8 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
 
     if (isMultiDay) {
       // ===== MULTI-DAY MODE =====
-      dayGroups.forEach((dayGroup) => {
+      const filteredGroups = dayGroups.filter(dg => visibleDays.has(dg.date));
+      filteredGroups.forEach((dayGroup) => {
         const route = buildDayRoute(
           dayGroup.retailers,
           dayGroup.startLocation?.latitude,
@@ -398,7 +407,7 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
       const bounds = L.latLngBounds(allCoordinates as L.LatLngTuple[]);
       mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
     }
-  }, [positions, optimizedRetailers, totalRouteDistance, dayGroups, isMultiDay]);
+  }, [positions, optimizedRetailers, totalRouteDistance, dayGroups, isMultiDay, visibleDays]);
 
   if (positions.length === 0 && retailers.length === 0 && (!dayGroups || dayGroups.length === 0)) {
     return (
@@ -417,14 +426,36 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
       {isMultiDay ? (
         /* Multi-day legend: day colors + status colors */
         <div className="space-y-1.5">
-          <div className="flex flex-wrap gap-2 px-2 py-1.5 bg-muted/50 rounded-lg text-xs">
-            {dayGroups.map((dg) => (
-              <div key={dg.date} className="flex items-center gap-1.5">
-                <div className="w-6 h-1.5 rounded-full" style={{ backgroundColor: dg.color }}></div>
-                <span className="font-medium">{dg.dayLabel}</span>
-                <span className="text-muted-foreground">({dg.retailers.length})</span>
-              </div>
-            ))}
+        <div className="flex flex-wrap gap-2 px-2 py-1.5 bg-muted/50 rounded-lg text-xs">
+            {dayGroups.map((dg) => {
+              const isActive = visibleDays.has(dg.date);
+              return (
+                <button
+                  key={dg.date}
+                  onClick={() => {
+                    setVisibleDays(prev => {
+                      const next = new Set(prev);
+                      if (next.has(dg.date)) {
+                        next.delete(dg.date);
+                      } else {
+                        next.add(dg.date);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    isActive ? 'opacity-100' : 'opacity-40'
+                  }`}
+                >
+                  <div
+                    className="w-6 h-1.5 rounded-full transition-colors"
+                    style={{ backgroundColor: isActive ? dg.color : '#9ca3af' }}
+                  ></div>
+                  <span className={`font-medium ${!isActive ? 'line-through' : ''}`}>{dg.dayLabel}</span>
+                  <span className="text-muted-foreground">({dg.retailers.length})</span>
+                </button>
+              );
+            })}
           </div>
           <div className="flex flex-wrap gap-3 px-2 py-1 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
