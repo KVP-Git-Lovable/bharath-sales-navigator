@@ -4481,8 +4481,10 @@ export type Database = {
           is_locked: boolean | null
           quantity_unit: string | null
           setup_completed: boolean | null
+          target_end_month: number
           target_period_type: string | null
           target_plan_name: string | null
+          target_start_month: number
           total_quantity_target: number | null
           total_revenue_target: number | null
           total_visits_target: number | null
@@ -4500,8 +4502,10 @@ export type Database = {
           is_locked?: boolean | null
           quantity_unit?: string | null
           setup_completed?: boolean | null
+          target_end_month?: number
           target_period_type?: string | null
           target_plan_name?: string | null
+          target_start_month?: number
           total_quantity_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
@@ -4519,8 +4523,10 @@ export type Database = {
           is_locked?: boolean | null
           quantity_unit?: string | null
           setup_completed?: boolean | null
+          target_end_month?: number
           target_period_type?: string | null
           target_plan_name?: string | null
+          target_start_month?: number
           total_quantity_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
