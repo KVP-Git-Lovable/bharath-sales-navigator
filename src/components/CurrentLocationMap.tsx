@@ -49,6 +49,8 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
   const journeyLayerRef = useRef<L.LayerGroup | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const intervalTrackingRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef<number>(0); // timestamp of last saved point
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy?: number; timestamp?: Date } | null>(null);
   const [isAttendanceActive, setIsAttendanceActive] = useState(false);
@@ -125,6 +127,10 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
+      }
+      if (intervalTrackingRef.current) {
+        clearInterval(intervalTrackingRef.current);
+        intervalTrackingRef.current = null;
       }
     };
   }, []);
@@ -288,34 +294,45 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
     );
   }, [user?.id, updateMapMarker]);
 
-  // Start watching live location
+  // Save a GPS point to database (with dedup by min interval)
+  const saveGPSPoint = useCallback((latitude: number, longitude: number, accuracy: number) => {
+    const now = Date.now();
+    // Only save if at least 15 seconds since last save
+    if (now - lastSavedRef.current < 14000) return;
+    lastSavedRef.current = now;
+
+    if (user?.id) {
+      const today = new Date().toISOString().split('T')[0];
+      supabase.from('gps_tracking').insert([{
+        user_id: user.id,
+        latitude,
+        longitude,
+        accuracy,
+        timestamp: new Date().toISOString(),
+        date: today
+      }]).then(({ error }) => {
+        if (error) console.error('Error saving GPS data:', error);
+      });
+    }
+  }, [user?.id]);
+
+  // Start watching live location + interval-based capture every 15s
   const startWatchingLocation = useCallback(() => {
     if (!navigator.geolocation || !isCurrentUser) return;
 
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
     }
+    if (intervalTrackingRef.current) {
+      clearInterval(intervalTrackingRef.current);
+    }
 
+    // watchPosition for real-time UI updates
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
-        const timestamp = new Date();
-        updateMapMarker(latitude, longitude, accuracy, timestamp);
-
-        // Save to gps_tracking table periodically
-        if (user?.id) {
-          const today = new Date().toISOString().split('T')[0];
-          supabase.from('gps_tracking').insert([{
-            user_id: user.id,
-            latitude: latitude,
-            longitude: longitude,
-            accuracy: accuracy,
-            timestamp: timestamp.toISOString(),
-            date: today
-          }]).then(({ error }) => {
-            if (error) console.error('Error saving GPS data:', error);
-          });
-        }
+        updateMapMarker(latitude, longitude, accuracy, new Date());
+        saveGPSPoint(latitude, longitude, accuracy);
       },
       (error) => {
         console.error('Watch position error:', error);
@@ -326,7 +343,26 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
         maximumAge: 5000
       }
     );
-  }, [isCurrentUser, user?.id, updateMapMarker]);
+
+    // Interval-based capture every 15 seconds for continuous route data
+    intervalTrackingRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          updateMapMarker(latitude, longitude, accuracy, new Date());
+          saveGPSPoint(latitude, longitude, accuracy);
+        },
+        (error) => {
+          console.error('Interval GPS error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5000
+        }
+      );
+    }, 15000);
+  }, [isCurrentUser, updateMapMarker, saveGPSPoint]);
 
   // Fetch location from database (for viewing other users)
   const fetchUserLocation = useCallback(async () => {
@@ -389,9 +425,15 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       // For current user, use geolocation watch only when attendance is active
       if (isAttendanceActive) {
         startWatchingLocation();
-      } else if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
+      } else {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+        }
+        if (intervalTrackingRef.current) {
+          clearInterval(intervalTrackingRef.current);
+          intervalTrackingRef.current = null;
+        }
       }
     } else {
       // For other users, use polling
@@ -404,6 +446,10 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
         refreshIntervalRef.current = null;
+      }
+      if (intervalTrackingRef.current) {
+        clearInterval(intervalTrackingRef.current);
+        intervalTrackingRef.current = null;
       }
     };
   }, [isAttendanceActive, userId, isCurrentUser, isViewingOther, startWatchingLocation, fetchUserLocation]);
