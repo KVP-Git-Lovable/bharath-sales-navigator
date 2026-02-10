@@ -27,6 +27,8 @@ interface BreakdownItem {
   quantity: number;
   revenue: number;
   visits: number;
+  categoryId?: string;
+  categoryName?: string;
 }
 
 const FY_MONTHS = [
@@ -742,6 +744,109 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
   );
 }
 
+// === Product Category Groups Component ===
+function ProductCategoryGroups({
+  items,
+  config,
+  formatNumber,
+  parseNumber,
+  handleItemChange,
+}: {
+  items: BreakdownItem[];
+  config: TargetConfig;
+  formatNumber: (n: number) => string;
+  parseNumber: (v: string) => number;
+  handleItemChange: (paramKey: string, itemId: string, field: 'quantity' | 'revenue' | 'visits', value: number) => void;
+}) {
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+
+  const grouped = useMemo(() => {
+    const map: Record<string, { name: string; items: BreakdownItem[] }> = {};
+    items.forEach(item => {
+      const catKey = item.categoryId || 'uncategorized';
+      const catName = item.categoryName || 'Uncategorized';
+      if (!map[catKey]) map[catKey] = { name: catName, items: [] };
+      map[catKey].items.push(item);
+    });
+    return Object.entries(map).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  }, [items]);
+
+  const toggleCategory = (catKey: string) => {
+    setOpenCategories(prev => ({ ...prev, [catKey]: !prev[catKey] }));
+  };
+
+  const getCategoryTotal = (catItems: BreakdownItem[], field: 'quantity' | 'revenue' | 'visits') =>
+    catItems.reduce((sum, item) => sum + item[field], 0);
+
+  return (
+    <div className="space-y-2">
+      {grouped.map(([catKey, { name: catName, items: catItems }]) => {
+        const isOpen = openCategories[catKey] ?? false;
+        return (
+          <div key={catKey} className="border rounded-lg overflow-hidden">
+            {/* Category header - clickable */}
+            <button
+              onClick={() => toggleCategory(catKey)}
+              className="w-full grid gap-2 items-center p-2.5 bg-muted/50 hover:bg-muted transition-colors"
+              style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground text-left">
+                {isOpen ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                {catName}
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{catItems.length}</Badge>
+              </span>
+              {config.enable_quantity && <span className="text-xs font-medium text-muted-foreground">{formatNumber(getCategoryTotal(catItems, 'quantity'))}</span>}
+              {config.enable_revenue && <span className="text-xs font-medium text-muted-foreground">₹{formatNumber(getCategoryTotal(catItems, 'revenue'))}</span>}
+              {config.enable_visits && <span className="text-xs font-medium text-muted-foreground">{formatNumber(getCategoryTotal(catItems, 'visits'))}</span>}
+            </button>
+            {/* Expanded products */}
+            {isOpen && (
+              <div className="divide-y">
+                {catItems.map(item => (
+                  <div
+                    key={item.id}
+                    className="grid gap-2 items-center p-2 pl-8 bg-card hover:bg-accent/30 transition-colors"
+                    style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                  >
+                    <span className="text-sm text-foreground truncate">{item.name}</span>
+                    {config.enable_quantity && (
+                      <Input
+                        type="text"
+                        className="h-8 text-sm"
+                        value={item.quantity > 0 ? formatNumber(item.quantity) : ''}
+                        onChange={(e) => handleItemChange('product', item.id, 'quantity', parseNumber(e.target.value))}
+                        placeholder="0"
+                      />
+                    )}
+                    {config.enable_revenue && (
+                      <Input
+                        type="text"
+                        className="h-8 text-sm"
+                        value={item.revenue > 0 ? formatNumber(item.revenue) : ''}
+                        onChange={(e) => handleItemChange('product', item.id, 'revenue', parseNumber(e.target.value))}
+                        placeholder="0"
+                      />
+                    )}
+                    {config.enable_visits && (
+                      <Input
+                        type="text"
+                        className="h-8 text-sm"
+                        value={item.visits > 0 ? formatNumber(item.visits) : ''}
+                        onChange={(e) => handleItemChange('product', item.id, 'visits', parseNumber(e.target.value))}
+                        placeholder="0"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // === Parameter Breakdown Section Component ===
 interface ParameterBreakdownProps {
   config: TargetConfig;
@@ -781,12 +886,12 @@ function ParameterBreakdownSection({
   }, [enabledParams, activeParamTab, setActiveParamTab]);
 
   // Fetch data for each enabled parameter
-  const { data: productCategories, isLoading: productsLoading } = useQuery({
-    queryKey: ['product-categories-breakdown'],
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ['products-breakdown'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('product_categories')
-        .select('id, name')
+        .from('products')
+        .select('id, name, category_id, product_categories(id, name)')
         .order('name');
       if (error) throw error;
       return data ?? [];
@@ -837,8 +942,11 @@ function ParameterBreakdownSection({
   useEffect(() => {
     const newData: Record<string, BreakdownItem[]> = { ...breakdownData };
 
-    if (config.enabled_parameters.product && productCategories && !newData.product) {
-      newData.product = productCategories.map(c => ({ id: c.id, name: c.name, quantity: 0, revenue: 0, visits: 0 }));
+    if (config.enabled_parameters.product && products && !newData.product) {
+      newData.product = products.map(p => {
+        const cat = p.product_categories as any;
+        return { id: p.id, name: p.name, quantity: 0, revenue: 0, visits: 0, categoryId: cat?.id, categoryName: cat?.name ?? 'Uncategorized' };
+      });
     }
     if (config.enabled_parameters.distributor && distributors && !newData.distributor) {
       newData.distributor = distributors.map(d => ({ id: d.id, name: d.name, quantity: 0, revenue: 0, visits: 0 }));
@@ -857,7 +965,7 @@ function ParameterBreakdownSection({
     }
 
     setBreakdownData(newData);
-  }, [productCategories, distributors, territories, beats, config.enabled_parameters]);
+  }, [products, distributors, territories, beats, config.enabled_parameters]);
 
   const handleItemChange = (paramKey: string, itemId: string, field: 'quantity' | 'revenue' | 'visits', value: number) => {
     setBreakdownData(prev => ({
@@ -967,44 +1075,54 @@ function ParameterBreakdownSection({
                     {config.enable_visits && <div className="text-xs font-medium text-muted-foreground px-2">Visits</div>}
                   </div>
 
-                  {/* Items */}
-                  <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
-                    {items.map(item => (
-                      <div
-                        key={item.id}
-                        className="grid gap-2 items-center p-2 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
-                        style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
-                      >
-                        <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
-                        {config.enable_quantity && (
-                          <Input
-                            type="text"
-                            className="h-8 text-sm"
-                            value={item.quantity > 0 ? formatNumber(item.quantity) : ''}
-                            onChange={(e) => handleItemChange(paramKey, item.id, 'quantity', parseNumber(e.target.value))}
-                            placeholder="0"
-                          />
-                        )}
-                        {config.enable_revenue && (
-                          <Input
-                            type="text"
-                            className="h-8 text-sm"
-                            value={item.revenue > 0 ? formatNumber(item.revenue) : ''}
-                            onChange={(e) => handleItemChange(paramKey, item.id, 'revenue', parseNumber(e.target.value))}
-                            placeholder="0"
-                          />
-                        )}
-                        {config.enable_visits && (
-                          <Input
-                            type="text"
-                            className="h-8 text-sm"
-                            value={item.visits > 0 ? formatNumber(item.visits) : ''}
-                            onChange={(e) => handleItemChange(paramKey, item.id, 'visits', parseNumber(e.target.value))}
-                            placeholder="0"
-                          />
-                        )}
-                      </div>
-                    ))}
+                  {/* Items - grouped by category for products */}
+                  <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                    {paramKey === 'product' ? (
+                      <ProductCategoryGroups
+                        items={items}
+                        config={config}
+                        formatNumber={formatNumber}
+                        parseNumber={parseNumber}
+                        handleItemChange={handleItemChange}
+                      />
+                    ) : (
+                      items.map(item => (
+                        <div
+                          key={item.id}
+                          className="grid gap-2 items-center p-2 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
+                          style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                        >
+                          <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
+                          {config.enable_quantity && (
+                            <Input
+                              type="text"
+                              className="h-8 text-sm"
+                              value={item.quantity > 0 ? formatNumber(item.quantity) : ''}
+                              onChange={(e) => handleItemChange(paramKey, item.id, 'quantity', parseNumber(e.target.value))}
+                              placeholder="0"
+                            />
+                          )}
+                          {config.enable_revenue && (
+                            <Input
+                              type="text"
+                              className="h-8 text-sm"
+                              value={item.revenue > 0 ? formatNumber(item.revenue) : ''}
+                              onChange={(e) => handleItemChange(paramKey, item.id, 'revenue', parseNumber(e.target.value))}
+                              placeholder="0"
+                            />
+                          )}
+                          {config.enable_visits && (
+                            <Input
+                              type="text"
+                              className="h-8 text-sm"
+                              value={item.visits > 0 ? formatNumber(item.visits) : ''}
+                              onChange={(e) => handleItemChange(paramKey, item.id, 'visits', parseNumber(e.target.value))}
+                              placeholder="0"
+                            />
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   {/* Total footer */}
