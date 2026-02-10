@@ -4,12 +4,12 @@ import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Target, BarChart3, Settings, Users } from 'lucide-react';
+import { ArrowLeft, Target, BarChart3, Settings } from 'lucide-react';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { TeamTargetDashboard } from '@/components/admin/TeamTargetDashboard';
 import { TargetConfigTab } from '@/components/admin/TargetConfigTab';
-import { HierarchyAllocationTab } from '@/components/admin/HierarchyAllocationTab';
+
 import { useAllUserIds } from '@/hooks/useAllUserIds';
 
 export type UserScope = 'self' | 'single' | 'multiple' | 'team' | 'all';
@@ -40,7 +40,7 @@ const TargetVsActual = () => {
   const { allUserIds, isLoading: allUsersLoading } = useAllUserIds();
   const navigate = useNavigate();
   
-  const [activeTab, setActiveTab] = useState<'targets' | 'hierarchy' | 'dashboard'>('targets');
+  const [activeTab, setActiveTab] = useState<'targets' | 'dashboard'>('targets');
   const [fyYear, setFYYear] = useState(getCurrentFY());
   
   // Dashboard tab state - default to 'all' for admins
@@ -86,9 +86,6 @@ const TargetVsActual = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleLockedAndAssign = () => {
-    setActiveTab('hierarchy');
-  };
 
   return (
     <Layout>
@@ -129,14 +126,10 @@ const TargetVsActual = () => {
 
           {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="grid w-full grid-cols-3 max-w-lg">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
               <TabsTrigger value="targets" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Targets</span>
-              </TabsTrigger>
-              <TabsTrigger value="hierarchy" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Hierarchy</span>
               </TabsTrigger>
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
@@ -148,13 +141,7 @@ const TargetVsActual = () => {
             <TabsContent value="targets" className="mt-6">
               <TargetConfigTab 
                 fyYear={fyYear} 
-                onLockedAndAssign={handleLockedAndAssign}
               />
-            </TabsContent>
-
-            {/* Hierarchy Tab - Allocate to Users */}
-            <TabsContent value="hierarchy" className="mt-6">
-              <HierarchyAllocationTab fyYear={fyYear} />
             </TabsContent>
 
             {/* Dashboard Tab - Target vs Actual */}
