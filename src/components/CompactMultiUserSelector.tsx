@@ -16,6 +16,7 @@ interface CompactMultiUserSelectorProps {
   onSelectionChange: (userIds: string[]) => void;
   className?: string;
   includesSelf?: boolean;
+  variant?: 'default' | 'onDark';
 }
 
 export function CompactMultiUserSelector({
@@ -23,6 +24,7 @@ export function CompactMultiUserSelector({
   onSelectionChange,
   className,
   includesSelf = true,
+  variant = 'default',
 }: CompactMultiUserSelectorProps) {
   const { user } = useAuth();
   const { subordinates, isLoading, isManager } = useSubordinates();
@@ -127,7 +129,11 @@ export function CompactMultiUserSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('justify-between gap-2 min-w-[140px]', className)}
+          className={cn(
+            'justify-between gap-2 min-w-[140px]',
+            variant === 'onDark' && 'bg-background/10 text-primary-foreground border-primary-foreground/20 hover:bg-background/15 focus:ring-primary-foreground/30 backdrop-blur-sm',
+            className
+          )}
         >
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 shrink-0" />
