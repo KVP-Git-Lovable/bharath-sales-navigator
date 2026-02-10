@@ -17,6 +17,7 @@ interface CompactMultiUserSelectorProps {
   className?: string;
   includesSelf?: boolean;
   variant?: 'default' | 'onDark';
+  showAllTeam?: boolean;
 }
 
 export function CompactMultiUserSelector({
@@ -25,6 +26,7 @@ export function CompactMultiUserSelector({
   className,
   includesSelf = true,
   variant = 'default',
+  showAllTeam = true,
 }: CompactMultiUserSelectorProps) {
   const { user } = useAuth();
   const { subordinates, isLoading, isManager } = useSubordinates();
@@ -165,14 +167,14 @@ export function CompactMultiUserSelector({
             >
               My Data
             </Button>
-            <Button
+            {showAllTeam && <Button
               variant="outline"
               size="sm"
               onClick={handleSelectAll}
               className="flex-1 h-7 text-xs"
             >
               All Team
-            </Button>
+            </Button>}
             <Button
               variant="ghost"
               size="sm"
