@@ -256,10 +256,6 @@ export function OrganizationTree({ selectedNodeId, onNodeSelect }: OrganizationT
   return (
     <ScrollArea className="h-[500px]">
       <div className="p-3">
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1 flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Organization Hierarchy
-        </h3>
         <div className="space-y-1">
           {hierarchy.map(node => renderNode(node))}
         </div>
