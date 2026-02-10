@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import {
   Select,
   SelectContent,
@@ -60,8 +62,8 @@ export const VisitFilters = ({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
+      <Drawer open={isOpen} onOpenChange={setIsOpen}>
+        <DrawerTrigger asChild>
           <Button
             variant="outline"
             size="icon"
@@ -74,22 +76,22 @@ export const VisitFilters = ({
               </Badge>
             )}
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 sm:w-80 p-0 bg-background z-50" align="start" side="bottom" sideOffset={8} collisionPadding={16} avoidCollisions>
-          <div className="flex items-center justify-between p-3 border-b">
-            <h4 className="font-semibold text-sm">Filter Retailers</h4>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="flex flex-row items-center justify-between pb-2 border-b">
+            <DrawerTitle className="text-base font-semibold">Filter Retailers</DrawerTitle>
             {activeFiltersCount > 0 && (
               <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-7 text-xs">
                 Clear All
               </Button>
             )}
-          </div>
-          <ScrollArea className="max-h-[60vh]">
-            <div className="p-3 space-y-3">
+          </DrawerHeader>
+          <ScrollArea className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 80px)' }}>
+            <div className="px-4 py-3 space-y-4 pb-8">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Category</Label>
                 <Select value={filters.category || "all"} onValueChange={(value) => handleFilterChange("category", value)}>
-                  <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="All Categories" /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm bg-background"><SelectValue placeholder="All Categories" /></SelectTrigger>
                   <SelectContent className="bg-background z-[60]">
                     <SelectItem value="all">All Categories</SelectItem>
                     {availableCategories.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}
@@ -99,7 +101,7 @@ export const VisitFilters = ({
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Last Visited</Label>
                 <Select value={filters.lastVisitDays || "all"} onValueChange={(value) => handleFilterChange("lastVisitDays", value)}>
-                  <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="Any time" /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm bg-background"><SelectValue placeholder="Any time" /></SelectTrigger>
                   <SelectContent className="bg-background z-[60]">
                     <SelectItem value="all">Any time</SelectItem>
                     <SelectItem value="7">Last 7 days</SelectItem>
@@ -114,7 +116,7 @@ export const VisitFilters = ({
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Avg Order Value</Label>
                 <Select value={filters.avgSalesRange || "all"} onValueChange={(value) => handleFilterChange("avgSalesRange", value)}>
-                  <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="All ranges" /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm bg-background"><SelectValue placeholder="All ranges" /></SelectTrigger>
                   <SelectContent className="bg-background z-[60]">
                     <SelectItem value="all">All ranges</SelectItem>
                     <SelectItem value="high">High (₹20,000+)</SelectItem>
@@ -128,7 +130,7 @@ export const VisitFilters = ({
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Focused Products</Label>
                 <Select value={filters.focusedProduct || "all"} onValueChange={(value) => handleFilterChange("focusedProduct", value)}>
-                  <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="All products" /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm bg-background"><SelectValue placeholder="All products" /></SelectTrigger>
                   <SelectContent className="bg-background z-[60]">
                     <SelectItem value="all">All products</SelectItem>
                     <SelectItem value="focused">Focused Products Only</SelectItem>
@@ -139,7 +141,7 @@ export const VisitFilters = ({
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Priority</Label>
                 <Select value={filters.priority || "all"} onValueChange={(value) => handleFilterChange("priority", value)}>
-                  <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="All priorities" /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm bg-background"><SelectValue placeholder="All priorities" /></SelectTrigger>
                   <SelectContent className="bg-background z-[60]">
                     <SelectItem value="all">All priorities</SelectItem>
                     <SelectItem value="high">High Priority</SelectItem>
@@ -152,7 +154,7 @@ export const VisitFilters = ({
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Location</Label>
                   <Select value={filters.location || "all"} onValueChange={(value) => handleFilterChange("location", value)}>
-                    <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="All locations" /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-sm bg-background"><SelectValue placeholder="All locations" /></SelectTrigger>
                     <SelectContent className="bg-background z-[60]">
                       <SelectItem value="all">All locations</SelectItem>
                       {availableLocations.map((loc) => (<SelectItem key={loc} value={loc}>{loc}</SelectItem>))}
@@ -162,8 +164,8 @@ export const VisitFilters = ({
               )}
             </div>
           </ScrollArea>
-        </PopoverContent>
-      </Popover>
+        </DrawerContent>
+      </Drawer>
 
       {/* Active Filter Badges */}
       {activeFiltersCount > 0 && (
@@ -171,10 +173,7 @@ export const VisitFilters = ({
           {filters.category && (
             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
               Category: {filters.category}
-              <button
-                onClick={() => handleFilterChange("category", "")}
-                className="ml-1 hover:text-primary-foreground"
-              >
+              <button onClick={() => handleFilterChange("category", "")} className="ml-1 hover:text-primary-foreground">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -182,10 +181,7 @@ export const VisitFilters = ({
           {filters.lastVisitDays && (
             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
               {filters.lastVisitDays === "never" ? "Never visited" : `Last ${filters.lastVisitDays} days`}
-              <button
-                onClick={() => handleFilterChange("lastVisitDays", "")}
-                className="ml-1 hover:text-primary-foreground"
-              >
+              <button onClick={() => handleFilterChange("lastVisitDays", "")} className="ml-1 hover:text-primary-foreground">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -193,10 +189,7 @@ export const VisitFilters = ({
           {filters.avgSalesRange && (
             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
               Sales: {filters.avgSalesRange}
-              <button
-                onClick={() => handleFilterChange("avgSalesRange", "")}
-                className="ml-1 hover:text-primary-foreground"
-              >
+              <button onClick={() => handleFilterChange("avgSalesRange", "")} className="ml-1 hover:text-primary-foreground">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -204,10 +197,7 @@ export const VisitFilters = ({
           {filters.priority && (
             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
               Priority: {filters.priority}
-              <button
-                onClick={() => handleFilterChange("priority", "")}
-                className="ml-1 hover:text-primary-foreground"
-              >
+              <button onClick={() => handleFilterChange("priority", "")} className="ml-1 hover:text-primary-foreground">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -215,21 +205,15 @@ export const VisitFilters = ({
           {filters.location && (
             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
               Location: {filters.location}
-              <button
-                onClick={() => handleFilterChange("location", "")}
-                className="ml-1 hover:text-primary-foreground"
-              >
+              <button onClick={() => handleFilterChange("location", "")} className="ml-1 hover:text-primary-foreground">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
           )}
           {filters.focusedProduct && (
-            <Badge variant="secondary" className="text-xs bg-orange-500/10 text-orange-600 border-orange-500/20">
+            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
               {filters.focusedProduct === "focused" ? "Focused Products" : "Non-Focused Products"}
-              <button
-                onClick={() => handleFilterChange("focusedProduct", "")}
-                className="ml-1 hover:text-orange-700"
-              >
+              <button onClick={() => handleFilterChange("focusedProduct", "")} className="ml-1 hover:text-primary-foreground">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
