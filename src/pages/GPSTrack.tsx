@@ -428,34 +428,57 @@ export default function GPSTrack() {
   const loadVisitStats = useCallback(async () => {
     if (!selectedMember) return;
 
-    // Calculate stats directly from visits table (not dependent on retailer coordinates)
-    const { data: visits, error } = await supabase
-      .from('visits')
-      .select('id, status, no_order_reason')
-      .eq('user_id', selectedMember)
-      .gte('planned_date', startDateStr)
-      .lte('planned_date', endDateStr);
+    // Fetch visits AND beat plan retailers to match My Visits page logic
+    // "Planned" = total retailers in beat plan (not just visit records)
+    // "Pending" = planned retailers not yet visited
+    const [visitsResult, beatPlansResult] = await Promise.all([
+      supabase
+        .from('visits')
+        .select('id, status, no_order_reason')
+        .eq('user_id', selectedMember)
+        .gte('planned_date', startDateStr)
+        .lte('planned_date', endDateStr),
+      supabase
+        .from('beat_plans')
+        .select('beat_id')
+        .eq('user_id', selectedMember)
+        .gte('plan_date', startDateStr)
+        .lte('plan_date', endDateStr)
+    ]);
 
-    if (error) {
-      console.error('Error loading visit stats:', error);
+    if (visitsResult.error) {
+      console.error('Error loading visit stats:', visitsResult.error);
       return;
     }
 
-    if (visits) {
-      const total = visits.length;
-      const productive = visits.filter(v => v.status === 'productive').length;
-      const unproductive = visits.filter(v => v.status === 'unproductive' || !!v.no_order_reason).length;
-      const pending = visits.filter(v => v.status === 'planned' || v.status === 'pending').length;
+    const visits = visitsResult.data || [];
+    const beatPlans = beatPlansResult.data || [];
+    
+    // Get total planned retailers from beat plans
+    let totalPlanned = visits.length; // fallback to visits count
+    if (beatPlans.length > 0) {
+      const beatIds = [...new Set(beatPlans.map(bp => bp.beat_id))];
+      const { data: retailers, error: retErr } = await supabase
+        .from('retailers')
+        .select('id', { count: 'exact', head: false })
+        .in('beat_id', beatIds)
+        .eq('user_id', selectedMember);
       
-      setVisitStats({ 
-        planned: total, 
-        productive, 
-        unproductive, 
-        pending 
-      });
-    } else {
-      setVisitStats({ planned: 0, productive: 0, unproductive: 0, pending: 0 });
+      if (!retErr && retailers) {
+        totalPlanned = retailers.length;
+      }
     }
+
+    const productive = visits.filter(v => v.status === 'productive').length;
+    const unproductive = visits.filter(v => v.status === 'unproductive' || !!v.no_order_reason).length;
+    const pending = totalPlanned - productive - unproductive;
+    
+    setVisitStats({ 
+      planned: totalPlanned, 
+      productive, 
+      unproductive, 
+      pending: Math.max(0, pending)
+    });
   }, [selectedMember, startDateStr, endDateStr]);
 
   // Data loading effect - called after all functions are defined
