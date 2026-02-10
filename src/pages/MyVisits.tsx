@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
-import { UserSelector } from "@/components/UserSelector";
+import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, differenceInDays } from "date-fns";
 import { SearchInput } from "@/components/SearchInput";
@@ -196,7 +196,7 @@ export const MyVisits = () => {
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [selectedViewUserId, setSelectedViewUserId] = useState<string>('self');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const {
     user,
     userProfile
@@ -207,7 +207,9 @@ export const MyVisits = () => {
 
   // NOTE: AI Recommendations hooks moved below after plannedBeats is defined
   const { isLocationEnabled } = useLocationFeature();
-  const isViewingSelf = selectedViewUserId === 'self' || selectedViewUserId === user?.id;
+  const isViewingSelf = selectedUserIds.length === 0 || (selectedUserIds.length === 1 && selectedUserIds[0] === user?.id);
+  // Derive viewUserId for the hook: use the first selected non-self user, or 'self'
+  const selectedViewUserId = isViewingSelf ? 'self' : selectedUserIds[0];
 
   // One-time fix: Restore cancelled visits to planned if day hasn't ended
   useEffect(() => {
@@ -1173,11 +1175,17 @@ export const MyVisits = () => {
                 <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
                 <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
               </div>
-              <UserSelector
-                selectedUserId={selectedViewUserId}
-                onUserChange={setSelectedViewUserId}
-                showAllOption={false}
-                variant="onDark"
+              <CompactMultiUserSelector
+                selectedUserIds={selectedUserIds}
+                onSelectionChange={(ids) => {
+                  // Single-select behavior: keep only the last selected
+                  if (ids.length > 1) {
+                    const newest = ids.filter(id => !selectedUserIds.includes(id));
+                    setSelectedUserIds(newest.length > 0 ? [newest[0]] : [ids[ids.length - 1]]);
+                  } else {
+                    setSelectedUserIds(ids);
+                  }
+                }}
               />
             </div>
           </CardHeader>
