@@ -112,71 +112,36 @@ const buildDayRoute = (
   return all.map((r, idx) => ({ ...r, sequenceNumber: idx + 1 }));
 };
 
-// OSRM route cache to avoid redundant API calls
-const osrmCache = new Map<string, L.LatLngExpression[]>();
-
-// Helper: delay for rate limiting / retry backoff
-const osrmDelay = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-// Fetch road-following route geometry from OSRM with caching & retry on 429
-async function fetchOSRMRoute(coords: L.LatLngExpression[], maxRetries = 3): Promise<L.LatLngExpression[]> {
+// Fetch road-following route geometry from OSRM (free, no API key needed)
+async function fetchOSRMRoute(coords: L.LatLngExpression[]): Promise<L.LatLngExpression[]> {
   if (coords.length < 2) return coords;
 
-  // Build cache key from rounded coords
-  const cacheKey = coords.map(c => {
-    const [lat, lng] = c as [number, number];
-    return `${lat.toFixed(4)},${lng.toFixed(4)}`;
-  }).join('|');
+  try {
+    // OSRM expects lng,lat (Leaflet uses lat,lng)
+    const waypoints = coords.map((c) => {
+      const [lat, lng] = c as [number, number];
+      return `${lng},${lat}`;
+    }).join(';');
 
-  if (osrmCache.has(cacheKey)) return osrmCache.get(cacheKey)!;
+    const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
 
-  const waypoints = coords.map((c) => {
-    const [lat, lng] = c as [number, number];
-    return `${lng},${lat}`;
-  }).join(';');
+    if (!res.ok) throw new Error(`OSRM returned ${res.status}`);
 
-  const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
+    const data = await res.json();
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        // Exponential backoff: 1s, 2s, 4s
-        await osrmDelay(1000 * Math.pow(2, attempt - 1));
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
-
-      if (res.status === 429) {
-        console.log(`OSRM rate limited, retry ${attempt + 1}/${maxRetries}`);
-        continue; // retry after backoff
-      }
-
-      if (!res.ok) throw new Error(`OSRM returned ${res.status}`);
-
-      const data = await res.json();
-
-      if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates) {
-        throw new Error('No route found');
-      }
-
-      const result = data.routes[0].geometry.coordinates.map(
-        ([lng, lat]: [number, number]) => [lat, lng] as L.LatLngExpression
-      );
-      osrmCache.set(cacheKey, result);
-      return result;
-    } catch (error) {
-      if (attempt === maxRetries) {
-        // Final fallback to straight line only after all retries exhausted
-        return coords;
-      }
+    if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates) {
+      throw new Error('No route found');
     }
-  }
 
-  return coords;
+    // GeoJSON coordinates are [lng, lat], convert to [lat, lng] for Leaflet
+    return data.routes[0].geometry.coordinates.map(
+      ([lng, lat]: [number, number]) => [lat, lng] as L.LatLngExpression
+    );
+  } catch (error) {
+    console.warn('OSRM route fetch failed, falling back to straight line:', error);
+    return coords; // Fallback to straight line
+  }
 }
 
 export const JourneyMap: React.FC<JourneyMapProps> = ({
@@ -366,14 +331,14 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
             `);
         });
 
-        // Draw road-following route from OSRM (with retry on rate limit)
+        // Draw day's polyline with road-following geometry from OSRM
         if (routeCoords.length >= 2) {
-          await osrmDelay(400); // spacing between day requests to avoid 429
-          if (cancelled || !mapRef.current) return;
           const roadGeometry = await fetchOSRMRoute(routeCoords);
           if (cancelled || !mapRef.current) return;
           L.polyline(roadGeometry, {
-            color: dayGroup.color, weight: 4, opacity: 0.85,
+            color: dayGroup.color,
+            weight: 4,
+            opacity: 0.85,
           }).addTo(mapRef.current!);
         }
       }
@@ -384,7 +349,6 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
           retailer.latitude, retailer.longitude,
         ]);
 
-        // Draw road-following route from OSRM
         const roadGeometry = await fetchOSRMRoute(routeCoordinates);
         if (cancelled || !mapRef.current) return;
         L.polyline(roadGeometry, {
