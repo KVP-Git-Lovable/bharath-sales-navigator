@@ -1473,8 +1473,8 @@ export const MyVisits = () => {
         </div>
 
         {/* Activity Events Table */}
-        {user?.id && (
-          <ActivityEventsTable userId={user.id} selectedDate={selectedDate} />
+        {(isViewingSelf ? user?.id : selectedUserIds[0]) && (
+          <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} />
         )}
 
         {/* Create New Visit Modal */}
