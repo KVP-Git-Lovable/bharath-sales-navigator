@@ -112,6 +112,38 @@ const buildDayRoute = (
   return all.map((r, idx) => ({ ...r, sequenceNumber: idx + 1 }));
 };
 
+// Fetch road-following route geometry from OSRM (free, no API key needed)
+async function fetchOSRMRoute(coords: L.LatLngExpression[]): Promise<L.LatLngExpression[]> {
+  if (coords.length < 2) return coords;
+
+  try {
+    // OSRM expects lng,lat (Leaflet uses lat,lng)
+    const waypoints = coords.map((c) => {
+      const [lat, lng] = c as [number, number];
+      return `${lng},${lat}`;
+    }).join(';');
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+
+    if (!res.ok) throw new Error(`OSRM returned ${res.status}`);
+
+    const data = await res.json();
+
+    if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates) {
+      throw new Error('No route found');
+    }
+
+    // GeoJSON coordinates are [lng, lat], convert to [lat, lng] for Leaflet
+    return data.routes[0].geometry.coordinates.map(
+      ([lng, lat]: [number, number]) => [lat, lng] as L.LatLngExpression
+    );
+  } catch (error) {
+    console.warn('OSRM route fetch failed, falling back to straight line:', error);
+    return coords; // Fallback to straight line
+  }
+}
+
 export const JourneyMap: React.FC<JourneyMapProps> = ({
   positions,
   retailers = [],
@@ -219,6 +251,9 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
 
   // Update map layers when data changes
   useEffect(() => {
+    let cancelled = false;
+
+    const updateMap = async () => {
     if (!mapRef.current) return;
 
     const hasData = isMultiDay
@@ -239,7 +274,8 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
     if (isMultiDay) {
       // ===== MULTI-DAY MODE =====
       const filteredGroups = dayGroups.filter(dg => visibleDays.has(dg.date));
-      filteredGroups.forEach((dayGroup) => {
+      for (const dayGroup of filteredGroups) {
+        if (cancelled || !mapRef.current) return;
         const route = buildDayRoute(
           dayGroup.retailers,
           dayGroup.startLocation?.latitude,
@@ -295,15 +331,17 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
             `);
         });
 
-        // Draw day's polyline
+        // Draw day's polyline with road-following geometry from OSRM
         if (routeCoords.length >= 2) {
-          L.polyline(routeCoords, {
+          const roadGeometry = await fetchOSRMRoute(routeCoords);
+          if (cancelled || !mapRef.current) return;
+          L.polyline(roadGeometry, {
             color: dayGroup.color,
             weight: 4,
             opacity: 0.85,
           }).addTo(mapRef.current!);
         }
-      });
+      }
     } else {
       // ===== SINGLE-DAY MODE (existing behavior) =====
       if (optimizedRetailers.length > 0) {
@@ -311,7 +349,9 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
           retailer.latitude, retailer.longitude,
         ]);
 
-        L.polyline(routeCoordinates, {
+        const roadGeometry = await fetchOSRMRoute(routeCoordinates);
+        if (cancelled || !mapRef.current) return;
+        L.polyline(roadGeometry, {
           color: '#8b5cf6', weight: 4, opacity: 0.8, dashArray: '10, 10'
         }).addTo(mapRef.current);
 
@@ -407,6 +447,11 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
       const bounds = L.latLngBounds(allCoordinates as L.LatLngTuple[]);
       mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
     }
+    };
+
+    updateMap();
+
+    return () => { cancelled = true; };
   }, [positions, optimizedRetailers, totalRouteDistance, dayGroups, isMultiDay, visibleDays]);
 
   if (positions.length === 0 && retailers.length === 0 && (!dayGroups || dayGroups.length === 0)) {
