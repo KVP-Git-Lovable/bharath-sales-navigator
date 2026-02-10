@@ -42,6 +42,8 @@ interface UserMonthlyTargetsProps {
   quantityUnit: string;
   selectedTargetType: 'quantity' | 'revenue' | 'visits';
   enabledBasis: EnabledBasis;
+  targetStartMonth?: number;
+  targetEndMonth?: number;
 }
 
 export function UserMonthlyTargets({
@@ -53,6 +55,8 @@ export function UserMonthlyTargets({
   quantityUnit,
   selectedTargetType,
   enabledBasis,
+  targetStartMonth = 1,
+  targetEndMonth = 12,
 }: UserMonthlyTargetsProps) {
   const [equalDivide, setEqualDivide] = useState(true);
   const [monthTargets, setMonthTargets] = useState<MonthTarget[]>([]);
@@ -91,35 +95,41 @@ export function UserMonthlyTargets({
     enabled: !!businessPlan?.id,
   });
 
+  // Filter months based on target duration
+  const activeFYMonths = useMemo(() => 
+    FY_MONTHS.filter(m => m.number >= targetStartMonth && m.number <= targetEndMonth),
+    [targetStartMonth, targetEndMonth]
+  );
+
+  const activeMonthCount = activeFYMonths.length;
+
   // Initialize monthly targets
   useEffect(() => {
-    const numMonths = 12;
-    const equalQty = totalQuantity / numMonths;
-    const equalRev = totalRevenue / numMonths;
-    const equalVisits = totalVisits / numMonths;
+    const equalQty = activeMonthCount > 0 ? totalQuantity / activeMonthCount : 0;
+    const equalRev = activeMonthCount > 0 ? totalRevenue / activeMonthCount : 0;
+    const equalVisits = activeMonthCount > 0 ? totalVisits / activeMonthCount : 0;
 
-    const newTargets = FY_MONTHS.map((month) => {
+    const newTargets = activeFYMonths.map((month) => {
       const existing = existingTargets?.find((t: any) => t.month_number === month.number);
       return {
-      monthNumber: month.number,
+        monthNumber: month.number,
         monthName: month.fullName,
         quantityTarget: existing?.quantity_target ?? (equalDivide ? equalQty : 0),
         revenueTarget: existing?.revenue_target ?? (equalDivide ? equalRev : 0),
-        visitsTarget: equalDivide ? equalVisits : 0, // visits_target not in schema, handle locally
+        visitsTarget: equalDivide ? equalVisits : 0,
       };
     });
 
     setMonthTargets(newTargets);
-  }, [existingTargets, totalQuantity, totalRevenue, totalVisits, equalDivide]);
+  }, [existingTargets, totalQuantity, totalRevenue, totalVisits, equalDivide, activeFYMonths, activeMonthCount]);
 
   // Apply equal divide
   useEffect(() => {
     if (!equalDivide) return;
 
-    const numMonths = 12;
-    const equalQty = totalQuantity / numMonths;
-    const equalRev = totalRevenue / numMonths;
-    const equalVisits = totalVisits / numMonths;
+    const equalQty = activeMonthCount > 0 ? totalQuantity / activeMonthCount : 0;
+    const equalRev = activeMonthCount > 0 ? totalRevenue / activeMonthCount : 0;
+    const equalVisits = activeMonthCount > 0 ? totalVisits / activeMonthCount : 0;
 
     setMonthTargets((prev) =>
       prev.map((t) => ({
@@ -129,7 +139,7 @@ export function UserMonthlyTargets({
         visitsTarget: equalVisits,
       }))
     );
-  }, [equalDivide, totalQuantity, totalRevenue, totalVisits]);
+  }, [equalDivide, totalQuantity, totalRevenue, totalVisits, activeMonthCount]);
 
   // Save mutation
   const saveMutation = useMutation({
