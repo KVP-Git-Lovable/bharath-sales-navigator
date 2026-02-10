@@ -1178,7 +1178,6 @@ export const MyVisits = () => {
               <CompactMultiUserSelector
                 selectedUserIds={selectedUserIds}
                 onSelectionChange={(ids) => {
-                  // Single-select behavior: keep only the last selected
                   if (ids.length > 1) {
                     const newest = ids.filter(id => !selectedUserIds.includes(id));
                     setSelectedUserIds(newest.length > 0 ? [newest[0]] : [ids[ids.length - 1]]);
@@ -1186,6 +1185,7 @@ export const MyVisits = () => {
                     setSelectedUserIds(ids);
                   }
                 }}
+                variant="onDark"
               />
             </div>
           </CardHeader>
