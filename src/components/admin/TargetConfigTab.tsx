@@ -3,19 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PeriodTypeSelector, type PeriodType } from './target-config/PeriodTypeSelector';
-import { PeriodBreakdownGrid, generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
+import { type PeriodType } from './target-config/PeriodTypeSelector';
+import { generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
 import { useTargetPeriods } from '@/hooks/useTargetPeriods';
- import { AnnualMonthlyBreakdown, generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
+import { generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
 
 interface TargetConfig {
   id?: string;
@@ -47,6 +46,7 @@ interface TargetConfigTabProps {
 }
 
 const QUANTITY_UNITS = ['Kg', 'Units', 'Liters', 'Pcs', 'Boxes', 'Tonnes', 'Cartons'];
+const CURRENCY_OPTIONS = ['₹ (INR)', '$ (USD)', '€ (EUR)', '£ (GBP)'];
 
 const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   target_plan_name: 'FY Sales Plan',
@@ -396,297 +396,283 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
 
   // Edit view
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-xl">
+          <Settings className="h-5 w-5 text-primary" />
           Create Target for FY {fyYear - 1}-{String(fyYear).slice(-2)}
         </CardTitle>
         <CardDescription>
           Define target metrics, parameters, and company-wide goals
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Target Plan Name */}
+      <CardContent className="space-y-8">
+        {/* Step 1: Target Plan Name */}
         <div className="space-y-2">
-          <Label htmlFor="plan_name" className="text-base font-semibold">Target Plan Name</Label>
+          <Label htmlFor="plan_name" className="text-sm font-semibold text-foreground">Plan Name</Label>
           <Input
             id="plan_name"
             value={config.target_plan_name}
             onChange={(e) => setConfig(prev => ({ ...prev, target_plan_name: e.target.value }))}
-            placeholder="e.g., FY 25 Sales Plan"
+            placeholder="e.g., FY 25-26 Sales Plan"
             className="max-w-md"
           />
         </div>
 
         <Separator />
 
-        {/* Target Metrics */}
+        {/* Step 2: Target Metrics */}
         <div className="space-y-4">
-          <Label className="text-base font-semibold">Target Metrics</Label>
-          <p className="text-sm text-muted-foreground">Select which metrics to track for targets</p>
-          <div className="flex flex-wrap gap-3">
-            {[
-              { key: 'enable_quantity', label: 'Quantity', checked: config.enable_quantity },
-              { key: 'enable_revenue', label: 'Revenue (₹)', checked: config.enable_revenue },
-              { key: 'enable_visits', label: 'Productive Visits', checked: config.enable_visits },
-            ].map(({ key, label, checked }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handleBasisChange(key as 'enable_quantity' | 'enable_revenue' | 'enable_visits', !checked)}
-                className={`
-                  flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all cursor-pointer
-                  ${checked 
-                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
-                    : 'bg-white dark:bg-background border-border text-muted-foreground hover:border-emerald-300 hover:bg-emerald-50/50'
-                  }
-                `}
-              >
-                <div className={`
-                  w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-                  ${checked ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground bg-white dark:bg-background'}
-                `}>
-                  {checked && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-                <span className="font-medium text-sm">{label}</span>
-              </button>
-            ))}
+          <div>
+            <Label className="text-sm font-semibold text-foreground">Target Metrics</Label>
+            <p className="text-xs text-muted-foreground mt-1">Select which metrics to track</p>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Quantity */}
+            <div
+              onClick={() => handleBasisChange('enable_quantity', !config.enable_quantity)}
+              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                config.enable_quantity
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                  config.enable_quantity ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Package className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">Quantity</p>
+                  <p className="text-xs text-muted-foreground">Track volume targets</p>
+                </div>
+              </div>
+              {config.enable_quantity && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Revenue */}
+            <div
+              onClick={() => handleBasisChange('enable_revenue', !config.enable_revenue)}
+              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                config.enable_revenue
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                  config.enable_revenue ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <IndianRupee className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">Revenue</p>
+                  <p className="text-xs text-muted-foreground">Track revenue targets</p>
+                </div>
+              </div>
+              {config.enable_revenue && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Visits */}
+            <div
+              onClick={() => handleBasisChange('enable_visits', !config.enable_visits)}
+              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                config.enable_visits
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                  config.enable_visits ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Footprints className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">Productive Visits</p>
+                  <p className="text-xs text-muted-foreground">Track visit targets</p>
+                </div>
+              </div>
+              {config.enable_visits && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Inline unit selectors below metrics */}
+          {(config.enable_quantity || config.enable_revenue) && (
+            <div className="flex flex-wrap gap-4 pt-2">
+              {config.enable_quantity && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Quantity Unit</Label>
+                  <Select 
+                    value={config.quantity_unit} 
+                    onValueChange={(v) => setConfig(prev => ({ ...prev, quantity_unit: v }))}
+                  >
+                    <SelectTrigger className="w-36 h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QUANTITY_UNITS.map((unit) => (
+                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {config.enable_revenue && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Currency</Label>
+                  <Select value="₹ (INR)" onValueChange={() => {}}>
+                    <SelectTrigger className="w-36 h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCY_OPTIONS.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <Separator />
 
-        {/* Target Parameters */}
+        {/* Step 3: Target Parameters */}
         <div className="space-y-4">
-          <Label className="text-base font-semibold">Target Parameters</Label>
-          <p className="text-sm text-muted-foreground">Select which breakdowns are available for targets</p>
+          <div>
+            <Label className="text-sm font-semibold text-foreground">Target Parameters</Label>
+            <p className="text-xs text-muted-foreground mt-1">Select the breakdowns for target allocation</p>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {Object.entries({
-              product: 'Product-wise',
-              retailer: 'Retailer-wise',
-              beat: 'Beat-wise',
-              distributor: 'Distributor-wise',
-              territory: 'Territory-wise',
-              monthly: 'Month-wise',
-            }).map(([key, label]) => {
+              product: { label: 'Product-wise', icon: '📦' },
+              retailer: { label: 'Retailer-wise', icon: '🏪' },
+              beat: { label: 'Beat-wise', icon: '📍' },
+              distributor: { label: 'Distributor-wise', icon: '🚛' },
+              territory: { label: 'Territory-wise', icon: '🗺️' },
+              monthly: { label: 'Month-wise', icon: '📅' },
+            }).map(([key, { label, icon }]) => {
               const isChecked = config.enabled_parameters[key as keyof typeof config.enabled_parameters];
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
                   onClick={() => handleParameterChange(key as keyof typeof config.enabled_parameters, !isChecked)}
-                  className={`
-                    flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all cursor-pointer
-                    ${isChecked 
-                      ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
-                      : 'bg-white dark:bg-background border-border text-muted-foreground hover:border-emerald-300 hover:bg-emerald-50/50'
-                    }
-                  `}
+                  className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    isChecked
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
                 >
-                  <div className={`
-                    w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-                    ${isChecked ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground bg-white dark:bg-background'}
-                  `}>
-                    {isChecked && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <span className="text-base">{icon}</span>
+                  <span className="font-medium text-sm text-foreground">{label}</span>
+                  {isChecked && (
+                    <div className="ml-auto w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
-                    )}
-                  </div>
-                  <span className="font-medium text-sm">{label}</span>
-                </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
         </div>
 
-        {/* Quantity Unit */}
-        {config.enable_quantity && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">Quantity Unit</Label>
-              <Select 
-                value={config.quantity_unit} 
-                onValueChange={(v) => setConfig(prev => ({ ...prev, quantity_unit: v }))}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUANTITY_UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </>
-        )}
-
         <Separator />
 
-        {/* Period Type Selector */}
-        <PeriodTypeSelector
-          value={config.target_period_type}
-          onChange={handlePeriodTypeChange}
-        />
-
-        <Separator />
-
-        {/* FY Totals - show inputs only for annual, otherwise read-only */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        {/* Step 4: FY Total Targets - only show enabled metrics */}
+        {hasAtLeastOneBasis && (
+          <div className="space-y-4">
             <div>
-              <Label className="text-base font-semibold">FY Total Targets</Label>
-              <p className="text-sm text-muted-foreground">
-                {config.target_period_type === 'annual' 
-                  ? 'Define company-wide targets for the financial year'
-                  : 'Auto-calculated from period targets below'
-                }
-              </p>
+              <Label className="text-sm font-semibold text-foreground">FY Total Targets</Label>
+              <p className="text-xs text-muted-foreground mt-1">Define company-wide targets for the financial year</p>
             </div>
-            {config.target_period_type !== 'annual' && config.total_quantity_target + config.total_revenue_target + config.total_visits_target > 0 && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleEqualDistribution}
-              >
-                Distribute Equally
-              </Button>
-            )}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {config.enable_quantity && (
-              <div className="space-y-2">
-                <Label>Quantity ({config.quantity_unit})</Label>
-                {config.target_period_type === 'annual' ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {config.enable_quantity && (
+                <div className="p-4 rounded-xl border bg-card space-y-2">
+                  <Label className="text-xs text-muted-foreground">Quantity ({config.quantity_unit})</Label>
                   <Input
                     type="text"
                     value={config.total_quantity_target > 0 ? formatNumber(config.total_quantity_target) : ''}
                     onChange={(e) => setConfig(prev => ({ ...prev, total_quantity_target: parseNumber(e.target.value) }))}
-                    placeholder={`e.g., 1,00,000 ${config.quantity_unit}`}
+                    placeholder={`e.g., 10,000 ${config.quantity_unit}`}
+                    className="text-lg font-semibold"
                   />
-                ) : (
-                  <div className="p-2 bg-muted rounded-md font-medium text-primary">
-                    {formatNumber(config.total_quantity_target) || '0'} {config.quantity_unit}
-                  </div>
-                )}
-              </div>
-            )}
-            {config.enable_revenue && (
-              <div className="space-y-2">
-                <Label>Revenue (₹)</Label>
-                {config.target_period_type === 'annual' ? (
+                </div>
+              )}
+              {config.enable_revenue && (
+                <div className="p-4 rounded-xl border bg-card space-y-2">
+                  <Label className="text-xs text-muted-foreground">Revenue (₹)</Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
                     <Input
                       type="text"
-                      className="pl-7"
+                      className="pl-7 text-lg font-semibold"
                       value={config.total_revenue_target > 0 ? formatNumber(config.total_revenue_target) : ''}
                       onChange={(e) => setConfig(prev => ({ ...prev, total_revenue_target: parseNumber(e.target.value) }))}
-                      placeholder="e.g., 55,00,00,000"
+                      placeholder="e.g., 55,00,000"
                     />
                   </div>
-                ) : (
-                  <div className="p-2 bg-muted rounded-md font-medium text-primary">
-                    ₹{formatNumber(config.total_revenue_target) || '0'}
-                  </div>
-                )}
-              </div>
-            )}
-            {config.enable_visits && (
-              <div className="space-y-2">
-                <Label>Productive Visits</Label>
-                {config.target_period_type === 'annual' ? (
+                </div>
+              )}
+              {config.enable_visits && (
+                <div className="p-4 rounded-xl border bg-card space-y-2">
+                  <Label className="text-xs text-muted-foreground">Productive Visits</Label>
                   <Input
                     type="text"
                     value={config.total_visits_target > 0 ? formatNumber(config.total_visits_target) : ''}
                     onChange={(e) => setConfig(prev => ({ ...prev, total_visits_target: Math.round(parseNumber(e.target.value)) }))}
                     placeholder="e.g., 12,000"
+                    className="text-lg font-semibold"
                   />
-                ) : (
-                  <div className="p-2 bg-muted rounded-md font-medium text-primary">
-                    {formatNumber(config.total_visits_target) || '0'}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Annual Monthly Breakdown (shown for annual mode) */}
-        {config.target_period_type === 'annual' && (
-          <>
-            <Separator />
-            <AnnualMonthlyBreakdown
-              totalQuantity={config.total_quantity_target}
-              totalRevenue={config.total_revenue_target}
-              totalVisits={config.total_visits_target}
-              enableQuantity={config.enable_quantity}
-              enableRevenue={config.enable_revenue}
-              enableVisits={config.enable_visits}
-              quantityUnit={config.quantity_unit}
-              monthlyTargets={annualMonthlyTargets}
-              onMonthlyTargetsChange={setAnnualMonthlyTargets}
-              showBreakdown={showAnnualMonthlyBreakdown}
-              onToggleBreakdown={setShowAnnualMonthlyBreakdown}
-            />
-          </>
-        )}
-
-        {/* Period Breakdown Grid (shown for non-annual modes) */}
-        {config.target_period_type !== 'annual' && (
-          <>
-            <Separator />
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">
-                {config.target_period_type === 'biannual' && 'Bi-Annual Targets (H1 & H2)'}
-                {config.target_period_type === 'quarterly' && 'Quarterly Targets (Q1-Q4)'}
-                {config.target_period_type === 'monthly' && 'Monthly Targets (Apr-Mar)'}
-              </Label>
-              <PeriodBreakdownGrid
-                periodType={config.target_period_type}
-                periods={periodTargets}
-                onPeriodChange={handlePeriodChange}
-                enableQuantity={config.enable_quantity}
-                enableRevenue={config.enable_revenue}
-                enableVisits={config.enable_visits}
-                quantityUnit={config.quantity_unit}
-              />
+                </div>
+              )}
             </div>
-          </>
+          </div>
         )}
 
         <Separator />
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-4">
+        <div className="flex items-center justify-between pt-2">
           <Button variant="outline" onClick={handleSave} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Save Draft
           </Button>
           
-          <div className="flex items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              Satisfied with the configuration?
-            </p>
+          <div className="flex items-center gap-3">
             <Button 
               onClick={handleLockAndAssign} 
               disabled={!canLock || saveMutation.isPending}
+              className="gap-2"
             >
               {saveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Lock className="h-4 w-4 mr-2" />
+                <Lock className="h-4 w-4" />
               )}
-              Lock and Assign to Hierarchy
+              Lock & Assign to Hierarchy
             </Button>
           </div>
         </div>
