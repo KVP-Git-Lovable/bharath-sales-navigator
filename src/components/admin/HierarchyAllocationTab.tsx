@@ -136,58 +136,41 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
       };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      {/* Left Panel - Organization Tree */}
-      <div className="lg:col-span-4 xl:col-span-3">
-        <Card className="h-fit sticky top-4">
-          <CardContent className="p-0">
-            <OrganizationTree
-              selectedNodeId={selectedNode?.userId || null}
-              onNodeSelect={(userId, fullName, level) => {
-                setSelectedNode({ userId, fullName, level });
-              }}
-            />
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-4">
+      {/* Target Summary */}
+      <TargetSummaryCard
+        config={{
+          target_plan_name: config.target_plan_name || 'FY Sales Plan',
+          enable_quantity: config.enable_quantity,
+          enable_revenue: config.enable_revenue,
+          enable_visits: config.enable_visits,
+          quantity_unit: config.quantity_unit,
+          total_quantity_target: config.total_quantity_target,
+          total_revenue_target: config.total_revenue_target,
+          total_visits_target: config.total_visits_target,
+          is_locked: config.is_locked,
+        }}
+        fyYear={fyYear}
+        selectedUserName={selectedNode?.fullName}
+      />
 
-      {/* Right Panel - Allocation View */}
-      <div className="lg:col-span-8 xl:col-span-9 space-y-4">
-        {/* Target Summary */}
-        <TargetSummaryCard
-          config={{
-            target_plan_name: config.target_plan_name || 'FY Sales Plan',
-            enable_quantity: config.enable_quantity,
-            enable_revenue: config.enable_revenue,
-            enable_visits: config.enable_visits,
-            quantity_unit: config.quantity_unit,
-            total_quantity_target: config.total_quantity_target,
-            total_revenue_target: config.total_revenue_target,
-            total_visits_target: config.total_visits_target,
-            is_locked: config.is_locked,
+      {/* Allocation Table */}
+      {selectedNode && (
+        <AllocationTable
+          parentUserId={selectedNode.userId}
+          totalQuantity={config.total_quantity_target}
+          totalRevenue={config.total_revenue_target}
+          totalVisits={config.total_visits_target}
+          quantityUnit={config.quantity_unit}
+          enabledMetrics={{
+            quantity: config.enable_quantity,
+            revenue: config.enable_revenue,
+            visits: config.enable_visits,
           }}
+          enabledParameters={enabledParams}
           fyYear={fyYear}
-          selectedUserName={selectedNode?.fullName}
         />
-
-        {/* Allocation Table */}
-        {selectedNode && (
-          <AllocationTable
-            parentUserId={selectedNode.userId}
-            totalQuantity={config.total_quantity_target}
-            totalRevenue={config.total_revenue_target}
-            totalVisits={config.total_visits_target}
-            quantityUnit={config.quantity_unit}
-            enabledMetrics={{
-              quantity: config.enable_quantity,
-              revenue: config.enable_revenue,
-              visits: config.enable_visits,
-            }}
-            enabledParameters={enabledParams}
-            fyYear={fyYear}
-          />
-        )}
-      </div>
+      )}
     </div>
   );
 }
