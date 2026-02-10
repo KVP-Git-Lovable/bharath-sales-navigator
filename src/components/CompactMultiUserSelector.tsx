@@ -101,9 +101,12 @@ export function CompactMultiUserSelector({
   // Get display text for trigger
   const getDisplayText = () => {
     if (selectedUserIds.length === 0) {
-      return 'Select users';
+      return 'Select';
     }
     if (selectedUserIds.length === 1) {
+      if (user && selectedUserIds[0] === user.id) {
+        return 'My Data';
+      }
       const selected = selectableUsers.find(u => u.id === selectedUserIds[0]);
       return selected?.name || '1 user';
     }
@@ -131,17 +134,18 @@ export function CompactMultiUserSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          size="sm"
           className={cn(
-            'justify-between gap-2 min-w-[140px]',
+            'justify-between gap-1.5 min-w-[100px] h-7 text-xs px-2',
             variant === 'onDark' && 'bg-background/10 text-primary-foreground border-primary-foreground/20 hover:bg-background/15 focus:ring-primary-foreground/30 backdrop-blur-sm',
             className
           )}
         >
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 shrink-0" />
-            <span className="truncate">{getDisplayText()}</span>
+          <div className="flex items-center gap-1.5">
+            <Users className="h-3 w-3 shrink-0" />
+            <span className="truncate text-xs">{getDisplayText()}</span>
           </div>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="end">
