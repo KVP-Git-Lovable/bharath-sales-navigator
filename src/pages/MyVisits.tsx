@@ -424,10 +424,12 @@ export const MyVisits = () => {
         const endIso = weekDays[weekDays.length - 1]?.isoDate;
         if (!startIso || !endIso) return;
         
+        const effectiveUserId = isViewingSelf ? user.id : selectedUserIds[0];
+        if (!effectiveUserId) return;
         const {
           data,
           error
-        } = await supabase.from('beat_plans').select('plan_date').eq('user_id', user.id).gte('plan_date', startIso).lte('plan_date', endIso);
+        } = await supabase.from('beat_plans').select('plan_date').eq('user_id', effectiveUserId).gte('plan_date', startIso).lte('plan_date', endIso);
         
         if (error) throw error;
         setPlannedDates(new Set((data || []).map((d: any) => d.plan_date)));
@@ -438,7 +440,7 @@ export const MyVisits = () => {
       }
     };
     loadWeekPlans();
-  }, [user, weekDays]);
+  }, [user, weekDays, isViewingSelf, selectedUserIds]);
   // Removed - now using useVisitsDataOptimized hook for better performance
   // Calculate the effective user ID for timeline queries
   const timelineTargetUserId = user?.id;
