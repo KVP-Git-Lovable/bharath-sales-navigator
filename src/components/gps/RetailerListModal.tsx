@@ -22,6 +22,7 @@ export interface EnhancedRetailerLocation {
   status: RetailerStatus;
   hasOrder: boolean;
   sequenceNumber?: number;
+  planDate?: string; // 'yyyy-MM-dd'
 }
 
 interface RetailerListModalProps {

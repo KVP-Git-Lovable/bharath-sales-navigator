@@ -10,7 +10,7 @@ import { CalendarIcon, MapPin } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { JourneyMap } from '@/components/JourneyMap';
+import { JourneyMap, DayGroup } from '@/components/JourneyMap';
 import { CurrentLocationMap } from '@/components/CurrentLocationMap';
 import { toast } from 'sonner';
 import { UserSelector } from '@/components/UserSelector';
@@ -80,6 +80,7 @@ export default function GPSTrack() {
   const isRange = dateRangeMode === 'week' || dateRangeMode === 'month' || dateRangeMode === 'custom';
   const [gpsData, setGpsData] = useState<GPSData[]>([]);
   const [retailers, setRetailers] = useState<EnhancedRetailerLocation[]>([]);
+  const [dayGroups, setDayGroups] = useState<DayGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [beatName, setBeatName] = useState<string | null>(null);
   const [visitStats, setVisitStats] = useState<VisitStats>({ planned: 0, productive: 0, unproductive: 0, pending: 0 });
@@ -204,15 +205,18 @@ export default function GPSTrack() {
     setLoading(false);
   };
 
+  // Day color palette for multi-day mode
+  const dayColorPalette = ['#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#06b6d4', '#ec4899', '#f59e0b'];
+
   const loadRetailerLocations = async () => {
     if (!selectedMember) return;
 
     console.log('Loading ALL retailer locations for range:', startDateStr, '-', endDateStr, 'user:', selectedMember);
 
-    // First, get all beat plans for the date range
+    // Fetch beat plans WITH plan_date
     const { data: beatPlans, error: beatPlansError } = await supabase
       .from('beat_plans')
-      .select('beat_id')
+      .select('beat_id, plan_date')
       .eq('user_id', selectedMember)
       .gte('plan_date', startDateStr)
       .lte('plan_date', endDateStr);
@@ -223,17 +227,30 @@ export default function GPSTrack() {
     }
 
     const beatIds = beatPlans?.map(bp => bp.beat_id) || [];
-    
+
     if (beatIds.length === 0) {
       console.log('No beat plans found for this date');
       setRetailers([]);
+      setDayGroups([]);
       return;
     }
+
+    // Build beat_id -> plan_date map (a beat can appear on multiple days, take earliest)
+    const beatToPlanDate = new Map<string, string>();
+    beatPlans?.forEach(bp => {
+      // For each beat, map to its plan_date; if same beat on multiple days, group retailers by day
+      if (!beatToPlanDate.has(bp.beat_id + '_' + bp.plan_date)) {
+        beatToPlanDate.set(bp.beat_id + '_' + bp.plan_date, bp.plan_date);
+      }
+    });
+
+    // Get unique beat_id -> plan_date pairs
+    const beatDatePairs = beatPlans?.map(bp => ({ beatId: bp.beat_id, planDate: bp.plan_date })) || [];
 
     // Get all retailers assigned to these beats
     const { data: allRetailers, error: retailersError } = await supabase
       .from('retailers')
-      .select('id, name, address, latitude, longitude')
+      .select('id, name, address, latitude, longitude, beat_id')
       .in('beat_id', beatIds);
 
     if (retailersError) {
@@ -244,13 +261,14 @@ export default function GPSTrack() {
     if (!allRetailers || allRetailers.length === 0) {
       console.log('No retailers found for beats');
       setRetailers([]);
+      setDayGroups([]);
       return;
     }
 
     // Get visits for this date range
     const { data: visitsData, error: visitsError } = await supabase
       .from('visits')
-      .select('id, check_in_time, check_out_time, status, retailer_id, no_order_reason, check_in_location, check_in_address')
+      .select('id, check_in_time, check_out_time, status, retailer_id, no_order_reason, check_in_location, check_in_address, planned_date')
       .eq('user_id', selectedMember)
       .gte('planned_date', startDateStr)
       .lte('planned_date', endDateStr)
@@ -273,10 +291,25 @@ export default function GPSTrack() {
       console.error('Error loading orders:', ordersError);
     }
 
+    // Fetch attendance for date range (for start locations)
+    const { data: attendanceData } = await supabase
+      .from('attendance')
+      .select('date, check_in_location')
+      .eq('user_id', selectedMember)
+      .gte('date', startDateStr)
+      .lte('date', endDateStr);
+
+    const attendanceByDate = new Map<string, { latitude: number; longitude: number }>();
+    attendanceData?.forEach(att => {
+      const loc = att.check_in_location as any;
+      if (loc?.latitude && loc?.longitude) {
+        attendanceByDate.set(att.date, { latitude: loc.latitude, longitude: loc.longitude });
+      }
+    });
+
     const visits = visitsData || [];
     const orders = ordersData || [];
-    
-    // Create a map of retailer visits
+
     const visitsByRetailer = new Map<string, any[]>();
     visits.forEach(v => {
       if (v.retailer_id) {
@@ -286,13 +319,9 @@ export default function GPSTrack() {
       }
     });
 
-    // Create a set of retailers with orders
     const retailersWithOrders = new Set(orders.map(o => o.retailer_id));
-
-    // Check if any visits have started (to determine planned vs pending)
     const hasAnyVisits = visits.length > 0;
 
-    // Helper to parse lat/lng from address
     const parseLatLngFromAddress = (addr?: string | null) => {
       if (!addr) return null;
       const match = addr.match(/(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
@@ -303,72 +332,103 @@ export default function GPSTrack() {
       return { latitude: lat, longitude: lng };
     };
 
-    // Map all retailers with their status
+    // Build enhanced retailer for a given retailer record
+    const buildEnhancedRetailer = (retailer: any, planDate?: string): EnhancedRetailerLocation | null => {
+      const retailerVisits = visitsByRetailer.get(retailer.id) || [];
+      const hasOrder = retailersWithOrders.has(retailer.id);
+      const hasVisit = retailerVisits.length > 0;
+      const firstVisit = retailerVisits[0];
+
+      let status: RetailerStatus;
+      if (hasOrder || retailerVisits.some((v: any) => v.status === 'productive')) {
+        status = 'productive';
+      } else if (retailerVisits.some((v: any) => v.status === 'unproductive' || !!v.no_order_reason)) {
+        status = 'unproductive';
+      } else if (hasVisit) {
+        status = 'pending';
+      } else if (hasAnyVisits) {
+        status = 'pending';
+      } else {
+        status = 'planned';
+      }
+
+      let lat: number | null = null;
+      let lng: number | null = null;
+
+      if (retailer.latitude && retailer.longitude) {
+        lat = parseFloat(retailer.latitude as unknown as string);
+        lng = parseFloat(retailer.longitude as unknown as string);
+      } else if (firstVisit?.check_in_location?.latitude && firstVisit?.check_in_location?.longitude) {
+        lat = firstVisit.check_in_location.latitude;
+        lng = firstVisit.check_in_location.longitude;
+      } else if (firstVisit?.check_in_address) {
+        const parsed = parseLatLngFromAddress(firstVisit.check_in_address);
+        if (parsed) { lat = parsed.latitude; lng = parsed.longitude; }
+      }
+
+      if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return null;
+
+      return {
+        id: retailer.id,
+        name: retailer.name || 'Retailer',
+        address: retailer.address || '',
+        latitude: lat,
+        longitude: lng,
+        visitId: firstVisit?.id,
+        checkInTime: firstVisit?.check_in_time || null,
+        status,
+        hasOrder,
+        planDate,
+      };
+    };
+
+    // Build flat list (for single-day and stats)
     const enhancedRetailers: EnhancedRetailerLocation[] = allRetailers
-      .map((retailer) => {
-        const retailerVisits = visitsByRetailer.get(retailer.id) || [];
-        const hasOrder = retailersWithOrders.has(retailer.id);
-        const hasVisit = retailerVisits.length > 0;
-        const firstVisit = retailerVisits[0];
-
-        // Determine status
-        let status: RetailerStatus;
-        if (hasOrder || retailerVisits.some(v => v.status === 'productive')) {
-          status = 'productive';
-        } else if (retailerVisits.some(v => v.status === 'unproductive' || !!v.no_order_reason)) {
-          status = 'unproductive';
-        } else if (hasVisit) {
-          // Has visit but neither productive nor unproductive yet
-          status = 'pending';
-        } else if (hasAnyVisits) {
-          // No visit for this retailer, but other visits have started
-          status = 'pending';
-        } else {
-          // No visits at all - show as planned
-          status = 'planned';
-        }
-
-        // Get coordinates - prefer retailer data, fallback to visit check-in
-        let lat: number | null = null;
-        let lng: number | null = null;
-
-        if (retailer.latitude && retailer.longitude) {
-          lat = parseFloat(retailer.latitude as unknown as string);
-          lng = parseFloat(retailer.longitude as unknown as string);
-        } else if (firstVisit?.check_in_location?.latitude && firstVisit?.check_in_location?.longitude) {
-          lat = firstVisit.check_in_location.latitude;
-          lng = firstVisit.check_in_location.longitude;
-        } else if (firstVisit?.check_in_address) {
-          const parsed = parseLatLngFromAddress(firstVisit.check_in_address);
-          if (parsed) {
-            lat = parsed.latitude;
-            lng = parsed.longitude;
-          }
-        }
-
-        // Skip retailers without coordinates
-        if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
-          console.log('Skipping retailer without coordinates:', retailer.name);
-          return null;
-        }
-
-        const result: EnhancedRetailerLocation = {
-          id: retailer.id,
-          name: retailer.name || 'Retailer',
-          address: retailer.address || '',
-          latitude: lat,
-          longitude: lng,
-          visitId: firstVisit?.id,
-          checkInTime: firstVisit?.check_in_time || null,
-          status,
-          hasOrder,
-        };
-        return result;
-      })
+      .map((r) => buildEnhancedRetailer(r))
       .filter((r): r is EnhancedRetailerLocation => r !== null);
 
-    console.log('Enhanced retailer locations:', enhancedRetailers);
     setRetailers(enhancedRetailers);
+
+    // Build day groups for multi-day mode
+    if (isRange) {
+      // Group retailers by plan_date using beat -> date mapping
+      const retailersByDate = new Map<string, EnhancedRetailerLocation[]>();
+
+      beatDatePairs.forEach(({ beatId, planDate }) => {
+        const beatsRetailers = allRetailers.filter(r => r.beat_id === beatId);
+        beatsRetailers.forEach(r => {
+          const enhanced = buildEnhancedRetailer(r, planDate);
+          if (enhanced) {
+            const list = retailersByDate.get(planDate) || [];
+            // Avoid duplicates (same retailer in same date)
+            if (!list.some(existing => existing.id === enhanced.id)) {
+              list.push(enhanced);
+              retailersByDate.set(planDate, list);
+            }
+          }
+        });
+      });
+
+      // Sort dates and build DayGroup[]
+      const sortedDates = [...retailersByDate.keys()].sort();
+      const groups: DayGroup[] = sortedDates.map((dateStr, idx) => {
+        const d = new Date(dateStr + 'T00:00:00');
+        const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
+        return {
+          date: dateStr,
+          dayLabel,
+          color: dayColorPalette[idx % dayColorPalette.length],
+          retailers: retailersByDate.get(dateStr) || [],
+          startLocation: attendanceByDate.get(dateStr),
+        };
+      });
+
+      setDayGroups(groups);
+    } else {
+      setDayGroups([]);
+    }
+
+    console.log('Enhanced retailer locations:', enhancedRetailers);
   };
 
   // Calculate distance between two points using Haversine formula
@@ -812,7 +872,8 @@ export default function GPSTrack() {
               <Card className="overflow-hidden relative z-0">
                   <JourneyMap 
                     positions={gpsData} 
-                    retailers={filteredRetailers} 
+                    retailers={filteredRetailers}
+                    dayGroups={isRange ? dayGroups : undefined}
                     height="500px"
                     totalGpsDistance={totalKmTraveled}
                   />
