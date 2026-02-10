@@ -1,53 +1,39 @@
 
 
-## Fix: Add Parameter Detail Section to Admin Target Config
+## Add Target Duration (Start/End Month) to Target Config
 
 ### Problem
-In the admin "Create Target for FY 2025-26" page (`TargetConfigTab`), selecting a Target Parameter (e.g., Product-wise, Retailer-wise) does not show any corresponding detail section. The component currently only has parameter selection pills and FY Total Targets -- there is no breakdown or detail panel that renders based on the selected parameters.
-
-### What Screenshot 1 Shows (Expected Behavior)
-The user-facing `UserFYPlanTarget` component already has a working tabs-based breakdown with:
-- Tabs for Products, Retailers, Distributors, Monthly, Territory
-- Product categories with quantity/revenue inputs
-- Equal divide option
-- Total footer
-
-This same type of breakdown section needs to appear in the admin `TargetConfigTab` after selecting target parameters.
+Currently, the Target Management module is locked to a full Financial Year (April-March). There is no way to set targets for a specific subset of months (e.g., only July, or April-September).
 
 ### Solution
-Add a dynamic parameter detail section to `TargetConfigTab` (below the FY Total Targets section) that renders tabs based on which parameters are enabled. This section will show:
+Add a **Target Duration** selector to the Create Target UI that lets the admin pick a Start Month and End Month within the FY. This filters the Monthly parameter breakdown and adjusts equal-divide calculations accordingly.
 
-1. **Tabs row** matching enabled parameters (Products, Retailers, Distributors, Monthly, Territory)
-2. **Tab content** for each parameter showing the relevant breakdown items fetched from the database (product categories, retailers, distributors, months, territories)
-3. **Input fields** for quantity and revenue targets per item
-4. **Equal divide toggle** to distribute FY totals equally
-5. **Total footer** showing sum of all entries
+### Changes
 
-### Technical Changes
+**1. Database: Add two columns to `fy_target_config`**
+- `target_start_month` (integer, default 1) -- 1=April, 2=May, ..., 12=March
+- `target_end_month` (integer, default 12) -- 1=April, ..., 12=March
 
-**File: `src/components/admin/TargetConfigTab.tsx`**
+These will be added via a Supabase migration.
 
-1. Add new state for the active parameter tab and breakdown data (product categories, retailers, distributors, months)
-2. Add data-fetching effects to load products (with categories), retailers, distributors from Supabase when parameters are enabled
-3. Add a new section after FY Total Targets (before Action Buttons) containing:
-   - A `Tabs` component filtered to only show tabs for enabled parameters
-   - Tab content panels for each parameter type:
-     - **Products**: Collapsible product categories with quantity/revenue inputs per category
-     - **Retailers**: Retailer list with quantity/revenue inputs
-     - **Distributors**: Distributor list with quantity/revenue inputs
-     - **Monthly**: 12-month breakdown with quantity/revenue inputs
-     - **Territory**: Territory list with quantity/revenue inputs
-   - An "Equally divide" checkbox that distributes FY totals across all items
-   - A total summary footer per tab
+**2. UI: Add Target Duration section in `TargetConfigTab.tsx`**
+- Add a new section between Target Parameters and FY Total Targets
+- Two side-by-side Select dropdowns: "Start Month" and "End Month" (April through March)
+- Default: April to March (full year)
+- Styled consistently with the existing card/pill design
 
-4. This mirrors the pattern already used in `UserFYPlanTarget` (lines 1963-2120) but adapted for the admin config context where the data represents company-wide allocation rather than individual user targets.
+**3. Logic Updates in `TargetConfigTab.tsx`**
+- Add `target_start_month` and `target_end_month` to the `TargetConfig` interface and default config
+- Filter the Monthly breakdown (`FY_MONTHS`) to only show months within the selected range
+- Update equal-divide logic to divide by the number of active months instead of always 12
+- Include the new fields in save/load mutations
 
-### Data Sources
-- **Products**: `products` table joined with `product_categories`
-- **Retailers**: Not applicable at admin level (skip or show placeholder)
-- **Distributors**: `distributors` table
-- **Monthly**: Static 12-month FY calendar (April to March)
-- **Territory**: `territories` table
+**4. State flow**
+- When the user changes Start/End month, the monthly breakdown items auto-update to show only the relevant months
+- Equal divide recalculates based on the active month count
+- FY Total Targets remain as the overall target; the duration just controls the breakdown window
 
-### UI Layout
-The section will render vertically below the FY Total Targets, using the same `Tabs` + `TabsList` + `TabsContent` pattern from the existing UI library. Each tab content will show a list of items with inline quantity/revenue input fields, matching the style shown in Screenshot 1.
+### Files Modified
+- `src/components/admin/TargetConfigTab.tsx` -- UI + state + logic
+- Supabase migration -- add `target_start_month` and `target_end_month` columns
+
