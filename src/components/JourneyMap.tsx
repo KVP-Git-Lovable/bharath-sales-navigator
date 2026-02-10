@@ -112,19 +112,33 @@ const buildDayRoute = (
   return all.map((r, idx) => ({ ...r, sequenceNumber: idx + 1 }));
 };
 
-// Fetch road-following route geometry from OSRM (free, no API key needed)
+// OSRM route cache to avoid redundant API calls
+const osrmCache = new Map<string, L.LatLngExpression[]>();
+
+// Fetch road-following route geometry from OSRM with caching & fast timeout
 async function fetchOSRMRoute(coords: L.LatLngExpression[]): Promise<L.LatLngExpression[]> {
   if (coords.length < 2) return coords;
 
+  // Build cache key from rounded coords
+  const cacheKey = coords.map(c => {
+    const [lat, lng] = c as [number, number];
+    return `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  }).join('|');
+
+  if (osrmCache.has(cacheKey)) return osrmCache.get(cacheKey)!;
+
   try {
-    // OSRM expects lng,lat (Leaflet uses lat,lng)
     const waypoints = coords.map((c) => {
       const [lat, lng] = c as [number, number];
       return `${lng},${lat}`;
     }).join(';');
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
     const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
 
     if (!res.ok) throw new Error(`OSRM returned ${res.status}`);
 
@@ -134,15 +148,19 @@ async function fetchOSRMRoute(coords: L.LatLngExpression[]): Promise<L.LatLngExp
       throw new Error('No route found');
     }
 
-    // GeoJSON coordinates are [lng, lat], convert to [lat, lng] for Leaflet
-    return data.routes[0].geometry.coordinates.map(
+    const result = data.routes[0].geometry.coordinates.map(
       ([lng, lat]: [number, number]) => [lat, lng] as L.LatLngExpression
     );
+    osrmCache.set(cacheKey, result);
+    return result;
   } catch (error) {
-    console.warn('OSRM route fetch failed, falling back to straight line:', error);
-    return coords; // Fallback to straight line
+    // Silently fall back — don't spam console
+    return coords;
   }
 }
+
+// Helper: delay between OSRM calls to respect rate limits
+const osrmDelay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export const JourneyMap: React.FC<JourneyMapProps> = ({
   positions,
@@ -331,15 +349,24 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
             `);
         });
 
-        // Draw day's polyline with road-following geometry from OSRM
+        // Draw day's polyline — try OSRM road geometry with rate-limit delay
         if (routeCoords.length >= 2) {
+          // Draw straight line immediately for instant feedback
+          const straightLine = L.polyline(routeCoords, {
+            color: dayGroup.color, weight: 4, opacity: 0.85,
+          }).addTo(mapRef.current!);
+
+          // Then upgrade to road geometry in background
+          await osrmDelay(300); // rate-limit spacing
+          if (cancelled || !mapRef.current) return;
           const roadGeometry = await fetchOSRMRoute(routeCoords);
           if (cancelled || !mapRef.current) return;
-          L.polyline(roadGeometry, {
-            color: dayGroup.color,
-            weight: 4,
-            opacity: 0.85,
-          }).addTo(mapRef.current!);
+          if (roadGeometry !== routeCoords) {
+            straightLine.remove();
+            L.polyline(roadGeometry, {
+              color: dayGroup.color, weight: 4, opacity: 0.85,
+            }).addTo(mapRef.current!);
+          }
         }
       }
     } else {
@@ -349,11 +376,19 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
           retailer.latitude, retailer.longitude,
         ]);
 
-        const roadGeometry = await fetchOSRMRoute(routeCoordinates);
-        if (cancelled || !mapRef.current) return;
-        L.polyline(roadGeometry, {
+        // Draw straight line immediately, upgrade to road geometry in background
+        const straightLine = L.polyline(routeCoordinates, {
           color: '#8b5cf6', weight: 4, opacity: 0.8, dashArray: '10, 10'
         }).addTo(mapRef.current);
+
+        const roadGeometry = await fetchOSRMRoute(routeCoordinates);
+        if (cancelled || !mapRef.current) return;
+        if (roadGeometry !== routeCoordinates) {
+          straightLine.remove();
+          L.polyline(roadGeometry, {
+            color: '#8b5cf6', weight: 4, opacity: 0.8, dashArray: '10, 10'
+          }).addTo(mapRef.current);
+        }
 
         optimizedRetailers.forEach((retailer) => {
           const icon = createRetailerIcon(retailer.status);
