@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -67,7 +67,11 @@ interface TargetConfig {
   is_locked: boolean;
   setup_completed: boolean;
   target_period_type: PeriodType;
+  target_start_month: number;
+  target_end_month: number;
 }
+
+const FY_MONTH_OPTIONS = FY_MONTHS.map((name, i) => ({ value: i + 1, label: name }));
 
 interface TargetConfigTabProps {
   fyYear: number;
@@ -97,6 +101,8 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   is_locked: false,
   setup_completed: false,
   target_period_type: 'annual',
+  target_start_month: 1,
+  target_end_month: 12,
 };
 
 export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabProps) {
@@ -156,6 +162,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         is_locked: existingConfig.is_locked ?? false,
         setup_completed: existingConfig.setup_completed ?? false,
         target_period_type: periodType,
+        target_start_month: (existingConfig as any).target_start_month ?? 1,
+        target_end_month: (existingConfig as any).target_end_month ?? 12,
       });
     } else {
       setConfig({
@@ -193,6 +201,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
             is_locked: configData.is_locked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
+            target_start_month: configData.target_start_month,
+            target_end_month: configData.target_end_month,
           })
           .eq('id', configData.id);
         if (error) throw error;
@@ -222,6 +232,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
             is_locked: configData.is_locked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
+            target_start_month: configData.target_start_month,
+            target_end_month: configData.target_end_month,
             created_by: user?.id,
           })
           .select()
@@ -635,6 +647,65 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
 
         <Separator />
 
+        {/* Step 3.5: Target Duration */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Target Duration</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Select the months for which targets apply</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Start Month</Label>
+              <Select
+                value={String(config.target_start_month)}
+                onValueChange={(v) => {
+                  const val = parseInt(v);
+                  setConfig(prev => ({
+                    ...prev,
+                    target_start_month: val,
+                    target_end_month: prev.target_end_month < val ? val : prev.target_end_month,
+                  }));
+                }}
+              >
+                <SelectTrigger className="w-40 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FY_MONTH_OPTIONS.map((m) => (
+                    <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">End Month</Label>
+              <Select
+                value={String(config.target_end_month)}
+                onValueChange={(v) => setConfig(prev => ({ ...prev, target_end_month: parseInt(v) }))}
+              >
+                <SelectTrigger className="w-40 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FY_MONTH_OPTIONS.filter(m => m.value >= config.target_start_month).map((m) => (
+                    <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="self-end pb-0.5">
+              <Badge variant="outline" className="text-xs">
+                {config.target_end_month - config.target_start_month + 1} month{config.target_end_month - config.target_start_month + 1 !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Step 4: FY Total Targets */}
         {hasAtLeastOneBasis && (
           <div className="rounded-xl border bg-card p-5 space-y-4">
@@ -957,15 +1028,18 @@ function ParameterBreakdownSection({
     if (config.enabled_parameters.beat && beats && !newData.beat) {
       newData.beat = beats.map(b => ({ id: b.id, name: b.name, quantity: 0, revenue: 0, visits: 0 }));
     }
-    if (config.enabled_parameters.monthly && !newData.monthly) {
-      newData.monthly = FY_MONTHS.map((m, i) => ({ id: `month-${i}`, name: m, quantity: 0, revenue: 0, visits: 0 }));
+    if (config.enabled_parameters.monthly) {
+      const activeMonths = FY_MONTHS
+        .map((m, i) => ({ name: m, index: i }))
+        .filter((_, i) => (i + 1) >= config.target_start_month && (i + 1) <= config.target_end_month);
+      newData.monthly = activeMonths.map(m => ({ id: `month-${m.index}`, name: m.name, quantity: 0, revenue: 0, visits: 0 }));
     }
     if (config.enabled_parameters.retailer && !newData.retailer) {
       newData.retailer = []; // Retailers handled at user level
     }
 
     setBreakdownData(newData);
-  }, [products, distributors, territories, beats, config.enabled_parameters]);
+  }, [products, distributors, territories, beats, config.enabled_parameters, config.target_start_month, config.target_end_month]);
 
   const handleItemChange = (paramKey: string, itemId: string, field: 'quantity' | 'revenue' | 'visits', value: number) => {
     setBreakdownData(prev => ({
