@@ -19,22 +19,34 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+interface JourneyPosition {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  timestamp: Date;
+}
+
 interface CurrentLocationMapProps {
   height?: string;
   userId?: string;
-  isViewingOther?: boolean; // True if admin viewing another user
+  isViewingOther?: boolean;
+  journeyPositions?: JourneyPosition[];
+  journeyLoading?: boolean;
 }
 
 export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({ 
   height = '500px', 
   userId,
-  isViewingOther = false 
+  isViewingOther = false,
+  journeyPositions = [],
+  journeyLoading = false,
 }) => {
   const { user } = useAuth();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const circleRef = useRef<L.Circle | null>(null);
+  const journeyLayerRef = useRef<L.LayerGroup | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,6 +128,59 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       }
     };
   }, []);
+
+  // Draw journey polyline when journeyPositions change
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Remove previous journey layer
+    if (journeyLayerRef.current) {
+      journeyLayerRef.current.clearLayers();
+      mapRef.current.removeLayer(journeyLayerRef.current);
+      journeyLayerRef.current = null;
+    }
+
+    if (journeyPositions.length < 2) return;
+
+    const layerGroup = L.layerGroup().addTo(mapRef.current);
+    journeyLayerRef.current = layerGroup;
+
+    const coords: L.LatLngExpression[] = journeyPositions.map(p => [p.latitude, p.longitude]);
+
+    // Journey polyline
+    L.polyline(coords, {
+      color: '#3b82f6',
+      weight: 3,
+      opacity: 0.7,
+    }).addTo(layerGroup);
+
+    // Start marker (green)
+    const startIcon = L.divIcon({
+      className: 'journey-start',
+      html: `<div style="width:14px;height:14px;background:#22c55e;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+    L.marker([journeyPositions[0].latitude, journeyPositions[0].longitude], { icon: startIcon })
+      .bindPopup(`<strong>Start</strong><br/>${format(journeyPositions[0].timestamp, 'hh:mm a')}`)
+      .addTo(layerGroup);
+
+    // End marker (red)
+    const last = journeyPositions[journeyPositions.length - 1];
+    const endIcon = L.divIcon({
+      className: 'journey-end',
+      html: `<div style="width:14px;height:14px;background:#ef4444;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+    L.marker([last.latitude, last.longitude], { icon: endIcon })
+      .bindPopup(`<strong>Latest</strong><br/>${format(last.timestamp, 'hh:mm a')}`)
+      .addTo(layerGroup);
+
+    // Fit map to journey bounds
+    const bounds = L.latLngBounds(coords as L.LatLngTuple[]);
+    mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+  }, [journeyPositions]);
 
   const updateMapMarker = useCallback((latitude: number, longitude: number, accuracy: number, timestamp: Date) => {
     if (!mapRef.current) return;
