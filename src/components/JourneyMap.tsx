@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { EnhancedRetailerLocation, RetailerStatus } from './gps/RetailerListModal';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Position {
   latitude: number;
@@ -112,23 +113,21 @@ const buildDayRoute = (
   return all.map((r, idx) => ({ ...r, sequenceNumber: idx + 1 }));
 };
 
-// Fetch road-following route geometry from OSRM (free, no API key needed)
+// Fetch road-following route geometry via edge function proxy to OSRM
 async function fetchOSRMRoute(coords: L.LatLngExpression[]): Promise<L.LatLngExpression[]> {
   if (coords.length < 2) return coords;
 
   try {
-    // OSRM expects lng,lat (Leaflet uses lat,lng)
-    const waypoints = coords.map((c) => {
+    const coordinates = coords.map((c) => {
       const [lat, lng] = c as [number, number];
-      return `${lng},${lat}`;
-    }).join(';');
+      return [lat, lng];
+    });
 
-    const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
+    const { data, error } = await supabase.functions.invoke('osrm-route', {
+      body: { coordinates },
+    });
 
-    if (!res.ok) throw new Error(`OSRM returned ${res.status}`);
-
-    const data = await res.json();
+    if (error) throw error;
 
     if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates) {
       throw new Error('No route found');
