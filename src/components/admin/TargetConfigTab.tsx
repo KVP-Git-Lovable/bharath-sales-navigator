@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -11,10 +11,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type PeriodType } from './target-config/PeriodTypeSelector';
 import { generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
 import { useTargetPeriods } from '@/hooks/useTargetPeriods';
 import { generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
+
+// Types for breakdown data
+interface BreakdownItem {
+  id: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+  visits: number;
+}
+
+const FY_MONTHS = [
+  'April', 'May', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December', 'January', 'February', 'March',
+];
+
+const PARAM_TAB_MAP: Record<string, { key: string; label: string; icon: string }> = {
+  product: { key: 'product', label: 'Products', icon: '📦' },
+  retailer: { key: 'retailer', label: 'Retailers', icon: '🏪' },
+  beat: { key: 'beat', label: 'Beats', icon: '📍' },
+  distributor: { key: 'distributor', label: 'Distributors', icon: '🚛' },
+  territory: { key: 'territory', label: 'Territories', icon: '🗺️' },
+  monthly: { key: 'monthly', label: 'Monthly', icon: '📅' },
+};
 
 interface TargetConfig {
   id?: string;
@@ -78,8 +105,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     ...DEFAULT_CONFIG,
   });
   const [periodTargets, setPeriodTargets] = useState<PeriodTarget[]>([]);
-   const [annualMonthlyTargets, setAnnualMonthlyTargets] = useState(generateInitialMonthlyTargets());
-   const [showAnnualMonthlyBreakdown, setShowAnnualMonthlyBreakdown] = useState(false);
+  const [annualMonthlyTargets, setAnnualMonthlyTargets] = useState(generateInitialMonthlyTargets());
+  const [showAnnualMonthlyBreakdown, setShowAnnualMonthlyBreakdown] = useState(false);
+
+  // Breakdown state
+  const [activeParamTab, setActiveParamTab] = useState<string>('');
+  const [breakdownData, setBreakdownData] = useState<Record<string, BreakdownItem[]>>({});
+  const [equalDivide, setEqualDivide] = useState<Record<string, boolean>>({});
 
   // Fetch existing config
   const { data: existingConfig, isLoading } = useQuery({
@@ -652,6 +684,24 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
           </div>
         )}
 
+        {/* Step 5: Parameter Breakdown */}
+        {hasAtLeastOneParameter && hasAtLeastOneBasis && (
+          <>
+            <Separator />
+            <ParameterBreakdownSection
+              config={config}
+              breakdownData={breakdownData}
+              setBreakdownData={setBreakdownData}
+              equalDivide={equalDivide}
+              setEqualDivide={setEqualDivide}
+              activeParamTab={activeParamTab}
+              setActiveParamTab={setActiveParamTab}
+              formatNumber={formatNumber}
+              parseNumber={parseNumber}
+            />
+          </>
+        )}
+
         <Separator />
 
         {/* Action Buttons */}
@@ -678,5 +728,290 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// === Parameter Breakdown Section Component ===
+interface ParameterBreakdownProps {
+  config: TargetConfig;
+  breakdownData: Record<string, BreakdownItem[]>;
+  setBreakdownData: React.Dispatch<React.SetStateAction<Record<string, BreakdownItem[]>>>;
+  equalDivide: Record<string, boolean>;
+  setEqualDivide: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  activeParamTab: string;
+  setActiveParamTab: (tab: string) => void;
+  formatNumber: (n: number) => string;
+  parseNumber: (v: string) => number;
+}
+
+function ParameterBreakdownSection({
+  config,
+  breakdownData,
+  setBreakdownData,
+  equalDivide,
+  setEqualDivide,
+  activeParamTab,
+  setActiveParamTab,
+  formatNumber,
+  parseNumber,
+}: ParameterBreakdownProps) {
+  const enabledParams = useMemo(() => 
+    Object.entries(config.enabled_parameters)
+      .filter(([, v]) => v)
+      .map(([k]) => k),
+    [config.enabled_parameters]
+  );
+
+  // Auto-select first enabled tab
+  useEffect(() => {
+    if (enabledParams.length > 0 && (!activeParamTab || !enabledParams.includes(activeParamTab))) {
+      setActiveParamTab(enabledParams[0]);
+    }
+  }, [enabledParams, activeParamTab, setActiveParamTab]);
+
+  // Fetch data for each enabled parameter
+  const { data: productCategories, isLoading: productsLoading } = useQuery({
+    queryKey: ['product-categories-breakdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: config.enabled_parameters.product,
+  });
+
+  const { data: distributors, isLoading: distributorsLoading } = useQuery({
+    queryKey: ['distributors-breakdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('distributors')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: config.enabled_parameters.distributor,
+  });
+
+  const { data: territories, isLoading: territoriesLoading } = useQuery({
+    queryKey: ['territories-breakdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('territories')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: config.enabled_parameters.territory,
+  });
+
+  const { data: beats, isLoading: beatsLoading } = useQuery({
+    queryKey: ['beats-breakdown'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('beats')
+        .select('id, beat_name')
+        .order('beat_name');
+      if (error) throw error;
+      return (data ?? []).map(b => ({ id: b.id, name: b.beat_name }));
+    },
+    enabled: config.enabled_parameters.beat,
+  });
+
+  // Initialize breakdown data when source data loads
+  useEffect(() => {
+    const newData: Record<string, BreakdownItem[]> = { ...breakdownData };
+
+    if (config.enabled_parameters.product && productCategories && !newData.product) {
+      newData.product = productCategories.map(c => ({ id: c.id, name: c.name, quantity: 0, revenue: 0, visits: 0 }));
+    }
+    if (config.enabled_parameters.distributor && distributors && !newData.distributor) {
+      newData.distributor = distributors.map(d => ({ id: d.id, name: d.name, quantity: 0, revenue: 0, visits: 0 }));
+    }
+    if (config.enabled_parameters.territory && territories && !newData.territory) {
+      newData.territory = territories.map(t => ({ id: t.id, name: t.name, quantity: 0, revenue: 0, visits: 0 }));
+    }
+    if (config.enabled_parameters.beat && beats && !newData.beat) {
+      newData.beat = beats.map(b => ({ id: b.id, name: b.name, quantity: 0, revenue: 0, visits: 0 }));
+    }
+    if (config.enabled_parameters.monthly && !newData.monthly) {
+      newData.monthly = FY_MONTHS.map((m, i) => ({ id: `month-${i}`, name: m, quantity: 0, revenue: 0, visits: 0 }));
+    }
+    if (config.enabled_parameters.retailer && !newData.retailer) {
+      newData.retailer = []; // Retailers handled at user level
+    }
+
+    setBreakdownData(newData);
+  }, [productCategories, distributors, territories, beats, config.enabled_parameters]);
+
+  const handleItemChange = (paramKey: string, itemId: string, field: 'quantity' | 'revenue' | 'visits', value: number) => {
+    setBreakdownData(prev => ({
+      ...prev,
+      [paramKey]: (prev[paramKey] ?? []).map(item =>
+        item.id === itemId ? { ...item, [field]: value } : item
+      ),
+    }));
+  };
+
+  const handleEqualDivide = (paramKey: string) => {
+    const items = breakdownData[paramKey];
+    if (!items || items.length === 0) return;
+
+    const count = items.length;
+    const newItems = items.map(item => ({
+      ...item,
+      quantity: config.enable_quantity ? Math.round(config.total_quantity_target / count) : 0,
+      revenue: config.enable_revenue ? Math.round(config.total_revenue_target / count) : 0,
+      visits: config.enable_visits ? Math.round(config.total_visits_target / count) : 0,
+    }));
+
+    setBreakdownData(prev => ({ ...prev, [paramKey]: newItems }));
+    setEqualDivide(prev => ({ ...prev, [paramKey]: true }));
+    toast.success('Targets divided equally');
+  };
+
+  const getTotal = (paramKey: string, field: 'quantity' | 'revenue' | 'visits') => {
+    return (breakdownData[paramKey] ?? []).reduce((sum, item) => sum + item[field], 0);
+  };
+
+  const isLoading = (paramKey: string) => {
+    switch (paramKey) {
+      case 'product': return productsLoading;
+      case 'distributor': return distributorsLoading;
+      case 'territory': return territoriesLoading;
+      case 'beat': return beatsLoading;
+      default: return false;
+    }
+  };
+
+  if (enabledParams.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-sm font-semibold text-foreground">Parameter Breakdown</Label>
+        <p className="text-xs text-muted-foreground mt-1">Allocate targets across selected parameters</p>
+      </div>
+
+      <Tabs value={activeParamTab} onValueChange={setActiveParamTab}>
+        <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+          {enabledParams.map(key => {
+            const info = PARAM_TAB_MAP[key];
+            if (!info) return null;
+            return (
+              <TabsTrigger key={key} value={key} className="flex items-center gap-1.5 text-xs px-3 py-1.5">
+                <span>{info.icon}</span>
+                <span>{info.label}</span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+
+        {enabledParams.map(paramKey => {
+          const items = breakdownData[paramKey] ?? [];
+          const info = PARAM_TAB_MAP[paramKey];
+          if (!info) return null;
+
+          return (
+            <TabsContent key={paramKey} value={paramKey} className="mt-4 space-y-3">
+              {paramKey === 'retailer' ? (
+                <div className="p-6 text-center text-sm text-muted-foreground border rounded-lg bg-muted/30">
+                  Retailer-wise breakdown is managed at the individual user level during hierarchy allocation.
+                </div>
+              ) : isLoading(paramKey) ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : items.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground border rounded-lg bg-muted/30">
+                  No {info.label.toLowerCase()} found. Add them in their respective management section first.
+                </div>
+              ) : (
+                <>
+                  {/* Equal divide toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {items.length} {info.label.toLowerCase()} found
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs h-8"
+                      onClick={() => handleEqualDivide(paramKey)}
+                    >
+                      <Divide className="h-3 w-3" />
+                      Equally Divide
+                    </Button>
+                  </div>
+
+                  {/* Header */}
+                  <div className="grid gap-2" style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}>
+                    <div className="text-xs font-medium text-muted-foreground px-2">{info.label}</div>
+                    {config.enable_quantity && <div className="text-xs font-medium text-muted-foreground px-2">Qty ({config.quantity_unit})</div>}
+                    {config.enable_revenue && <div className="text-xs font-medium text-muted-foreground px-2">Revenue (₹)</div>}
+                    {config.enable_visits && <div className="text-xs font-medium text-muted-foreground px-2">Visits</div>}
+                  </div>
+
+                  {/* Items */}
+                  <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
+                    {items.map(item => (
+                      <div
+                        key={item.id}
+                        className="grid gap-2 items-center p-2 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
+                        style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                      >
+                        <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
+                        {config.enable_quantity && (
+                          <Input
+                            type="text"
+                            className="h-8 text-sm"
+                            value={item.quantity > 0 ? formatNumber(item.quantity) : ''}
+                            onChange={(e) => handleItemChange(paramKey, item.id, 'quantity', parseNumber(e.target.value))}
+                            placeholder="0"
+                          />
+                        )}
+                        {config.enable_revenue && (
+                          <Input
+                            type="text"
+                            className="h-8 text-sm"
+                            value={item.revenue > 0 ? formatNumber(item.revenue) : ''}
+                            onChange={(e) => handleItemChange(paramKey, item.id, 'revenue', parseNumber(e.target.value))}
+                            placeholder="0"
+                          />
+                        )}
+                        {config.enable_visits && (
+                          <Input
+                            type="text"
+                            className="h-8 text-sm"
+                            value={item.visits > 0 ? formatNumber(item.visits) : ''}
+                            onChange={(e) => handleItemChange(paramKey, item.id, 'visits', parseNumber(e.target.value))}
+                            placeholder="0"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total footer */}
+                  <div
+                    className="grid gap-2 items-center p-2 rounded-lg bg-primary/5 border border-primary/20 font-semibold"
+                    style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                  >
+                    <span className="text-sm text-foreground">Total</span>
+                    {config.enable_quantity && <span className="text-sm text-foreground">{formatNumber(getTotal(paramKey, 'quantity'))}</span>}
+                    {config.enable_revenue && <span className="text-sm text-foreground">₹{formatNumber(getTotal(paramKey, 'revenue'))}</span>}
+                    {config.enable_visits && <span className="text-sm text-foreground">{formatNumber(getTotal(paramKey, 'visits'))}</span>}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+          );
+        })}
+      </Tabs>
+    </div>
   );
 }
