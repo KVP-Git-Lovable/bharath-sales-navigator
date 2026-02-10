@@ -169,6 +169,8 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
           }}
           enabledParameters={enabledParams}
           fyYear={fyYear}
+          targetStartMonth={config.target_start_month || 1}
+          targetEndMonth={config.target_end_month || 12}
         />
       )}
     </div>

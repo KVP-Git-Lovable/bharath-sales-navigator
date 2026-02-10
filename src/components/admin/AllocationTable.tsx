@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { 
   Save, AlertCircle, Loader2, ChevronDown, ChevronRight, Users, 
-  GitBranch, Table2, Equal, Percent, Edit3, ArrowUpCircle 
+  GitBranch, Table2, Equal, Percent, Edit3, ArrowUpCircle, Calendar, CalendarDays, TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,14 @@ interface AllocationTableProps {
   };
   enabledParameters: EnabledParameters;
   fyYear: number;
+  targetStartMonth?: number;
+  targetEndMonth?: number;
 }
+
+const FY_MONTHS_LIST = [
+  'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+  'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar',
+];
 
 type AllocationMethod = 'equal' | 'percentage' | 'manual';
 type ViewMode = 'tree' | 'table';
@@ -88,6 +95,94 @@ const parseNumber = (value: string) => {
 
 const getInitials = (name: string) =>
   name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+const getMonthRangeLabel = (startMonth: number, endMonth: number) => {
+  if (startMonth === endMonth) return FY_MONTHS_LIST[startMonth - 1];
+  return `${FY_MONTHS_LIST[startMonth - 1]} - ${FY_MONTHS_LIST[endMonth - 1]}`;
+};
+
+// Daily Average Panel for expanded user cards
+function DailyAvgPanel({
+  quantityTarget,
+  revenueTarget,
+  visitsTarget,
+  quantityUnit,
+  enabledMetrics,
+  targetStartMonth,
+  targetEndMonth,
+}: {
+  quantityTarget: number;
+  revenueTarget: number;
+  visitsTarget: number;
+  quantityUnit: string;
+  enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean };
+  targetStartMonth: number;
+  targetEndMonth: number;
+}) {
+  const [workingDays, setWorkingDays] = React.useState(25);
+  const activeMonthCount = targetEndMonth - targetStartMonth + 1;
+  const monthLabel = getMonthRangeLabel(targetStartMonth, targetEndMonth);
+
+  const monthlyQty = activeMonthCount === 1 ? quantityTarget : quantityTarget / activeMonthCount;
+  const monthlyRev = activeMonthCount === 1 ? revenueTarget : revenueTarget / activeMonthCount;
+  const monthlyVisits = activeMonthCount === 1 ? visitsTarget : visitsTarget / activeMonthCount;
+
+  const avgQtyPerDay = workingDays > 0 ? monthlyQty / workingDays : 0;
+  const avgRevPerDay = workingDays > 0 ? monthlyRev / workingDays : 0;
+  const avgVisitsPerDay = workingDays > 0 ? monthlyVisits / workingDays : 0;
+
+  const fmt = (num: number) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 }).format(num);
+
+  return (
+    <div className="mt-2 ml-10 p-3 bg-muted/30 rounded-lg border space-y-2">
+      <div className="flex items-center gap-2 mb-2">
+        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Daily Avg</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+          <Calendar className="h-3 w-3" />
+          {monthLabel}
+        </Badge>
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Working days/month:</span>
+        <Input
+          type="number"
+          min={1}
+          max={31}
+          value={workingDays}
+          onChange={(e) => setWorkingDays(Math.max(1, parseInt(e.target.value) || 1))}
+          className="w-16 h-7 text-right text-sm"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        {enabledMetrics.quantity && (
+          <div className="flex-1 min-w-[120px] p-2 rounded-md bg-card border">
+            <p className="text-[10px] text-muted-foreground uppercase">Qty / Day</p>
+            <p className="text-sm font-bold">{fmt(avgQtyPerDay)} {quantityUnit}</p>
+            <p className="text-[10px] text-muted-foreground">{fmt(monthlyQty)} ÷ {workingDays}d</p>
+          </div>
+        )}
+        {enabledMetrics.revenue && (
+          <div className="flex-1 min-w-[120px] p-2 rounded-md bg-card border">
+            <p className="text-[10px] text-muted-foreground uppercase">Revenue / Day</p>
+            <p className="text-sm font-bold">₹{fmt(avgRevPerDay)}</p>
+            <p className="text-[10px] text-muted-foreground">₹{fmt(monthlyRev)} ÷ {workingDays}d</p>
+          </div>
+        )}
+        {enabledMetrics.visits && (
+          <div className="flex-1 min-w-[120px] p-2 rounded-md bg-card border">
+            <p className="text-[10px] text-muted-foreground uppercase">Visits / Day</p>
+            <p className="text-sm font-bold">{fmt(avgVisitsPerDay)}</p>
+            <p className="text-[10px] text-muted-foreground">{fmt(monthlyVisits)} ÷ {workingDays}d</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Recursively compute effective targets based on each node's strategy.
@@ -145,6 +240,8 @@ export function AllocationTable({
   enabledMetrics,
   enabledParameters,
   fyYear,
+  targetStartMonth = 1,
+  targetEndMonth = 12,
 }: AllocationTableProps) {
   const queryClient = useQueryClient();
   const [allocations, setAllocations] = useState<Map<string, SubordinateAllocation>>(new Map());
@@ -509,21 +606,17 @@ export function AllocationTable({
           )}
         >
           <div className="flex items-center gap-3">
-            {/* Expand/Collapse */}
-            {hasChildren ? (
-              <button
-                onClick={() => toggleExpand(user.userId)}
-                className="p-1 hover:bg-muted/50 rounded shrink-0"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            ) : (
-              <div className="w-6" />
-            )}
+            {/* Expand/Collapse - always show for daily avg */}
+            <button
+              onClick={() => toggleExpand(user.userId)}
+              className="p-1 hover:bg-muted/50 rounded shrink-0"
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
 
             {/* Avatar */}
             <Avatar className="h-9 w-9 shrink-0">
@@ -545,6 +638,10 @@ export function AllocationTable({
                   {user.subordinateCount}
                 </Badge>
               )}
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0 gap-1">
+                <Calendar className="h-3 w-3" />
+                {getMonthRangeLabel(targetStartMonth, targetEndMonth)}
+              </Badge>
             </div>
 
             {/* Per-user strategy selector (only for sub-managers) */}
@@ -666,6 +763,18 @@ export function AllocationTable({
               Auto-calculated from {user.subordinateCount} subordinates
             </p>
           )}
+          {/* Daily Average Section (expandable) */}
+          {isExpanded && !hasChildren && (
+            <DailyAvgPanel
+              quantityTarget={allocations.get(user.userId)?.quantityTarget || 0}
+              revenueTarget={allocations.get(user.userId)?.revenueTarget || 0}
+              visitsTarget={allocations.get(user.userId)?.visitsTarget || 0}
+              quantityUnit={quantityUnit}
+              enabledMetrics={enabledMetrics}
+              targetStartMonth={targetStartMonth}
+              targetEndMonth={targetEndMonth}
+            />
+          )}
         </div>
 
         {/* Children */}
@@ -727,6 +836,10 @@ export function AllocationTable({
                           {user.subordinateCount}
                         </Badge>
                       )}
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
+                        <Calendar className="h-2.5 w-2.5" />
+                        {getMonthRangeLabel(targetStartMonth, targetEndMonth)}
+                      </Badge>
                     </div>
                   </td>
                   <td className="p-3 text-center">
