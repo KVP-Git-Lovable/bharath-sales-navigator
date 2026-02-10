@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { Plus, FileDown, Search, Check, ChevronsUpDown, X, BarChart3, Pencil, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, AlertTriangle, MapPin, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TerritoryDetailsModal from './TerritoryDetailsModal';
-import { TerritoryMap } from './territories/TerritoryMap';
+
 
 import { format } from 'date-fns';
 import {
@@ -560,15 +560,6 @@ const TerritoriesManagement = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Territories Management</h2>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleGeocodeAll} 
-            disabled={isGeocoding}
-            className="gap-2"
-          >
-            {isGeocoding ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-            {isGeocoding ? 'Geocoding...' : 'Sync Place IDs'}
-          </Button>
           <Button onClick={() => setShowForm(!showForm)} className="gap-2">
             <Plus size={16} /> Add Territory
           </Button>
@@ -576,16 +567,6 @@ const TerritoriesManagement = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Territory Map Section - At Top */}
-        <TerritoryMap 
-          territories={territories.map(t => ({
-            id: t.id,
-            name: t.name,
-            region: t.region,
-            place_id: t.place_id,
-          }))} 
-          height="400px"
-        />
 
         {showForm && (
           <Card>
