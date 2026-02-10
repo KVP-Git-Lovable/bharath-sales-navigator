@@ -34,6 +34,7 @@ interface VisitStats {
 }
 
 type DateRangeMode = 'today' | 'week' | 'month' | 'custom';
+type CurrentLocDateRange = 'today' | 'week' | 'month' | 'custom';
 
 export default function GPSTrack() {
   const { user } = useAuth();
@@ -95,6 +96,31 @@ export default function GPSTrack() {
     return userParam || 'self';
   });
   const [currentLocationUserId, setCurrentLocationUserId] = useState<string>('self');
+  
+  // Current Location tab - date range and journey history
+  const [clDateRange, setClDateRange] = useState<CurrentLocDateRange>('today');
+  const [clCustomStart, setClCustomStart] = useState<Date>(new Date());
+  const [clCustomEnd, setClCustomEnd] = useState<Date>(new Date());
+  const [clGpsData, setClGpsData] = useState<GPSData[]>([]);
+  const [clLoading, setClLoading] = useState(false);
+
+  // Compute current location tab date range
+  const { clStartDate, clEndDate } = useMemo(() => {
+    const today = new Date();
+    switch (clDateRange) {
+      case 'week':
+        return { clStartDate: startOfWeek(today, { weekStartsOn: 1 }), clEndDate: endOfWeek(today, { weekStartsOn: 1 }) };
+      case 'month':
+        return { clStartDate: startOfMonth(today), clEndDate: endOfMonth(today) };
+      case 'custom':
+        return { clStartDate: clCustomStart, clEndDate: clCustomEnd };
+      default:
+        return { clStartDate: today, clEndDate: today };
+    }
+  }, [clDateRange, clCustomStart, clCustomEnd]);
+
+  const clStartStr = useMemo(() => format(clStartDate, 'yyyy-MM-dd'), [clStartDate]);
+  const clEndStr = useMemo(() => format(clEndDate, 'yyyy-MM-dd'), [clEndDate]);
   
   // Determine if user can select team members (is a manager with subordinates)
   const canSelectTeamMembers = isManager;
@@ -442,6 +468,40 @@ export default function GPSTrack() {
     }
   }, [selectedMember, startDateStr, endDateStr, loadVisitStats]);
 
+  // Load GPS journey history for Current Location tab
+  useEffect(() => {
+    if (!currentLocationUser) return;
+    
+    const loadClGpsData = async () => {
+      setClLoading(true);
+      const { data, error } = await supabase
+        .from('gps_tracking')
+        .select('latitude, longitude, accuracy, timestamp')
+        .eq('user_id', currentLocationUser)
+        .gte('date', clStartStr)
+        .lte('date', clEndStr)
+        .order('timestamp', { ascending: true });
+
+      if (error) {
+        console.error('Error loading CL GPS data:', error);
+        setClLoading(false);
+        return;
+      }
+
+      if (data) {
+        setClGpsData(data.map(d => ({
+          latitude: parseFloat(d.latitude as unknown as string),
+          longitude: parseFloat(d.longitude as unknown as string),
+          accuracy: d.accuracy ? parseFloat(d.accuracy as unknown as string) : 0,
+          timestamp: new Date(d.timestamp),
+        })));
+      }
+      setClLoading(false);
+    };
+
+    loadClGpsData();
+  }, [currentLocationUser, clStartStr, clEndStr]);
+
   const isViewingOtherUser = currentLocationUser !== user?.id;
 
   // Handle status card clicks - toggle filter for map
@@ -483,26 +543,107 @@ export default function GPSTrack() {
 
           {/* Current Location Tab */}
           <TabsContent value="current" className="space-y-6 mt-6">
-            {/* User Selector - For Managers with subordinates */}
-            {canSelectTeamMembers && (
-              <Card className="p-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Team Member</label>
-                  <UserSelector
-                    selectedUserId={currentLocationUserId}
-                    onUserChange={setCurrentLocationUserId}
-                    showAllOption={false}
-                    className="w-full max-w-full h-10"
-                  />
+            {/* Filters Card */}
+            <Card className="p-6">
+              <div className="space-y-4">
+                {/* Date Range Filter */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Select Date Range</label>
+                  <Select
+                    value={clDateRange}
+                    onValueChange={(value: CurrentLocDateRange) => setClDateRange(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select range" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background z-50">
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="custom">Custom Date Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {clDateRange === 'custom' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">From</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal text-sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {format(clCustomStart, 'MMM d, yyyy')}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-50" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={clCustomStart}
+                              onSelect={(d) => {
+                                if (d) {
+                                  setClCustomStart(d);
+                                  if (d > clCustomEnd) setClCustomEnd(d);
+                                }
+                              }}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">To</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal text-sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {format(clCustomEnd, 'MMM d, yyyy')}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-50" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={clCustomEnd}
+                              onSelect={(d) => {
+                                if (d && d >= clCustomStart) setClCustomEnd(d);
+                              }}
+                              disabled={(d) => d < clCustomStart}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-muted-foreground">
+                    {clDateRange !== 'today'
+                      ? `Showing: ${format(clStartDate, 'MMM d')} – ${format(clEndDate, 'MMM d, yyyy')}`
+                      : `Showing: ${format(clStartDate, 'PPP')}`}
+                  </p>
                 </div>
-              </Card>
-            )}
+
+                {/* User Selector - For Managers with subordinates */}
+                {canSelectTeamMembers && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Select Team Member</label>
+                    <UserSelector
+                      selectedUserId={currentLocationUserId}
+                      onUserChange={setCurrentLocationUserId}
+                      showAllOption={false}
+                      className="w-full max-w-full h-10"
+                    />
+                  </div>
+                )}
+              </div>
+            </Card>
 
             <Card className="p-6 relative z-0">
               <CurrentLocationMap 
                 height="600px" 
                 userId={currentLocationUser} 
                 isViewingOther={isViewingOtherUser}
+                journeyPositions={clGpsData}
+                journeyLoading={clLoading}
               />
             </Card>
           </TabsContent>
