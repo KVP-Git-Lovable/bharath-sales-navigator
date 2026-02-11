@@ -121,27 +121,18 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await fetch(
-        `https://etabpbfokzhhfuybeieu.supabase.co/functions/v1/admin-delete-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            deleteOption,
-            transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
-          }),
-        }
-      );
+      const { data: result, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
+        body: {
+          userId: user.id,
+          deleteOption,
+          transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
+        },
+      });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to delete user');
+      if (invokeError) {
+        throw new Error(invokeError.message || 'Failed to delete user');
       }
+
 
       if (result.warning) {
         toast.warning(result.warning);
