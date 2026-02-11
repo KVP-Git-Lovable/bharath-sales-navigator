@@ -6,9 +6,7 @@ import { TeamMemberAttendanceCard } from './TeamMemberAttendanceCard';
 import { TeamMemberDetailSheet } from './TeamMemberDetailSheet';
 import { SearchInput } from '@/components/SearchInput';
 import { PaginationControls } from '@/components/ui/PaginationControls';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ChevronRight } from 'lucide-react';
+import { Briefcase, Clock, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -58,6 +56,10 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
 
   const detailMember = teamMembers.find(m => m.profile.id === detailUserId);
 
+  // Count leave and regularization requests
+  const leaveCount = pendingApprovals.filter(a => a.type === 'leave').length;
+  const regCount = pendingApprovals.filter(a => a.type === 'regularization').length;
+
   return (
     <div className="space-y-4">
       <TeamSummaryCards
@@ -68,24 +70,60 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
         onFilterChange={(f) => { setFilter(f); setCurrentPage(1); }}
       />
 
+      {/* Approvals Section */}
       {pendingApprovals.length > 0 && (
-        <Button
-          className="w-full h-11 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold"
-          onClick={() => navigate('/team-approvals')}
-        >
-          Approvals
-          <Badge className="ml-2 bg-red-500 text-white hover:bg-red-500 h-5 min-w-5 px-1.5 text-xs rounded-full">
-            {pendingApprovals.length}
-          </Badge>
-        </Button>
+        <div className="space-y-2">
+          {/* Main Approvals Button */}
+          <button
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[hsl(20,70%,94%)] hover:bg-[hsl(20,70%,90%)] transition-colors"
+            onClick={() => navigate('/team-approvals')}
+          >
+            <span className="text-sm font-semibold text-[hsl(160,40%,35%)]">Approvals</span>
+            <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-[hsl(15,55%,82%)] text-[hsl(15,60%,35%)] text-xs font-semibold">
+              {pendingApprovals.length}
+            </span>
+            <ChevronRight className="h-4 w-4 text-[hsl(160,40%,35%)]" />
+          </button>
+
+          {/* Sub-options */}
+          <div className="space-y-2">
+            <button
+              className="w-full flex items-center gap-3 p-3 bg-background rounded-xl shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => navigate('/team-approvals')}
+            >
+              <div className="h-8 w-8 rounded-full bg-[hsl(150,40%,94%)] flex items-center justify-center">
+                <Briefcase className="h-4 w-4 text-[hsl(150,50%,40%)]" />
+              </div>
+              <span className="flex-1 text-sm font-medium text-foreground text-left">Leave Requests</span>
+              {leaveCount > 0 && (
+                <span className="text-xs text-muted-foreground">{leaveCount}</span>
+              )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <button
+              className="w-full flex items-center gap-3 p-3 bg-background rounded-xl shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => navigate('/team-approvals')}
+            >
+              <div className="h-8 w-8 rounded-full bg-[hsl(200,40%,94%)] flex items-center justify-center">
+                <Clock className="h-4 w-4 text-[hsl(200,50%,40%)]" />
+              </div>
+              <span className="flex-1 text-sm font-medium text-foreground text-left">Regularization</span>
+              {regCount > 0 && (
+                <span className="text-xs text-muted-foreground">{regCount}</span>
+              )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
       )}
 
+      {/* Team Members */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-foreground whitespace-nowrap">
             Team Members ({filteredMembers.length})
           </h3>
-          <div className="flex-1 max-w-[220px]">
+          <div className="flex-1 max-w-[200px]">
             <SearchInput
               placeholder="Search members..."
               value={searchQuery}
