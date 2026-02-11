@@ -35,24 +35,18 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    // Validate user via getUser() on anon client
+    const { data: { user: callerUser }, error: callerError } = await supabaseUser.auth.getUser();
     
-    // Create a client with the user's token to validate it
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getUser(token);
-    
-    if (claimsError || !claimsData?.user) {
-      console.error('Invalid token:', claimsError);
+    if (callerError || !callerUser) {
+      console.error('Invalid token:', callerError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const adminUserId = claimsData.user.id;
+    const adminUserId = callerUser.id;
     console.log('User authenticated:', adminUserId);
 
     // Check if user is admin
@@ -147,18 +141,24 @@ serve(async (req) => {
     if (hint_answer?.trim()) userMetadata.hint_answer = hint_answer.trim();
 
     // Check if username already exists in profiles
-    const { data: existingProfile } = await supabaseAdmin
+    const { data: usernameProfile } = await supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('username', username)
       .maybeSingle();
 
-    // Check if user already exists by email
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    // Check if user already exists by email (using profiles table to avoid auth.admin.listUsers bug)
+    // In this app, username field in profiles stores the email
+    const { data: emailProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username')
+      .eq('username', email.toLowerCase())
+      .maybeSingle();
+
+    const existingUser = emailProfile ? { id: emailProfile.id, email: emailProfile.username } : null;
     
     // If username exists for a DIFFERENT user, reject
-    if (existingProfile && (!existingUser || existingProfile.id !== existingUser.id)) {
+    if (usernameProfile && (!existingUser || usernameProfile.id !== existingUser.id)) {
       return new Response(
         JSON.stringify({ error: 'Username already taken', details: `The username "${username}" is already in use by another user.` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
