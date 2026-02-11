@@ -8359,8 +8359,8 @@ export type Database = {
           emergency_contact_phone: string | null
           facebook_url: string | null
           full_name: string
-          hint_answer: string
-          hint_question: string
+          hint_answer: string | null
+          hint_question: string | null
           id: string
           instagram_url: string | null
           interests: string[] | null
@@ -8394,8 +8394,8 @@ export type Database = {
           emergency_contact_phone?: string | null
           facebook_url?: string | null
           full_name: string
-          hint_answer: string
-          hint_question: string
+          hint_answer?: string | null
+          hint_question?: string | null
           id: string
           instagram_url?: string | null
           interests?: string[] | null
@@ -8429,8 +8429,8 @@ export type Database = {
           emergency_contact_phone?: string | null
           facebook_url?: string | null
           full_name?: string
-          hint_answer?: string
-          hint_question?: string
+          hint_answer?: string | null
+          hint_question?: string | null
           id?: string
           instagram_url?: string | null
           interests?: string[] | null
