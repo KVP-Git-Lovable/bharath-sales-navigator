@@ -909,12 +909,12 @@ const Attendance = () => {
           {/* Segmented Control - only show if manager */}
           {isManager && (
             <div className="sticky top-0 z-10 bg-gradient-subtle pt-1 pb-2">
-              <div className="flex bg-[hsl(210,20%,95%)] rounded-full p-1">
+              <div className="flex bg-[hsl(0,0%,96%)] rounded-full p-1 border border-border/40">
                 <button
                   className={cn(
-                    'flex-1 text-sm font-medium py-2.5 rounded-full transition-all',
+                    'flex-1 text-sm font-semibold py-2.5 rounded-full transition-all',
                     selectedTopTab === 'my-attendance'
-                      ? 'bg-gradient-to-r from-[hsl(160,45%,55%)] to-[hsl(170,50%,50%)] text-white shadow-sm'
+                      ? 'bg-[hsl(153,43%,43%)] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => setSelectedTopTab('my-attendance')}
@@ -923,9 +923,9 @@ const Attendance = () => {
                 </button>
                 <button
                   className={cn(
-                    'flex-1 text-sm font-medium py-2.5 rounded-full transition-all',
+                    'flex-1 text-sm font-semibold py-2.5 rounded-full transition-all',
                     selectedTopTab === 'my-team'
-                      ? 'bg-gradient-to-r from-[hsl(160,45%,55%)] to-[hsl(170,50%,50%)] text-white shadow-sm'
+                      ? 'bg-[hsl(153,43%,43%)] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => setSelectedTopTab('my-team')}
@@ -945,13 +945,13 @@ const Attendance = () => {
 
             {/* Monthly Summary Cards */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[hsl(160,35%,94%)] rounded-2xl p-4 text-center shadow-sm">
-                <div className="text-3xl font-bold text-[hsl(160,40%,35%)]">{stats.attendance}%</div>
-                <div className="text-xs font-medium text-[hsl(160,30%,45%)] mt-1">{t('attendance.thisMonth')}</div>
+              <div className="bg-[hsl(155,30%,95%)] rounded-2xl p-5 text-center border border-[hsl(155,25%,85%)]">
+                <div className="text-3xl font-bold text-[hsl(153,43%,33%)]">{stats.attendance}%</div>
+                <div className="text-xs font-medium text-muted-foreground mt-1">{t('attendance.thisMonth')}</div>
               </div>
-              <div className="bg-[hsl(220,20%,95%)] rounded-2xl p-4 text-center shadow-sm">
-                <div className="text-3xl font-bold text-[hsl(220,25%,35%)]">{stats.presentDays}/{stats.totalDays}</div>
-                <div className="text-xs font-medium text-[hsl(220,15%,50%)] mt-1">{t('attendance.presentDays')}</div>
+              <div className="bg-[hsl(210,15%,96%)] rounded-2xl p-5 text-center border border-[hsl(210,10%,88%)]">
+                <div className="text-3xl font-bold text-[hsl(220,30%,30%)]">{stats.presentDays}/{stats.totalDays}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-1">{t('attendance.presentDays')}</div>
               </div>
             </div>
 
@@ -961,10 +961,10 @@ const Attendance = () => {
                 onClick={() => !todaysAttendance?.check_in_time && markAttendance('check-in')}
                 disabled={isMarkingAttendance || !!todaysAttendance?.check_in_time}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all shadow-sm',
+                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all',
                   todaysAttendance?.check_in_time
-                    ? 'bg-[hsl(150,35%,92%)] text-[hsl(150,45%,35%)] cursor-default'
-                    : 'bg-[hsl(150,40%,88%)] text-[hsl(150,50%,30%)] hover:bg-[hsl(150,40%,84%)]'
+                    ? 'bg-white text-[hsl(153,43%,38%)] border-2 border-[hsl(153,35%,75%)] cursor-default'
+                    : 'bg-white text-[hsl(153,43%,38%)] border-2 border-[hsl(153,35%,75%)] hover:bg-[hsl(155,30%,97%)]'
                 )}
               >
                 <CheckCircle className="h-4 w-4" />
@@ -975,10 +975,10 @@ const Attendance = () => {
                 onClick={() => markAttendance('check-out')}
                 disabled={isMarkingAttendance || !todaysAttendance?.check_in_time || !!todaysAttendance?.check_out_time}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all shadow-sm',
+                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all',
                   !todaysAttendance?.check_in_time || todaysAttendance?.check_out_time
-                    ? 'bg-[hsl(20,30%,93%)] text-[hsl(20,20%,55%)] cursor-default opacity-60'
-                    : 'bg-[hsl(15,65%,88%)] text-[hsl(15,60%,35%)] hover:bg-[hsl(15,65%,83%)]'
+                    ? 'bg-[hsl(15,50%,93%)] text-[hsl(15,30%,55%)] cursor-default opacity-60'
+                    : 'bg-[hsl(15,60%,91%)] text-[hsl(15,50%,35%)] hover:bg-[hsl(15,60%,87%)]'
                 )}
               >
                 <Clock className="h-4 w-4" />
