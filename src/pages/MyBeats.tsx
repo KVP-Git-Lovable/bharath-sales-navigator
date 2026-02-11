@@ -184,6 +184,13 @@ export const MyBeats = () => {
     loadData();
   }, [effectiveUserIds, isOnline]);
 
+  // Auto-populate retailers list when allRetailers loads and create modal is open
+  useEffect(() => {
+    if (isCreateBeatOpen && allRetailers.length > 0) {
+      loadRetailersForCreateBeat();
+    }
+  }, [allRetailers, isCreateBeatOpen]);
+
   // Set up real-time updates
   useEffect(() => {
     if (!user) return;
@@ -488,8 +495,10 @@ export const MyBeats = () => {
   const handleCreateBeat = async () => {
     // First, ensure we have the latest retailers data
     await loadAllRetailers();
-    // Then load retailers for the modal (this will use the fresh data)
-    loadRetailersForCreateBeat();
+    // Use a small delay to let React state update before reading allRetailers
+    setTimeout(() => {
+      loadRetailersForCreateBeat();
+    }, 100);
     setIsCreateBeatOpen(true);
     setBeatName("");
     setAverageKm("");
