@@ -31,6 +31,7 @@ export interface OrderDetails {
   retailer_id: string;
   visit_id: string | null;
   order_date: string;
+  created_at: string;
   total_amount: number;
   is_credit_order: boolean;
   credit_pending_amount: number;
@@ -45,7 +46,7 @@ export interface OrderDetails {
 async function fetchOrderWithDetails(orderId: string): Promise<OrderDetails | null> {
   const { data: order, error } = await supabase
     .from('orders')
-    .select('id, user_id, retailer_id, visit_id, order_date, total_amount, is_credit_order, credit_pending_amount, credit_paid_amount, status, delivery_status')
+    .select('id, user_id, retailer_id, visit_id, order_date, created_at, total_amount, is_credit_order, credit_pending_amount, credit_paid_amount, status, delivery_status')
     .eq('id', orderId)
     .single();
 
@@ -478,10 +479,11 @@ export async function cancelOrder(
     // 7. Recalculate retailer's last order
     await recalculateRetailerLastOrder(order.retailer_id);
 
-    // 8. Remove gamification points
+    // 8. Remove gamification points (use created_at date, not order_date, since points are earned when order is placed)
+    const pointsEarnedDate = order.created_at.split('T')[0];
     const pointsRemoved = await removeGamificationPoints(
       order.retailer_id,
-      order.order_date,
+      pointsEarnedDate,
       order.user_id
     );
     result.reversedData.pointsRemoved = pointsRemoved;
@@ -494,7 +496,7 @@ export async function cancelOrder(
     await reverseRetailerSequence(order.user_id, order.retailer_id);
 
     // 11. Reverse daily tracking counts
-    await reverseDailyTracking(order.user_id, order.order_date);
+    await reverseDailyTracking(order.user_id, pointsEarnedDate);
 
     // 12. Clear local caches
     await clearLocalCaches(
