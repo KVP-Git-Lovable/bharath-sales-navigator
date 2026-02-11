@@ -32,6 +32,7 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
   const connectivityStatus = useConnectivity();
   const isOffline = connectivityStatus === 'offline';
   const [isSaving, setIsSaving] = useState(false);
+  const [locationError, setLocationError] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [capturedPhotoPreview, setCapturedPhotoPreview] = useState<string | null>(null);
   const [isScanningBoard, setIsScanningBoard] = useState(false);
@@ -447,6 +448,13 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
       toast({ title: 'Missing Information', description: 'Please fill in all required fields', variant: 'destructive' });
       return;
     }
+
+    if (!retailerData.latitude || !retailerData.longitude) {
+      setLocationError(true);
+      toast({ title: 'Location Required', description: 'Please tap the location button to capture GPS coordinates', variant: 'destructive' });
+      return;
+    }
+    setLocationError(false);
 
     if (!user) {
       toast({ title: 'Not signed in', description: 'Please sign in to continue', variant: 'destructive' });
@@ -914,8 +922,8 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Address *</Label>
+            <div className={cn("space-y-2", locationError && !retailerData.latitude && "ring-2 ring-destructive rounded-md p-2")}>
+              <Label htmlFor="address">Address * {locationError && !retailerData.latitude && <span className="text-destructive text-xs ml-1">(GPS location required)</span>}</Label>
               <div className="flex gap-2">
                 <Textarea
                   id="address"
@@ -1008,6 +1016,7 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
                       
                       handleInputChange("latitude", lat.toString());
                       handleInputChange("longitude", lon.toString());
+                      setLocationError(false);
                       
                       if (accuracy > 100) {
                         toast({ 

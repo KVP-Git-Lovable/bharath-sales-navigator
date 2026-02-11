@@ -528,6 +528,48 @@ export const OrderEntry = () => {
     loadRetailerCoordinates();
   }, [validRetailerId, isActuallyOnline]);
 
+  // Auto-capture retailer GPS if missing - silently update retailer record
+  const hasAttemptedGpsCapture = useRef(false);
+  useEffect(() => {
+    if (!validRetailerId || hasAttemptedGpsCapture.current) return;
+    // Wait a bit for retailer coords to load from cache/network
+    const timer = setTimeout(() => {
+      if (retailerLat || retailerLng) return; // Already has coordinates
+      hasAttemptedGpsCapture.current = true;
+      
+      if (!navigator.geolocation) return;
+      
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = Number(position.coords.latitude.toFixed(7));
+          const lng = Number(position.coords.longitude.toFixed(7));
+          
+          // Update retailer record in Supabase
+          const { error } = await supabase
+            .from('retailers')
+            .update({ latitude: lat, longitude: lng, updated_at: new Date().toISOString() })
+            .eq('id', validRetailerId);
+          
+          if (!error) {
+            setRetailerLat(lat);
+            setRetailerLng(lng);
+            toast({
+              title: '📍 Location Updated',
+              description: 'Retailer location captured automatically',
+              duration: 3000,
+            });
+          }
+        },
+        (err) => {
+          console.log('Auto GPS capture failed (non-critical):', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }, 3000); // Wait 3s for existing coords to load first
+
+    return () => clearTimeout(timer);
+  }, [validRetailerId, retailerLat, retailerLng]);
+
   // Debug location tracking state (disabled for performance)
   useEffect(() => {
     if (!DEV_LOG) return;
