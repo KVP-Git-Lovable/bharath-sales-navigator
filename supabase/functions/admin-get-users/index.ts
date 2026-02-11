@@ -57,15 +57,26 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get all users from auth with admin privileges
-    const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers()
-    
-    if (authError) {
-      console.error('Error fetching auth users:', authError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch auth users' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Get all users from auth with admin privileges (paginated)
+    let authUsers: any[] = [];
+    let page = 1;
+    const perPage = 50;
+    let fetchMore = true;
+
+    while (fetchMore) {
+      const { data, error: authError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+      
+      if (authError) {
+        console.error('Error fetching auth users (page ' + page + '):', authError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch auth users' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      authUsers = authUsers.concat(data.users || []);
+      fetchMore = (data.users?.length || 0) === perPage;
+      page++;
     }
 
     // Get profiles data
