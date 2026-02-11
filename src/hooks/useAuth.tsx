@@ -23,6 +23,7 @@ interface AuthContextType {
   signIn: (email: string, password: string, role?: 'admin' | 'user') => Promise<void>;
   signOut: () => Promise<void>;
   resetPasswordByEmail: (email: string) => Promise<{ error: any }>;
+  refreshProfile: () => Promise<void>;
 }
 
 interface SignUpData {
@@ -465,6 +466,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.replace(cleanUrl);
   };
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    const profile = await fetchUserProfile(user.id);
+    if (profile) {
+      setUserProfile(profile);
+      localStorage.setItem('cached_profile', JSON.stringify(profile));
+    }
+  };
+
   const resetPasswordByEmail = async (email: string) => {
     try {
       const redirectUrl = `${window.location.origin}/reset-password`;
@@ -493,6 +503,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signOut,
       resetPasswordByEmail,
+      refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>
