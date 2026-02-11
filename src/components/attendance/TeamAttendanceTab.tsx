@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTeamAttendance } from '@/hooks/useTeamAttendance';
 import { TeamSummaryCards, TeamFilter } from './TeamSummaryCards';
-import { PendingApprovalsSection } from './PendingApprovalsSection';
 import { TeamMemberAttendanceCard } from './TeamMemberAttendanceCard';
 import { TeamMemberDetailSheet } from './TeamMemberDetailSheet';
 import { SearchInput } from '@/components/SearchInput';
 import { PaginationControls } from '@/components/ui/PaginationControls';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -14,6 +17,7 @@ interface TeamAttendanceTabProps {
 }
 
 export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) => {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<TeamFilter>('all');
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,11 +68,17 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
         onFilterChange={(f) => { setFilter(f); setCurrentPage(1); }}
       />
 
-      <PendingApprovalsSection
-        approvals={pendingApprovals}
-        onLeaveAction={handleLeaveAction}
-        onRegularizationAction={handleRegularizationAction}
-      />
+      {pendingApprovals.length > 0 && (
+        <Button
+          className="w-full h-11 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold"
+          onClick={() => navigate('/team-approvals')}
+        >
+          Approvals
+          <Badge className="ml-2 bg-red-500 text-white hover:bg-red-500 h-5 min-w-5 px-1.5 text-xs rounded-full">
+            {pendingApprovals.length}
+          </Badge>
+        </Button>
+      )}
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">

@@ -136,6 +136,7 @@ import PrimaryOrders from "./pages/PrimaryOrders";
 import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
 import MapRedirect from "./pages/MapRedirect";
+import { TeamApprovals } from "./pages/TeamApprovals";
 
 // Distributor Portal Pages
 import DistributorLogin from "./pages/distributor-portal/DistributorLogin";
@@ -354,6 +355,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/today-summary" element={<ProtectedRoute><TodaySummary /></ProtectedRoute>} />
         <Route path="/add-retailer" element={<ProtectedRoute><AddRetailer /></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+        <Route path="/team-approvals" element={<ProtectedRoute><TeamApprovals /></ProtectedRoute>} />
         <Route path="/my-retailers" element={<ProtectedRoute><MyRetailers /></ProtectedRoute>} />
         <Route path="/my-target" element={<ProtectedRoute><MyTarget /></ProtectedRoute>} />
         <Route path="/performance-dashboard" element={<ProtectedRoute><PerformanceDashboard /></ProtectedRoute>} />
