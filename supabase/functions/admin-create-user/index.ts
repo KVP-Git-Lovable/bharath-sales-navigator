@@ -35,7 +35,10 @@ serve(async (req) => {
       );
     }
 
-    // Validate user via getUser() on anon client
+    // Create anon client with user's token and validate
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
     const { data: { user: callerUser }, error: callerError } = await supabaseUser.auth.getUser();
     
     if (callerError || !callerUser) {
