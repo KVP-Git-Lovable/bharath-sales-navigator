@@ -44,7 +44,7 @@ interface ProcessingState {
 const Attendance = () => {
   const { t } = useTranslation('common');
   const { toast } = useToast();
-  const { userProfile, user } = useAuth();
+  const { userProfile, user, userRole } = useAuth();
   const navigate = useNavigate();
   
   // Hierarchical user filter
@@ -929,8 +929,8 @@ const Attendance = () => {
             <p className="text-muted-foreground text-sm">{t('attendance.subtitle')}</p>
           </div>
 
-          {/* Segmented Control - only show if manager */}
-          {isManager && (
+          {/* Segmented Control - show if manager or admin */}
+          {(isManager || userRole === 'admin') && (
             <div className="sticky top-0 z-10 bg-gradient-subtle pt-1 pb-2">
               <div className="flex bg-muted rounded-full p-1">
                 <button
@@ -960,7 +960,7 @@ const Attendance = () => {
           )}
 
           {/* My Team Tab Content */}
-          {selectedTopTab === 'my-team' && isManager ? (
+          {selectedTopTab === 'my-team' && (isManager || userRole === 'admin') ? (
             <TeamAttendanceTab subordinateIds={subordinateIds} />
           ) : (
           /* My Attendance Tab Content */
