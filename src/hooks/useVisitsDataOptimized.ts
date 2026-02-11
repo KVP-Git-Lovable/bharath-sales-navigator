@@ -1503,6 +1503,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     window.addEventListener('syncComplete', handleSyncComplete);
     window.addEventListener('beatDeleted', handleBeatDeleted as EventListener);
     window.addEventListener('forceVisitsRefresh', handleForceRefresh);
+    window.addEventListener('globalDataRefresh', handleForceRefresh);
     window.addEventListener('pointsEarned', handlePointsEarned as EventListener);
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -1513,6 +1514,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       window.removeEventListener('syncComplete', handleSyncComplete);
       window.removeEventListener('beatDeleted', handleBeatDeleted as EventListener);
       window.removeEventListener('forceVisitsRefresh', handleForceRefresh);
+      window.removeEventListener('globalDataRefresh', handleForceRefresh);
       window.removeEventListener('pointsEarned', handlePointsEarned as EventListener);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
