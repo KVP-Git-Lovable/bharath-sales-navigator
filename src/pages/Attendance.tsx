@@ -44,7 +44,7 @@ interface ProcessingState {
 const Attendance = () => {
   const { t } = useTranslation('common');
   const { toast } = useToast();
-  const { userProfile, user, userRole } = useAuth();
+  const { userProfile, user } = useAuth();
   const navigate = useNavigate();
   
   // Hierarchical user filter
@@ -586,22 +586,8 @@ const Attendance = () => {
         setAttendanceType(null);
         setIsMarkingAttendance(false);
 
-        // Immediately update local state so UI reflects check-in instantly
-        setTodaysAttendance((prev: any) => ({
-          ...prev,
-          user_id: user.id,
-          date: today,
-          check_in_time: timestamp,
-          check_in_location: freshLocation,
-          check_in_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
-          check_in_photo_url: photoPath,
-          status: 'present',
-          face_verification_status: matchStatus,
-          face_match_confidence: confidence
-        }));
-
-        // Refresh attendance data using cached hooks (background sync)
-        refreshTodayOnly();
+        // Refresh attendance data using cached hooks
+        await refreshTodayOnly();
 
         // Reset processing state
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
@@ -724,17 +710,8 @@ const Attendance = () => {
         setAttendanceType(null);
         setIsMarkingAttendance(false);
 
-        // Immediately update local state so UI reflects check-out instantly
-        setTodaysAttendance((prev: any) => ({
-          ...prev,
-          check_out_time: timestamp,
-          check_out_location: freshLocation,
-          check_out_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
-          check_out_photo_url: photoPath,
-        }));
-
-        // Refresh attendance data using cached hooks (background sync)
-        refreshTodayOnly();
+        // Refresh attendance data using cached hooks
+        await refreshTodayOnly();
 
         // Reset processing state
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
@@ -929,15 +906,15 @@ const Attendance = () => {
             <p className="text-muted-foreground text-sm">{t('attendance.subtitle')}</p>
           </div>
 
-          {/* Segmented Control - show if manager or admin */}
-          {(isManager || userRole === 'admin') && (
+          {/* Segmented Control - only show if manager */}
+          {isManager && (
             <div className="sticky top-0 z-10 bg-gradient-subtle pt-1 pb-2">
-              <div className="flex bg-muted rounded-full p-1">
+              <div className="flex bg-[hsl(0,0%,96%)] rounded-full p-1 border border-border/40">
                 <button
                   className={cn(
-                    'flex-1 text-sm font-medium py-2.5 rounded-full transition-all',
+                    'flex-1 text-sm font-semibold py-2.5 rounded-full transition-all',
                     selectedTopTab === 'my-attendance'
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-[hsl(153,43%,43%)] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => setSelectedTopTab('my-attendance')}
@@ -946,9 +923,9 @@ const Attendance = () => {
                 </button>
                 <button
                   className={cn(
-                    'flex-1 text-sm font-medium py-2.5 rounded-full transition-all',
+                    'flex-1 text-sm font-semibold py-2.5 rounded-full transition-all',
                     selectedTopTab === 'my-team'
-                      ? 'bg-green-500 text-white shadow-sm'
+                      ? 'bg-[hsl(153,43%,43%)] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => setSelectedTopTab('my-team')}
@@ -960,136 +937,105 @@ const Attendance = () => {
           )}
 
           {/* My Team Tab Content */}
-          {selectedTopTab === 'my-team' && (isManager || userRole === 'admin') ? (
+          {selectedTopTab === 'my-team' && isManager ? (
             <TeamAttendanceTab subordinateIds={subordinateIds} />
           ) : (
           /* My Attendance Tab Content */
-          <div className="space-y-6">
-          <div className="text-center space-y-4">
-            
-            {/* Main Stats */}
-            <div className="flex justify-center items-center gap-8 mb-6">
-              <div className="text-center">
-                <div className="text-4xl font-bold text-primary">{stats.attendance}%</div>
-                <div className="text-sm text-muted-foreground">{t('attendance.thisMonth')}</div>
+          <div className="space-y-5">
+
+            {/* Monthly Summary Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-card rounded-2xl p-5 text-center shadow-sm">
+                <div className="text-3xl font-bold text-foreground">{stats.attendance}%</div>
+                <div className="text-xs font-medium text-muted-foreground mt-1">{t('attendance.thisMonth')}</div>
               </div>
-              <div className="text-center">
+              <div className="bg-card rounded-2xl p-5 text-center shadow-sm">
                 <div className="text-3xl font-bold text-foreground">{stats.presentDays}/{stats.totalDays}</div>
-                <div className="text-sm text-muted-foreground">{t('attendance.presentDays')}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-1">{t('attendance.presentDays')}</div>
               </div>
             </div>
 
-          {/* Start/End Day Buttons */}
-            <div className="flex justify-center gap-4">
-              {/* Start My Day Button */}
-              <Button
-                onClick={() => markAttendance('check-in')}
+            {/* Day Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => !todaysAttendance?.check_in_time && markAttendance('check-in')}
                 disabled={isMarkingAttendance || !!todaysAttendance?.check_in_time}
-                variant={todaysAttendance?.check_in_time ? "outline" : "default"}
-                className="gap-2"
-              >
-                {todaysAttendance?.check_in_time ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    {t('attendance.dayStarted')}
-                  </>
-                ) : (
-                  <>
-                    <Camera className="h-4 w-4" />
-                    {isMarkingAttendance ? t('attendance.startingDay') : t('attendance.startMyDay')}
-                  </>
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all border',
+                  todaysAttendance?.check_in_time
+                    ? 'bg-card text-muted-foreground border-border cursor-default'
+                    : 'bg-card text-foreground border-border hover:bg-accent'
                 )}
-              </Button>
-              
-              {/* End My Day Button */}
-              <Button
+              >
+                <CheckCircle className="h-4 w-4 text-[hsl(150,50%,45%)]" />
+                {todaysAttendance?.check_in_time ? t('attendance.dayStarted') : isMarkingAttendance ? t('attendance.startingDay') : t('attendance.startMyDay')}
+              </button>
+
+              <button
                 onClick={() => markAttendance('check-out')}
                 disabled={isMarkingAttendance || !todaysAttendance?.check_in_time || !!todaysAttendance?.check_out_time}
-                variant={todaysAttendance?.check_out_time ? "outline" : "destructive"}
-                className="gap-2"
-              >
-                {todaysAttendance?.check_out_time ? (
-                  <>
-                    <XCircle className="h-4 w-4 text-red-600" />
-                    {t('attendance.dayEnded')}
-                  </>
-                ) : (
-                  <>
-                    <Camera className="h-4 w-4" />
-                    {isMarkingAttendance ? t('attendance.endingDay') : t('attendance.endMyDay')}
-                  </>
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all',
+                  !todaysAttendance?.check_in_time || todaysAttendance?.check_out_time
+                    ? 'bg-destructive/10 text-destructive/50 cursor-default opacity-60'
+                    : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                 )}
-              </Button>
+              >
+                <Clock className="h-4 w-4" />
+                {todaysAttendance?.check_out_time ? t('attendance.dayEnded') : isMarkingAttendance ? t('attendance.endingDay') : t('attendance.endMyDay')}
+              </button>
             </div>
 
             {/* Processing Progress Overlay */}
             {processingState.isProcessing && (
-              <Card className="border-primary/50 bg-primary/5">
-                <CardContent className="p-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
-                      <span className="font-medium text-primary">{processingState.stepMessage}</span>
-                    </div>
-                    
-                    {/* Progress Steps */}
-                    <div className="flex justify-center gap-2">
-                      {(['location', 'photo', 'face', 'saving', 'complete'] as ProcessingStep[]).map((step, index) => {
-                        const steps: ProcessingStep[] = ['location', 'photo', 'face', 'saving', 'complete'];
-                        const currentIndex = processingState.currentStep ? steps.indexOf(processingState.currentStep) : -1;
-                        const stepIndex = steps.indexOf(step);
-                        const isCompleted = stepIndex < currentIndex;
-                        const isCurrent = stepIndex === currentIndex;
-                        
-                        return (
-                          <div key={step} className="flex items-center">
-                            <div 
-                              className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all",
-                                isCompleted && "bg-green-500 text-white",
-                                isCurrent && "bg-primary text-primary-foreground animate-pulse",
-                                !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
-                              )}
-                            >
-                              {isCompleted ? (
-                                <CheckCircle className="h-4 w-4" />
-                              ) : (
-                                index + 1
-                              )}
-                            </div>
-                            {index < 4 && (
-                              <div 
-                                className={cn(
-                                  "w-6 h-0.5 mx-1",
-                                  isCompleted ? "bg-green-500" : "bg-muted"
-                                )}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* Step Labels */}
-                    <div className="flex justify-between text-xs text-muted-foreground px-1">
-                      <span className="w-12 text-center">Location</span>
-                      <span className="w-12 text-center">Photo</span>
-                      <span className="w-12 text-center">Face</span>
-                      <span className="w-12 text-center">Save</span>
-                      <span className="w-12 text-center">Done</span>
-                    </div>
+              <div className="bg-[hsl(160,30%,95%)] rounded-2xl p-4 shadow-sm">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-[hsl(160,45%,50%)] border-t-transparent" />
+                    <span className="font-medium text-[hsl(160,40%,35%)] text-sm">{processingState.stepMessage}</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex justify-center gap-2">
+                    {(['location', 'photo', 'face', 'saving', 'complete'] as ProcessingStep[]).map((step, index) => {
+                      const steps: ProcessingStep[] = ['location', 'photo', 'face', 'saving', 'complete'];
+                      const currentIndex = processingState.currentStep ? steps.indexOf(processingState.currentStep) : -1;
+                      const stepIndex = steps.indexOf(step);
+                      const isCompleted = stepIndex < currentIndex;
+                      const isCurrent = stepIndex === currentIndex;
+                      return (
+                        <div key={step} className="flex items-center">
+                          <div className={cn(
+                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all",
+                            isCompleted && "bg-[hsl(150,45%,50%)] text-white",
+                            isCurrent && "bg-[hsl(160,45%,45%)] text-white animate-pulse",
+                            !isCompleted && !isCurrent && "bg-[hsl(210,15%,90%)] text-[hsl(210,10%,55%)]"
+                          )}>
+                            {isCompleted ? <CheckCircle className="h-3.5 w-3.5" /> : index + 1}
+                          </div>
+                          {index < 4 && <div className={cn("w-5 h-0.5 mx-0.5", isCompleted ? "bg-[hsl(150,45%,50%)]" : "bg-[hsl(210,15%,88%)]")} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+                    <span className="w-10 text-center">Location</span>
+                    <span className="w-10 text-center">Photo</span>
+                    <span className="w-10 text-center">Face</span>
+                    <span className="w-10 text-center">Save</span>
+                    <span className="w-10 text-center">Done</span>
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* GPS Tracking Info */}
-            {todaysAttendance && !todaysAttendance.check_out_time && (
-              <div className="flex justify-center items-center gap-2 text-sm text-muted-foreground">
-                <Navigation2 className={cn("h-4 w-4", isTracking && "animate-pulse text-primary")} />
-                <span>
-                  {isTracking ? `🟢 ${t('attendance.gpsTrackingActive')}` : t('attendance.gpsTrackingWillStart')}
-                </span>
+            {/* GPS Info Text */}
+            {todaysAttendance && !todaysAttendance.check_out_time ? (
+              <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground">
+                <Navigation2 className={cn("h-3.5 w-3.5", isTracking && "animate-pulse text-[hsl(150,50%,45%)]")} />
+                <span>{isTracking ? `🟢 ${t('attendance.gpsTrackingActive')}` : `⚠ ${t('attendance.gpsTrackingWillStart')}`}</span>
+              </div>
+            ) : (
+              <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground">
+                <span>⚠ {t('attendance.gpsTrackingWillStart')}</span>
               </div>
             )}
 
@@ -1124,31 +1070,32 @@ const Attendance = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Present/Absent Cards - Clickable */}
-            <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-              <Card 
-                className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setShowPresentDaysDialog(true)}
-              >
-                <CardContent className="p-4 text-center">
-                  <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.presentDays}</div>
-                  <div className="text-sm text-green-600 dark:text-green-400">{t('attendance.presentDays')}</div>
-                  <div className="text-xs text-green-500 mt-1">{t('attendance.tapToViewDates')}</div>
-                </CardContent>
-              </Card>
-              
-              <Card 
-                className="bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setShowAbsentDaysDialog(true)}
-              >
-                <CardContent className="p-4 text-center">
-                  <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.absentDays}</div>
-                  <div className="text-sm text-red-600 dark:text-red-400">{t('attendance.absentDays')}</div>
-                  <div className="text-xs text-red-500 mt-1">{t('attendance.tapToViewDates')}</div>
-                </CardContent>
-              </Card>
+            {/* Today's Market Hours Section */}
+            <div className="bg-[hsl(210,20%,97%)] rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  className="bg-[hsl(150,35%,93%)] rounded-2xl p-4 text-center cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setShowPresentDaysDialog(true)}
+                >
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <CheckCircle className="h-5 w-5 text-[hsl(150,50%,45%)]" />
+                    <span className="text-2xl font-bold text-[hsl(150,45%,30%)]">{stats.presentDays}</span>
+                  </div>
+                  <div className="text-xs font-medium text-[hsl(150,35%,40%)]">{t('attendance.presentDays')}</div>
+                  <div className="text-[10px] text-[hsl(150,25%,55%)] mt-1">{t('attendance.tapToViewDates')}</div>
+                </div>
+                <div
+                  className="bg-[hsl(0,40%,95%)] rounded-2xl p-4 text-center cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setShowAbsentDaysDialog(true)}
+                >
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <XCircle className="h-5 w-5 text-[hsl(0,50%,55%)]" />
+                    <span className="text-2xl font-bold text-[hsl(0,45%,35%)]">{stats.absentDays}</span>
+                  </div>
+                  <div className="text-xs font-medium text-[hsl(0,35%,45%)]">{t('attendance.absentDays')}</div>
+                  <div className="text-[10px] text-[hsl(0,25%,60%)] mt-1">{t('attendance.tapToViewDates')}</div>
+                </div>
+              </div>
             </div>
 
             {/* Present Days Dialog */}
@@ -1156,16 +1103,16 @@ const Attendance = () => {
               <DialogContent className="max-w-md max-h-[70vh] overflow-auto">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <CheckCircle className="h-5 w-5 text-[hsl(150,50%,45%)]" />
                     Present Days ({presentDatesList.length})
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-2 mt-4">
                   {presentDatesList.length > 0 ? (
                     presentDatesList.map((date) => (
-                      <div key={date} className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">{format(new Date(date), 'EEE, MMM dd, yyyy')}</span>
+                      <div key={date} className="flex items-center gap-3 p-3 bg-[hsl(150,35%,94%)] rounded-xl">
+                        <CheckCircle className="h-4 w-4 text-[hsl(150,50%,45%)]" />
+                        <span className="font-medium text-sm">{format(new Date(date), 'EEE, MMM dd, yyyy')}</span>
                       </div>
                     ))
                   ) : (
@@ -1180,16 +1127,16 @@ const Attendance = () => {
               <DialogContent className="max-w-md max-h-[70vh] overflow-auto">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-600" />
+                    <XCircle className="h-5 w-5 text-[hsl(0,50%,55%)]" />
                     Absent Days ({absentDatesList.length})
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-2 mt-4">
                   {absentDatesList.length > 0 ? (
                     absentDatesList.map((date) => (
-                      <div key={date} className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="font-medium">{format(new Date(date), 'EEE, MMM dd, yyyy')}</span>
+                      <div key={date} className="flex items-center gap-3 p-3 bg-[hsl(0,40%,95%)] rounded-xl">
+                        <XCircle className="h-4 w-4 text-[hsl(0,50%,55%)]" />
+                        <span className="font-medium text-sm">{format(new Date(date), 'EEE, MMM dd, yyyy')}</span>
                       </div>
                     ))
                   ) : (
@@ -1198,7 +1145,6 @@ const Attendance = () => {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
 
           {/* Market Hours Module */}
           <Card>
