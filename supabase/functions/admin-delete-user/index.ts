@@ -161,33 +161,41 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Verify admin access via getClaims
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing authorization' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token)
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const callerId = claimsData.claims.sub as string
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Verify admin access
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    if (authError || !caller) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
     // Check admin role or System Administrator profile
     const [{ data: roleData }, { data: profileData }] = await Promise.all([
-      supabaseAdmin.from('user_roles').select('role').eq('user_id', caller.id).single(),
+      supabaseAdmin.from('user_roles').select('role').eq('user_id', callerId).single(),
       supabaseAdmin.from('user_profiles').select('profile_id, security_profiles!inner(name)')
-        .eq('user_id', caller.id).single(),
+        .eq('user_id', callerId).single(),
     ])
 
     const isAdmin = roleData?.role === 'admin' ||
@@ -208,13 +216,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (userId === caller.id) {
+    if (userId === callerId) {
       return new Response(JSON.stringify({ error: 'Cannot delete yourself' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log(`Admin ${caller.id} initiating ${deleteOption} for user ${userId}`)
+    console.log(`Admin ${callerId} initiating ${deleteOption} for user ${userId}`)
 
     // ============ ARCHIVE TO RECYCLE BIN ============
     console.log('Archiving user data to recycle bin...')
@@ -227,7 +235,7 @@ Deno.serve(async (req) => {
         archived_at: new Date().toISOString(),
         user_name: userName,
         user_email: profile?.username || '',
-        deleted_by_admin: caller.id,
+        deleted_by_admin: callerId,
         delete_option: deleteOption,
         transfer_to: transferToUserId || null,
       }
@@ -247,7 +255,7 @@ Deno.serve(async (req) => {
       original_table: 'profiles',
       original_id: userId,
       record_data: archiveMeta,
-      deleted_by: caller.id,
+      deleted_by: callerId,
       module_name: 'Users & Roles',
       record_name: userName,
     })
@@ -419,7 +427,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`User ${userId} fully deleted by admin ${caller.id}`)
+    console.log(`User ${userId} fully deleted by admin ${callerId}`)
 
     return new Response(JSON.stringify({
       success: true,
