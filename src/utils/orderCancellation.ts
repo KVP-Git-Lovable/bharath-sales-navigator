@@ -251,12 +251,11 @@ async function removeGamificationPoints(
   orderDate: string,
   userId: string
 ): Promise<number> {
-  // Find and delete points for this retailer on this date
+  // Find and delete ALL points for this retailer on this date (both 'order' and 'visit' reference_types)
   const { data: points, error: fetchError } = await supabase
     .from('gamification_points')
     .select('id, points')
     .eq('user_id', userId)
-    .eq('reference_type', 'order')
     .eq('reference_id', retailerId)
     .gte('earned_at', `${orderDate}T00:00:00`)
     .lt('earned_at', `${orderDate}T23:59:59`);
@@ -278,8 +277,64 @@ async function removeGamificationPoints(
     return 0;
   }
 
-  console.log(`[CancelOrder] Removed ${totalPoints} gamification points`);
+  console.log(`[CancelOrder] Removed ${totalPoints} gamification points (order + visit types)`);
   return totalPoints;
+}
+
+/**
+ * Reverse retailer consecutive order sequence tracking
+ */
+async function reverseRetailerSequence(
+  userId: string,
+  retailerId: string
+): Promise<void> {
+  const { data: seq, error: fetchError } = await supabase
+    .from('gamification_retailer_sequences')
+    .select('id, consecutive_orders')
+    .eq('user_id', userId)
+    .eq('retailer_id', retailerId)
+    .maybeSingle();
+
+  if (fetchError || !seq) return;
+
+  if ((seq.consecutive_orders || 0) <= 1) {
+    await supabase.from('gamification_retailer_sequences').delete().eq('id', seq.id);
+    console.log('[CancelOrder] Deleted retailer sequence record');
+  } else {
+    await supabase
+      .from('gamification_retailer_sequences')
+      .update({ consecutive_orders: seq.consecutive_orders - 1 })
+      .eq('id', seq.id);
+    console.log(`[CancelOrder] Decremented retailer sequence to ${seq.consecutive_orders - 1}`);
+  }
+}
+
+/**
+ * Reverse daily tracking counts for gamification
+ */
+async function reverseDailyTracking(
+  userId: string,
+  orderDate: string
+): Promise<void> {
+  const { data: tracks, error: fetchError } = await supabase
+    .from('gamification_daily_tracking')
+    .select('id, count, action_id')
+    .eq('user_id', userId)
+    .eq('tracking_date', orderDate);
+
+  if (fetchError || !tracks || tracks.length === 0) return;
+
+  for (const track of tracks) {
+    if ((track.count || 0) <= 1) {
+      await supabase.from('gamification_daily_tracking').delete().eq('id', track.id);
+    } else {
+      await supabase
+        .from('gamification_daily_tracking')
+        .update({ count: track.count - 1 })
+        .eq('id', track.id);
+    }
+  }
+  console.log(`[CancelOrder] Reversed ${tracks.length} daily tracking records`);
 }
 
 /**
@@ -342,6 +397,11 @@ async function clearLocalCaches(
       status: visitReverted ? 'planned' : 'productive',
       orderValue: 0 
     }
+  }));
+
+  // Dispatch pointsEarned so gamification UI (breakdown, leaderboard) refreshes instantly
+  window.dispatchEvent(new CustomEvent('pointsEarned', {
+    detail: { source: 'orderCancellation', retailerId, orderId }
   }));
 
   // Dispatch a global data refresh event so all tabs/views pick up the latest data
@@ -430,7 +490,13 @@ export async function cancelOrder(
     const loyaltyPointsRemoved = await removeLoyaltyPoints(orderId);
     result.reversedData.loyaltyPointsRemoved = loyaltyPointsRemoved;
 
-    // 10. Clear local caches
+    // 10. Reverse retailer sequence tracking
+    await reverseRetailerSequence(order.user_id, order.retailer_id);
+
+    // 11. Reverse daily tracking counts
+    await reverseDailyTracking(order.user_id, order.order_date);
+
+    // 12. Clear local caches
     await clearLocalCaches(
       order.retailer_id,
       order.user_id,
