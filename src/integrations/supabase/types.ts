@@ -11060,7 +11060,6 @@ export type Database = {
           retail_type: string | null
           state: string | null
           status: string | null
-          tenant_id: string | null
           territory_id: string | null
           total_visits_3m: number | null
           updated_at: string
@@ -11103,7 +11102,6 @@ export type Database = {
           retail_type?: string | null
           state?: string | null
           status?: string | null
-          tenant_id?: string | null
           territory_id?: string | null
           total_visits_3m?: number | null
           updated_at?: string
@@ -11146,7 +11144,6 @@ export type Database = {
           retail_type?: string | null
           state?: string | null
           status?: string | null
-          tenant_id?: string | null
           territory_id?: string | null
           total_visits_3m?: number | null
           updated_at?: string
@@ -11159,13 +11156,6 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailers_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
           {
