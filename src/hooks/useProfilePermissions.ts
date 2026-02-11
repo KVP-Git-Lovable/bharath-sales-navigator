@@ -17,7 +17,7 @@ interface ProfilePermission {
 export const ADMIN_MODULE_PERMISSION_MAP: Record<string, string> = {
   'admin_dashboard': '/admin',
   'admin_price_book': '/admin/price-books',
-  'admin_attendance_mgmt': '/attendance-management',
+  'admin_attendance': '/attendance-management',
   'admin_product_mgmt': '/product-management',
   'admin_scheme_master': '/scheme-management',
   'admin_vendor_mgmt': '/vendors',
