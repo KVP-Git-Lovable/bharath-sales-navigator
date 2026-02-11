@@ -20,24 +20,23 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Validate JWT using anon client + getClaims
+    // Validate JWT using anon client + getUser
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token)
-
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user: caller }, error: callerError } = await supabaseAuth.auth.getUser()
+    if (callerError || !caller) {
+      console.error('Auth error:', callerError)
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const userId = claimsData.claims.sub as string
+    const userId = caller.id
 
     // Create service role client for admin queries
     const supabaseAdmin = createClient(
