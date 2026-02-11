@@ -182,7 +182,7 @@ export const AddRetailer = () => {
       
       const mappedDistributors = (data || [])
         .filter(d => d.distributors)
-        .map(d => ({ id: d.distributors.id, name: d.distributors.name }));
+        .map(d => ({ id: (d.distributors as any)?.id, name: (d.distributors as any)?.name }));
       
       setBeatMappedDistributors(mappedDistributors);
       

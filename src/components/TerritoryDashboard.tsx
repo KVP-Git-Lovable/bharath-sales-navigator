@@ -101,7 +101,7 @@ const TerritoryDashboard = () => {
       territories?.forEach(territory => {
         territory.pincode_ranges?.forEach(pincode => {
           const matchingOrders = orders?.filter(order => 
-            order.retailers?.address?.includes(pincode)
+            (order.retailers as any)?.address?.includes(pincode)
           ) || [];
           
           const existing = pincodeMap.get(pincode) || { sales: 0, orders: 0 };

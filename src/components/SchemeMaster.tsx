@@ -363,7 +363,7 @@ export const SchemeMaster = () => {
         // Insert new rules
         const rulesToInsert = applicabilityRules.map(rule => ({
           scheme_id: schemeId,
-          applicability_level: rule.level,
+          applicability_type: rule.level,
           entity_id: rule.entityId || null,
           entity_name: rule.entityName,
           include_children: rule.includeChildren
@@ -516,7 +516,7 @@ export const SchemeMaster = () => {
       
       if (data) {
         setApplicabilityRules(data.map(r => ({
-          level: r.applicability_level as ApplicabilityRule['level'],
+          level: r.applicability_type as ApplicabilityRule['level'],
           entityId: r.entity_id || '',
           entityName: r.entity_name || '',
           includeChildren: r.include_children ?? true

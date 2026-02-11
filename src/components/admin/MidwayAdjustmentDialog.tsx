@@ -106,9 +106,9 @@ export const MidwayAdjustmentDialog: React.FC<MidwayAdjustmentDialogProps> = ({
     try {
       if (adjustmentType === 'leave' && affectedUser) {
         // Mark the user's allocation as ended
-        await supabase
+        await (supabase as any)
           .from('hierarchy_target_allocations')
-          .update({ effective_to: new Date().toISOString().split('T')[0] })
+          .update({ period_end: new Date().toISOString().split('T')[0] } as any)
           .eq('hierarchy_target_id', hierarchyTargetId)
           .eq('user_id', affectedUser.userId);
 
@@ -128,9 +128,9 @@ export const MidwayAdjustmentDialog: React.FC<MidwayAdjustmentDialogProps> = ({
               await supabase
                 .from('hierarchy_target_allocations')
                 .update({
-                  quantity_target: member.currentQuantityTarget + perMemberQty,
-                  revenue_target: member.currentRevenueTarget + perMemberRev,
-                })
+                  target_value: member.currentQuantityTarget + perMemberQty,
+                  allocated_value: member.currentRevenueTarget + perMemberRev,
+                } as any)
                 .eq('hierarchy_target_id', hierarchyTargetId)
                 .eq('user_id', member.userId)
                 .is('effective_to', null);
@@ -144,9 +144,9 @@ export const MidwayAdjustmentDialog: React.FC<MidwayAdjustmentDialogProps> = ({
               await supabase
                 .from('hierarchy_target_allocations')
                 .update({
-                  quantity_target: member.currentQuantityTarget + (targetToRedistribute.quantity * proportion),
-                  revenue_target: member.currentRevenueTarget + (targetToRedistribute.revenue * proportion),
-                })
+                  target_value: member.currentQuantityTarget + (targetToRedistribute.quantity * proportion),
+                  allocated_value: member.currentRevenueTarget + (targetToRedistribute.revenue * proportion),
+                } as any)
                 .eq('hierarchy_target_id', hierarchyTargetId)
                 .eq('user_id', member.userId)
                 .is('effective_to', null);

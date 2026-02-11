@@ -68,11 +68,11 @@ const LeaveLedger = () => {
     try {
       const [usersRes, leaveTypesRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name').order('full_name'),
-        supabase.from('leave_types').select('id, name, code').eq('is_active', true).order('sort_order'),
+        supabase.from('leave_types').select('id, name, code' as any).eq('is_active', true).order('sort_order'),
       ]);
 
       setUsers(usersRes.data || []);
-      setLeaveTypes(leaveTypesRes.data || []);
+      setLeaveTypes((leaveTypesRes.data || []) as any);
 
       // Set first user as default if available
       if (usersRes.data && usersRes.data.length > 0) {
@@ -92,7 +92,7 @@ const LeaveLedger = () => {
     setIsLoading(true);
     try {
       // Fetch accrual logs
-      let logsQuery = supabase
+      let logsQuery = (supabase as any)
         .from('leave_accrual_log')
         .select('*')
         .eq('user_id', selectedUser)
@@ -125,7 +125,7 @@ const LeaveLedger = () => {
         ...(balancesRes.data?.map(b => b.leave_type_id) || []),
       ])];
 
-      const { data: leaveTypesData } = await supabase
+      const { data: leaveTypesData } = await (supabase as any)
         .from('leave_types')
         .select('id, name, code, color')
         .in('id', leaveTypeIds);
@@ -140,8 +140,8 @@ const LeaveLedger = () => {
         leave_types: leaveTypesData?.find(lt => lt.id === balance.leave_type_id),
       }));
 
-      setAccrualLogs(enrichedLogs);
-      setBalances(enrichedBalances);
+      setAccrualLogs(enrichedLogs as any);
+      setBalances(enrichedBalances as any);
     } catch (error) {
       console.error('Error fetching ledger data:', error);
       toast.error('Failed to load ledger data');

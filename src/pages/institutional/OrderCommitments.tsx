@@ -86,7 +86,7 @@ const OrderCommitments = () => {
       
       if (error) throw error;
       if (data) {
-        setSelectedQuote(data as Quote);
+        setSelectedQuote(data as unknown as Quote);
         setIsCreateOpen(true);
       }
     } catch (error) {
@@ -104,7 +104,7 @@ const OrderCommitments = () => {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setQuotes(data as Quote[] || []);
+      setQuotes((data as unknown as Quote[]) || []);
     } catch (error) {
       console.error('Error fetching quotes:', error);
     }

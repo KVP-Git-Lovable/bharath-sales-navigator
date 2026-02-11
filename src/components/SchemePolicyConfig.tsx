@@ -49,14 +49,14 @@ export const SchemePolicyConfig = ({ trigger, inline = false }: SchemePolicyConf
       setLoading(true);
       const { data, error } = await supabase
         .from('scheme_policy_config')
-        .select('policy_name, policy_value')
+        .select('policy_key, policy_value')
         .eq('is_active', true);
 
       if (error) throw error;
 
       if (data) {
         const policyMap = data.reduce((acc, policy) => {
-          acc[policy.policy_name] = policy.policy_value;
+          acc[policy.policy_key] = policy.policy_value;
           return acc;
         }, {} as Record<string, any>);
 
@@ -85,7 +85,7 @@ export const SchemePolicyConfig = ({ trigger, inline = false }: SchemePolicyConf
         supabase
           .from('scheme_policy_config')
           .update({ policy_value: value, updated_at: new Date().toISOString() })
-          .eq('policy_name', name)
+          .eq('policy_key', name)
       );
 
       const results = await Promise.all(updates);

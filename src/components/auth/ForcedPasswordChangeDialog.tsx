@@ -60,7 +60,7 @@ const ForcedPasswordChangeDialog = ({ open, userId, onPasswordChanged, onDismiss
       // Clear the must_change_password flag
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ must_change_password: false })
+        .update({ must_change_password: false } as any)
         .eq('id', userId);
 
       if (profileError) {
