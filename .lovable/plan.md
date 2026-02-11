@@ -1,48 +1,65 @@
 
 
-## Road-Following Routes Using OSRM (Free Routing API)
+## Fix: Show Admin Panel Based on Profile Permissions
 
-### What Changes
-Replace the current straight-line connections between retailers with actual road-following routes using the free OSRM (Open Source Routing Machine) API. Routes will follow real roads just like Google Maps, giving a much more realistic view of the daily journey.
+### Problem
+The Admin Panel visibility is hardcoded to only show for users with `role = 'admin'` or `securityProfileName = 'System Administrator'`. Even though the Product Manager profile has been granted specific admin permissions (e.g., Attendance Management), those permissions are completely ignored when determining whether to show the Admin Panel.
 
-### How It Works
-- When the map renders route coordinates, instead of drawing a straight line between points, we call the OSRM API with all waypoints
-- OSRM returns the actual road geometry (as a polyline) which we decode and draw on the map
-- The colored day-wise routes and clickable legend continue to work exactly the same -- only the line shape changes
-- Falls back to straight lines if the OSRM request fails (e.g., offline or too many waypoints)
+### Solution
+Update the access control logic so that any user whose security profile has at least one `admin_*` permission granted in the `profile_object_permissions` table can see the Admin Panel -- but they will only see the specific admin modules they have access to.
 
-### Technical Details
+### Changes
 
-**File: `src/components/JourneyMap.tsx`**
+**1. New hook: `src/hooks/useProfilePermissions.ts`**
+- Fetches the user's profile permissions from `profile_object_permissions` (and `user_object_permissions` for overrides)
+- Returns a `hasAnyAdminPermission` boolean (true if any `admin_*` object has `can_read = true`)
+- Returns a `hasPermission(objectName)` function to check specific permissions
+- Returns a list of permitted admin feature names for filtering modules
+- Caches results to avoid repeated queries
 
-1. **Add OSRM fetch helper function** that takes an array of coordinates and returns road-following geometry:
-   ```typescript
-   async function fetchOSRMRoute(coords: [number, number][]): Promise<L.LatLngExpression[]> {
-     // OSRM expects lng,lat (not lat,lng)
-     const waypoints = coords.map(([lat, lng]) => `${lng},${lat}`).join(';');
-     const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
-     const res = await fetch(url);
-     const data = await res.json();
-     // Returns [lat, lng] pairs from GeoJSON [lng, lat]
-     return data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-   }
-   ```
+**2. Update `src/hooks/useAdminAccess.ts`**
+- In addition to the current admin/System Administrator check, also check `hasAnyAdminPermission` from the new hook
+- A user gets admin access if: `userRole === 'admin'` OR `securityProfileName === 'System Administrator'` OR they have any `admin_*` permissions granted
 
-2. **Add polyline decoding utility** -- OSRM with `geometries=geojson` returns GeoJSON coordinates directly, so no extra decoding library is needed.
+**3. Update `src/components/Navbar.tsx`**
+- Use the updated `useAdminAccess` to determine Admin Controls visibility
+- The Admin Controls link will now appear for users like Girish (Product Manager) who have specific admin permissions
 
-3. **Make the map update effect async** -- the useEffect that draws routes will become async to await the OSRM API calls.
+**4. Update `src/pages/AdminControls.tsx`**
+- Use the updated access check so non-admin users with profile permissions can access the page
+- Filter `adminModules` to only show modules the user has permission for
+- Map each admin module to its corresponding permission feature names (e.g., "Attendance Management" maps to `admin_attendance_mgmt` and its sub-features)
+- Full admins and System Administrators continue to see all modules
 
-4. **Multi-day mode** (lines 298-305): For each day group, call `fetchOSRMRoute(routeCoords)` and use the returned road geometry for the polyline instead of the straight `routeCoords`.
+**5. Update individual admin pages (e.g., AttendanceManagement, etc.)**
+- Update `useAdminAccess` or add permission checks so that pages granted via profile permissions are accessible
+- Users without specific module permission still get redirected
 
-5. **Single-day mode** (lines 314-316): Same change -- call OSRM for the optimized retailer route and draw road-following geometry.
+### Permission Mapping
+Each admin module card in AdminControls will be mapped to its permission feature name from `permissionModules.ts`:
 
-6. **Error handling / fallback**: If OSRM fails (network error, rate limit, or no route found), fall back to the existing straight-line polyline so the map never breaks.
+```text
+Admin Dashboard        -> admin_dashboard
+Price Book Management  -> admin_price_book
+Attendance Management  -> admin_attendance_mgmt
+Product Management     -> admin_product_mgmt
+Scheme Master          -> admin_scheme_master
+... (and so on for all 25+ modules)
+```
 
-7. **Rate limiting**: OSRM's public server has usage limits. We batch all waypoints for a day into a single request (up to ~100 waypoints supported) rather than making per-segment calls.
+A module card shows if the user has `can_read = true` on ANY sub-feature under that module's feature group, OR if they are a full admin/System Administrator.
 
-### Important Notes
-- OSRM public server (`router.project-osrm.org`) is free but has fair-use rate limits -- suitable for this use case since routes are fetched on-demand, not in bulk
-- No API key required
-- No new dependencies needed -- uses standard `fetch` and Leaflet's existing polyline rendering
-- Only **one file** changes: `src/components/JourneyMap.tsx`
+### How It Works (for Girish as Product Manager)
+
+1. Girish logs in -- `securityProfileName` = "Product Manager", `userRole` = "user"
+2. New hook queries `profile_object_permissions` for his profile and finds `admin_attendance_*` permissions with `can_read = true`
+3. `hasAnyAdminPermission` = true, so Admin Controls link appears in navigation
+4. On AdminControls page, only "Attendance Management" card (and any other granted modules) are shown
+5. Girish can access `/attendance-management` because he has the relevant permissions
+
+### Technical Notes
+- The permission check query is lightweight (single query joining `user_profiles` + `profile_object_permissions`)
+- Results are cached via React Query to avoid repeated fetches
+- Full admins and System Administrators bypass all permission checks and see everything (no behavior change for them)
+- Individual page access checks are updated to respect profile permissions, preventing URL-based bypass
 
