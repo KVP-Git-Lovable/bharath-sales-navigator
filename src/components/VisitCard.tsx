@@ -1337,9 +1337,11 @@ export const VisitCard = ({
             );
           }
           
-          // For 'productive' status, don't need to fetch from network - already have all data
+          // For 'productive' status, still fetch from network to get updated order list
+          // This ensures the visit card shows the correct order count after multiple orders
           if (newStatus === 'productive') {
-            console.log('🛑 [VisitCard] Status is PRODUCTIVE (truly final), skipping network refresh');
+            console.log('🔄 [VisitCard] Status is PRODUCTIVE, refreshing order data from DB');
+            checkStatus(true);
             return;
           }
         }
