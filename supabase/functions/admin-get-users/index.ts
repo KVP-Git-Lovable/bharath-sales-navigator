@@ -57,29 +57,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get all users from auth with admin privileges (paginated)
-    let authUsers: any[] = [];
-    let page = 1;
-    const perPage = 50;
-    let fetchMore = true;
-
-    while (fetchMore) {
-      const { data, error: authError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
-      
-      if (authError) {
-        console.error('Error fetching auth users (page ' + page + '):', authError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch auth users' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      authUsers = authUsers.concat(data.users || []);
-      fetchMore = (data.users?.length || 0) === perPage;
-      page++;
-    }
-
-    // Get profiles data
+    // Fetch profiles directly (avoids Supabase auth.admin.listUsers bug with NULL confirmation_token)
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, username, full_name, phone_number, recovery_email, created_at, profile_picture_url, user_status')
@@ -102,37 +80,35 @@ Deno.serve(async (req) => {
     }
 
     // Combine all data
-    const usersWithDetails = authUsers.map(authUser => {
-      const profile = profiles?.find(p => p.id === authUser.id)
-      const roleData = userRoles?.find(r => r.user_id === authUser.id)
+    const usersWithDetails = (profiles || []).map(profile => {
+      const roleData = userRoles?.find(r => r.user_id === profile.id)
       
       return {
-        id: authUser.id,
-        email: authUser.email || 'No email',
-        username: profile?.username || 'N/A',
-        full_name: profile?.full_name || 'N/A',
-        phone_number: profile?.phone_number || 'N/A',
-        recovery_email: profile?.recovery_email || 'N/A',
+        id: profile.id,
+        email: profile.username || 'No email',
+        username: profile.username || 'N/A',
+        full_name: profile.full_name || 'N/A',
+        phone_number: profile.phone_number || 'N/A',
+        recovery_email: profile.recovery_email || 'N/A',
         role: roleData?.role || 'user',
-        assigned_at: roleData?.assigned_at || authUser.created_at,
-        created_at: authUser.created_at,
-        last_sign_in_at: authUser.last_sign_in_at,
-        email_confirmed_at: authUser.email_confirmed_at,
-        confirmed_at: authUser.confirmed_at,
-        phone: authUser.phone,
-        app_metadata: authUser.app_metadata,
-        user_metadata: authUser.user_metadata,
+        assigned_at: roleData?.assigned_at || profile.created_at,
+        created_at: profile.created_at,
+        last_sign_in_at: null,
+        email_confirmed_at: null,
+        confirmed_at: null,
+        phone: null,
+        app_metadata: {},
+        user_metadata: {},
         profile: {
-          id: profile?.id || authUser.id,
-          username: profile?.username || 'N/A',
-          full_name: profile?.full_name || 'N/A',
-          created_at: profile?.created_at || authUser.created_at,
-          profile_picture_url: profile?.profile_picture_url,
-          user_status: profile?.user_status || 'active'
+          id: profile.id,
+          username: profile.username || 'N/A',
+          full_name: profile.full_name || 'N/A',
+          created_at: profile.created_at,
+          profile_picture_url: profile.profile_picture_url,
+          user_status: profile.user_status || 'active'
         }
       }
     })
-
     console.log(`Successfully fetched ${usersWithDetails.length} users`)
 
     return new Response(
