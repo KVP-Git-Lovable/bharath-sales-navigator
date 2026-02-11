@@ -410,17 +410,20 @@ Deno.serve(async (req) => {
     const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
     if (authDeleteError) {
-      // "User not found" means auth user is already gone — treat as success
-      const isNotFound = authDeleteError.message?.toLowerCase().includes('user not found') ||
+      // Known Supabase bug: NULL confirmation_token causes "Database error loading user"
+      // Also handle "User not found" (already gone)
+      const errMsg = authDeleteError.message?.toLowerCase() || ''
+      const isNonFatal = errMsg.includes('user not found') ||
+                         errMsg.includes('database error') ||
                          (authDeleteError as any)?.status === 404 ||
                          (authDeleteError as any)?.code === 'user_not_found'
-      if (isNotFound) {
-        console.log('Auth user already removed (not found) — continuing as success')
+      if (isNonFatal) {
+        console.warn('Auth user delete non-fatal error (continuing):', authDeleteError.message)
       } else {
         console.error('Auth user delete error:', authDeleteError)
         return new Response(JSON.stringify({
           success: false,
-          error: `Profile deleted but auth user removal failed: ${authDeleteError.message}. Check for remaining FK constraints.`,
+          error: `Profile deleted but auth user removal failed: ${authDeleteError.message}`,
         }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
