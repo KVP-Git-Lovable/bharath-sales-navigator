@@ -1,97 +1,55 @@
 
 
-## Multi-Invoice Selection for Order Cancellation
+# Fix: Complete Gamification Points Reversal on Order Cancellation
 
-### Problem
-Currently, clicking "Cancel Order" passes only a single `orderId` and one invoice number to the `CancelOrderDialog`. When a retailer has multiple orders/invoices placed on the same visit, the user cannot select which specific orders to cancel.
+## Problem Identified
 
-### Solution
-Redesign the `CancelOrderDialog` to accept the full list of orders for the visit and let the user select which ones to cancel. Each selected order gets fully reversed independently. If ALL orders for the visit are cancelled, the visit reverts to "planned"; otherwise it stays "productive".
+When an order is cancelled, the system only removes gamification points with `reference_type = 'order'`. However, the order placement process (`awardPointsForOrder`) also awards points with `reference_type = 'visit'` (for "Productive visits with orders"). These visit-type points are **never cleaned up**, which is what you're seeing in the Points Breakdown.
 
----
+## What Gets Created When an Order is Placed
 
-### Changes
+| Data | Table | reference_type | Reversed on Cancel? |
+|------|-------|---------------|---------------------|
+| Order-based points (first order, daily target, focused product, etc.) | `gamification_points` | `order` | Yes (partially) |
+| Productive visit points | `gamification_points` | `visit` | **NO - this is the bug** |
+| Retailer consecutive order tracking | `gamification_retailer_sequences` | N/A | **NO** |
+| Daily tracking counts | `gamification_daily_tracking` | N/A | **NO** |
+| Loyalty points | `retailer_loyalty_points` | `order` | Yes |
+| Visit status | `visits` | N/A | Yes |
+| Retailer credit/analytics | `retailers` | N/A | Yes |
+| Invoice | `invoices` | N/A | Yes |
 
-#### 1. `src/components/CancelOrderDialog.tsx` -- Major rewrite
+## Fix Plan
 
-**New props:**
-- Replace single `orderId` + `invoiceNumber` + `orderAmount` with `orders: Array<{ id, invoice_number, total_amount, is_credit_order, credit_pending_amount }>`
-- Keep `retailerName`, `onCancelled`, `isOpen`, `onClose`
+### Step 1: Update `removeGamificationPoints` in `orderCancellation.ts`
 
-**New UI flow:**
+Change the function to remove **all** gamification points for this user + retailer on the order date, regardless of `reference_type`. This catches both `order` and `visit` type points.
 
-Step 1 -- Invoice Selection:
-- Show a list of all orders as selectable cards (checkbox per order)
-- Each card shows: invoice number, amount, credit badge if applicable
-- "Select All" toggle at top
-- Selected count + total amount shown at bottom
-- "Continue" button (disabled until at least one selected)
+- Remove the `.eq('reference_type', 'order')` filter
+- Instead, query for points where `reference_id = retailerId` (both order and visit points use retailer ID as reference)
+- Keep the date range filter to scope it to the correct day
 
-Step 2 -- Reason:
-- Same reason dropdown + notes textarea as current
+### Step 2: Add `gamification_retailer_sequences` reversal
 
-Step 3 -- Confirm:
-- Summary of selected invoices being cancelled
-- Warning about reversals (visit revert only if ALL orders cancelled)
-- Confirm button
+Add a new function `reverseRetailerSequence` that decrements the `consecutive_orders` count for the retailer when an order is cancelled. If it reaches 0, delete the record.
 
-**Cancellation logic:**
-- Loop through each selected order and call `cancelOrder()` from `orderCancellation.ts`
-- Track success/failure per order
-- Show summary toast
+### Step 3: Add `gamification_daily_tracking` reversal
 
-#### 2. `src/utils/orderCancellation.ts` -- Visit revert logic fix
+Add a function to decrement the daily tracking count for the user on the order date, preventing stale daily limits.
 
-**Problem:** `revertVisitStatus` currently always reverts the visit to "planned" when any order is cancelled. If 3 orders exist and only 1 is cancelled, the visit should stay "productive".
+### Step 4: Dispatch `pointsEarned` event after cancellation
 
-**Fix:** Add a check in `revertVisitStatus` -- before reverting, query if any other confirmed orders remain for this visit. Only revert to "planned" if zero confirmed orders remain.
+After removing points, dispatch a `pointsEarned` event so all UI components (Points Breakdown modal, leaderboard, summary cards) refresh immediately without needing a manual page refresh.
 
-New helper function:
-```text
-async function hasRemainingConfirmedOrders(visitId: string, excludeOrderId: string): Promise<boolean>
-  SELECT count(*) FROM orders WHERE visit_id = visitId AND id != excludeOrderId AND status = 'confirmed'
-```
+## Technical Details
 
-Modify `cancelOrder()` to use this check before reverting.
+**File modified:** `src/utils/orderCancellation.ts`
 
-#### 3. `src/components/VisitCard.tsx` -- Pass full order list
+1. `removeGamificationPoints()` -- Remove `reference_type` filter so both `order` and `visit` points are deleted for that retailer + date
+2. New `reverseRetailerSequence()` -- Decrement or delete from `gamification_retailer_sequences`
+3. New `reverseDailyTracking()` -- Decrement counts in `gamification_daily_tracking`
+4. In `clearLocalCaches()` -- Add `pointsEarned` event dispatch for instant UI refresh of gamification components
+5. In `cancelOrder()` -- Call the two new reversal functions
 
-Change the `CancelOrderDialog` invocation:
-- Pass `orders={ordersTodayList}` instead of single `orderId`
-- Update `onCancelled` callback to:
-  - Remove only cancelled orders from `ordersTodayList`
-  - Recalculate `actualOrderValue`, `creditPendingAmount`, `paidTodayAmount`
-  - Only reset to "planned" if all orders were cancelled
+No database migrations needed -- this is purely a code logic fix.
 
----
-
-### Reversal Completeness Checklist
-
-Each cancelled order already triggers these reversals in `cancelOrder()`:
-1. Order status set to `cancelled` with timestamp, reason, cancelled_by
-2. Invoice status set to `cancelled`
-3. Visit status reverted (now conditional -- only if no remaining orders)
-4. Retailer `pending_amount` reduced by credit amount
-5. Retailer `last_order_date` / `last_order_value` recalculated
-6. Gamification points deleted
-7. Loyalty points deleted
-8. Local caches invalidated + UI events dispatched
-9. DB triggers auto-fire: `update_retailer_analytics` recalculates 3-month metrics, `update_revenue_actual` recalculates KPI targets
-
-No additional reversal logic is needed -- the existing `cancelOrder()` function is comprehensive.
-
-### Cancelled Orders Visibility
-Cancelled orders are already excluded from active queries (most queries filter `status = 'confirmed'`). They remain in the `orders` table with `status = 'cancelled'` and are accessible in admin/history views.
-
----
-
-### Technical Details
-
-**Files to modify:**
-- `src/components/CancelOrderDialog.tsx` -- Multi-select UI with 3-step flow
-- `src/utils/orderCancellation.ts` -- Conditional visit revert
-- `src/components/VisitCard.tsx` -- Pass full order list, partial cancellation state management
-
-**No new files needed.**
-
-**No database changes needed** -- all required columns (`cancelled_at`, `cancellation_reason`, `cancelled_by`, `status`) already exist on the `orders` table.
