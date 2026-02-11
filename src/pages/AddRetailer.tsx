@@ -871,6 +871,10 @@ export const AddRetailer = () => {
       toast({ title: 'Distributor Required', description: 'Please select a distributor for this retailer', variant: 'destructive' });
       return;
     }
+    if (!retailerData.latitude || !retailerData.longitude) {
+      toast({ title: 'Location Required', description: "GPS location is required - please tap 'Get Location' button", variant: 'destructive' });
+      return;
+    }
     await loadExistingBeats();
     setExistingBeat(undefined);
     setNewBeat("");
