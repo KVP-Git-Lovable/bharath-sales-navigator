@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { TeamAttendanceTab } from '@/components/attendance/TeamAttendanceTab';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const Attendance = () => {
   
   // Hierarchical user filter
   const { isManager, subordinateIds } = useSubordinates();
+  const [selectedTopTab, setSelectedTopTab] = useState<'my-attendance' | 'my-team'>('my-attendance');
   const [selectedUserId, setSelectedUserId] = useState<string>('self');
   
   // Calculate effective user ID for data filtering
@@ -897,11 +899,50 @@ const Attendance = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-subtle p-4">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Header Stats */}
+        <div className="max-w-4xl mx-auto space-y-4">
+          {/* Page Title */}
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('attendance.title')}</h1>
+            <p className="text-muted-foreground text-sm">{t('attendance.subtitle')}</p>
+          </div>
+
+          {/* Segmented Control - only show if manager */}
+          {isManager && (
+            <div className="sticky top-0 z-10 bg-gradient-subtle pt-1 pb-2">
+              <div className="flex bg-muted rounded-lg p-1">
+                <button
+                  className={cn(
+                    'flex-1 text-sm font-medium py-2 rounded-md transition-all',
+                    selectedTopTab === 'my-attendance'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => setSelectedTopTab('my-attendance')}
+                >
+                  My Attendance
+                </button>
+                <button
+                  className={cn(
+                    'flex-1 text-sm font-medium py-2 rounded-md transition-all',
+                    selectedTopTab === 'my-team'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => setSelectedTopTab('my-team')}
+                >
+                  My Team
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* My Team Tab Content */}
+          {selectedTopTab === 'my-team' && isManager ? (
+            <TeamAttendanceTab subordinateIds={subordinateIds} />
+          ) : (
+          /* My Attendance Tab Content */
+          <div className="space-y-6">
           <div className="text-center space-y-4">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('attendance.title')}</h1>
-            <p className="text-muted-foreground">{t('attendance.subtitle')}</p>
             
             {/* Main Stats */}
             <div className="flex justify-center items-center gap-8 mb-6">
@@ -1474,8 +1515,11 @@ const Attendance = () => {
               <HolidayList />
             </TabsContent>
           </Tabs>
+          </div>
+          )}
         </div>
       </div>
+
 
       {/* Camera Capture Component */}
       <CameraCapture
