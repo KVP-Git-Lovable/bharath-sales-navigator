@@ -1072,10 +1072,6 @@ const Attendance = () => {
 
             {/* Today's Market Hours Section */}
             <div className="bg-[hsl(210,20%,97%)] rounded-2xl p-4 shadow-sm space-y-3">
-              <div className="flex items-center gap-2 justify-center">
-                <Clock className="h-4 w-4 text-[hsl(210,15%,45%)]" />
-                <h3 className="text-sm font-semibold text-[hsl(210,15%,30%)]">{t('attendance.todaysMarketHours')}</h3>
-              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div
                   className="bg-[hsl(150,35%,93%)] rounded-2xl p-4 text-center cursor-pointer hover:shadow-md transition-shadow"
