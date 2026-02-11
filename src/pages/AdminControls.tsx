@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,12 +8,9 @@ import { Shield, Users, Settings, Package, ArrowLeft, CalendarDays, MapPin, Doll
 import { SearchInput } from '@/components/SearchInput';
 
 const AdminControls = () => {
-  const { userRole, securityProfileName, loading } = useAuth();
+  const { hasAdminAccess, isFullAdmin, permittedAdminPaths, loading } = useAdminAccess();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Check if user has admin access - either through role OR System Administrator profile
-  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
 
   if (loading) {
     return (
@@ -59,7 +56,12 @@ const AdminControls = () => {
     { title: "Pincode Master", description: "Import and manage India PIN code reference data", icon: Map, color: "teal", path: "/admin/pincode-master" },
   ];
 
-  const filteredModules = adminModules.filter(module => 
+  // Filter modules based on permissions - full admins see all, others see only permitted
+  const accessibleModules = isFullAdmin 
+    ? adminModules 
+    : adminModules.filter(module => permittedAdminPaths.has(module.path));
+
+  const filteredModules = accessibleModules.filter(module => 
     module.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     module.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
