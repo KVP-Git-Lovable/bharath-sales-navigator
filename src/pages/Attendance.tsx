@@ -909,7 +909,7 @@ const Attendance = () => {
           {/* Segmented Control - only show if manager */}
           {isManager && (
             <div className="sticky top-0 z-10 bg-gradient-subtle pt-1 pb-2">
-              <div className="flex bg-muted rounded-full p-1">
+              <div className="flex bg-[hsl(210,20%,95%)] rounded-full p-1">
                 <button
                   className={cn(
                     'flex-1 text-sm font-medium py-2.5 rounded-full transition-all',
@@ -925,7 +925,7 @@ const Attendance = () => {
                   className={cn(
                     'flex-1 text-sm font-medium py-2.5 rounded-full transition-all',
                     selectedTopTab === 'my-team'
-                      ? 'bg-green-500 text-white shadow-sm'
+                      ? 'bg-gradient-to-r from-[hsl(160,45%,55%)] to-[hsl(170,50%,50%)] text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => setSelectedTopTab('my-team')}
