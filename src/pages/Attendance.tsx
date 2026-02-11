@@ -586,8 +586,22 @@ const Attendance = () => {
         setAttendanceType(null);
         setIsMarkingAttendance(false);
 
-        // Refresh attendance data using cached hooks
-        await refreshTodayOnly();
+        // Immediately update local state so UI reflects check-in instantly
+        setTodaysAttendance((prev: any) => ({
+          ...prev,
+          user_id: user.id,
+          date: today,
+          check_in_time: timestamp,
+          check_in_location: freshLocation,
+          check_in_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
+          check_in_photo_url: photoPath,
+          status: 'present',
+          face_verification_status: matchStatus,
+          face_match_confidence: confidence
+        }));
+
+        // Refresh attendance data using cached hooks (background sync)
+        refreshTodayOnly();
 
         // Reset processing state
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
@@ -710,8 +724,17 @@ const Attendance = () => {
         setAttendanceType(null);
         setIsMarkingAttendance(false);
 
-        // Refresh attendance data using cached hooks
-        await refreshTodayOnly();
+        // Immediately update local state so UI reflects check-out instantly
+        setTodaysAttendance((prev: any) => ({
+          ...prev,
+          check_out_time: timestamp,
+          check_out_location: freshLocation,
+          check_out_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
+          check_out_photo_url: photoPath,
+        }));
+
+        // Refresh attendance data using cached hooks (background sync)
+        refreshTodayOnly();
 
         // Reset processing state
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
