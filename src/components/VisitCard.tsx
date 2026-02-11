@@ -3654,6 +3654,23 @@ export const VisitCard = ({
             const retailerId = (visit.retailerId || visit.id) as string;
             const today = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
             await visitStatusCache.invalidate(retailerId, userId, today);
+
+            // Dispatch visitStatusChanged so TodaySummary and other listeners update immediately
+            const newStatus = remaining.length === 0 ? 'planned' : 'productive';
+            const newOrderValue = remaining.reduce((s, o) => s + o.total_amount, 0);
+            window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+              detail: {
+                visitId: currentVisitId || visit.id,
+                retailerId,
+                status: newStatus,
+                orderValue: Math.round(newOrderValue),
+              }
+            }));
+
+            // Force all react-query caches to refetch
+            window.dispatchEvent(new CustomEvent('globalDataRefresh', {
+              detail: { source: 'orderCancellation', retailerId }
+            }));
           }}
         />
       </CardContent>

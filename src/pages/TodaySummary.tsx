@@ -246,11 +246,21 @@ export const TodaySummary = () => {
       }
       // For non-order status changes, no refresh needed - UI already reflects local state
     };
+
+    // Listen for globalDataRefresh (e.g. after order cancellation) — do full re-fetch
+    const handleGlobalDataRefresh = () => {
+      console.log('📢 [SUMMARY] globalDataRefresh - full re-fetch');
+      if (filterType === 'today') {
+        fetchTodaysData(true);
+      }
+    };
     
     window.addEventListener('visitStatusChanged', handleVisitStatusChanged as EventListener);
+    window.addEventListener('globalDataRefresh', handleGlobalDataRefresh);
     
     return () => {
       window.removeEventListener('visitStatusChanged', handleVisitStatusChanged as EventListener);
+      window.removeEventListener('globalDataRefresh', handleGlobalDataRefresh);
     };
   }, [filterType]);
 

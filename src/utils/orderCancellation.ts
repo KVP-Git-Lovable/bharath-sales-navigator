@@ -321,7 +321,8 @@ async function clearLocalCaches(
   retailerId: string,
   userId: string,
   orderDate: string,
-  orderId: string
+  orderId: string,
+  visitReverted: boolean
 ): Promise<void> {
   // Invalidate visit status cache
   await visitStatusCache.invalidate(retailerId, userId, orderDate);
@@ -334,13 +335,18 @@ async function clearLocalCaches(
     detail: { retailerId, orderId, orderDate }
   }));
   
-  // Also dispatch visitStatusChanged for visit card updates
+  // Dispatch visitStatusChanged for visit card updates
   window.dispatchEvent(new CustomEvent('visitStatusChanged', {
     detail: { 
       retailerId, 
-      status: 'planned',
+      status: visitReverted ? 'planned' : 'productive',
       orderValue: 0 
     }
+  }));
+
+  // Dispatch a global data refresh event so all tabs/views pick up the latest data
+  window.dispatchEvent(new CustomEvent('globalDataRefresh', {
+    detail: { source: 'orderCancellation', retailerId, orderId, orderDate }
   }));
 }
 
@@ -429,7 +435,8 @@ export async function cancelOrder(
       order.retailer_id,
       order.user_id,
       order.order_date,
-      orderId
+      orderId,
+      result.reversedData.visitReverted
     );
 
     result.success = true;
