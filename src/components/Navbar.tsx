@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useMemo, useCallback, memo, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Button } from "@/components/ui/button";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
@@ -53,9 +54,7 @@ import {
 // Memoized Navbar component for better performance
 export const Navbar = memo(() => {
   const { signOut, userProfile, userRole, securityProfileName } = useAuth();
-  
-  // Check if user has admin access - either through role OR System Administrator profile
-  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
+  const { hasAdminAccess } = useAdminAccess();
   const navigate = useNavigate();
   const location = useLocation();
   const connectivityStatus = useConnectivity();
