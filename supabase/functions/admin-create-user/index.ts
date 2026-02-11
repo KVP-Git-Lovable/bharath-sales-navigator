@@ -146,10 +146,25 @@ serve(async (req) => {
     if (hint_question?.trim()) userMetadata.hint_question = hint_question.trim();
     if (hint_answer?.trim()) userMetadata.hint_answer = hint_answer.trim();
 
-    // Check if user already exists
+    // Check if username already exists in profiles
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    // Check if user already exists by email
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
     
+    // If username exists for a DIFFERENT user, reject
+    if (existingProfile && (!existingUser || existingProfile.id !== existingUser.id)) {
+      return new Response(
+        JSON.stringify({ error: 'Username already taken', details: `The username "${username}" is already in use by another user.` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     let authUserId: string;
     
     if (existingUser) {
