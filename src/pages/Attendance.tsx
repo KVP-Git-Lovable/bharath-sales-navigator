@@ -945,12 +945,12 @@ const Attendance = () => {
 
             {/* Monthly Summary Cards */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[hsl(155,30%,95%)] rounded-2xl p-5 text-center border border-[hsl(155,25%,85%)]">
-                <div className="text-3xl font-bold text-[hsl(153,43%,33%)]">{stats.attendance}%</div>
+              <div className="bg-card rounded-2xl p-5 text-center shadow-sm">
+                <div className="text-3xl font-bold text-foreground">{stats.attendance}%</div>
                 <div className="text-xs font-medium text-muted-foreground mt-1">{t('attendance.thisMonth')}</div>
               </div>
-              <div className="bg-[hsl(210,15%,96%)] rounded-2xl p-5 text-center border border-[hsl(210,10%,88%)]">
-                <div className="text-3xl font-bold text-[hsl(220,30%,30%)]">{stats.presentDays}/{stats.totalDays}</div>
+              <div className="bg-card rounded-2xl p-5 text-center shadow-sm">
+                <div className="text-3xl font-bold text-foreground">{stats.presentDays}/{stats.totalDays}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-1">{t('attendance.presentDays')}</div>
               </div>
             </div>
@@ -961,13 +961,13 @@ const Attendance = () => {
                 onClick={() => !todaysAttendance?.check_in_time && markAttendance('check-in')}
                 disabled={isMarkingAttendance || !!todaysAttendance?.check_in_time}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all',
+                  'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all border',
                   todaysAttendance?.check_in_time
-                    ? 'bg-white text-[hsl(153,43%,38%)] border-2 border-[hsl(153,35%,75%)] cursor-default'
-                    : 'bg-white text-[hsl(153,43%,38%)] border-2 border-[hsl(153,35%,75%)] hover:bg-[hsl(155,30%,97%)]'
+                    ? 'bg-card text-muted-foreground border-border cursor-default'
+                    : 'bg-card text-foreground border-border hover:bg-accent'
                 )}
               >
-                <CheckCircle className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4 text-[hsl(150,50%,45%)]" />
                 {todaysAttendance?.check_in_time ? t('attendance.dayStarted') : isMarkingAttendance ? t('attendance.startingDay') : t('attendance.startMyDay')}
               </button>
 
@@ -977,8 +977,8 @@ const Attendance = () => {
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-sm font-semibold transition-all',
                   !todaysAttendance?.check_in_time || todaysAttendance?.check_out_time
-                    ? 'bg-[hsl(15,50%,93%)] text-[hsl(15,30%,55%)] cursor-default opacity-60'
-                    : 'bg-[hsl(15,60%,91%)] text-[hsl(15,50%,35%)] hover:bg-[hsl(15,60%,87%)]'
+                    ? 'bg-destructive/10 text-destructive/50 cursor-default opacity-60'
+                    : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                 )}
               >
                 <Clock className="h-4 w-4" />
@@ -1030,13 +1030,12 @@ const Attendance = () => {
             {/* GPS Info Text */}
             {todaysAttendance && !todaysAttendance.check_out_time ? (
               <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground">
-                <Navigation2 className={cn("h-3.5 w-3.5", isTracking && "animate-pulse text-[hsl(160,45%,45%)]")} />
-                <span>{isTracking ? `🟢 ${t('attendance.gpsTrackingActive')}` : t('attendance.gpsTrackingWillStart')}</span>
+                <Navigation2 className={cn("h-3.5 w-3.5", isTracking && "animate-pulse text-[hsl(150,50%,45%)]")} />
+                <span>{isTracking ? `🟢 ${t('attendance.gpsTrackingActive')}` : `⚠ ${t('attendance.gpsTrackingWillStart')}`}</span>
               </div>
             ) : (
               <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5" />
-                <span>{t('attendance.gpsTrackingWillStart')}</span>
+                <span>⚠ {t('attendance.gpsTrackingWillStart')}</span>
               </div>
             )}
 
