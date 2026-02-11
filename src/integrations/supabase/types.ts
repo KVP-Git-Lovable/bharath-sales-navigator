@@ -10822,6 +10822,145 @@ export type Database = {
           },
         ]
       }
+      tax_components: {
+        Row: {
+          component_type: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          percentage: number
+          tax_master_id: string
+          updated_at: string
+        }
+        Insert: {
+          component_type: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          percentage?: number
+          tax_master_id: string
+          updated_at?: string
+        }
+        Update: {
+          component_type?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          percentage?: number
+          tax_master_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_components_tax_master_id_fkey"
+            columns: ["tax_master_id"]
+            isOneToOne: false
+            referencedRelation: "tax_masters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_masters: {
+        Row: {
+          apply_to_primary_orders: boolean
+          apply_to_secondary_orders: boolean
+          cloned_from_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          is_active: boolean
+          name: string
+          tax_type: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          apply_to_primary_orders?: boolean
+          apply_to_secondary_orders?: boolean
+          cloned_from_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          tax_type?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          apply_to_primary_orders?: boolean
+          apply_to_secondary_orders?: boolean
+          cloned_from_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          tax_type?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_masters_cloned_from_id_fkey"
+            columns: ["cloned_from_id"]
+            isOneToOne: false
+            referencedRelation: "tax_masters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_product_map: {
+        Row: {
+          created_at: string
+          id: string
+          is_applicable: boolean
+          product_variant_id: string
+          tax_master_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_applicable?: boolean
+          product_variant_id: string
+          tax_master_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_applicable?: boolean
+          product_variant_id?: string
+          tax_master_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_product_map_product_variant_id_fkey"
+            columns: ["product_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_product_map_tax_master_id_fkey"
+            columns: ["tax_master_id"]
+            isOneToOne: false
+            referencedRelation: "tax_masters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       territories: {
         Row: {
           assigned_distributor_ids: Json | null
