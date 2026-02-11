@@ -65,18 +65,19 @@ export default function DistributorCompanyProfile({ distributorId, readOnly = fa
       if (error) throw error;
 
       if (data) {
-        setDistributorName(data.name || "");
-        setGstNumber(data.gst_number || "");
-        setLogoUrl(data.logo_url || "");
-        setQrCodeUrl(data.qr_code_url || "");
+        const d = data as any;
+        setDistributorName(d.name || "");
+        setGstNumber(d.gst_number || "");
+        setLogoUrl(d.logo_url || "");
+        setQrCodeUrl(d.qr_code_url || "");
         form.reset({
-          state: data.state || "",
-          bank_name: data.bank_name || "",
-          bank_account: data.bank_account || "",
-          ifsc: data.ifsc || "",
-          account_holder_name: data.account_holder_name || "",
-          qr_upi: data.qr_upi || "",
-          terms_conditions: data.terms_conditions || "Thanks for doing business with us!",
+          state: d.state || "",
+          bank_name: d.bank_name || "",
+          bank_account: d.bank_account || "",
+          ifsc: d.ifsc || "",
+          account_holder_name: d.account_holder_name || "",
+          qr_upi: d.qr_upi || "",
+          terms_conditions: d.terms_conditions || "Thanks for doing business with us!",
         });
       }
     } catch (error: any) {

@@ -500,7 +500,7 @@ const TerritoryDetailsModal: React.FC<TerritoryDetailsModalProps> = ({ open, onO
       const retailerSalesMap = new Map();
       ordersData?.forEach(order => {
         const retailerId = order.retailer_id;
-        const retailerName = order.retailers?.name || 'Unknown';
+        const retailerName = (order.retailers as any)?.name || 'Unknown';
         const existing = retailerSalesMap.get(retailerId) || { name: retailerName, sales: 0 };
         retailerSalesMap.set(retailerId, { name: retailerName, sales: existing.sales + Number(order.total_amount || 0) });
       });
@@ -516,7 +516,7 @@ const TerritoryDetailsModal: React.FC<TerritoryDetailsModalProps> = ({ open, onO
       
       const competitionMap = new Map();
       competitionEntries?.forEach(entry => {
-        const name = entry.competition_master?.competitor_name || 'Unknown';
+        const name = (entry.competition_master as any)?.competitor_name || 'Unknown';
         const existing = competitionMap.get(name) || { count: 0, avgPrice: 0, totalStock: 0 };
         competitionMap.set(name, {
           count: existing.count + 1,
@@ -535,7 +535,7 @@ const TerritoryDetailsModal: React.FC<TerritoryDetailsModalProps> = ({ open, onO
 
       const pincodeMap = new Map();
       territory.pincode_ranges?.forEach(pincode => {
-        const pincodeOrders = ordersData?.filter(o => o.retailers?.address?.includes(pincode)) || [];
+        const pincodeOrders = ordersData?.filter(o => (o.retailers as any)?.address?.includes(pincode)) || [];
         const pincodeRetailers = matchingRetailers.filter(r => r.address?.includes(pincode));
         
         // Extract location name (text before the pincode)

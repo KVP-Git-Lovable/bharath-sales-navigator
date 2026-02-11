@@ -54,7 +54,7 @@ export function PerformanceDashboard({ userId }: { userId: string }) {
 
     try {
       // Fetch orders
-      // @ts-expect-error - Supabase type inference too complex
+      
       const ordersQuery = supabase
         .from("orders")
         .select("id, total_amount, created_at")
@@ -99,7 +99,7 @@ export function PerformanceDashboard({ userId }: { userId: string }) {
       }
 
       // Fetch visits
-      // @ts-expect-error - Supabase type inference too complex
+      
       const visitsQuery = supabase
         .from("visits")
         .select("id, created_at")
@@ -123,7 +123,7 @@ export function PerformanceDashboard({ userId }: { userId: string }) {
       }
 
       // Fetch retailers
-      // @ts-expect-error - Supabase type inference too complex
+      
       const retailersQuery = supabase
         .from("retailers")
         .select("created_at")

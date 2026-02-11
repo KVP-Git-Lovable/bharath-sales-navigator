@@ -137,7 +137,7 @@ export function UserRetailerTargets({
       retailerId: r.id,
         retailerName: r.name,
         category: r.category || 'Uncategorized',
-        quantityTarget: existing?.quantity_target ?? (equalDivide ? equalQty : 0),
+        quantityTarget: (existing as any)?.quantity_target ?? (equalDivide ? equalQty : 0),
         revenueTarget: existing?.target_revenue ?? (equalDivide ? equalRev : 0),
       };
     });

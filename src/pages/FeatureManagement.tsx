@@ -77,7 +77,7 @@ const FeatureManagement = () => {
 
   // Filter features based on search
   const filteredGroupedFeatures = Object.entries(groupedFeatures || {}).reduce((acc, [category, categoryFeatures]) => {
-    const filtered = categoryFeatures?.filter(feature => 
+    const filtered = (categoryFeatures as any[])?.filter((feature: any) => 
       feature.feature_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       feature.description?.toLowerCase().includes(searchQuery.toLowerCase())
     );

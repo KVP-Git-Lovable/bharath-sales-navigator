@@ -328,7 +328,7 @@ export function DistributorFYPlan({ distributorId }: Props) {
         setPlanForm(prev => ({
           ...prev,
           quantity_target: fyAllocation.quantity_target?.toString() || prev.quantity_target,
-          quantity_unit: fyAllocation.business_plan.quantity_unit || prev.quantity_unit,
+          quantity_unit: (fyAllocation.business_plan as any)?.quantity_unit || prev.quantity_unit,
           revenue_target: fyAllocation.revenue_target?.toString() || prev.revenue_target,
         }));
       }

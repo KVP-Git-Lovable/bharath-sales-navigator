@@ -135,10 +135,10 @@
        setStatusMessage('Clearing data...');
        setIsImporting(true);
  
-       const { error } = await supabase
-         .from('pincode_master')
-         .delete()
-         .neq('id', '00000000-0000-0000-0000-000000000000');
+      const { error } = await (supabase as any)
+        .from('pincode_master')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
  
        if (error) throw error;
  

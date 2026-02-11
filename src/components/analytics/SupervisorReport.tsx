@@ -326,7 +326,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         const fromDate = format(dateRange.from, 'yyyy-MM-dd');
         const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-        const { data, error } = await supabase.rpc('get_productivity_summary', {
+        const { data, error } = await (supabase as any).rpc('get_productivity_summary', {
           user_full_name: productivityDrilldownUser,
           start_date: fromDate,
           end_date: toDate
@@ -336,7 +336,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           console.error('Error fetching productivity drilldown:', error);
           setProductivityDrilldownData([]);
         } else {
-          setProductivityDrilldownData(data || []);
+          setProductivityDrilldownData(data || [] as any);
         }
       } catch (err) {
         console.error('Error in productivity drilldown:', err);
@@ -396,11 +396,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       let profilesData: { id: string; full_name: string | null }[] = [];
       
       // Use the selector RPC (works for all authenticated users)
-      const { data: selectorProfiles, error: selectorError } = await supabase.rpc('get_profiles_for_selector');
+      const { data: selectorProfiles, error: selectorError } = await (supabase as any).rpc('get_profiles_for_selector');
       
       if (!selectorError && selectorProfiles) {
         // Filter to only the user IDs we need
-        profilesData = selectorProfiles.filter((p: any) => userIds.includes(p.id));
+        profilesData = (selectorProfiles as any[]).filter((p: any) => userIds.includes(p.id));
       } else {
         // Fallback to admin function if selector fails
         const { data: adminProfiles, error: adminError } = await supabase.rpc('get_basic_profiles_for_admin');
@@ -538,14 +538,14 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           .order('order_date', { ascending: true }),
         
         // Use the same RPC as Product and Revenue Performance report
-        supabase.rpc('get_product_revenue_performance', {
+        (supabase as any).rpc('get_product_revenue_performance', {
           user_full_name: userName,
           start_date: fromDate,
           end_date: toDate
         }),
         
         // Get productivity summary using the RPC
-        supabase.rpc('get_productivity_summary', {
+        (supabase as any).rpc('get_productivity_summary', {
           user_full_name: userName,
           start_date: fromDate,
           end_date: toDate

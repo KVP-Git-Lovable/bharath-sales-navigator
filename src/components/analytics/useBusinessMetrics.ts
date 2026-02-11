@@ -187,7 +187,7 @@ export const useBusinessMetrics = () => {
       if (userNames && userNames.length > 0) {
         useRpcRevenue = true;
         for (const userName of userNames) {
-          const { data: productData } = await supabase.rpc('get_product_revenue_performance', {
+          const { data: productData } = await (supabase as any).rpc('get_product_revenue_performance', {
             user_full_name: userName,
             start_date: fromDate,
             end_date: toDate

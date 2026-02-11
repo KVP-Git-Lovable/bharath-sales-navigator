@@ -81,7 +81,7 @@ const TeamLeaveCalendar = () => {
 
       const [profilesRes, leaveTypesRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name').in('id', userIds),
-        supabase.from('leave_types').select('id, name, code, color').in('id', leaveTypeIds),
+        (supabase as any).from('leave_types').select('id, name, code, color').in('id', leaveTypeIds),
       ]);
 
       const enrichedLeaves = (leavesRes.data || []).map(leave => ({
@@ -90,7 +90,7 @@ const TeamLeaveCalendar = () => {
         leave_types: leaveTypesRes.data?.find(lt => lt.id === leave.leave_type_id),
       }));
 
-      setLeaves(enrichedLeaves);
+      setLeaves(enrichedLeaves as any);
       setHolidays(holidaysRes.data || []);
       setUsers(usersRes.data || []);
     } catch (error) {

@@ -533,6 +533,9 @@ export function AllocationTable({
           id: alloc.existingPlanId || undefined,
           user_id: alloc.userId,
           year: fyYear,
+          fiscal_year: `${fyYear}-${fyYear + 1}`,
+          year_start: fyYear,
+          year_end: fyYear + 1,
           quantity_target: isRollUpManager ? (effective?.quantity || 0) : alloc.quantityTarget,
           revenue_target: isRollUpManager ? (effective?.revenue || 0) : alloc.revenueTarget,
           quantity_unit: quantityUnit,
@@ -542,7 +545,7 @@ export function AllocationTable({
 
       const { error } = await supabase
         .from('user_business_plans')
-        .upsert(upserts, { onConflict: 'user_id,year' });
+        .upsert(upserts as any, { onConflict: 'user_id,year' });
       if (error) throw error;
 
       // Save parent manager's plan

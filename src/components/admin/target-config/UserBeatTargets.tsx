@@ -51,7 +51,7 @@ export function UserBeatTargets({
   const { data: beats, isLoading: beatsLoading } = useQuery({
     queryKey: ['user-beats-for-targets', userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('beats')
         .select('id, beat_id, beat_name')
         .eq('owner_id', userId)
