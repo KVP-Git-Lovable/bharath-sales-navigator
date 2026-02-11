@@ -124,9 +124,34 @@ async function updateInvoiceStatus(orderId: string): Promise<boolean> {
 }
 
 /**
- * Revert visit status from productive to planned
+ * Check if a visit has remaining confirmed orders (excluding the one being cancelled)
  */
-async function revertVisitStatus(visitId: string): Promise<boolean> {
+async function hasRemainingConfirmedOrders(visitId: string, excludeOrderId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('visit_id', visitId)
+    .neq('id', excludeOrderId)
+    .eq('status', 'confirmed');
+
+  if (error) {
+    console.error('[CancelOrder] Failed to check remaining orders:', error);
+    return true; // err on the side of caution — don't revert
+  }
+
+  return (count || 0) > 0;
+}
+
+/**
+ * Revert visit status from productive to planned (only if no remaining confirmed orders)
+ */
+async function revertVisitStatus(visitId: string, excludeOrderId: string): Promise<boolean> {
+  const hasRemaining = await hasRemainingConfirmedOrders(visitId, excludeOrderId);
+  if (hasRemaining) {
+    console.log('[CancelOrder] Visit still has confirmed orders, keeping productive');
+    return false;
+  }
+
   const { error } = await supabase
     .from('visits')
     .update({
@@ -135,7 +160,7 @@ async function revertVisitStatus(visitId: string): Promise<boolean> {
       updated_at: new Date().toISOString()
     })
     .eq('id', visitId)
-    .eq('status', 'productive'); // Only revert if currently productive
+    .eq('status', 'productive');
 
   if (error) {
     console.error('[CancelOrder] Failed to revert visit status:', error);
@@ -369,7 +394,7 @@ export async function cancelOrder(
 
     // 5. Revert visit status if visit exists
     if (order.visit_id) {
-      const visitReverted = await revertVisitStatus(order.visit_id);
+      const visitReverted = await revertVisitStatus(order.visit_id, orderId);
       result.reversedData.visitReverted = visitReverted;
     }
 
