@@ -264,34 +264,44 @@ serve(async (req) => {
         );
       }
     } else {
-      // Create new auth user
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        user_metadata: userMetadata,
-        email_confirm: true
+      // Create new auth user using raw REST API to avoid the broken listUsers/createUser internal check
+      const createResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'apikey': supabaseServiceKey,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          user_metadata: userMetadata,
+          email_confirm: true,
+        }),
       });
 
-      if (authError) {
-        console.error('Auth creation error:', authError);
+      const createResult = await createResponse.json();
+
+      if (!createResponse.ok) {
+        console.error('Auth creation error:', createResult);
         return new Response(
           JSON.stringify({ 
             error: 'Failed to create user account', 
-            details: authError.message 
+            details: createResult.msg || createResult.message || JSON.stringify(createResult)
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      if (!authUser.user) {
-        console.error('User creation returned no user object');
+      if (!createResult.id) {
+        console.error('User creation returned no user id');
         return new Response(
           JSON.stringify({ error: 'User creation failed - no user returned' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      authUserId = authUser.user.id;
+      authUserId = createResult.id;
     }
 
     console.log('Auth user created/updated:', authUserId);
