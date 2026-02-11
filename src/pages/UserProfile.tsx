@@ -33,7 +33,7 @@ interface Manager {
 }
 
 const UserProfile = () => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -187,6 +187,7 @@ const UserProfile = () => {
       });
       
       setIsEditMode(false);
+      await refreshProfile();
     } catch (error: any) {
       toast({
         title: "Error",
