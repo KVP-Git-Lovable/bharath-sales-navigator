@@ -354,6 +354,11 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                   hasNoData ? 'Loading users...' : effectiveUserDisplay
                 } • {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
               </p>
+              {!isSingleUserMode && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  PTV indicates Planned to Visit productivity and VTO indicates Visit to Order productivity
+                </p>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -383,8 +388,8 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Pending</TableHead>
-                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "Overall %" : "Overall Productivity %"}</TableHead>
-                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "Actual %" : "Actual Productivity %"}</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "PTV %" : "PTV %"}</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "VTO %" : "VTO %"}</TableHead>
                       </TableRow>
                     </thead>
                     <TableBody>
@@ -426,8 +431,8 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                     <thead className="sticky top-0 bg-muted z-20">
                       <TableRow className="border-b">
                         <TableHead className={cn("whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>User</TableHead>
-                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "Overall %" : "Overall Productivity %"}</TableHead>
-                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "Actual %" : "Actual Productivity %"}</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "PTV %" : "PTV %"}</TableHead>
+                        <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>{isMobile ? "VTO %" : "VTO %"}</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Planned</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Productive</TableHead>
                         <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Unproductive</TableHead>
@@ -505,8 +510,8 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                     <TableHead className="text-right">Productive</TableHead>
                     <TableHead className="text-right">Unproductive</TableHead>
                     <TableHead className="text-right">Pending</TableHead>
-                    <TableHead className="text-right">Overall Productivity %</TableHead>
-                    <TableHead className="text-right">Actual Productivity %</TableHead>
+                    <TableHead className="text-right">PTV %</TableHead>
+                    <TableHead className="text-right">VTO %</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
