@@ -155,6 +155,8 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
   const [optimizedRetailers, setOptimizedRetailers] = useState<EnhancedRetailerLocation[]>([]);
   const [totalRouteDistance, setTotalRouteDistance] = useState<number>(0);
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
+  // Cache layer groups per day to avoid redrawing on toggle
+  const dayLayerGroupsRef = useRef<Map<string, L.LayerGroup>>(new Map());
 
   const isMultiDay = dayGroups && dayGroups.length > 0;
 
@@ -164,6 +166,22 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
       setVisibleDays(new Set(dayGroups.map(dg => dg.date)));
     }
   }, [dayGroups]);
+
+  // Toggle day layer visibility without redrawing
+  useEffect(() => {
+    if (!mapRef.current || !isMultiDay) return;
+    dayLayerGroupsRef.current.forEach((layerGroup, dateStr) => {
+      if (visibleDays.has(dateStr)) {
+        if (!mapRef.current!.hasLayer(layerGroup)) {
+          layerGroup.addTo(mapRef.current!);
+        }
+      } else {
+        if (mapRef.current!.hasLayer(layerGroup)) {
+          mapRef.current!.removeLayer(layerGroup);
+        }
+      }
+    });
+  }, [visibleDays, isMultiDay]);
 
   // Optimize route for single-day mode
   useEffect(() => {
@@ -267,14 +285,17 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
         mapRef.current?.removeLayer(layer);
       }
     });
+    // Clear cached layer groups
+    dayLayerGroupsRef.current.clear();
 
     const allCoordinates: L.LatLngExpression[] = [];
 
     if (isMultiDay) {
       // ===== MULTI-DAY MODE =====
-      const filteredGroups = dayGroups.filter(dg => visibleDays.has(dg.date));
-      for (const dayGroup of filteredGroups) {
+      // Build layer groups for ALL days (not just visible), cache them
+      for (const dayGroup of dayGroups) {
         if (cancelled || !mapRef.current) return;
+        const layerGroup = L.layerGroup();
         const route = buildDayRoute(
           dayGroup.retailers,
           dayGroup.startLocation?.latitude,
@@ -298,7 +319,7 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
               iconSize: [60, 24],
               iconAnchor: [30, 12],
             })
-          }).addTo(mapRef.current!);
+          }).addTo(layerGroup);
         }
 
         route.forEach((retailer) => {
@@ -310,7 +331,7 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
           const statusInfo = statusLabels[retailer.status];
 
           L.marker([retailer.latitude, retailer.longitude], { icon })
-            .addTo(mapRef.current!)
+            .addTo(layerGroup)
             .bindPopup(`
               <div style="min-width: 200px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -338,7 +359,14 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
             color: dayGroup.color,
             weight: 4,
             opacity: 0.85,
-          }).addTo(mapRef.current!);
+          }).addTo(layerGroup);
+        }
+
+        // Cache the layer group
+        dayLayerGroupsRef.current.set(dayGroup.date, layerGroup);
+        // Only add to map if currently visible
+        if (visibleDays.has(dayGroup.date)) {
+          layerGroup.addTo(mapRef.current!);
         }
       }
     } else {
@@ -451,7 +479,7 @@ export const JourneyMap: React.FC<JourneyMapProps> = ({
     updateMap();
 
     return () => { cancelled = true; };
-  }, [positions, optimizedRetailers, totalRouteDistance, dayGroups, isMultiDay, visibleDays]);
+  }, [positions, optimizedRetailers, totalRouteDistance, dayGroups, isMultiDay]);
 
   if (positions.length === 0 && retailers.length === 0 && (!dayGroups || dayGroups.length === 0)) {
     return (
