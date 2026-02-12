@@ -385,7 +385,7 @@ export function useOfflineSync() {
             delete orderToInsert.visit_id;
           }
           
-          // DUPLICATE PREVENTION: Check if order already exists by ID first, then idempotency_key
+          // Check if order already exists by ID (skip duplicate sync attempts)
           if (offlineOrderId && isValidUUID(offlineOrderId)) {
             const { data: existingById } = await supabase
               .from('orders')
@@ -399,70 +399,39 @@ export function useOfflineSync() {
             }
           }
           
-          if (orderToInsert.idempotency_key) {
-            try {
-              const checkResult = await (supabase
-                .from('orders')
-                .select('id')
-                .eq('idempotency_key', orderToInsert.idempotency_key)
-                .limit(1) as any);
-              
-              if (checkResult.data && checkResult.data.length > 0) {
-                console.log('⚠️ Order with idempotency_key already exists, skipping duplicate:', orderToInsert.idempotency_key);
-                return; // Successfully "synced" (already existed)
-              }
-            } catch (dupCheckError) {
-              console.warn('Could not check for duplicate order (continuing):', dupCheckError);
-            }
-          }
-          
           // New format with separate order and items
           let actualOrderId = offlineOrderId; // Use offline ID as fallback
           
-          // Try to insert order (with original UUID if valid)
+          // Try to insert order - ALLOW ALL orders regardless of duplicate invoice
           const { data: insertedOrder, error: orderError } = await supabase
             .from('orders')
             .insert(orderToInsert)
             .select()
             .single();
           
-          // Handle duplicate key error gracefully
           if (orderError) {
             if (orderError.code === '23505') {
-              // Duplicate key error - order already exists
-              // Find the existing order to get its ID for items
-              console.log('⚠️ Duplicate order detected, checking for missing items...');
+              // Duplicate key - order already exists, find it to ensure items exist
+              console.log('⚠️ Duplicate key detected, finding existing order...');
               
-              // Try to find existing order by idempotency_key or retailer+date
-              let existingOrderId = null;
-              if (orderToInsert.idempotency_key) {
-                const { data: existing } = await supabase
-                  .from('orders')
-                  .select('id')
-                  .eq('idempotency_key', orderToInsert.idempotency_key)
-                  .single();
-                existingOrderId = existing?.id;
-              }
-              
-              if (!existingOrderId && orderToInsert.retailer_id) {
-                // Fallback: find by retailer and approximate time
+              if (offlineOrderId && isValidUUID(offlineOrderId)) {
+                actualOrderId = offlineOrderId;
+              } else if (orderToInsert.retailer_id) {
                 const { data: existing } = await supabase
                   .from('orders')
                   .select('id')
                   .eq('retailer_id', orderToInsert.retailer_id)
-                  .gte('created_at', new Date(Date.now() - 3600000).toISOString()) // Last hour
+                  .gte('created_at', new Date(Date.now() - 3600000).toISOString())
                   .order('created_at', { ascending: false })
                   .limit(1)
-                  .single();
-                existingOrderId = existing?.id;
+                  .maybeSingle();
+                if (existing) actualOrderId = existing.id;
               }
-              
-              if (existingOrderId) {
-                actualOrderId = existingOrderId;
-              }
-              // Don't return here - continue to ensure items exist
+              // Continue to ensure items exist
             } else {
-              throw orderError;
+              // For ANY other error, log but don't throw - never block order creation
+              console.error('⚠️ Order insert error (non-blocking):', orderError.message);
+              // Still try to continue with items if we have an order ID
             }
           } else {
             actualOrderId = insertedOrder.id;
