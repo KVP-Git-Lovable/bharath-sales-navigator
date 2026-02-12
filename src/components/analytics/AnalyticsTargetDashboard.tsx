@@ -222,10 +222,10 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
           <span className="font-medium">{member.fullName}</span>
         </div>
       </TableCell>
-      <TableCell className="text-right font-medium">
+      <TableCell className="text-right font-medium hidden sm:table-cell">
         {formatValue(member.target)}
       </TableCell>
-      <TableCell className="text-right font-medium">
+      <TableCell className="text-right font-medium hidden sm:table-cell">
         {formatValue(member.actual)}
       </TableCell>
       <TableCell>
@@ -240,7 +240,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
         </div>
       </TableCell>
       <TableCell className={cn(
-        "text-right font-medium",
+        "text-right font-medium hidden sm:table-cell",
         member.gap >= 0 ? "text-green-600" : "text-red-600"
       )}>
         {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
@@ -431,7 +431,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                           <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
                           <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
                         </div>
-                        {getStatusBadge(teamStatus)}
+                        <span className="hidden sm:inline-flex">{getStatusBadge(teamStatus)}</span>
                       </div>
                     </div>
 
@@ -442,10 +442,10 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                           <TableHeader>
                             <TableRow>
                               <TableHead>Team Member</TableHead>
-                              <TableHead className="text-right">Target</TableHead>
-                              <TableHead className="text-right">Actual</TableHead>
+                              <TableHead className="text-right hidden sm:table-cell">Target</TableHead>
+                              <TableHead className="text-right hidden sm:table-cell">Actual</TableHead>
                               <TableHead className="text-center">Progress</TableHead>
-                              <TableHead className="text-right">Gap</TableHead>
+                              <TableHead className="text-right hidden sm:table-cell">Gap</TableHead>
                               <TableHead className="text-center">Status</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -466,10 +466,10 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                 <TableHeader>
                   <TableRow>
                     <TableHead>Team Member</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
-                    <TableHead className="text-right">Actual</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Target</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Actual</TableHead>
                     <TableHead className="text-center">Progress</TableHead>
-                    <TableHead className="text-right">Gap</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Gap</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
