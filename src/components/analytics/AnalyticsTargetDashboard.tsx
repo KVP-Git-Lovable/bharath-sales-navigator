@@ -6,9 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Users, Trophy, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, Trophy, TrendingUp, TrendingDown, ChevronDown, ChevronRight, Network } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTeamTargetProgress, PeriodType, TargetBasis } from '@/hooks/useTeamTargetProgress';
+import { useTeamTargetProgress, PeriodType, TargetBasis, TeamMemberProgress } from '@/hooks/useTeamTargetProgress';
+import { useHierarchyTeamStructure } from '@/hooks/useHierarchyTeamProgress';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,6 +23,7 @@ interface AnalyticsTargetDashboardProps {
 export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFilter, isScopeReady = true }: AnalyticsTargetDashboardProps) {
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved'>('all');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Fetch all user IDs when no specific users are selected
   const { data: allUserIds = [] } = useQuery({
@@ -37,12 +39,9 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
     staleTime: 5 * 60 * 1000,
   });
 
-  // Use selected users if provided, otherwise use all users
   const effectiveUserIds = selectedUserIds.length > 0 ? selectedUserIds : allUserIds;
 
-  // Determine period type based on periodFilter or date range
   const periodType = useMemo((): PeriodType => {
-    // Use explicit period mapping if periodFilter is provided
     if (periodFilter) {
       switch (periodFilter) {
         case 'today':
@@ -62,7 +61,6 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
           return 'year';
       }
     }
-    // Fallback to date range calculation
     const diffDays = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays <= 1) return 'day';
     if (diffDays <= 7) return 'week';
@@ -78,12 +76,13 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
     basis,
   });
 
-  // Calculate summary stats
+  // Fetch hierarchy structure for grouping
+  const { data: hierarchyGroups } = useHierarchyTeamStructure(effectiveUserIds);
+
   const stats = useMemo(() => {
     if (!teamProgress?.length) {
       return { total: 0, achieved: 0, goodToGo: 0, almostThere: 0, inProgress: 0, notStarted: 0 };
     }
-
     return {
       total: teamProgress.length,
       achieved: teamProgress.filter(m => m.status === 'achieved').length,
@@ -94,17 +93,59 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
     };
   }, [teamProgress]);
 
-  // Filter team progress based on selected status
   const filteredTeamProgress = useMemo(() => {
     if (!teamProgress?.length || statusFilter === 'all') return teamProgress;
     return teamProgress.filter(m => m.status === statusFilter);
   }, [teamProgress, statusFilter]);
 
+  // Build progress lookup map
+  const progressMap = useMemo(() => {
+    const map = new Map<string, TeamMemberProgress>();
+    filteredTeamProgress?.forEach(m => map.set(m.userId, m));
+    return map;
+  }, [filteredTeamProgress]);
+
+  // Build hierarchy groups with aggregated data
+  const groupedData = useMemo(() => {
+    if (!hierarchyGroups?.length || !filteredTeamProgress?.length) {
+      return null;
+    }
+
+    return hierarchyGroups.map(group => {
+      const members = group.memberIds
+        .map(id => progressMap.get(id))
+        .filter(Boolean) as TeamMemberProgress[];
+
+      const managerProgress = group.managerId ? progressMap.get(group.managerId) : null;
+
+      const teamTarget = members.reduce((sum, m) => sum + m.target, 0);
+      const teamActual = members.reduce((sum, m) => sum + m.actual, 0);
+      const teamAchievement = teamTarget > 0 ? (teamActual / teamTarget) * 100 : 0;
+
+      return {
+        ...group,
+        members,
+        managerProgress,
+        teamTarget,
+        teamActual,
+        teamAchievement,
+      };
+    }).filter(g => g.members.length > 0 || g.managerProgress);
+  }, [hierarchyGroups, filteredTeamProgress, progressMap]);
+
   const handleStatusFilterClick = (filter: 'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved') => {
     setStatusFilter(prev => prev === filter ? 'all' : filter);
   };
 
-  // Show loading while scope is being determined
+  const toggleGroupCollapsed = (managerId: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(managerId)) next.delete(managerId);
+      else next.add(managerId);
+      return next;
+    });
+  };
+
   if (!isScopeReady) {
     return (
       <Card>
@@ -156,7 +197,6 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
       .slice(0, 2);
   };
 
-  // Show loading while fetching all user IDs
   if (effectiveUserIds.length === 0 && selectedUserIds.length === 0) {
     return (
       <Card>
@@ -168,6 +208,48 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
       </Card>
     );
   }
+
+  const renderMemberRow = (member: TeamMemberProgress) => (
+    <TableRow key={member.userId}>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={member.avatarUrl || undefined} />
+            <AvatarFallback className="text-xs">
+              {getInitials(member.fullName)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-medium">{member.fullName}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-right font-medium">
+        {formatValue(member.target)}
+      </TableCell>
+      <TableCell className="text-right font-medium">
+        {formatValue(member.actual)}
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Progress 
+            value={Math.min(member.achievementPercentage, 100)} 
+            className="h-2 w-20"
+          />
+          <span className="text-sm font-medium w-12 text-right">
+            {member.achievementPercentage.toFixed(0)}%
+          </span>
+        </div>
+      </TableCell>
+      <TableCell className={cn(
+        "text-right font-medium",
+        member.gap >= 0 ? "text-green-600" : "text-red-600"
+      )}>
+        {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
+      </TableCell>
+      <TableCell className="text-center">
+        {getStatusBadge(member.status)}
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-4">
@@ -284,10 +366,13 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
         </Card>
       </div>
 
-      {/* Team Progress Table */}
+      {/* Team Performance - Hierarchy View */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Team Performance</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Network className="h-5 w-5" />
+            Team Performance (Hierarchy View)
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -303,7 +388,79 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                 </Button>
               )}
             </div>
+          ) : groupedData && groupedData.length > 0 ? (
+            <div className="space-y-4">
+              {groupedData.map((group, idx) => {
+                const groupKey = group.managerId || `other-${idx}`;
+                const isCollapsed = collapsedGroups.has(groupKey);
+                const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
+
+                return (
+                  <div key={groupKey} className="border rounded-lg overflow-hidden">
+                    {/* Group Header */}
+                    <div
+                      className={cn(
+                        "flex items-center justify-between p-3 cursor-pointer transition-colors",
+                        "bg-muted/50 hover:bg-muted/70"
+                      )}
+                      onClick={() => toggleGroupCollapsed(groupKey)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {group.managerId && (
+                          <Avatar className="h-7 w-7">
+                            <AvatarImage src={group.managerAvatar || undefined} />
+                            <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          <span className="font-semibold text-sm">{group.managerName}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({group.members.length} members)</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right text-xs hidden sm:block">
+                          <div className="text-muted-foreground">Team Target</div>
+                          <div className="font-semibold">{formatValue(group.teamTarget)}</div>
+                        </div>
+                        <div className="text-right text-xs hidden sm:block">
+                          <div className="text-muted-foreground">Team Actual</div>
+                          <div className="font-semibold">{formatValue(group.teamActual)}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
+                          <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
+                        </div>
+                        {getStatusBadge(teamStatus)}
+                      </div>
+                    </div>
+
+                    {/* Group Members */}
+                    {!isCollapsed && (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Team Member</TableHead>
+                              <TableHead className="text-right">Target</TableHead>
+                              <TableHead className="text-right">Actual</TableHead>
+                              <TableHead className="text-center">Progress</TableHead>
+                              <TableHead className="text-right">Gap</TableHead>
+                              <TableHead className="text-center">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.members.map(member => renderMemberRow(member))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            // Fallback flat table when no hierarchy data
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -317,47 +474,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTeamProgress.map((member) => (
-                    <TableRow key={member.userId}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.avatarUrl || undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(member.fullName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{member.fullName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatValue(member.target)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatValue(member.actual)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={Math.min(member.achievementPercentage, 100)} 
-                            className="h-2 w-20"
-                          />
-                          <span className="text-sm font-medium w-12 text-right">
-                            {member.achievementPercentage.toFixed(0)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-medium",
-                        member.gap >= 0 ? "text-green-600" : "text-red-600"
-                      )}>
-                        {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getStatusBadge(member.status)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredTeamProgress.map(member => renderMemberRow(member))}
                 </TableBody>
               </Table>
             </div>
