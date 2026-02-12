@@ -244,7 +244,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
         <div className="flex items-center gap-2">
           <Progress 
             value={Math.min(member.achievementPercentage, 100)} 
-            className="h-2 w-20"
+            className="h-2 w-20 hidden sm:block"
           />
           <span className="text-sm font-medium w-12 text-right">
             {member.achievementPercentage.toFixed(0)}%
