@@ -172,9 +172,17 @@ export async function submitOrderWithOfflineSupport(
       
       await Promise.race([submitPromise, timeoutPromise]);
       options.onOnline?.();
-    } catch {
+    } catch (syncError: any) {
       // On any error/timeout, queue BOTH order and items for sync
       // The sync handler will handle idempotent upserts
+      console.error(`⚠️ ORDER SYNC FAILED - queuing for retry:`, {
+        orderId,
+        retailerId: orderData.retailer_id,
+        userId: orderData.user_id,
+        totalAmount: orderValue,
+        error: syncError?.message || syncError,
+        timestamp: new Date().toISOString()
+      });
       offlineStorage.addToSyncQueue('CREATE_ORDER', {
         order: normalizedOrder,
         items: normalizedItems,

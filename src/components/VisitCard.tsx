@@ -679,7 +679,7 @@ export const VisitCard = ({
             .from('orders')
             .select('order_date')
             .eq('retailer_id', visitRetailerId)
-            .gt('pending_amount', 0)
+            .gt('credit_pending_amount', 0)
             .order('order_date', { ascending: true })
             .limit(1)
             .maybeSingle();
@@ -1188,7 +1188,7 @@ export const VisitCard = ({
               .from('orders')
               .select('order_date')
               .eq('retailer_id', visitRetailerId)
-              .gt('pending_amount', 0)
+              .gt('credit_pending_amount', 0)
               .order('order_date', { ascending: true })
               .limit(1)
               .maybeSingle();

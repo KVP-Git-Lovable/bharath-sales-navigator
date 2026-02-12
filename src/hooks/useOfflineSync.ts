@@ -40,20 +40,38 @@ export function useOfflineSync() {
         return uuidRegex.test(id);
       };
 
-      // Clean up stale sync items (older than 15 mins OR 2+ retries)
+      // Clean up stale sync items with priority-based retention
+      // CREATE_ORDER items get 48-hour / 5-retry protection to prevent data loss
       const cleanupStaleSyncItems = async (queue: any[]): Promise<any[]> => {
         const now = Date.now();
         const fifteenMinutesAgo = now - (15 * 60 * 1000);
+        const fortyEightHoursAgo = now - (48 * 60 * 60 * 1000);
         const cleanQueue: any[] = [];
         
         for (const item of queue) {
-          const isStale = item.timestamp && item.timestamp < fifteenMinutesAgo;
-          // Keep retry behavior consistent (max 2 attempts before cleanup)
-          const tooManyRetries = (item.retryCount || 0) >= 2;
+          const isCritical = item.action === 'CREATE_ORDER';
+          const ageMs = item.timestamp ? now - item.timestamp : 0;
+          const retries = item.retryCount || 0;
+          
+          // Critical items (orders): 48-hour window, 5 retries max
+          // Non-critical items: 15-minute window, 2 retries max
+          const maxAge = isCritical ? fortyEightHoursAgo : fifteenMinutesAgo;
+          const maxRetries = isCritical ? 5 : 2;
+          
+          const isStale = item.timestamp && item.timestamp < maxAge;
+          const tooManyRetries = retries >= maxRetries;
           
           if (isStale || tooManyRetries) {
-            console.log(`🧹 Removing stale sync item: ${item.action}, age=${Math.round((now - item.timestamp) / 60000)}min, retries=${item.retryCount || 0}`);
-            await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            if (isCritical) {
+              // NEVER silently delete orders - mark as permanently_failed instead
+              console.error(`⛔ ORDER SYNC FAILED PERMANENTLY: age=${Math.round(ageMs / 60000)}min, retries=${retries}`, JSON.stringify(item.data));
+              const failedItem = { ...item, status: 'permanently_failed', failedAt: new Date().toISOString() };
+              await offlineStorage.save(STORES.SYNC_QUEUE, failedItem);
+              cleanQueue.push(failedItem);
+            } else {
+              console.log(`🧹 Removing stale sync item: ${item.action}, age=${Math.round(ageMs / 60000)}min, retries=${retries}`);
+              await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            }
           } else {
             cleanQueue.push(item);
           }
@@ -167,15 +185,23 @@ export function useOfflineSync() {
           const updatedItem = {
             ...item,
             retryCount: (item.retryCount || 0) + 1,
-            lastError: errorMsg
+            lastError: errorMsg,
+            lastRetryAt: new Date().toISOString()
           };
           
-          // Keep in queue for retry (max 2 attempts only)
-          if (updatedItem.retryCount < 2) {
+          const isCritical = item.action === 'CREATE_ORDER';
+          const maxRetries = isCritical ? 5 : 2;
+          
+          if (updatedItem.retryCount < maxRetries) {
             await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
+          } else if (isCritical) {
+            // NEVER delete order data - mark as permanently failed for manual recovery
+            console.error(`⛔ ORDER PERMANENTLY FAILED after ${maxRetries} retries:`, JSON.stringify(item.data));
+            const failedItem = { ...updatedItem, status: 'permanently_failed', failedAt: new Date().toISOString() };
+            await offlineStorage.save(STORES.SYNC_QUEUE, failedItem);
           } else {
-            // After 2 failed attempts, remove from queue to avoid stuck items
-            console.error(`⛔ Removing item after 2 failed attempts:`, item.action);
+            // Non-critical items can be removed after max retries
+            console.error(`⛔ Removing non-critical item after ${maxRetries} failed attempts:`, item.action);
             await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
           }
         }
