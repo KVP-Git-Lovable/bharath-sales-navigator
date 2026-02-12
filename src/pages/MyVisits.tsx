@@ -1601,12 +1601,10 @@ export const MyVisits = () => {
                     await Preferences.remove({ key: snapshotKey });
                     await Preferences.remove({ key: 'visit_status_cache' });
                     
-                    toast.success('Cache cleared - refreshing...');
+                    toast.success('Cache cleared - data refreshed');
                     invalidateData?.();
-                    
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 500);
+                    // Dispatch global refresh event instead of full page reload
+                    window.dispatchEvent(new CustomEvent('globalDataRefresh', { detail: { source: 'cacheClear' } }));
                   } catch (err) {
                     console.error('Cache clear error:', err);
                     toast.error('Failed to clear cache');

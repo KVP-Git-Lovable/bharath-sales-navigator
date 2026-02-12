@@ -58,6 +58,7 @@ export const BeatDetail = () => {
   const { user } = useAuth();
   const [beatData, setBeatData] = useState<BeatDetailData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [swot, setSwot] = useState<BeatSWOT>({ strengths: [], weaknesses: [], opportunities: [], threats: [] });
@@ -234,7 +235,7 @@ export const BeatDetail = () => {
     };
 
     fetchBeatData();
-  }, [user, id]);
+  }, [user, id, refreshKey]);
 
   const calculatePerformanceStats = async (beatId: string, userId: string, retailers: any[]) => {
     try {
@@ -1280,7 +1281,8 @@ export const BeatDetail = () => {
           }}
           onBeatUpdated={() => {
             setIsEditOpen(false);
-            window.location.reload();
+            // Refetch beat data without full page reload
+            setRefreshKey(k => k + 1);
           }}
         />
       )}
@@ -1307,7 +1309,8 @@ export const BeatDetail = () => {
         onSuccess={() => {
           setShowRetailerModal(false);
           setSelectedRetailer(null);
-          window.location.reload();
+          // Refetch beat data without full page reload
+          setRefreshKey(k => k + 1);
         }}
       />
 
