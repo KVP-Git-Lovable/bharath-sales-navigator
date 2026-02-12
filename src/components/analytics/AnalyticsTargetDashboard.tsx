@@ -383,7 +383,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Network className="h-5 w-5" />
-            Team Performance (Hierarchy View)
+            Target Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -441,7 +441,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                           <div className="font-semibold">{formatValue(group.teamActual)}</div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-10 sm:w-16" />
+                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16 hidden sm:block" />
                           <span className="text-[10px] sm:text-xs font-bold w-8 sm:w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
                         </div>
                         {getStatusBadge(teamStatus)}
