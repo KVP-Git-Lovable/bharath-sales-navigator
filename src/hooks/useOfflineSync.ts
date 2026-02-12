@@ -40,6 +40,32 @@ export function useOfflineSync() {
         return uuidRegex.test(id);
       };
 
+      // Auto-recover permanently failed CREATE_ORDER items so they get retried
+      const recoverPermanentlyFailedOrders = async (): Promise<void> => {
+        try {
+          const queue = await offlineStorage.getSyncQueue();
+          const failedOrders = queue.filter(
+            (item: any) => item.status === 'permanently_failed' && item.action === 'CREATE_ORDER'
+          );
+
+          if (failedOrders.length === 0) return;
+
+          for (const item of failedOrders) {
+            const recovered = { ...item };
+            recovered.retryCount = 0;
+            delete recovered.status;
+            delete recovered.failedAt;
+            recovered._recovered = true;
+            recovered.recoveredAt = Date.now();
+            await offlineStorage.save(STORES.SYNC_QUEUE, recovered);
+          }
+
+          console.log(`🔄 Recovered ${failedOrders.length} permanently failed orders for retry`);
+        } catch (e) {
+          console.warn('⚠️ Failed to recover permanently failed orders (non-fatal):', e);
+        }
+      };
+
       // Clean up stale sync items with priority-based retention
       // CREATE_ORDER items get 48-hour / 5-retry protection to prevent data loss
       const cleanupStaleSyncItems = async (queue: any[]): Promise<any[]> => {
@@ -50,15 +76,18 @@ export function useOfflineSync() {
         
         for (const item of queue) {
           const isCritical = item.action === 'CREATE_ORDER';
-          const ageMs = item.timestamp ? now - item.timestamp : 0;
           const retries = item.retryCount || 0;
+          
+          // For recovered items, use recoveredAt as the age baseline
+          const ageBaseline = item._recovered && item.recoveredAt ? item.recoveredAt : item.timestamp;
+          const ageMs = ageBaseline ? now - ageBaseline : 0;
           
           // Critical items (orders): 48-hour window, 5 retries max
           // Non-critical items: 15-minute window, 2 retries max
           const maxAge = isCritical ? fortyEightHoursAgo : fifteenMinutesAgo;
           const maxRetries = isCritical ? 5 : 2;
           
-          const isStale = item.timestamp && item.timestamp < maxAge;
+          const isStale = ageBaseline && ageBaseline < maxAge;
           const tooManyRetries = retries >= maxRetries;
           
           if (isStale || tooManyRetries) {
@@ -129,6 +158,9 @@ export function useOfflineSync() {
           console.warn('⚠️ Failed to rebuild no-order sync items (non-fatal):', e);
         }
       };
+
+      // Step 0: Recover any permanently failed orders before cleanup
+      await recoverPermanentlyFailedOrders();
 
       // Step 1: Get and clean up stale items first
       let syncQueue = await offlineStorage.getSyncQueue();
