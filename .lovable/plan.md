@@ -1,55 +1,121 @@
 
+# Fix: Order Data Loss Due to Aggressive Sync Queue Cleanup
 
-# Fix: Complete Gamification Points Reversal on Order Cancellation
+## Problem Summary
+Sardar's order created today was not synced to the database because the sync queue cleanup mechanism is too aggressive. Orders are being deleted from the local sync queue after:
+- 15 minutes have elapsed, OR
+- 2 failed retry attempts
 
-## Problem Identified
+This causes permanent data loss before the order can be successfully synced to the database.
 
-When an order is cancelled, the system only removes gamification points with `reference_type = 'order'`. However, the order placement process (`awardPointsForOrder`) also awards points with `reference_type = 'visit'` (for "Productive visits with orders"). These visit-type points are **never cleaned up**, which is what you're seeing in the Points Breakdown.
+## Root Causes Identified
 
-## What Gets Created When an Order is Placed
+### Issue 1: Aggressive Sync Queue Cleanup (PRIMARY)
+**File**: `src/hooks/useOfflineSync.ts` (lines 43-63, 166-180)
 
-| Data | Table | reference_type | Reversed on Cancel? |
-|------|-------|---------------|---------------------|
-| Order-based points (first order, daily target, focused product, etc.) | `gamification_points` | `order` | Yes (partially) |
-| Productive visit points | `gamification_points` | `visit` | **NO - this is the bug** |
-| Retailer consecutive order tracking | `gamification_retailer_sequences` | N/A | **NO** |
-| Daily tracking counts | `gamification_daily_tracking` | N/A | **NO** |
-| Loyalty points | `retailer_loyalty_points` | `order` | Yes |
-| Visit status | `visits` | N/A | Yes |
-| Retailer credit/analytics | `retailers` | N/A | Yes |
-| Invoice | `invoices` | N/A | Yes |
+Current behavior:
+- ALL sync items (including critical CREATE_ORDER) are deleted after 15 minutes
+- Orders are deleted after just 2 failed retries
+- No distinction between critical orders and non-critical updates
 
-## Fix Plan
+### Issue 2: Invalid Database Query
+**File**: `src/components/VisitCard.tsx` (lines 682, 1191)
 
-### Step 1: Update `removeGamificationPoints` in `orderCancellation.ts`
+Current code queries:
+```typescript
+.gt('pending_amount', 0)  // WRONG - column doesn't exist on orders table
+```
 
-Change the function to remove **all** gamification points for this user + retailer on the order date, regardless of `reference_type`. This catches both `order` and `visit` type points.
+Should query:
+```typescript
+.gt('credit_pending_amount', 0)  // CORRECT - actual column name
+```
 
-- Remove the `.eq('reference_type', 'order')` filter
-- Instead, query for points where `reference_id = retailerId` (both order and visit points use retailer ID as reference)
-- Keep the date range filter to scope it to the correct day
+This causes database errors every time pending orders are fetched.
 
-### Step 2: Add `gamification_retailer_sequences` reversal
+## Implementation Plan
 
-Add a new function `reverseRetailerSequence` that decrements the `consecutive_orders` count for the retailer when an order is cancelled. If it reaches 0, delete the record.
+### Step 1: Fix Sync Queue Retention Logic
+**File**: `src/hooks/useOfflineSync.ts`
 
-### Step 3: Add `gamification_daily_tracking` reversal
+**Location 1 - cleanupStaleSyncItems function (lines 43-63)**:
+- Add 48-hour and 5-retry thresholds specifically for `CREATE_ORDER` items
+- Keep 15-minute and 2-retry thresholds for other sync actions
+- Logic:
+  - If action === 'CREATE_ORDER': Only delete if older than 48 hours OR 5+ retries
+  - Otherwise: Delete if older than 15 minutes OR 2+ retries
 
-Add a function to decrement the daily tracking count for the user on the order date, preventing stale daily limits.
+**Location 2 - Retry handling (lines 166-180)**:
+- Change max retry limit: `maxRetries = item.action === 'CREATE_ORDER' ? 5 : 2`
+- Instead of DELETING after max retries, KEEP the item in queue with status: 'permanently_failed'
+- This ensures users are alerted and can manually retry if needed
+- Add console error with full item context for manual intervention
 
-### Step 4: Dispatch `pointsEarned` event after cancellation
+### Step 2: Fix Database Column Query
+**File**: `src/components/VisitCard.tsx`
 
-After removing points, dispatch a `pointsEarned` event so all UI components (Points Breakdown modal, leaderboard, summary cards) refresh immediately without needing a manual page refresh.
+**Location 1 (line 682)**:
+```typescript
+// BEFORE:
+.gt('pending_amount', 0)
 
-## Technical Details
+// AFTER:
+.gt('credit_pending_amount', 0)
+```
 
-**File modified:** `src/utils/orderCancellation.ts`
+**Location 2 (line 1191)**:
+```typescript
+// BEFORE:
+.gt('pending_amount', 0)
 
-1. `removeGamificationPoints()` -- Remove `reference_type` filter so both `order` and `visit` points are deleted for that retailer + date
-2. New `reverseRetailerSequence()` -- Decrement or delete from `gamification_retailer_sequences`
-3. New `reverseDailyTracking()` -- Decrement counts in `gamification_daily_tracking`
-4. In `clearLocalCaches()` -- Add `pointsEarned` event dispatch for instant UI refresh of gamification components
-5. In `cancelOrder()` -- Call the two new reversal functions
+// AFTER:
+.gt('credit_pending_amount', 0)
+```
 
-No database migrations needed -- this is purely a code logic fix.
+### Step 3: Improve Error Logging for Sync Failures
+**File**: `src/utils/offlineOrderUtils.ts`
 
+In the background sync catch block (around line 220), add more detailed logging:
+- Log the complete order object when sync fails
+- Include retry count and timestamp
+- Help users understand why their order might not have synced
+
+## Data Flow After Fix
+
+```
+Order Created (offline or slow connection)
+    ↓
+Local Cache → UI shows immediately (✅ Already working)
+    ↓
+Background Sync (5s timeout)
+    ├─ Success → Remove from queue ✅
+    ├─ Timeout → Add to queue, retry later
+    │   ↓
+    │ Sync Queue Processing
+    │   ├─ Success → Remove from queue ✅
+    │   ├─ Failure → Increment retry counter
+    │   │   ├─ CREATE_ORDER: Retry up to 5 times over 48 hours ✅ (FIXED)
+    │   │   ├─ Other actions: Retry up to 2 times over 15 mins
+    │   │   └─ Max retries reached → Keep in queue, alert user (FIXED)
+    │   └─ Stale cleanup: Only after max retries + time threshold
+```
+
+## Files Modified
+1. `src/hooks/useOfflineSync.ts` - Stale cleanup + retry logic
+2. `src/components/VisitCard.tsx` - Database column name fixes
+
+## Testing Validation
+- Test offline order creation and sync timing
+- Verify that CREATE_ORDER items are retained for 48 hours
+- Confirm that orders are retried up to 5 times
+- Ensure no more "pending_amount" database errors
+- Verify pending orders show correct "pending since" date
+
+## Impact on Sardar's Lost Order
+Unfortunately, Sardar's order data cannot be recovered as it was permanently deleted from the sync queue before reaching the database. **After this fix is applied, Sardar will need to manually re-create the order**, and it will be properly retained and synced going forward.
+
+## Regression Prevention
+- CREATE_ORDER items now have a 48-hour protection window
+- Explicit logging of all cleanup actions
+- Permanently failed items stay in queue (not auto-deleted)
+- Better visibility into why sync might fail
