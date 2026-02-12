@@ -106,8 +106,9 @@ export async function submitOrderWithOfflineSupport(
     markVisitDataChanged();
   }
 
-  // STEP 4: Background sync with 5-second timeout - ALWAYS non-blocking
-  setTimeout(async () => {
+  // STEP 4: Immediate sync when online, queue only when truly offline
+  // Orders are critical - always attempt direct sync first
+  const syncOrder = async () => {
     // DUPLICATE FIX: Check sync attempt lock
     const lastAttempt = syncAttemptLock.get(orderId);
     if (lastAttempt && Date.now() - lastAttempt < LOCK_DURATION_MS) {
@@ -116,7 +117,9 @@ export async function submitOrderWithOfflineSupport(
     }
     syncAttemptLock.set(orderId, Date.now());
     
-    if (!navigator.onLine || options.connectivityStatus === 'offline') {
+    // Only queue to offline when genuinely offline (not on slow connections)
+    if (!navigator.onLine) {
+      console.log('📴 Device offline - queuing order for later sync:', orderId);
       offlineStorage.addToSyncQueue('CREATE_ORDER', {
         order: normalizedOrder,
         items: normalizedItems,
@@ -147,7 +150,6 @@ export async function submitOrderWithOfflineSupport(
         }
 
         // ALWAYS ensure order items are inserted (even if order existed)
-        // First check if items already exist
         const { data: existingItems } = await supabase
           .from('order_items')
           .select('id')
@@ -155,7 +157,6 @@ export async function submitOrderWithOfflineSupport(
           .limit(1);
 
         if (!existingItems || existingItems.length === 0) {
-          // Insert items only if they don't exist
           const { error: itemsError } = await supabase
             .from('order_items')
             .insert(normalizedItems);
@@ -167,14 +168,14 @@ export async function submitOrderWithOfflineSupport(
       })();
       
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('5s timeout')), SYNC_TIMEOUT_MS)
+        setTimeout(() => reject(new Error('10s timeout')), 10000)
       );
       
       await Promise.race([submitPromise, timeoutPromise]);
+      console.log('✅ Order synced immediately to database:', orderId);
       options.onOnline?.();
     } catch (syncError: any) {
-      // On any error/timeout, queue BOTH order and items for sync
-      // The sync handler will handle idempotent upserts
+      // On any error/timeout, queue for retry - never lose order data
       console.error(`⚠️ ORDER SYNC FAILED - queuing for retry:`, {
         orderId,
         retailerId: orderData.retailer_id,
@@ -190,7 +191,10 @@ export async function submitOrderWithOfflineSupport(
       });
       options.onOffline?.();
     }
-  }, 0);
+  };
+
+  // Start sync immediately (non-blocking - don't await, let UI return instantly)
+  syncOrder();
 
   // Return IMMEDIATELY - don't wait for network
   return { 

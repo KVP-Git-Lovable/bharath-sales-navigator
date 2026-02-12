@@ -100,7 +100,23 @@ export function useConnectivity(pollMs = 30000, startupDelayMs = 2000) {
     const removeListener = addNetworkListener((networkStatus: NetworkStatus) => {
       if (!mountedRef.current) return;
       console.log('📶 useConnectivity: status changed', networkStatus);
-      setStatus(networkStatus.connected ? 'online' : 'offline');
+      if (networkStatus.connected) {
+        setStatus('online');
+      } else {
+        // Grace period before confirming offline to prevent false triggers
+        setTimeout(() => {
+          if (mountedRef.current) {
+            // Re-check actual status before confirming offline
+            getNetworkStatus().then(current => {
+              if (!current.connected && mountedRef.current) {
+                setStatus('offline');
+              }
+            }).catch(() => {
+              if (mountedRef.current) setStatus('offline');
+            });
+          }
+        }, 2000);
+      }
     });
     
     // Browser events as backup (especially for web)
@@ -111,8 +127,17 @@ export function useConnectivity(pollMs = 30000, startupDelayMs = 2000) {
     };
     
     const onOffline = () => {
-      console.log('📴 Browser offline event');
-      setStatus('offline');
+      console.log('📴 Browser offline event - verifying...');
+      // Grace period: don't immediately go offline - verify first
+      // This prevents false offline detection during network transitions
+      setTimeout(() => {
+        if (!navigator.onLine && mountedRef.current) {
+          console.log('📴 Confirmed offline after grace period');
+          setStatus('offline');
+        } else {
+          console.log('🌐 False offline alarm - network recovered');
+        }
+      }, 3000); // 3 second grace period
     };
 
     window.addEventListener('online', onOnline);
