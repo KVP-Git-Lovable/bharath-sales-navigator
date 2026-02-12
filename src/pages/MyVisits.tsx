@@ -1469,7 +1469,7 @@ export const MyVisits = () => {
                   {t('visits.createNewVisit')}
                 </Button>
               </CardContent>
-            </Card> : filteredVisits.length > 0 && <VirtualizedVisitList visits={filteredVisits} onViewDetails={handleViewDetails} selectedDate={selectedDate} />}
+            </Card> : filteredVisits.length > 0 && <VirtualizedVisitList visits={filteredVisits} onViewDetails={handleViewDetails} selectedDate={selectedDate} viewingUserId={isViewingSelf ? undefined : selectedUserIds[0]} />}
         </div>
 
         {/* Activity Events Table */}
