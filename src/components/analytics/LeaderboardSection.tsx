@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Loader2 } from 'lucide-react';
@@ -131,16 +132,24 @@ export const LeaderboardSection = ({ selectedUserIds, dateRange, allUsers }: Lea
                 <SelectItem value="all_team">All Team</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={viewFilter} onValueChange={(v) => setViewFilter(v as ViewFilter)}>
-              <SelectTrigger className="w-[110px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="top5">Top 5</SelectItem>
-                <SelectItem value="bottom5">Bottom 5</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1">
+              <Button
+                variant={viewFilter === 'top5' ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={() => setViewFilter(viewFilter === 'top5' ? 'all' : 'top5')}
+              >
+                Top 5
+              </Button>
+              <Button
+                variant={viewFilter === 'bottom5' ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={() => setViewFilter(viewFilter === 'bottom5' ? 'all' : 'bottom5')}
+              >
+                Bottom 5
+              </Button>
+            </div>
             <Select value="role" disabled>
               <SelectTrigger className="w-[90px] h-8 text-xs opacity-50">
                 <SelectValue placeholder="Role" />
