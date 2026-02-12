@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trophy, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns';
 
 interface LeaderboardSectionProps {
   selectedUserIds: string[];
@@ -21,15 +22,30 @@ interface RankedUser {
 }
 
 type ViewFilter = 'all' | 'top5' | 'bottom5';
+type TimeFilter = 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year';
+
+const getTimeRange = (filter: TimeFilter): { from: Date; to: Date } => {
+  const now = new Date();
+  switch (filter) {
+    case 'today': return { from: startOfDay(now), to: endOfDay(now) };
+    case 'yesterday': { const y = subDays(now, 1); return { from: startOfDay(y), to: endOfDay(y) }; }
+    case 'week': return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    case 'month': return { from: startOfMonth(now), to: endOfMonth(now) };
+    case 'quarter': return { from: startOfQuarter(now), to: endOfQuarter(now) };
+    case 'year': return { from: startOfYear(now), to: endOfYear(now) };
+  }
+};
 
 export const LeaderboardSection = ({ selectedUserIds, dateRange, allUsers }: LeaderboardSectionProps) => {
   const [scopeFilter, setScopeFilter] = useState<'my_scope' | 'all_team'>('my_scope');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
   const [allRankings, setAllRankings] = useState<RankedUser[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const startDate = useMemo(() => dateRange.from.toISOString(), [dateRange.from]);
-  const endDate = useMemo(() => dateRange.to.toISOString(), [dateRange.to]);
+  const effectiveRange = useMemo(() => getTimeRange(timeFilter), [timeFilter]);
+  const startDate = useMemo(() => effectiveRange.from.toISOString(), [effectiveRange]);
+  const endDate = useMemo(() => effectiveRange.to.toISOString(), [effectiveRange]);
 
   useEffect(() => {
     fetchRankings();
@@ -130,6 +146,19 @@ export const LeaderboardSection = ({ selectedUserIds, dateRange, allUsers }: Lea
               <SelectContent>
                 <SelectItem value="my_scope">My Scope</SelectItem>
                 <SelectItem value="all_team">All Team</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
+              <SelectTrigger className="w-[130px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today's Points</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="quarter">This Quarter</SelectItem>
+                <SelectItem value="year">Year-to-Date</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex items-center gap-1">
