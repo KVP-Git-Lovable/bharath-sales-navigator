@@ -497,10 +497,28 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       }
 
       // Update orders granularly - ALWAYS compare full list
-      const oChanges = getChangedItems(currentCache.orders, newOrders);
+      // FIX: Preserve locally-cached orders that haven't synced to DB yet
+      // These are orders saved to IndexedDB by offlineOrderUtils but not yet in Supabase
+      const mergedOrders = [...newOrders];
+      const dbOrderIds = new Set(newOrders.map(o => o.id));
+      
+      // Check current state for locally-added orders not yet in DB
+      const currentOrders = currentCache.orders || [];
+      for (const localOrder of currentOrders) {
+        if (!dbOrderIds.has(localOrder.id) && 
+            localOrder.order_date === date && 
+            localOrder.status === 'confirmed' &&
+            localOrder.user_id === uid) {
+          // This order exists locally but not in DB — preserve it
+          mergedOrders.push(localOrder);
+          console.log('[SmartSync] Preserving unsynced local order:', localOrder.id, '₹' + localOrder.total_amount);
+        }
+      }
+      
+      const oChanges = getChangedItems(currentCache.orders, mergedOrders);
       if (oChanges.changed.length > 0 || oChanges.added.length > 0 || oChanges.removed.length > 0) {
         uiUpdated = applyGranularUpdate(setOrders, oChanges) || uiUpdated;
-        currentCache.orders = newOrders;
+        currentCache.orders = mergedOrders;
       }
 
       // FIX #2: ALWAYS fetch ALL retailers by beat_id (not just from visits/orders)
