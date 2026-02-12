@@ -189,7 +189,17 @@ export async function submitOrderWithOfflineSupport(
         items: normalizedItems,
         visitId: orderData.visit_id
       });
-      options.onOffline?.();
+      // Only show "Saved Offline" toast when genuinely offline
+      // If device is online but sync failed (timeout/server error), 
+      // silently queue - don't alarm the user with a false offline message
+      if (!navigator.onLine) {
+        options.onOffline?.();
+      } else {
+        // Device is online but sync failed - show success since data is safely cached
+        // The sync queue will retry automatically in the background
+        console.log('📡 Order queued for background retry (device is online, sync will retry)');
+        options.onOnline?.();
+      }
     }
   };
 
