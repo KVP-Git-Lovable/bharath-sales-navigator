@@ -2,14 +2,13 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from './ui/button';
-import { MapPin, Loader2, RefreshCw, Clock, Navigation } from 'lucide-react';
+import { MapPin, Loader2, RefreshCw, Clock, Navigation, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-
 
 // Fix default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -54,7 +53,8 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy?: number; timestamp?: Date } | null>(null);
   const [isAttendanceActive, setIsAttendanceActive] = useState(false);
-
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [locationDeniedReason, setLocationDeniedReason] = useState<string>('');
   const isCurrentUser = userId === user?.id;
 
   // Check if attendance is active (checked in but not checked out)
@@ -135,7 +135,7 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
     };
   }, []);
 
-  // Draw journey polyline when journeyPositions change
+  // Draw journey route using OSRM for road-snapped path
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -151,16 +151,7 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
     const layerGroup = L.layerGroup().addTo(mapRef.current);
     journeyLayerRef.current = layerGroup;
 
-    const coords: L.LatLngExpression[] = journeyPositions.map(p => [p.latitude, p.longitude]);
-
-    // Journey polyline
-    L.polyline(coords, {
-      color: '#3b82f6',
-      weight: 3,
-      opacity: 0.7,
-    }).addTo(layerGroup);
-
-    // Start marker (green)
+    // Add start marker (green)
     const startIcon = L.divIcon({
       className: 'journey-start',
       html: `<div style="width:14px;height:14px;background:#22c55e;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
@@ -168,10 +159,10 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       iconAnchor: [7, 7],
     });
     L.marker([journeyPositions[0].latitude, journeyPositions[0].longitude], { icon: startIcon })
-      .bindPopup(`<strong>Start</strong><br/>${format(journeyPositions[0].timestamp, 'hh:mm a')}`)
+      .bindPopup(`<strong>Day Start</strong><br/>${format(journeyPositions[0].timestamp, 'hh:mm a')}`)
       .addTo(layerGroup);
 
-    // End marker (red)
+    // Add end marker (red)
     const last = journeyPositions[journeyPositions.length - 1];
     const endIcon = L.divIcon({
       className: 'journey-end',
@@ -180,12 +171,61 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       iconAnchor: [7, 7],
     });
     L.marker([last.latitude, last.longitude], { icon: endIcon })
-      .bindPopup(`<strong>Latest</strong><br/>${format(last.timestamp, 'hh:mm a')}`)
+      .bindPopup(`<strong>Latest Position</strong><br/>${format(last.timestamp, 'hh:mm a')}`)
       .addTo(layerGroup);
 
-    // Fit map to journey bounds
-    const bounds = L.latLngBounds(coords as L.LatLngTuple[]);
-    mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+    // Sample waypoints for OSRM (max ~80 per batch to stay within limits)
+    const sampleWaypoints = (positions: JourneyPosition[], maxPoints: number): JourneyPosition[] => {
+      if (positions.length <= maxPoints) return positions;
+      const step = (positions.length - 1) / (maxPoints - 1);
+      const sampled: JourneyPosition[] = [];
+      for (let i = 0; i < maxPoints - 1; i++) {
+        sampled.push(positions[Math.round(i * step)]);
+      }
+      sampled.push(positions[positions.length - 1]); // always include last
+      return sampled;
+    };
+
+    // Fetch OSRM road-snapped route
+    const fetchRoute = async () => {
+      try {
+        const waypoints = sampleWaypoints(journeyPositions, 80);
+        const coordinates = waypoints.map(p => [p.latitude, p.longitude]);
+
+        const { data, error } = await supabase.functions.invoke('osrm-route', {
+          body: { coordinates },
+        });
+
+        if (error || !data?.routes?.[0]?.geometry) {
+          // Fallback to straight-line polyline if OSRM fails
+          console.warn('OSRM route failed, using straight-line fallback:', error);
+          const coords: L.LatLngExpression[] = journeyPositions.map(p => [p.latitude, p.longitude]);
+          L.polyline(coords, { color: '#3b82f6', weight: 3, opacity: 0.7, dashArray: '8, 6' }).addTo(layerGroup);
+        } else {
+          // Draw road-snapped route from OSRM GeoJSON
+          const routeCoords = data.routes[0].geometry.coordinates.map(
+            ([lng, lat]: [number, number]) => [lat, lng] as L.LatLngExpression
+          );
+          L.polyline(routeCoords, { color: '#3b82f6', weight: 4, opacity: 0.8 }).addTo(layerGroup);
+        }
+
+        // Fit map to journey bounds
+        const allCoords: L.LatLngExpression[] = journeyPositions.map(p => [p.latitude, p.longitude]);
+        const bounds = L.latLngBounds(allCoords as L.LatLngTuple[]);
+        if (mapRef.current) {
+          mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+        }
+      } catch (err) {
+        console.error('Route fetch error:', err);
+        // Fallback to straight-line
+        const coords: L.LatLngExpression[] = journeyPositions.map(p => [p.latitude, p.longitude]);
+        L.polyline(coords, { color: '#3b82f6', weight: 3, opacity: 0.7, dashArray: '8, 6' }).addTo(layerGroup);
+        const bounds = L.latLngBounds(coords as L.LatLngTuple[]);
+        if (mapRef.current) mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+      }
+    };
+
+    fetchRoute();
   }, [journeyPositions]);
 
   const updateMapMarker = useCallback((latitude: number, longitude: number, accuracy: number, timestamp: Date) => {
@@ -274,13 +314,17 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
         setLoading(false);
         switch (error.code) {
           case error.PERMISSION_DENIED:
+            setLocationDenied(true);
+            setLocationDeniedReason('Location permission denied. Please enable location access in your device settings.');
             toast.error('Location permission denied. Please enable location access.');
             break;
           case error.POSITION_UNAVAILABLE:
+            setLocationDenied(true);
+            setLocationDeniedReason('User location is turned off. Please enable GPS/Location services on your device.');
             toast.error('Location information is unavailable.');
             break;
           case error.TIMEOUT:
-            toast.error('Location request timed out.');
+            toast.error('Location request timed out. Retrying...');
             break;
           default:
             toast.error('An unknown error occurred while getting location.');
@@ -365,19 +409,22 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
   }, [isCurrentUser, updateMapMarker, saveGPSPoint]);
 
   // Fetch location from database (for viewing other users)
+  // IMPORTANT: Filter by today's date to avoid showing stale data from other cities
   const fetchUserLocation = useCallback(async () => {
     if (!userId) return;
 
     setLoading(true);
 
     try {
+      const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('gps_tracking')
         .select('*')
         .eq('user_id', userId)
+        .eq('date', today)
         .order('timestamp', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching location:', error);
@@ -391,7 +438,12 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
         const accuracy = data.accuracy ? parseFloat(data.accuracy as unknown as string) : 50;
         const timestamp = new Date(data.timestamp);
 
+        setLocationDenied(false);
         updateMapMarker(latitude, longitude, accuracy, timestamp);
+      } else {
+        // No data for today - user may not have started their day or location is off
+        setLocationDenied(true);
+        setLocationDeniedReason('No location data available for today. The user may not have started their day or their location is turned off.');
       }
 
       setLoading(false);
@@ -550,8 +602,31 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
           </div>
         )}
 
-        {/* No Location State */}
-        {!location && !loading && userId && (
+        {/* Location Denied / Turned Off Warning */}
+        {locationDenied && !loading && userId && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-[1000]">
+            <div className="text-center p-6 max-w-sm">
+              <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-yellow-600" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">Location Unavailable</p>
+              <p className="text-xs text-muted-foreground mb-4">
+                {locationDeniedReason || 'User location is turned off.'}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleManualRefresh}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {isCurrentUser && !isViewingOther ? 'Retry Location' : 'Try Again'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* No Location State (no data and not denied) */}
+        {!location && !loading && !locationDenied && userId && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-[1000]">
             <div className="text-center p-6">
               <MapPin className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
