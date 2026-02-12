@@ -431,7 +431,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                           <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
                           <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
                         </div>
-                        <span className="hidden sm:inline-flex">{getStatusBadge(teamStatus)}</span>
+                        {getStatusBadge(teamStatus)}
                       </div>
                     </div>
 
