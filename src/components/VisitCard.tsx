@@ -74,12 +74,14 @@ interface VisitCardProps {
   onViewDetails: (visitId: string) => void;
   selectedDate?: string; // Add selectedDate prop
   skipInitialCheck?: boolean; // Skip initial DB check when data is pre-loaded
+  viewingUserId?: string; // The user whose data we're viewing (for subordinate view)
 }
 export const VisitCard = ({
   visit,
   onViewDetails,
   selectedDate,
-  skipInitialCheck = false
+  skipInitialCheck = false,
+  viewingUserId
 }: VisitCardProps) => {
   const navigate = useNavigate();
   const [showNoOrderModal, setShowNoOrderModal] = useState(false);
@@ -591,7 +593,7 @@ export const VisitCard = ({
   const checkStatus = useCallback(async (forceRefresh = false) => {
     // Get user and date info first
     const { data: { session } } = await supabase.auth.getSession();
-    const currentUserId = session?.user?.id || userId;
+    const currentUserId = viewingUserId || session?.user?.id || userId;
     const visitRetailerId = visit.retailerId || visit.id;
     const targetDate = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
     
@@ -2282,10 +2284,11 @@ export const VisitCard = ({
       setLoadingOrder(true);
       const {
         data: {
-          user
+          user: authUser
         }
       } = await supabase.auth.getUser();
-      if (!user) {
+      const effectiveUserId = viewingUserId || authUser?.id;
+      if (!effectiveUserId) {
         setLoadingOrder(false);
         return;
       }
@@ -2309,11 +2312,11 @@ export const VisitCard = ({
           // Check by order_date first (exact date match), fallback to created_at
           if (o.order_date) {
             const orderDateStr = o.order_date.split('T')[0];
-            return o.user_id === user.id && o.retailer_id === retailerId && orderDateStr === targetDateStr;
+            return o.user_id === effectiveUserId && o.retailer_id === retailerId && orderDateStr === targetDateStr;
           }
           // Fallback to created_at timestamp comparison
           const orderDate = new Date(o.created_at);
-          return o.user_id === user.id && o.retailer_id === retailerId && orderDate >= dayStart && orderDate <= dayEnd;
+          return o.user_id === effectiveUserId && o.retailer_id === retailerId && orderDate >= dayStart && orderDate <= dayEnd;
         });
         console.log('[VisitCard] Offline orders found:', offlineOrders.length, 'for retailer:', retailerId);
       } catch (e) {
@@ -2330,7 +2333,7 @@ export const VisitCard = ({
           const { data } = await supabase
             .from('orders')
             .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, idempotency_key, order_items(product_name, quantity, rate, original_rate, total, unit)')
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId)
             .eq('retailer_id', retailerId)
             .in('status', ['confirmed', 'delivered'])
             .gte('created_at', dayStart.toISOString())
