@@ -41,7 +41,8 @@ export function AboutViewMode({
 
   const handlePhotoUpdate = (newUrl: string) => {
     // Photo update triggers a refetch through query invalidation in ProfilePictureUpload
-    window.location.reload();
+    // Dispatch event to refresh profile data without full page reload
+    window.dispatchEvent(new CustomEvent('globalDataRefresh', { detail: { source: 'profilePhoto' } }));
   };
 
   return (
