@@ -225,13 +225,13 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
     <TableRow key={member.userId}>
       <TableCell>
         <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-8 w-8 hidden sm:flex">
             <AvatarImage src={member.avatarUrl || undefined} />
             <AvatarFallback className="text-xs">
               {getInitials(member.fullName)}
             </AvatarFallback>
           </Avatar>
-          <span className="font-medium">{member.fullName}</span>
+          <span className="font-medium text-xs sm:text-sm">{member.fullName}</span>
         </div>
       </TableCell>
       <TableCell className="text-right font-medium hidden sm:table-cell">
@@ -246,7 +246,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
             value={Math.min(member.achievementPercentage, 100)} 
             className="h-2 w-20 hidden sm:block"
           />
-          <span className="text-sm font-medium w-12 text-right">
+          <span className="text-[10px] sm:text-sm font-bold sm:font-medium w-8 sm:w-12 text-right">
             {member.achievementPercentage.toFixed(0)}%
           </span>
         </div>
@@ -420,7 +420,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                       <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
                         {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                         {group.managerId && (
-                          <Avatar className="h-6 w-6 sm:h-7 sm:w-7 shrink-0">
+                          <Avatar className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 hidden sm:flex">
                             <AvatarImage src={group.managerAvatar || undefined} />
                             <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
                           </Avatar>
