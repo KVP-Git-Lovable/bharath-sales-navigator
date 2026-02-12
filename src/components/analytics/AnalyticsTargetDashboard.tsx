@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,6 +24,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved'>('all');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const initialCollapseApplied = useRef(false);
 
   // Fetch all user IDs when no specific users are selected
   const { data: allUserIds = [] } = useQuery({
@@ -132,6 +133,17 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
       };
     }).filter(g => g.members.length > 0 || g.managerProgress);
   }, [hierarchyGroups, filteredTeamProgress, progressMap]);
+
+  // Auto-collapse all groups on mobile on first load
+  useEffect(() => {
+    if (initialCollapseApplied.current || !groupedData?.length) return;
+    const isMobile = window.innerWidth < 640;
+    if (isMobile) {
+      const allKeys = new Set(groupedData.map((g, idx) => g.managerId || `other-${idx}`));
+      setCollapsedGroups(allKeys);
+    }
+    initialCollapseApplied.current = true;
+  }, [groupedData]);
 
   const handleStatusFilterClick = (filter: 'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved') => {
     setStatusFilter(prev => prev === filter ? 'all' : filter);
@@ -400,25 +412,26 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                     {/* Group Header */}
                     <div
                       className={cn(
-                        "flex items-center justify-between p-3 cursor-pointer transition-colors",
+                        "flex items-center justify-between p-2 sm:p-3 cursor-pointer transition-colors",
                         "bg-muted/50 hover:bg-muted/70"
                       )}
                       onClick={() => toggleGroupCollapsed(groupKey)}
                     >
-                      <div className="flex items-center gap-3">
-                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                         {group.managerId && (
-                          <Avatar className="h-7 w-7">
+                          <Avatar className="h-6 w-6 sm:h-7 sm:w-7 shrink-0">
                             <AvatarImage src={group.managerAvatar || undefined} />
                             <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
                           </Avatar>
                         )}
-                        <div>
-                          <span className="font-semibold text-sm">{group.managerName}</span>
-                          <span className="text-xs text-muted-foreground ml-2">({group.members.length} members)</span>
+                        <div className="min-w-0">
+                          <span className="font-semibold text-xs sm:text-sm truncate">{group.managerName}</span>
+                          <span className="text-xs text-muted-foreground ml-1 hidden sm:inline">({group.members.length} members)</span>
+                          <span className="text-[10px] text-muted-foreground ml-1 sm:hidden">({group.members.length})</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                         <div className="text-right text-xs hidden sm:block">
                           <div className="text-muted-foreground">Team Target</div>
                           <div className="font-semibold">{formatValue(group.teamTarget)}</div>
@@ -427,9 +440,9 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
                           <div className="text-muted-foreground">Team Actual</div>
                           <div className="font-semibold">{formatValue(group.teamActual)}</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
-                          <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
+                        <div className="flex items-center gap-1">
+                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-10 sm:w-16" />
+                          <span className="text-[10px] sm:text-xs font-bold w-8 sm:w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
                         </div>
                         {getStatusBadge(teamStatus)}
                       </div>
