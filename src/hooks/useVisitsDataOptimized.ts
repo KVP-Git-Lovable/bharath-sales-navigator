@@ -230,30 +230,47 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const userIdRef = useRef(effectiveUserId);
   const selectedDateRef = useRef(selectedDate);
   
+  // Helper to clear all in-memory state and caches
+  const clearAllCachesAndState = useCallback(() => {
+    console.log('[useVisitsDataOptimized] CLEARING ALL CACHES AND STATE');
+    cacheRef.current.clear();
+    lastSyncTimeRef.current.clear();
+    setBeatPlans([]);
+    setVisits([]);
+    setRetailers([]);
+    setOrders([]);
+    setPointsData({ total: 0, byRetailer: new Map() });
+    setHasLoadedOnce(false);
+    setIsLoading(true);
+    isFetchingRef.current = false;
+    lastDateRef.current = '';
+    smartSyncLockRef.current = false;
+  }, []);
+  
   // CRITICAL: Clear ALL caches when viewing different user to prevent data leakage
   useEffect(() => {
     if (effectiveUserId && lastUserRef.current && effectiveUserId !== lastUserRef.current) {
       console.log('[useVisitsDataOptimized] User changed from', lastUserRef.current, 'to', effectiveUserId, '- CLEARING ALL CACHES');
-      
-      // Clear in-memory caches
-      cacheRef.current.clear();
-      lastSyncTimeRef.current.clear();
-      
-      // Reset all state to prevent showing previous user's data
-      setBeatPlans([]);
-      setVisits([]);
-      setRetailers([]);
-      setOrders([]);
-      setPointsData({ total: 0, byRetailer: new Map() });
-      setHasLoadedOnce(false);
-      setIsLoading(true);
-      
-      // Reset fetch flags to force fresh load
-      isFetchingRef.current = false;
-      lastDateRef.current = '';
+      clearAllCachesAndState();
     }
     lastUserRef.current = effectiveUserId || '';
-  }, [effectiveUserId]);
+  }, [effectiveUserId, clearAllCachesAndState]);
+  
+  // CRITICAL: Listen for auth state changes (login/logout) to clear stale data
+  // This prevents showing old cached data when user logs out and logs back in
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        console.log('[useVisitsDataOptimized] SIGNED_IN detected - clearing stale caches');
+        clearAllCachesAndState();
+      }
+      if (event === 'SIGNED_OUT') {
+        console.log('[useVisitsDataOptimized] SIGNED_OUT detected - clearing all data');
+        clearAllCachesAndState();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [clearAllCachesAndState]);
   
   useEffect(() => {
     userIdRef.current = effectiveUserId;

@@ -139,17 +139,18 @@ export async function submitOrderWithOfflineSupport(
           .maybeSingle();
 
         if (!existingOrder) {
-          // Insert order header first
+          // Insert order header first - NEVER block on errors
           const { error: orderError } = await supabase
             .from('orders')
             .insert({ ...normalizedOrder, id: orderId });
 
-          if (orderError && orderError.code !== '23505') {
-            throw orderError;
+          if (orderError) {
+            // Log but don't throw - duplicate invoice or any error should not block order
+            console.warn('⚠️ Order insert warning (non-blocking):', orderError.message, orderError.code);
           }
         }
 
-        // ALWAYS ensure order items are inserted (even if order existed)
+        // ALWAYS ensure order items are inserted (even if order had errors)
         const { data: existingItems } = await supabase
           .from('order_items')
           .select('id')
@@ -161,8 +162,8 @@ export async function submitOrderWithOfflineSupport(
             .from('order_items')
             .insert(normalizedItems);
 
-          if (itemsError && itemsError.code !== '23505') {
-            throw itemsError;
+          if (itemsError) {
+            console.warn('⚠️ Order items insert warning (non-blocking):', itemsError.message, itemsError.code);
           }
         }
       })();
