@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Loader2, AlertTriangle, Database, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -278,8 +278,8 @@ export const UserDeleteDataDialog: React.FC<UserDeleteDataDialogProps> = ({
               </RadioGroup>
 
               {deleteMode === 'selective' && (
-                <ScrollArea className="flex-1 h-[40vh] max-h-[400px] border rounded-lg p-1">
-                  <div className="space-y-1 p-2">
+                <div className="flex-1 max-h-[300px] border rounded-lg p-2 overflow-y-auto">
+                  <div className="space-y-1">
                     {Object.entries(moduleSummary)
                       .sort(([, a], [, b]) => b.count - a.count)
                       .map(([key, mod]) => (
@@ -298,7 +298,7 @@ export const UserDeleteDataDialog: React.FC<UserDeleteDataDialogProps> = ({
                         </label>
                       ))}
                   </div>
-                </ScrollArea>
+                </div>
               )}
             </>
           )}
