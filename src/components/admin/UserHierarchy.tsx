@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, User, ChevronDown, ChevronUp, List, GitBranch } from 'lucide-react';
+import { Users, User, ChevronDown, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface HierarchyUser {
   id: string;
@@ -16,7 +15,6 @@ interface HierarchyUser {
   profile_picture_url?: string;
   role_name?: string;
   manager_id?: string;
-  secondary_manager_id?: string;
   directReports: HierarchyUser[];
 }
 
@@ -24,313 +22,193 @@ interface UserHierarchyProps {
   className?: string;
 }
 
-type ViewMode = 'tree' | 'list';
-
-// Color palette for different hierarchy levels
-const levelColors = [
-  'bg-pink-500',      // Level 0 - Top (CEO/Admin)
-  'bg-slate-700',     // Level 1
-  'bg-purple-500',    // Level 2
-  'bg-blue-500',      // Level 3
-  'bg-green-500',     // Level 4
-  'bg-amber-500',     // Level 5+
-];
-
-const getLevelColor = (level: number): string => {
-  return levelColors[Math.min(level, levelColors.length - 1)];
+// Role-based color mapping
+const roleColorMap: Record<string, { bg: string; text: string; border: string; badge: string }> = {
+  'System Administrator': { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' },
+  'Super Admin': { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' },
+  'Admin': { bg: 'bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500' },
+  'Manager': { bg: 'bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/30', badge: 'bg-blue-500' },
+  'Team Lead': { bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/30', badge: 'bg-emerald-500' },
+  'default': { bg: 'bg-slate-500/10', text: 'text-slate-700 dark:text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-500' },
 };
 
-const OrgNode = ({ user, level = 0 }: { user: HierarchyUser; level?: number }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+const getRoleColors = (role?: string) => {
+  if (!role) return roleColorMap['default'];
+  return roleColorMap[role] || roleColorMap['default'];
+};
+
+// Level-based accent for depth indication
+const levelAccents = [
+  'border-l-rose-500',
+  'border-l-purple-500',
+  'border-l-blue-500',
+  'border-l-emerald-500',
+  'border-l-amber-500',
+  'border-l-cyan-500',
+];
+
+const getLevelAccent = (level: number) => levelAccents[Math.min(level, levelAccents.length - 1)];
+
+const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number }) => {
+  const [isOpen, setIsOpen] = useState(level < 1);
   const hasReports = user.directReports.length > 0;
-  const colorClass = getLevelColor(level);
+  const colors = getRoleColors(user.role_name);
+  const accentClass = getLevelAccent(level);
 
   return (
-    <div className="flex flex-col items-center">
-      {/* User Node */}
-      <div 
-        className={cn(
-          "relative flex flex-col items-center cursor-pointer group",
-          hasReports && "mb-2"
-        )}
-        onClick={() => hasReports && setIsExpanded(!isExpanded)}
-      >
-        {/* Avatar with colored background */}
-        <div className={cn(
-          "relative rounded-full p-1 transition-transform group-hover:scale-105",
-          colorClass
-        )}>
-          <Avatar className="h-10 w-10 md:h-12 md:w-12 border-2 border-background">
+    <div className={cn("space-y-1", level > 0 && "ml-3 md:ml-5")}>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <div
+          className={cn(
+            "flex items-center gap-2.5 p-2 rounded-lg border-l-[3px] transition-colors",
+            accentClass,
+            hasReports ? "cursor-pointer hover:bg-muted/60" : "bg-transparent"
+          )}
+        >
+          {hasReports ? (
+            <CollapsibleTrigger asChild>
+              <button className="shrink-0 p-0.5 rounded hover:bg-muted">
+                {isOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+          ) : (
+            <div className="w-[18px]" />
+          )}
+
+          {/* Avatar */}
+          <Avatar className="h-7 w-7 shrink-0">
             <AvatarImage src={user.profile_picture_url} />
-            <AvatarFallback className="bg-background text-foreground font-semibold text-sm">
+            <AvatarFallback className={cn("text-[10px] font-semibold text-white", colors.badge)}>
               {user.full_name?.charAt(0) || 'U'}
             </AvatarFallback>
           </Avatar>
-          
-          {/* Expand/Collapse indicator */}
+
+          {/* Name + Role */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium truncate leading-tight">
+              {user.full_name || user.username}
+            </p>
+          </div>
+
+          {/* Role Badge */}
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px] px-1.5 py-0 h-5 shrink-0 font-medium border",
+              colors.bg, colors.text, colors.border
+            )}
+          >
+            {user.role_name || 'No Role'}
+          </Badge>
+
+          {/* Report count */}
           {hasReports && (
-            <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 shadow-sm border">
-              {isExpanded ? (
-                <ChevronUp className="h-3 w-3 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              )}
-            </div>
+            <span className="text-[10px] text-muted-foreground shrink-0 tabular-nums">
+              {user.directReports.length}
+            </span>
           )}
         </div>
 
-        {/* Name and Role */}
-        <div className="mt-1 text-center max-w-[100px] md:max-w-[120px]">
-          <p className="text-xs font-medium truncate" title={user.full_name || user.username}>
-            {user.full_name || user.username}
-          </p>
-          <p className="text-[10px] text-muted-foreground truncate" title={user.role_name}>
-            {user.role_name || 'No Role'}
-          </p>
-        </div>
-      </div>
-
-      {/* Vertical connector line to children */}
-      {hasReports && isExpanded && (
-        <>
-          <div className="w-px h-4 bg-border" />
-          
-          {/* Horizontal connector and children container */}
-          <div className="relative">
-            {/* Horizontal line spanning all children */}
-            {user.directReports.length > 1 && (
-              <div 
-                className="absolute top-0 h-px bg-border"
-                style={{
-                  left: '50%',
-                  right: '50%',
-                  transform: 'translateX(-50%)',
-                  width: `calc(100% - 60px)`
-                }}
-              />
-            )}
-            
-            {/* Children */}
-            <div className="flex gap-2 md:gap-4">
-              {user.directReports.map((report) => (
-                <div key={report.id} className="flex flex-col items-center">
-                  {/* Vertical line from horizontal connector to child */}
-                  <div className="w-px h-4 bg-border" />
-                  <OrgNode user={report} level={level + 1} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+        {hasReports && (
+          <CollapsibleContent className="pt-1">
+            {user.directReports.map((report) => (
+              <HierarchyRow key={report.id} user={report} level={level + 1} />
+            ))}
+          </CollapsibleContent>
+        )}
+      </Collapsible>
     </div>
-  );
-};
-
-// List view row component with expandable children
-const ListRow = ({ 
-  user, 
-  level = 0, 
-  allUsers 
-}: { 
-  user: HierarchyUser; 
-  level?: number;
-  allUsers: Map<string, HierarchyUser>;
-}) => {
-  const [isExpanded, setIsExpanded] = useState(level < 2);
-  const hasReports = user.directReports.length > 0;
-  const colorClass = getLevelColor(level);
-  
-  // Find manager name
-  const managerName = user.manager_id 
-    ? allUsers.get(user.manager_id)?.full_name || 'Unknown'
-    : '-';
-
-  return (
-    <>
-      <TableRow className="hover:bg-muted/50">
-        <TableCell>
-          <div className="flex items-center gap-3" style={{ paddingLeft: `${level * 24}px` }}>
-            {hasReports && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => setIsExpanded(!isExpanded)}
-              >
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-            {!hasReports && <div className="w-6" />}
-            <div className={cn("rounded-full p-0.5", colorClass)}>
-              <Avatar className="h-8 w-8 border-2 border-background">
-                <AvatarImage src={user.profile_picture_url} />
-                <AvatarFallback className="bg-background text-foreground font-semibold text-xs">
-                  {user.full_name?.charAt(0) || 'U'}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-            <div>
-              <p className="font-medium text-sm">{user.full_name || user.username}</p>
-              <p className="text-xs text-muted-foreground">{user.username}</p>
-            </div>
-          </div>
-        </TableCell>
-        <TableCell>
-          <Badge variant="outline" className="text-xs">
-            {user.role_name || 'No Role'}
-          </Badge>
-        </TableCell>
-        <TableCell className="text-sm text-muted-foreground">
-          {managerName}
-        </TableCell>
-        <TableCell className="text-center">
-          <Badge variant="secondary" className="text-xs">
-            {user.directReports.length}
-          </Badge>
-        </TableCell>
-      </TableRow>
-      
-      {/* Render direct reports if expanded */}
-      {hasReports && isExpanded && user.directReports.map((report) => (
-        <ListRow 
-          key={report.id} 
-          user={report} 
-          level={level + 1} 
-          allUsers={allUsers}
-        />
-      ))}
-    </>
   );
 };
 
 const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   const [hierarchy, setHierarchy] = useState<HierarchyUser[]>([]);
-  const [allUsersMap, setAllUsersMap] = useState<Map<string, HierarchyUser>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('tree');
 
   useEffect(() => {
     fetchHierarchy();
-    
-    // Subscribe to real-time changes
+
     const channel = supabase
       .channel('hierarchy-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
-        fetchHierarchy();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_profiles' }, () => {
-        fetchHierarchy();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => fetchHierarchy())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_profiles' }, () => fetchHierarchy())
       .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchHierarchy = async () => {
     try {
       setLoading(true);
-      
-      // Fetch all profiles
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, profile_picture_url');
-      
-      if (profileError) throw profileError;
 
-      // Fetch employee relationships
-      const { data: employees, error: empError } = await supabase
-        .from('employees')
-        .select('user_id, manager_id, secondary_manager_id');
-      
-      if (empError) throw empError;
+      const [
+        { data: profiles, error: pe },
+        { data: employees, error: ee },
+        { data: userProfiles, error: ue },
+        { data: securityProfiles, error: se },
+      ] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, username, profile_picture_url'),
+        supabase.from('employees').select('user_id, manager_id, secondary_manager_id'),
+        supabase.from('user_profiles').select('user_id, profile_id'),
+        supabase.from('security_profiles').select('id, name'),
+      ]);
 
-      // Fetch user_profiles (users with security profiles/roles)
-      const { data: userProfiles, error: upError } = await supabase
-        .from('user_profiles')
-        .select('user_id, profile_id');
-      
-      if (upError) throw upError;
+      if (pe || ee || ue || se) throw (pe || ee || ue || se);
 
-      // Fetch security_profiles
-      const { data: securityProfiles, error: spError } = await supabase
-        .from('security_profiles')
-        .select('id, name');
-      
-      if (spError) throw spError;
-
-      // Build hierarchy map - include all users who have a role assigned
       const userMap = new Map<string, HierarchyUser>();
       const childToParent = new Map<string, string>();
 
-      // First, add all users who have roles assigned
       userProfiles?.forEach(up => {
         const profile = profiles?.find(p => p.id === up.user_id);
         if (!profile) return;
-        
         const emp = employees?.find(e => e.user_id === up.user_id);
         const secProfile = securityProfiles?.find(sp => sp.id === up.profile_id);
-        const roleName = secProfile?.name;
-        
+
         userMap.set(up.user_id, {
           id: up.user_id,
           full_name: profile.full_name || '',
           username: profile.username || '',
           profile_picture_url: profile.profile_picture_url,
-          role_name: roleName,
+          role_name: secProfile?.name,
           manager_id: emp?.manager_id,
-          secondary_manager_id: emp?.secondary_manager_id,
-          directReports: []
+          directReports: [],
         });
 
-        if (emp?.manager_id) {
-          childToParent.set(up.user_id, emp.manager_id);
-        }
+        if (emp?.manager_id) childToParent.set(up.user_id, emp.manager_id);
       });
 
-      // Also add managers who might not have a security profile assignment
       employees?.forEach(emp => {
         if (emp.manager_id && !userMap.has(emp.manager_id)) {
           const profile = profiles?.find(p => p.id === emp.manager_id);
           if (profile) {
-            const managerProfile = userProfiles?.find(up => up.user_id === emp.manager_id);
-            const secProfile = managerProfile 
-              ? securityProfiles?.find(sp => sp.id === managerProfile.profile_id)
-              : null;
-            
+            const mp = userProfiles?.find(up => up.user_id === emp.manager_id);
+            const sp = mp ? securityProfiles?.find(s => s.id === mp.profile_id) : null;
             userMap.set(emp.manager_id, {
               id: emp.manager_id,
               full_name: profile.full_name || '',
               username: profile.username || '',
               profile_picture_url: profile.profile_picture_url,
-              role_name: secProfile?.name || 'Manager',
+              role_name: sp?.name || 'Manager',
               manager_id: undefined,
-              secondary_manager_id: undefined,
-              directReports: []
+              directReports: [],
             });
           }
         }
       });
 
-      // Build parent-child relationships
       childToParent.forEach((managerId, userId) => {
         const manager = userMap.get(managerId);
         const user = userMap.get(userId);
-        if (manager && user) {
-          manager.directReports.push(user);
-        }
+        if (manager && user) manager.directReports.push(user);
       });
 
-      // Find root nodes (users without managers or whose managers aren't in the map)
       const rootNodes: HierarchyUser[] = [];
       const superAdmins: HierarchyUser[] = [];
-      
+
       userMap.forEach((user, userId) => {
         const managerId = childToParent.get(userId);
         if (!managerId || !userMap.has(managerId)) {
@@ -342,17 +220,11 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
         }
       });
 
-      // Sort direct reports by name for each user
-      userMap.forEach(user => {
-        user.directReports.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
-      });
-
-      // Sort root nodes by name
+      userMap.forEach(user => user.directReports.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')));
       rootNodes.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
       superAdmins.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
-      
+
       setHierarchy([...superAdmins, ...rootNodes]);
-      setAllUsersMap(userMap);
     } catch (error) {
       console.error('Error fetching hierarchy:', error);
     } finally {
@@ -363,102 +235,70 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   if (loading) {
     return (
       <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            User Hierarchy
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="h-4 w-4" /> User Hierarchy
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex justify-center py-12">
-          <div className="flex flex-col items-center gap-4">
-            <Skeleton className="h-12 w-12 rounded-full" />
-            <div className="flex gap-8">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col items-center gap-2">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-              ))}
+        <CardContent className="space-y-2">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="flex items-center gap-3 p-2">
+              <Skeleton className="h-7 w-7 rounded-full" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-5 w-16 ml-auto rounded-full" />
             </div>
-          </div>
+          ))}
         </CardContent>
       </Card>
     );
   }
 
+  // Collect unique roles for legend
+  const collectRoles = (users: HierarchyUser[]): Set<string> => {
+    const roles = new Set<string>();
+    users.forEach(u => {
+      if (u.role_name) roles.add(u.role_name);
+      if (u.directReports.length) {
+        collectRoles(u.directReports).forEach(r => roles.add(r));
+      }
+    });
+    return roles;
+  };
+  const uniqueRoles = Array.from(collectRoles(hierarchy));
+
   return (
     <Card className={className}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            User Hierarchy
-          </CardTitle>
-          
-          {/* View Toggle Buttons */}
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <Button
-              variant={viewMode === 'tree' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('tree')}
-            >
-              <GitBranch className="h-4 w-4 mr-1.5" />
-              Tree
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4 mr-1.5" />
-              List
-            </Button>
-          </div>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Users className="h-4 w-4" /> User Hierarchy
+        </CardTitle>
+        {/* Role color legend */}
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {uniqueRoles.map(role => {
+            const c = getRoleColors(role);
+            return (
+              <span
+                key={role}
+                className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border font-medium", c.bg, c.text, c.border)}
+              >
+                <span className={cn("h-1.5 w-1.5 rounded-full", c.badge)} />
+                {role}
+              </span>
+            );
+          })}
         </div>
       </CardHeader>
       <CardContent>
         {hierarchy.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No users with hierarchy configured</p>
-            <p className="text-sm">Assign managers to users to build the hierarchy</p>
-          </div>
-        ) : viewMode === 'tree' ? (
-          /* Tree View */
-          <div className="overflow-x-auto pb-4">
-            <div className="flex justify-center min-w-max py-4">
-              <div className="flex gap-8">
-                {hierarchy.map((user) => (
-                  <OrgNode key={user.id} user={user} level={0} />
-                ))}
-              </div>
-            </div>
+            <User className="h-10 w-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No hierarchy configured</p>
           </div>
         ) : (
-          /* List View */
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[250px]">User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Reports To</TableHead>
-                  <TableHead className="text-center">Direct Reports</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {hierarchy.map((user) => (
-                  <ListRow 
-                    key={user.id} 
-                    user={user} 
-                    level={0} 
-                    allUsers={allUsersMap}
-                  />
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-1">
+            {hierarchy.map(user => (
+              <HierarchyRow key={user.id} user={user} level={0} />
+            ))}
           </div>
         )}
       </CardContent>
