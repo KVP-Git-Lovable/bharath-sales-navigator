@@ -517,43 +517,50 @@ export function TeamTargetDashboard({
         <div
           key={`mgr-${groupKey}-${idx}`}
           className={cn(
-            "flex items-center gap-2 py-2.5 px-3 border-l-[3px] cursor-pointer transition-colors hover:opacity-90",
-            getRowBgStyle(entry.depth)
+            "grid items-center py-2.5 px-3 border-l-[3px] cursor-pointer transition-colors hover:opacity-90 gap-x-2",
+            getRowBgStyle(entry.depth),
+            isMobile ? "grid-cols-[auto_1fr_auto_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
           )}
           onClick={() => toggleGroupCollapsed(groupKey)}
         >
-          {isCollapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          {/* Chevron */}
+          {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
 
+          {/* Avatar */}
           {!isMobile && (
-            <Avatar className="h-7 w-7 shrink-0">
+            <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={group.managerAvatar || undefined} />
               <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
             </Avatar>
           )}
 
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className="text-xs font-semibold truncate">{group.managerName}</span>
-            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border", getRoleBadgeStyle(entry.depth))}>
+          {/* Name + Role */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold truncate">{group.managerName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0", getRoleBadgeStyle(entry.depth))}>
               {entry.roleLabel}
             </Badge>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {!isMobile && (
-              <>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground leading-tight">Target</p>
-                  <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground leading-tight">Actual</p>
-                  <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
-                </div>
-              </>
-            )}
-            <span className="text-[10px] font-bold w-8 text-right">{group.teamAchievement.toFixed(0)}%</span>
-            <div className="shrink-0 scale-90">{getStatusBadge(teamStatus)}</div>
+          {/* Target */}
+          <div className={cn("text-right", isMobile && "")}>
+            <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+            <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
           </div>
+
+          {/* Actual */}
+          <div className="text-right">
+            <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+            <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
+          </div>
+
+          {/* % */}
+          {!isMobile && (
+            <span className="text-xs font-bold text-right">{group.teamAchievement.toFixed(0)}%</span>
+          )}
+
+          {/* Status */}
+          <div className="shrink-0 justify-self-end">{getStatusBadge(teamStatus)}</div>
         </div>
       );
     }
@@ -567,50 +574,56 @@ export function TeamTargetDashboard({
       <div key={`mem-${member.userId}-${idx}`}>
         <div
           className={cn(
-            "flex items-center gap-2 py-2 px-3 border-l-[3px] transition-colors",
+            "grid items-center py-2 px-3 border-l-[3px] transition-colors gap-x-2",
             getRowBgStyle(entry.depth),
             hasBreakdown && "cursor-pointer hover:opacity-90",
-            isExpanded && "bg-muted/30"
+            isExpanded && "bg-muted/30",
+            isMobile ? "grid-cols-[auto_1fr_auto_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
           )}
           onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
         >
-          <div className="w-4 shrink-0">
+          {/* Chevron / spacer */}
+          <div className="w-4 shrink-0 flex justify-center">
             {hasBreakdown && (
               isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
             )}
           </div>
 
+          {/* Avatar */}
           {!isMobile && (
-            <Avatar className="h-7 w-7 shrink-0">
+            <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={member.avatarUrl || undefined} />
               <AvatarFallback className="text-[10px]">{getInitials(member.fullName)}</AvatarFallback>
             </Avatar>
           )}
 
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className="text-xs font-medium truncate">{member.fullName}</span>
-            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border", getRoleBadgeStyle(entry.depth))}>
+          {/* Name + Role */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium truncate">{member.fullName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0", getRoleBadgeStyle(entry.depth))}>
               {entry.roleLabel}
             </Badge>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="text-right">
-              <p className="text-[10px] text-muted-foreground leading-tight">Target</p>
-              <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-muted-foreground leading-tight">Actual</p>
-              <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
-            </div>
-            {!isMobile && (
-              <div className="flex items-center gap-1 w-16">
-                <Progress value={Math.min(member.achievementPercentage, 100)} className="h-1.5 flex-1" />
-              </div>
-            )}
-            <span className="text-[10px] font-bold w-8 text-right">{member.achievementPercentage.toFixed(0)}%</span>
-            <div className="shrink-0">{getStatusBadge(member.status)}</div>
+          {/* Target */}
+          <div className="text-right">
+            <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+            <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
           </div>
+
+          {/* Actual */}
+          <div className="text-right">
+            <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+            <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
+          </div>
+
+          {/* % */}
+          {!isMobile && (
+            <span className="text-xs font-bold text-right">{member.achievementPercentage.toFixed(0)}%</span>
+          )}
+
+          {/* Status */}
+          <div className="shrink-0 justify-self-end">{getStatusBadge(member.status)}</div>
         </div>
 
         {hasBreakdown && isExpanded && (
