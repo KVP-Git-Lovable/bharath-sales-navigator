@@ -411,83 +411,215 @@ export function TeamTargetDashboard({
     );
   };
 
-  // Count total members recursively in a group
-  const countTotalMembers = (group: any): number => {
-    return group.members.length + (group.children || []).reduce((sum: number, child: any) => sum + countTotalMembers(child), 0);
+  // Flatten hierarchy into a single ordered list
+  interface FlatEntry {
+    type: 'manager' | 'member';
+    depth: number;
+    roleLabel: string;
+    managerId?: string; // for collapsible manager rows
+    parentManagerId?: string; // to track visibility
+    data: any; // group data for managers, TeamMemberProgress for members
+  }
+
+  const flattenHierarchy = (groups: any[]): FlatEntry[] => {
+    const entries: FlatEntry[] = [];
+    
+    const walkGroup = (group: any, depth: number, parentManagerId?: string) => {
+      const groupKey = group.managerId || `other-${entries.length}`;
+      
+      // Add manager row
+      if (group.managerId) {
+        entries.push({
+          type: 'manager',
+          depth,
+          roleLabel: depth === 0 ? 'Top Manager' : depth === 1 ? 'Manager' : 'Team Lead',
+          managerId: groupKey,
+          parentManagerId,
+          data: group,
+        });
+      }
+      
+      // Add child sub-managers
+      (group.children || []).forEach((child: any) => {
+        walkGroup(child, depth + 1, groupKey);
+      });
+      
+      // Add leaf members
+      group.members.forEach((member: TeamMemberProgress) => {
+        entries.push({
+          type: 'member',
+          depth: group.managerId ? depth + 1 : depth,
+          roleLabel: 'Member',
+          parentManagerId: groupKey,
+          data: member,
+        });
+      });
+    };
+    
+    groups.forEach(g => walkGroup(g, 0));
+    return entries;
   };
 
-  const renderHierarchyGroup = (group: any, idx: number, depth: number) => {
-    const groupKey = group.managerId || `other-${idx}`;
-    const isCollapsed = collapsedGroups.has(groupKey);
-    const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
-    const totalMembers = countTotalMembers(group);
-    const colors = getDepthColor(depth);
+  const flatEntries = useMemo(() => {
+    if (!groupedData?.length) return [];
+    return flattenHierarchy(groupedData);
+  }, [groupedData]);
 
-    return (
-      <div key={groupKey} className={cn("rounded-lg overflow-hidden border-l-[3px]", colors.border, depth > 0 && "ml-3 md:ml-5 mt-2")}>
-        {/* Group Header */}
+  // Determine visible entries based on collapsed state
+  const visibleEntries = useMemo(() => {
+    if (!flatEntries.length) return [];
+    
+    // Build set of all collapsed manager IDs and their descendants
+    const hiddenParents = new Set<string>();
+    
+    const isHidden = (entry: FlatEntry): boolean => {
+      if (!entry.parentManagerId) return false;
+      if (collapsedGroups.has(entry.parentManagerId)) return true;
+      // Check if any ancestor is collapsed
+      const parentEntry = flatEntries.find(e => e.managerId === entry.parentManagerId);
+      if (parentEntry) return isHidden(parentEntry);
+      return false;
+    };
+    
+    return flatEntries.filter(entry => !isHidden(entry));
+  }, [flatEntries, collapsedGroups]);
+
+  const getRoleBadgeStyle = (depth: number) => {
+    const styles = [
+      'bg-rose-100 text-rose-700 border-rose-200',
+      'bg-purple-100 text-purple-700 border-purple-200',
+      'bg-blue-100 text-blue-700 border-blue-200',
+      'bg-emerald-100 text-emerald-700 border-emerald-200',
+      'bg-amber-100 text-amber-700 border-amber-200',
+    ];
+    return styles[Math.min(depth, styles.length - 1)];
+  };
+
+  const getRowBgStyle = (depth: number) => {
+    const styles = [
+      'bg-rose-50/60 dark:bg-rose-950/20 border-l-rose-500',
+      'bg-purple-50/60 dark:bg-purple-950/20 border-l-purple-500',
+      'bg-blue-50/60 dark:bg-blue-950/20 border-l-blue-500',
+      'bg-emerald-50/60 dark:bg-emerald-950/20 border-l-emerald-500',
+      'bg-amber-50/60 dark:bg-amber-950/20 border-l-amber-500',
+    ];
+    return styles[Math.min(depth, styles.length - 1)];
+  };
+
+  const renderFlatRow = (entry: FlatEntry, idx: number) => {
+    if (entry.type === 'manager') {
+      const group = entry.data;
+      const groupKey = entry.managerId!;
+      const isCollapsed = collapsedGroups.has(groupKey);
+      const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
+
+      return (
         <div
-          className={cn("flex items-center gap-2 p-2.5 cursor-pointer transition-colors", colors.bg, "hover:opacity-90")}
+          key={`mgr-${groupKey}-${idx}`}
+          className={cn(
+            "flex items-center gap-2 py-2.5 px-3 border-l-[3px] cursor-pointer transition-colors hover:opacity-90",
+            getRowBgStyle(entry.depth)
+          )}
           onClick={() => toggleGroupCollapsed(groupKey)}
         >
-          {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+          {isCollapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
 
-          {group.managerId && !isMobile && (
+          {!isMobile && (
             <Avatar className="h-7 w-7 shrink-0">
               <AvatarImage src={group.managerAvatar || undefined} />
               <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
             </Avatar>
           )}
-          {group.managerId && isMobile && (
-            <div className={cn("h-5 w-5 rounded-full flex items-center justify-center shrink-0", colors.dot)}>
-              <span className="text-[8px] font-bold text-white">{group.managerName?.charAt(0)}</span>
-            </div>
-          )}
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
             <span className="text-xs font-semibold truncate">{group.managerName}</span>
-            <span className="text-[10px] text-muted-foreground ml-1.5">({totalMembers})</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border", getRoleBadgeStyle(entry.depth))}>
+              {entry.roleLabel}
+            </Badge>
           </div>
 
-          {/* Aggregated stats */}
           <div className="flex items-center gap-2 shrink-0">
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] text-muted-foreground leading-tight">Target</p>
-              <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
-            </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] text-muted-foreground leading-tight">Actual</p>
-              <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
-            </div>
             {!isMobile && (
-              <div className="flex items-center gap-1 w-16">
-                <Progress value={Math.min(group.teamAchievement, 100)} className="h-1.5 flex-1" />
-                <span className="text-[10px] font-bold w-8 text-right">{group.teamAchievement.toFixed(0)}%</span>
-              </div>
+              <>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground leading-tight">Target</p>
+                  <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground leading-tight">Actual</p>
+                  <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
+                </div>
+              </>
             )}
-            {isMobile && (
-              <span className="text-[10px] font-bold">{group.teamAchievement.toFixed(0)}%</span>
-            )}
+            <span className="text-[10px] font-bold w-8 text-right">{group.teamAchievement.toFixed(0)}%</span>
             <div className="shrink-0 scale-90">{getStatusBadge(teamStatus)}</div>
           </div>
         </div>
+      );
+    }
 
-        {/* Group Content */}
-        {!isCollapsed && (
-          <div className="bg-background">
-            {/* Nested sub-manager groups */}
-            {(group.children || []).length > 0 && (
-              <div className="p-1.5 space-y-1">
-                {group.children.map((child: any, childIdx: number) => renderHierarchyGroup(child, childIdx, depth + 1))}
+    // Member row
+    const member = entry.data as TeamMemberProgress;
+    const isExpanded = expandedRows.has(member.userId);
+    const hasBreakdown = hasProductAndMonthly && member.productMonthBreakdown && member.productMonthBreakdown.length > 0;
+
+    return (
+      <div key={`mem-${member.userId}-${idx}`}>
+        <div
+          className={cn(
+            "flex items-center gap-2 py-2 px-3 border-l-[3px] transition-colors",
+            getRowBgStyle(entry.depth),
+            hasBreakdown && "cursor-pointer hover:opacity-90",
+            isExpanded && "bg-muted/30"
+          )}
+          onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
+        >
+          <div className="w-4 shrink-0">
+            {hasBreakdown && (
+              isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
+
+          {!isMobile && (
+            <Avatar className="h-7 w-7 shrink-0">
+              <AvatarImage src={member.avatarUrl || undefined} />
+              <AvatarFallback className="text-[10px]">{getInitials(member.fullName)}</AvatarFallback>
+            </Avatar>
+          )}
+
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <span className="text-xs font-medium truncate">{member.fullName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border", getRoleBadgeStyle(entry.depth))}>
+              {entry.roleLabel}
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground leading-tight">Target</p>
+              <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground leading-tight">Actual</p>
+              <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
+            </div>
+            {!isMobile && (
+              <div className="flex items-center gap-1 w-16">
+                <Progress value={Math.min(member.achievementPercentage, 100)} className="h-1.5 flex-1" />
               </div>
             )}
+            <span className="text-[10px] font-bold w-8 text-right">{member.achievementPercentage.toFixed(0)}%</span>
+            <div className="shrink-0">{getStatusBadge(member.status)}</div>
+          </div>
+        </div>
 
-            {/* Leaf members */}
-            {group.members.length > 0 && (
-              <div className={cn("divide-y", (group.children || []).length > 0 && "border-t")}>
-                {group.members.map((member: TeamMemberProgress) => renderMemberCard(member))}
-              </div>
-            )}
+        {hasBreakdown && isExpanded && (
+          <div className="mx-3 mb-2 p-3 bg-muted/20 rounded-md border">
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium">Product × Month Breakdown</span>
+            </div>
+            <ProductMonthBreakdownTable data={member.productMonthBreakdown!} basis={basis} />
           </div>
         )}
       </div>
@@ -711,9 +843,9 @@ export function TeamTargetDashboard({
                 <Button variant="link" onClick={() => setStatusFilter('all')} className="mt-2">Clear filter</Button>
               )}
             </div>
-          ) : groupedData && groupedData.length > 0 ? (
-            <div className="space-y-4">
-              {groupedData.map((group: any, idx: number) => renderHierarchyGroup(group, idx, 0))}
+          ) : visibleEntries.length > 0 ? (
+            <div className="rounded-lg overflow-hidden border divide-y divide-border/50">
+              {visibleEntries.map((entry, idx) => renderFlatRow(entry, idx))}
             </div>
           ) : (
             // Fallback flat list when no hierarchy data
