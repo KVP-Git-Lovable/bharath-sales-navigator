@@ -223,35 +223,48 @@ export function TeamTargetDashboard({
     return map;
   }, [filteredTeamProgress]);
 
+  // Recursively aggregate hierarchy group data
+  const buildGroupedData = (group: HierarchyGroup): any => {
+    // Get leaf members that exist in filteredTeamProgress
+    const members = group.memberIds
+      .map(id => progressMap.get(id))
+      .filter(Boolean) as TeamMemberProgress[];
+
+    // Recursively build children
+    const children = (group.children || [])
+      .map(child => buildGroupedData(child))
+      .filter((c: any) => c.members.length > 0 || c.children.length > 0);
+
+    // Aggregate totals: leaf members + all nested children
+    let teamTarget = members.reduce((sum, m) => sum + m.target, 0);
+    let teamActual = members.reduce((sum, m) => sum + m.actual, 0);
+    
+    children.forEach((child: any) => {
+      teamTarget += child.teamTarget;
+      teamActual += child.teamActual;
+    });
+    
+    const teamAchievement = teamTarget > 0 ? (teamActual / teamTarget) * 100 : 0;
+
+    return {
+      ...group,
+      members,
+      children,
+      teamTarget,
+      teamActual,
+      teamAchievement,
+    };
+  };
+
   // Build hierarchy groups with aggregated data
   const groupedData = useMemo(() => {
     if (!hierarchyGroups?.length || !filteredTeamProgress?.length) {
       return null;
     }
 
-    return hierarchyGroups.map(group => {
-      // Get members that exist in filteredTeamProgress
-      const members = group.memberIds
-        .map(id => progressMap.get(id))
-        .filter(Boolean) as TeamMemberProgress[];
-
-      // Also get the manager's own data if present
-      const managerProgress = group.managerId ? progressMap.get(group.managerId) : null;
-
-      // Aggregate team totals
-      const teamTarget = members.reduce((sum, m) => sum + m.target, 0);
-      const teamActual = members.reduce((sum, m) => sum + m.actual, 0);
-      const teamAchievement = teamTarget > 0 ? (teamActual / teamTarget) * 100 : 0;
-
-      return {
-        ...group,
-        members,
-        managerProgress,
-        teamTarget,
-        teamActual,
-        teamAchievement,
-      };
-    }).filter(g => g.members.length > 0 || g.managerProgress);
+    return hierarchyGroups
+      .map(group => buildGroupedData(group))
+      .filter((g: any) => g.members.length > 0 || g.children.length > 0);
   }, [hierarchyGroups, filteredTeamProgress, progressMap]);
 
   const handleStatusFilterClick = (filter: 'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved') => {
@@ -376,6 +389,94 @@ export function TeamTargetDashboard({
           </TableRow>
         )}
       </React.Fragment>
+    );
+  };
+
+  // Count total members recursively in a group
+  const countTotalMembers = (group: any): number => {
+    return group.members.length + (group.children || []).reduce((sum: number, child: any) => sum + countTotalMembers(child), 0);
+  };
+
+  const renderHierarchyGroup = (group: any, idx: number, depth: number) => {
+    const groupKey = group.managerId || `other-${idx}`;
+    const isCollapsed = collapsedGroups.has(groupKey);
+    const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
+    const totalMembers = countTotalMembers(group);
+
+    return (
+      <div key={groupKey} className={cn("border rounded-lg overflow-hidden", depth > 0 && "ml-4 mt-2")}>
+        {/* Group Header */}
+        <div
+          className={cn(
+            "flex items-center justify-between p-3 cursor-pointer transition-colors",
+            depth === 0 ? "bg-muted/50 hover:bg-muted/70" : "bg-muted/30 hover:bg-muted/50"
+          )}
+          onClick={() => toggleGroupCollapsed(groupKey)}
+        >
+          <div className="flex items-center gap-3">
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {group.managerId && (
+              <Avatar className="h-7 w-7">
+                <AvatarImage src={group.managerAvatar || undefined} />
+                <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
+              </Avatar>
+            )}
+            <div>
+              <span className="font-semibold text-sm">{group.managerName}</span>
+              <span className="text-xs text-muted-foreground ml-2">({totalMembers} members)</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right text-xs hidden sm:block">
+              <div className="text-muted-foreground">Team Target</div>
+              <div className="font-semibold">{formatValue(group.teamTarget)}</div>
+            </div>
+            <div className="text-right text-xs hidden sm:block">
+              <div className="text-muted-foreground">Team Actual</div>
+              <div className="font-semibold">{formatValue(group.teamActual)}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
+              <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
+            </div>
+            {getStatusBadge(teamStatus)}
+          </div>
+        </div>
+
+        {/* Group Content */}
+        {!isCollapsed && (
+          <div>
+            {/* Nested sub-manager groups */}
+            {(group.children || []).length > 0 && (
+              <div className="p-2 space-y-2">
+                {group.children.map((child: any, childIdx: number) => renderHierarchyGroup(child, childIdx, depth + 1))}
+              </div>
+            )}
+
+            {/* Leaf members table */}
+            {group.members.length > 0 && (
+              <div className={cn("overflow-x-auto", (group.children || []).length > 0 && "border-t")}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {hasProductAndMonthly && <TableHead className="w-10"></TableHead>}
+                      <TableHead>Team Member</TableHead>
+                      <TableHead className="text-right">Target</TableHead>
+                      <TableHead className="text-right">Actual</TableHead>
+                      <TableHead className="text-center">Progress</TableHead>
+                      <TableHead className="text-right">Gap</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.members.map((member: TeamMemberProgress) => renderMemberRow(member))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -598,75 +699,7 @@ export function TeamTargetDashboard({
             </div>
           ) : groupedData && groupedData.length > 0 ? (
             <div className="space-y-4">
-              {groupedData.map((group, idx) => {
-                const groupKey = group.managerId || `other-${idx}`;
-                const isCollapsed = collapsedGroups.has(groupKey);
-                const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
-
-                return (
-                  <div key={groupKey} className="border rounded-lg overflow-hidden">
-                    {/* Group Header */}
-                    <div
-                      className={cn(
-                        "flex items-center justify-between p-3 cursor-pointer transition-colors",
-                        "bg-muted/50 hover:bg-muted/70"
-                      )}
-                      onClick={() => toggleGroupCollapsed(groupKey)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        {group.managerId && (
-                          <Avatar className="h-7 w-7">
-                            <AvatarImage src={group.managerAvatar || undefined} />
-                            <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div>
-                          <span className="font-semibold text-sm">{group.managerName}</span>
-                          <span className="text-xs text-muted-foreground ml-2">({group.members.length} members)</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right text-xs hidden sm:block">
-                          <div className="text-muted-foreground">Team Target</div>
-                          <div className="font-semibold">{formatValue(group.teamTarget)}</div>
-                        </div>
-                        <div className="text-right text-xs hidden sm:block">
-                          <div className="text-muted-foreground">Team Actual</div>
-                          <div className="font-semibold">{formatValue(group.teamActual)}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
-                          <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
-                        </div>
-                        {getStatusBadge(teamStatus)}
-                      </div>
-                    </div>
-
-                    {/* Group Members */}
-                    {!isCollapsed && (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {hasProductAndMonthly && <TableHead className="w-10"></TableHead>}
-                              <TableHead>Team Member</TableHead>
-                              <TableHead className="text-right">Target</TableHead>
-                              <TableHead className="text-right">Actual</TableHead>
-                              <TableHead className="text-center">Progress</TableHead>
-                              <TableHead className="text-right">Gap</TableHead>
-                              <TableHead className="text-center">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.members.map(member => renderMemberRow(member))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {groupedData.map((group: any, idx: number) => renderHierarchyGroup(group, idx, 0))}
             </div>
           ) : (
             // Fallback flat table when no hierarchy data
