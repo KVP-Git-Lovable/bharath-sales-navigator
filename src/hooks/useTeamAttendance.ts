@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface TeamMemberProfile {
@@ -43,7 +44,7 @@ const today = format(new Date(), 'yyyy-MM-dd');
 const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
 const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-export const useTeamAttendance = (subordinateIds: string[], directReportIds?: string[]) => {
+export const useTeamAttendance = (subordinateIds: string[], directReportIds?: string[], dateFilter: string = 'current-month') => {
   // Use directReportIds for approvals (only immediate reports), fall back to subordinateIds
   const approvalUserIds = directReportIds && directReportIds.length > 0 ? directReportIds : subordinateIds;
   const { user } = useAuth();
@@ -184,8 +185,8 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
   const onLeaveCount = [...onLeaveUserIds].filter(id => !presentUserIds.has(id)).length;
   const absentCount = subordinateIds.length - presentCount - onLeaveCount;
 
-  // Working days in month (approx)
-  const totalWorkingDaysInMonth = 22;
+  // Working days in month - dynamically calculated from config
+  const { totalWorkingDays: totalWorkingDaysInMonth } = useWorkingDaysConfig(dateFilter);
 
   // Build team members list
   const profileMap = new Map(profiles.map(p => [p.id, p]));
