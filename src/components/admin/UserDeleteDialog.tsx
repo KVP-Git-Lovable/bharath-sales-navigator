@@ -231,7 +231,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 flex-1 overflow-hidden flex flex-col">
+        <div className="space-y-4 py-4 flex-1 overflow-y-auto flex flex-col">
           {/* Data Summary */}
           {loadingData ? (
             <div className="flex items-center justify-center py-4">
