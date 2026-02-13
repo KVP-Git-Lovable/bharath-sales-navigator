@@ -285,9 +285,35 @@
     left: 0;
     right: 0;
     height: var(--sat);
-    background-color: hsl(var(--card));
+    background-color: hsl(var(--primary));
     z-index: 9999;
   }
+
+/* Global safe area top cover - protects ALL pages */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: hsl(var(--primary));
+  z-index: 99999;
+  pointer-events: none;
+}
+
+/* Global safe area bottom cover */
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-bottom, 0px);
+  background-color: hsl(var(--background));
+  z-index: 99999;
+  pointer-events: none;
+}
 
 
   /* Safe area container for full app */

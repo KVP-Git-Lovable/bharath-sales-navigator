@@ -22,7 +22,7 @@ export const LandingPage = () => {
   }, [user, navigate]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background standalone-page">
       <WebsiteHeader />
       <HeroSection />
       <SolutionsSection />
