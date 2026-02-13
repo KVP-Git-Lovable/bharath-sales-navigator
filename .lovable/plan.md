@@ -1,56 +1,96 @@
 
 
-# Flatten Hierarchy View to Single-Line Color-Coded List
+# Ensure Top Bezel (Status Bar) Area is Never Covered on Mobile
 
-## Current Problem
-The Team Performance section uses a nested tree structure with indentation and collapsible groups. This creates deep nesting that is hard to read, especially on mobile screens.
+## Problem
+On mobile devices (especially iPhones with notches), the system status bar area can overlap with app content. Currently, pages wrapped in `<Layout>` are protected (it renders a fixed overlay covering the safe area inset), but **standalone pages** that don't use Layout have no consistent protection.
 
-## New Design
-Replace the nested tree with a **flat, single-line-per-user list**. Each user gets a single row with a colored left accent and role badge to indicate their position in the hierarchy. No nesting or indentation -- just a clean vertical list.
+## Affected Pages
 
-### Visual Layout (each row)
-```text
-[color bar] [Avatar] Name          Role Badge     Target   Actual   %   Status
+### Category 1: Already Protected (no changes needed)
+- ~90 pages wrapped in `<Layout>` component -- Layout.tsx already renders a fixed `z-[9999]` safe area spacer at top and bottom
+- Distributor portal standalone pages -- use `standalone-page` CSS class with `::before` pseudo-element
+
+### Category 2: Standalone Pages Needing Safe Area Protection
+These pages render full-screen without Layout and have NO safe area handling:
+
+| Page | Route |
+|------|-------|
+| Auth (RoleBasedAuthPage) | `/auth` |
+| Reset Password | `/reset-password` |
+| Change Password | `/change-password` |
+| Complete Profile | `/auth/complete-profile` |
+| Not Found (404) | `*` |
+| Map Redirect | `/map-redirect` |
+| Landing Page | `/` |
+
+### Category 3: DMSLayout (Distributor Management System)
+- Mobile header uses `safe-area-top` class for padding but lacks the colored overlay spacer that Layout.tsx uses
+
+## Solution
+
+### 1. Global Safe Area Protection via CSS (single fix for all pages)
+Add a global `::before` pseudo-element on the `#root` or `body` to create a persistent safe area cover. This ensures ALL pages, including standalone ones, are protected without modifying each file individually.
+
+In `src/index.css`, update the `body` styles or add a new rule:
+
+```css
+/* Global safe area top cover - protects ALL pages */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: hsl(var(--primary));
+  z-index: 99999;
+  pointer-events: none;
+}
+
+/* Global safe area bottom cover */
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-bottom, 0px);
+  background-color: hsl(var(--background));
+  z-index: 99999;
+  pointer-events: none;
+}
 ```
 
-### Color Coding by Role
-- **Top Manager** (Level 0): Rose/red tinted row with "Top Manager" badge
-- **Manager** (Level 1): Purple tinted row with "Manager" badge  
-- **Team Lead** (Level 2): Blue tinted row with "Team Lead" badge
-- **Member** (Level 3+): Emerald tinted row with "Member" badge
+### 2. Add top padding to standalone pages
+Each standalone page needs `padding-top: env(safe-area-inset-top)` so content doesn't hide behind the overlay. Update these 7 pages to add the `pt-[env(safe-area-inset-top)]` or use the existing `standalone-page` class.
 
-Each level gets a light background tint and a left border accent in the corresponding color, making roles instantly distinguishable without any tree indentation.
+Pages to update:
+- `src/components/auth/RoleBasedAuthPage.tsx` -- add `standalone-page` class to root div
+- `src/pages/ResetPassword.tsx` -- add `standalone-page` class to all 3 return branches
+- `src/pages/ChangePassword.tsx` -- add `standalone-page` class to root div
+- `src/pages/CompleteProfile.tsx` -- already uses `standalone-page` on main return, add to loading/error returns
+- `src/pages/NotFound.tsx` -- add `standalone-page` class to root div
+- `src/pages/MapRedirect.tsx` -- add `standalone-page` class to root div
+- `src/pages/LandingPage.tsx` -- add `standalone-page` class to root div
 
-### How It Works
-1. Recursively flatten the hierarchy groups into a single ordered array, tagging each entry with its depth level and role label
-2. Render all entries as a simple vertical list of single-line cards
-3. Managers show their aggregated team totals; leaf members show individual targets
-4. The top-level manager appears first, followed by their sub-managers and members in order
-5. Collapsible expand is preserved per manager row to show/hide their team members beneath them
+### 3. Remove duplicate safe area spacers from Layout.tsx
+Since the global `body::before/::after` now handles it, the inline fixed divs in Layout.tsx become redundant. We can keep them for safety (they'll just overlap harmlessly) or remove them to clean up.
 
-## Technical Changes
+### 4. Update `standalone-page` CSS class
+Change the `::before` background from `hsl(var(--card))` to `hsl(var(--primary))` to match the navbar color consistently.
 
-**File: `src/components/admin/TeamTargetDashboard.tsx`**
+## Technical Details
 
-1. Add a `flattenHierarchy()` utility that walks the recursive `groupedData` and produces a flat array like:
-   ```
-   [
-     { type: 'manager', depth: 0, data: abhishekGroup },
-     { type: 'manager', depth: 1, data: girishGroup },
-     { type: 'member',  depth: 2, data: harshithMember },
-     { type: 'member',  depth: 2, data: sanjaySMember },
-     ...
-   ]
-   ```
+### Files to modify:
+1. **`src/index.css`** -- Add global `body::before` and `body::after` safe area overlays; update `standalone-page::before` background color
+2. **`src/components/auth/RoleBasedAuthPage.tsx`** -- Add `standalone-page` class
+3. **`src/pages/ResetPassword.tsx`** -- Add `standalone-page` class to all return branches
+4. **`src/pages/ChangePassword.tsx`** -- Add `standalone-page` class
+5. **`src/pages/CompleteProfile.tsx`** -- Add `standalone-page` class to loading/error returns
+6. **`src/pages/NotFound.tsx`** -- Add `standalone-page` class
+7. **`src/pages/MapRedirect.tsx`** -- Add `standalone-page` class
+8. **`src/pages/LandingPage.tsx`** -- Add `standalone-page` class
 
-2. Replace `renderHierarchyGroup` with a new `renderFlatRow()` that renders each item as a single-line row with:
-   - A 3px left border in the depth color
-   - A light background tint matching the depth color
-   - A small role badge (e.g., "Manager", "Member")
-   - Target, Actual, %, Status all on one line
-   - Managers are still collapsible (clicking hides/shows their children in the flat list)
-
-3. Remove all `ml-3 md:ml-5` nesting indentation -- every row starts at the same horizontal position
-
-4. Keep the existing `renderMemberCard` product breakdown expand functionality intact within the flat row
+This approach ensures every single page in the app respects the device's safe area, preventing any UI from appearing under the status bar/notch.
 
