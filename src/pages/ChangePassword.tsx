@@ -87,7 +87,7 @@ const ChangePassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4 standalone-page">
       <Card className="w-full max-w-md relative">
         {/* Close button */}
         <Button
