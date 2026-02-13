@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Eye } from 'lucide-react';
+import { Eye, Phone } from 'lucide-react';
 import { TeamMemberAttendance } from '@/hooks/useTeamAttendance';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,7 @@ const statusConfig = {
 export const TeamMemberAttendanceCard = ({ member, onViewAttendance }: TeamMemberAttendanceCardProps) => {
   const status = statusConfig[member.todayStatus];
   const initials = member.profile.full_name?.substring(0, 2).toUpperCase() || '??';
+  const phoneNumber = member.profile.phone_number;
 
   return (
     <div className="bg-background rounded-2xl shadow-sm p-3.5 flex items-center gap-3">
@@ -36,9 +37,21 @@ export const TeamMemberAttendanceCard = ({ member, onViewAttendance }: TeamMembe
         </div>
 
         <div className="flex items-center justify-between mt-1">
-          <span className="text-xs text-muted-foreground">
-            {member.monthlyPresent} / {member.monthlyTotal}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {member.monthlyPresent} / {member.monthlyTotal}
+            </span>
+            {phoneNumber && (
+              <a
+                href={`tel:${phoneNumber}`}
+                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                title={`Call ${phoneNumber}`}
+              >
+                <Phone className="h-3.5 w-3.5" />
+              </a>
+            )}
+          </div>
           <button
             className="inline-flex items-center gap-1 text-xs font-medium text-[hsl(160,45%,40%)] hover:text-[hsl(160,45%,30%)] transition-colors"
             onClick={() => onViewAttendance(member.profile.id)}

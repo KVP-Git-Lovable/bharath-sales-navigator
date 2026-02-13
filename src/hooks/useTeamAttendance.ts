@@ -9,6 +9,7 @@ export interface TeamMemberProfile {
   full_name: string;
   profile_picture_url: string | null;
   designation: string | null;
+  phone_number: string | null;
 }
 
 export interface TeamMemberAttendance {
@@ -57,7 +58,7 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
       if (!subordinateIds.length) return [];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, profile_picture_url, designation')
+        .select('id, full_name, profile_picture_url, designation, phone_number')
         .in('id', subordinateIds);
       if (error) throw error;
       return (data || []) as TeamMemberProfile[];
@@ -191,7 +192,7 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
   const attendanceMap = new Map(todayAttendance.map((a: any) => [a.user_id, a]));
 
   const teamMembers: TeamMemberAttendance[] = subordinateIds.map(id => {
-    const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null };
+    const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null, phone_number: null };
     const att = attendanceMap.get(id);
     const isOnLeave = onLeaveUserIds.has(id) && !presentUserIds.has(id);
     
