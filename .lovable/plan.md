@@ -1,42 +1,54 @@
 
-# Fix "Unknown" User Names in Productivity Summary
+
+# Fix: Leaderboard "All Team" Showing Only Own Data
 
 ## Root Cause
 
-The `ProductivitySummarySection` component has a **timing/data-flow bug**. During the data fetch (line 221 of `ProductivitySummarySection.tsx`), user names are resolved and baked into the `dayData` state:
+The issue is **not in the frontend code** -- it's in the **Row Level Security (RLS) policies** on the `gamification_points` table.
 
-```
-userName: userNameMap.get(userId) || 'Unknown'
-```
+Current SELECT policies:
+- "Users can view their own points" -- restricts to `auth.uid() = user_id`
+- "Admins can view all points" -- only for admin role users
 
-The problem: `userNameMap` is built from the `allUsers` prop, which comes from a separate `useEffect` in `Analytics.tsx` that fetches profiles. If the productivity data fetch completes before the profiles load, all user names are permanently stored as "Unknown" in state. Even when profiles load later, the `dayData` is not re-derived -- it retains the stale "Unknown" values.
-
-Additionally, the `userSummaries` grouping (line 248) groups by `userName`, so all "Unknown" entries merge into a single aggregated row -- which is exactly what the screenshot shows: 16 users collapsed into 1 "Unknown" row.
-
-## Why It Affects Abhishek Pai and Harshith
-
-These users likely have many subordinates (16 users in scope). The subordinate IDs resolve quickly, triggering the productivity data fetch before the profiles query completes. For admins or users with fewer subordinates, the timing may coincidentally work.
+When Harshith (a manager, not an admin) selects "All Team", the frontend correctly removes the user ID filter from the query. However, the database RLS policy still only returns his own rows because he's not an admin. So the query silently returns only his data.
 
 ## Solution
 
-**Decouple name resolution from data fetching.** Store only `userId` in `dayData` and resolve names at render time using the always-up-to-date `userNameMap`.
+Add a new RLS policy that allows **managers to view gamification points for their subordinates** (using the existing `get_subordinate_users` function), and also allow viewing all points when "All Team" is selected by any authenticated user.
 
-### Changes to `src/components/analytics/ProductivitySummarySection.tsx`:
+Since the leaderboard is meant to be a motivational/competitive feature visible to everyone on the team, the simplest and most appropriate fix is to **allow all authenticated users to read all gamification points**.
 
-1. **Stop baking `userName` into fetched data** (line 221): Store only `userId`, remove the name lookup at fetch time.
+### Database Change
 
-2. **Fix the `useEffect` dependency** (line 242): Add `userNameMap` (or `allUsers`) as a dependency so the component re-derives summaries when profiles load. Alternatively (and better), change the grouping logic to group by `userId` instead of `userName`.
+Add a new RLS SELECT policy on `gamification_points` that grants all authenticated users read access:
 
-3. **Resolve names at render/summary time**: In the `userSummaries` memo (line 245-277), group by `userId` instead of `userName`, and look up `userNameMap` for display. This ensures names are always current.
+```sql
+CREATE POLICY "All authenticated users can view points"
+  ON gamification_points FOR SELECT
+  TO authenticated
+  USING (true);
+```
 
-4. **Update drilldown filtering**: The drilldown filter (line 302) currently matches on `userName`. Change to match on `userId`.
+And remove the now-redundant restrictive policies:
+- Drop "Users can view their own points"
+- Drop "Admins can view all points"
 
-### Specific code changes:
+(The test policy `testuser_select_gamification_points` with `USING(true)` may already partially do this, but it may be scoped to a specific role. We'll clean it up.)
 
-- **Line 221**: Change `userName: userNameMap.get(userId) || 'Unknown'` to just keep `userId` (already stored)
-- **Lines 245-277 (`userSummaries` memo)**: Group by `row.userId` instead of `row.userName`, resolve `full_name` from `userNameMap` at grouping time, and add `userNameMap` to the memo dependencies
-- **Line 302 (drilldown filter)**: Filter by `row.userId === selectedUserForDrilldown` instead of `row.userName`
-- **Line 45 (`selectedUserForDrilldown`)**: Change type to store userId instead of userName
-- **Render sections**: Update table rows to use `userNameMap.get(userId)` for display
+### No Frontend Changes Needed
 
-This ensures that even if profiles load after productivity data, names will always render correctly since they are resolved from the live `userNameMap` rather than stale state.
+The component code already handles both scopes correctly:
+- **My Scope**: filters by `selectedUserIds` (line 63-64)
+- **All Team**: removes the filter, fetching all rows (which RLS currently blocks)
+
+Once the RLS policy is updated, the existing code will work as intended.
+
+## Technical Details
+
+| Item | Detail |
+|------|--------|
+| Table | `gamification_points` |
+| Change | Update RLS SELECT policy to allow all authenticated users |
+| Risk | Low -- gamification points are non-sensitive ranking data |
+| Files changed | None (database migration only) |
+
