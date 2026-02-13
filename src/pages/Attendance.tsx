@@ -48,7 +48,7 @@ const Attendance = () => {
   const navigate = useNavigate();
   
   // Hierarchical user filter
-  const { isManager, subordinateIds } = useSubordinates();
+  const { isManager, subordinateIds, directReportIds } = useSubordinates();
   const [selectedTopTab, setSelectedTopTab] = useState<'my-attendance' | 'my-team'>('my-attendance');
   const [selectedUserId, setSelectedUserId] = useState<string>('self');
   
@@ -938,7 +938,7 @@ const Attendance = () => {
 
           {/* My Team Tab Content */}
           {selectedTopTab === 'my-team' && isManager ? (
-            <TeamAttendanceTab subordinateIds={subordinateIds} />
+            <TeamAttendanceTab subordinateIds={subordinateIds} directReportIds={directReportIds} />
           ) : (
           /* My Attendance Tab Content */
           <div className="space-y-5">

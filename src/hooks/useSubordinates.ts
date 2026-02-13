@@ -12,6 +12,7 @@ export interface Subordinate {
 interface UseSubordinatesReturn {
   subordinates: Subordinate[];
   subordinateIds: string[];
+  directReportIds: string[];
   isManager: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -53,12 +54,16 @@ export const useSubordinates = (): UseSubordinatesReturn => {
   // Get all subordinate IDs (excluding self)
   const subordinateIds = actualSubordinates.map((s) => s.subordinate_user_id);
   
+  // Get direct report IDs only (level 1) - used for approvals
+  const directReportIds = subordinates.filter((s) => s.level === 1).map((s) => s.subordinate_user_id);
+  
   // User is a manager if they have at least one subordinate
   const isManager = actualSubordinates.length > 0;
 
   return {
     subordinates: actualSubordinates,
     subordinateIds,
+    directReportIds,
     isManager,
     isLoading,
     error: error as Error | null,

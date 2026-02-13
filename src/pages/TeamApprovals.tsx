@@ -17,12 +17,12 @@ const PAGE_SIZE = 10;
 
 export const TeamApprovals = () => {
   const navigate = useNavigate();
-  const { subordinateIds } = useSubordinates();
+  const { subordinateIds, directReportIds } = useSubordinates();
   const {
     pendingApprovals,
     handleLeaveAction,
     handleRegularizationAction,
-  } = useTeamAttendance(subordinateIds);
+  } = useTeamAttendance(subordinateIds, directReportIds);
 
   const [activeTab, setActiveTab] = useState<ApprovalTab>('leave');
   const [processingId, setProcessingId] = useState<string | null>(null);
