@@ -1720,41 +1720,6 @@ const Analytics = () => {
               />
 
               <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Product-wise Business Analysis</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto scrollbar-always-visible">
-                    <table className="w-full">
-                      <thead className="sticky top-0 bg-background z-10">
-                        <tr className="border-b">
-                          <th className="text-left p-2 text-sm font-medium">Product Name</th>
-                          <th className="text-right p-2 text-sm font-medium">Quantity Sold (KG)</th>
-                          <th className="text-right p-2 text-sm font-medium">Revenue</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {productData.map((product: any, index: number) => (
-                          <tr key={index} className="border-b hover:bg-muted/50">
-                            <td className="p-2 text-sm">{product.name}</td>
-                            <td className="p-2 text-sm text-right">{product.quantity.toFixed(2)}</td>
-                            <td className="p-2 text-sm text-right font-semibold">₹{product.revenue.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                        {productData.length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="p-4 text-center text-muted-foreground">
-                              No product data available for selected period
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Products by Revenue</CardTitle>
                   <div className="flex gap-1">
@@ -1805,6 +1770,41 @@ const Analytics = () => {
                       </ResponsiveContainer>
                     );
                   })()}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Product-wise Business Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto max-h-[240px] overflow-y-auto scrollbar-always-visible">
+                    <table className="w-full">
+                      <thead className="sticky top-0 bg-background z-10">
+                        <tr className="border-b">
+                          <th className="text-left p-2 text-sm font-medium">Product Name</th>
+                          <th className="text-right p-2 text-sm font-medium">Quantity Sold (KG)</th>
+                          <th className="text-right p-2 text-sm font-medium">Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...productData].sort((a, b) => b.quantity - a.quantity).map((product: any, index: number) => (
+                          <tr key={index} className="border-b hover:bg-muted/50">
+                            <td className="p-2 text-sm">{product.name}</td>
+                            <td className="p-2 text-sm text-right">{product.quantity.toFixed(2)}</td>
+                            <td className="p-2 text-sm text-right font-semibold">₹{product.revenue.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        {productData.length === 0 && (
+                          <tr>
+                            <td colSpan={3} className="p-4 text-center text-muted-foreground">
+                              No product data available for selected period
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
