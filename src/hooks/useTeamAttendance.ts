@@ -42,7 +42,9 @@ const today = format(new Date(), 'yyyy-MM-dd');
 const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
 const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-export const useTeamAttendance = (subordinateIds: string[]) => {
+export const useTeamAttendance = (subordinateIds: string[], directReportIds?: string[]) => {
+  // Use directReportIds for approvals (only immediate reports), fall back to subordinateIds
+  const approvalUserIds = directReportIds && directReportIds.length > 0 ? directReportIds : subordinateIds;
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -119,15 +121,15 @@ export const useTeamAttendance = (subordinateIds: string[]) => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // 5. Pending leave approvals
+  // 5. Pending leave approvals (only from direct reports)
   const { data: pendingLeaves = [] } = useQuery({
-    queryKey: ['team-pending-leaves', subordinateIds],
+    queryKey: ['team-pending-leaves', approvalUserIds],
     queryFn: async () => {
-      if (!subordinateIds.length) return [];
+      if (!approvalUserIds.length) return [];
       const { data, error } = await supabase
         .from('leave_applications')
         .select('id, user_id, start_date, end_date, reason, leave_type_id, status')
-        .in('user_id', subordinateIds)
+        .in('user_id', approvalUserIds)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -148,15 +150,15 @@ export const useTeamAttendance = (subordinateIds: string[]) => {
     staleTime: 2 * 60 * 1000,
   });
 
-  // 6. Pending regularization approvals
+  // 6. Pending regularization approvals (only from direct reports)
   const { data: pendingRegularizations = [] } = useQuery({
-    queryKey: ['team-pending-regularizations', subordinateIds],
+    queryKey: ['team-pending-regularizations', approvalUserIds],
     queryFn: async () => {
-      if (!subordinateIds.length) return [];
+      if (!approvalUserIds.length) return [];
       const { data, error } = await supabase
         .from('regularization_requests')
         .select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time, status')
-        .in('user_id', subordinateIds)
+        .in('user_id', approvalUserIds)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       if (error) throw error;

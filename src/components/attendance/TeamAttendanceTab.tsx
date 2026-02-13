@@ -12,9 +12,10 @@ const PAGE_SIZE = 10;
 
 interface TeamAttendanceTabProps {
   subordinateIds: string[];
+  directReportIds: string[];
 }
 
-export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) => {
+export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAttendanceTabProps) => {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<TeamFilter>('all');
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
     absentCount,
     handleLeaveAction,
     handleRegularizationAction,
-  } = useTeamAttendance(subordinateIds);
+  } = useTeamAttendance(subordinateIds, directReportIds);
 
   const filteredMembers = useMemo(() => {
     let members = filter === 'all'
