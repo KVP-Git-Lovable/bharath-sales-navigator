@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, startOfWeek, endOfWeek, startOfQuarter, endOfQuarter, subQuarters, subMonths as subM, startOfDay, subDays, startOfYear } from "date-fns";
 import { RetailerLoyaltySection } from "./loyalty/RetailerLoyaltySection";
@@ -601,10 +602,14 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
     }
   };
 
-  const handleDelete = async () => {
-    if (!formData || !user) return;
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    if (!window.confirm(`Delete ${formData.name}? This will move it to the recycle bin.`)) return;
+  const handleDeleteClick = useCallback(() => {
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const handleDeleteConfirm = async () => {
+    if (!formData || !user) return;
 
     setLoading(true);
     try {
@@ -633,6 +638,7 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
         description: `${formData.name} can be restored from Recycle Bin`,
       });
 
+      setShowDeleteConfirm(false);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -1458,7 +1464,7 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
               <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} disabled={loading}>
                 <Edit2 className="h-4 w-4 mr-1" /> Edit
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete} disabled={loading}>
+              <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteClick(); }} disabled={loading}>
                 <Trash2 className="h-4 w-4 mr-1" /> Delete
               </Button>
             </>
@@ -1562,6 +1568,15 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
           </div>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Retailer"
+        description={`Are you sure you want to delete "${formData?.name}"? This will move it to the recycle bin.`}
+        isLoading={loading}
+      />
     </Dialog>
   );
 };
