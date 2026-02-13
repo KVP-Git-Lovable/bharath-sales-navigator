@@ -251,7 +251,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
           className={cn(
             "grid items-center py-2.5 px-3 border-l-[3px] cursor-pointer transition-colors hover:opacity-90 gap-x-2",
             getRowBgStyle(entry.depth),
-            isMobile ? "grid-cols-[auto_1fr_auto_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
+            isMobile ? "grid-cols-[auto_1fr_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
           )}
           onClick={() => toggleGroupCollapsed(groupKey)}
         >
@@ -264,26 +264,28 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
             </Avatar>
           )}
 
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-semibold truncate">{group.managerName}</span>
-            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0", getRoleBadgeStyle(entry.depth))}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={cn("font-semibold truncate", isMobile ? "text-xs" : "text-sm")}>{group.managerName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0 hidden sm:inline-flex", getRoleBadgeStyle(entry.depth))}>
               {entry.roleLabel}
             </Badge>
           </div>
 
-          <div className="text-right">
-            <p className="text-[9px] text-muted-foreground leading-none">Target</p>
-            <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
-          </div>
-
-          <div className="text-right">
-            <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
-            <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
-          </div>
+          {!isMobile && (
+            <div className="text-right">
+              <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+              <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
+            </div>
+          )}
 
           {!isMobile && (
-            <span className="text-xs font-bold text-right">{group.teamAchievement.toFixed(0)}%</span>
+            <div className="text-right">
+              <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+              <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
+            </div>
           )}
+
+          <span className={cn("text-xs font-bold text-right", isMobile && "text-[11px]")}>{group.teamAchievement.toFixed(0)}%</span>
 
           <div className="shrink-0 justify-self-end">{getStatusBadge(teamStatus)}</div>
         </div>
@@ -299,7 +301,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
           className={cn(
             "grid items-center py-2 px-3 border-l-[3px] transition-colors gap-x-2",
             getRowBgStyle(entry.depth),
-            isMobile ? "grid-cols-[auto_1fr_auto_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
+            isMobile ? "grid-cols-[auto_1fr_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
           )}
         >
           <div className="w-4 shrink-0" />
@@ -311,26 +313,28 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
             </Avatar>
           )}
 
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-medium truncate">{member.fullName}</span>
-            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0", getRoleBadgeStyle(entry.depth))}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={cn("font-medium truncate", isMobile ? "text-xs" : "text-sm")}>{member.fullName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0 hidden sm:inline-flex", getRoleBadgeStyle(entry.depth))}>
               {entry.roleLabel}
             </Badge>
           </div>
 
-          <div className="text-right">
-            <p className="text-[9px] text-muted-foreground leading-none">Target</p>
-            <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
-          </div>
-
-          <div className="text-right">
-            <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
-            <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
-          </div>
+          {!isMobile && (
+            <div className="text-right">
+              <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+              <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
+            </div>
+          )}
 
           {!isMobile && (
-            <span className="text-xs font-bold text-right">{member.achievementPercentage.toFixed(0)}%</span>
+            <div className="text-right">
+              <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+              <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
+            </div>
           )}
+
+          <span className={cn("text-xs font-bold text-right", isMobile && "text-[11px]")}>{member.achievementPercentage.toFixed(0)}%</span>
 
           <div className="shrink-0 justify-self-end">{getStatusBadge(member.status)}</div>
         </div>
