@@ -278,7 +278,7 @@ export const UserDeleteDataDialog: React.FC<UserDeleteDataDialogProps> = ({
               </RadioGroup>
 
               {deleteMode === 'selective' && (
-                <ScrollArea className="flex-1 max-h-[300px] border rounded-lg p-1">
+                <ScrollArea className="flex-1 h-[40vh] max-h-[400px] border rounded-lg p-1">
                   <div className="space-y-1 p-2">
                     {Object.entries(moduleSummary)
                       .sort(([, a], [, b]) => b.count - a.count)
