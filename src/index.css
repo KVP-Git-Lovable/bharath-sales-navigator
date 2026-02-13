@@ -236,7 +236,7 @@
     top: var(--sat);
     left: 0;
     right: 0;
-    z-index: 50;
+    z-index: 60;
   }
 
   /* Main content area - ensure it scrolls under fixed navbar */
@@ -250,6 +250,12 @@
   /* Navbar spacer to prevent content from going under navbar */
   .navbar-spacer {
     height: calc(3.5rem + var(--sat));
+  }
+
+  /* Menu Sheet positioned below the navbar */
+  .menu-below-navbar {
+    top: calc(3.5rem + var(--sat)) !important;
+    height: calc(100% - 3.5rem - var(--sat)) !important;
   }
 
   /* Sticky header with safe area - for pages without Layout */

@@ -233,7 +233,7 @@ export const Navbar = memo(() => {
       <div className="navbar-spacer" />
 
       <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto menu-below-navbar">
           {/* User Profile Section */}
           <SheetHeader className="pb-3 border-b bg-gradient-primary text-primary-foreground rounded-lg -mx-6 -mt-6 px-6 pt-4 mb-6 pr-12">
             <div className="flex items-start justify-between gap-3">
