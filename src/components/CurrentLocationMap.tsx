@@ -31,6 +31,7 @@ interface CurrentLocationMapProps {
   isViewingOther?: boolean;
   journeyPositions?: JourneyPosition[];
   journeyLoading?: boolean;
+  attendanceCompleted?: boolean;
 }
 
 export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({ 
@@ -39,6 +40,7 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
   isViewingOther = false,
   journeyPositions = [],
   journeyLoading = false,
+  attendanceCompleted = false,
 }) => {
   const { user } = useAuth();
   const mapRef = useRef<L.Map | null>(null);
@@ -170,8 +172,9 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
       iconSize: [14, 14],
       iconAnchor: [7, 7],
     });
+    const endLabel = attendanceCompleted ? 'Day End' : 'Latest Position';
     L.marker([last.latitude, last.longitude], { icon: endIcon })
-      .bindPopup(`<strong>Latest Position</strong><br/>${format(last.timestamp, 'hh:mm a')}`)
+      .bindPopup(`<strong>${endLabel}</strong><br/>${format(last.timestamp, 'hh:mm a')}`)
       .addTo(layerGroup);
 
     // Sample waypoints for OSRM (max ~80 per batch to stay within limits)
@@ -226,7 +229,7 @@ export const CurrentLocationMap: React.FC<CurrentLocationMapProps> = ({
     };
 
     fetchRoute();
-  }, [journeyPositions]);
+  }, [journeyPositions, attendanceCompleted]);
 
   const updateMapMarker = useCallback((latitude: number, longitude: number, accuracy: number, timestamp: Date) => {
     if (!mapRef.current) return;
