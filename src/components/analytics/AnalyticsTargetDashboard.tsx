@@ -32,6 +32,7 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
   const [basis, setBasis] = useState<TargetBasis>('quantity');
   const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved'>('all');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [mobileShowValues, setMobileShowValues] = useState(false);
   const isMobile = useIsMobile();
 
   const { data: allUserIds = [] } = useQuery({
@@ -285,9 +286,23 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
             </div>
           )}
 
-          <span className={cn("text-xs font-bold text-right", isMobile && "text-[11px]")}>{group.teamAchievement.toFixed(0)}%</span>
-
-          <div className="shrink-0 justify-self-end">{getStatusBadge(teamStatus)}</div>
+          {isMobile && mobileShowValues ? (
+            <>
+              <div className="text-right">
+                <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+                <p className="text-[11px] font-bold leading-tight">{formatValue(group.teamTarget)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+                <p className="text-[11px] font-bold leading-tight">{formatValue(group.teamActual)}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className={cn("text-xs font-bold text-right", isMobile && "text-[11px]")}>{group.teamAchievement.toFixed(0)}%</span>
+              <div className="shrink-0 justify-self-end">{getStatusBadge(teamStatus)}</div>
+            </>
+          )}
         </div>
       );
     }
@@ -334,9 +349,23 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
             </div>
           )}
 
-          <span className={cn("text-xs font-bold text-right", isMobile && "text-[11px]")}>{member.achievementPercentage.toFixed(0)}%</span>
-
-          <div className="shrink-0 justify-self-end">{getStatusBadge(member.status)}</div>
+          {isMobile && mobileShowValues ? (
+            <>
+              <div className="text-right">
+                <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+                <p className="text-[11px] font-semibold leading-tight">{formatValue(member.target)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+                <p className="text-[11px] font-semibold leading-tight">{formatValue(member.actual)}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className={cn("text-xs font-bold text-right", isMobile && "text-[11px]")}>{member.achievementPercentage.toFixed(0)}%</span>
+              <div className="shrink-0 justify-self-end">{getStatusBadge(member.status)}</div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -393,10 +422,22 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
       {/* Target Summary - Flat Hierarchy View */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Network className="h-5 w-5" />
-            Target Summary
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Network className="h-5 w-5" />
+              Target Summary
+            </CardTitle>
+            {isMobile && (
+              <Button
+                variant={mobileShowValues ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-[10px] px-2"
+                onClick={() => setMobileShowValues(prev => !prev)}
+              >
+                {mobileShowValues ? 'Show Status' : 'Show Values'}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
