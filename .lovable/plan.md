@@ -1,44 +1,54 @@
 
 
-## Auto-Recover Permanently Failed Orders
+# GPS Day Tracking – Full Route Display (OSRM Integration)
 
-### What This Does
-When any salesperson opens the app on their original device, the system will **automatically detect and retry** all orders that were marked as `permanently_failed` this morning. No user action needed beyond simply opening the app.
+## Current State
 
-### What Users Need To Do
-**Nothing special** -- just open the app normally on the same device/browser they used this morning. The recovery happens silently in the background.
+The `CurrentLocationMap` component already has OSRM road-snapped routing built in. When it receives `journeyPositions`, it draws start/end markers and a continuous road-based route line using the `osrm-route` edge function.
 
-### Technical Changes
+However, the GPS data loading in the Current Location tab (`GPSTrack.tsx`) does **not** filter by attendance check-in/check-out times. It loads all GPS points for the selected date range without considering when the user actually started or ended their day.
 
-**File: `src/hooks/useOfflineSync.ts`**
+## What Needs to Change
 
-1. **Add `recoverPermanentlyFailedOrders()` function** (insert before `processSyncQueue` logic, around line 133):
-   - Scans the sync queue for items where `status === 'permanently_failed'` AND `action === 'CREATE_ORDER'`
-   - For each found item:
-     - Resets `retryCount` to 0
-     - Removes `status` and `failedAt` fields
-     - Adds `_recovered: true` flag and `recoveredAt` timestamp
-   - Saves recovered items back to offline storage
-   - Logs how many orders were recovered
+### 1. Filter GPS data by Attendance boundaries (GPSTrack.tsx)
 
-2. **Call recovery before cleanup** (line ~133-135):
-   - Insert `await recoverPermanentlyFailedOrders();` before `cleanupStaleSyncItems` runs
-   - This ensures recovered items are treated as fresh and not immediately re-marked as stale
+Update the `loadClGpsData` effect to:
+- Fetch the user's attendance record for each date in the range (check_in_time, check_out_time)
+- Filter GPS points to only include those between check-in and check-out timestamps
+- This ensures the route starts at Day Start and ends at Day End
 
-3. **Update `cleanupStaleSyncItems`** (lines 45-81):
-   - Add a check: if an item has `_recovered: true`, use `recoveredAt` as the age baseline instead of the original `timestamp`
-   - This prevents a just-recovered item from being immediately classified as "stale" (since its original timestamp is hours old)
+### 2. Update Start/End marker labels (CurrentLocationMap.tsx)
 
-### Safety Guarantees
-- **No duplicates**: The existing `CREATE_ORDER` handler (line 389-399) already checks if an order exists by ID before inserting
-- **Idempotent**: Running recovery multiple times has no side effect -- already-recovered items simply get processed again
-- **Only orders**: Recovery only targets `CREATE_ORDER` actions, leaving other sync types untouched
-- **Silent**: No toast notifications or UI disruptions -- syncs quietly in the background
+Currently the markers say "Day Start" and "Latest Position". Update them to:
+- **Start marker**: "Day Start" (with attendance check-in time)
+- **End marker**: "Day End" if attendance is completed (check-out exists), or "Latest Position" if the day is still active
 
-### Expected Outcome
-Once deployed, the next time each salesperson opens the app on their original device:
-1. Recovery function finds `permanently_failed` CREATE_ORDER items
-2. Resets them so the sync processor picks them up
-3. Orders insert into the database (constraint removed)
-4. Console logs confirm: "Recovered X permanently failed orders for retry"
+Add a new optional prop `attendanceCompleted` to `CurrentLocationMap` so it can label the end marker correctly.
+
+### 3. Show attendance time info in the Current Location tab (GPSTrack.tsx)
+
+Display a small info card showing:
+- Check-in time (Day Start)
+- Check-out time (Day End) or "Active" if not yet checked out
+- This gives context about the route boundaries
+
+## Technical Details
+
+**File: `src/pages/GPSTrack.tsx`**
+- In the `loadClGpsData` useEffect, after fetching GPS points, also fetch attendance records for the date range
+- Use attendance `check_in_time` and `check_out_time` as timestamp boundaries to filter GPS data
+- Store attendance info in state for display and pass `attendanceCompleted` to `CurrentLocationMap`
+- Add an attendance info card above the map in the Current Location tab
+
+**File: `src/components/CurrentLocationMap.tsx`**
+- Add `attendanceCompleted?: boolean` prop
+- Update end marker popup label: show "Day End" when `attendanceCompleted` is true, keep "Latest Position" otherwise
+- No changes to OSRM routing logic (already working correctly)
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/pages/GPSTrack.tsx` | Filter GPS data by attendance check-in/check-out times; add attendance info display |
+| `src/components/CurrentLocationMap.tsx` | Add `attendanceCompleted` prop; update end marker label |
 
