@@ -1,11 +1,9 @@
- import { useState, useEffect, useMemo } from 'react';
- import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
- import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
- import { RefreshCw, Users, AlertTriangle } from 'lucide-react';
- import { supabase } from '@/integrations/supabase/client';
- import { format } from 'date-fns';
- import { useIsMobile } from '@/hooks/use-mobile';
- import { Badge } from '@/components/ui/badge';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { RefreshCw, Users, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
  
 interface RetailerProductivity {
   retailer_id: string;
@@ -30,8 +28,7 @@ interface RetailerProductivity {
    allUsers = [],
    periodFilter
  }: RetailerMonthlyProductivitySectionProps) => {
-   const isMobile = useIsMobile();
-   const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
    const [data, setData] = useState<RetailerProductivity[]>([]);
  
    const fetchData = async () => {
