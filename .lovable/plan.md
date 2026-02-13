@@ -1,96 +1,42 @@
 
+# Fix "Unknown" User Names in Productivity Summary
 
-# Ensure Top Bezel (Status Bar) Area is Never Covered on Mobile
+## Root Cause
 
-## Problem
-On mobile devices (especially iPhones with notches), the system status bar area can overlap with app content. Currently, pages wrapped in `<Layout>` are protected (it renders a fixed overlay covering the safe area inset), but **standalone pages** that don't use Layout have no consistent protection.
+The `ProductivitySummarySection` component has a **timing/data-flow bug**. During the data fetch (line 221 of `ProductivitySummarySection.tsx`), user names are resolved and baked into the `dayData` state:
 
-## Affected Pages
+```
+userName: userNameMap.get(userId) || 'Unknown'
+```
 
-### Category 1: Already Protected (no changes needed)
-- ~90 pages wrapped in `<Layout>` component -- Layout.tsx already renders a fixed `z-[9999]` safe area spacer at top and bottom
-- Distributor portal standalone pages -- use `standalone-page` CSS class with `::before` pseudo-element
+The problem: `userNameMap` is built from the `allUsers` prop, which comes from a separate `useEffect` in `Analytics.tsx` that fetches profiles. If the productivity data fetch completes before the profiles load, all user names are permanently stored as "Unknown" in state. Even when profiles load later, the `dayData` is not re-derived -- it retains the stale "Unknown" values.
 
-### Category 2: Standalone Pages Needing Safe Area Protection
-These pages render full-screen without Layout and have NO safe area handling:
+Additionally, the `userSummaries` grouping (line 248) groups by `userName`, so all "Unknown" entries merge into a single aggregated row -- which is exactly what the screenshot shows: 16 users collapsed into 1 "Unknown" row.
 
-| Page | Route |
-|------|-------|
-| Auth (RoleBasedAuthPage) | `/auth` |
-| Reset Password | `/reset-password` |
-| Change Password | `/change-password` |
-| Complete Profile | `/auth/complete-profile` |
-| Not Found (404) | `*` |
-| Map Redirect | `/map-redirect` |
-| Landing Page | `/` |
+## Why It Affects Abhishek Pai and Harshith
 
-### Category 3: DMSLayout (Distributor Management System)
-- Mobile header uses `safe-area-top` class for padding but lacks the colored overlay spacer that Layout.tsx uses
+These users likely have many subordinates (16 users in scope). The subordinate IDs resolve quickly, triggering the productivity data fetch before the profiles query completes. For admins or users with fewer subordinates, the timing may coincidentally work.
 
 ## Solution
 
-### 1. Global Safe Area Protection via CSS (single fix for all pages)
-Add a global `::before` pseudo-element on the `#root` or `body` to create a persistent safe area cover. This ensures ALL pages, including standalone ones, are protected without modifying each file individually.
+**Decouple name resolution from data fetching.** Store only `userId` in `dayData` and resolve names at render time using the always-up-to-date `userNameMap`.
 
-In `src/index.css`, update the `body` styles or add a new rule:
+### Changes to `src/components/analytics/ProductivitySummarySection.tsx`:
 
-```css
-/* Global safe area top cover - protects ALL pages */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top, 0px);
-  background-color: hsl(var(--primary));
-  z-index: 99999;
-  pointer-events: none;
-}
+1. **Stop baking `userName` into fetched data** (line 221): Store only `userId`, remove the name lookup at fetch time.
 
-/* Global safe area bottom cover */
-body::after {
-  content: '';
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-bottom, 0px);
-  background-color: hsl(var(--background));
-  z-index: 99999;
-  pointer-events: none;
-}
-```
+2. **Fix the `useEffect` dependency** (line 242): Add `userNameMap` (or `allUsers`) as a dependency so the component re-derives summaries when profiles load. Alternatively (and better), change the grouping logic to group by `userId` instead of `userName`.
 
-### 2. Add top padding to standalone pages
-Each standalone page needs `padding-top: env(safe-area-inset-top)` so content doesn't hide behind the overlay. Update these 7 pages to add the `pt-[env(safe-area-inset-top)]` or use the existing `standalone-page` class.
+3. **Resolve names at render/summary time**: In the `userSummaries` memo (line 245-277), group by `userId` instead of `userName`, and look up `userNameMap` for display. This ensures names are always current.
 
-Pages to update:
-- `src/components/auth/RoleBasedAuthPage.tsx` -- add `standalone-page` class to root div
-- `src/pages/ResetPassword.tsx` -- add `standalone-page` class to all 3 return branches
-- `src/pages/ChangePassword.tsx` -- add `standalone-page` class to root div
-- `src/pages/CompleteProfile.tsx` -- already uses `standalone-page` on main return, add to loading/error returns
-- `src/pages/NotFound.tsx` -- add `standalone-page` class to root div
-- `src/pages/MapRedirect.tsx` -- add `standalone-page` class to root div
-- `src/pages/LandingPage.tsx` -- add `standalone-page` class to root div
+4. **Update drilldown filtering**: The drilldown filter (line 302) currently matches on `userName`. Change to match on `userId`.
 
-### 3. Remove duplicate safe area spacers from Layout.tsx
-Since the global `body::before/::after` now handles it, the inline fixed divs in Layout.tsx become redundant. We can keep them for safety (they'll just overlap harmlessly) or remove them to clean up.
+### Specific code changes:
 
-### 4. Update `standalone-page` CSS class
-Change the `::before` background from `hsl(var(--card))` to `hsl(var(--primary))` to match the navbar color consistently.
+- **Line 221**: Change `userName: userNameMap.get(userId) || 'Unknown'` to just keep `userId` (already stored)
+- **Lines 245-277 (`userSummaries` memo)**: Group by `row.userId` instead of `row.userName`, resolve `full_name` from `userNameMap` at grouping time, and add `userNameMap` to the memo dependencies
+- **Line 302 (drilldown filter)**: Filter by `row.userId === selectedUserForDrilldown` instead of `row.userName`
+- **Line 45 (`selectedUserForDrilldown`)**: Change type to store userId instead of userName
+- **Render sections**: Update table rows to use `userNameMap.get(userId)` for display
 
-## Technical Details
-
-### Files to modify:
-1. **`src/index.css`** -- Add global `body::before` and `body::after` safe area overlays; update `standalone-page::before` background color
-2. **`src/components/auth/RoleBasedAuthPage.tsx`** -- Add `standalone-page` class
-3. **`src/pages/ResetPassword.tsx`** -- Add `standalone-page` class to all return branches
-4. **`src/pages/ChangePassword.tsx`** -- Add `standalone-page` class
-5. **`src/pages/CompleteProfile.tsx`** -- Add `standalone-page` class to loading/error returns
-6. **`src/pages/NotFound.tsx`** -- Add `standalone-page` class
-7. **`src/pages/MapRedirect.tsx`** -- Add `standalone-page` class
-8. **`src/pages/LandingPage.tsx`** -- Add `standalone-page` class
-
-This approach ensures every single page in the app respects the device's safe area, preventing any UI from appearing under the status bar/notch.
-
+This ensures that even if profiles load after productivity data, names will always render correctly since they are resolved from the live `userNameMap` rather than stale state.
