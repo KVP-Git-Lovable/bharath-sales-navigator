@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HierarchyUser {
   id: string;
@@ -28,22 +29,26 @@ type ViewMode = 'tree' | 'list';
 
 // Color palette for different hierarchy levels
 const levelColors = [
-  'bg-pink-500',      // Level 0 - Top (CEO/Admin)
-  'bg-slate-700',     // Level 1
-  'bg-purple-500',    // Level 2
-  'bg-blue-500',      // Level 3
-  'bg-green-500',     // Level 4
-  'bg-amber-500',     // Level 5+
+  { bg: 'bg-pink-500', text: 'text-pink-500', border: 'border-pink-500/30', bgLight: 'bg-pink-500/10' },
+  { bg: 'bg-slate-700', text: 'text-slate-700', border: 'border-slate-500/30', bgLight: 'bg-slate-500/10' },
+  { bg: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-500/30', bgLight: 'bg-purple-500/10' },
+  { bg: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500/30', bgLight: 'bg-blue-500/10' },
+  { bg: 'bg-green-500', text: 'text-green-500', border: 'border-green-500/30', bgLight: 'bg-green-500/10' },
+  { bg: 'bg-amber-500', text: 'text-amber-500', border: 'border-amber-500/30', bgLight: 'bg-amber-500/10' },
 ];
 
-const getLevelColor = (level: number): string => {
+const getLevelColor = (level: number) => {
   return levelColors[Math.min(level, levelColors.length - 1)];
+};
+
+const getLevelColorBg = (level: number): string => {
+  return getLevelColor(level).bg;
 };
 
 const OrgNode = ({ user, level = 0 }: { user: HierarchyUser; level?: number }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasReports = user.directReports.length > 0;
-  const colorClass = getLevelColor(level);
+  const colorClass = getLevelColorBg(level);
 
   return (
     <div className="flex flex-col items-center">
@@ -139,7 +144,7 @@ const ListRow = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(level < 2);
   const hasReports = user.directReports.length > 0;
-  const colorClass = getLevelColor(level);
+  const colorClass = getLevelColorBg(level);
   
   // Find manager name
   const managerName = user.manager_id 
@@ -208,11 +213,96 @@ const ListRow = ({
   );
 };
 
+// Mobile: Flat role-grouped card layout
+const MobileRoleView = ({ hierarchy }: { hierarchy: HierarchyUser[] }) => {
+  // Flatten hierarchy into level-tagged entries
+  const flatEntries = useMemo(() => {
+    const entries: { user: HierarchyUser; level: number }[] = [];
+    const traverse = (users: HierarchyUser[], level: number) => {
+      for (const user of users) {
+        entries.push({ user, level });
+        if (user.directReports.length > 0) {
+          traverse(user.directReports, level + 1);
+        }
+      }
+    };
+    traverse(hierarchy, 0);
+    return entries;
+  }, [hierarchy]);
+
+  // Group by role
+  const grouped = useMemo(() => {
+    const map = new Map<string, { users: HierarchyUser[]; level: number }>();
+    for (const { user, level } of flatEntries) {
+      const role = user.role_name || 'No Role';
+      if (!map.has(role)) {
+        map.set(role, { users: [], level });
+      }
+      map.get(role)!.users.push(user);
+      // Keep the minimum level for the color
+      if (level < map.get(role)!.level) {
+        map.get(role)!.level = level;
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].level - b[1].level);
+  }, [flatEntries]);
+
+  return (
+    <div className="space-y-3">
+      {grouped.map(([role, { users, level }]) => {
+        const colors = getLevelColor(level);
+        return (
+          <div key={role} className={cn("rounded-lg border p-3", colors.border, colors.bgLight)}>
+            {/* Role header */}
+            <div className="flex items-center gap-2 mb-2.5">
+              <div className={cn("w-2.5 h-2.5 rounded-full", colors.bg)} />
+              <span className={cn("text-xs font-semibold uppercase tracking-wide", colors.text)}>
+                {role}
+              </span>
+              <Badge variant="secondary" className="ml-auto text-[10px] h-5">
+                {users.length}
+              </Badge>
+            </div>
+            {/* User cards */}
+            <div className="space-y-1.5">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center gap-2.5 bg-background/80 rounded-md px-2.5 py-2"
+                >
+                  <div className={cn("rounded-full p-0.5 shrink-0", colors.bg)}>
+                    <Avatar className="h-7 w-7 border border-background">
+                      <AvatarImage src={user.profile_picture_url} />
+                      <AvatarFallback className="bg-background text-foreground font-semibold text-[10px]">
+                        {user.full_name?.charAt(0) || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate">{user.full_name || user.username}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{user.username}</p>
+                  </div>
+                  {user.directReports.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] h-5 shrink-0">
+                      {user.directReports.length} reports
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   const [hierarchy, setHierarchy] = useState<HierarchyUser[]>([]);
   const [allUsersMap, setAllUsersMap] = useState<Map<string, HierarchyUser>>(new Map());
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchHierarchy();
@@ -395,27 +485,29 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
             User Hierarchy
           </CardTitle>
           
-          {/* View Toggle Buttons */}
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <Button
-              variant={viewMode === 'tree' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('tree')}
-            >
-              <GitBranch className="h-4 w-4 mr-1.5" />
-              Tree
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4 mr-1.5" />
-              List
-            </Button>
-          </div>
+          {/* View Toggle Buttons - hidden on mobile since we auto-use role view */}
+          {!isMobile && (
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <Button
+                variant={viewMode === 'tree' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 px-3"
+                onClick={() => setViewMode('tree')}
+              >
+                <GitBranch className="h-4 w-4 mr-1.5" />
+                Tree
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 px-3"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4 mr-1.5" />
+                List
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -425,6 +517,9 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
             <p>No users with hierarchy configured</p>
             <p className="text-sm">Assign managers to users to build the hierarchy</p>
           </div>
+        ) : isMobile ? (
+          /* Mobile: Color-coded role-grouped view */
+          <MobileRoleView hierarchy={hierarchy} />
         ) : viewMode === 'tree' ? (
           /* Tree View */
           <div className="overflow-x-auto pb-4">
