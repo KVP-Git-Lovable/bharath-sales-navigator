@@ -1714,6 +1714,7 @@ const Analytics = () => {
                 selectedUsers={effectiveUserIds} 
                 dateRange={stableDashboardDateRange}
                 allUsers={users}
+                periodFilter={dashboardPeriod}
               />
 
               <Card className="shadow-lg">

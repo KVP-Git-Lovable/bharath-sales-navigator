@@ -21,12 +21,14 @@ interface RetailerProductivity {
    selectedUsers: string[];
    dateRange: { from: Date; to: Date };
    allUsers?: { id: string; full_name: string | null }[];
+   periodFilter?: string;
  }
  
  export const RetailerMonthlyProductivitySection = ({ 
    selectedUsers, 
    dateRange,
-   allUsers = []
+   allUsers = [],
+   periodFilter
  }: RetailerMonthlyProductivitySectionProps) => {
    const isMobile = useIsMobile();
    const [loading, setLoading] = useState(false);
@@ -217,15 +219,21 @@ interface RetailerProductivity {
              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
            </button>
          </div>
-           <p className="text-xs text-muted-foreground mt-1">
-             Retailers with visits but no confirmed orders
-           </p>
-            <p className="text-[10px] text-blue-600 mt-0.5">
-              This shows monthly data only. Select "Last month" in the dropdown.
+            <p className="text-xs text-muted-foreground mt-1">
+              Retailers with visits but no confirmed orders
             </p>
-       </CardHeader>
-       <CardContent className="pt-0">
-         {loading ? (
+             <p className="text-[10px] text-blue-600 mt-0.5">
+               This shows monthly data only. Select "Last month" in the dropdown.
+             </p>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {periodFilter !== 'last_month' ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium">Select "Last Month" to view data</p>
+              <p className="text-xs mt-1">This section displays monthly productivity data only.</p>
+            </div>
+          ) : loading ? (
            <div className="flex items-center justify-center py-8">
              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
            </div>
@@ -269,8 +277,8 @@ interface RetailerProductivity {
                  </table>
                </div>
              </div>
-           )}
-       </CardContent>
-     </Card>
+            )}
+        </CardContent>
+      </Card>
    );
  };
