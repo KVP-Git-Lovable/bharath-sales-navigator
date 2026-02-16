@@ -52,22 +52,27 @@ serve(async (req) => {
     const adminUserId = callerUser.id;
     console.log('User authenticated:', adminUserId);
 
-    // Check if user is admin
-    const { data: roleData, error: roleError } = await supabaseAdmin
+    // Check if user is admin (role OR System Administrator security profile)
+    const { data: roleData } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', adminUserId)
       .single();
 
-    if (roleError) {
-      console.error('Error fetching user role:', roleError);
-      return new Response(
-        JSON.stringify({ error: 'Error checking user permissions', details: roleError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const isAdminRole = roleData?.role === 'admin';
+
+    let isSystemAdmin = false;
+    if (!isAdminRole) {
+      const { data: profileData } = await supabaseAdmin
+        .from('user_profiles')
+        .select('profile_id, security_profiles(name)')
+        .eq('user_id', adminUserId)
+        .single();
+
+      isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
     }
 
-    if (roleData?.role !== 'admin') {
+    if (!isAdminRole && !isSystemAdmin) {
       console.error('User is not admin. Role:', roleData?.role);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - Admin access required' }),
