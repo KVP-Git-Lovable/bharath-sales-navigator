@@ -1,48 +1,113 @@
 
-## Fix: Filter My Visit Sub-features and Today's Progress by Permissions
 
-### Problem
-The My Visits page shows all 8 quick-action buttons (Auto Plan, All Beat, Retailers, Summary, Timeline, GPS Track, Van Stock, Activity) and the "Today's Progress" card regardless of the user's security profile permissions. For the Data Viewer role, only **GPS Track** and **Activity** should be visible since those are the only visit sub-features with `can_read` permissions assigned.
+## Audit: Link Permission Set to All Features
 
-### Solution
-Use the existing `useProfilePermissions` hook inside MyVisits.tsx to conditionally render each button and the Today's Progress card based on the user's permissions.
+### Current State
 
-### Changes
+After investigating the codebase, here is what is working and what is NOT:
 
-#### 1. `src/pages/MyVisits.tsx` - Add permission-based filtering
+**Already Working:**
+- Navigation bar filters modules based on profile permissions (via `isNavItemEnabled`)
+- Dashboard quick-nav tiles filter based on profile permissions
+- My Visit page filters sub-feature buttons (GPS Track, Activity, etc.) based on permissions
 
-- Import `useProfilePermissions` hook
-- For each of the 8 quick-action buttons, check if the user has `can_read` on the corresponding permission prefix before rendering:
+**NOT Working (Gaps Found):**
+
+#### Gap 1: No Route-Level Protection
+The `ProtectedRoute` component only checks if the user is logged in -- it does NOT check module permissions. This means a Data Viewer can type any URL directly (e.g., `/my-retailers`, `/my-beats`, `/analytics`) and access pages they should not see, even though the navigation hides them.
+
+#### Gap 2: Missing Permission Modules
+The following navigation items have permission prefix mappings but NO corresponding module defined in `permissionModules.ts`, so admins cannot configure them in the Permission Set UI:
+
+| Nav Item | Permission Prefix | Module in permissionModules.ts? |
+|---|---|---|
+| Leaderboard/Gamification | `gamification_` | Missing (only admin_gamification exists) |
+| Packing List | `packing_list_` | Missing |
+| My Deliveries | `delivery_` | Missing |
+
+#### Gap 3: Sub-feature Filtering Inside Pages
+Pages like Attendance, Analytics, All Retailers, My Beats, Schemes, Expenses, etc. show all their internal tabs/sections regardless of the user's sub-feature permissions. Only the My Visit page currently filters its internal buttons.
+
+### Implementation Plan
+
+#### Step 1: Create a Permission-Aware Route Guard
+
+Create a new `PermissionGuard` component that wraps page content and checks if the user has `can_read` on at least one permission object matching the module's prefix. If not, redirect to `/dashboard`.
 
 ```text
-Button              Permission Prefix
----------           -----------------
-Auto Plan           visit_auto_plan
-All Beat            visit_all_beat
-Retailers           visit_retailers (or visit_all_beat_retailers)
-Summary             visit_summary
-Timeline            visit_timeline
-GPS Track           visit_gps_track
-Van Stock           visit_van_stock
-Activity            visit_activity
+Props:
+  - permissionPrefix: string (e.g. "retailer_", "beat_", "analytics_")
+  - children: ReactNode
+
+Logic:
+  - Admin/System Administrator -> allow
+  - No security profile (permissions empty) -> allow
+  - Has can_read on any object starting with prefix -> allow
+  - Otherwise -> redirect to /dashboard
 ```
 
-- For admin/System Administrator users, all buttons remain visible (bypass check)
-- If the user has no security profile (permissions array is empty), all buttons remain visible (no restrictions)
+#### Step 2: Apply PermissionGuard to All Module Routes in App.tsx
 
-#### 2. Today's Progress Card - Permission control
+Wrap each module's route element with `PermissionGuard`:
 
-- Add a new permission object `visit_todays_progress` to the permission modules definition
-- Conditionally render the Today's Progress card based on whether the user has `can_read` on `visit_todays_progress`
-- If no such permission object exists yet, we will add it to `permissionModules.ts` so admins can toggle it
+```text
+Route                          Permission Prefix
+/attendance                    attendance_
+/visits/retailers              visit_
+/my-retailers                  retailer_
+/my-target, /my-targets        target_
+/performance-dashboard         performance_
+/analytics                     analytics_
+/institutional-sales/*         institutional_
+/distributor-master/*          distributor_
+/primary-orders                primary_order_
+/territories-and-distributors  territory_
+/gps-track                     gps_
+/my-beats/*                    beat_
+/competition-master/*          competition_
+/schemes                       scheme_
+/expenses                      expense_
+/leaderboard                   gamification_
+/packing-list-management       packing_list_
+/my-deliveries                 delivery_
+/competency-dashboard          competency_
+/recycle-bin                   recycle_
+```
 
-#### 3. `src/components/security/permissionModules.ts` - Add Today's Progress
+#### Step 3: Add Missing Permission Modules to permissionModules.ts
 
-- Add a `visit_todays_progress` feature under the My Visit module with sub-features like `visit_todays_progress_view`
+Add three new modules so they appear in the Permission Set configuration UI:
+
+1. **Gamification** (user-facing leaderboard)
+   - `gamification_leaderboard`, `gamification_badges`, `gamification_rewards`, `gamification_redemption`
+
+2. **Packing List**
+   - `packing_list_view`, `packing_list_create`, `packing_list_manage`
+
+3. **My Deliveries**
+   - `delivery_list`, `delivery_detail`, `delivery_status_update`
+
+#### Step 4: Add Sub-feature Filtering to Key Pages (Phase 1)
+
+For the most important pages, add permission-based filtering for internal tabs/sections, following the same pattern used in MyVisits.tsx:
+
+- **Attendance page**: Filter internal sections (Check-in, Leave Applications, Holiday List, etc.) using `attendance_` sub-permissions
+- **Analytics page**: Filter tabs (Business Summary, Beat Details, Order Details, etc.) using `analytics_` sub-permissions
+
+Other pages can be enhanced in future phases as needed.
 
 ### Technical Details
 
-- The `hasModuleAccess(prefix)` function from `useProfilePermissions` checks if any permission object starting with the given prefix has `can_read = true`
-- Each button will be wrapped in a conditional: only render if `isFullAdmin || permissions.length === 0 || hasModuleAccess('visit_auto_plan')` (example for Auto Plan)
-- The two button grids (rows of 4 buttons each) will use `.filter()` to remove hidden buttons, then render dynamically with appropriate grid classes
-- The Today's Progress card will similarly be conditionally rendered
+- The `PermissionGuard` component will use the existing `useProfilePermissions` hook and `useAdminAccess` hook
+- No database changes needed -- the permission system already stores arbitrary `object_name` strings
+- When a new module is added to `permissionModules.ts`, it automatically appears in the Permission Set UI for admins to configure
+- The guard component will show a brief loading state while permissions are being fetched, then redirect if unauthorized
+
+### Summary of Files to Change
+
+1. **New**: `src/components/auth/PermissionGuard.tsx` - Route-level permission check component
+2. **Edit**: `src/App.tsx` - Wrap module routes with PermissionGuard
+3. **Edit**: `src/components/security/permissionModules.ts` - Add Gamification, Packing List, My Deliveries modules
+4. **Edit**: `src/pages/Attendance.tsx` - Add sub-feature filtering (Phase 1)
+5. **Edit**: `src/pages/Analytics.tsx` - Add sub-feature filtering (Phase 1)
+
