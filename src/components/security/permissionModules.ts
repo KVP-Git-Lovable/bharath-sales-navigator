@@ -551,6 +551,52 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       { name: 'expense_distance_calculation', label: 'Distance-based Calculation' },
     ]
   },
+  {
+    name: 'gamification',
+    label: 'Gamification / Leaderboard',
+    features: [
+      { name: 'gamification_leaderboard', label: 'Leaderboard' },
+      { name: 'gamification_badges', label: 'Badges' },
+      { name: 'gamification_rewards', label: 'Rewards' },
+      { name: 'gamification_redemption', label: 'Redemption' },
+    ]
+  },
+  {
+    name: 'packing_list',
+    label: 'Packing List',
+    features: [
+      { name: 'packing_list_view', label: 'View Packing Lists' },
+      { name: 'packing_list_create', label: 'Create Packing List' },
+      { name: 'packing_list_manage', label: 'Manage Packing Lists' },
+    ]
+  },
+  {
+    name: 'my_deliveries',
+    label: 'My Deliveries',
+    features: [
+      { name: 'delivery_list', label: 'Delivery List' },
+      { name: 'delivery_detail', label: 'Delivery Detail' },
+      { name: 'delivery_status_update', label: 'Status Update' },
+    ]
+  },
+  {
+    name: 'recycle_bin',
+    label: 'Recycle Bin',
+    features: [
+      { name: 'recycle_view', label: 'View Recycle Bin' },
+      { name: 'recycle_restore', label: 'Restore Items' },
+      { name: 'recycle_permanent_delete', label: 'Permanent Delete' },
+    ]
+  },
+  {
+    name: 'competency',
+    label: 'Competency',
+    features: [
+      { name: 'competency_dashboard', label: 'Competency Dashboard' },
+      { name: 'competency_detail', label: 'Competency Detail' },
+      { name: 'competency_team', label: 'Team Competency' },
+    ]
+  },
 ];
 
 export const PERMISSION_FIELDS = [

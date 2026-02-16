@@ -44,6 +44,8 @@ import { SupervisorReport } from "@/components/analytics/SupervisorReport";
 import { CoverageMapSection } from "@/components/analytics/CoverageMapSection";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfilePermissions } from "@/hooks/useProfilePermissions";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 interface UserProfile {
   id: string;
   full_name: string | null;
@@ -53,6 +55,15 @@ interface UserProfile {
 const Analytics = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  const { permissions, hasPermission: hasFeaturePermission } = useProfilePermissions();
+  const { isFullAdmin } = useAdminAccess();
+  const hasSecurityProfile = permissions.length > 0;
+  const canShowTab = (featureName: string) => !hasSecurityProfile || isFullAdmin || hasFeaturePermission(featureName, 'can_read');
+  
+  const showProductivityTab = canShowTab('analytics_business_summary');
+  const showTargetTab = canShowTab('analytics_order_details');
+  const showProductsTab = canShowTab('analytics_product_breakdown');
+  
   const { subordinateIds, isLoading: subordinatesLoading } = useSubordinates();
   const [hasLiked, setHasLiked] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
@@ -1580,7 +1591,7 @@ const Analytics = () => {
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="supervisor-report" className="space-y-4">
+          <Tabs defaultValue={showProductivityTab ? "supervisor-report" : showTargetTab ? "kpi" : "products"} className="space-y-4">
             <div className="relative flex items-center gap-1">
               <button
                 onClick={() => {
@@ -1598,10 +1609,10 @@ const Analytics = () => {
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 <TabsList className="inline-flex w-max gap-1 p-1">
-                  <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Productivity</TabsTrigger>
-                  <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>
+                  {showProductivityTab && <TabsTrigger value="supervisor-report" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Productivity</TabsTrigger>}
+                  {showTargetTab && <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>}
                   {/* Calendar tab hidden per user request */}
-                  <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>
+                  {showProductsTab && <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>}
                   {/* Coverage tab hidden per user request */}
                 </TabsList>
               </div>
