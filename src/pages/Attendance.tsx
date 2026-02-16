@@ -31,6 +31,8 @@ import { getLocalTodayDate, toLocalISODate } from '@/utils/dateUtils';
 import RegularizationRequestModal from '@/components/RegularizationRequestModal';
 import { useAttendanceCache } from '@/hooks/useAttendanceCache';
 import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
+import { useProfilePermissions } from '@/hooks/useProfilePermissions';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 
 // Processing steps for attendance
 type ProcessingStep = 'location' | 'photo' | 'face' | 'saving' | 'complete';
@@ -49,6 +51,18 @@ const Attendance = () => {
   
   // Hierarchical user filter
   const { isManager, subordinateIds } = useSubordinates();
+  const { permissions, hasPermission: hasFeaturePermission, hasModuleAccess } = useProfilePermissions();
+  const { isFullAdmin } = useAdminAccess();
+  const hasSecurityProfile = permissions.length > 0;
+  
+  // Permission-based section visibility
+  const canShowSection = (featureName: string) => !hasSecurityProfile || isFullAdmin || hasFeaturePermission(featureName, 'can_read');
+  const showLeaveTab = canShowSection('attendance_leave_applications');
+  const showHolidayTab = canShowSection('attendance_holiday_list');
+  const showTimelineTab = canShowSection('attendance_timeline_view');
+  const showJourneyMapTab = canShowSection('attendance_journey_map');
+  const showStatisticsTab = canShowSection('attendance_statistics');
+  
   const [selectedTopTab, setSelectedTopTab] = useState<'my-attendance' | 'my-team'>('my-attendance');
   const [selectedUserId, setSelectedUserId] = useState<string>('self');
   
@@ -1239,10 +1253,10 @@ const Attendance = () => {
 
           {/* Tabs for different sections */}
           <Tabs defaultValue="attendance" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className={`grid w-full`} style={{ gridTemplateColumns: `repeat(${1 + (showLeaveTab ? 1 : 0) + (showHolidayTab ? 1 : 0)}, 1fr)` }}>
               <TabsTrigger value="attendance">{t('attendance.myAttendance')}</TabsTrigger>
-              <TabsTrigger value="leave">{t('attendance.leave')}</TabsTrigger>
-              <TabsTrigger value="holiday">{t('attendance.holiday')}</TabsTrigger>
+              {showLeaveTab && <TabsTrigger value="leave">{t('attendance.leave')}</TabsTrigger>}
+              {showHolidayTab && <TabsTrigger value="holiday">{t('attendance.holiday')}</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="attendance" className="space-y-4">
@@ -1460,7 +1474,7 @@ const Attendance = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="leave">
+            {showLeaveTab && <TabsContent value="leave">
               <div className="space-y-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
@@ -1478,11 +1492,11 @@ const Attendance = () => {
                 
                 <MyLeaveApplications refreshTrigger={leaveRefreshTrigger} />
               </div>
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="holiday">
+            {showHolidayTab && <TabsContent value="holiday">
               <HolidayList />
-            </TabsContent>
+            </TabsContent>}
           </Tabs>
           </div>
           )}
