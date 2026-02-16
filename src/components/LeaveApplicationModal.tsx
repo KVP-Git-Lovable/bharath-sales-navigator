@@ -204,7 +204,11 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
                     mode="single"
                     selected={startDate}
                     onSelect={setStartDate}
-                    disabled={(date) => date < new Date()}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      return date < today;
+                    }}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
@@ -232,7 +236,12 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
                     mode="single"
                     selected={endDate}
                     onSelect={setEndDate}
-                    disabled={(date) => date < (startDate || new Date())}
+                    disabled={(date) => {
+                      const minDate = startDate || new Date();
+                      const compare = new Date(minDate);
+                      compare.setHours(0, 0, 0, 0);
+                      return date < compare;
+                    }}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
