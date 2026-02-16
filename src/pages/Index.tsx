@@ -244,8 +244,8 @@ const Index = () => {
               {/* Quick Navigation */}
               <QuickNavGrid items={quickNavItems} />
 
-              {/* Device Info */}
-              <DeviceInfoCard />
+              {/* Device Info - hidden for now */}
+              {/* <DeviceInfoCard /> */}
             </>
           )}
         </div>

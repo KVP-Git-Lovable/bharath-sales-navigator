@@ -21,9 +21,10 @@ export function useBatteryMonitor() {
     }
   }, []);
 
-  useManagedInterval('battery-monitor', checkBattery, BATTERY_CHECK_INTERVAL, {
-    enabled: !!userId,
-    runWhenHidden: false,
-    immediate: true,
-  });
+  // Battery logging disabled for now
+  // useManagedInterval('battery-monitor', checkBattery, BATTERY_CHECK_INTERVAL, {
+  //   enabled: !!userId,
+  //   runWhenHidden: false,
+  //   immediate: true,
+  // });
 }
