@@ -329,9 +329,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/auth/complete-profile" element={<CompleteProfile />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         
-        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="admin_"><AdminDashboard /></RoutePermissionGuard></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-        <Route path="/admin-controls" element={<ProtectedRoute><AdminControls /></ProtectedRoute>} />
+        <Route path="/admin-controls" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="admin_"><AdminControls /></RoutePermissionGuard></ProtectedRoute>} />
         <Route path="/feature-management" element={<ProtectedRoute><FeatureManagement /></ProtectedRoute>} />
         <Route path="/push-content-setup" element={<ProtectedRoute><PushContentSetup /></ProtectedRoute>} />
         <Route path="/user_roles" element={<ProtectedRoute><UserRoles /></ProtectedRoute>} />
@@ -347,7 +347,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
 <Route path="/territories-and-distributors" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="territory_"><TerritoriesAndDistributors /></RoutePermissionGuard></ProtectedRoute>} />
         <Route path="/territory/:id" element={<ProtectedRoute><TerritoryDetail /></ProtectedRoute>} />
         <Route path="/admin-expense-management" element={<ProtectedRoute><AdminExpenseManagement /></ProtectedRoute>} />
-        <Route path="/operations" element={<ProtectedRoute><Operations /></ProtectedRoute>} />
+        <Route path="/operations" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="admin_operations"><Operations /></RoutePermissionGuard></ProtectedRoute>} />
         <Route path="/visit-planner" element={<ProtectedRoute><VisitPlanner /></ProtectedRoute>} />
         <Route path="/visits" element={<ProtectedRoute><BeatPlanning /></ProtectedRoute>} />
         <Route path="/beat-planning" element={<ProtectedRoute><BeatPlanning /></ProtectedRoute>} />
