@@ -16,6 +16,7 @@ import { usePackingListModule, useDeliveryAgentApp } from "@/hooks/useD1Delivery
 import { useCompanyData } from "@/hooks/useCompanyData";
 import { Building2 as DefaultLogoIcon } from "lucide-react";
 import { useNavCustomization, NavItem } from "@/hooks/useNavCustomization";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { NavSearch } from "@/components/navigation/NavSearch";
 import { NavCustomizeDialog } from "@/components/navigation/NavCustomizeDialog";
 import { NavGroupSection } from "@/components/navigation/NavGroupSection";
@@ -64,6 +65,7 @@ export const Navbar = memo(() => {
   const { isEnabled: isPackingListEnabled } = usePackingListModule();
   const { isEnabled: isDeliveryAgentEnabled } = useDeliveryAgentApp();
   const { headerName, headerLogo } = useCompanyData();
+  const { isNavItemEnabled } = useFeatureFlags();
   
   // Company name and logo - no hardcoded fallbacks, uses cache
   const companyName = headerName || '';
@@ -113,8 +115,9 @@ export const Navbar = memo(() => {
       { id: 'recycle-bin', icon: Trash2, label: t('nav.recycleBin'), href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
     );
 
-    return baseItems;
-  }, [t, isGamificationActive, isPackingListEnabled, isDeliveryAgentEnabled]);
+    // Filter by feature flags
+    return baseItems.filter(item => isNavItemEnabled(item.id));
+  }, [t, isGamificationActive, isPackingListEnabled, isDeliveryAgentEnabled, isNavItemEnabled]);
 
   // Nav customization hook
   const {
