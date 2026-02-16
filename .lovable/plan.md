@@ -1,178 +1,76 @@
 
 
-## Revamped Attendance Page: My Attendance + My Team Tabs
+## Fix: Role-Based Module Visibility in Navigation
 
-### Overview
-Restructure the Attendance page with a top-level segmented control (`My Attendance` / `My Team`). The existing attendance UI moves under "My Attendance" with spacing/consistency polish. A new "My Team" tab provides a manager dashboard with summary cards, pending approvals, and team member attendance cards.
+### Problem
+Currently, the navigation bar uses only the global `feature_flags` table to decide which modules to show. Since all flags are set to `is_enabled: true`, every user sees all modules regardless of their security profile permissions. The Data Viewer role should only see modules they have permissions for (e.g., GPS Track and Activity within My Visit).
 
-### Page Structure
+### Solution
+Combine **global feature flags** with **per-user profile permissions** to filter navigation items. A module should only appear if:
+1. It is globally enabled in `feature_flags` (existing check), AND
+2. The user's security profile has `can_read` on at least one permission object under that module
 
-```text
-+----------------------------------+
-| Attendance          [...]        |
-| [My Attendance] [My Team]        |
-+----------------------------------+
-|  (content based on active tab)   |
-+----------------------------------+
-```
+### Implementation Steps
 
-- "My Team" tab only renders if `isManager === true` (from existing `useSubordinates` hook)
-- Default tab: "My Attendance"
-- Tabs are sticky at top, mobile-friendly
+#### 1. Update `useFeatureFlags.ts` to also check profile permissions
 
----
+- Import and use the user's profile permissions from `profile_object_permissions` (via `user_profiles` join)
+- Create a mapping from navigation item IDs to their permission module prefixes (e.g., `'my-visit'` maps to prefix `'visit_'`, `'attendance'` maps to `'attendance_'`, `'gps-track'` maps to `'gps_'`)
+- Update `isNavItemEnabled` logic: if the user has a security profile assigned, only show modules where they have `can_read` on at least one object matching that module's prefix
+- For admin/System Administrator roles, bypass this check (show everything that's globally enabled)
 
-### 1. My Attendance Tab (Existing UI, polished)
+#### 2. Create a NAV_ITEM_PERMISSION_PREFIX map
 
-Keep all existing content exactly as-is under this tab:
-- Monthly summary (% attendance, Present days count)
-- Start My Day / End My Day buttons
-- Processing overlay
-- GPS tracking info
-- Present/Absent cards
-- Market Hours card
-- Sub-tabs: My Attendance / Leaves / Holidays
-- Recent attendance list (card-based)
-- Camera capture, regularization modal
-
-Only changes: wrap in the tab content area. Minor spacing adjustments for consistency with the compact mobile preference (h-7, text-xs where appropriate).
-
----
-
-### 2. My Team Tab (New)
-
-#### 2.1 Team Summary Cards (horizontal scroll)
-Three small cards in a horizontal row:
-- **Present Today** (green) -- count of subordinates with attendance `status = 'present'` today
-- **On Leave** (yellow/amber) -- count with approved leave today
-- **Absent** (red) -- remaining subordinates
-
-Each card is tappable to filter the team list below.
-
-Data source:
-- Fetch today's attendance for all `subordinateIds` in one query
-- Fetch today's approved leaves for all `subordinateIds` in one query
-- Absent = total subordinates - present - on leave
-
-#### 2.2 Pending Approvals Section
-Only shown if there are pending leave applications or regularization requests from subordinates.
-
-Query:
-- `leave_applications` where `user_id IN subordinateIds` and `status = 'pending'`
-- `regularization_requests` where `user_id IN subordinateIds` and `status = 'pending'`
-
-Each approval card shows:
-- Employee avatar/initials + name + designation
-- Type badge (Leave / Regularization)
-- Date + reason (truncated)
-- Approve (green) + Reject (red) buttons -- large, thumb-friendly
-
-Approve/Reject reuses the same logic from `AttendanceManagement.tsx`:
-- `handleLeaveStatusUpdate` for leaves
-- `handleRegularizationStatusUpdate` for regularization (including attendance upsert on approval)
-
-Cards disappear after action. Section hides when empty.
-
-#### 2.3 Team Member Attendance List
-Vertical stack of cards, one per subordinate.
-
-Each card:
-- Profile photo (from `profiles.profile_picture_url`) or initials fallback
-- Name + designation
-- Today's status badge (Present / Absent / On Leave / Late)
-- Check-in time + hours worked (or `--` if on leave/absent)
-- Monthly summary (e.g., `18 / 22`)
-- "View Attendance" button -- navigates to a detail view
-
-Data source:
-- Profiles + today's attendance + monthly attendance counts for each subordinate
-- All fetched in bulk queries (not per-user)
-
-Filterable by the summary card taps (Present / On Leave / Absent).
-
-#### 2.4 Team Member Detail View
-When tapping "View Attendance" on a team member card:
-- Navigate to a new route `/attendance/team/:userId` OR open a full-screen bottom sheet
-- Reuses the same UI structure as "My Attendance" but filtered to that employee
-- Sub-tabs: Attendance / Leaves / Regularization
-- Read-only (no Start/End Day buttons)
-- Shows their monthly summary, attendance records list, leave applications, regularization history
-
----
-
-### New Files
-
-1. **`src/components/attendance/TeamAttendanceTab.tsx`** -- Main "My Team" tab content
-   - Team summary cards (Present/Leave/Absent)
-   - Pending approvals section
-   - Team member list with filter state
-
-2. **`src/components/attendance/TeamSummaryCards.tsx`** -- Horizontal scrolling summary cards
-
-3. **`src/components/attendance/PendingApprovalsSection.tsx`** -- Pending leave + regularization approvals with approve/reject
-
-4. **`src/components/attendance/TeamMemberCard.tsx`** -- Individual team member card
-
-5. **`src/components/attendance/TeamMemberDetailSheet.tsx`** -- Bottom sheet / dialog showing a team member's full attendance detail (reuses existing attendance list UI pattern)
-
-6. **`src/hooks/useTeamAttendance.ts`** -- Hook to fetch team attendance data:
-   - Today's attendance for all subordinates
-   - Today's approved leaves for subordinates
-   - Monthly attendance counts
-   - Pending approvals (leaves + regularization)
-
-### Modified Files
-
-1. **`src/pages/Attendance.tsx`** -- Add top-level segmented control
-   - Import `useSubordinates` (already imported)
-   - Add segmented tab state (`my-attendance` / `my-team`)
-   - Wrap existing content under "My Attendance" tab
-   - Render `TeamAttendanceTab` under "My Team" tab
-   - Only show "My Team" tab if `isManager === true`
-
----
-
-### Data Queries (in `useTeamAttendance.ts`)
+A new mapping that connects nav item IDs to their permission object name prefixes:
 
 ```text
-1. Today's attendance:
-   SELECT * FROM attendance WHERE user_id IN (subordinateIds) AND date = today
-
-2. Today's approved leaves:
-   SELECT * FROM leave_applications WHERE user_id IN (subordinateIds) 
-   AND status = 'approved' AND start_date <= today AND end_date >= today
-
-3. Monthly attendance counts (for summary on each card):
-   SELECT user_id, COUNT(*) FROM attendance 
-   WHERE user_id IN (subordinateIds) AND date >= monthStart AND date <= monthEnd 
-   AND status IN ('present','regularized') GROUP BY user_id
-
-4. Pending leave approvals:
-   SELECT la.*, p.full_name, p.profile_picture_url, p.designation 
-   FROM leave_applications la JOIN profiles p ON la.user_id = p.id
-   WHERE la.user_id IN (subordinateIds) AND la.status = 'pending'
-
-5. Pending regularization approvals:
-   SELECT rr.*, p.full_name, p.profile_picture_url, p.designation
-   FROM regularization_requests rr JOIN profiles p ON rr.user_id = p.id
-   WHERE rr.user_id IN (subordinateIds) AND rr.status = 'pending'
-
-6. Subordinate profiles:
-   SELECT id, full_name, profile_picture_url, designation 
-   FROM profiles WHERE id IN (subordinateIds)
+'attendance'          -> 'attendance_'
+'my-visit'            -> 'visit_'
+'all-retailers'       -> 'retailer_'
+'my-target'           -> 'target_'
+'performance'         -> 'performance_'
+'analytics'           -> 'analytics_'
+'institutional-sales' -> 'institutional_'
+'distributor-master'  -> 'distributor_'
+'primary-orders'      -> 'primary_order_'
+'territories'         -> 'territory_'
+'gps-track'           -> 'gps_'
+'my-beats'            -> 'beat_'
+'competition-master'  -> 'competition_'
+'schemes'             -> 'scheme_'
+'expenses'            -> 'expense_'
+'leaderboard'         -> 'gamification_'
+'my-competency'       -> 'competency_'
+'recycle-bin'         -> 'recycle_'
 ```
 
-### Mobile Design Details
-- No tables anywhere -- all cards
-- Summary cards: horizontal flex with `overflow-x-auto`, `gap-3`, `snap-x`
-- Status chips: colored badges (green/red/yellow/blue)
-- Approval buttons: `h-9` minimum for thumb targets
-- Soft shadows (`shadow-sm`), rounded corners (`rounded-xl`)
-- Team member cards: `p-3`, compact layout matching user preference for compact mobile UI
-- Sticky segmented control at top of page content
+#### 3. Update `isNavItemEnabled` logic
 
-### Role-based Behavior
-- Individual contributors: Only "My Attendance" tab shown, no toggle visible
-- Managers: Both tabs visible, "My Attendance" default
-- Admins: Same as managers here; separate Admin Panel has the full admin attendance management
+```text
+function isNavItemEnabled(navItemId):
+  1. Check global feature flag -> if disabled, hide
+  2. If user is admin/System Administrator -> show (skip permission check)
+  3. If user has no security profile -> show (no restrictions)
+  4. Check if user has can_read on ANY object matching the module prefix
+     - If yes -> show
+     - If no -> hide
+```
+
+#### 4. Handle "My Visit" sub-feature filtering
+
+The visit page tabs (Auto Plan, All Beat, Summary, Activity, GPS Track, etc.) need filtering too. Update the visit page to check `hasPermission` for each sub-tab's permission object and only render tabs the user has access to.
+
+### Technical Details
+
+- Modify `src/hooks/useFeatureFlags.ts`: Add permission-based filtering alongside existing feature flag logic. Fetch user's profile permissions and merge both checks.
+- Modify `src/components/Navbar.tsx`: No changes needed (already uses `isNavItemEnabled`).
+- Modify `src/pages/Index.tsx`: No changes needed (already uses `isNavItemEnabled`).
+- The visit pages (under `/visits/`) will need to be updated to filter sub-tabs based on the user's `visit_*` permissions.
+- Uses existing `useAuth` hook's `userRole` and `securityProfileName` to detect admin bypass.
+
+### What This Achieves
+- Data Viewer logging in will only see modules they have `can_read` permissions for
+- Admins and System Administrators continue to see all globally-enabled modules
+- The feature flag global toggle still works as an override (if globally disabled, no one sees it)
+- Sub-features within My Visit are filtered based on granular permission objects
 
