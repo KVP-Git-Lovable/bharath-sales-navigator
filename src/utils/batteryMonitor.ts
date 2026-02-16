@@ -42,6 +42,14 @@ export async function logBatteryStatus(userId: string): Promise<void> {
     return;
   }
 
+  // Delete rows older than 30 minutes for this user
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  await supabase
+    .from('device_battery_logs' as any)
+    .delete()
+    .eq('user_id', userId)
+    .lt('recorded_at', thirtyMinAgo);
+
   const { error } = await supabase.from('device_battery_logs' as any).insert({
     user_id: userId,
     battery_level: info.batteryLevel,
