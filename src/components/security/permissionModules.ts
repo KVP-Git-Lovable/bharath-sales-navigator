@@ -294,18 +294,79 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     name: 'my_visit',
     label: 'My Visit',
     features: [
-      { name: 'visit_list', label: 'Visit List' },
-      { name: 'visit_cards', label: 'Visit Cards' },
-      { name: 'visit_check_in_verification', label: 'Check-in Verification' },
-      { name: 'visit_order_entry', label: 'Order Entry' },
-      { name: 'visit_no_order_reasons', label: 'No-Order Reasons' },
+      {
+        name: 'visit_auto_plan',
+        label: 'Auto Plan',
+        subFeatures: [
+          { name: 'visit_auto_plan_view', label: 'View Auto Plan' },
+          { name: 'visit_auto_plan_generate', label: 'Generate Auto Plan' },
+          { name: 'visit_auto_plan_edit', label: 'Edit Auto Plan' },
+        ]
+      },
+      {
+        name: 'visit_all_beat',
+        label: 'All Beat',
+        subFeatures: [
+          { name: 'visit_all_beat_view', label: 'View All Beats' },
+          { name: 'visit_all_beat_select', label: 'Select Beat' },
+          { name: 'visit_all_beat_retailers', label: 'Beat Retailers' },
+        ]
+      },
+      {
+        name: 'visit_retailers',
+        label: 'Retailers',
+        subFeatures: [
+          { name: 'visit_retailer_list', label: 'Retailer List' },
+          { name: 'visit_retailer_check_in', label: 'Check-in Verification' },
+          { name: 'visit_retailer_order_entry', label: 'Order Entry' },
+          { name: 'visit_retailer_no_order', label: 'No-Order Reasons' },
+          { name: 'visit_retailer_create_visit', label: 'Create Visit' },
+        ]
+      },
+      {
+        name: 'visit_summary',
+        label: 'Summary',
+        subFeatures: [
+          { name: 'visit_summary_view', label: 'View Summary' },
+          { name: 'visit_summary_export', label: 'Export Summary' },
+          { name: 'visit_summary_insights', label: 'Summary Insights' },
+        ]
+      },
+      {
+        name: 'visit_timeline',
+        label: 'Timeline',
+        subFeatures: [
+          { name: 'visit_timeline_view', label: 'View Timeline' },
+          { name: 'visit_timeline_details', label: 'Timeline Details' },
+        ]
+      },
+      {
+        name: 'visit_gps_track',
+        label: 'GPS Track',
+        subFeatures: [
+          { name: 'visit_gps_track_view', label: 'View GPS Track' },
+          { name: 'visit_gps_track_playback', label: 'Journey Playback' },
+        ]
+      },
+      {
+        name: 'visit_van_stock',
+        label: 'Van Stock',
+        subFeatures: [
+          { name: 'visit_van_stock_view', label: 'View Van Stock' },
+          { name: 'visit_van_stock_manage', label: 'Manage Van Stock' },
+        ]
+      },
+      {
+        name: 'visit_activity',
+        label: 'Activity',
+        subFeatures: [
+          { name: 'visit_activity_view', label: 'View Activity' },
+          { name: 'visit_activity_log', label: 'Activity Log' },
+          { name: 'visit_activity_sync', label: 'Sync Activity' },
+        ]
+      },
       { name: 'visit_points_gamification', label: 'Points / Gamification' },
       { name: 'visit_ai_recommendations', label: 'AI Recommendations' },
-      { name: 'visit_create_visit', label: 'Create Visit' },
-      { name: 'visit_insights_panel', label: 'Insights Panel' },
-      { name: 'visit_van_stock_management', label: 'Van Stock Management' },
-      { name: 'visit_export_visits', label: 'Export Visits' },
-      { name: 'visit_sync_data', label: 'Sync Data' },
     ]
   },
   {
