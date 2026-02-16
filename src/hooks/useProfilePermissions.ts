@@ -42,6 +42,16 @@ export const ADMIN_MODULE_PERMISSION_MAP: Record<string, string> = {
   'admin_hierarchy_targets': '/admin/target-vs-actual', // same page
 };
 
+// Sub-feature prefixes for modules where parent name doesn't match sub-feature naming
+export const ADMIN_MODULE_SUB_PREFIXES: Record<string, string[]> = {
+  'admin_product_mgmt': ['admin_product_'],
+  'admin_scheme_master': ['admin_scheme_'],
+  'admin_vendor_mgmt': ['admin_vendor_'],
+  'admin_territories_distributors': ['admin_territory_', 'admin_distributor_', 'admin_region_'],
+  'admin_expense_mgmt': ['admin_expense_'],
+  'admin_feedback_mgmt': ['admin_feedback_', 'admin_competition_', 'admin_branding_'],
+};
+
 // Reverse map: path -> feature name(s)
 export const PATH_TO_PERMISSION_MAP: Record<string, string> = {};
 Object.entries(ADMIN_MODULE_PERMISSION_MAP).forEach(([feature, path]) => {
@@ -109,7 +119,16 @@ export const useProfilePermissions = () => {
 
   // Get list of admin module feature names user has access to
   const permittedAdminModules = Object.keys(ADMIN_MODULE_PERMISSION_MAP).filter(
-    featureName => hasModuleAccess(featureName)
+    featureName => {
+      if (hasModuleAccess(featureName)) return true;
+      const subPrefixes = ADMIN_MODULE_SUB_PREFIXES[featureName];
+      if (subPrefixes) {
+        return subPrefixes.some(prefix =>
+          permissions.some(p => p.object_name.startsWith(prefix) && p.can_read)
+        );
+      }
+      return false;
+    }
   );
 
   // Get permitted admin paths
