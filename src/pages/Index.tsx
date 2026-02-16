@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { useFeatureFlags, NAV_ITEM_FEATURE_MAP } from "@/hooks/useFeatureFlags";
+import { useProfilePermissions } from "@/hooks/useProfilePermissions";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 
 const Index = () => {
   const { userProfile, user, userRole } = useAuth();
@@ -29,6 +31,18 @@ const Index = () => {
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const isOnline = navigator.onLine;
   const { isNavItemEnabled } = useFeatureFlags();
+  const { permissions, hasModuleAccess } = useProfilePermissions();
+  const { isFullAdmin } = useAdminAccess();
+  const hasSecurityProfile = permissions.length > 0;
+
+  const canShow = (prefix: string) =>
+    !hasSecurityProfile || isFullAdmin || hasModuleAccess(prefix);
+
+  const showCheckIn = canShow('attendance_');
+  const showTodaysBeat = canShow('visit_');
+  const showAIInsights = canShow('visit_ai_recommendations') || canShow('visit_');
+  const showPerfCalendar = canShow('performance_');
+  const showPendingPay = canShow('analytics_pending_payments') || canShow('analytics_');
 
   const refreshProfilePicture = async () => {
     if (!user?.id) return;
@@ -136,27 +150,37 @@ const Index = () => {
                     <span className="text-xs">{t('home.quickAdd')}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[180px]">
-                  <DropdownMenuItem onClick={() => navigate('/visits/retailers')} className="cursor-pointer">
-                    <ShoppingCart className="h-4 w-4 mr-2 text-blue-500" />
-                    <span>{t('home.todaysVisit')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/retailers/add')} className="cursor-pointer">
-                    <Plus className="h-4 w-4 mr-2 text-green-500" />
-                    <span>{t('home.addRetailer')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/competition')} className="cursor-pointer">
-                    <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
-                    <span>{t('home.addCompetition')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/schemes')} className="cursor-pointer">
-                    <Tag className="h-4 w-4 mr-2 text-purple-500" />
-                    <span>{t('home.checkSchemes')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/leaderboard')} className="cursor-pointer">
-                    <Award className="h-4 w-4 mr-2 text-yellow-500" />
-                    <span>{t('home.leaderboard')}</span>
-                  </DropdownMenuItem>
+                 <DropdownMenuContent align="end" className="w-[180px]">
+                  {canShow('visit_') && (
+                    <DropdownMenuItem onClick={() => navigate('/visits/retailers')} className="cursor-pointer">
+                      <ShoppingCart className="h-4 w-4 mr-2 text-blue-500" />
+                      <span>{t('home.todaysVisit')}</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canShow('retailer_') && (
+                    <DropdownMenuItem onClick={() => navigate('/retailers/add')} className="cursor-pointer">
+                      <Plus className="h-4 w-4 mr-2 text-green-500" />
+                      <span>{t('home.addRetailer')}</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canShow('competition_') && (
+                    <DropdownMenuItem onClick={() => navigate('/competition')} className="cursor-pointer">
+                      <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
+                      <span>{t('home.addCompetition')}</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canShow('scheme_') && (
+                    <DropdownMenuItem onClick={() => navigate('/schemes')} className="cursor-pointer">
+                      <Tag className="h-4 w-4 mr-2 text-purple-500" />
+                      <span>{t('home.checkSchemes')}</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canShow('gamification_') && (
+                    <DropdownMenuItem onClick={() => navigate('/leaderboard')} className="cursor-pointer">
+                      <Award className="h-4 w-4 mr-2 text-yellow-500" />
+                      <span>{t('home.leaderboard')}</span>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -181,34 +205,38 @@ const Index = () => {
           ) : (
             <>
               {/* Check-in Status */}
-              <CheckInStatusBanner 
-                attendance={todayData.attendance}
-                onStartDay={() => navigate('/attendance')}
-                onEndDay={() => navigate('/attendance')}
-              />
+              {showCheckIn && (
+                <CheckInStatusBanner 
+                  attendance={todayData.attendance}
+                  onStartDay={() => navigate('/attendance')}
+                  onEndDay={() => navigate('/attendance')}
+                />
+              )}
 
               {/* Today's Beat */}
-              <TodaysBeatCard 
-                beatPlan={todayData.beatPlan}
-                beatName={todayData.beatName}
-                beatProgress={todayData.beatProgress}
-                revenueTarget={todayData.revenueTarget}
-                revenueAchieved={todayData.revenueAchieved}
-                newRetailers={todayData.newRetailers}
-                potentialRevenue={todayData.potentialRevenue}
-                points={todayData.points}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-              />
+              {showTodaysBeat && (
+                <TodaysBeatCard 
+                  beatPlan={todayData.beatPlan}
+                  beatName={todayData.beatName}
+                  beatProgress={todayData.beatProgress}
+                  revenueTarget={todayData.revenueTarget}
+                  revenueAchieved={todayData.revenueAchieved}
+                  newRetailers={todayData.newRetailers}
+                  potentialRevenue={todayData.potentialRevenue}
+                  points={todayData.points}
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                />
+              )}
 
               {/* AI Insights Section - Tomorrow + Current Week + Next Week */}
-              {userProfile?.id && <AIInsightsSection userId={userProfile.id} />}
+              {showAIInsights && userProfile?.id && <AIInsightsSection userId={userProfile.id} />}
 
               {/* Performance Calendar */}
-              {userProfile?.id && <PerformanceCalendar />}
+              {showPerfCalendar && userProfile?.id && <PerformanceCalendar />}
 
               {/* Pending Payments - Moved below calendar */}
-              {userProfile?.id && <PendingPayments userId={userProfile.id} />}
+              {showPendingPay && userProfile?.id && <PendingPayments userId={userProfile.id} />}
 
               {/* Quick Navigation */}
               <QuickNavGrid items={quickNavItems} />
