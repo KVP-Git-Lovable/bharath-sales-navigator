@@ -1,75 +1,55 @@
 
 
-## Fix: Filter Home Dashboard Sections by Permissions
+## Fix: Dashboard Sections Still Visible Despite Permissions Not Selected
 
-### Problem
-The Home/Dashboard page displays all widgets unconditionally -- Target data (inside TodaysBeatCard), AI Insights, Performance Calendar, Pending Payments, and Check-in Status -- even when the user's security profile does not include the corresponding modules.
+### Root Cause
 
-### Solution
-Add permission checks to the Home page (`src/pages/Index.tsx`) using the existing `useProfilePermissions` and `useAdminAccess` hooks, following the same pattern already used in MyVisits.tsx.
+There are two problems:
 
-### Mapping: Dashboard Widget to Permission Prefix
+1. **Unreliable "has security profile" detection**: The current code uses `permissions.length > 0` to determine if a user has a security profile assigned. This fails when:
+   - Permissions are still loading (returns empty array initially)
+   - The profile exists but has limited permissions configured
+   
+   The fix: Use `securityProfileName` from `useAuth()` instead, which is a direct check of whether the user has a security profile assigned via `user_profiles` table. This is the same approach used in `useFeatureFlags.ts` and `useAdminAccess.ts`.
 
-| Dashboard Widget | Permission Prefix | Rationale |
-|---|---|---|
-| CheckInStatusBanner | `attendance_` | Part of Attendance module |
-| TodaysBeatCard (visit planned for the day) | `visit_` | Part of My Visit module |
-| AIInsightsSection | `visit_ai_recommendations` | Already defined as a visit sub-feature |
-| PerformanceCalendar | `performance_` | Part of Performance module |
-| PendingPayments | `analytics_pending_payments` | Already defined under Analytics module |
+2. **Target section bundled inside TodaysBeatCard**: The `TodaysBeatCard` contains a target progress section (period selector, target vs actual, gap indicator) that should only show when the user has `target_` permissions. Currently there is no independent check for this.
 
 ### Changes
 
-#### 1. `src/pages/Index.tsx` - Add permission-based conditional rendering
+#### 1. `src/pages/Index.tsx` - Fix hasSecurityProfile detection
 
-- Import `useProfilePermissions` from the existing hook and `useAdminAccess`
-- Define visibility flags using the same bypass logic (admin / no security profile / has module access):
-
+Replace:
 ```
-const { permissions, hasModuleAccess } = useProfilePermissions();
-const { isFullAdmin } = useAdminAccess();
 const hasSecurityProfile = permissions.length > 0;
-
-const canShow = (prefix: string) =>
-  !hasSecurityProfile || isFullAdmin || hasModuleAccess(prefix);
-
-const showCheckIn      = canShow('attendance_');
-const showTodaysBeat   = canShow('visit_');
-const showAIInsights   = canShow('visit_ai_recommendations') || canShow('visit_');
-const showPerfCalendar = canShow('performance_');
-const showPendingPay   = canShow('analytics_pending_payments') || canShow('analytics_');
+```
+With:
+```
+const { securityProfileName } = useAuth();
+const hasSecurityProfile = !!securityProfileName;
 ```
 
-- Wrap each section in a conditional:
-  - `{showCheckIn && <CheckInStatusBanner ... />}`
-  - `{showTodaysBeat && <TodaysBeatCard ... />}`
-  - `{showAIInsights && <AIInsightsSection ... />}`
-  - `{showPerfCalendar && <PerformanceCalendar />}`
-  - `{showPendingPay && <PendingPayments ... />}`
+This uses the already-available `securityProfileName` (which is fetched via `user_profiles -> security_profiles` join) as the reliable indicator. Since `useAuth()` is already imported and destructured, we just need to add `securityProfileName` to the destructuring.
 
-#### 2. Quick Add Dropdown - Filter items
+Also add a `showTarget` flag:
+```
+const showTarget = canShow('target_');
+```
 
-The "Quick Add" dropdown in the header also contains shortcuts (Today's Visit, Add Retailer, Competition, Schemes, Leaderboard). These should also be filtered:
+And pass it to `TodaysBeatCard`:
+```
+<TodaysBeatCard ... showTarget={showTarget} />
+```
 
-| Dropdown Item | Permission Prefix |
+#### 2. `src/components/home/TodaysBeatCard.tsx` - Conditionally render target section
+
+- Add `showTarget?: boolean` prop (default `true` for backward compatibility)
+- Wrap the entire "Target Progress Section" (period selectors, target display, progress bar, gap indicator) in `{showTarget && (...)}` so it only renders when the user has target permissions
+- The visit stats (Planned, Productive, Remaining, New Added, Potential, Points) and Visit/Summary buttons remain visible as they belong to the `visit_` module
+
+### Summary
+
+| File | Change |
 |---|---|
-| Today's Visit | `visit_` |
-| Add Retailer | `retailer_` |
-| Add Competition | `competition_` |
-| Check Schemes | `scheme_` |
-| Leaderboard | `gamification_` |
-
-Items without matching permissions will be hidden from the dropdown.
-
-### What stays visible regardless of permissions
-- Welcome header with user name and role
-- Offline indicator
-- Quick Navigation grid (already filtered via `isNavItemEnabled`)
-- Profile Setup Modal
-
-### No new modules needed
-All permission prefixes already exist in `permissionModules.ts`. No database changes required.
-
-### Files to Change
-1. **Edit**: `src/pages/Index.tsx` - Add permission checks around dashboard widgets and Quick Add dropdown items
+| `src/pages/Index.tsx` | Use `securityProfileName` for profile detection; pass `showTarget` prop |
+| `src/components/home/TodaysBeatCard.tsx` | Accept `showTarget` prop; hide target section when false |
 
