@@ -11,6 +11,7 @@ import { ProfilePictureUpload } from "@/components/ProfilePictureUpload";
 import { PerformanceCalendar } from "@/components/PerformanceCalendar";
 import { AIInsightsSection } from "@/components/home/AIInsightsSection";
 import { PendingPayments } from "@/components/home/PendingPayments";
+import { DeviceInfoCard } from "@/components/home/DeviceInfoCard";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -242,6 +243,9 @@ const Index = () => {
 
               {/* Quick Navigation */}
               <QuickNavGrid items={quickNavItems} />
+
+              {/* Device Info */}
+              <DeviceInfoCard />
             </>
           )}
         </div>
