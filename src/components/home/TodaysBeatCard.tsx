@@ -29,6 +29,7 @@ interface TodaysBeatCardProps {
   points: number;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  showTarget?: boolean;
 }
 
 // These will be replaced with translated versions in the component
@@ -62,7 +63,8 @@ export const TodaysBeatCard = ({
   potentialRevenue,
   points,
   selectedDate,
-  onDateChange
+  onDateChange,
+  showTarget = true
 }: TodaysBeatCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -170,7 +172,7 @@ export const TodaysBeatCard = ({
         </div>
 
         {/* Target Progress Section */}
-        <div className="space-y-3 p-4 rounded-xl bg-gradient-to-br from-primary/5 to-transparent border border-primary/10">
+        {showTarget && <div className="space-y-3 p-4 rounded-xl bg-gradient-to-br from-primary/5 to-transparent border border-primary/10">
           {/* Period & Basis Selectors */}
           <div className="flex gap-2">
             <Select value={targetPeriod} onValueChange={(v) => setTargetPeriod(v as TargetPeriod)}>
@@ -346,7 +348,7 @@ export const TodaysBeatCard = ({
               </Button>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-3">

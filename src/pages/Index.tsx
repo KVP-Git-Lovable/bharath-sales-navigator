@@ -23,7 +23,7 @@ import { useProfilePermissions } from "@/hooks/useProfilePermissions";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 
 const Index = () => {
-  const { userProfile, user, userRole } = useAuth();
+  const { userProfile, user, userRole, securityProfileName } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation('common');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -33,7 +33,7 @@ const Index = () => {
   const { isNavItemEnabled } = useFeatureFlags();
   const { permissions, hasModuleAccess } = useProfilePermissions();
   const { isFullAdmin } = useAdminAccess();
-  const hasSecurityProfile = permissions.length > 0;
+  const hasSecurityProfile = !!securityProfileName;
 
   const canShow = (prefix: string) =>
     !hasSecurityProfile || isFullAdmin || hasModuleAccess(prefix);
@@ -43,6 +43,7 @@ const Index = () => {
   const showAIInsights = canShow('visit_ai_recommendations') || canShow('visit_');
   const showPerfCalendar = canShow('performance_');
   const showPendingPay = canShow('analytics_pending_payments') || canShow('analytics_');
+  const showTarget = canShow('target_');
 
   const refreshProfilePicture = async () => {
     if (!user?.id) return;
@@ -226,6 +227,7 @@ const Index = () => {
                   points={todayData.points}
                   selectedDate={selectedDate}
                   onDateChange={setSelectedDate}
+                  showTarget={showTarget}
                 />
               )}
 
