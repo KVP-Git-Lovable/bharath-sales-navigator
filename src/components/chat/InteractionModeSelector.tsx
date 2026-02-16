@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { MessageCircle, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface InteractionModeSelectorProps {
   onSelectText: () => void;
@@ -11,14 +10,12 @@ interface InteractionModeSelectorProps {
 export const InteractionModeSelector = memo(({ onSelectText, onSelectVoice }: InteractionModeSelectorProps) => {
   return (
     <div className="flex flex-col h-full">
-      <DialogHeader className="p-4 pb-2">
-        <DialogTitle className="text-center text-lg font-semibold">
-          Choose how to interact
-        </DialogTitle>
-        <DialogDescription className="text-center text-sm text-muted-foreground">
+      <div className="p-4 pb-2 text-center">
+        <h3 className="text-lg font-semibold">Choose how to interact</h3>
+        <p className="text-sm text-muted-foreground">
           Select your preferred way to communicate with the AI Assistant
-        </DialogDescription>
-      </DialogHeader>
+        </p>
+      </div>
       
       <div className="flex-1 flex flex-col gap-4 p-4 pt-2 justify-center">
         {/* Text Chat Option */}
