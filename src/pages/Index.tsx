@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
+import { useFeatureFlags, NAV_ITEM_FEATURE_MAP } from "@/hooks/useFeatureFlags";
 
 const Index = () => {
   const { userProfile, user, userRole } = useAuth();
@@ -27,6 +28,7 @@ const Index = () => {
   const { todayData, performance, urgentItems, isLoading, lastUpdated, refresh } = useHomeDashboard(userProfile?.id, selectedDate);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const isOnline = navigator.onLine;
+  const { isNavItemEnabled } = useFeatureFlags();
 
   const refreshProfilePicture = async () => {
     if (!user?.id) return;
@@ -80,13 +82,13 @@ const Index = () => {
   };
 
   const quickNavItems = [
-    { icon: Store, label: t('home.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
-    { icon: Users, label: t('home.myBeats'), href: "/my-beats", color: "from-orange-500 to-orange-600" },
-    { icon: Trophy, label: t('home.leaderboard'), href: "/leaderboard", color: "from-yellow-500 to-yellow-600" },
-    { icon: BarChart, label: t('home.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600" },
-    { icon: CreditCard, label: t('home.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600" },
-    { icon: MapPin, label: t('home.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },
-  ];
+    { icon: Store, label: t('home.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600", id: 'all-retailers' },
+    { icon: Users, label: t('home.myBeats'), href: "/my-beats", color: "from-orange-500 to-orange-600", id: 'my-beats' },
+    { icon: Trophy, label: t('home.leaderboard'), href: "/leaderboard", color: "from-yellow-500 to-yellow-600", id: 'leaderboard' },
+    { icon: BarChart, label: t('home.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600", id: 'analytics' },
+    { icon: CreditCard, label: t('home.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600", id: 'expenses' },
+    { icon: MapPin, label: t('home.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600", id: 'territories' },
+  ].filter(item => isNavItemEnabled(item.id));
 
   return (
     <Layout>
