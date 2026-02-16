@@ -365,6 +365,13 @@ export const PERMISSION_MODULES: PermissionModule[] = [
           { name: 'visit_activity_sync', label: 'Sync Activity' },
         ]
       },
+      {
+        name: 'visit_todays_progress',
+        label: "Today's Progress",
+        subFeatures: [
+          { name: 'visit_todays_progress_view', label: "View Today's Progress" },
+        ]
+      },
       { name: 'visit_points_gamification', label: 'Points / Gamification' },
       { name: 'visit_ai_recommendations', label: 'AI Recommendations' },
     ]

@@ -36,6 +36,8 @@ import { useVisitsDataOptimized } from "@/hooks/useVisitsDataOptimized";
 import { schedulePrefetch } from "@/utils/backgroundProductPrefetch";
 import { Preferences } from "@capacitor/preferences";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { useProfilePermissions } from "@/hooks/useProfilePermissions";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
 import { InsightsPanel } from "@/components/visits/InsightsPanel";
@@ -204,6 +206,21 @@ export const MyVisits = () => {
   const navigate = useNavigate();
   const networkStatus = useConnectivity();
   const isOnline = networkStatus === 'online';
+  const { isFullAdmin } = useAdminAccess();
+  const { permissions, hasModuleAccess } = useProfilePermissions();
+  
+  // Permission-based visibility: if user has a security profile, filter buttons
+  const hasSecurityProfile = permissions.length > 0;
+  const canShowButton = (prefix: string) => !hasSecurityProfile || isFullAdmin || hasModuleAccess(prefix);
+  const showAutoPlan = canShowButton('visit_auto_plan');
+  const showAllBeat = canShowButton('visit_all_beat');
+  const showRetailers = canShowButton('visit_retailers');
+  const showSummary = canShowButton('visit_summary');
+  const showTimeline = canShowButton('visit_timeline');
+  const showGpsTrack = canShowButton('visit_gps_track');
+  const showVanStock = canShowButton('visit_van_stock');
+  const showActivity = canShowButton('visit_activity');
+  const showTodaysProgress = canShowButton('visit_todays_progress');
 
   // NOTE: AI Recommendations hooks moved below after plannedBeats is defined
   const { isLocationEnabled } = useLocationFeature();
@@ -1235,64 +1252,82 @@ export const MyVisits = () => {
                 </button>)}
             </div>
 
-            {/* Quick Actions - Only show for own data */}
-            {isViewingSelf && <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-2">
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3"
-                onClick={handleAutoGeneratePlan}
-                disabled={isGeneratingPlan}
-                title="AI generates optimized weekly beat plans"
-              >
-                {isGeneratingPlan ? (
-                  <Loader2 size={12} className="mr-1 sm:mr-1.5 animate-spin" />
-                ) : (
-                  <Sparkles size={12} className="mr-1 sm:mr-1.5" />
-                )}
-                <span className="whitespace-nowrap">{isGeneratingPlan ? t('visits.planning') : t('visits.autoPlan')}</span>
-              </Button>
-              <Button variant="secondary" size="sm" className={`bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3 ${selectedDate < new Date().toISOString().split('T')[0] ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => navigate(`/beat-planning?date=${selectedDate}`)} disabled={selectedDate < new Date().toISOString().split('T')[0]}>
-                <Route size={12} className="mr-1 sm:mr-1.5" />
-                <span className="whitespace-nowrap">{t('visits.journeyPlan')}</span>
-              </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={() => navigate('/my-retailers', { state: { returnTo: '/visits/retailers' } })}>
-                <Users size={12} className="mr-1 sm:mr-1.5" />
-                <span className="whitespace-nowrap">{t('visits.retailers')}</span>
-              </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3 overflow-hidden" onClick={() => navigate(`/today-summary?date=${selectedDate}`)}>
-                <FileText size={10} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                <span className="truncate">{t('visits.summary')}</span>
-              </Button>
-            </div>}
-            
-            {/* Timeline View, GPS Track, Van Stock, and Activity Buttons - Only for own data */}
-            {isViewingSelf && <div className="grid grid-cols-4 gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2">
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => {
-              setTimelineDate(selectedDate ? new Date(selectedDate) : new Date());
-              setIsTimelineOpen(true);
-            }}>
-                <Clock size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                <span className="truncate">{t('visits.timeline')}</span>
-              </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => navigate('/gps-track')}>
-                <MapPin size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                <span className="truncate">{t('visits.gpsTrack')}</span>
-              </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsVanStockOpen(true)}>
-                <Truck size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                <span className="truncate">{t('visits.vanStock')}</span>
-              </Button>
-              <Button variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsActivityModalOpen(true)}>
-                <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
-                <span className="truncate">Activity</span>
-              </Button>
-            </div>}
+            {/* Quick Actions - Only show for own data, filtered by permissions */}
+            {isViewingSelf && (() => {
+              const row1Buttons = [
+                showAutoPlan && (
+                  <Button key="auto-plan" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={handleAutoGeneratePlan} disabled={isGeneratingPlan} title="AI generates optimized weekly beat plans">
+                    {isGeneratingPlan ? <Loader2 size={12} className="mr-1 sm:mr-1.5 animate-spin" /> : <Sparkles size={12} className="mr-1 sm:mr-1.5" />}
+                    <span className="whitespace-nowrap">{isGeneratingPlan ? t('visits.planning') : t('visits.autoPlan')}</span>
+                  </Button>
+                ),
+                showAllBeat && (
+                  <Button key="all-beat" variant="secondary" size="sm" className={`bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3 ${selectedDate < new Date().toISOString().split('T')[0] ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => navigate(`/beat-planning?date=${selectedDate}`)} disabled={selectedDate < new Date().toISOString().split('T')[0]}>
+                    <Route size={12} className="mr-1 sm:mr-1.5" />
+                    <span className="whitespace-nowrap">{t('visits.journeyPlan')}</span>
+                  </Button>
+                ),
+                showRetailers && (
+                  <Button key="retailers" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={() => navigate('/my-retailers', { state: { returnTo: '/visits/retailers' } })}>
+                    <Users size={12} className="mr-1 sm:mr-1.5" />
+                    <span className="whitespace-nowrap">{t('visits.retailers')}</span>
+                  </Button>
+                ),
+                showSummary && (
+                  <Button key="summary" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3 overflow-hidden" onClick={() => navigate(`/today-summary?date=${selectedDate}`)}>
+                    <FileText size={10} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                    <span className="truncate">{t('visits.summary')}</span>
+                  </Button>
+                ),
+              ].filter(Boolean);
+
+              const row2Buttons = [
+                showTimeline && (
+                  <Button key="timeline" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => { setTimelineDate(selectedDate ? new Date(selectedDate) : new Date()); setIsTimelineOpen(true); }}>
+                    <Clock size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                    <span className="truncate">{t('visits.timeline')}</span>
+                  </Button>
+                ),
+                showGpsTrack && (
+                  <Button key="gps-track" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => navigate('/gps-track')}>
+                    <MapPin size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                    <span className="truncate">{t('visits.gpsTrack')}</span>
+                  </Button>
+                ),
+                showVanStock && (
+                  <Button key="van-stock" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsVanStockOpen(true)}>
+                    <Truck size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                    <span className="truncate">{t('visits.vanStock')}</span>
+                  </Button>
+                ),
+                showActivity && (
+                  <Button key="activity" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsActivityModalOpen(true)}>
+                    <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
+                    <span className="truncate">Activity</span>
+                  </Button>
+                ),
+              ].filter(Boolean);
+
+              return (
+                <>
+                  {row1Buttons.length > 0 && (
+                    <div className={`grid gap-1.5 sm:gap-2 mb-2`} style={{ gridTemplateColumns: `repeat(${Math.min(row1Buttons.length, 4)}, 1fr)` }}>
+                      {row1Buttons}
+                    </div>
+                  )}
+                  {row2Buttons.length > 0 && (
+                    <div className={`grid gap-1.5 sm:gap-2 border-t border-primary-foreground/20 pt-2`} style={{ gridTemplateColumns: `repeat(${Math.min(row2Buttons.length, 4)}, 1fr)` }}>
+                      {row2Buttons}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
 
-        {/* Progress Card */}
-        <Card className="shadow-card bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+        {/* Progress Card - filtered by permission */}
+        {showTodaysProgress && <Card className="shadow-card bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="p-2 sm:p-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-0.5 sm:gap-1">
               <h3 className="font-bold text-xs sm:text-base text-primary leading-tight">{t('visits.todaysProgress')}</h3>
@@ -1361,7 +1396,7 @@ export const MyVisits = () => {
                </button>
              </div>
            </CardContent>
-        </Card>
+        </Card>}
 
         {/* Insights Panel - Target vs Actual & Priority Retailers */}
         <InsightsPanel
