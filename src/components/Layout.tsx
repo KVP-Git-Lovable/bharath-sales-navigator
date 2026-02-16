@@ -6,6 +6,7 @@ import { useMasterDataCache } from "@/hooks/useMasterDataCache";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useStartupCleanup } from "@/hooks/useStartupCleanup";
 import { periodicMemoryCleanup, initMemoryPressureHandler } from "@/utils/memoryManager";
+import { useBatteryMonitor } from "@/hooks/useBatteryMonitor";
 
 interface LayoutProps {
   children: ReactNode;
@@ -23,6 +24,7 @@ export const Layout = memo(({ children }: LayoutProps) => {
   
   // Run startup cleanup routines (orphan orders, stale cache, etc.)
   useStartupCleanup();
+  useBatteryMonitor();
 
   // Initialize memory pressure handlers once per app lifecycle
   useEffect(() => {

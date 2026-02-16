@@ -2317,6 +2317,33 @@ export type Database = {
         }
         Relationships: []
       }
+      device_battery_logs: {
+        Row: {
+          battery_level: number
+          created_at: string
+          id: string
+          is_charging: boolean
+          recorded_at: string
+          user_id: string
+        }
+        Insert: {
+          battery_level: number
+          created_at?: string
+          id?: string
+          is_charging?: boolean
+          recorded_at?: string
+          user_id: string
+        }
+        Update: {
+          battery_level?: number
+          created_at?: string
+          id?: string
+          is_charging?: boolean
+          recorded_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       distributor_attachments: {
         Row: {
           created_at: string | null
