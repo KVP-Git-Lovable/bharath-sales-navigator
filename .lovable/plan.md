@@ -1,84 +1,70 @@
 
 
-## Fix: Admin Modules Not Showing for Non-Full-Admin Users
+## Battery Monitoring Utility
 
-### Root Cause
+### Overview
+Add a background battery monitoring system that reads the device battery percentage every 15 minutes and sends it to the Supabase backend, leveraging the existing interval manager and Capacitor plugin ecosystem.
 
-The admin panel decides which modules to show using `hasModuleAccess(featureName)`, which checks if any user permission's `object_name` **starts with** the parent feature name.
+### Components
 
-For example, for Expense Management:
-- Parent feature name: `admin_expense_mgmt`
-- Sub-feature names in DB: `admin_expense_claims_list`, `admin_expense_approvals`, `admin_expense_analytics`, `admin_expense_policy_config`
+**1. Install `@capacitor/device` package**
+This official Capacitor plugin provides `Device.getBatteryInfo()` which returns `batteryLevel` (0-1) and `isCharging` (boolean). It works on Android, iOS, and web.
 
-The sub-features start with `admin_expense_`, **not** `admin_expense_mgmt`. So `startsWith('admin_expense_mgmt')` never matches, and the module is hidden.
+**2. New database table: `device_battery_logs`**
 
-This same bug affects multiple modules:
-- `admin_expense_mgmt` vs `admin_expense_*`
-- `admin_vendor_mgmt` vs `admin_vendor_*`
-- `admin_product_mgmt` vs `admin_product_*`
-- `admin_feedback_mgmt` vs `admin_feedback_*`
-- `admin_territories_distributors` vs `admin_territory_*` / `admin_distributor_*` / `admin_region_*`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Auto-generated |
+| user_id | UUID (FK) | References auth.users |
+| battery_level | INTEGER | Battery percentage (0-100) |
+| is_charging | BOOLEAN | Whether device is plugged in |
+| recorded_at | TIMESTAMPTZ | When the reading was taken |
+| created_at | TIMESTAMPTZ | DB insert time |
 
-### Fix
+RLS policies:
+- Users can INSERT their own logs (`auth.uid() = user_id`)
+- Users can SELECT their own logs
+- Admins can SELECT all logs
 
-Update `useProfilePermissions.ts` to add a new mapping from each parent module to the **actual common prefix(es)** of its sub-features. The `permittedAdminModules` logic will check these prefixes instead of the parent name.
+**3. New utility: `src/utils/batteryMonitor.ts`**
+- Uses `@capacitor/device` to call `Device.getBatteryInfo()`
+- Falls back gracefully on web (Battery Status API or skip)
+- Exports a `logBatteryStatus(userId)` function that reads battery and inserts into `device_battery_logs`
 
-#### Changes to `src/hooks/useProfilePermissions.ts`
+**4. New hook: `src/hooks/useBatteryMonitor.ts`**
+- Uses the existing `useManagedInterval` from `intervalManager.ts` to schedule readings every 15 minutes (900,000 ms)
+- Only runs when a user is authenticated
+- Pauses automatically when app is in background (via the existing visibility API in intervalManager)
+- Resumes and takes a reading when app becomes visible again
 
-1. Add a new map that associates each admin module key with its sub-feature prefixes:
-
-```text
-ADMIN_MODULE_SUB_PREFIXES = {
-  'admin_expense_mgmt': ['admin_expense_'],
-  'admin_product_mgmt': ['admin_product_'],
-  'admin_vendor_mgmt': ['admin_vendor_'],
-  'admin_feedback_mgmt': ['admin_feedback_', 'admin_competition_', 'admin_branding_'],
-  'admin_territories_distributors': ['admin_territory_', 'admin_distributor_', 'admin_region_'],
-  // modules where parent name IS the prefix (already working) don't need entries
-}
-```
-
-2. Update the `permittedAdminModules` computation to:
-   - First check if the user has any permission starting with the parent name (existing behavior, works for modules like `admin_attendance`, `admin_operations`, etc.)
-   - If not, check the sub-prefixes from the new map
-
-This is a targeted fix that only changes one file and does not affect any other permission logic.
+**5. Integration in `Layout.tsx`**
+- Add `useBatteryMonitor()` call inside the Layout component so it runs app-wide for all authenticated users
 
 ### Technical Details
 
-**File**: `src/hooks/useProfilePermissions.ts`
-
-Add the sub-prefix map after `ADMIN_MODULE_PERMISSION_MAP`, then update `permittedAdminModules` to use a new helper that checks both the parent name and the sub-prefixes:
-
-```typescript
-const ADMIN_MODULE_SUB_PREFIXES: Record<string, string[]> = {
-  'admin_product_mgmt': ['admin_product_'],
-  'admin_scheme_master': ['admin_scheme_'],
-  'admin_vendor_mgmt': ['admin_vendor_'],
-  'admin_territories_distributors': ['admin_territory_', 'admin_distributor_', 'admin_region_'],
-  'admin_expense_mgmt': ['admin_expense_'],
-  'admin_feedback_mgmt': ['admin_feedback_', 'admin_competition_', 'admin_branding_'],
-  // Add others as needed
-};
+```text
+Flow:
+  Layout mounts
+    -> useBatteryMonitor() starts
+      -> useManagedInterval('battery-monitor', logBattery, 900000)
+        -> Every 15 min (when visible):
+          1. Device.getBatteryInfo() -> { batteryLevel: 0.72, isCharging: false }
+          2. supabase.from('device_battery_logs').insert({ user_id, battery_level: 72, is_charging: false })
 ```
 
-Then update `permittedAdminModules`:
-```typescript
-const permittedAdminModules = Object.keys(ADMIN_MODULE_PERMISSION_MAP).filter(
-  featureName => {
-    // Check direct prefix match (works for admin_attendance, admin_operations, etc.)
-    if (hasModuleAccess(featureName)) return true;
-    // Check sub-feature prefixes
-    const subPrefixes = ADMIN_MODULE_SUB_PREFIXES[featureName];
-    if (subPrefixes) {
-      return subPrefixes.some(prefix =>
-        permissions.some(p => p.object_name.startsWith(prefix) && p.can_read)
-      );
-    }
-    return false;
-  }
-);
-```
+### Files to Create/Modify
 
-No other files need changes.
+| File | Action |
+|------|--------|
+| `package.json` | Add `@capacitor/device` dependency |
+| `supabase/migrations/...` | New migration for `device_battery_logs` table + RLS |
+| `src/utils/batteryMonitor.ts` | New - battery reading + DB insert logic |
+| `src/hooks/useBatteryMonitor.ts` | New - hook using `useManagedInterval` |
+| `src/components/Layout.tsx` | Add `useBatteryMonitor()` call |
+
+### Edge Cases Handled
+- **Web/PWA**: Falls back to Navigator Battery API if available, or silently skips
+- **Background**: Interval pauses automatically via existing `intervalManager` visibility support
+- **Offline**: Insert will fail silently; battery logs are non-critical telemetry
+- **No auth**: Hook checks for authenticated user before starting
 
