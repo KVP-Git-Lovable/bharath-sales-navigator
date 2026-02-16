@@ -221,6 +221,7 @@ export const MyVisits = () => {
   const showVanStock = canShowButton('visit_van_stock');
   const showActivity = canShowButton('visit_activity');
   const showTodaysProgress = canShowButton('visit_todays_progress');
+  const showInsightsTarget = canShowButton('target_');
 
   // NOTE: AI Recommendations hooks moved below after plannedBeats is defined
   const { isLocationEnabled } = useLocationFeature();
@@ -1399,7 +1400,7 @@ export const MyVisits = () => {
         </Card>}
 
         {/* Insights Panel - Target vs Actual & Priority Retailers */}
-        <InsightsPanel
+        {showInsightsTarget && <InsightsPanel
           userId={user?.id}
           recommendations={retailerPriorityRecs}
           onGenerateRecommendations={() => currentBeatId && generateRetailerRecs('retailer_priority', currentBeatId)}
@@ -1407,7 +1408,7 @@ export const MyVisits = () => {
           recommendationsLoading={retailerRecsLoading}
           beatId={currentBeatId}
           hasBeat={plannedBeats.length > 0 && !!currentBeatId}
-        />
+        />}
 
         {/* Enhanced Search and Filter Bar - Mobile Optimized */}
         <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
