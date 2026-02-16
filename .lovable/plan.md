@@ -1,55 +1,84 @@
 
 
-## Fix: Dashboard Sections Still Visible Despite Permissions Not Selected
+## Fix: Admin Modules Not Showing for Non-Full-Admin Users
 
 ### Root Cause
 
-There are two problems:
+The admin panel decides which modules to show using `hasModuleAccess(featureName)`, which checks if any user permission's `object_name` **starts with** the parent feature name.
 
-1. **Unreliable "has security profile" detection**: The current code uses `permissions.length > 0` to determine if a user has a security profile assigned. This fails when:
-   - Permissions are still loading (returns empty array initially)
-   - The profile exists but has limited permissions configured
-   
-   The fix: Use `securityProfileName` from `useAuth()` instead, which is a direct check of whether the user has a security profile assigned via `user_profiles` table. This is the same approach used in `useFeatureFlags.ts` and `useAdminAccess.ts`.
+For example, for Expense Management:
+- Parent feature name: `admin_expense_mgmt`
+- Sub-feature names in DB: `admin_expense_claims_list`, `admin_expense_approvals`, `admin_expense_analytics`, `admin_expense_policy_config`
 
-2. **Target section bundled inside TodaysBeatCard**: The `TodaysBeatCard` contains a target progress section (period selector, target vs actual, gap indicator) that should only show when the user has `target_` permissions. Currently there is no independent check for this.
+The sub-features start with `admin_expense_`, **not** `admin_expense_mgmt`. So `startsWith('admin_expense_mgmt')` never matches, and the module is hidden.
 
-### Changes
+This same bug affects multiple modules:
+- `admin_expense_mgmt` vs `admin_expense_*`
+- `admin_vendor_mgmt` vs `admin_vendor_*`
+- `admin_product_mgmt` vs `admin_product_*`
+- `admin_feedback_mgmt` vs `admin_feedback_*`
+- `admin_territories_distributors` vs `admin_territory_*` / `admin_distributor_*` / `admin_region_*`
 
-#### 1. `src/pages/Index.tsx` - Fix hasSecurityProfile detection
+### Fix
 
-Replace:
-```
-const hasSecurityProfile = permissions.length > 0;
-```
-With:
-```
-const { securityProfileName } = useAuth();
-const hasSecurityProfile = !!securityProfileName;
-```
+Update `useProfilePermissions.ts` to add a new mapping from each parent module to the **actual common prefix(es)** of its sub-features. The `permittedAdminModules` logic will check these prefixes instead of the parent name.
 
-This uses the already-available `securityProfileName` (which is fetched via `user_profiles -> security_profiles` join) as the reliable indicator. Since `useAuth()` is already imported and destructured, we just need to add `securityProfileName` to the destructuring.
+#### Changes to `src/hooks/useProfilePermissions.ts`
 
-Also add a `showTarget` flag:
-```
-const showTarget = canShow('target_');
-```
+1. Add a new map that associates each admin module key with its sub-feature prefixes:
 
-And pass it to `TodaysBeatCard`:
-```
-<TodaysBeatCard ... showTarget={showTarget} />
+```text
+ADMIN_MODULE_SUB_PREFIXES = {
+  'admin_expense_mgmt': ['admin_expense_'],
+  'admin_product_mgmt': ['admin_product_'],
+  'admin_vendor_mgmt': ['admin_vendor_'],
+  'admin_feedback_mgmt': ['admin_feedback_', 'admin_competition_', 'admin_branding_'],
+  'admin_territories_distributors': ['admin_territory_', 'admin_distributor_', 'admin_region_'],
+  // modules where parent name IS the prefix (already working) don't need entries
+}
 ```
 
-#### 2. `src/components/home/TodaysBeatCard.tsx` - Conditionally render target section
+2. Update the `permittedAdminModules` computation to:
+   - First check if the user has any permission starting with the parent name (existing behavior, works for modules like `admin_attendance`, `admin_operations`, etc.)
+   - If not, check the sub-prefixes from the new map
 
-- Add `showTarget?: boolean` prop (default `true` for backward compatibility)
-- Wrap the entire "Target Progress Section" (period selectors, target display, progress bar, gap indicator) in `{showTarget && (...)}` so it only renders when the user has target permissions
-- The visit stats (Planned, Productive, Remaining, New Added, Potential, Points) and Visit/Summary buttons remain visible as they belong to the `visit_` module
+This is a targeted fix that only changes one file and does not affect any other permission logic.
 
-### Summary
+### Technical Details
 
-| File | Change |
-|---|---|
-| `src/pages/Index.tsx` | Use `securityProfileName` for profile detection; pass `showTarget` prop |
-| `src/components/home/TodaysBeatCard.tsx` | Accept `showTarget` prop; hide target section when false |
+**File**: `src/hooks/useProfilePermissions.ts`
+
+Add the sub-prefix map after `ADMIN_MODULE_PERMISSION_MAP`, then update `permittedAdminModules` to use a new helper that checks both the parent name and the sub-prefixes:
+
+```typescript
+const ADMIN_MODULE_SUB_PREFIXES: Record<string, string[]> = {
+  'admin_product_mgmt': ['admin_product_'],
+  'admin_scheme_master': ['admin_scheme_'],
+  'admin_vendor_mgmt': ['admin_vendor_'],
+  'admin_territories_distributors': ['admin_territory_', 'admin_distributor_', 'admin_region_'],
+  'admin_expense_mgmt': ['admin_expense_'],
+  'admin_feedback_mgmt': ['admin_feedback_', 'admin_competition_', 'admin_branding_'],
+  // Add others as needed
+};
+```
+
+Then update `permittedAdminModules`:
+```typescript
+const permittedAdminModules = Object.keys(ADMIN_MODULE_PERMISSION_MAP).filter(
+  featureName => {
+    // Check direct prefix match (works for admin_attendance, admin_operations, etc.)
+    if (hasModuleAccess(featureName)) return true;
+    // Check sub-feature prefixes
+    const subPrefixes = ADMIN_MODULE_SUB_PREFIXES[featureName];
+    if (subPrefixes) {
+      return subPrefixes.some(prefix =>
+        permissions.some(p => p.object_name.startsWith(prefix) && p.can_read)
+      );
+    }
+    return false;
+  }
+);
+```
+
+No other files need changes.
 
