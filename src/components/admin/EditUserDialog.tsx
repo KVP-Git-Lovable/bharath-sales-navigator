@@ -406,7 +406,7 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
                   <SelectTrigger>
                     <SelectValue placeholder="Select primary manager" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto z-[9999]" position="popper" sideOffset={4}>
                     <SelectItem value="none">No Manager</SelectItem>
                     {managers.map((manager) => (
                       <SelectItem key={manager.id} value={manager.id}>
@@ -427,7 +427,7 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
                   <SelectTrigger>
                     <SelectValue placeholder="Select secondary manager" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto z-[9999]" position="popper" sideOffset={4}>
                     <SelectItem value="none">No Secondary Manager</SelectItem>
                     {managers.map((manager) => (
                       <SelectItem key={manager.id} value={manager.id}>
