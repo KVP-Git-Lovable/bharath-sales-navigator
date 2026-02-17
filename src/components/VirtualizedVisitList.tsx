@@ -27,6 +27,7 @@ interface VirtualizedVisitListProps {
   visits: Visit[];
   onViewDetails: (visitId: string) => void;
   selectedDate: string;
+  viewingUserId?: string;
 }
 
 // Memoized VisitCard wrapper to prevent unnecessary re-renders
@@ -39,7 +40,8 @@ const MemoizedVisitCard = memo(VisitCard, (prevProps, nextProps) => {
     prevProps.visit.orderValue === nextProps.visit.orderValue &&
     prevProps.visit.noOrderReason === nextProps.visit.noOrderReason &&
     prevProps.selectedDate === nextProps.selectedDate &&
-    prevProps.skipInitialCheck === nextProps.skipInitialCheck
+    prevProps.skipInitialCheck === nextProps.skipInitialCheck &&
+    prevProps.viewingUserId === nextProps.viewingUserId
   );
 });
 
@@ -53,7 +55,8 @@ const LOAD_MORE_THRESHOLD = 200; // Pixels from bottom to trigger load
 export const VirtualizedVisitList = ({ 
   visits, 
   onViewDetails, 
-  selectedDate 
+  selectedDate,
+  viewingUserId
 }: VirtualizedVisitListProps) => {
   const [displayCount, setDisplayCount] = useState(INITIAL_BATCH_SIZE);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -121,6 +124,7 @@ export const VirtualizedVisitList = ({
           onViewDetails={onViewDetails}
           selectedDate={selectedDate}
           skipInitialCheck={true}
+          viewingUserId={viewingUserId}
         />
       ))}
       

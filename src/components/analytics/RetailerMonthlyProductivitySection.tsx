@@ -1,11 +1,9 @@
- import { useState, useEffect, useMemo } from 'react';
- import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
- import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
- import { RefreshCw, Users, AlertTriangle } from 'lucide-react';
- import { supabase } from '@/integrations/supabase/client';
- import { format } from 'date-fns';
- import { useIsMobile } from '@/hooks/use-mobile';
- import { Badge } from '@/components/ui/badge';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { RefreshCw, Users, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
  
 interface RetailerProductivity {
   retailer_id: string;
@@ -21,15 +19,16 @@ interface RetailerProductivity {
    selectedUsers: string[];
    dateRange: { from: Date; to: Date };
    allUsers?: { id: string; full_name: string | null }[];
+   periodFilter?: string;
  }
  
  export const RetailerMonthlyProductivitySection = ({ 
    selectedUsers, 
    dateRange,
-   allUsers = []
+   allUsers = [],
+   periodFilter
  }: RetailerMonthlyProductivitySectionProps) => {
-   const isMobile = useIsMobile();
-   const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
    const [data, setData] = useState<RetailerProductivity[]>([]);
  
    const fetchData = async () => {
@@ -143,12 +142,12 @@ interface RetailerProductivity {
          }
        });
  
-       // Filter: retailers with visits but NO confirmed orders
-       const results: RetailerProductivity[] = [];
- 
-        retailerVisitMap.forEach((stats, retailerId) => {
-          // Only include if no confirmed orders, zero productive visits, and at least one visit
-          if (!retailersWithOrders.has(retailerId) && stats.productive === 0 && stats.planned > 0) {
+        // Filter: retailers with 3+ visits but NO confirmed orders
+        const results: RetailerProductivity[] = [];
+
+         retailerVisitMap.forEach((stats, retailerId) => {
+           // Only include if no confirmed orders, zero productive visits, and 3+ visits
+           if (!retailersWithOrders.has(retailerId) && stats.productive === 0 && stats.planned >= 3) {
             const retailerInfo = retailerMap.get(retailerId);
             const userId = retailerInfo?.user_id || null;
             results.push({
@@ -217,15 +216,21 @@ interface RetailerProductivity {
              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
            </button>
          </div>
-           <p className="text-xs text-muted-foreground mt-1">
-             Retailers with visits but no confirmed orders
-           </p>
-            <p className="text-[10px] text-blue-600 mt-0.5">
-              This shows monthly data only. Select "Last month" in the dropdown.
+            <p className="text-xs text-muted-foreground mt-1">
+              Retailers with 3+ visits but no confirmed orders
             </p>
-       </CardHeader>
-       <CardContent className="pt-0">
-         {loading ? (
+             <p className="text-[10px] text-blue-600 mt-0.5">
+               This shows monthly data only. Select "Last month" in the dropdown.
+             </p>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {periodFilter !== 'last_month' ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium">Select "Last Month" to view data</p>
+              <p className="text-xs mt-1">This section displays monthly productivity data only.</p>
+            </div>
+          ) : loading ? (
            <div className="flex items-center justify-center py-8">
              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
            </div>
@@ -240,37 +245,34 @@ interface RetailerProductivity {
                  <table className="w-full caption-bottom text-sm min-w-[500px]">
                    <thead className="[&_tr]:border-b sticky top-0 bg-background z-10">
                      <tr className="border-b transition-colors hover:bg-muted/50">
-                       <th className="h-12 px-1.5 md:px-4 text-left align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Retailer Name</th>
-                       <th className="h-12 px-1.5 md:px-4 text-left align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">User</th>
-                       <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Visits</th>
-                       <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Productive</th>
-                       <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Unproductive</th>
+                        <th className="h-12 px-1.5 md:px-4 text-left align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Retailer Name</th>
+                        <th className="h-12 px-1.5 md:px-4 text-left align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">User</th>
+                        <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Visits</th>
+                        <th className="h-12 px-1 md:px-4 text-center align-middle font-medium text-muted-foreground text-[10px] md:text-xs whitespace-nowrap">Unproductive</th>
                      </tr>
                    </thead>
                    <tbody className="[&_tr:last-child]:border-0">
                      {data.map((row) => (
                        <tr key={row.retailer_id} className="border-b transition-colors hover:bg-muted/50">
-                         <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm font-medium whitespace-nowrap">{row.retailer_name}</td>
-                         <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap text-muted-foreground">{row.user_name}</td>
-                         <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center">{row.planned_visits}</td>
-                         <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-primary">{row.productive_visits}</td>
-                         <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-destructive">{row.unproductive_visits}</td>
+                          <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm font-medium whitespace-nowrap">{row.retailer_name}</td>
+                          <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap text-muted-foreground">{row.user_name}</td>
+                          <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center">{row.planned_visits}</td>
+                          <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-destructive">{row.unproductive_visits}</td>
                        </tr>
                      ))}
                      {/* Total Row */}
                      <tr className="bg-muted/50 font-semibold sticky bottom-0 z-10 border-t">
-                       <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap bg-muted/50">Total ({data.length})</td>
-                       <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap bg-muted/50"></td>
-                       <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center bg-muted/50">{totals.planned}</td>
-                       <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-primary bg-muted/50">{totals.productive}</td>
-                       <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-destructive bg-muted/50">{totals.unproductive}</td>
+                        <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap bg-muted/50">Total ({data.length})</td>
+                        <td className="p-1.5 md:p-4 align-middle text-[10px] md:text-sm whitespace-nowrap bg-muted/50"></td>
+                        <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center bg-muted/50">{totals.planned}</td>
+                        <td className="p-1 md:p-4 align-middle text-[10px] md:text-sm text-center text-destructive bg-muted/50">{totals.unproductive}</td>
                      </tr>
                    </tbody>
                  </table>
                </div>
              </div>
-           )}
-       </CardContent>
-     </Card>
+            )}
+        </CardContent>
+      </Card>
    );
  };

@@ -40,20 +40,67 @@ export function useOfflineSync() {
         return uuidRegex.test(id);
       };
 
-      // Clean up stale sync items (older than 15 mins OR 2+ retries)
+      // Auto-recover permanently failed CREATE_ORDER items so they get retried
+      const recoverPermanentlyFailedOrders = async (): Promise<void> => {
+        try {
+          const queue = await offlineStorage.getSyncQueue();
+          const failedOrders = queue.filter(
+            (item: any) => item.status === 'permanently_failed' && item.action === 'CREATE_ORDER'
+          );
+
+          if (failedOrders.length === 0) return;
+
+          for (const item of failedOrders) {
+            const recovered = { ...item };
+            recovered.retryCount = 0;
+            delete recovered.status;
+            delete recovered.failedAt;
+            recovered._recovered = true;
+            recovered.recoveredAt = Date.now();
+            await offlineStorage.save(STORES.SYNC_QUEUE, recovered);
+          }
+
+          console.log(`🔄 Recovered ${failedOrders.length} permanently failed orders for retry`);
+        } catch (e) {
+          console.warn('⚠️ Failed to recover permanently failed orders (non-fatal):', e);
+        }
+      };
+
+      // Clean up stale sync items with priority-based retention
+      // CREATE_ORDER items get 48-hour / 5-retry protection to prevent data loss
       const cleanupStaleSyncItems = async (queue: any[]): Promise<any[]> => {
         const now = Date.now();
         const fifteenMinutesAgo = now - (15 * 60 * 1000);
+        const fortyEightHoursAgo = now - (48 * 60 * 60 * 1000);
         const cleanQueue: any[] = [];
         
         for (const item of queue) {
-          const isStale = item.timestamp && item.timestamp < fifteenMinutesAgo;
-          // Keep retry behavior consistent (max 2 attempts before cleanup)
-          const tooManyRetries = (item.retryCount || 0) >= 2;
+          const isCritical = item.action === 'CREATE_ORDER';
+          const retries = item.retryCount || 0;
+          
+          // For recovered items, use recoveredAt as the age baseline
+          const ageBaseline = item._recovered && item.recoveredAt ? item.recoveredAt : item.timestamp;
+          const ageMs = ageBaseline ? now - ageBaseline : 0;
+          
+          // Critical items (orders): 48-hour window, 5 retries max
+          // Non-critical items: 15-minute window, 2 retries max
+          const maxAge = isCritical ? fortyEightHoursAgo : fifteenMinutesAgo;
+          const maxRetries = isCritical ? 5 : 2;
+          
+          const isStale = ageBaseline && ageBaseline < maxAge;
+          const tooManyRetries = retries >= maxRetries;
           
           if (isStale || tooManyRetries) {
-            console.log(`🧹 Removing stale sync item: ${item.action}, age=${Math.round((now - item.timestamp) / 60000)}min, retries=${item.retryCount || 0}`);
-            await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            if (isCritical) {
+              // NEVER silently delete orders - mark as permanently_failed instead
+              console.error(`⛔ ORDER SYNC FAILED PERMANENTLY: age=${Math.round(ageMs / 60000)}min, retries=${retries}`, JSON.stringify(item.data));
+              const failedItem = { ...item, status: 'permanently_failed', failedAt: new Date().toISOString() };
+              await offlineStorage.save(STORES.SYNC_QUEUE, failedItem);
+              cleanQueue.push(failedItem);
+            } else {
+              console.log(`🧹 Removing stale sync item: ${item.action}, age=${Math.round(ageMs / 60000)}min, retries=${retries}`);
+              await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            }
           } else {
             cleanQueue.push(item);
           }
@@ -112,6 +159,9 @@ export function useOfflineSync() {
         }
       };
 
+      // Step 0: Recover any permanently failed orders before cleanup
+      await recoverPermanentlyFailedOrders();
+
       // Step 1: Get and clean up stale items first
       let syncQueue = await offlineStorage.getSyncQueue();
       syncQueue = await cleanupStaleSyncItems(syncQueue);
@@ -167,15 +217,23 @@ export function useOfflineSync() {
           const updatedItem = {
             ...item,
             retryCount: (item.retryCount || 0) + 1,
-            lastError: errorMsg
+            lastError: errorMsg,
+            lastRetryAt: new Date().toISOString()
           };
           
-          // Keep in queue for retry (max 2 attempts only)
-          if (updatedItem.retryCount < 2) {
+          const isCritical = item.action === 'CREATE_ORDER';
+          const maxRetries = isCritical ? 5 : 2;
+          
+          if (updatedItem.retryCount < maxRetries) {
             await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
+          } else if (isCritical) {
+            // NEVER delete order data - mark as permanently failed for manual recovery
+            console.error(`⛔ ORDER PERMANENTLY FAILED after ${maxRetries} retries:`, JSON.stringify(item.data));
+            const failedItem = { ...updatedItem, status: 'permanently_failed', failedAt: new Date().toISOString() };
+            await offlineStorage.save(STORES.SYNC_QUEUE, failedItem);
           } else {
-            // After 2 failed attempts, remove from queue to avoid stuck items
-            console.error(`⛔ Removing item after 2 failed attempts:`, item.action);
+            // Non-critical items can be removed after max retries
+            console.error(`⛔ Removing non-critical item after ${maxRetries} failed attempts:`, item.action);
             await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
           }
         }
@@ -341,84 +399,71 @@ export function useOfflineSync() {
         console.log('Syncing order creation:', data);
         // Handle both old format (single data) and new format (order + items)
         if (data.order && data.items) {
-          // CRITICAL FIX: Strip offline-generated ID and let Supabase auto-generate UUID
-          // Also strip non-existent columns (scheme_details, pending_amount)
-          const { id: offlineOrderId, scheme_details, pending_amount, ...orderWithoutId } = data.order;
+          // Strip non-existent columns (scheme_details, pending_amount)
+          const { scheme_details, pending_amount, ...orderClean } = data.order;
+          
+          // KEEP the order ID if it's a valid UUID (generated by offlineOrderUtils)
+          // Only strip if it's not a valid UUID (offline-generated temp ID)
+          const offlineOrderId = orderClean.id;
+          const orderToInsert = { ...orderClean };
+          if (offlineOrderId && !isValidUUID(offlineOrderId)) {
+            console.log('⚠️ Stripping invalid order ID:', offlineOrderId);
+            delete orderToInsert.id;
+          }
           
           // Strip visit_id if it's not a valid UUID (offline-generated)
-          const orderToInsert = { ...orderWithoutId };
           if (orderToInsert.visit_id && !isValidUUID(orderToInsert.visit_id)) {
             console.log('⚠️ Stripping invalid visit_id:', orderToInsert.visit_id);
             delete orderToInsert.visit_id;
           }
           
-          // DUPLICATE PREVENTION: Check if order with same idempotency_key already exists
-          if (orderToInsert.idempotency_key) {
-            try {
-              // Use type assertion to avoid TS2589 (idempotency_key not in types yet)
-              const checkResult = await (supabase
-                .from('orders')
-                .select('id')
-                .eq('idempotency_key', orderToInsert.idempotency_key)
-                .limit(1) as any);
-              
-              if (checkResult.data && checkResult.data.length > 0) {
-                console.log('⚠️ Order with idempotency_key already exists, skipping duplicate:', orderToInsert.idempotency_key);
-                // Order already exists - this sync item should be removed without error
-                return; // Successfully "synced" (already existed)
-              }
-            } catch (dupCheckError) {
-              console.warn('Could not check for duplicate order (continuing):', dupCheckError);
+          // Check if order already exists by ID (skip duplicate sync attempts)
+          if (offlineOrderId && isValidUUID(offlineOrderId)) {
+            const { data: existingById } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('id', offlineOrderId)
+              .maybeSingle();
+            
+            if (existingById) {
+              console.log('✅ Order already synced by ID, skipping:', offlineOrderId);
+              return; // Already synced by offlineOrderUtils direct sync
             }
           }
           
           // New format with separate order and items
           let actualOrderId = offlineOrderId; // Use offline ID as fallback
           
-          // Try to insert order
+          // Try to insert order - ALLOW ALL orders regardless of duplicate invoice
           const { data: insertedOrder, error: orderError } = await supabase
             .from('orders')
             .insert(orderToInsert)
             .select()
             .single();
           
-          // Handle duplicate key error gracefully
           if (orderError) {
             if (orderError.code === '23505') {
-              // Duplicate key error - order already exists
-              // Find the existing order to get its ID for items
-              console.log('⚠️ Duplicate order detected, checking for missing items...');
+              // Duplicate key - order already exists, find it to ensure items exist
+              console.log('⚠️ Duplicate key detected, finding existing order...');
               
-              // Try to find existing order by idempotency_key or retailer+date
-              let existingOrderId = null;
-              if (orderToInsert.idempotency_key) {
-                const { data: existing } = await supabase
-                  .from('orders')
-                  .select('id')
-                  .eq('idempotency_key', orderToInsert.idempotency_key)
-                  .single();
-                existingOrderId = existing?.id;
-              }
-              
-              if (!existingOrderId && orderToInsert.retailer_id) {
-                // Fallback: find by retailer and approximate time
+              if (offlineOrderId && isValidUUID(offlineOrderId)) {
+                actualOrderId = offlineOrderId;
+              } else if (orderToInsert.retailer_id) {
                 const { data: existing } = await supabase
                   .from('orders')
                   .select('id')
                   .eq('retailer_id', orderToInsert.retailer_id)
-                  .gte('created_at', new Date(Date.now() - 3600000).toISOString()) // Last hour
+                  .gte('created_at', new Date(Date.now() - 3600000).toISOString())
                   .order('created_at', { ascending: false })
                   .limit(1)
-                  .single();
-                existingOrderId = existing?.id;
+                  .maybeSingle();
+                if (existing) actualOrderId = existing.id;
               }
-              
-              if (existingOrderId) {
-                actualOrderId = existingOrderId;
-              }
-              // Don't return here - continue to ensure items exist
+              // Continue to ensure items exist
             } else {
-              throw orderError;
+              // For ANY other error, log but don't throw - never block order creation
+              console.error('⚠️ Order insert error (non-blocking):', orderError.message);
+              // Still try to continue with items if we have an order ID
             }
           } else {
             actualOrderId = insertedOrder.id;

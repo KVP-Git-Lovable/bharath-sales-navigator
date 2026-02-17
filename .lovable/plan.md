@@ -1,70 +1,21 @@
 
 
-## Battery Monitoring Utility
+# Fix: Module List Not Scrollable in Selective Deletion Dialog
 
-### Overview
-Add a background battery monitoring system that reads the device battery percentage every 15 minutes and sends it to the Supabase backend, leveraging the existing interval manager and Capacitor plugin ecosystem.
+## Problem
 
-### Components
+The selective deletion module list only shows 4-5 modules out of 19. The Radix `ScrollArea` component is not scrolling properly inside the dialog's constrained flex layout (`max-h-[85vh] overflow-hidden flex flex-col`). The Radix ScrollArea viewport doesn't calculate its height correctly in this context, so the remaining modules are simply clipped.
 
-**1. Install `@capacitor/device` package**
-This official Capacitor plugin provides `Device.getBatteryInfo()` which returns `batteryLevel` (0-1) and `isCharging` (boolean). It works on Android, iOS, and web.
+## Solution
 
-**2. New database table: `device_battery_logs`**
+Replace the Radix `ScrollArea` with a plain `div` using native CSS overflow scrolling, which works reliably inside flex-constrained dialogs.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID (PK) | Auto-generated |
-| user_id | UUID (FK) | References auth.users |
-| battery_level | INTEGER | Battery percentage (0-100) |
-| is_charging | BOOLEAN | Whether device is plugged in |
-| recorded_at | TIMESTAMPTZ | When the reading was taken |
-| created_at | TIMESTAMPTZ | DB insert time |
+## Changes
 
-RLS policies:
-- Users can INSERT their own logs (`auth.uid() = user_id`)
-- Users can SELECT their own logs
-- Admins can SELECT all logs
+**File: `src/components/admin/UserDeleteDataDialog.tsx`**
 
-**3. New utility: `src/utils/batteryMonitor.ts`**
-- Uses `@capacitor/device` to call `Device.getBatteryInfo()`
-- Falls back gracefully on web (Battery Status API or skip)
-- Exports a `logBatteryStatus(userId)` function that reads battery and inserts into `device_battery_logs`
+1. Replace the `<ScrollArea>` wrapper (line 281) with a simple `<div>` that has `max-h-[300px] overflow-y-auto` styling
+2. Remove the `ScrollArea` import if no longer used elsewhere in the file
 
-**4. New hook: `src/hooks/useBatteryMonitor.ts`**
-- Uses the existing `useManagedInterval` from `intervalManager.ts` to schedule readings every 15 minutes (900,000 ms)
-- Only runs when a user is authenticated
-- Pauses automatically when app is in background (via the existing visibility API in intervalManager)
-- Resumes and takes a reading when app becomes visible again
-
-**5. Integration in `Layout.tsx`**
-- Add `useBatteryMonitor()` call inside the Layout component so it runs app-wide for all authenticated users
-
-### Technical Details
-
-```text
-Flow:
-  Layout mounts
-    -> useBatteryMonitor() starts
-      -> useManagedInterval('battery-monitor', logBattery, 900000)
-        -> Every 15 min (when visible):
-          1. Device.getBatteryInfo() -> { batteryLevel: 0.72, isCharging: false }
-          2. supabase.from('device_battery_logs').insert({ user_id, battery_level: 72, is_charging: false })
-```
-
-### Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `package.json` | Add `@capacitor/device` dependency |
-| `supabase/migrations/...` | New migration for `device_battery_logs` table + RLS |
-| `src/utils/batteryMonitor.ts` | New - battery reading + DB insert logic |
-| `src/hooks/useBatteryMonitor.ts` | New - hook using `useManagedInterval` |
-| `src/components/Layout.tsx` | Add `useBatteryMonitor()` call |
-
-### Edge Cases Handled
-- **Web/PWA**: Falls back to Navigator Battery API if available, or silently skips
-- **Background**: Interval pauses automatically via existing `intervalManager` visibility support
-- **Offline**: Insert will fail silently; battery logs are non-critical telemetry
-- **No auth**: Hook checks for authenticated user before starting
+This is a minimal, targeted fix -- just swapping the scroll container type while keeping all the module checkboxes and layout intact.
 

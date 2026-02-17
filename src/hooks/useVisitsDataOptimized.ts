@@ -230,30 +230,47 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const userIdRef = useRef(effectiveUserId);
   const selectedDateRef = useRef(selectedDate);
   
+  // Helper to clear all in-memory state and caches
+  const clearAllCachesAndState = useCallback(() => {
+    console.log('[useVisitsDataOptimized] CLEARING ALL CACHES AND STATE');
+    cacheRef.current.clear();
+    lastSyncTimeRef.current.clear();
+    setBeatPlans([]);
+    setVisits([]);
+    setRetailers([]);
+    setOrders([]);
+    setPointsData({ total: 0, byRetailer: new Map() });
+    setHasLoadedOnce(false);
+    setIsLoading(true);
+    isFetchingRef.current = false;
+    lastDateRef.current = '';
+    smartSyncLockRef.current = false;
+  }, []);
+  
   // CRITICAL: Clear ALL caches when viewing different user to prevent data leakage
   useEffect(() => {
     if (effectiveUserId && lastUserRef.current && effectiveUserId !== lastUserRef.current) {
       console.log('[useVisitsDataOptimized] User changed from', lastUserRef.current, 'to', effectiveUserId, '- CLEARING ALL CACHES');
-      
-      // Clear in-memory caches
-      cacheRef.current.clear();
-      lastSyncTimeRef.current.clear();
-      
-      // Reset all state to prevent showing previous user's data
-      setBeatPlans([]);
-      setVisits([]);
-      setRetailers([]);
-      setOrders([]);
-      setPointsData({ total: 0, byRetailer: new Map() });
-      setHasLoadedOnce(false);
-      setIsLoading(true);
-      
-      // Reset fetch flags to force fresh load
-      isFetchingRef.current = false;
-      lastDateRef.current = '';
+      clearAllCachesAndState();
     }
     lastUserRef.current = effectiveUserId || '';
-  }, [effectiveUserId]);
+  }, [effectiveUserId, clearAllCachesAndState]);
+  
+  // CRITICAL: Listen for auth state changes (login/logout) to clear stale data
+  // This prevents showing old cached data when user logs out and logs back in
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        console.log('[useVisitsDataOptimized] SIGNED_IN detected - clearing stale caches');
+        clearAllCachesAndState();
+      }
+      if (event === 'SIGNED_OUT') {
+        console.log('[useVisitsDataOptimized] SIGNED_OUT detected - clearing all data');
+        clearAllCachesAndState();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [clearAllCachesAndState]);
   
   useEffect(() => {
     userIdRef.current = effectiveUserId;
@@ -497,10 +514,28 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       }
 
       // Update orders granularly - ALWAYS compare full list
-      const oChanges = getChangedItems(currentCache.orders, newOrders);
+      // FIX: Preserve locally-cached orders that haven't synced to DB yet
+      // These are orders saved to IndexedDB by offlineOrderUtils but not yet in Supabase
+      const mergedOrders = [...newOrders];
+      const dbOrderIds = new Set(newOrders.map(o => o.id));
+      
+      // Check current state for locally-added orders not yet in DB
+      const currentOrders = currentCache.orders || [];
+      for (const localOrder of currentOrders) {
+        if (!dbOrderIds.has(localOrder.id) && 
+            localOrder.order_date === date && 
+            localOrder.status === 'confirmed' &&
+            localOrder.user_id === uid) {
+          // This order exists locally but not in DB — preserve it
+          mergedOrders.push(localOrder);
+          console.log('[SmartSync] Preserving unsynced local order:', localOrder.id, '₹' + localOrder.total_amount);
+        }
+      }
+      
+      const oChanges = getChangedItems(currentCache.orders, mergedOrders);
       if (oChanges.changed.length > 0 || oChanges.added.length > 0 || oChanges.removed.length > 0) {
         uiUpdated = applyGranularUpdate(setOrders, oChanges) || uiUpdated;
-        currentCache.orders = newOrders;
+        currentCache.orders = mergedOrders;
       }
 
       // FIX #2: ALWAYS fetch ALL retailers by beat_id (not just from visits/orders)
@@ -1503,6 +1538,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     window.addEventListener('syncComplete', handleSyncComplete);
     window.addEventListener('beatDeleted', handleBeatDeleted as EventListener);
     window.addEventListener('forceVisitsRefresh', handleForceRefresh);
+    window.addEventListener('globalDataRefresh', handleForceRefresh);
     window.addEventListener('pointsEarned', handlePointsEarned as EventListener);
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -1513,6 +1549,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       window.removeEventListener('syncComplete', handleSyncComplete);
       window.removeEventListener('beatDeleted', handleBeatDeleted as EventListener);
       window.removeEventListener('forceVisitsRefresh', handleForceRefresh);
+      window.removeEventListener('globalDataRefresh', handleForceRefresh);
       window.removeEventListener('pointsEarned', handlePointsEarned as EventListener);
       document.removeEventListener('visibilitychange', handleVisibility);
     };

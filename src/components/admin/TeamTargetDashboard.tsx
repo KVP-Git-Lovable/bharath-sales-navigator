@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, Trophy, TrendingUp, TrendingDown, Filter, Globe, ChevronDown, ChevronRight, Package, Network } from 'lucide-react';
+import { Users, Trophy, TrendingUp, TrendingDown, Filter, Globe, ChevronDown, ChevronRight, Package, Network, User } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays, subWeeks, subMonths, subQuarters } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -165,6 +166,7 @@ export function TeamTargetDashboard({
   hasAdminAccess = false,
 }: TeamTargetDashboardProps) {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { subordinateIds, isManager } = useSubordinates();
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('this_month');
   const [basis, setBasis] = useState<TargetBasis>('quantity');
@@ -223,35 +225,48 @@ export function TeamTargetDashboard({
     return map;
   }, [filteredTeamProgress]);
 
+  // Recursively aggregate hierarchy group data
+  const buildGroupedData = (group: HierarchyGroup): any => {
+    // Get leaf members that exist in filteredTeamProgress
+    const members = group.memberIds
+      .map(id => progressMap.get(id))
+      .filter(Boolean) as TeamMemberProgress[];
+
+    // Recursively build children
+    const children = (group.children || [])
+      .map(child => buildGroupedData(child))
+      .filter((c: any) => c.members.length > 0 || c.children.length > 0);
+
+    // Aggregate totals: leaf members + all nested children
+    let teamTarget = members.reduce((sum, m) => sum + m.target, 0);
+    let teamActual = members.reduce((sum, m) => sum + m.actual, 0);
+    
+    children.forEach((child: any) => {
+      teamTarget += child.teamTarget;
+      teamActual += child.teamActual;
+    });
+    
+    const teamAchievement = teamTarget > 0 ? (teamActual / teamTarget) * 100 : 0;
+
+    return {
+      ...group,
+      members,
+      children,
+      teamTarget,
+      teamActual,
+      teamAchievement,
+    };
+  };
+
   // Build hierarchy groups with aggregated data
   const groupedData = useMemo(() => {
     if (!hierarchyGroups?.length || !filteredTeamProgress?.length) {
       return null;
     }
 
-    return hierarchyGroups.map(group => {
-      // Get members that exist in filteredTeamProgress
-      const members = group.memberIds
-        .map(id => progressMap.get(id))
-        .filter(Boolean) as TeamMemberProgress[];
-
-      // Also get the manager's own data if present
-      const managerProgress = group.managerId ? progressMap.get(group.managerId) : null;
-
-      // Aggregate team totals
-      const teamTarget = members.reduce((sum, m) => sum + m.target, 0);
-      const teamActual = members.reduce((sum, m) => sum + m.actual, 0);
-      const teamAchievement = teamTarget > 0 ? (teamActual / teamTarget) * 100 : 0;
-
-      return {
-        ...group,
-        members,
-        managerProgress,
-        teamTarget,
-        teamActual,
-        teamAchievement,
-      };
-    }).filter(g => g.members.length > 0 || g.managerProgress);
+    return hierarchyGroups
+      .map(group => buildGroupedData(group))
+      .filter((g: any) => g.members.length > 0 || g.children.length > 0);
   }, [hierarchyGroups, filteredTeamProgress, progressMap]);
 
   const handleStatusFilterClick = (filter: 'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved') => {
@@ -310,72 +325,317 @@ export function TeamTargetDashboard({
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const renderMemberRow = (member: TeamMemberProgress) => {
+  // Depth-based color accents
+  const depthColors = [
+    { border: 'border-l-rose-500', bg: 'bg-rose-500/8', badge: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500' },
+    { border: 'border-l-purple-500', bg: 'bg-purple-500/8', badge: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
+    { border: 'border-l-blue-500', bg: 'bg-blue-500/8', badge: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+    { border: 'border-l-emerald-500', bg: 'bg-emerald-500/8', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+    { border: 'border-l-amber-500', bg: 'bg-amber-500/8', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+  ];
+  const getDepthColor = (depth: number) => depthColors[Math.min(depth, depthColors.length - 1)];
+
+  const renderMemberCard = (member: TeamMemberProgress) => {
     const isExpanded = expandedRows.has(member.userId);
     const hasBreakdown = hasProductAndMonthly && member.productMonthBreakdown && member.productMonthBreakdown.length > 0;
+    const gap = member.gap;
 
     return (
-      <React.Fragment key={member.userId}>
-        <TableRow
+      <div key={member.userId} className="space-y-0">
+        <div
           className={cn(
+            "flex items-center gap-2 py-2 px-3 rounded-md transition-colors",
             hasBreakdown && "cursor-pointer hover:bg-muted/50",
             isExpanded && "bg-muted/30"
           )}
           onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
         >
-          {hasProductAndMonthly && (
-            <TableCell className="p-2 w-10">
-              {hasBreakdown ? (
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </Button>
-              ) : null}
-            </TableCell>
+          {/* Expand icon */}
+          <div className="w-4 shrink-0">
+            {hasBreakdown && (
+              isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
+
+          {/* Avatar */}
+          {!isMobile && (
+            <Avatar className="h-7 w-7 shrink-0">
+              <AvatarImage src={member.avatarUrl || undefined} />
+              <AvatarFallback className="text-[10px]">{getInitials(member.fullName)}</AvatarFallback>
+            </Avatar>
           )}
-          <TableCell>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={member.avatarUrl || undefined} />
-                <AvatarFallback className="text-xs">{getInitials(member.fullName)}</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="font-medium">{member.fullName}</span>
-                {hasBreakdown && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Package className="h-3 w-3" />
-                    {member.productMonthBreakdown!.length} product-month entries
-                  </span>
-                )}
-              </div>
+
+          {/* Name */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium truncate">{member.fullName}</p>
+          </div>
+
+          {/* Target & Actual */}
+          <div className="text-right shrink-0">
+            <p className="text-[10px] text-muted-foreground leading-tight">Target</p>
+            <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-[10px] text-muted-foreground leading-tight">Actual</p>
+            <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
+          </div>
+
+          {/* Progress */}
+          {!isMobile && (
+            <div className="flex items-center gap-1.5 shrink-0 w-24">
+              <Progress value={Math.min(member.achievementPercentage, 100)} className="h-1.5 flex-1" />
+              <span className="text-[10px] font-bold w-8 text-right">{member.achievementPercentage.toFixed(0)}%</span>
             </div>
-          </TableCell>
-          <TableCell className="text-right font-medium">{formatValue(member.target)}</TableCell>
-          <TableCell className="text-right font-medium">{formatValue(member.actual)}</TableCell>
-          <TableCell>
-            <div className="flex items-center gap-2">
-              <Progress value={Math.min(member.achievementPercentage, 100)} className="h-2 w-20" />
-              <span className="text-sm font-medium w-12 text-right">{member.achievementPercentage.toFixed(0)}%</span>
-            </div>
-          </TableCell>
-          <TableCell className={cn("text-right font-medium", member.gap >= 0 ? "text-green-600" : "text-red-600")}>
-            {member.gap >= 0 ? '+' : ''}{formatValue(member.gap)}
-          </TableCell>
-          <TableCell className="text-center">{getStatusBadge(member.status)}</TableCell>
-        </TableRow>
+          )}
+
+          {/* Gap */}
+          <span className={cn("text-[10px] font-semibold shrink-0 hidden sm:inline", gap >= 0 ? "text-green-600" : "text-red-600")}>
+            {gap >= 0 ? '+' : ''}{formatValue(gap)}
+          </span>
+
+          {/* Status */}
+          <div className="shrink-0">{getStatusBadge(member.status)}</div>
+        </div>
+
+        {/* Product breakdown */}
         {hasBreakdown && isExpanded && (
-          <TableRow>
-            <TableCell colSpan={hasProductAndMonthly ? 7 : 6} className="p-0 bg-muted/20">
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Product × Month Breakdown</span>
-                </div>
-                <ProductMonthBreakdownTable data={member.productMonthBreakdown!} basis={basis} />
-              </div>
-            </TableCell>
-          </TableRow>
+          <div className="ml-6 mr-2 mb-2 p-3 bg-muted/20 rounded-md border">
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium">Product × Month Breakdown</span>
+            </div>
+            <ProductMonthBreakdownTable data={member.productMonthBreakdown!} basis={basis} />
+          </div>
         )}
-      </React.Fragment>
+      </div>
+    );
+  };
+
+  // Flatten hierarchy into a single ordered list
+  interface FlatEntry {
+    type: 'manager' | 'member';
+    depth: number;
+    roleLabel: string;
+    managerId?: string; // for collapsible manager rows
+    parentManagerId?: string; // to track visibility
+    data: any; // group data for managers, TeamMemberProgress for members
+  }
+
+  const flattenHierarchy = (groups: any[]): FlatEntry[] => {
+    const entries: FlatEntry[] = [];
+    
+    const walkGroup = (group: any, depth: number, parentManagerId?: string) => {
+      const groupKey = group.managerId || `other-${entries.length}`;
+      
+      // Add manager row
+      if (group.managerId) {
+        entries.push({
+          type: 'manager',
+          depth,
+          roleLabel: depth === 0 ? 'Top Manager' : depth === 1 ? 'Manager' : 'Team Lead',
+          managerId: groupKey,
+          parentManagerId,
+          data: group,
+        });
+      }
+      
+      // Add child sub-managers
+      (group.children || []).forEach((child: any) => {
+        walkGroup(child, depth + 1, groupKey);
+      });
+      
+      // Add leaf members
+      group.members.forEach((member: TeamMemberProgress) => {
+        entries.push({
+          type: 'member',
+          depth: group.managerId ? depth + 1 : depth,
+          roleLabel: 'Member',
+          parentManagerId: groupKey,
+          data: member,
+        });
+      });
+    };
+    
+    groups.forEach(g => walkGroup(g, 0));
+    return entries;
+  };
+
+  const flatEntries = useMemo(() => {
+    if (!groupedData?.length) return [];
+    return flattenHierarchy(groupedData);
+  }, [groupedData]);
+
+  // Determine visible entries based on collapsed state
+  const visibleEntries = useMemo(() => {
+    if (!flatEntries.length) return [];
+    
+    // Build set of all collapsed manager IDs and their descendants
+    const hiddenParents = new Set<string>();
+    
+    const isHidden = (entry: FlatEntry): boolean => {
+      if (!entry.parentManagerId) return false;
+      if (collapsedGroups.has(entry.parentManagerId)) return true;
+      // Check if any ancestor is collapsed
+      const parentEntry = flatEntries.find(e => e.managerId === entry.parentManagerId);
+      if (parentEntry) return isHidden(parentEntry);
+      return false;
+    };
+    
+    return flatEntries.filter(entry => !isHidden(entry));
+  }, [flatEntries, collapsedGroups]);
+
+  const getRoleBadgeStyle = (depth: number) => {
+    const styles = [
+      'bg-rose-100 text-rose-700 border-rose-200',
+      'bg-purple-100 text-purple-700 border-purple-200',
+      'bg-blue-100 text-blue-700 border-blue-200',
+      'bg-emerald-100 text-emerald-700 border-emerald-200',
+      'bg-amber-100 text-amber-700 border-amber-200',
+    ];
+    return styles[Math.min(depth, styles.length - 1)];
+  };
+
+  const getRowBgStyle = (depth: number) => {
+    const styles = [
+      'bg-rose-50/60 dark:bg-rose-950/20 border-l-rose-500',
+      'bg-purple-50/60 dark:bg-purple-950/20 border-l-purple-500',
+      'bg-blue-50/60 dark:bg-blue-950/20 border-l-blue-500',
+      'bg-emerald-50/60 dark:bg-emerald-950/20 border-l-emerald-500',
+      'bg-amber-50/60 dark:bg-amber-950/20 border-l-amber-500',
+    ];
+    return styles[Math.min(depth, styles.length - 1)];
+  };
+
+  const renderFlatRow = (entry: FlatEntry, idx: number) => {
+    if (entry.type === 'manager') {
+      const group = entry.data;
+      const groupKey = entry.managerId!;
+      const isCollapsed = collapsedGroups.has(groupKey);
+      const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
+
+      return (
+        <div
+          key={`mgr-${groupKey}-${idx}`}
+          className={cn(
+            "grid items-center py-2.5 px-3 border-l-[3px] cursor-pointer transition-colors hover:opacity-90 gap-x-2",
+            getRowBgStyle(entry.depth),
+            isMobile ? "grid-cols-[auto_1fr_auto_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
+          )}
+          onClick={() => toggleGroupCollapsed(groupKey)}
+        >
+          {/* Chevron */}
+          {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+
+          {/* Avatar */}
+          {!isMobile && (
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarImage src={group.managerAvatar || undefined} />
+              <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
+            </Avatar>
+          )}
+
+          {/* Name + Role */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold truncate">{group.managerName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0", getRoleBadgeStyle(entry.depth))}>
+              {entry.roleLabel}
+            </Badge>
+          </div>
+
+          {/* Target */}
+          <div className={cn("text-right", isMobile && "")}>
+            <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+            <p className="text-xs font-bold leading-tight">{formatValue(group.teamTarget)}</p>
+          </div>
+
+          {/* Actual */}
+          <div className="text-right">
+            <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+            <p className="text-xs font-bold leading-tight">{formatValue(group.teamActual)}</p>
+          </div>
+
+          {/* % */}
+          {!isMobile && (
+            <span className="text-xs font-bold text-right">{group.teamAchievement.toFixed(0)}%</span>
+          )}
+
+          {/* Status */}
+          <div className="shrink-0 justify-self-end">{getStatusBadge(teamStatus)}</div>
+        </div>
+      );
+    }
+
+    // Member row
+    const member = entry.data as TeamMemberProgress;
+    const isExpanded = expandedRows.has(member.userId);
+    const hasBreakdown = hasProductAndMonthly && member.productMonthBreakdown && member.productMonthBreakdown.length > 0;
+
+    return (
+      <div key={`mem-${member.userId}-${idx}`}>
+        <div
+          className={cn(
+            "grid items-center py-2 px-3 border-l-[3px] transition-colors gap-x-2",
+            getRowBgStyle(entry.depth),
+            hasBreakdown && "cursor-pointer hover:opacity-90",
+            isExpanded && "bg-muted/30",
+            isMobile ? "grid-cols-[auto_1fr_auto_auto_auto]" : "grid-cols-[auto_auto_1fr_80px_80px_40px_auto]"
+          )}
+          onClick={() => hasBreakdown && toggleRowExpanded(member.userId)}
+        >
+          {/* Chevron / spacer */}
+          <div className="w-4 shrink-0 flex justify-center">
+            {hasBreakdown && (
+              isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
+
+          {/* Avatar */}
+          {!isMobile && (
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarImage src={member.avatarUrl || undefined} />
+              <AvatarFallback className="text-[10px]">{getInitials(member.fullName)}</AvatarFallback>
+            </Avatar>
+          )}
+
+          {/* Name + Role */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium truncate">{member.fullName}</span>
+            <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border shrink-0", getRoleBadgeStyle(entry.depth))}>
+              {entry.roleLabel}
+            </Badge>
+          </div>
+
+          {/* Target */}
+          <div className="text-right">
+            <p className="text-[9px] text-muted-foreground leading-none">Target</p>
+            <p className="text-xs font-semibold leading-tight">{formatValue(member.target)}</p>
+          </div>
+
+          {/* Actual */}
+          <div className="text-right">
+            <p className="text-[9px] text-muted-foreground leading-none">Actual</p>
+            <p className="text-xs font-semibold leading-tight">{formatValue(member.actual)}</p>
+          </div>
+
+          {/* % */}
+          {!isMobile && (
+            <span className="text-xs font-bold text-right">{member.achievementPercentage.toFixed(0)}%</span>
+          )}
+
+          {/* Status */}
+          <div className="shrink-0 justify-self-end">{getStatusBadge(member.status)}</div>
+        </div>
+
+        {hasBreakdown && isExpanded && (
+          <div className="mx-3 mb-2 p-3 bg-muted/20 rounded-md border">
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium">Product × Month Breakdown</span>
+            </div>
+            <ProductMonthBreakdownTable data={member.productMonthBreakdown!} basis={basis} />
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -596,97 +856,14 @@ export function TeamTargetDashboard({
                 <Button variant="link" onClick={() => setStatusFilter('all')} className="mt-2">Clear filter</Button>
               )}
             </div>
-          ) : groupedData && groupedData.length > 0 ? (
-            <div className="space-y-4">
-              {groupedData.map((group, idx) => {
-                const groupKey = group.managerId || `other-${idx}`;
-                const isCollapsed = collapsedGroups.has(groupKey);
-                const teamStatus = group.teamAchievement >= 100 ? 'achieved' : group.teamAchievement >= 90 ? 'good_to_go' : group.teamAchievement >= 50 ? 'almost_there' : group.teamAchievement >= 1 ? 'in_progress' : 'not_started';
-
-                return (
-                  <div key={groupKey} className="border rounded-lg overflow-hidden">
-                    {/* Group Header */}
-                    <div
-                      className={cn(
-                        "flex items-center justify-between p-3 cursor-pointer transition-colors",
-                        "bg-muted/50 hover:bg-muted/70"
-                      )}
-                      onClick={() => toggleGroupCollapsed(groupKey)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        {group.managerId && (
-                          <Avatar className="h-7 w-7">
-                            <AvatarImage src={group.managerAvatar || undefined} />
-                            <AvatarFallback className="text-[10px]">{getInitials(group.managerName)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div>
-                          <span className="font-semibold text-sm">{group.managerName}</span>
-                          <span className="text-xs text-muted-foreground ml-2">({group.members.length} members)</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right text-xs hidden sm:block">
-                          <div className="text-muted-foreground">Team Target</div>
-                          <div className="font-semibold">{formatValue(group.teamTarget)}</div>
-                        </div>
-                        <div className="text-right text-xs hidden sm:block">
-                          <div className="text-muted-foreground">Team Actual</div>
-                          <div className="font-semibold">{formatValue(group.teamActual)}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Progress value={Math.min(group.teamAchievement, 100)} className="h-2 w-16" />
-                          <span className="text-xs font-bold w-10 text-right">{group.teamAchievement.toFixed(0)}%</span>
-                        </div>
-                        {getStatusBadge(teamStatus)}
-                      </div>
-                    </div>
-
-                    {/* Group Members */}
-                    {!isCollapsed && (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {hasProductAndMonthly && <TableHead className="w-10"></TableHead>}
-                              <TableHead>Team Member</TableHead>
-                              <TableHead className="text-right">Target</TableHead>
-                              <TableHead className="text-right">Actual</TableHead>
-                              <TableHead className="text-center">Progress</TableHead>
-                              <TableHead className="text-right">Gap</TableHead>
-                              <TableHead className="text-center">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.members.map(member => renderMemberRow(member))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          ) : visibleEntries.length > 0 ? (
+            <div className="rounded-lg overflow-hidden border divide-y divide-border/50">
+              {visibleEntries.map((entry, idx) => renderFlatRow(entry, idx))}
             </div>
           ) : (
-            // Fallback flat table when no hierarchy data
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {hasProductAndMonthly && <TableHead className="w-10"></TableHead>}
-                    <TableHead>Team Member</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
-                    <TableHead className="text-right">Actual</TableHead>
-                    <TableHead className="text-center">Progress</TableHead>
-                    <TableHead className="text-right">Gap</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTeamProgress.map(member => renderMemberRow(member))}
-                </TableBody>
-              </Table>
+            // Fallback flat list when no hierarchy data
+            <div className="divide-y">
+              {filteredTeamProgress.map(member => renderMemberCard(member))}
             </div>
           )}
         </CardContent>

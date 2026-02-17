@@ -15,7 +15,7 @@ import { ExpirationPlugin } from 'workbox-expiration';
 
 // Version runtime caches to force fresh data after deploys
 // INCREMENT THIS VERSION TO FORCE COMPLETE CACHE REFRESH
-const RUNTIME_CACHE_VERSION = 'v19';
+const RUNTIME_CACHE_VERSION = 'v20';
 
 // Workbox will replace this with the list of files to precache.
 precacheAndRoute(self.__WB_MANIFEST);
@@ -99,29 +99,40 @@ self.addEventListener('activate', (event) => {
 registerRoute(
   ({ request }) => request.mode === 'navigate',
   async (args) => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+    // Try network first with generous timeout
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), attempt === 0 ? 8000 : 5000);
 
-      const networkResponse = await fetch(args.request, {
-        signal: controller.signal,
-        cache: 'no-store',
-      });
+        const networkResponse = await fetch(args.request, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      // Some hosting setups may return 404 for deep links; fall back to app shell.
-      if (networkResponse && networkResponse.ok) {
-        return networkResponse;
+        if (networkResponse && networkResponse.ok) {
+          return networkResponse;
+        }
+      } catch {
+        // Retry once before falling back
       }
-    } catch {
-      // ignore
     }
 
+    // Fall back to precached app shell
     try {
       return await appShellHandler(args);
     } catch {
-      // First-time offline install: show a simple offline page instead of white screen
+      // Last resort: try fetching index.html directly from network one more time
+      try {
+        const fallbackResponse = await fetch('/index.html', { cache: 'no-store' });
+        if (fallbackResponse.ok) return fallbackResponse;
+      } catch {
+        // ignore
+      }
+
+      // True offline with no cache - show minimal offline page
       return new Response(
         `<!DOCTYPE html>
 <html lang="en">
@@ -134,15 +145,19 @@ registerRoute(
       .card{max-width:420px}
       h1{font-size:20px;margin:0 0 10px}
       p{margin:0;opacity:.75;line-height:1.5}
+      button{margin-top:16px;padding:10px 24px;border:none;border-radius:8px;background:#4f46e5;color:#fff;font-size:16px;cursor:pointer}
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>You’re offline</h1>
+      <h1>You're offline</h1>
       <p>Connect to the internet once to finish setting up the app.</p>
+      <button onclick="window.location.reload()">Retry</button>
     </div>
     <script>
       window.addEventListener('online', () => window.location.reload());
+      // Auto-retry every 5 seconds
+      setInterval(() => { if (navigator.onLine) window.location.reload(); }, 5000);
     </script>
   </body>
 </html>`,

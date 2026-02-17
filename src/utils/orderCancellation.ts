@@ -31,6 +31,7 @@ export interface OrderDetails {
   retailer_id: string;
   visit_id: string | null;
   order_date: string;
+  created_at: string;
   total_amount: number;
   is_credit_order: boolean;
   credit_pending_amount: number;
@@ -45,7 +46,7 @@ export interface OrderDetails {
 async function fetchOrderWithDetails(orderId: string): Promise<OrderDetails | null> {
   const { data: order, error } = await supabase
     .from('orders')
-    .select('id, user_id, retailer_id, visit_id, order_date, total_amount, is_credit_order, credit_pending_amount, credit_paid_amount, status, delivery_status')
+    .select('id, user_id, retailer_id, visit_id, order_date, created_at, total_amount, is_credit_order, credit_pending_amount, credit_paid_amount, status, delivery_status')
     .eq('id', orderId)
     .single();
 
@@ -124,9 +125,34 @@ async function updateInvoiceStatus(orderId: string): Promise<boolean> {
 }
 
 /**
- * Revert visit status from productive to planned
+ * Check if a visit has remaining confirmed orders (excluding the one being cancelled)
  */
-async function revertVisitStatus(visitId: string): Promise<boolean> {
+async function hasRemainingConfirmedOrders(visitId: string, excludeOrderId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('visit_id', visitId)
+    .neq('id', excludeOrderId)
+    .eq('status', 'confirmed');
+
+  if (error) {
+    console.error('[CancelOrder] Failed to check remaining orders:', error);
+    return true; // err on the side of caution — don't revert
+  }
+
+  return (count || 0) > 0;
+}
+
+/**
+ * Revert visit status from productive to planned (only if no remaining confirmed orders)
+ */
+async function revertVisitStatus(visitId: string, excludeOrderId: string): Promise<boolean> {
+  const hasRemaining = await hasRemainingConfirmedOrders(visitId, excludeOrderId);
+  if (hasRemaining) {
+    console.log('[CancelOrder] Visit still has confirmed orders, keeping productive');
+    return false;
+  }
+
   const { error } = await supabase
     .from('visits')
     .update({
@@ -135,7 +161,7 @@ async function revertVisitStatus(visitId: string): Promise<boolean> {
       updated_at: new Date().toISOString()
     })
     .eq('id', visitId)
-    .eq('status', 'productive'); // Only revert if currently productive
+    .eq('status', 'productive');
 
   if (error) {
     console.error('[CancelOrder] Failed to revert visit status:', error);
@@ -226,12 +252,11 @@ async function removeGamificationPoints(
   orderDate: string,
   userId: string
 ): Promise<number> {
-  // Find and delete points for this retailer on this date
+  // Find and delete ALL points for this retailer on this date (both 'order' and 'visit' reference_types)
   const { data: points, error: fetchError } = await supabase
     .from('gamification_points')
     .select('id, points')
     .eq('user_id', userId)
-    .eq('reference_type', 'order')
     .eq('reference_id', retailerId)
     .gte('earned_at', `${orderDate}T00:00:00`)
     .lt('earned_at', `${orderDate}T23:59:59`);
@@ -253,8 +278,64 @@ async function removeGamificationPoints(
     return 0;
   }
 
-  console.log(`[CancelOrder] Removed ${totalPoints} gamification points`);
+  console.log(`[CancelOrder] Removed ${totalPoints} gamification points (order + visit types)`);
   return totalPoints;
+}
+
+/**
+ * Reverse retailer consecutive order sequence tracking
+ */
+async function reverseRetailerSequence(
+  userId: string,
+  retailerId: string
+): Promise<void> {
+  const { data: seq, error: fetchError } = await supabase
+    .from('gamification_retailer_sequences')
+    .select('id, consecutive_orders')
+    .eq('user_id', userId)
+    .eq('retailer_id', retailerId)
+    .maybeSingle();
+
+  if (fetchError || !seq) return;
+
+  if ((seq.consecutive_orders || 0) <= 1) {
+    await supabase.from('gamification_retailer_sequences').delete().eq('id', seq.id);
+    console.log('[CancelOrder] Deleted retailer sequence record');
+  } else {
+    await supabase
+      .from('gamification_retailer_sequences')
+      .update({ consecutive_orders: seq.consecutive_orders - 1 })
+      .eq('id', seq.id);
+    console.log(`[CancelOrder] Decremented retailer sequence to ${seq.consecutive_orders - 1}`);
+  }
+}
+
+/**
+ * Reverse daily tracking counts for gamification
+ */
+async function reverseDailyTracking(
+  userId: string,
+  orderDate: string
+): Promise<void> {
+  const { data: tracks, error: fetchError } = await supabase
+    .from('gamification_daily_tracking')
+    .select('id, count, action_id')
+    .eq('user_id', userId)
+    .eq('tracking_date', orderDate);
+
+  if (fetchError || !tracks || tracks.length === 0) return;
+
+  for (const track of tracks) {
+    if ((track.count || 0) <= 1) {
+      await supabase.from('gamification_daily_tracking').delete().eq('id', track.id);
+    } else {
+      await supabase
+        .from('gamification_daily_tracking')
+        .update({ count: track.count - 1 })
+        .eq('id', track.id);
+    }
+  }
+  console.log(`[CancelOrder] Reversed ${tracks.length} daily tracking records`);
 }
 
 /**
@@ -296,7 +377,8 @@ async function clearLocalCaches(
   retailerId: string,
   userId: string,
   orderDate: string,
-  orderId: string
+  orderId: string,
+  visitReverted: boolean
 ): Promise<void> {
   // Invalidate visit status cache
   await visitStatusCache.invalidate(retailerId, userId, orderDate);
@@ -309,13 +391,23 @@ async function clearLocalCaches(
     detail: { retailerId, orderId, orderDate }
   }));
   
-  // Also dispatch visitStatusChanged for visit card updates
+  // Dispatch visitStatusChanged for visit card updates
   window.dispatchEvent(new CustomEvent('visitStatusChanged', {
     detail: { 
       retailerId, 
-      status: 'planned',
+      status: visitReverted ? 'planned' : 'productive',
       orderValue: 0 
     }
+  }));
+
+  // Dispatch pointsEarned so gamification UI (breakdown, leaderboard) refreshes instantly
+  window.dispatchEvent(new CustomEvent('pointsEarned', {
+    detail: { source: 'orderCancellation', retailerId, orderId }
+  }));
+
+  // Dispatch a global data refresh event so all tabs/views pick up the latest data
+  window.dispatchEvent(new CustomEvent('globalDataRefresh', {
+    detail: { source: 'orderCancellation', retailerId, orderId, orderDate }
   }));
 }
 
@@ -369,7 +461,7 @@ export async function cancelOrder(
 
     // 5. Revert visit status if visit exists
     if (order.visit_id) {
-      const visitReverted = await revertVisitStatus(order.visit_id);
+      const visitReverted = await revertVisitStatus(order.visit_id, orderId);
       result.reversedData.visitReverted = visitReverted;
     }
 
@@ -387,10 +479,11 @@ export async function cancelOrder(
     // 7. Recalculate retailer's last order
     await recalculateRetailerLastOrder(order.retailer_id);
 
-    // 8. Remove gamification points
+    // 8. Remove gamification points (use created_at date, not order_date, since points are earned when order is placed)
+    const pointsEarnedDate = order.created_at.split('T')[0];
     const pointsRemoved = await removeGamificationPoints(
       order.retailer_id,
-      order.order_date,
+      pointsEarnedDate,
       order.user_id
     );
     result.reversedData.pointsRemoved = pointsRemoved;
@@ -399,12 +492,19 @@ export async function cancelOrder(
     const loyaltyPointsRemoved = await removeLoyaltyPoints(orderId);
     result.reversedData.loyaltyPointsRemoved = loyaltyPointsRemoved;
 
-    // 10. Clear local caches
+    // 10. Reverse retailer sequence tracking
+    await reverseRetailerSequence(order.user_id, order.retailer_id);
+
+    // 11. Reverse daily tracking counts
+    await reverseDailyTracking(order.user_id, pointsEarnedDate);
+
+    // 12. Clear local caches
     await clearLocalCaches(
       order.retailer_id,
       order.user_id,
       order.order_date,
-      orderId
+      orderId,
+      result.reversedData.visitReverted
     );
 
     result.success = true;

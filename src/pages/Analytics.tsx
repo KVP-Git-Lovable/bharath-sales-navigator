@@ -179,6 +179,8 @@ const Analytics = () => {
   const [loading, setLoading] = useState(false);
   const [weeklyProgress, setWeeklyProgress] = useState<any[]>([]);
   const [productData, setProductData] = useState<any[]>([]);
+  const [productRevenueView, setProductRevenueView] = useState<'top5' | 'bottom5'>('top5');
+  const [productQuantityView, setProductQuantityView] = useState<'top5' | 'bottom5'>('top5');
   const [topRetailers, setTopRetailers] = useState<any[]>([]);
   const [bottomRetailers, setBottomRetailers] = useState<any[]>([]);
   const [retailerFeedback, setRetailerFeedback] = useState<any[]>([]);
@@ -1725,14 +1727,69 @@ const Analytics = () => {
                 selectedUsers={effectiveUserIds} 
                 dateRange={stableDashboardDateRange}
                 allUsers={users}
+                periodFilter={dashboardPeriod}
               />
 
               <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Product-wise Business Analysis</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Products by Revenue</CardTitle>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant={productRevenueView === 'top5' ? 'default' : 'outline'} className="h-7 text-xs px-2" onClick={() => setProductRevenueView('top5')}>Top 5</Button>
+                    <Button size="sm" variant={productRevenueView === 'bottom5' ? 'default' : 'outline'} className="h-7 text-xs px-2" onClick={() => setProductRevenueView('bottom5')}>Bottom 5</Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto scrollbar-always-visible">
+                  {(() => {
+                    const sortedByRevenue = [...productData].sort((a, b) => b.revenue - a.revenue);
+                    const revenueChartData = productRevenueView === 'top5' ? sortedByRevenue.slice(0, 5) : sortedByRevenue.slice(-5).reverse();
+                    return (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={revenueChartData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tick={{ fontSize: 10 }} />
+                          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10 }} interval={0} />
+                          <Tooltip formatter={(value: any) => `₹${value.toLocaleString()}`} />
+                          <Bar dataKey="revenue" fill="#8b5cf6" name="Revenue" barSize={16} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Products by Quantity (KG)</CardTitle>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant={productQuantityView === 'top5' ? 'default' : 'outline'} className="h-7 text-xs px-2" onClick={() => setProductQuantityView('top5')}>Top 5</Button>
+                    <Button size="sm" variant={productQuantityView === 'bottom5' ? 'default' : 'outline'} className="h-7 text-xs px-2" onClick={() => setProductQuantityView('bottom5')}>Bottom 5</Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const sortedByQuantity = [...productData].sort((a, b) => b.quantity - a.quantity);
+                    const quantityChartData = productQuantityView === 'top5' ? sortedByQuantity.slice(0, 5) : sortedByQuantity.slice(-5).reverse();
+                    return (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={quantityChartData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tick={{ fontSize: 10 }} />
+                          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10 }} interval={0} />
+                          <Tooltip formatter={(value: any) => `${Number(value).toFixed(2)} KG`} />
+                          <Bar dataKey="quantity" fill="#10b981" name="Quantity (KG)" barSize={16} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Product-wise Business Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto max-h-[240px] overflow-y-auto scrollbar-always-visible">
                     <table className="w-full">
                       <thead className="sticky top-0 bg-background z-10">
                         <tr className="border-b">
@@ -1742,7 +1799,7 @@ const Analytics = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {productData.map((product: any, index: number) => (
+                        {[...productData].sort((a, b) => b.quantity - a.quantity).map((product: any, index: number) => (
                           <tr key={index} className="border-b hover:bg-muted/50">
                             <td className="p-2 text-sm">{product.name}</td>
                             <td className="p-2 text-sm text-right">{product.quantity.toFixed(2)}</td>
@@ -1759,40 +1816,6 @@ const Analytics = () => {
                       </tbody>
                     </table>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Top Products by Revenue</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={productData.slice(0, 10)} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={150} />
-                      <Tooltip formatter={(value: any) => `₹${value.toLocaleString()}`} />
-                      <Bar dataKey="revenue" fill="#8b5cf6" name="Revenue" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Top Products by Quantity (KG)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={productData.slice(0, 10)} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={150} />
-                      <Tooltip formatter={(value: any) => `${Number(value).toFixed(2)} KG`} />
-                      <Bar dataKey="quantity" fill="#10b981" name="Quantity (KG)" />
-                    </BarChart>
-                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </TabsContent>

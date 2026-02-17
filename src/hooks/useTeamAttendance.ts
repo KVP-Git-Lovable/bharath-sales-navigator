@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface TeamMemberProfile {
@@ -9,6 +10,7 @@ export interface TeamMemberProfile {
   full_name: string;
   profile_picture_url: string | null;
   designation: string | null;
+  phone_number: string | null;
 }
 
 export interface TeamMemberAttendance {
@@ -42,7 +44,9 @@ const today = format(new Date(), 'yyyy-MM-dd');
 const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
 const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-export const useTeamAttendance = (subordinateIds: string[]) => {
+export const useTeamAttendance = (subordinateIds: string[], directReportIds?: string[], dateFilter: string = 'current-month') => {
+  // Use directReportIds for approvals (only immediate reports), fall back to subordinateIds
+  const approvalUserIds = directReportIds && directReportIds.length > 0 ? directReportIds : subordinateIds;
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -55,7 +59,7 @@ export const useTeamAttendance = (subordinateIds: string[]) => {
       if (!subordinateIds.length) return [];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, profile_picture_url, designation')
+        .select('id, full_name, profile_picture_url, designation, phone_number')
         .in('id', subordinateIds);
       if (error) throw error;
       return (data || []) as TeamMemberProfile[];
@@ -119,15 +123,15 @@ export const useTeamAttendance = (subordinateIds: string[]) => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // 5. Pending leave approvals
+  // 5. Pending leave approvals (only from direct reports)
   const { data: pendingLeaves = [] } = useQuery({
-    queryKey: ['team-pending-leaves', subordinateIds],
+    queryKey: ['team-pending-leaves', approvalUserIds],
     queryFn: async () => {
-      if (!subordinateIds.length) return [];
+      if (!approvalUserIds.length) return [];
       const { data, error } = await supabase
         .from('leave_applications')
         .select('id, user_id, start_date, end_date, reason, leave_type_id, status')
-        .in('user_id', subordinateIds)
+        .in('user_id', approvalUserIds)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -148,15 +152,15 @@ export const useTeamAttendance = (subordinateIds: string[]) => {
     staleTime: 2 * 60 * 1000,
   });
 
-  // 6. Pending regularization approvals
+  // 6. Pending regularization approvals (only from direct reports)
   const { data: pendingRegularizations = [] } = useQuery({
-    queryKey: ['team-pending-regularizations', subordinateIds],
+    queryKey: ['team-pending-regularizations', approvalUserIds],
     queryFn: async () => {
-      if (!subordinateIds.length) return [];
+      if (!approvalUserIds.length) return [];
       const { data, error } = await supabase
         .from('regularization_requests')
         .select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time, status')
-        .in('user_id', subordinateIds)
+        .in('user_id', approvalUserIds)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -181,15 +185,15 @@ export const useTeamAttendance = (subordinateIds: string[]) => {
   const onLeaveCount = [...onLeaveUserIds].filter(id => !presentUserIds.has(id)).length;
   const absentCount = subordinateIds.length - presentCount - onLeaveCount;
 
-  // Working days in month (approx)
-  const totalWorkingDaysInMonth = 22;
+  // Working days in month - dynamically calculated from config
+  const { totalWorkingDays: totalWorkingDaysInMonth } = useWorkingDaysConfig(dateFilter);
 
   // Build team members list
   const profileMap = new Map(profiles.map(p => [p.id, p]));
   const attendanceMap = new Map(todayAttendance.map((a: any) => [a.user_id, a]));
 
   const teamMembers: TeamMemberAttendance[] = subordinateIds.map(id => {
-    const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null };
+    const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null, phone_number: null };
     const att = attendanceMap.get(id);
     const isOnLeave = onLeaveUserIds.has(id) && !presentUserIds.has(id);
     

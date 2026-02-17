@@ -232,14 +232,16 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
 
     setLoading(true);
     try {
-      // Update profile
+      // Update profile - exclude sensitive fields (phone_number) to avoid
+      // trigger blocking admin access to sensitive profile data
+      const profileUpdate: Record<string, any> = {
+        full_name: formData.full_name,
+        username: formData.username,
+      };
+      
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
-          full_name: formData.full_name,
-          username: formData.username,
-          phone_number: formData.phone_number,
-        })
+        .update(profileUpdate)
         .eq('id', user.id);
 
       if (profileError) throw profileError;

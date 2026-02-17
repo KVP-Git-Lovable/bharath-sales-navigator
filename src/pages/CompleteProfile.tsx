@@ -133,7 +133,7 @@ const CompleteProfile = () => {
 
   if (validatingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle standalone-page">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
           <p>Validating invitation...</p>
@@ -144,7 +144,7 @@ const CompleteProfile = () => {
 
   if (!invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle standalone-page">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <p className="text-muted-foreground">Invalid or expired invitation.</p>
@@ -158,7 +158,7 @@ const CompleteProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle p-4">
+    <div className="min-h-screen bg-gradient-subtle p-4 standalone-page">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center">
           <User className="w-12 h-12 mx-auto mb-4 text-primary" />

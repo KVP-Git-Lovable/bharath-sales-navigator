@@ -104,6 +104,7 @@ export default function GPSTrack() {
   const [clCustomEnd, setClCustomEnd] = useState<Date>(new Date());
   const [clGpsData, setClGpsData] = useState<GPSData[]>([]);
   const [clLoading, setClLoading] = useState(false);
+  const [clAttendanceData, setClAttendanceData] = useState<{ check_in_time: string | null; check_out_time: string | null } | null>(null);
 
   // Compute current location tab date range
   const { clStartDate, clEndDate } = useMemo(() => {
@@ -551,19 +552,45 @@ export default function GPSTrack() {
     }
   }, [selectedMember, startDateStr, endDateStr, loadVisitStats]);
 
-  // Load GPS journey history for Current Location tab
+  // Load GPS journey history for Current Location tab (filtered by attendance boundaries)
   useEffect(() => {
     if (!currentLocationUser) return;
     
     const loadClGpsData = async () => {
       setClLoading(true);
-      const { data, error } = await supabase
+      setClAttendanceData(null);
+
+      // Fetch attendance record for the date range (use first date for single-day)
+      const { data: attendanceInfo } = await supabase
+        .from('attendance')
+        .select('check_in_time, check_out_time')
+        .eq('user_id', currentLocationUser)
+        .gte('date', clStartStr)
+        .lte('date', clEndStr)
+        .order('date', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      setClAttendanceData(attendanceInfo || null);
+
+      // Build GPS query
+      let query = supabase
         .from('gps_tracking')
         .select('latitude, longitude, accuracy, timestamp')
         .eq('user_id', currentLocationUser)
         .gte('date', clStartStr)
         .lte('date', clEndStr)
         .order('timestamp', { ascending: true });
+
+      // Filter by attendance check-in/check-out boundaries
+      if (attendanceInfo?.check_in_time) {
+        query = query.gte('timestamp', attendanceInfo.check_in_time);
+      }
+      if (attendanceInfo?.check_out_time) {
+        query = query.lte('timestamp', attendanceInfo.check_out_time);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error loading CL GPS data:', error);
@@ -720,6 +747,34 @@ export default function GPSTrack() {
               </div>
             </Card>
 
+            {/* Attendance Info Card */}
+            {clAttendanceData && (
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Attendance Boundaries</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Day Start: </span>
+                    <span className="font-medium">
+                      {clAttendanceData.check_in_time
+                        ? format(new Date(clAttendanceData.check_in_time), 'hh:mm a')
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Day End: </span>
+                    <span className="font-medium">
+                      {clAttendanceData.check_out_time
+                        ? format(new Date(clAttendanceData.check_out_time), 'hh:mm a')
+                        : 'Active'}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             <Card className="p-6 relative z-0">
               <CurrentLocationMap 
                 height="600px" 
@@ -727,6 +782,7 @@ export default function GPSTrack() {
                 isViewingOther={isViewingOtherUser}
                 journeyPositions={clGpsData}
                 journeyLoading={clLoading}
+                attendanceCompleted={!!clAttendanceData?.check_out_time}
               />
             </Card>
           </TabsContent>

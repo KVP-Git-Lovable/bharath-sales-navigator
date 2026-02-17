@@ -46,7 +46,7 @@ export const RoleBasedAuthPage = () => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center p-4 standalone-page"
       style={{
         background: 'linear-gradient(135deg, #e3f2fd 0%, #90caf9 30%, #42a5f5 60%, #1976d2 100%)',
         minHeight: '100vh'

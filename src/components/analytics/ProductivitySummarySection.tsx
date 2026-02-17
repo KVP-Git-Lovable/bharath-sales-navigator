@@ -11,7 +11,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface DayProductivity {
   date: string;
   displayDate: string;
-  userName: string;
+  userName?: string; // deprecated - resolve from userNameMap at render time
   userId: string;
   planned: number;
   productive: number;
@@ -20,6 +20,7 @@ interface DayProductivity {
 }
 
 interface UserProductivitySummary {
+  userId: string;
   full_name: string;
   planned_visits: number;
   productive_visits: number;
@@ -218,7 +219,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
           results.push({
             date: dateStr,
             displayDate: format(new Date(dateStr + 'T00:00:00'), 'MMMM d, yyyy'),
-            userName: userNameMap.get(userId) || 'Unknown',
+            userName: undefined, // resolved at render time from userNameMap
             userId,
             planned,
             productive,
@@ -246,9 +247,10 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
     const grouped: Record<string, UserProductivitySummary> = {};
 
     dayData.forEach(row => {
-      if (!grouped[row.userName]) {
-        grouped[row.userName] = {
-          full_name: row.userName,
+      if (!grouped[row.userId]) {
+        grouped[row.userId] = {
+          userId: row.userId,
+          full_name: userNameMap.get(row.userId) || 'Unknown',
           planned_visits: 0,
           productive_visits: 0,
           unproductive_visits: 0,
@@ -258,7 +260,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
           days_count: 0,
         };
       }
-      const g = grouped[row.userName];
+      const g = grouped[row.userId];
       g.planned_visits += row.planned;
       g.productive_visits += row.productive;
       g.unproductive_visits += row.unproductive;
@@ -268,13 +270,15 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
     });
 
     Object.values(grouped).forEach(user => {
+      // Re-resolve name in case userNameMap updated after initial grouping
+      user.full_name = userNameMap.get(user.userId) || 'Unknown';
       user.productivity_percentage = user.planned_visits > 0
         ? Math.round((user.productive_visits / user.planned_visits) * 100 * 100) / 100
         : 0;
     });
 
     return Object.values(grouped).sort((a, b) => b.productivity_percentage - a.productivity_percentage);
-  }, [dayData]);
+  }, [dayData, userNameMap]);
 
   // Notify parent
   useEffect(() => {
@@ -299,7 +303,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
   const drilldownData = useMemo(() => {
     if (!selectedUserForDrilldown) return [];
     return dayData
-      .filter(row => row.userName === selectedUserForDrilldown)
+      .filter(row => row.userId === selectedUserForDrilldown)
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [dayData, selectedUserForDrilldown]);
 
@@ -445,7 +449,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
                         <TableRow
                           key={index}
                           className="hover:bg-muted/30 cursor-pointer"
-                          onClick={() => setSelectedUserForDrilldown(row.full_name)}
+                          onClick={() => setSelectedUserForDrilldown(row.userId)}
                         >
                           <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{row.full_name}</TableCell>
                           <TableCell className={cn("text-right font-semibold whitespace-nowrap", isMobile ? "py-1 px-1" : "py-1.5")}>
@@ -494,7 +498,7 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
-              Day-wise Productivity - {selectedUserForDrilldown}
+              Day-wise Productivity - {selectedUserForDrilldown ? (userNameMap.get(selectedUserForDrilldown) || 'Unknown') : ''}
             </DialogTitle>
             <p className="text-sm text-muted-foreground">
               {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}

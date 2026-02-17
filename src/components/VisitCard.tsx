@@ -74,12 +74,14 @@ interface VisitCardProps {
   onViewDetails: (visitId: string) => void;
   selectedDate?: string; // Add selectedDate prop
   skipInitialCheck?: boolean; // Skip initial DB check when data is pre-loaded
+  viewingUserId?: string; // The user whose data we're viewing (for subordinate view)
 }
 export const VisitCard = ({
   visit,
   onViewDetails,
   selectedDate,
-  skipInitialCheck = false
+  skipInitialCheck = false,
+  viewingUserId
 }: VisitCardProps) => {
   const navigate = useNavigate();
   const [showNoOrderModal, setShowNoOrderModal] = useState(false);
@@ -591,7 +593,7 @@ export const VisitCard = ({
   const checkStatus = useCallback(async (forceRefresh = false) => {
     // Get user and date info first
     const { data: { session } } = await supabase.auth.getSession();
-    const currentUserId = session?.user?.id || userId;
+    const currentUserId = viewingUserId || session?.user?.id || userId;
     const visitRetailerId = visit.retailerId || visit.id;
     const targetDate = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
     
@@ -679,7 +681,7 @@ export const VisitCard = ({
             .from('orders')
             .select('order_date')
             .eq('retailer_id', visitRetailerId)
-            .gt('pending_amount', 0)
+            .gt('credit_pending_amount', 0)
             .order('order_date', { ascending: true })
             .limit(1)
             .maybeSingle();
@@ -1188,7 +1190,7 @@ export const VisitCard = ({
               .from('orders')
               .select('order_date')
               .eq('retailer_id', visitRetailerId)
-              .gt('pending_amount', 0)
+              .gt('credit_pending_amount', 0)
               .order('order_date', { ascending: true })
               .limit(1)
               .maybeSingle();
@@ -1337,9 +1339,11 @@ export const VisitCard = ({
             );
           }
           
-          // For 'productive' status, don't need to fetch from network - already have all data
+          // For 'productive' status, still fetch from network to get updated order list
+          // This ensures the visit card shows the correct order count after multiple orders
           if (newStatus === 'productive') {
-            console.log('🛑 [VisitCard] Status is PRODUCTIVE (truly final), skipping network refresh');
+            console.log('🔄 [VisitCard] Status is PRODUCTIVE, refreshing order data from DB');
+            checkStatus(true);
             return;
           }
         }
@@ -2280,10 +2284,11 @@ export const VisitCard = ({
       setLoadingOrder(true);
       const {
         data: {
-          user
+          user: authUser
         }
       } = await supabase.auth.getUser();
-      if (!user) {
+      const effectiveUserId = viewingUserId || authUser?.id;
+      if (!effectiveUserId) {
         setLoadingOrder(false);
         return;
       }
@@ -2307,11 +2312,11 @@ export const VisitCard = ({
           // Check by order_date first (exact date match), fallback to created_at
           if (o.order_date) {
             const orderDateStr = o.order_date.split('T')[0];
-            return o.user_id === user.id && o.retailer_id === retailerId && orderDateStr === targetDateStr;
+            return o.user_id === effectiveUserId && o.retailer_id === retailerId && orderDateStr === targetDateStr;
           }
           // Fallback to created_at timestamp comparison
           const orderDate = new Date(o.created_at);
-          return o.user_id === user.id && o.retailer_id === retailerId && orderDate >= dayStart && orderDate <= dayEnd;
+          return o.user_id === effectiveUserId && o.retailer_id === retailerId && orderDate >= dayStart && orderDate <= dayEnd;
         });
         console.log('[VisitCard] Offline orders found:', offlineOrders.length, 'for retailer:', retailerId);
       } catch (e) {
@@ -2328,7 +2333,7 @@ export const VisitCard = ({
           const { data } = await supabase
             .from('orders')
             .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, idempotency_key, order_items(product_name, quantity, rate, original_rate, total, unit)')
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId)
             .eq('retailer_id', retailerId)
             .in('status', ['confirmed', 'delivered'])
             .gte('created_at', dayStart.toISOString())
@@ -3607,39 +3612,68 @@ export const VisitCard = ({
         <CancelOrderDialog
           isOpen={showCancelOrderDialog}
           onClose={() => setShowCancelOrderDialog(false)}
-          orderId={lastOrderId}
-          invoiceNumber={ordersTodayList[0]?.invoice_number}
+          orders={ordersTodayList.map(o => ({
+            id: o.id,
+            invoice_number: o.invoice_number,
+            total_amount: o.total_amount,
+            is_credit_order: o.is_credit_order,
+            credit_pending_amount: o.is_credit_order ? (o.total_amount - o.credit_paid_amount) : 0,
+          }))}
           retailerName={visit.retailerName}
-          orderAmount={actualOrderValue}
-          isCreditOrder={isCreditOrder}
-          creditPendingAmount={creditPendingAmount}
-          onCancelled={async () => {
-            // Reset local state to show retailer as "fresh"
-            setHasOrderToday(false);
-            setActualOrderValue(0);
-            setCurrentStatus('planned');
-            setOrderPreviewOpen(false);
-            setOrderValueSource(null);
-            setOrdersTodayList([]);
-            setLastOrderItems([]);
-            setLastOrderId(null);
-            setCreditPendingAmount(0);
-            setPaidTodayAmount(0);
-            setIsCreditOrder(false);
-            
-            // Close dialog
+          onCancelled={async (cancelledIds: string[]) => {
+            const remaining = ordersTodayList.filter(o => !cancelledIds.includes(o.id));
+
+            if (remaining.length === 0) {
+              // All orders cancelled — reset to fresh
+              setHasOrderToday(false);
+              setActualOrderValue(0);
+              setCurrentStatus('planned');
+              setOrderPreviewOpen(false);
+              setOrderValueSource(null);
+              setOrdersTodayList([]);
+              setLastOrderItems([]);
+              setLastOrderId(null);
+              setCreditPendingAmount(0);
+              setPaidTodayAmount(0);
+              setIsCreditOrder(false);
+            } else {
+              // Partial cancellation — recalculate
+              setOrdersTodayList(remaining);
+              const newTotal = remaining.reduce((s, o) => s + o.total_amount, 0);
+              setActualOrderValue(Math.round(newTotal));
+              setOrderValueSource('db');
+              const newCreditPending = remaining
+                .filter(o => o.is_credit_order)
+                .reduce((s, o) => s + (o.total_amount - o.credit_paid_amount), 0);
+              setCreditPendingAmount(Math.max(0, newCreditPending));
+              const newPaid = remaining.reduce((s, o) => s + o.credit_paid_amount, 0);
+              setPaidTodayAmount(newPaid);
+              setIsCreditOrder(remaining.some(o => o.is_credit_order));
+              setLastOrderId(remaining[remaining.length - 1]?.id || null);
+            }
+
             setShowCancelOrderDialog(false);
-            
-            // Clear caches
+
             const retailerId = (visit.retailerId || visit.id) as string;
             const today = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
             await visitStatusCache.invalidate(retailerId, userId, today);
-            
-            // Toast confirmation
-            toast({
-              title: "Order cancelled",
-              description: "The retailer now appears as a fresh visit."
-            });
+
+            // Dispatch visitStatusChanged so TodaySummary and other listeners update immediately
+            const newStatus = remaining.length === 0 ? 'planned' : 'productive';
+            const newOrderValue = remaining.reduce((s, o) => s + o.total_amount, 0);
+            window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+              detail: {
+                visitId: currentVisitId || visit.id,
+                retailerId,
+                status: newStatus,
+                orderValue: Math.round(newOrderValue),
+              }
+            }));
+
+            // Force all react-query caches to refetch
+            window.dispatchEvent(new CustomEvent('globalDataRefresh', {
+              detail: { source: 'orderCancellation', retailerId }
+            }));
           }}
         />
       </CardContent>

@@ -10,7 +10,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { RoutePermissionGuard } from "@/components/auth/RoutePermissionGuard";
 import { RoleBasedAuthPage } from "@/components/auth/RoleBasedAuthPage";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -111,7 +110,6 @@ import CreditManagement from "./pages/CreditManagement";
 import RetailerLoyaltyAdmin from "./pages/RetailerLoyaltyAdmin";
 import RetailerLoyalty from "./pages/RetailerLoyalty";
 import SecurityManagement from "./pages/SecurityManagement";
-import PermissionSetPage from "./pages/PermissionSetPage";
 import PushContentSetup from "./pages/admin/PushContentSetup";
 import PerformanceModuleAdmin from "./pages/admin/PerformanceModuleAdmin";
 import PriceBookAdmin from "./pages/admin/PriceBookAdmin";
@@ -139,6 +137,7 @@ import PrimaryOrders from "./pages/PrimaryOrders";
 import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
 import MapRedirect from "./pages/MapRedirect";
+import { TeamApprovals } from "./pages/TeamApprovals";
 
 // Distributor Portal Pages
 import DistributorLogin from "./pages/distributor-portal/DistributorLogin";
@@ -329,38 +328,38 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/auth/complete-profile" element={<CompleteProfile />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         
-        <Route path="/admin" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="admin_"><AdminDashboard /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-        <Route path="/admin-controls" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="admin_"><AdminControls /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/admin-controls" element={<ProtectedRoute><AdminControls /></ProtectedRoute>} />
         <Route path="/feature-management" element={<ProtectedRoute><FeatureManagement /></ProtectedRoute>} />
         <Route path="/push-content-setup" element={<ProtectedRoute><PushContentSetup /></ProtectedRoute>} />
         <Route path="/user_roles" element={<ProtectedRoute><UserRoles /></ProtectedRoute>} />
         <Route path="/security-management" element={<ProtectedRoute><SecurityManagement /></ProtectedRoute>} />
-        <Route path="/permission-set" element={<ProtectedRoute><PermissionSetPage /></ProtectedRoute>} />
         <Route path="/product-management" element={<ProtectedRoute><ProductManagementPage /></ProtectedRoute>} />
         <Route path="/scheme-management" element={<ProtectedRoute><SchemeMasterPage /></ProtectedRoute>} />
         <Route path="/attendance-management" element={<ProtectedRoute><AttendanceManagement /></ProtectedRoute>} />
         <Route path="/feedback-management" element={<ProtectedRoute><FeedbackManagement /></ProtectedRoute>} />
-        <Route path="/competition-master" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="competition_"><CompetitionMaster /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/competition-master/:competitorId" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="competition_"><CompetitorDetail /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/competition-master" element={<ProtectedRoute><CompetitionMaster /></ProtectedRoute>} />
+        <Route path="/competition-master/:competitorId" element={<ProtectedRoute><CompetitorDetail /></ProtectedRoute>} />
         <Route path="/retailer/:id" element={<RetailerDetail />} />
-<Route path="/territories-and-distributors" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="territory_"><TerritoriesAndDistributors /></RoutePermissionGuard></ProtectedRoute>} />
+<Route path="/territories-and-distributors" element={<ProtectedRoute><TerritoriesAndDistributors /></ProtectedRoute>} />
         <Route path="/territory/:id" element={<ProtectedRoute><TerritoryDetail /></ProtectedRoute>} />
         <Route path="/admin-expense-management" element={<ProtectedRoute><AdminExpenseManagement /></ProtectedRoute>} />
-        <Route path="/operations" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="admin_operations"><Operations /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/operations" element={<ProtectedRoute><Operations /></ProtectedRoute>} />
         <Route path="/visit-planner" element={<ProtectedRoute><VisitPlanner /></ProtectedRoute>} />
         <Route path="/visits" element={<ProtectedRoute><BeatPlanning /></ProtectedRoute>} />
         <Route path="/beat-planning" element={<ProtectedRoute><BeatPlanning /></ProtectedRoute>} />
-        <Route path="/visits/retailers" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="visit_"><MyVisits /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/visits/retailers" element={<ProtectedRoute><MyVisits /></ProtectedRoute>} />
         <Route path="/order-entry" element={<ProtectedRoute><OrderEntry /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
-        <Route path="/my-beats" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="beat_"><MyBeats /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/my-beats" element={<ProtectedRoute><MyBeats /></ProtectedRoute>} />
         <Route path="/today-summary" element={<ProtectedRoute><TodaySummary /></ProtectedRoute>} />
         <Route path="/add-retailer" element={<ProtectedRoute><AddRetailer /></ProtectedRoute>} />
-        <Route path="/attendance" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="attendance_"><Attendance /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/my-retailers" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="retailer_"><MyRetailers /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/my-target" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="target_"><MyTarget /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/performance-dashboard" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="performance_"><PerformanceDashboard /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+        <Route path="/team-approvals" element={<ProtectedRoute><TeamApprovals /></ProtectedRoute>} />
+        <Route path="/my-retailers" element={<ProtectedRoute><MyRetailers /></ProtectedRoute>} />
+        <Route path="/my-target" element={<ProtectedRoute><MyTarget /></ProtectedRoute>} />
+        <Route path="/performance-dashboard" element={<ProtectedRoute><PerformanceDashboard /></ProtectedRoute>} />
         <Route path="/target-advisor" element={<ProtectedRoute><TargetAchievementAdvisor /></ProtectedRoute>} />
         <Route path="/auto-plan-rationale" element={<ProtectedRoute><AutoPlanRationale /></ProtectedRoute>} />
         <Route path="/admin/target-vs-actual" element={<ProtectedRoute><TargetVsActual /></ProtectedRoute>} />
@@ -371,24 +370,24 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/beat-analytics" element={<ProtectedRoute><BeatAnalytics /></ProtectedRoute>} />
         <Route path="/add-records" element={<ProtectedRoute><AddRecords /></ProtectedRoute>} />
         <Route path="/add-beat" element={<ProtectedRoute><AddBeat /></ProtectedRoute>} />
-        <Route path="/expenses" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="expense_"><MyExpenses /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/leaderboard" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="gamification_"><Leaderboard /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/expenses" element={<ProtectedRoute><MyExpenses /></ProtectedRoute>} />
+        <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="/game-policy" element={<ProtectedRoute><GamePolicy /></ProtectedRoute>} />
         <Route path="/activities-info" element={<ProtectedRoute><ActivitiesInfo /></ProtectedRoute>} />
         <Route path="/badges-info" element={<ProtectedRoute><BadgesInfo /></ProtectedRoute>} />
-        <Route path="/performance" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="performance_"><Performance /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
         
-        <Route path="/competency-dashboard" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="competency_"><CompetencyDashboard /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/competency-dashboard" element={<ProtectedRoute><CompetencyDashboard /></ProtectedRoute>} />
         <Route path="/competency/:competencyId" element={<ProtectedRoute><CompetencyDetail /></ProtectedRoute>} />
         <Route path="/team-competency" element={<ProtectedRoute><TeamCompetency /></ProtectedRoute>} />
         <Route path="/competency-admin" element={<ProtectedRoute><CompetencyAdmin /></ProtectedRoute>} />
-        <Route path="/analytics" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="analytics_"><Analytics /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/schemes" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="scheme_"><Schemes /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+        <Route path="/schemes" element={<ProtectedRoute><Schemes /></ProtectedRoute>} />
         
         <Route path="/branding-requests" element={<ProtectedRoute><BrandingRequests /></ProtectedRoute>} />
         <Route path="/admin/hierarchy-targets" element={<Navigate to="/admin/target-vs-actual?mode=hierarchy" replace />} />
         <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
-        <Route path="/gps-track" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="gps_"><GPSTrack /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/gps-track" element={<ProtectedRoute><GPSTrack /></ProtectedRoute>} />
         <Route path="/gps-track-management" element={<ProtectedRoute><GPSTrackManagement /></ProtectedRoute>} />
         <Route path="/retail-management" element={<ProtectedRoute><RetailManagement /></ProtectedRoute>} />
         <Route path="/van-sales-management" element={<ProtectedRoute><VanSalesManagement /></ProtectedRoute>} />
@@ -402,7 +401,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/admin/performance-module" element={<ProtectedRoute><PerformanceModuleAdmin /></ProtectedRoute>} />
         <Route path="/admin/price-books" element={<ProtectedRoute><PriceBookAdmin /></ProtectedRoute>} />
         <Route path="/admin/price-books/:id" element={<ProtectedRoute><PriceBookDetail /></ProtectedRoute>} />
-        <Route path="/my-targets" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="target_"><MyTargets /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/my-targets" element={<ProtectedRoute><MyTargets /></ProtectedRoute>} />
         <Route path="/team-targets" element={<ProtectedRoute><TeamTargets /></ProtectedRoute>} />
         <Route path="/joint-sales-analytics" element={<ProtectedRoute><JointSalesAnalytics /></ProtectedRoute>} />
         <Route path="/features/beat-planning" element={<BeatPlanningFeature />} />
@@ -413,17 +412,17 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/features/growth-analytics" element={<GrowthAnalyticsFeature />} />
         <Route path="/onboarding" element={<ProtectedRoute><EmployeeOnboarding /></ProtectedRoute>} />
         <Route path="/employee-360" element={<ProtectedRoute><Employee360 /></ProtectedRoute>} />
-        <Route path="/recycle-bin" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="recycle_"><RecycleBin /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
         <Route path="/admin/recycle-bin" element={<ProtectedRoute><RecycleBinAdmin /></ProtectedRoute>} />
         <Route path="/admin/distributor-portal" element={<ProtectedRoute><DistributorPortalAdmin /></ProtectedRoute>} />
         <Route path="/admin/pincode-master" element={<ProtectedRoute><PincodeMasterPage /></ProtectedRoute>} />
         <Route path="/admin/tax-master" element={<ProtectedRoute><TaxMaster /></ProtectedRoute>} />
-        <Route path="/distributor-master" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="distributor_"><DistributorMaster /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/distributor-master" element={<ProtectedRoute><DistributorMaster /></ProtectedRoute>} />
         <Route path="/add-distributor" element={<ProtectedRoute><AddDistributor /></ProtectedRoute>} />
         <Route path="/distributor/:id" element={<ProtectedRoute><DistributorDetail /></ProtectedRoute>} />
         <Route path="/edit-distributor/:id" element={<ProtectedRoute><EditDistributor /></ProtectedRoute>} />
-        <Route path="/primary-orders" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="primary_order_"><PrimaryOrders /></RoutePermissionGuard></ProtectedRoute>} />
-        <Route path="/my-deliveries" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="delivery_"><MyDeliveriesPage /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/primary-orders" element={<ProtectedRoute><PrimaryOrders /></ProtectedRoute>} />
+        <Route path="/my-deliveries" element={<ProtectedRoute><MyDeliveriesPage /></ProtectedRoute>} />
 
         {/* Distributor Portal Routes */}
         <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
@@ -455,12 +454,12 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
-        <Route path="/packing-list-management" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="packing_list_"><PackingListManagementPage /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/packing-list-management" element={<ProtectedRoute><PackingListManagementPage /></ProtectedRoute>} />
         <Route path="/packing-list/:id" element={<ProtectedRoute><PackingListDetailPage /></ProtectedRoute>} />
         <Route path="/delivery-run" element={<ProtectedRoute><DeliveryRun /></ProtectedRoute>} />
 
         {/* Institutional Sales Routes */}
-        <Route path="/institutional-sales" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="institutional_"><InstitutionalSalesDashboard /></RoutePermissionGuard></ProtectedRoute>} />
+        <Route path="/institutional-sales" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
         <Route path="/institutional-sales/leads" element={<ProtectedRoute><LeadManagement /></ProtectedRoute>} />
         <Route path="/institutional-sales/accounts" element={<ProtectedRoute><AccountManagement /></ProtectedRoute>} />
         <Route path="/institutional-sales/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />

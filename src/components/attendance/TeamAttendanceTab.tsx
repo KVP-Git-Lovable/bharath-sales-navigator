@@ -1,19 +1,22 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTeamAttendance } from '@/hooks/useTeamAttendance';
 import { TeamSummaryCards, TeamFilter } from './TeamSummaryCards';
-import { PendingApprovalsSection } from './PendingApprovalsSection';
 import { TeamMemberAttendanceCard } from './TeamMemberAttendanceCard';
 import { TeamMemberDetailSheet } from './TeamMemberDetailSheet';
 import { SearchInput } from '@/components/SearchInput';
 import { PaginationControls } from '@/components/ui/PaginationControls';
+import { ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
 interface TeamAttendanceTabProps {
   subordinateIds: string[];
+  directReportIds: string[];
 }
 
-export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) => {
+export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAttendanceTabProps) => {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<TeamFilter>('all');
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +30,7 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
     absentCount,
     handleLeaveAction,
     handleRegularizationAction,
-  } = useTeamAttendance(subordinateIds);
+  } = useTeamAttendance(subordinateIds, directReportIds);
 
   const filteredMembers = useMemo(() => {
     let members = filter === 'all'
@@ -54,6 +57,10 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
 
   const detailMember = teamMembers.find(m => m.profile.id === detailUserId);
 
+  // Count leave and regularization requests
+  const leaveCount = pendingApprovals.filter(a => a.type === 'leave').length;
+  const regCount = pendingApprovals.filter(a => a.type === 'regularization').length;
+
   return (
     <div className="space-y-4">
       <TeamSummaryCards
@@ -64,18 +71,27 @@ export const TeamAttendanceTab = ({ subordinateIds }: TeamAttendanceTabProps) =>
         onFilterChange={(f) => { setFilter(f); setCurrentPage(1); }}
       />
 
-      <PendingApprovalsSection
-        approvals={pendingApprovals}
-        onLeaveAction={handleLeaveAction}
-        onRegularizationAction={handleRegularizationAction}
-      />
+      {/* Approvals Button */}
+      {pendingApprovals.length > 0 && (
+        <button
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[hsl(20,70%,94%)] hover:bg-[hsl(20,70%,90%)] transition-colors"
+          onClick={() => navigate('/team-approvals')}
+        >
+          <span className="text-sm font-semibold text-[hsl(160,40%,35%)]">Approvals</span>
+          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-[hsl(15,55%,82%)] text-[hsl(15,60%,35%)] text-xs font-semibold">
+            {pendingApprovals.length}
+          </span>
+          <ChevronRight className="h-4 w-4 text-[hsl(160,40%,35%)]" />
+        </button>
+      )}
 
+      {/* Team Members */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-foreground whitespace-nowrap">
             Team Members ({filteredMembers.length})
           </h3>
-          <div className="flex-1 max-w-[220px]">
+          <div className="flex-1 max-w-[200px]">
             <SearchInput
               placeholder="Search members..."
               value={searchQuery}
