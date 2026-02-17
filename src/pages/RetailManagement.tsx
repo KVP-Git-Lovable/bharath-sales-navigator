@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { compressImageFile } from "@/utils/imageCompression";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -259,11 +260,12 @@ export default function RetailManagement() {
     
     setUploadingPhoto(true);
     try {
+      const compressedBlob = await compressImageFile(blob);
       const fileName = `${selectedRetailer.id}/store_${Date.now()}.jpg`;
       
       const { error: uploadError } = await supabase.storage
         .from('retailer-photos')
-        .upload(fileName, blob);
+        .upload(fileName, compressedBlob);
 
       if (uploadError) throw uploadError;
 
