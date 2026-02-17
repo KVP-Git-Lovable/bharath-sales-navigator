@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivityEvents } from '@/hooks/useActivityEvents';
 import { toast } from 'sonner';
@@ -40,27 +39,8 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
   const [fromDate, setFromDate] = useState<Date>(new Date());
   const [toDate, setToDate] = useState<Date>(new Date());
   const [activityType, setActivityType] = useState('Event');
-  const [selectedRetailerId, setSelectedRetailerId] = useState<string>('');
-  const [selectedRetailerName, setSelectedRetailerName] = useState('');
+  const [siteName, setSiteName] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [retailers, setRetailers] = useState<Array<{ id: string; name: string }>>([]);
-  const [retailerSearch, setRetailerSearch] = useState('');
-
-  // Load user's retailers
-  useEffect(() => {
-    if (!open || !user?.id) return;
-    const loadRetailers = async () => {
-      const { data } = await supabase
-        .from('retailers')
-        .select('id, name')
-        .eq('user_id', user.id)
-        .order('name');
-      if (data) {
-        setRetailers(data);
-      }
-    };
-    loadRetailers();
-  }, [open, user?.id]);
 
   // Calculate total days for multiple days
   const totalDays = durationType === 'multiple_days' && fromDate && toDate
@@ -77,10 +57,8 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
     setFromDate(new Date());
     setToDate(new Date());
     setActivityType('Event');
-    setSelectedRetailerId('');
-    setSelectedRetailerName('');
+    setSiteName('');
     setRemarks('');
-    setRetailerSearch('');
   };
 
   const handleSubmit = async () => {
@@ -88,11 +66,6 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
       toast.error('Please log in first');
       return;
     }
-    if (!selectedRetailerId) {
-      toast.error('Please select a customer/outlet');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const dateStr = format(activityDate, 'yyyy-MM-dd');
@@ -116,8 +89,7 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
         from_date: durationType === 'multiple_days' ? format(fromDate, 'yyyy-MM-dd') : undefined,
         to_date: durationType === 'multiple_days' ? format(toDate, 'yyyy-MM-dd') : undefined,
         total_days: totalDays || undefined,
-        retailer_id: selectedRetailerId || undefined,
-        retailer_name: selectedRetailerName || undefined,
+        retailer_name: siteName || undefined,
         remarks: remarks || undefined,
       });
 
@@ -135,10 +107,6 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
       setIsSubmitting(false);
     }
   };
-
-  const filteredRetailers = retailers.filter(r =>
-    r.name.toLowerCase().includes(retailerSearch.toLowerCase())
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -353,52 +321,15 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
             </Select>
           </div>
 
-          {/* Customer / Outlet */}
+          {/* Site Name */}
           <div>
-            <Label className="text-sm">Customer / Outlet <span className="text-destructive">*</span></Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-between text-left font-normal mt-1">
-                  {selectedRetailerName || 'Select customer...'}
-                  <CalendarIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[calc(100vw-4rem)] max-w-md p-0" align="start">
-                <div className="p-2 border-b">
-                  <Input
-                    placeholder="Search customers..."
-                    value={retailerSearch}
-                    onChange={(e) => setRetailerSearch(e.target.value)}
-                    className="h-8 text-sm"
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {filteredRetailers.slice(0, 50).map((retailer) => (
-                    <button
-                      key={retailer.id}
-                      type="button"
-                      className={cn(
-                        "w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors",
-                        selectedRetailerId === retailer.id && "bg-primary/10 text-primary font-medium"
-                      )}
-                      onClick={() => {
-                        setSelectedRetailerId(retailer.id);
-                        setSelectedRetailerName(retailer.name);
-                        setRetailerSearch('');
-                      }}
-                    >
-                      {retailer.name}
-                    </button>
-                  ))}
-                  {filteredRetailers.length === 0 && (
-                    <div className="p-3 text-sm text-muted-foreground text-center">
-                      No customers found
-                    </div>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Label className="text-sm">Site</Label>
+            <Input
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              placeholder="Enter site name..."
+              className="mt-1"
+            />
           </div>
 
           {/* Remarks */}
