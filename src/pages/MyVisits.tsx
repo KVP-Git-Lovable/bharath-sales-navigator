@@ -1465,7 +1465,7 @@ export const MyVisits = () => {
                   <div className="h-4 w-32 mx-auto mb-2 bg-muted rounded" />
                   <div className="h-3 w-48 mx-auto bg-muted rounded" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">Loading retailers...</p>
+                <p className="text-xs text-muted-foreground mt-3">Loading visits...</p>
               </CardContent>
             </Card>
           )}
