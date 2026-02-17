@@ -31,6 +31,7 @@ import { getLocalTodayDate, toLocalISODate } from '@/utils/dateUtils';
 import RegularizationRequestModal from '@/components/RegularizationRequestModal';
 import { useAttendanceCache } from '@/hooks/useAttendanceCache';
 import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
+import { getSignedStorageUrl } from '@/utils/storageUtils';
 
 // Processing steps for attendance
 type ProcessingStep = 'location' | 'photo' | 'face' | 'saving' | 'complete';
@@ -432,10 +433,11 @@ const Attendance = () => {
       
       console.log('Photo uploaded successfully');
 
-      // Get public URL for face matching
-      const { data: urlData } = supabase.storage
-        .from('attendance-photos')
-        .getPublicUrl(photoPath);
+      // Create signed URLs for face matching (buckets are private)
+      const [attendanceSignedUrl, baselineSignedUrl] = await Promise.all([
+        getSignedStorageUrl(photoPath, 'attendance-photos', 300),
+        getSignedStorageUrl(profile.profile_picture_url),
+      ]);
 
       // Update to face verification step
       setProcessingState({
@@ -449,8 +451,8 @@ const Attendance = () => {
         'verify-face-match',
         {
           body: {
-            baselinePhotoUrl: profile.profile_picture_url,
-            attendancePhotoUrl: urlData.publicUrl
+            baselinePhotoUrl: baselineSignedUrl,
+            attendancePhotoUrl: attendanceSignedUrl
           }
         }
       );

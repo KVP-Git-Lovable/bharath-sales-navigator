@@ -185,11 +185,7 @@ export const CompetitionDataForm = ({ retailerId, visitId, onSave }: Competition
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('visits')
-        .getPublicUrl(filePath);
-
-      updateRow(id, 'photoUrls', [...rows.find(r => r.id === id)!.photoUrls, publicUrl]);
+      updateRow(id, 'photoUrls', [...rows.find(r => r.id === id)!.photoUrls, filePath]);
       
       toast({
         title: "Success",
@@ -301,11 +297,7 @@ export const CompetitionDataForm = ({ retailerId, visitId, onSave }: Competition
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('visits')
-        .getPublicUrl(filePath);
-
-      updateRow(id, 'voiceNoteUrls', [...rows.find(r => r.id === id)!.voiceNoteUrls, publicUrl]);
+      updateRow(id, 'voiceNoteUrls', [...rows.find(r => r.id === id)!.voiceNoteUrls, filePath]);
       
       toast({
         title: "Success",

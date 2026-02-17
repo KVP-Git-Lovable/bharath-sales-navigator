@@ -6,6 +6,7 @@ import { Camera, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CameraCapture } from './CameraCapture';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface ProfileSetupModalProps {
   userId: string;
@@ -20,6 +21,7 @@ export const ProfileSetupModal = ({ userId, fullName, onComplete }: ProfileSetup
   const [isUploading, setIsUploading] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const signedProfileUrl = useSignedUrl(profileImageUrl);
 
   useEffect(() => {
     const completed = localStorage.getItem('profileSetupComplete') === 'true';
@@ -156,7 +158,7 @@ export const ProfileSetupModal = ({ userId, fullName, onComplete }: ProfileSetup
 
           <div className="flex flex-col items-center gap-6 py-4">
             <Avatar className="w-32 h-32 border-4 border-border">
-              <AvatarImage src={profileImageUrl || undefined} />
+              <AvatarImage src={signedProfileUrl || undefined} />
               <AvatarFallback className="text-4xl">{fullName.charAt(0)}</AvatarFallback>
             </Avatar>
 

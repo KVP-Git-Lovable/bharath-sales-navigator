@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Loader2, Upload, Building2 } from "lucide-react";
 import { HEADER_BRANDING_UPDATED_EVENT } from "@/hooks/useCompanyData";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 export default function HeaderBrandingSettings() {
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -15,6 +16,7 @@ export default function HeaderBrandingSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const signedLogoUrl = useSignedUrl(logoUrl);
 
   useEffect(() => {
     fetchCompanyData();
@@ -159,9 +161,9 @@ export default function HeaderBrandingSettings() {
           <Label>Company Logo</Label>
           <div className="flex items-start gap-6">
             <div className="w-24 h-24 border-2 border-dashed rounded-lg overflow-hidden bg-muted/50 flex items-center justify-center">
-              {logoUrl ? (
+              {signedLogoUrl ? (
                 <img
-                  src={logoUrl}
+                  src={signedLogoUrl}
                   alt="Company Logo"
                   className="w-full h-full object-contain p-2"
                 />
@@ -211,8 +213,8 @@ export default function HeaderBrandingSettings() {
           <Label className="text-xs text-muted-foreground mb-3 block">Preview</Label>
           <div className="flex items-center gap-3 bg-primary text-primary-foreground p-3 rounded-lg w-fit">
             <div className="w-9 h-9 rounded-lg bg-white p-0.5 overflow-hidden">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              {signedLogoUrl ? (
+                <img src={signedLogoUrl} alt="Logo" className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted">
                   <Building2 className="h-4 w-4 text-muted-foreground" />

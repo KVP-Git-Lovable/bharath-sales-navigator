@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Camera, Upload, User, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface BaselinePhotoManagementProps {
   userId: string;
@@ -20,6 +21,7 @@ export const BaselinePhotoManagement = ({ userId, userProfile }: BaselinePhotoMa
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const signedPhotoUrl = useSignedUrl(currentPhoto);
 
   useEffect(() => {
     fetchCurrentPhoto();
@@ -130,7 +132,7 @@ export const BaselinePhotoManagement = ({ userId, userProfile }: BaselinePhotoMa
       <CardContent className="space-y-4">
         <div className="flex justify-center">
           <Avatar className="w-32 h-32">
-            <AvatarImage src={currentPhoto || undefined} alt="Baseline photo" />
+            <AvatarImage src={signedPhotoUrl || undefined} alt="Baseline photo" />
             <AvatarFallback className="text-2xl">
               {userProfile?.full_name?.charAt(0) || 'U'}
             </AvatarFallback>
