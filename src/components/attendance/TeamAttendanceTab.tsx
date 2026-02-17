@@ -1,26 +1,75 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTeamAttendance } from '@/hooks/useTeamAttendance';
 import { TeamSummaryCards, TeamFilter } from './TeamSummaryCards';
-import { TeamMemberAttendanceCard } from './TeamMemberAttendanceCard';
+import { TeamMemberHierarchyRow, HierarchyMemberNode } from './TeamMemberHierarchyRow';
 import { TeamMemberDetailSheet } from './TeamMemberDetailSheet';
 import { SearchInput } from '@/components/SearchInput';
-import { PaginationControls } from '@/components/ui/PaginationControls';
 import { ChevronRight } from 'lucide-react';
-
-const PAGE_SIZE = 10;
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { TeamMemberAttendance } from '@/hooks/useTeamAttendance';
 
 interface TeamAttendanceTabProps {
   subordinateIds: string[];
   directReportIds: string[];
 }
 
+// Build hierarchy tree from flat member list + employee relationships
+function buildHierarchyTree(
+  members: TeamMemberAttendance[],
+  managerMap: Map<string, string | null>, // userId -> managerId
+  currentUserId: string | undefined,
+  searchQuery: string
+): HierarchyMemberNode[] {
+  const memberMap = new Map(members.map(m => [m.profile.id, m]));
+
+  // If searching, return flat filtered list
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    return members
+      .filter(m =>
+        m.profile.full_name.toLowerCase().includes(q) ||
+        (m.profile.designation && m.profile.designation.toLowerCase().includes(q))
+      )
+      .map(m => ({ member: m, children: [] }));
+  }
+
+  // Build tree
+  const nodeMap = new Map<string, HierarchyMemberNode>();
+  members.forEach(m => {
+    nodeMap.set(m.profile.id, { member: m, children: [] });
+  });
+
+  const roots: HierarchyMemberNode[] = [];
+
+  members.forEach(m => {
+    const node = nodeMap.get(m.profile.id)!;
+    const managerId = managerMap.get(m.profile.id);
+
+    // If manager is the current user or manager not in the list, it's a root
+    if (!managerId || managerId === currentUserId || !nodeMap.has(managerId)) {
+      roots.push(node);
+    } else {
+      const parentNode = nodeMap.get(managerId);
+      if (parentNode) {
+        parentNode.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+  });
+
+  return roots;
+}
+
 export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAttendanceTabProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<TeamFilter>('all');
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [managerMap, setManagerMap] = useState<Map<string, string | null>>(new Map());
 
   const {
     teamMembers,
@@ -32,34 +81,31 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
     handleRegularizationAction,
   } = useTeamAttendance(subordinateIds, directReportIds);
 
+  // Fetch manager relationships for all subordinates
+  useEffect(() => {
+    if (!subordinateIds.length) return;
+    supabase
+      .from('employees')
+      .select('user_id, manager_id')
+      .in('user_id', subordinateIds)
+      .then(({ data }) => {
+        const map = new Map<string, string | null>();
+        data?.forEach(e => map.set(e.user_id, e.manager_id));
+        setManagerMap(map);
+      });
+  }, [subordinateIds]);
+
   const filteredMembers = useMemo(() => {
-    let members = filter === 'all'
-      ? teamMembers
-      : teamMembers.filter((m) => m.todayStatus === filter);
+    if (filter === 'all') return teamMembers;
+    return teamMembers.filter((m) => m.todayStatus === filter);
+  }, [teamMembers, filter]);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      members = members.filter((m) =>
-        m.profile.full_name.toLowerCase().includes(q) ||
-        (m.profile.designation && m.profile.designation.toLowerCase().includes(q))
-      );
-    }
-    return members;
-  }, [teamMembers, filter, searchQuery]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE));
-  const safePage = Math.min(currentPage, totalPages);
-  if (safePage !== currentPage) setCurrentPage(safePage);
-
-  const paginatedMembers = filteredMembers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const startIndex = filteredMembers.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const endIndex = Math.min(safePage * PAGE_SIZE, filteredMembers.length);
+  const hierarchyTree = useMemo(() =>
+    buildHierarchyTree(filteredMembers, managerMap, user?.id, searchQuery),
+    [filteredMembers, managerMap, user?.id, searchQuery]
+  );
 
   const detailMember = teamMembers.find(m => m.profile.id === detailUserId);
-
-  // Count leave and regularization requests
-  const leaveCount = pendingApprovals.filter(a => a.type === 'leave').length;
-  const regCount = pendingApprovals.filter(a => a.type === 'regularization').length;
 
   return (
     <div className="space-y-4">
@@ -68,7 +114,7 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
         onLeaveCount={onLeaveCount}
         absentCount={absentCount}
         activeFilter={filter}
-        onFilterChange={(f) => { setFilter(f); setCurrentPage(1); }}
+        onFilterChange={(f) => { setFilter(f); }}
       />
 
       {/* Approvals Button */}
@@ -95,37 +141,25 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
             <SearchInput
               placeholder="Search members..."
               value={searchQuery}
-              onChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
+              onChange={(v) => { setSearchQuery(v); }}
             />
           </div>
         </div>
 
-        {filteredMembers.length === 0 ? (
+        {hierarchyTree.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             No team members {filter !== 'all' ? `with status "${filter.replace('_', ' ')}"` : 'found'}
           </p>
         ) : (
-          <>
-            {paginatedMembers.map((member) => (
-              <TeamMemberAttendanceCard
-                key={member.profile.id}
-                member={member}
+          <div className="space-y-1">
+            {hierarchyTree.map((node) => (
+              <TeamMemberHierarchyRow
+                key={node.member.profile.id}
+                node={node}
                 onViewAttendance={setDetailUserId}
               />
             ))}
-            <PaginationControls
-              currentPage={safePage}
-              totalPages={totalPages}
-              startIndex={startIndex}
-              endIndex={endIndex}
-              totalItems={filteredMembers.length}
-              hasNextPage={safePage < totalPages}
-              hasPrevPage={safePage > 1}
-              onNextPage={() => setCurrentPage(p => p + 1)}
-              onPrevPage={() => setCurrentPage(p => p - 1)}
-              onGoToPage={setCurrentPage}
-            />
-          </>
+          </div>
         )}
       </div>
 
