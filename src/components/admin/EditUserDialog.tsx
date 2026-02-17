@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, Trash2, Eye, EyeOff, Copy, Key, Check, AlertTriangle, Database } from 'lucide-react';
+import { Loader2, Trash2, Eye, EyeOff, Copy, Key, Check, AlertTriangle, Database, ChevronsUpDown, Search } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserDeleteDialog } from './UserDeleteDialog';
 import { UserDeleteDataDialog } from './UserDeleteDataDialog';
@@ -77,6 +79,12 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
     manager_id: '',
     secondary_manager_id: '',
   });
+
+  // Manager search state
+  const [primaryManagerSearch, setPrimaryManagerSearch] = useState('');
+  const [primaryManagerOpen, setPrimaryManagerOpen] = useState(false);
+  const [secondaryManagerSearch, setSecondaryManagerSearch] = useState('');
+  const [secondaryManagerOpen, setSecondaryManagerOpen] = useState(false);
 
   // Password reset state
   const [newPassword, setNewPassword] = useState('');
@@ -399,43 +407,123 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ user, open, onOpenChang
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Primary Manager (Reports To)</Label>
-                <Select 
-                  value={employeeData.manager_id || "none"} 
-                  onValueChange={(value) => setEmployeeData(prev => ({ ...prev, manager_id: value === "none" ? "" : value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select primary manager" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto z-[9999]" position="popper" sideOffset={4}>
-                    <SelectItem value="none">No Manager</SelectItem>
-                    {managers.map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        {manager.full_name || manager.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={primaryManagerOpen} onOpenChange={setPrimaryManagerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      {employeeData.manager_id
+                        ? (managers.find(m => m.id === employeeData.manager_id)?.full_name || managers.find(m => m.id === employeeData.manager_id)?.username || 'Selected')
+                        : "No Manager"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[9999]" align="start">
+                    <div className="flex items-center border-b px-3">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <input
+                        className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
+                        placeholder="Search manager..."
+                        value={primaryManagerSearch}
+                        onChange={(e) => setPrimaryManagerSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto p-1">
+                      <div
+                        className={cn(
+                          "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                          !employeeData.manager_id && "bg-accent"
+                        )}
+                        onClick={() => {
+                          setEmployeeData(prev => ({ ...prev, manager_id: '' }));
+                          setPrimaryManagerOpen(false);
+                          setPrimaryManagerSearch('');
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", !employeeData.manager_id ? "opacity-100" : "opacity-0")} />
+                        No Manager
+                      </div>
+                      {managers
+                        .filter(m => `${m.full_name} ${m.username}`.toLowerCase().includes(primaryManagerSearch.toLowerCase()))
+                        .map((manager) => (
+                          <div
+                            key={manager.id}
+                            className={cn(
+                              "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                              employeeData.manager_id === manager.id && "bg-accent"
+                            )}
+                            onClick={() => {
+                              setEmployeeData(prev => ({ ...prev, manager_id: manager.id }));
+                              setPrimaryManagerOpen(false);
+                              setPrimaryManagerSearch('');
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", employeeData.manager_id === manager.id ? "opacity-100" : "opacity-0")} />
+                            {manager.full_name || manager.username}
+                          </div>
+                        ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-muted-foreground">This determines the user's position in the org hierarchy</p>
               </div>
 
               <div className="space-y-2">
                 <Label>Secondary Manager</Label>
-                <Select 
-                  value={employeeData.secondary_manager_id || "none"} 
-                  onValueChange={(value) => setEmployeeData(prev => ({ ...prev, secondary_manager_id: value === "none" ? "" : value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select secondary manager" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto z-[9999]" position="popper" sideOffset={4}>
-                    <SelectItem value="none">No Secondary Manager</SelectItem>
-                    {managers.map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        {manager.full_name || manager.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={secondaryManagerOpen} onOpenChange={setSecondaryManagerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      {employeeData.secondary_manager_id
+                        ? (managers.find(m => m.id === employeeData.secondary_manager_id)?.full_name || managers.find(m => m.id === employeeData.secondary_manager_id)?.username || 'Selected')
+                        : "No Secondary Manager"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[9999]" align="start">
+                    <div className="flex items-center border-b px-3">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <input
+                        className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
+                        placeholder="Search manager..."
+                        value={secondaryManagerSearch}
+                        onChange={(e) => setSecondaryManagerSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto p-1">
+                      <div
+                        className={cn(
+                          "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                          !employeeData.secondary_manager_id && "bg-accent"
+                        )}
+                        onClick={() => {
+                          setEmployeeData(prev => ({ ...prev, secondary_manager_id: '' }));
+                          setSecondaryManagerOpen(false);
+                          setSecondaryManagerSearch('');
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", !employeeData.secondary_manager_id ? "opacity-100" : "opacity-0")} />
+                        No Secondary Manager
+                      </div>
+                      {managers
+                        .filter(m => `${m.full_name} ${m.username}`.toLowerCase().includes(secondaryManagerSearch.toLowerCase()))
+                        .map((manager) => (
+                          <div
+                            key={manager.id}
+                            className={cn(
+                              "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                              employeeData.secondary_manager_id === manager.id && "bg-accent"
+                            )}
+                            onClick={() => {
+                              setEmployeeData(prev => ({ ...prev, secondary_manager_id: manager.id }));
+                              setSecondaryManagerOpen(false);
+                              setSecondaryManagerSearch('');
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", employeeData.secondary_manager_id === manager.id ? "opacity-100" : "opacity-0")} />
+                            {manager.full_name || manager.username}
+                          </div>
+                        ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-muted-foreground">Optional dotted-line reporting relationship</p>
               </div>
             </div>
