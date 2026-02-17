@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useTeamAttendance } from '@/hooks/useTeamAttendance';
 import { TeamSummaryCards, TeamFilter } from './TeamSummaryCards';
 import { TeamMemberHierarchyRow, HierarchyMemberNode } from './TeamMemberHierarchyRow';
@@ -69,8 +70,6 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
   const [filter, setFilter] = useState<TeamFilter>('all');
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [managerMap, setManagerMap] = useState<Map<string, string | null>>(new Map());
-  const [managerMapLoaded, setManagerMapLoaded] = useState(false);
 
   const {
     teamMembers,
@@ -82,23 +81,21 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
     handleRegularizationAction,
   } = useTeamAttendance(subordinateIds, directReportIds);
 
-  // Fetch manager relationships for all subordinates
-  useEffect(() => {
-    if (!subordinateIds.length) {
-      setManagerMapLoaded(true);
-      return;
-    }
-    supabase
-      .from('employees')
-      .select('user_id, manager_id')
-      .in('user_id', subordinateIds)
-      .then(({ data }) => {
-        const map = new Map<string, string | null>();
-        data?.forEach(e => map.set(e.user_id, e.manager_id));
-        setManagerMap(map);
-        setManagerMapLoaded(true);
-      });
-  }, [subordinateIds]);
+  // Fetch manager relationships using useQuery for stable caching
+  const { data: managerMap = new Map<string, string | null>(), isLoading: managerMapLoading } = useQuery({
+    queryKey: ['team-manager-map', subordinateIds],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('employees')
+        .select('user_id, manager_id')
+        .in('user_id', subordinateIds);
+      const map = new Map<string, string | null>();
+      data?.forEach(e => map.set(e.user_id, e.manager_id));
+      return map;
+    },
+    enabled: subordinateIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const filteredMembers = useMemo(() => {
     if (filter === 'all') return teamMembers;
@@ -151,7 +148,7 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
           </div>
         </div>
 
-        {!managerMapLoaded ? (
+        {managerMapLoading ? (
           <p className="text-sm text-muted-foreground text-center py-6">Loading team...</p>
         ) : hierarchyTree.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">

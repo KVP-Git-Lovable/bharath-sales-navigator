@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,13 +49,22 @@ export const useSubordinates = (): UseSubordinatesReturn => {
   });
 
   // Filter out self (level 0) to get actual subordinates
-  const actualSubordinates = subordinates.filter((s) => s.level > 0);
+  const actualSubordinates = useMemo(
+    () => subordinates.filter((s) => s.level > 0),
+    [subordinates]
+  );
   
   // Get all subordinate IDs (excluding self)
-  const subordinateIds = actualSubordinates.map((s) => s.subordinate_user_id);
+  const subordinateIds = useMemo(
+    () => actualSubordinates.map((s) => s.subordinate_user_id),
+    [actualSubordinates]
+  );
   
   // Get direct report IDs only (level 1) - used for approvals
-  const directReportIds = subordinates.filter((s) => s.level === 1).map((s) => s.subordinate_user_id);
+  const directReportIds = useMemo(
+    () => subordinates.filter((s) => s.level === 1).map((s) => s.subordinate_user_id),
+    [subordinates]
+  );
   
   // User is a manager if they have at least one subordinate
   const isManager = actualSubordinates.length > 0;

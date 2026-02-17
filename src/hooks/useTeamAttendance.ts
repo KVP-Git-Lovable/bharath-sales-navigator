@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -188,61 +189,66 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
   // Working days in month - dynamically calculated from config
   const { totalWorkingDays: totalWorkingDaysInMonth } = useWorkingDaysConfig(dateFilter);
 
-  // Build team members list
-  const profileMap = new Map(profiles.map(p => [p.id, p]));
-  const attendanceMap = new Map(todayAttendance.map((a: any) => [a.user_id, a]));
+  // Build team members list (memoized to prevent flickering)
+  const teamMembers: TeamMemberAttendance[] = useMemo(() => {
+    const profileMap = new Map(profiles.map(p => [p.id, p]));
+    const attendanceMap = new Map(todayAttendance.map((a: any) => [a.user_id, a]));
 
-  const teamMembers: TeamMemberAttendance[] = subordinateIds.map(id => {
-    const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null, phone_number: null };
-    const att = attendanceMap.get(id);
-    const isOnLeave = onLeaveUserIds.has(id) && !presentUserIds.has(id);
-    
-    let todayStatus: TeamMemberAttendance['todayStatus'] = 'absent';
-    if (att) {
-      todayStatus = att.status === 'regularized' ? 'regularized' : 'present';
-    } else if (isOnLeave) {
-      todayStatus = 'on_leave';
-    }
+    return subordinateIds.map(id => {
+      const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null, phone_number: null };
+      const att = attendanceMap.get(id);
+      const isOnLeave = onLeaveUserIds.has(id) && !presentUserIds.has(id);
+      
+      let todayStatus: TeamMemberAttendance['todayStatus'] = 'absent';
+      if (att) {
+        todayStatus = att.status === 'regularized' ? 'regularized' : 'present';
+      } else if (isOnLeave) {
+        todayStatus = 'on_leave';
+      }
 
-    return {
-      profile,
-      todayStatus,
-      checkInTime: att?.check_in_time || null,
-      checkOutTime: att?.check_out_time || null,
-      totalHours: att?.total_hours || null,
-      monthlyPresent: monthlyCounts.get(id) || 0,
-      monthlyTotal: totalWorkingDaysInMonth,
-    };
-  });
+      return {
+        profile,
+        todayStatus,
+        checkInTime: att?.check_in_time || null,
+        checkOutTime: att?.check_out_time || null,
+        totalHours: att?.total_hours || null,
+        monthlyPresent: monthlyCounts.get(id) || 0,
+        monthlyTotal: totalWorkingDaysInMonth,
+      };
+    });
+  }, [subordinateIds, profiles, todayAttendance, todayLeaves, monthlyCountsRaw, totalWorkingDaysInMonth]);
 
-  // Build pending approvals list
-  const pendingApprovals: PendingApproval[] = [
-    ...pendingLeaves.map((l: any) => ({
-      id: l.id,
-      type: 'leave' as const,
-      userId: l.user_id,
-      fullName: profileMap.get(l.user_id)?.full_name || 'Unknown',
-      profilePictureUrl: profileMap.get(l.user_id)?.profile_picture_url || null,
-      designation: profileMap.get(l.user_id)?.designation || null,
-      date: l.start_date,
-      endDate: l.end_date,
-      reason: l.reason,
-      leaveTypeName: l.leaveTypeName,
-    })),
-    ...pendingRegularizations.map((r: any) => ({
-      id: r.id,
-      type: 'regularization' as const,
-      userId: r.user_id,
-      fullName: profileMap.get(r.user_id)?.full_name || 'Unknown',
-      profilePictureUrl: profileMap.get(r.user_id)?.profile_picture_url || null,
-      designation: profileMap.get(r.user_id)?.designation || null,
-      date: r.attendance_date,
-      reason: r.reason,
-      requestedCheckIn: r.requested_check_in_time,
-      requestedCheckOut: r.requested_check_out_time,
-      attendanceDate: r.attendance_date,
-    })),
-  ];
+  // Build pending approvals list (memoized)
+  const pendingApprovals: PendingApproval[] = useMemo(() => {
+    const profileMap = new Map(profiles.map(p => [p.id, p]));
+    return [
+      ...pendingLeaves.map((l: any) => ({
+        id: l.id,
+        type: 'leave' as const,
+        userId: l.user_id,
+        fullName: profileMap.get(l.user_id)?.full_name || 'Unknown',
+        profilePictureUrl: profileMap.get(l.user_id)?.profile_picture_url || null,
+        designation: profileMap.get(l.user_id)?.designation || null,
+        date: l.start_date,
+        endDate: l.end_date,
+        reason: l.reason,
+        leaveTypeName: l.leaveTypeName,
+      })),
+      ...pendingRegularizations.map((r: any) => ({
+        id: r.id,
+        type: 'regularization' as const,
+        userId: r.user_id,
+        fullName: profileMap.get(r.user_id)?.full_name || 'Unknown',
+        profilePictureUrl: profileMap.get(r.user_id)?.profile_picture_url || null,
+        designation: profileMap.get(r.user_id)?.designation || null,
+        date: r.attendance_date,
+        reason: r.reason,
+        requestedCheckIn: r.requested_check_in_time,
+        requestedCheckOut: r.requested_check_out_time,
+        attendanceDate: r.attendance_date,
+      })),
+    ];
+  }, [pendingLeaves, pendingRegularizations, profiles]);
 
   // Approve/Reject leave
   const handleLeaveAction = async (applicationId: string, newStatus: 'approved' | 'rejected') => {
