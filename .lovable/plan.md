@@ -1,88 +1,104 @@
 
-# Fix Flickering and Hierarchy Issues in Team Attendance
 
-## Problem
+# Impact Analysis: Making Storage Buckets Private
 
-The Team Attendance section flickers because data objects are recreated on every render, causing the entire list (including avatar images) to unmount and remount repeatedly.
+## Summary
 
-## Root Causes
+Changing these 6 buckets from public to private **will break multiple features** across the app. The core issue is that the code uses `getPublicUrl()` which only works for public buckets. Private buckets require `createSignedUrl()` to generate temporary access URLs.
 
-**1. Unstable `subordinateIds` / `directReportIds` array references (useSubordinates.ts)**
-- These arrays are computed via `.map()` and `.filter()` on every render without `useMemo`
-- Since they're passed as props and used in query keys and `useEffect` dependencies, every parent re-render triggers cascading re-fetches and state resets
+Additionally, existing URLs stored in the database (e.g., `profile_picture_url` in the `profiles` table) are public URLs that will no longer be accessible.
 
-**2. Unmemoized `teamMembers` array in useTeamAttendance.ts**
-- The `teamMembers` array and `pendingApprovals` array are rebuilt on every render (lines 195-245) without `useMemo`
-- Each of the 6 independent queries resolving at different times causes a re-render, rebuilding the entire members list with new object references
-- This causes the hierarchy tree to be rebuilt, all rows to re-render, and avatar images to flicker
+---
 
-**3. Raw `useEffect` for manager map fetch (TeamAttendanceTab.tsx)**
-- The `useEffect` on line 86 re-runs whenever `subordinateIds` reference changes (which is every render due to issue #1)
-- This resets `managerMapLoaded` state indirectly and causes layout shifts
+## Affected Features by Bucket
 
-## Solution
+### 1. employee-photos -- HIGH IMPACT (breaks profile pictures app-wide)
 
-### Step 1: Stabilize array references in `useSubordinates.ts`
-Wrap `subordinateIds`, `directReportIds`, and `actualSubordinates` in `useMemo` so they only change when the underlying `subordinates` data actually changes.
+**What breaks:**
+- Profile pictures everywhere (sidebar, leaderboard, admin dashboard, employee 360, attendance pages)
+- Profile photo upload flow stores a public URL in `profiles.profile_picture_url` -- that URL now returns 403
 
-### Step 2: Memoize computed data in `useTeamAttendance.ts`
-Wrap `teamMembers` and `pendingApprovals` arrays in `useMemo` with proper dependency arrays, so they only rebuild when their source data (profiles, todayAttendance, todayLeaves, monthlyCounts) actually changes.
+**Files to fix (upload flow -- switch to signed URLs):**
+- `src/components/ProfilePictureUpload.tsx`
+- `src/components/profile/CompactProfilePhoto.tsx`
+- `src/components/BaselinePhotoManagement.tsx`
+- `src/components/ProfileSetupModal.tsx`
 
-### Step 3: Replace raw `useEffect` with `useQuery` for manager map (TeamAttendanceTab.tsx)
-Convert the manager relationship fetch from `useEffect` + `useState` to `useQuery`. This:
-- Eliminates the dependency on unstable `subordinateIds` reference (react-query compares array values)
-- Provides built-in caching and loading state
-- Removes the manual `managerMapLoaded` state management
-- Prevents redundant fetches
+**Files to fix (display -- need signed URL generation):**
+- Every component that renders `profile_picture_url` from the profiles table (47+ files reference this field)
 
-### Step 4: Memoize hierarchy tree inputs
-Ensure `filteredMembers` and `hierarchyTree` only recompute when their actual data changes (already using `useMemo`, but the fix to upstream references makes them effective).
+### 2. attendance-photos -- HIGH IMPACT (breaks attendance and face verification)
 
-## Technical Details
+**What breaks:**
+- Check-in/check-out photo display in admin monitoring
+- Face verification during attendance marking (the photo URL sent to the edge function is inaccessible)
 
-**useSubordinates.ts** - Add `useMemo`:
-```typescript
-const actualSubordinates = useMemo(
-  () => subordinates.filter((s) => s.level > 0),
-  [subordinates]
-);
-const subordinateIds = useMemo(
-  () => actualSubordinates.map((s) => s.subordinate_user_id),
-  [actualSubordinates]
-);
-const directReportIds = useMemo(
-  () => subordinates.filter((s) => s.level === 1).map((s) => s.subordinate_user_id),
-  [subordinates]
-);
+**Files to fix:**
+- `src/pages/Attendance.tsx` -- uses `getPublicUrl` for face verification
+- `src/components/AttendanceDetailModal.tsx` -- displays check-in photo
+- `src/components/LiveAttendanceMonitoring.tsx` -- displays check-in photos in monitoring grid
+
+### 3. company-assets -- MEDIUM IMPACT (breaks invoice branding)
+
+**What breaks:**
+- Company logo on invoices won't render
+- Company signature on invoices won't render
+- Distributor company logos won't render
+
+**Files to fix:**
+- `src/components/invoice/HeaderBrandingSettings.tsx`
+- `src/components/invoice/CompanySettings.tsx`
+- `src/components/distributor/DistributorCompanyProfile.tsx`
+
+### 4. visits (storage bucket) -- MEDIUM IMPACT (breaks competition data photos)
+
+**What breaks:**
+- Competition product photos and shelf photos uploaded during visits
+
+**Files to fix:**
+- `src/components/CompetitionDataForm.tsx`
+
+### 5. visit-photos -- LOW IMPACT (already mostly fixed)
+
+- `Operations.tsx` already uses `createSignedUrl()` -- this will continue working
+- Any old URLs stored directly in the database as public URLs will be broken
+
+### 6. avatars -- NO IMPACT
+
+- Not used anywhere in the application code
+
+---
+
+## Required Fix Strategy
+
+### Approach: Create a signed URL utility + update all affected components
+
+**Step 1: Create a utility function** for generating signed URLs from storage paths
+
+```text
+src/utils/storageUtils.ts
+- getSignedUrl(bucket, path, expiresIn) -- wrapper around createSignedUrl
+- Handles both full URLs (extracting path) and relative paths
+- Caches signed URLs briefly to avoid excessive API calls
 ```
 
-**useTeamAttendance.ts** - Wrap computed arrays in `useMemo`:
-```typescript
-const teamMembers = useMemo(() => {
-  // existing computation logic
-}, [subordinateIds, profiles, todayAttendance, todayLeaves, monthlyCountsRaw, totalWorkingDaysInMonth]);
+**Step 2: Change upload flows** -- Store the file path (not full public URL) in the database, then generate signed URLs on demand when displaying
 
-const pendingApprovals = useMemo(() => {
-  // existing computation logic  
-}, [pendingLeaves, pendingRegularizations, profiles]);
-```
+**Step 3: Update display components** -- Replace direct URL usage with signed URL generation via the utility. This requires converting many components to use async URL resolution with loading states.
 
-**TeamAttendanceTab.tsx** - Replace useEffect with useQuery:
-```typescript
-const { data: managerMap = new Map(), isLoading: managerMapLoading } = useQuery({
-  queryKey: ['team-manager-map', subordinateIds],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('employees')
-      .select('user_id, manager_id')
-      .in('user_id', subordinateIds);
-    const map = new Map();
-    data?.forEach(e => map.set(e.user_id, e.manager_id));
-    return map;
-  },
-  enabled: subordinateIds.length > 0,
-  staleTime: 5 * 60 * 1000,
-});
-```
+**Step 4: Fix face verification** -- Update `Attendance.tsx` to pass a signed URL (or the raw file path) to the face verification edge function, and update the edge function to handle private bucket access.
 
-These changes eliminate all unnecessary re-renders and ensure stable object identity throughout the render cycle.
+**Step 5: Handle existing data** -- Write a migration or utility to convert existing full public URLs stored in the database to relative storage paths.
+
+---
+
+## Recommendation
+
+This is a significant change affecting 15+ files and the face verification edge function. The safest approach would be:
+
+1. Keep `employee-photos` and `attendance-photos` public (they are the most widely used and critical for face verification)
+2. Make `visits`, `visit-photos`, `company-assets` private with signed URL fixes
+3. `avatars` can stay private as it's unused
+
+Alternatively, if all must be private, the full fix involves updating ~15 component files, 1 edge function, creating a signed URL utility, and migrating existing stored URLs.
+
