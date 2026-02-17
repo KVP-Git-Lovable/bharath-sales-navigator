@@ -97,6 +97,8 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
         toast.success('Activity created successfully!');
         resetForm();
         onOpenChange(false);
+        // Trigger refresh so ActivityEventsTable picks up the new activity
+        window.dispatchEvent(new Event('visitDataChanged'));
       } else {
         toast.error('Failed to create activity');
       }
