@@ -5,6 +5,7 @@ import { Camera, Upload, Video, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface ProfilePictureUploadProps {
   userId: string;
@@ -27,6 +28,7 @@ export const ProfilePictureUpload = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const signedPhotoUrl = useSignedUrl(currentPhotoUrl);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const sizeClasses = {
@@ -131,7 +133,7 @@ export const ProfilePictureUpload = ({
   return (
     <div className="relative group">
       <Avatar className={`${sizeClasses[size]} border-4 border-white shadow-elegant cursor-pointer`}>
-        <AvatarImage src={currentPhotoUrl} />
+        <AvatarImage src={signedPhotoUrl || undefined} />
         <AvatarFallback className="text-4xl">{fullName.charAt(0)}</AvatarFallback>
       </Avatar>
       <Button

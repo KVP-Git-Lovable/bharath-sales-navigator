@@ -5,6 +5,7 @@ import { Camera, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface CompactProfilePhotoProps {
   userId: string;
@@ -16,6 +17,7 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const signedPhotoUrl = useSignedUrl(currentPhoto);
 
   useEffect(() => {
     if (userProfile?.profile_picture_url) {
@@ -90,7 +92,7 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
         "group-hover:scale-105"
       )}>
         <AvatarImage 
-          src={currentPhoto || undefined} 
+          src={signedPhotoUrl || undefined} 
           alt="Profile" 
           className="object-cover"
         />

@@ -5,6 +5,7 @@ import { useFaceMatching, type FaceMatchResult } from "@/hooks/useFaceMatching";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface AttendanceDetailModalProps {
   isOpen: boolean;
@@ -59,11 +60,14 @@ export const AttendanceDetailModal = ({ isOpen, onClose, selectedDate, record }:
     }
   };
 
-  if (!selectedDate || !record) return null;
+  // Resolve signed URLs for private storage buckets
+  const signedBaselinePhoto = useSignedUrl(baselinePhoto);
+  const signedAttendancePhoto = useSignedUrl(
+    record?.rawRecord?.check_in_photo_url,
+    'attendance-photos'
+  );
 
-  const attendancePhotoUrl = record.rawRecord?.check_in_photo_url 
-    ? supabase.storage.from('attendance-photos').getPublicUrl(record.rawRecord.check_in_photo_url).data.publicUrl
-    : null;
+  if (!selectedDate || !record) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -131,28 +135,28 @@ export const AttendanceDetailModal = ({ isOpen, onClose, selectedDate, record }:
           )}
 
           {/* Face Match Section */}
-          {(baselinePhoto || attendancePhotoUrl) && (
+          {(signedBaselinePhoto || signedAttendancePhoto) && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Face Verification:</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {baselinePhoto && (
+                {signedBaselinePhoto && (
                   <div className="space-y-2">
                     <span className="text-sm text-muted-foreground">Baseline Photo:</span>
                     <img 
-                      src={baselinePhoto} 
+                      src={signedBaselinePhoto} 
                       alt="Baseline employee photo"
                       className="w-full h-32 object-cover rounded-lg border"
                     />
                   </div>
                 )}
-                {attendancePhotoUrl && (
+                {signedAttendancePhoto && (
                   <div className="space-y-2">
                     <span className="text-sm text-muted-foreground">Attendance Photo:</span>
                     <img 
-                      src={attendancePhotoUrl} 
+                      src={signedAttendancePhoto} 
                       alt="Attendance photo"
                       className="w-full h-32 object-cover rounded-lg border"
                     />

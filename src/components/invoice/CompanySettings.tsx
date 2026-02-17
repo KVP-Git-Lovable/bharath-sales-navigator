@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, X } from "lucide-react";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
@@ -36,6 +37,8 @@ export default function CompanySettings() {
   const [uploadingQR, setUploadingQR] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string>("/bharath-beverages-logo.png");
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const signedLogoUrl = useSignedUrl(logoUrl);
+  const signedQrUrl = useSignedUrl(qrCodeUrl);
 
   const form = useForm<z.infer<typeof companySchema>>({
     resolver: zodResolver(companySchema),
@@ -264,14 +267,14 @@ export default function CompanySettings() {
             <div className="border rounded-lg p-4 bg-muted/50">
               <h3 className="text-sm font-semibold mb-3">Company Logo</h3>
               <div className="flex items-center gap-4">
-                {logoUrl && (
+                {signedLogoUrl && (
                   <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white">
-                    {logoUrl.toLowerCase().endsWith('.pdf') ? (
+                    {signedLogoUrl.toLowerCase().endsWith('.pdf') ? (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                         <span>PDF Logo</span>
                       </div>
                     ) : (
-                      <img src={logoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                      <img src={signedLogoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
                     )}
                   </div>
                 )}
@@ -455,9 +458,9 @@ export default function CompanySettings() {
               <div className="border rounded-lg p-4 bg-muted/50 mt-4">
                 <h3 className="text-sm font-semibold mb-3">UPI QR Code</h3>
                 <div className="flex items-center gap-4">
-                  {qrCodeUrl && (
+                  {signedQrUrl && (
                     <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white">
-                      <img src={qrCodeUrl} alt="UPI QR Code" className="w-full h-full object-contain p-2" />
+                      <img src={signedQrUrl} alt="UPI QR Code" className="w-full h-full object-contain p-2" />
                       <Button
                         type="button"
                         variant="destructive"

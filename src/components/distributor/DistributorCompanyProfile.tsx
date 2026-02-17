@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { X } from "lucide-react";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 const distributorProfileSchema = z.object({
   state: z.string().optional(),
@@ -34,6 +35,8 @@ export default function DistributorCompanyProfile({ distributorId, readOnly = fa
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [distributorName, setDistributorName] = useState<string>("");
   const [gstNumber, setGstNumber] = useState<string>("");
+  const signedLogoUrl = useSignedUrl(logoUrl);
+  const signedQrUrl = useSignedUrl(qrCodeUrl);
 
   const form = useForm<z.infer<typeof distributorProfileSchema>>({
     resolver: zodResolver(distributorProfileSchema),
@@ -235,14 +238,14 @@ export default function DistributorCompanyProfile({ distributorId, readOnly = fa
             <div className="border rounded-lg p-4 bg-muted/50">
               <h3 className="text-sm font-semibold mb-3">Company Logo</h3>
               <div className="flex items-center gap-4">
-                {logoUrl && (
+                {signedLogoUrl && (
                   <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white">
-                    {logoUrl.toLowerCase().endsWith('.pdf') ? (
+                    {signedLogoUrl.toLowerCase().endsWith('.pdf') ? (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                         <span>PDF Logo</span>
                       </div>
                     ) : (
-                      <img src={logoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                      <img src={signedLogoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
                     )}
                   </div>
                 )}
@@ -366,9 +369,9 @@ export default function DistributorCompanyProfile({ distributorId, readOnly = fa
               <div className="border rounded-lg p-4 bg-muted/50 mt-4">
                 <h3 className="text-sm font-semibold mb-3">UPI QR Code</h3>
                 <div className="flex items-center gap-4">
-                  {qrCodeUrl && (
+                  {signedQrUrl && (
                     <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white">
-                      <img src={qrCodeUrl} alt="UPI QR Code" className="w-full h-full object-contain p-2" />
+                      <img src={signedQrUrl} alt="UPI QR Code" className="w-full h-full object-contain p-2" />
                       {!readOnly && (
                         <Button
                           type="button"
