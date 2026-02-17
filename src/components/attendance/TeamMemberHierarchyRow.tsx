@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { Eye, Phone, ChevronDown, ChevronRight } from 'lucide-react';
 import { TeamMemberAttendance } from '@/hooks/useTeamAttendance';
 import { cn } from '@/lib/utils';
@@ -70,7 +71,7 @@ export const TeamMemberHierarchyRow = ({ node, level = 0, onViewAttendance }: Te
 
           {/* Avatar */}
           <Avatar className="h-8 w-8 shrink-0">
-            <AvatarImage src={member.profile.profile_picture_url || undefined} />
+            <SignedAvatarImage src={member.profile.profile_picture_url || undefined} />
             <AvatarFallback className="text-[10px] bg-[hsl(210,20%,93%)]">{initials}</AvatarFallback>
           </Avatar>
 

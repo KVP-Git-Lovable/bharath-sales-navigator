@@ -20,6 +20,7 @@ import { downloadCSV } from '@/utils/fileDownloader';
 import { PaymentProofsView } from '@/components/admin/PaymentProofsView';
 import { OperationsSummaryBoxes } from '@/components/operations/OperationsSummaryBoxes';
 import EditOrderDialog from '@/components/EditOrderDialog';
+import { SignedImage } from '@/components/ui/signed-image';
 
 interface CheckInOutData {
   id: string;
@@ -1445,13 +1446,13 @@ const Operations = () => {
                                               {item.profile_picture_url && (
                                                 <div className="space-y-2">
                                                   <p className="text-xs text-muted-foreground">Profile Photo</p>
-                                                  <img src={item.profile_picture_url} alt="Profile" className="w-full h-32 object-cover rounded-lg border" />
+                                                  <SignedImage src={item.profile_picture_url} alt="Profile" className="w-full h-32 object-cover rounded-lg border" />
                                                 </div>
                                               )}
                                               {item.attendance_photo_url && (
                                                 <div className="space-y-2">
                                                   <p className="text-xs text-muted-foreground">Check-in Photo</p>
-                                                  <img src={item.attendance_photo_url} alt="Attendance" className="w-full h-32 object-cover rounded-lg border" />
+                                                  <SignedImage src={item.attendance_photo_url} alt="Attendance" className="w-full h-32 object-cover rounded-lg border" />
                                                 </div>
                                               )}
                                             </div>

@@ -14,6 +14,7 @@ import { HierarchyTargetBuilder } from '@/components/admin/HierarchyTargetBuilde
 import { AllocationSummaryTable } from '@/components/admin/AllocationSummaryTable';
 import { MidwayAdjustmentDialog, AdjustmentType } from '@/components/admin/MidwayAdjustmentDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -191,7 +192,7 @@ const HierarchyTargets = () => {
                         <SelectItem key={manager.id} value={manager.id}>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
-                              <AvatarImage src={manager.profile_picture_url} />
+                              <SignedAvatarImage src={manager.profile_picture_url} />
                               <AvatarFallback>{manager.full_name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <span>{manager.full_name}</span>

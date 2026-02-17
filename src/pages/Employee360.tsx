@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -326,7 +327,7 @@ export default function Employee360() {
               />
             ) : (
               <Avatar className="w-32 h-32 border-4 border-white shadow-elegant">
-                <AvatarImage src={profile.profile_picture_url} />
+                <SignedAvatarImage src={profile.profile_picture_url} />
                 <AvatarFallback className="text-4xl">{profile.full_name.charAt(0)}</AvatarFallback>
               </Avatar>
             )}
@@ -714,7 +715,7 @@ export default function Employee360() {
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
                             <Avatar className="w-10 h-10">
-                              <AvatarImage src={rec.recommender.profile_picture_url} />
+                              <SignedAvatarImage src={rec.recommender.profile_picture_url} />
                               <AvatarFallback>{rec.recommender.full_name.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
@@ -759,7 +760,7 @@ export default function Employee360() {
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
                             <Avatar className="w-10 h-10">
-                              <AvatarImage src={rec.recipient?.profile_picture_url} />
+                              <SignedAvatarImage src={rec.recipient?.profile_picture_url} />
                               <AvatarFallback>{rec.recipient?.full_name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">

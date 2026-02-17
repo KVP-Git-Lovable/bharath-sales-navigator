@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -218,7 +219,7 @@ export default function UserDetailSheet({
         <SheetHeader className="pb-4 border-b">
           <div className="flex items-start gap-3">
             <Avatar className="w-14 h-14">
-              <AvatarImage src={user.profile?.profile_picture_url} />
+              <SignedAvatarImage src={user.profile?.profile_picture_url} />
               <AvatarFallback className="text-lg bg-primary/10 text-primary">
                 {user.profile?.full_name?.charAt(0) || user.username?.charAt(0) || 'U'}
               </AvatarFallback>

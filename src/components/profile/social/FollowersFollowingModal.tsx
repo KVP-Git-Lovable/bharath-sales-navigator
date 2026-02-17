@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { Button } from "@/components/ui/button";
 import { UserPlus, UserCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,7 +195,7 @@ export function FollowersFollowingModal({
               }}
             >
               <Avatar className="h-10 w-10">
-                <AvatarImage src={u.profile_picture_url || ""} />
+                <SignedAvatarImage src={u.profile_picture_url || ""} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                   {u.full_name?.[0] || "?"}
                 </AvatarFallback>

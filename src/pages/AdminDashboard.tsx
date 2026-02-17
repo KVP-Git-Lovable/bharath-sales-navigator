@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -700,7 +701,7 @@ export const AdminDashboard = () => {
                                     setIsPhotoDialogOpen(true);
                                   }}
                                 >
-                                  <AvatarImage src={user.profile?.profile_picture_url} />
+                                  <SignedAvatarImage src={user.profile?.profile_picture_url} />
                                   <AvatarFallback className="text-[10px]">{user.profile?.full_name?.charAt(0) || 'U'}</AvatarFallback>
                                 </Avatar>
                               </TableCell>

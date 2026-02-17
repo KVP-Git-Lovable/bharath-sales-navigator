@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { Heart, MessageCircle, Send, Image as ImageIcon, X, Bot, RefreshCw, Sparkles, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -352,7 +353,7 @@ export function SocialFeed() {
         <CardContent className="pt-6">
           <div className="flex gap-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={userProfile?.profile_picture_url || ""} />
+              <SignedAvatarImage src={userProfile?.profile_picture_url || ""} />
               <AvatarFallback>
                 {userProfile?.full_name?.[0] || "U"}
               </AvatarFallback>
@@ -526,7 +527,7 @@ export function SocialFeed() {
 
                       <div className="flex gap-2 mt-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={userProfile?.profile_picture_url || ""} />
+                          <SignedAvatarImage src={userProfile?.profile_picture_url || ""} />
                           <AvatarFallback>
                             {userProfile?.full_name?.[0] || "U"}
                           </AvatarFallback>
