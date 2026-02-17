@@ -70,6 +70,7 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [managerMap, setManagerMap] = useState<Map<string, string | null>>(new Map());
+  const [managerMapLoaded, setManagerMapLoaded] = useState(false);
 
   const {
     teamMembers,
@@ -83,7 +84,10 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
 
   // Fetch manager relationships for all subordinates
   useEffect(() => {
-    if (!subordinateIds.length) return;
+    if (!subordinateIds.length) {
+      setManagerMapLoaded(true);
+      return;
+    }
     supabase
       .from('employees')
       .select('user_id, manager_id')
@@ -92,6 +96,7 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
         const map = new Map<string, string | null>();
         data?.forEach(e => map.set(e.user_id, e.manager_id));
         setManagerMap(map);
+        setManagerMapLoaded(true);
       });
   }, [subordinateIds]);
 
@@ -146,7 +151,9 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
           </div>
         </div>
 
-        {hierarchyTree.length === 0 ? (
+        {!managerMapLoaded ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Loading team...</p>
+        ) : hierarchyTree.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             No team members {filter !== 'all' ? `with status "${filter.replace('_', ' ')}"` : 'found'}
           </p>
