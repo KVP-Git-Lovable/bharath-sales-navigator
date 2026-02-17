@@ -1,4 +1,5 @@
 import { MapPin, Phone, Store, ShoppingCart, XCircle, BarChart3, Check, Users, MessageSquare, Paintbrush, Camera, LogIn, LogOut, Package, FileText, IndianRupee, Sparkles, Truck, UserCheck, Target, Gift, Ban } from "lucide-react";
+import { compressImageFile } from "@/utils/imageCompression";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1661,11 +1662,12 @@ export const VisitCard = ({
         match
       } = checkData;
 
-      // Upload photo first
+      // Compress and upload photo
+      const compressedPhoto = await compressImageFile(photoBlob);
       const path = `${userId}/${visitId}-${action}-${Date.now()}.jpg`;
       const {
         error: uploadError
-      } = await supabase.storage.from('visit-photos').upload(path, photoBlob, {
+      } = await supabase.storage.from('visit-photos').upload(path, compressedPhoto, {
         contentType: 'image/jpeg',
         upsert: false
       });

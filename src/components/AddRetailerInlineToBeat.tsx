@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { compressImageFile } from "@/utils/imageCompression";
 import { useTranslation } from "react-i18next";
 import { X, Camera, ScanLine, Store, ChevronsUpDown, Check, MapPin, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -265,10 +266,11 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
           };
           reader.readAsDataURL(file);
 
+          const compressedFile = await compressImageFile(file);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')
-            .upload(fileName, file, {
+            .upload(fileName, compressedFile, {
               cacheControl: '3600',
               upsert: false
             });
