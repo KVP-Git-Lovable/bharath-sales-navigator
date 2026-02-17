@@ -259,13 +259,11 @@ const LeaveBalancesManager = () => {
 
     setIsSaving(true);
     try {
-      const remaining = formData.opening_balance - formData.used_balance;
       const balanceData = {
         user_id: formData.user_id,
         leave_type_id: formData.leave_type_id,
         opening_balance: formData.opening_balance,
         used_balance: formData.used_balance,
-        remaining_balance: remaining,
         year: parseInt(filterYear),
       };
 
