@@ -13212,7 +13212,7 @@ export type Database = {
           location_match_out: boolean | null
           no_order_reason: string | null
           planned_date: string
-          retailer_id: string
+          retailer_id: string | null
           skip_check_in_reason: string | null
           skip_check_in_time: string | null
           status: string
@@ -13236,7 +13236,7 @@ export type Database = {
           location_match_out?: boolean | null
           no_order_reason?: string | null
           planned_date: string
-          retailer_id: string
+          retailer_id?: string | null
           skip_check_in_reason?: string | null
           skip_check_in_time?: string | null
           status?: string
@@ -13260,7 +13260,7 @@ export type Database = {
           location_match_out?: boolean | null
           no_order_reason?: string | null
           planned_date?: string
-          retailer_id?: string
+          retailer_id?: string | null
           skip_check_in_reason?: string | null
           skip_check_in_time?: string | null
           status?: string
