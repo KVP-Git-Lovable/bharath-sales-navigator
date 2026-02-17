@@ -79,20 +79,17 @@ export const useActivityEvents = () => {
         ? params.from_date 
         : params.activity_date;
 
-      // retailer_id is required in visits table - use a placeholder if none selected
-      const retailerId = params.retailer_id;
-      if (!retailerId) {
-        console.error('[useActivityEvents] retailer_id is required for visits');
-        throw new Error('Please select a customer/outlet for the activity');
-      }
-
       const visitInsert: Record<string, unknown> = {
         user_id: user.id,
-        retailer_id: retailerId,
         planned_date: plannedDate,
         status: 'planned',
         visit_type: 'activity',
       };
+
+      // Only include retailer_id if provided
+      if (params.retailer_id) {
+        visitInsert.retailer_id = params.retailer_id;
+      }
 
       const { data: visitData, error: visitError } = await supabase
         .from('visits')
