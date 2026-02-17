@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { UserFYPlanTarget } from '@/components/profile/UserFYPlanTarget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { HierarchyUserTargetNode, HierarchyNodeData, EnabledParameters, EnabledBasis } from './HierarchyUserTargetNode';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -395,7 +396,7 @@ export function ApplyToUsersStep({
                         <SelectItem key={user.id} value={user.id}>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
-                              <AvatarImage src={user.profile_picture_url} />
+                              <SignedAvatarImage src={user.profile_picture_url} />
                               <AvatarFallback>{(user.full_name || user.username || 'U').charAt(0)}</AvatarFallback>
                             </Avatar>
                             {user.full_name || user.username || 'Unknown User'}
@@ -453,7 +454,7 @@ export function ApplyToUsersStep({
                         <SelectItem key={manager.id} value={manager.id}>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
-                              <AvatarImage src={manager.profile_picture_url} />
+                              <SignedAvatarImage src={manager.profile_picture_url} />
                               <AvatarFallback>{manager.full_name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <span>{manager.full_name}</span>

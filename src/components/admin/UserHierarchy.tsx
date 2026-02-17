@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { Users, User, ChevronDown, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -81,7 +82,7 @@ const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number
 
           {/* Avatar */}
           <Avatar className="h-7 w-7 shrink-0">
-            <AvatarImage src={user.profile_picture_url} />
+            <SignedAvatarImage src={user.profile_picture_url} />
             <AvatarFallback className={cn("text-[10px] font-semibold text-white", colors.badge)}>
               {user.full_name?.charAt(0) || 'U'}
             </AvatarFallback>

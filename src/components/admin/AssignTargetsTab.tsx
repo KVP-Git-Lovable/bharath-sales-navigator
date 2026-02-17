@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { Users, User, GitBranch, Target, History } from 'lucide-react';
 import { AdminSetTarget } from './AdminSetTarget';
 import { HierarchyTargetBuilder } from './HierarchyTargetBuilder';
@@ -191,7 +192,7 @@ export function AssignTargetsTab({
                         <SelectItem key={manager.id} value={manager.id}>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
-                              <AvatarImage src={manager.profile_picture_url} />
+                              <SignedAvatarImage src={manager.profile_picture_url} />
                               <AvatarFallback>{manager.full_name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <span>{manager.full_name}</span>

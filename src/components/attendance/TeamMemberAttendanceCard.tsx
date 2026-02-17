@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { Eye, Phone } from 'lucide-react';
 import { TeamMemberAttendance } from '@/hooks/useTeamAttendance';
 import { cn } from '@/lib/utils';
@@ -24,7 +25,7 @@ export const TeamMemberAttendanceCard = ({ member, onViewAttendance }: TeamMembe
   return (
     <div className="bg-background rounded-2xl shadow-sm p-3.5 flex items-center gap-3">
       <Avatar className="h-10 w-10 shrink-0">
-        <AvatarImage src={member.profile.profile_picture_url || undefined} />
+        <SignedAvatarImage src={member.profile.profile_picture_url || undefined} />
         <AvatarFallback className="text-xs bg-[hsl(210,20%,93%)]">{initials}</AvatarFallback>
       </Avatar>
 

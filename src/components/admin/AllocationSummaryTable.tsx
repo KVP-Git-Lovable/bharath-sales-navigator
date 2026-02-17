@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { 
   Download, 
   Search, 
@@ -177,7 +178,7 @@ export const AllocationSummaryTable: React.FC<AllocationSummaryTableProps> = ({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={alloc.user?.profile_picture_url || undefined} />
+                      <SignedAvatarImage src={alloc.user?.profile_picture_url || undefined} />
                       <AvatarFallback className="text-xs">
                         {alloc.user?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'}
                       </AvatarFallback>

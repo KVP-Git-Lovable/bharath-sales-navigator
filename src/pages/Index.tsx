@@ -14,6 +14,7 @@ import { PendingPayments } from "@/components/home/PendingPayments";
 import { DeviceInfoCard } from "@/components/home/DeviceInfoCard";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ const Index = () => {
   const { todayData, performance, urgentItems, isLoading, lastUpdated, refresh } = useHomeDashboard(userProfile?.id, selectedDate);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const isOnline = navigator.onLine;
+  const signedProfilePicture = useSignedUrl(profilePictureUrl);
   const { isNavItemEnabled } = useFeatureFlags();
   const { permissions, hasModuleAccess } = useProfilePermissions();
   const { isFullAdmin } = useAdminAccess();
@@ -119,10 +121,10 @@ const Index = () => {
                 className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => navigate('/profile')}
               >
-                {profilePictureUrl ? (
+                {signedProfilePicture ? (
                   <div className="h-10 w-10 rounded-full border-2 border-white/30 overflow-hidden">
                     <img 
-                      src={profilePictureUrl} 
+                      src={signedProfilePicture} 
                       alt={displayName} 
                       className="h-full w-full object-cover"
                     />

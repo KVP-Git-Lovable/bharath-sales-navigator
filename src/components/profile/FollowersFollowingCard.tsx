@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { Users, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -84,7 +85,7 @@ export function FollowersFollowingCard() {
         <div className="flex -space-x-2">
           {displayUsers.map((u, idx) => (
             <Avatar key={u.id} className="h-8 w-8 border-2 border-background" style={{ zIndex: limit - idx }}>
-              <AvatarImage src={u.profile_picture_url || ""} />
+              <SignedAvatarImage src={u.profile_picture_url || ""} />
               <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                 {u.full_name?.[0] || "?"}
               </AvatarFallback>

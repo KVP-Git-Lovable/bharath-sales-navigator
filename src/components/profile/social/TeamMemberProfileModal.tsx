@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -261,7 +262,7 @@ export function TeamMemberProfileModal({ userId, open, onClose }: TeamMemberProf
             {/* Header Section - LinkedIn Style */}
             <div className="flex flex-col items-center text-center space-y-3">
               <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
-                <AvatarImage src={profile.profile_picture_url || ""} />
+                <SignedAvatarImage src={profile.profile_picture_url || ""} />
                 <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
                   {profile.full_name?.[0] || "?"}
                 </AvatarFallback>

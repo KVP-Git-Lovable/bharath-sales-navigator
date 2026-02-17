@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { Input } from "@/components/ui/input";
 import { 
   Heart, MessageCircle, Send, Image as ImageIcon, X, UserPlus, UserCheck, 
@@ -691,7 +692,7 @@ export function InstagramSocialFeed() {
                     }`}
                   >
                     <Avatar className="w-full h-full border-2 border-background">
-                      <AvatarImage src={u.profile_picture_url || ""} />
+                      <SignedAvatarImage src={u.profile_picture_url || ""} />
                       <AvatarFallback className="text-xs">{u.full_name?.[0] || "?"}</AvatarFallback>
                     </Avatar>
                   </button>
@@ -726,7 +727,7 @@ export function InstagramSocialFeed() {
         <CardContent className="pt-4">
           <div className="flex items-start gap-3 mb-3">
             <Avatar className="h-10 w-10 flex-shrink-0">
-              <AvatarImage src={userProfile?.profile_picture_url || ""} />
+              <SignedAvatarImage src={userProfile?.profile_picture_url || ""} />
               <AvatarFallback className="bg-primary text-primary-foreground">
                 {userProfile?.full_name?.[0] || "U"}
               </AvatarFallback>
@@ -1086,7 +1087,7 @@ export function InstagramSocialFeed() {
                     {/* Add Comment */}
                     <div className="flex gap-2 pt-3 mt-3 border-t">
                       <Avatar className="h-7 w-7 flex-shrink-0">
-                        <AvatarImage src={userProfile?.profile_picture_url || ""} />
+                        <SignedAvatarImage src={userProfile?.profile_picture_url || ""} />
                         <AvatarFallback className="text-xs bg-muted">
                           {userProfile?.full_name?.[0] || "U"}
                         </AvatarFallback>

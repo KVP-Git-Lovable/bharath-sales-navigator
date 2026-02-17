@@ -13,6 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { User, Save, Search, AlertCircle, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
 import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAllModulePermissionItems, SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
 
 interface UserPermission {
@@ -414,7 +415,7 @@ export const UserObjectPermissions = () => {
                 <SelectItem key={user.id} value={user.id}>
                   <div className="flex items-center gap-2">
                     <Avatar className="h-6 w-6">
-                      <AvatarImage src={user.profile_picture_url || undefined} />
+                      <SignedAvatarImage src={user.profile_picture_url || undefined} />
                       <AvatarFallback className="text-xs">
                         {user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                       </AvatarFallback>
@@ -431,7 +432,7 @@ export const UserObjectPermissions = () => {
         {selectedUser && (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={selectedUser.profile_picture_url || undefined} />
+              <SignedAvatarImage src={selectedUser.profile_picture_url || undefined} />
               <AvatarFallback>
                 {selectedUser.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
               </AvatarFallback>
