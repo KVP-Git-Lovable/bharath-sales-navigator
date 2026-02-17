@@ -1492,6 +1492,11 @@ export const MyVisits = () => {
             </Card>
           )}
           
+          {/* Activity Events Table - shown above visit list */}
+          {(isViewingSelf ? user?.id : selectedUserIds[0]) && (
+            <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} />
+          )}
+
           {/* No visits message - ONLY after loading completes */}
           {!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && (plannedBeats.length === 0 || searchTerm !== '') ? <Card className="shadow-card">
               <CardContent className="p-4 sm:p-8 text-center">
@@ -1507,11 +1512,6 @@ export const MyVisits = () => {
               </CardContent>
             </Card> : filteredVisits.length > 0 && <VirtualizedVisitList visits={filteredVisits} onViewDetails={handleViewDetails} selectedDate={selectedDate} viewingUserId={isViewingSelf ? undefined : selectedUserIds[0]} />}
         </div>
-
-        {/* Activity Events Table */}
-        {(isViewingSelf ? user?.id : selectedUserIds[0]) && (
-          <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} />
-        )}
 
         {/* Create New Visit Modal */}
         <CreateNewVisitModal isOpen={isCreateVisitModalOpen} onClose={() => setIsCreateVisitModalOpen(false)} initialDate={selectedDate} onVisitCreated={() => {
