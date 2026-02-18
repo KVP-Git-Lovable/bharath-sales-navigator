@@ -1,179 +1,67 @@
 
-# Leave Management System Audit Report
 
-## Executive Summary
+# Fix: Interlink Holidays, Week-offs, and Working Days Across Attendance
 
-The leave management system in `/attendance-management` is architecturally well-designed but has **4 critical bugs** that will cause failures in production, and **2 policy-linkage gaps** that mean the Attendance Policy configuration is only partially connected to leave balances.
+## Problem Identified
 
----
+There are **3 disconnected issues** causing holidays not to reduce working days:
 
-## How the System is Structured
+### Issue 1: Wrong Column Name (Critical Bug)
+In `useWorkingDaysConfig.ts`, the holidays query uses `.select('id, date, name')` but the actual database column is `holiday_name`, not `name`. This causes the query to **fail silently**, meaning holidays are never loaded, so working days are never reduced.
 
-The system has 5 interconnected components:
+### Issue 2: Empty Week-Off Config
+The `week_off_config` table is currently empty. The hook falls back to "Sunday only" as default, but ignores the `alternate_pattern` field that the admin panel uses (e.g., "all Saturdays off", "1st and 3rd Saturdays off").
 
-```text
-[Leave Types]  ->  [Attendance Policy / Leave Entitlements]  ->  [Leave Balances]
-     |                                                                  ^
-     v                                                                  |
-[Leave Applications]  -- on approval triggers -->  [used_balance updated]
-                                                         |
-                                                [remaining_balance = GENERATED]
-                                                (opening_balance - used_balance)
-```
-
-**Tab-by-tab breakdown:**
-
-| Tab | Table | Purpose |
-|---|---|---|
-| Leave Types | `leave_types` | Define leave categories (e.g., Sick Leave) |
-| Attendance Policy | `leave_policy` | Set yearly entitlement, accrual type, carry-forward |
-| Leave Balances | `leave_balance` | Track per-user balances (opening / used / remaining) |
-| Leave Management | `leave_applications` | Employee leave requests, approval workflow |
-| Leave Ledger | `leave_accrual_log` | Audit trail of all balance changes |
+### Issue 3: Admin Config Not Used
+The admin panel in "Working Days Config" calculates working days and saves them to `working_days_config` table. But the user-facing hook (`useWorkingDaysConfig`) **never reads from that table** -- it recalculates everything from scratch. This means the admin's calculated values are ignored on the user side.
 
 ---
 
-## Is the Attendance Policy Linked to Leave Balance?
+## The Fix
 
-**Partially — but not automatically.**
+### Change 1: Fix the column name in `useWorkingDaysConfig.ts`
+**File:** `src/hooks/useWorkingDaysConfig.ts`
 
-### What IS linked:
-1. **"Initialize Year" button** in Leave Balances tab reads `leave_policy.yearly_entitlement` and creates `leave_balance` records for all active users — this IS the link between policy and balance.
-2. **Leave validation trigger** (`validate_leave_application`) checks `leave_policy` for backdated limits, advance notice, max per month, and sandwich rules before allowing an application.
-3. **Monthly accrual function** (`process_monthly_leave_accrual`) reads `leave_policy.yearly_entitlement / 12` to calculate monthly credits.
+Change the holidays query from:
+```
+.select('id, date, name')
+```
+to:
+```
+.select('id, date, holiday_name')
+```
 
-### What is NOT automatically linked:
-1. **When a policy is created/updated, existing `leave_balance` records are NOT updated.** An admin must manually click "Initialize Year" or "Recalculate" to sync. There is no trigger on `leave_policy` that cascades to `leave_balance`.
-2. **No scheduled job** runs `process_monthly_leave_accrual` automatically. It exists as a function but nothing calls it on a schedule — monthly accrual only happens if triggered manually.
+Also update the `Holiday` interface to use `holiday_name` instead of `name`, and update all references that map holiday data.
+
+### Change 2: Add `alternate_pattern` support to `useWorkingDaysConfig.ts`
+The hook currently only checks `is_off` to determine week-off days. It needs to also respect `alternate_pattern` (values: `'all'`, `'1st_3rd'`, `'2nd_4th'`) -- the same logic already used in `WorkingDaysConfig.tsx` and `useWorkingDaysCalculator.ts`.
+
+Update the working days calculation to check each individual date against the pattern, rather than just checking the day-of-week.
+
+### Change 3: Use `working_days_config` as the source of truth (with fallback)
+When the admin has already calculated and saved working days via the admin panel, the user-facing hook should read from `working_days_config` for the relevant month/year. If no saved config exists, fall back to the current calculation logic.
+
+This ensures that when an admin clicks "Calculate & Save" in the Working Days Config panel, those values are what users see.
+
+### Change 4: Ensure Team view also uses the correct data
+The `useTeamAttendance.ts` hook already uses `useWorkingDaysConfig`, so fixing that hook will automatically fix the team summary cards (present/absent counts) as well.
 
 ---
 
-## Critical Bugs Found
-
-### Bug 1 (CRITICAL): "Initialize Year" will always fail silently or error
-
-**Location:** `LeaveBalancesManager.tsx` → `handleInitializeBalances()`
-
-**Problem:** The code tries to insert `remaining_balance` directly:
-```typescript
-balancesToInsert.push({
-  ...
-  remaining_balance: policy.yearly_entitlement,  // ❌ CANNOT WRITE THIS
-  ...
-});
-```
-
-But `remaining_balance` is a **STORED GENERATED COLUMN** in the database:
-```sql
-remaining_balance INTEGER GENERATED ALWAYS AS (opening_balance - used_balance) STORED
-```
-
-PostgreSQL will **reject any INSERT or UPDATE** that includes a value for a generated column. The "Initialize Year" button will throw an error and no balances will be created.
-
-**Fix:** Remove `remaining_balance` from all insert/update payloads. The DB computes it automatically. The correct insert is:
-```typescript
-balancesToInsert.push({
-  user_id: user.id,
-  leave_type_id: policy.leave_type_id,
-  opening_balance: policy.yearly_entitlement,
-  used_balance: 0,
-  year,
-  // NO remaining_balance field
-});
-```
-
----
-
-### Bug 2 (CRITICAL): `process_monthly_leave_accrual` will always fail
-
-**Location:** DB function `process_monthly_leave_accrual`
-
-**Problem:** The function tries to directly `UPDATE remaining_balance` — but since it's a generated column, this will throw a PostgreSQL error every time:
-```sql
-UPDATE leave_balance
-SET remaining_balance = COALESCE(remaining_balance, 0) + v_credit  -- ❌ CANNOT UPDATE GENERATED COLUMN
-```
-
-**Fix:** Change the monthly accrual logic to increment `opening_balance` instead (since `remaining_balance = opening_balance - used_balance`, increasing `opening_balance` is the correct way to credit days):
-```sql
-UPDATE leave_balance
-SET opening_balance = opening_balance + v_credit,
-    updated_at = now()
-WHERE ...
-```
-
----
-
-### Bug 3 (MODERATE): `update_leave_balance_on_approval` ignores half-day and sandwich rules
-
-**Location:** DB trigger function `update_leave_balance_on_approval`
-
-**Problem:** When a leave is approved, this trigger calculates days as:
-```sql
-leave_days := NEW.end_date - NEW.start_date + 1;
-```
-It **ignores** `NEW.days_requested` (which already accounts for half-days, sandwich rule, etc., calculated by `validate_leave_application`). This means a 0.5-day half-day leave will deduct 1 full day from the balance.
-
-**Fix:** Change to:
-```sql
-leave_days := COALESCE(NEW.days_requested, NEW.end_date - NEW.start_date + 1);
-```
-
----
-
-### Bug 4 (MODERATE): `handleSaveBalance` in LeaveBalancesManager writes `remaining_balance`
-
-**Location:** `LeaveBalancesManager.tsx` → `handleSaveBalance()`
-
-**Problem:** The edit/create dialog saves:
-```typescript
-const balanceData = {
-  user_id, leave_type_id, opening_balance, used_balance, year,
-  // remaining_balance is NOT written here ✅ - this one is OK
-};
-```
-Actually the save logic is correct — it only writes `opening_balance` and `used_balance`. But the `handleRecalculateBalances` function does:
-```typescript
-await supabase.from('leave_balance').update({
-  used_balance: usedDays,
-  remaining_balance: remaining,   // ❌ CANNOT WRITE GENERATED COLUMN
-})
-```
-The **"Recalculate" button will also fail** for the same reason as Bug 1.
-
-**Fix:** Remove `remaining_balance: remaining` from the update payload.
-
----
-
-## Summary of Issues
-
-| # | Severity | Location | Issue | Impact |
-|---|---|---|---|---|
-| 1 | Critical | `LeaveBalancesManager.tsx` `handleInitializeBalances` | Writes to generated column `remaining_balance` | "Initialize Year" always fails |
-| 2 | Critical | `process_monthly_leave_accrual` DB function | Updates generated column directly | Monthly accrual never works |
-| 3 | Moderate | `update_leave_balance_on_approval` trigger | Ignores `days_requested`, uses raw date diff | Half-day leaves deduct wrong amount |
-| 4 | Moderate | `LeaveBalancesManager.tsx` `handleRecalculateBalances` | Writes to generated column `remaining_balance` | "Recalculate" button always fails |
-
----
-
-## What IS Working Correctly
-
-- **Leave type creation** and policy configuration saves correctly to `leave_policy`
-- **Leave application validation** (balance check, overlap check, advance notice) works via DB trigger
-- **Leave approval → attendance marking** works (trigger marks attendance table)
-- **Leave accrual log** structure is correct
-- **`remaining_balance` reads** work everywhere since generated columns are fully readable
-- **Policy-to-balance link** concept is correct (policy → initialize year → balances), just broken by the generated column bug
-
----
-
-## Proposed Fixes
+## Technical Details
 
 ### Files to modify:
-1. **`src/components/attendance/LeaveBalancesManager.tsx`** — Remove `remaining_balance` from `handleInitializeBalances()` and `handleRecalculateBalances()` payloads (2 fixes)
 
-### Database migrations needed:
-2. **Fix `update_leave_balance_on_approval`** trigger function — use `days_requested` instead of raw date diff
-3. **Fix `process_monthly_leave_accrual`** function — update `opening_balance` instead of `remaining_balance`
+| File | Change |
+|------|--------|
+| `src/hooks/useWorkingDaysConfig.ts` | Fix column name `name` to `holiday_name`, add `alternate_pattern` support, optionally read from `working_days_config` |
+| `src/hooks/useWorkingDaysCalculator.ts` | No changes needed (already uses correct column `date` only) |
+| `src/components/attendance/WorkingDaysConfig.tsx` | No changes needed (already correct) |
 
-All 4 bugs can be fixed with targeted changes.
+### Expected Result After Fix:
+- February 2026 has 28 days, with Sundays off and 1 holiday (Feb 23) 
+- Working days should be 28 - 4 Sundays - 1 holiday = ~23 (exact count depends on week-off config)
+- The "Present Days" display will show `5/23` instead of `5/24`
+- Absent days will also be calculated correctly
+- Attendance percentage will reflect the correct denominator
+
