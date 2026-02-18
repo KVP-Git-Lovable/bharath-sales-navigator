@@ -140,49 +140,40 @@ const LeaveBalanceCards: React.FC<LeaveBalanceCardsProps> = ({ refreshTrigger, o
             return (
               <div
                 key={balance.leave_type_id}
-                className="flex items-center gap-4 px-4 py-4 sm:px-6"
+                className="px-4 py-4 sm:px-6"
               >
-                {/* Icon / Initials */}
-                <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold ${colorClass}`}>
-                  {getInitials(balance.leave_type_name)}
-                </div>
-
-                {/* Leave type name */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{balance.leave_type_name}</p>
-                </div>
-
-                {/* Available */}
-                <div className="text-center min-w-[70px]">
-                  <p className="text-xs text-muted-foreground">Available</p>
-                  <p className={`text-sm font-bold ${balance.remaining_balance > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
-                    {balance.remaining_balance} {balance.remaining_balance === 1 ? 'day' : 'days'}
-                  </p>
-                </div>
-
-                {/* Booked */}
-                <div className="text-center min-w-[70px]">
-                  <p className="text-xs text-muted-foreground">Booked</p>
-                  <p className="text-sm font-bold text-foreground">
-                    {balance.used_balance} {balance.used_balance === 1 ? 'day' : 'days'}
-                  </p>
-                </div>
-
-                {/* Apply button - only show if available > 0 */}
-                <div className="flex-shrink-0">
-                  {balance.remaining_balance > 0 ? (
+                {/* Top row: Icon + Name + Apply button */}
+                <div className="flex items-center gap-3">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${colorClass}`}>
+                    {getInitials(balance.leave_type_name)}
+                  </div>
+                  <p className="font-medium text-sm flex-1 min-w-0 truncate">{balance.leave_type_name}</p>
+                  {balance.remaining_balance > 0 && (
                     <LeaveApplicationModal
                       defaultLeaveTypeId={balance.leave_type_id}
                       onApplicationSubmitted={handleApplicationSubmitted}
                       trigger={
-                        <Button variant="outline" size="sm" className="text-xs whitespace-nowrap">
+                        <Button variant="outline" size="sm" className="text-xs whitespace-nowrap h-8">
                           Apply Leave
                         </Button>
                       }
                     />
-                  ) : (
-                    <div className="w-[90px]" /> // Spacer for alignment
                   )}
+                </div>
+                {/* Bottom row: Available + Booked stats */}
+                <div className="flex items-center gap-6 mt-2 ml-[52px]">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Available</p>
+                    <p className={`text-sm font-bold ${balance.remaining_balance > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {balance.remaining_balance} {balance.remaining_balance === 1 ? 'day' : 'days'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Booked</p>
+                    <p className="text-sm font-bold text-foreground">
+                      {balance.used_balance} {balance.used_balance === 1 ? 'day' : 'days'}
+                    </p>
+                  </div>
                 </div>
               </div>
             );
