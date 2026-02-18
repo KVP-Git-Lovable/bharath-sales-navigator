@@ -1,107 +1,72 @@
 
-# Compress Images Before Upload to retailer-photos and visit-photos
+# Fix Profile Photo Display and Upload Failures
 
-## Overview
+## Problem Summary
 
-Create a shared `compressImageFile()` utility that compresses any image (File or Blob) by 50% quality before uploading to Supabase Storage. Apply it at all 5 upload points across 4 files.
+Two distinct bugs found:
 
-## New Utility: `src/utils/imageCompression.ts`
+1. **Profile photo not showing in sidebar/navbar** -- The Navbar uses a raw storage URL directly, but the `employee-photos` bucket is private, so the URL returns a 403 error.
+2. **"Could not upload photo" error on Add Retailer** -- The image compression utility returns a `Blob` (not a `File`). When uploading a `Blob` to Supabase Storage without specifying `contentType`, the upload fails because Supabase can't determine the MIME type.
 
-A single reusable function that:
-1. Takes a `File` or `Blob` input
-2. Draws it onto an HTML Canvas
-3. Re-exports as JPEG at 50% quality (`canvas.toBlob(..., 'image/jpeg', 0.5)`)
-4. Also caps resolution at 1920px max dimension to further reduce size
-5. Returns a compressed `Blob`
+Both issues are directly related to the recent storage compression changes.
 
-```text
-Input (3MB photo) --> Canvas resize (max 1920px) --> JPEG @ 50% quality --> Output (~300-500KB)
-```
+---
 
-## Files to Modify
+## Fix 1: Navbar Profile Photo (src/components/Navbar.tsx)
 
-### 1. src/pages/AddRetailer.tsx -- 2 upload points
-
-**Line ~516 (camera capture upload):** Compress `file` before uploading to `retailer-photos`.
-
-**Line ~640 (board scan upload):** Compress `blob` before uploading to `retailer-photos`. Note: this already uses `compressImage()` for AI scanning, but the blob uploaded to storage is re-derived from that -- we'll compress it again at upload-quality level.
-
-### 2. src/components/AddRetailerInlineToBeat.tsx -- 1 upload point
-
-**Line ~269 (camera capture upload):** Compress `file` before uploading to `retailer-photos`.
-
-### 3. src/pages/RetailManagement.tsx -- 1 upload point
-
-**Line ~264 (photo capture upload):** Compress `blob` before uploading to `retailer-photos`.
-
-### 4. src/components/VisitCard.tsx -- 1 upload point
-
-**Line ~1668 (check-in/check-out photo):** Compress `photoBlob` before uploading to `visit-photos`.
-
-## Pattern at Each Upload Point
-
-Before:
+**Current code (line 251):**
 ```typescript
-await supabase.storage.from('retailer-photos').upload(fileName, file, { ... });
+<AvatarImage src={userProfile?.profile_picture_url || ""} />
 ```
 
-After:
-```typescript
-import { compressImageFile } from '@/utils/imageCompression';
-
-const compressedFile = await compressImageFile(file);
-await supabase.storage.from('retailer-photos').upload(fileName, compressedFile, { ... });
-```
-
-## Technical Details
-
-### compressImageFile utility
+**Fix:** Replace `AvatarImage` with `SignedAvatarImage` (already used in 17+ other files) which resolves private storage URLs to temporary signed URLs.
 
 ```typescript
-export async function compressImageFile(
-  input: File | Blob,
-  quality: number = 0.5,
-  maxDimension: number = 1920
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      // Calculate scaled dimensions
-      let { width, height } = img;
-      if (width > maxDimension || height > maxDimension) {
-        const ratio = Math.min(maxDimension / width, maxDimension / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Compression failed'));
-        },
-        'image/jpeg',
-        quality
-      );
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(input);
-  });
-}
+import { SignedAvatarImage } from "@/components/ui/signed-image";
+// ...
+<SignedAvatarImage src={userProfile?.profile_picture_url || ""} />
 ```
 
-### Parameters
-- **quality = 0.5**: 50% JPEG quality as requested
-- **maxDimension = 1920**: Caps width/height to prevent unnecessarily large images from phone cameras (often 4000px+)
+---
 
-## Application Impact
+## Fix 2: Add `contentType` to All Compressed Uploads
 
-- **Visual quality**: At 50% JPEG quality + 1920px max, photos remain clear enough for retailer identification and visit verification
-- **Storage savings**: Typical phone photos (3-8MB) will compress to 200-600KB -- roughly 80-90% size reduction
-- **Performance**: Compression takes ~100-300ms per image on modern devices, which is negligible compared to the upload time saved
-- **No breaking changes**: All existing functionality remains identical; only the file size of stored images changes
+The `compressImageFile()` function returns a raw `Blob`. While `canvas.toBlob()` sets the MIME type internally, Supabase Storage requires an explicit `contentType` option when the input is a `Blob` (not a `File`). Four upload points need this fix:
+
+### File: src/pages/AddRetailer.tsx -- 2 locations
+
+**Location 1 (~line 520):** Camera capture upload
+```typescript
+.upload(fileName, compressedFile, {
+  cacheControl: '3600',
+  upsert: false,
+  contentType: 'image/jpeg'  // ADD THIS
+});
+```
+
+**Location 2 (~line 640):** Board scan upload -- same fix, add `contentType: 'image/jpeg'`.
+
+### File: src/components/AddRetailerInlineToBeat.tsx -- 1 location
+
+**Line ~273:** Camera capture upload -- add `contentType: 'image/jpeg'` to the upload options.
+
+### File: src/pages/RetailManagement.tsx -- 1 location
+
+**Line ~268:** Photo capture upload -- add `contentType: 'image/jpeg'` to the upload options.
+
+### Already correct: src/components/VisitCard.tsx
+
+This file already has `contentType: 'image/jpeg'` (line 1671), so no change needed.
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/components/Navbar.tsx` | Replace `AvatarImage` with `SignedAvatarImage` for profile photo |
+| `src/pages/AddRetailer.tsx` | Add `contentType: 'image/jpeg'` to 2 upload calls |
+| `src/components/AddRetailerInlineToBeat.tsx` | Add `contentType: 'image/jpeg'` to 1 upload call |
+| `src/pages/RetailManagement.tsx` | Add `contentType: 'image/jpeg'` to 1 upload call |
+
+All changes are minimal, targeted fixes with no risk of side effects.
