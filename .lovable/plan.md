@@ -1,87 +1,90 @@
 
 
-# Fix: Activities Should Count as Visits + Add Check-in/Check-out for Activities
+## Show Karnataka District HDI Data as Info Boxes
 
-## Problem 1: "No visits found" Shows When Activities Exist
-When a user has only activities (no retailer visits) for a date, the page shows "No visits found" — but activities ARE visits (they create a record in the `visits` table with `visit_type = 'activity'`).
+When the user selects **KARNATAKA** as the state and picks a district, display the corresponding HDI (Human Development Index) data from the uploaded CSV as small summary boxes above the PIN code table.
 
-## Problem 2: No Check-in/Check-out on Activity Cards
-Activity cards currently show name, type, duration, and remarks — but no way to check in or check out, unlike regular retailer visit cards.
+### Data Overview
+The CSV contains 31 Karnataka districts with 4 metrics each:
+- **Health Index** (e.g., 0.777)
+- **Education Index** (e.g., 0.515)  
+- **Standard of Living Index** (e.g., 0.497)
+- **HDI** (e.g., 0.583)
 
----
+### Implementation Steps
 
-## Changes
+**Step 1: Store the CSV data as a static constant**
 
-### 1. Hide "No visits found" when activities exist
+Create a new file `src/data/karnatakaHDI.ts` containing the district-level HDI data as a typed Record, mapping district names to their index values. This avoids runtime file loading.
 
-**File:** `src/pages/MyVisits.tsx` (line ~1501)
+**Step 2: Update PincodeMasterLookup.tsx**
 
-The `ActivityEventsTable` component already fetches activities and renders above the empty state. The fix is to pass a callback or use a shared state so MyVisits knows whether activities exist for the selected date. When activities are present, the "No visits found" card should be hidden.
+When `selectedState === 'KARNATAKA'` and a district is selected:
+- Look up the selected district name in the HDI data (case-insensitive matching, since the pincode_master table may store district names in uppercase like "BAGALKOT" while the CSV has "Bagalkot")
+- Render 4 small colored boxes in a grid above the PIN code table showing:
+  - Health Index (green-toned box)
+  - Education Index (blue-toned box)
+  - Standard of Living Index (amber-toned box)
+  - HDI (purple-toned box)
 
-Approach: Add an `onActivitiesLoaded` callback prop to `ActivityEventsTable` that reports the count back to MyVisits. Then include `hasActivities` in the empty-state condition:
+Each box will display the metric name as a label and the value prominently.
 
-```
-// Before (line 1501):
-{!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && (plannedBeats.length === 0 || searchTerm !== '') ? ...
+### Technical Details
 
-// After:
-{!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && !hasActivities && (plannedBeats.length === 0 || searchTerm !== '') ? ...
-```
-
-### 2. Add Check-in / Check-out buttons to ActivityEventsTable
-
-**File:** `src/components/ActivityEventsTable.tsx`
-
-Each activity has a `visit_id` linking to the `visits` table, which already has `check_in_time` and `check_out_time` columns. The plan:
-
-- Fetch the linked visit's check-in/check-out status alongside each activity
-- Add Check In / Check Out buttons to each activity card (similar style to VisitCard but compact)
-- On Check In: update `visits` SET `check_in_time = now(), status = 'in-progress'` WHERE `id = activity.visit_id`
-- On Check Out: update `visits` SET `check_out_time = now(), status = 'productive'` WHERE `id = activity.visit_id`
-- Show check-in/out timestamps when already checked in/out
-- Only allow check-in/out for today's activities
-
-### 3. Update ActivityEventsTable data fetching
-
-**File:** `src/hooks/useActivityEvents.ts`
-
-Update `fetchActivitiesForDate` to also join/fetch the linked visit's `check_in_time` and `check_out_time` so the UI can display status. Alternatively, fetch visits separately in the component.
-
----
-
-## Technical Details
-
-### MyVisits.tsx changes
-- Add `const [hasActivities, setHasActivities] = useState(false);`
-- Pass `onActivitiesLoaded={(count) => setHasActivities(count > 0)}` to `ActivityEventsTable`
-- Add `hasActivities` to the empty-state condition guard
-
-### ActivityEventsTable.tsx changes
-- Fetch linked visit data: query `visits` table for `check_in_time, check_out_time, status` using each activity's `visit_id`
-- Add Check In button (green, with LogIn icon) -- enabled only if today and not yet checked in
-- Add Check Out button (outline, with LogOut icon) -- enabled only after check-in
-- Show timestamps: "Checked in at 10:30 AM" / "Checked out at 2:15 PM"
-- Supabase update calls to `visits` table on button click
-- Dispatch `visitDataChanged` event after check-in/out for UI refresh
-
-### ActivityEventsTable props update
+**New file: `src/data/karnatakaHDI.ts`**
 ```typescript
-interface ActivityEventsTableProps {
-  userId: string;
-  selectedDate: string;
-  onActivitiesLoaded?: (count: number) => void;  // NEW
+export interface DistrictHDI {
+  healthIndex: number;
+  educationIndex: number;
+  standardOfLivingIndex: number;
+  hdi: number;
 }
+
+export const karnatakaDistrictHDI: Record<string, DistrictHDI> = {
+  "bagalkot": { healthIndex: 0.777, educationIndex: 0.515, standardOfLivingIndex: 0.497, hdi: 0.583 },
+  "ballari": { healthIndex: 0.58, educationIndex: 0.422, standardOfLivingIndex: 0.524, hdi: 0.501 },
+  // ... all 31 districts, keyed by lowercase name
+};
 ```
 
-### Activity card layout after changes
-```
-+------------------------------------------+
-| Activity Name              [Event Badge] |
-| Clock: 10:00 AM - 2:00 PM  Pin: Site X  |
-| Remarks: "Promotion setup..."           |
-| [Check In]  [Check Out]    In: 10:05 AM |
-+------------------------------------------+
+**Modified file: `src/components/admin/PincodeMasterLookup.tsx`**
+
+Insert a new section between the district dropdown and the pincodes list (after line 141, before line 143):
+
+```tsx
+{selectedState === 'KARNATAKA' && selectedDistrict && (() => {
+  const hdiData = karnatakaDistrictHDI[selectedDistrict.toLowerCase()];
+  if (!hdiData) return null;
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-3 text-center">
+        <p className="text-[10px] text-green-600 font-medium uppercase">Health Index</p>
+        <p className="text-lg font-bold text-green-700 dark:text-green-400">{hdiData.healthIndex}</p>
+      </div>
+      <div className="rounded-lg bg-blue-50 ... p-3 text-center">
+        <p className="text-[10px] ...">Education Index</p>
+        <p className="text-lg font-bold ...">{hdiData.educationIndex}</p>
+      </div>
+      <div className="rounded-lg bg-amber-50 ... p-3 text-center">
+        <p className="text-[10px] ...">Standard of Living</p>
+        <p className="text-lg font-bold ...">{hdiData.standardOfLivingIndex}</p>
+      </div>
+      <div className="rounded-lg bg-purple-50 ... p-3 text-center">
+        <p className="text-[10px] ...">HDI</p>
+        <p className="text-lg font-bold ...">{hdiData.hdi}</p>
+      </div>
+    </div>
+  );
+})()}
 ```
 
-## No Database Schema Changes Needed
-The `visits` table already has `check_in_time` and `check_out_time` columns. Activity events already link to visits via `visit_id`. We just need to use these existing columns.
+### District Name Matching
+
+The pincode_master table likely stores district names in uppercase (e.g., "BAGALKOT"), while the CSV uses title case ("Bagalkot"). The lookup will normalize both to lowercase for matching. This handles any casing differences automatically.
+
+### Summary
+- 1 new file (`src/data/karnatakaHDI.ts`) -- static data, no API calls needed
+- 1 modified file (`src/components/admin/PincodeMasterLookup.tsx`) -- add HDI boxes UI
+- Only shows when state is KARNATAKA and a district is selected
+- 4 color-coded metric boxes in a 2x2 grid
+
