@@ -14,8 +14,8 @@ export default function SecurityManagement() {
   const { userRole, securityProfileName, loading, user } = useAuth();
   const [activeTab, setActiveTab] = useState('role-permissions');
 
-  // Check if user has admin access - either through role OR System Administrator profile
-  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
+  // Check if user has admin access - via System Administrator security profile
+  const hasAdminAccess = securityProfileName === 'System Administrator';
 
   // Show loading while auth is being determined
   if (loading) {

@@ -86,7 +86,7 @@ export const useFeatureFlags = () => {
 
   const isLoading = flagsLoading || permissionsLoading;
   const flagMap = new Map(featureFlags.map(f => [f.feature_key, f.is_enabled]));
-  const isFullAdmin = userRole === 'admin' || securityProfileName === 'System Administrator';
+  const isFullAdmin = securityProfileName === 'System Administrator';
 
   // Build a set of permission prefixes the user has can_read on
   const userPermissionPrefixes = useMemo(() => {

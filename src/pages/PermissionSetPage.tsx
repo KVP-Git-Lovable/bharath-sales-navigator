@@ -13,7 +13,7 @@ export default function PermissionSetPage() {
   const { user, userRole, securityProfileName, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('role-permissions');
 
-  const hasAdminAccess = userRole === 'admin' || securityProfileName === 'System Administrator';
+  const hasAdminAccess = securityProfileName === 'System Administrator';
 
   if (loading) {
     return (

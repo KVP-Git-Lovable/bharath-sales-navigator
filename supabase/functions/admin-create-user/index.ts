@@ -52,32 +52,36 @@ serve(async (req) => {
     const adminUserId = callerUser.id;
     console.log('User authenticated:', adminUserId);
 
-    // Check if user is admin (role OR System Administrator security profile)
-    const { data: roleData } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
+    // Check if user is admin via System Administrator security profile
+    const { data: profileData } = await supabaseAdmin
+      .from('user_profiles')
+      .select('profile_id, security_profiles(name)')
       .eq('user_id', adminUserId)
       .single();
 
-    const isAdminRole = roleData?.role === 'admin';
+    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
 
-    let isSystemAdmin = false;
-    if (!isAdminRole) {
-      const { data: profileData } = await supabaseAdmin
-        .from('user_profiles')
-        .select('profile_id, security_profiles(name)')
-        .eq('user_id', adminUserId)
-        .single();
+    if (!isSystemAdmin) {
+      // Also check for granular admin permissions
+      let hasAdminPermission = false;
+      if (profileData?.profile_id) {
+        const { data: perms } = await supabaseAdmin
+          .from('profile_object_permissions')
+          .select('object_name, can_read')
+          .eq('profile_id', profileData.profile_id)
+          .like('object_name', 'admin_%')
+          .eq('can_read', true)
+          .limit(1);
+        hasAdminPermission = (perms && perms.length > 0) || false;
+      }
 
-      isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
-    }
-
-    if (!isAdminRole && !isSystemAdmin) {
-      console.error('User is not admin. Role:', roleData?.role);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - Admin access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (!hasAdminPermission) {
+        console.error('User is not admin. Profile:', (profileData as any)?.security_profiles?.name);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized - Admin access required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     console.log('Admin verified');

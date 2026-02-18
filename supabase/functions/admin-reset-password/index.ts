@@ -39,18 +39,20 @@ serve(async (req) => {
       );
     }
 
-    // Verify caller is an admin using service role
+    // Verify caller has System Administrator security profile
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    const { data: callerRole, error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('profile_id, security_profiles(name)')
+      .eq('user_id', caller.id)
       .single();
 
-    if (roleError || callerRole?.role !== "admin") {
+    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
+
+    if (profileError || !isSystemAdmin) {
       return new Response(
-        JSON.stringify({ error: "Only administrators can reset user passwords" }),
+        JSON.stringify({ error: "Only System Administrators can reset user passwords" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -50,63 +50,43 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Check if user has admin role OR System Administrator security profile OR admin permissions
-    const { data: userRole } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
+    // Check if user has System Administrator security profile or admin permissions
+    const { data: profileData } = await supabaseAdmin
+      .from('user_profiles')
+      .select('profile_id, security_profiles(name)')
       .eq('user_id', userId)
       .single()
 
-    const isAdminRole = userRole?.role === 'admin'
-
-    // Also check for System Administrator security profile
-    let isSystemAdmin = false
-    if (!isAdminRole) {
-      const { data: profileData } = await supabaseAdmin
-        .from('user_profiles')
-        .select('profile_id, security_profiles(name)')
-        .eq('user_id', userId)
-        .single()
-
-      isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator'
-    }
+    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator'
 
     // Also check for granular admin permissions via profile_object_permissions
     let hasAdminPermission = false
-    if (!isAdminRole && !isSystemAdmin) {
-      const { data: userProfile } = await supabaseAdmin
-        .from('user_profiles')
-        .select('profile_id')
-        .eq('user_id', userId)
-        .single()
+    if (!isSystemAdmin && profileData?.profile_id) {
+      const { data: perms } = await supabaseAdmin
+        .from('profile_object_permissions')
+        .select('object_name, can_read')
+        .eq('profile_id', profileData.profile_id)
+        .like('object_name', 'admin_%')
+        .eq('can_read', true)
+        .limit(1)
 
-      if (userProfile?.profile_id) {
-        const { data: perms } = await supabaseAdmin
-          .from('profile_object_permissions')
-          .select('object_name, can_read')
-          .eq('profile_id', userProfile.profile_id)
-          .like('object_name', 'admin_%')
-          .eq('can_read', true)
-          .limit(1)
-
-        hasAdminPermission = (perms && perms.length > 0) || false
-      }
-
-      // Also check user-level overrides
-      if (!hasAdminPermission) {
-        const { data: userPerms } = await supabaseAdmin
-          .from('user_object_permissions')
-          .select('object_name, can_read')
-          .eq('user_id', userId)
-          .like('object_name', 'admin_%')
-          .eq('can_read', true)
-          .limit(1)
-
-        hasAdminPermission = (userPerms && userPerms.length > 0) || false
-      }
+      hasAdminPermission = (perms && perms.length > 0) || false
     }
 
-    if (!isAdminRole && !isSystemAdmin && !hasAdminPermission) {
+    // Also check user-level overrides
+    if (!isSystemAdmin && !hasAdminPermission) {
+      const { data: userPerms } = await supabaseAdmin
+        .from('user_object_permissions')
+        .select('object_name, can_read')
+        .eq('user_id', userId)
+        .like('object_name', 'admin_%')
+        .eq('can_read', true)
+        .limit(1)
+
+      hasAdminPermission = (userPerms && userPerms.length > 0) || false
+    }
+
+    if (!isSystemAdmin && !hasAdminPermission) {
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

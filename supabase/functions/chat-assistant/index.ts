@@ -73,7 +73,7 @@ async function getUserContext(supabase: any, userId: string) {
       teamStatsResult
     ] = await Promise.all([
       supabase.from('profiles').select('full_name, username').eq('id', userId).maybeSingle(),
-      supabase.from('user_roles').select('role').eq('user_id', userId),
+      supabase.from('user_profiles').select('profile_id, security_profiles(name)').eq('user_id', userId).maybeSingle(),
       supabase.from('visits').select('id, status, retailers(name)').eq('user_id', userId)
         .gte('planned_date', today).lte('planned_date', today),
       supabase.from('beat_plans').select('beat_name, beat_data').eq('user_id', userId)
@@ -89,7 +89,7 @@ async function getUserContext(supabase: any, userId: string) {
         Promise.resolve({ data: [] })
     ]);
 
-    const isAdmin = rolesResult.data?.some((r: any) => r.role === 'admin') || false;
+    const isAdmin = (rolesResult as any).data?.security_profiles?.name === 'System Administrator' || false;
     
     // Calculate business context
     const now = new Date();
