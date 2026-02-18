@@ -1,67 +1,72 @@
 
 
-# Fix: Interlink Holidays, Week-offs, and Working Days Across Attendance
+# Fix: Working Days Not Accounting for Week-Offs
 
-## Problem Identified
+## Root Cause
 
-There are **3 disconnected issues** causing holidays not to reduce working days:
+The `week_off_config` database table is **completely empty** -- no week-off rules have been saved there. Even though the admin panel (Working Days Config page) lets you configure week-offs, those changes write to `week_off_config`. If the admin never configured them there, the table stays empty.
 
-### Issue 1: Wrong Column Name (Critical Bug)
-In `useWorkingDaysConfig.ts`, the holidays query uses `.select('id, date, name')` but the actual database column is `holiday_name`, not `name`. This causes the query to **fail silently**, meaning holidays are never loaded, so working days are never reduced.
+The hook's caching logic (`refetchOnMount: false`, 6-hour stale time) makes this worse -- once it sees empty data, it may cache that emptiness and skip re-fetching.
 
-### Issue 2: Empty Week-Off Config
-The `week_off_config` table is currently empty. The hook falls back to "Sunday only" as default, but ignores the `alternate_pattern` field that the admin panel uses (e.g., "all Saturdays off", "1st and 3rd Saturdays off").
+Currently the flow is broken:
+- `week_off_config` table: empty
+- `working_days_config` table: no Feb 2026 record
+- Hook falls back to calculation, but with empty week-off config
+- Result: 28 days - 1 holiday = 27 (no Sundays subtracted)
 
-### Issue 3: Admin Config Not Used
-The admin panel in "Working Days Config" calculates working days and saves them to `working_days_config` table. But the user-facing hook (`useWorkingDaysConfig`) **never reads from that table** -- it recalculates everything from scratch. This means the admin's calculated values are ignored on the user side.
+## The Fix: Single Unified Flow
 
----
+Instead of multiple disconnected data sources with fragile caching, create ONE clear flow:
 
-## The Fix
+### Change 1: Remove aggressive caching that hides bugs
 
-### Change 1: Fix the column name in `useWorkingDaysConfig.ts`
 **File:** `src/hooks/useWorkingDaysConfig.ts`
 
-Change the holidays query from:
-```
-.select('id, date, name')
-```
-to:
-```
-.select('id, date, holiday_name')
-```
+The current "6-hour cache freshness" check inside the queryFn (lines 140-147 and 186-193) short-circuits the actual database fetch. This means if localStorage has stale/bad data, the hook returns wrong values for 6 hours. Remove these early-return cache checks and let React Query handle caching properly via `staleTime`.
 
-Also update the `Holiday` interface to use `holiday_name` instead of `name`, and update all references that map holiday data.
+Also set `refetchOnMount: true` (or remove `refetchOnMount: false`) so fresh data loads when the page is opened.
 
-### Change 2: Add `alternate_pattern` support to `useWorkingDaysConfig.ts`
-The hook currently only checks `is_off` to determine week-off days. It needs to also respect `alternate_pattern` (values: `'all'`, `'1st_3rd'`, `'2nd_4th'`) -- the same logic already used in `WorkingDaysConfig.tsx` and `useWorkingDaysCalculator.ts`.
+### Change 2: Always fetch fresh week-off config on mount
 
-Update the working days calculation to check each individual date against the pattern, rather than just checking the day-of-week.
+**File:** `src/hooks/useWorkingDaysConfig.ts`
 
-### Change 3: Use `working_days_config` as the source of truth (with fallback)
-When the admin has already calculated and saved working days via the admin panel, the user-facing hook should read from `working_days_config` for the relevant month/year. If no saved config exists, fall back to the current calculation logic.
+Change the week-off query options:
+- Remove `refetchOnMount: false` so it fetches on page load
+- Reduce `staleTime` to 5 minutes (not 6 hours) so data stays current
+- Keep `placeholderData` for instant display while fetching
 
-This ensures that when an admin clicks "Calculate & Save" in the Working Days Config panel, those values are what users see.
+### Change 3: Ensure default Sunday works when table is empty
 
-### Change 4: Ensure Team view also uses the correct data
-The `useTeamAttendance.ts` hook already uses `useWorkingDaysConfig`, so fixing that hook will automatically fix the team summary cards (present/absent counts) as well.
+**File:** `src/hooks/useWorkingDaysConfig.ts`
 
----
+The queryFn currently returns `cachedWeekOffSync` when the table is empty. But `cachedWeekOffSync` reads from localStorage first -- if localStorage has `[]` from a prior bad cache, it returns `[]` with no week-offs.
+
+Fix: when the database returns empty data, always return the hardcoded default `[{ id: 'default', day_of_week: 0, is_off: true, alternate_pattern: 'all' }]` directly, ignoring localStorage.
+
+### Change 4: Reduce holiday cache staleness too
+
+**File:** `src/hooks/useWorkingDaysConfig.ts`
+
+Same treatment for holidays query -- reduce staleTime, remove the manual cache freshness check, allow refetch on mount.
 
 ## Technical Details
 
-### Files to modify:
+**Single file change:** `src/hooks/useWorkingDaysConfig.ts`
 
-| File | Change |
-|------|--------|
-| `src/hooks/useWorkingDaysConfig.ts` | Fix column name `name` to `holiday_name`, add `alternate_pattern` support, optionally read from `working_days_config` |
-| `src/hooks/useWorkingDaysCalculator.ts` | No changes needed (already uses correct column `date` only) |
-| `src/components/attendance/WorkingDaysConfig.tsx` | No changes needed (already correct) |
+The key changes:
+1. Remove lines 139-148 (manual cache freshness check in weekOff queryFn)
+2. Remove lines 185-194 (manual cache freshness check in holidays queryFn)
+3. In weekOff queryFn: when `data.length === 0`, return hardcoded default instead of `cachedWeekOffSync`
+4. Change `staleTime` from `6 * 60 * 60 * 1000` to `5 * 60 * 1000` (5 min) for both queries
+5. Remove `refetchOnMount: false` from both queries
+6. Keep `placeholderData` for instant UI (no flicker)
 
-### Expected Result After Fix:
-- February 2026 has 28 days, with Sundays off and 1 holiday (Feb 23) 
-- Working days should be 28 - 4 Sundays - 1 holiday = ~23 (exact count depends on week-off config)
-- The "Present Days" display will show `5/23` instead of `5/24`
-- Absent days will also be calculated correctly
-- Attendance percentage will reflect the correct denominator
+No other files need changes -- `Attendance.tsx` and team views all consume this hook.
+
+## Expected Result
+
+- February 2026: 28 days - 4 Sundays - 1 holiday = **23 working days**
+- Display will show `5/23` Present Days instead of `5/27`
+- Attendance percentage will be `22%` (5/23) instead of `19%` (5/27)
+- When admin configures Saturday week-offs in the Working Days Config page, the user view will automatically reflect within 5 minutes
 
