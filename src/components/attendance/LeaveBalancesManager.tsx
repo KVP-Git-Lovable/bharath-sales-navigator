@@ -135,6 +135,14 @@ const LeaveBalancesManager = () => {
       }
 
       const year = parseInt(filterYear);
+
+      // Compute months elapsed: Jan=1, Feb=2, ..., Dec=12
+      // If initializing for a past/future year, use full 12 months; for current year use actual month
+      const currentYear = new Date().getFullYear();
+      const monthsElapsed = year === currentYear
+        ? new Date().getMonth() + 1  // Jan=1, Feb=2, ..., Dec=12
+        : 12;
+
       const balancesToInsert: Array<{
         user_id: string;
         leave_type_id: string;
@@ -146,10 +154,17 @@ const LeaveBalancesManager = () => {
       // Create balance entries for each user and policy
       for (const user of activeUsers) {
         for (const policy of policies) {
+          // For monthly accrual: credit only months elapsed so far
+          // For yearly: grant full entitlement upfront
+          const monthlyCredit = policy.yearly_entitlement / 12;
+          const initialBalance = policy.accrual_type === 'monthly'
+            ? Math.round(monthsElapsed * monthlyCredit)
+            : policy.yearly_entitlement;
+
           balancesToInsert.push({
             user_id: user.id,
             leave_type_id: policy.leave_type_id,
-            opening_balance: policy.yearly_entitlement,
+            opening_balance: initialBalance,
             used_balance: 0,
             year,
             // NOTE: remaining_balance is a GENERATED column (opening_balance - used_balance)
