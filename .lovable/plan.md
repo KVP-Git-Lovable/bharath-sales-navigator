@@ -1,71 +1,160 @@
 
-## Fix: Add Manager RLS Policies to leave_applications
 
-### What's Wrong
+## Centralize All Permission Control to Security Profiles
 
-The `leave_applications` table has two critical gaps in its Row Level Security policies:
+### Current Problem
 
-1. **SELECT**: Managers cannot read their direct reports' leave applications — so the pending approval list is always empty for non-admin managers like Prajwal.
-2. **UPDATE**: Managers cannot approve or reject leave applications — only admins can.
+Admin access is determined from **two independent sources**, creating confusion:
+1. `user_roles.role = 'admin'` (legacy table)
+2. `security_profiles.name = 'System Administrator'` (Security & Access Control module)
 
-Suyog's leave application (ID: `0c99ba44`) is sitting in the database with `status = pending`, but Prajwal gets zero rows returned because RLS filters it out.
+Currently, Abhishek KP has `role = 'admin'` in `user_roles` but **no security profile assigned at all**, yet gets full admin access everywhere.
 
-### Does it follow hierarchy?
+### Current State Audit
 
-The code in `useTeamAttendance.ts` already correctly handles this:
-- Line 50: `approvalUserIds = directReportIds` — only **immediate reports** (level 1) get shown for approvals, not all subordinates. This is intentional — you only approve your direct reports' leaves.
-- The `useSubordinates` hook fetches `directReportIds` (level = 1 only) correctly.
+| Layer | Count | Uses `user_roles.role = 'admin'` |
+|-------|-------|----------------------------------|
+| Frontend hooks/pages | 9 files | `userRole === 'admin'` checks |
+| Edge functions | 5 functions | `roleData?.role === 'admin'` checks |
+| Database RLS policies | **193 policies** | `has_role(auth.uid(), 'admin')` |
+| Database functions | ~10 functions | `has_role(...)`, `is_system_admin(...)` |
 
-So the hierarchy logic is correct in code — the database just blocks the data.
+| User | Current Role | Security Profile |
+|------|-------------|-----------------|
+| Abhishek KP | admin | None assigned |
+| Prabhu KVP | user | System Administrator |
+| Satyaprakash | user | Sales Manager |
+| Others | user | Data Viewer / Field Sales Executive |
 
-### The Fix: 2 New RLS Policies (1 Migration File)
+### Strategy: Modify `is_system_admin()` and `has_role()` at the Database Level
 
-**Policy 1 — SELECT for managers:**
-Allow a manager to read leave applications from their direct reports.
-```sql
-CREATE POLICY "Managers can view their direct reports' leave applications"
-  ON public.leave_applications
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.user_id = leave_applications.user_id
-        AND e.manager_id = auth.uid()
-    )
-  );
-```
+Rather than updating 193+ RLS policies individually, the most efficient and safe approach is:
 
-**Policy 2 — UPDATE for managers:**
-Allow a manager to approve or reject leave applications from their direct reports.
-```sql
-CREATE POLICY "Managers can update their direct reports' leave applications"
-  ON public.leave_applications
-  FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.user_id = leave_applications.user_id
-        AND e.manager_id = auth.uid()
-    )
+1. **Update the `is_system_admin()` function** to check ONLY security profiles (not `user_roles`)
+2. **Update the `has_role()` function** so that `has_role(uid, 'admin')` checks security profiles instead of `user_roles`
+3. **Update frontend hooks** to derive admin status from `securityProfileName` only
+4. **Update edge functions** to check security profiles instead of `user_roles`
+5. **Migrate Abhishek KP** to the System Administrator security profile
+6. **Remove admin role** from `user_roles` for Abhishek KP
+
+This way, all 193 RLS policies continue to work without any modification -- they still call `has_role()` and `is_system_admin()`, but those functions now look at security profiles.
+
+### Detailed Changes
+
+#### Phase 1: Database Migration
+
+**1a. Update `is_system_admin()` function:**
+Remove the `user_roles` check, keep only the security profile check.
+
+```text
+Before:
+  SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = _user_id AND role = 'admin')
+  OR EXISTS (SELECT 1 FROM user_profiles up JOIN security_profiles sp ...)
+
+After:
+  SELECT EXISTS (
+    SELECT 1 FROM user_profiles up
+    JOIN security_profiles sp ON sp.id = up.profile_id
+    WHERE up.user_id = _user_id AND sp.name = 'System Administrator'
   )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.employees e
-      WHERE e.user_id = leave_applications.user_id
-        AND e.manager_id = auth.uid()
-    )
-  );
 ```
 
-### Technical Details
+**1b. Update `has_role()` function:**
+When checking for `'admin'` role, redirect to security profile check instead of `user_roles`.
 
-- **File to create**: `supabase/migrations/[timestamp]_manager_leave_applications_rls.sql`
-- **No code changes needed** — the frontend query and hook logic is already correct
-- The `employees` table is used as the source of truth for the manager–subordinate relationship (same table used by `get_all_subordinates`)
-- This is a **direct-reports-only** policy (one level deep), matching the existing app behavior where approvals only show immediate subordinates
+```text
+Before:
+  SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = _user_id AND role = _role)
 
-### Expected Result After Fix
+After:
+  -- For 'admin' role, check System Administrator security profile
+  IF _role = 'admin' THEN
+    SELECT EXISTS (
+      SELECT 1 FROM user_profiles up
+      JOIN security_profiles sp ON sp.id = up.profile_id
+      WHERE up.user_id = _user_id AND sp.name = 'System Administrator'
+    )
+  ELSE
+    -- Keep existing behavior for non-admin roles
+    SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = _user_id AND role = _role)
+  END IF
+```
 
-Prajwal logs in → navigates to Team Approvals → sees Suyog's pending Sick Leave for Feb 18 → can Approve or Reject it.
+**1c. Migrate Abhishek KP's data:**
+- Assign "System Administrator" security profile to Abhishek KP (user_id: `6be7e2ff-...`)
+- Change his `user_roles.role` from `'admin'` to `'user'`
+
+#### Phase 2: Frontend Changes (4 files)
+
+**2a. `src/hooks/useAuth.tsx`:**
+- Remove `fetchUserRole()` dependency on admin/user distinction for access control
+- Keep `userRole` state but derive admin status purely from `securityProfileName`
+- Update `signIn()` to check security profile instead of `user_roles` for admin login validation
+- Remove the admin login role check (`if (role === 'admin' && userRole !== 'admin')`) or replace it with a security profile check
+
+**2b. `src/hooks/useAdminAccess.ts`:**
+- Change `isFullAdmin` from `userRole === 'admin' || securityProfileName === 'System Administrator'` to just `securityProfileName === 'System Administrator'`
+
+**2c. `src/hooks/useFeatureFlags.ts`:**
+- Same change: `isFullAdmin = securityProfileName === 'System Administrator'`
+
+**2d. Pages with direct `userRole === 'admin'` checks (6 files):**
+- `SecurityManagement.tsx`, `PermissionSetPage.tsx`: Replace with `securityProfileName === 'System Administrator'`
+- `Vendors.tsx`, `CompetitorDetail.tsx`, `CompetitionMaster.tsx`: Replace admin checks with `useAdminAccess().isFullAdmin` or permission-based checks
+- `TodaySummary.tsx`: Replace `userRole === 'admin'` with `isFullAdmin` from `useAdminAccess`
+- `AdminDashboard.tsx`: Remove "Make Admin" / "Make User" role toggle UI, replace with security profile assignment
+
+#### Phase 3: Edge Functions (5 functions)
+
+Update the admin check in each edge function to query `security_profiles` instead of `user_roles`:
+
+- `admin-create-user/index.ts`
+- `admin-get-users/index.ts`
+- `admin-delete-user/index.ts`
+- `admin-delete-user-data/index.ts`
+- `admin-login-as-user/index.ts`
+- `admin-reset-password/index.ts`
+
+Each will replace:
+```text
+const { data: roleData } = await supabaseAdmin
+  .from('user_roles').select('role').eq('user_id', userId).single()
+const isAdmin = roleData?.role === 'admin'
+```
+With:
+```text
+const { data: profileData } = await supabaseAdmin
+  .from('user_profiles')
+  .select('profile_id, security_profiles(name)')
+  .eq('user_id', userId).single()
+const isAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator'
+```
+
+#### Phase 4: Auth Login Flow
+
+- Remove the "Admin" vs "User" role selection on the login page (`RoleBasedAuthPage.tsx`)
+- All users log in through the same flow; the system determines access level from their assigned security profile
+- OR keep the admin login option but validate against security profile instead of `user_roles`
+
+### What Stays Unchanged
+
+- The `user_roles` table itself is NOT deleted (it may still serve non-admin role purposes)
+- All 193 RLS policies remain untouched (they call `has_role()` which is updated)
+- All 25 policies using `is_system_admin()` remain untouched
+- The `security_profiles` table, `user_profiles` table, and `profile_object_permissions` table remain as-is
+- The `RoutePermissionGuard` component remains as-is
+
+### Risk Mitigation
+
+- The `has_role()` function change is backward-compatible: it only redirects the `'admin'` role check to security profiles
+- Abhishek KP gets migrated to System Administrator profile BEFORE the role is changed, ensuring no gap in access
+- All edge functions are updated to use the same single source of truth
+
+### Expected Outcome
+
+After implementation:
+- Only users with **"System Administrator" security profile** get full admin access
+- `user_roles` no longer controls admin privileges
+- All permissions flow through Security & Access Control
+- Every user must have a security profile assigned for proper access control
+
