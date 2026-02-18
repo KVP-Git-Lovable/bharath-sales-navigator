@@ -1,54 +1,71 @@
 
-## Root Cause: Data Update Was Never Executed
+## Fix: Add Manager RLS Policies to leave_applications
 
-The previous plan proposed this SQL to reset balances from 12 → 2 (February = month 2 × 1 day/month), but it was never actually run against the database. The database still shows `opening_balance = 12` for all 21 users.
+### What's Wrong
 
-Confirmed from live database:
-- Leave policy: `Sick Leave`, accrual_type = `monthly`, yearly_entitlement = `12`
-- All 21 leave_balance rows for 2026 still have `opening_balance = 12`
-- Current month = February 2026 = month 2
-- Correct opening_balance = ROUND(2 × (12 / 12)) = 2
+The `leave_applications` table has two critical gaps in its Row Level Security policies:
 
-## What Will Be Done
+1. **SELECT**: Managers cannot read their direct reports' leave applications — so the pending approval list is always empty for non-admin managers like Prajwal.
+2. **UPDATE**: Managers cannot approve or reject leave applications — only admins can.
 
-### Step 1 — Run the Data Fix SQL (via Insert Tool)
+Suyog's leave application (ID: `0c99ba44`) is sitting in the database with `status = pending`, but Prajwal gets zero rows returned because RLS filters it out.
 
+### Does it follow hierarchy?
+
+The code in `useTeamAttendance.ts` already correctly handles this:
+- Line 50: `approvalUserIds = directReportIds` — only **immediate reports** (level 1) get shown for approvals, not all subordinates. This is intentional — you only approve your direct reports' leaves.
+- The `useSubordinates` hook fetches `directReportIds` (level = 1 only) correctly.
+
+So the hierarchy logic is correct in code — the database just blocks the data.
+
+### The Fix: 2 New RLS Policies (1 Migration File)
+
+**Policy 1 — SELECT for managers:**
+Allow a manager to read leave applications from their direct reports.
 ```sql
-UPDATE leave_balance lb
-SET 
-  opening_balance = ROUND(
-    EXTRACT(MONTH FROM CURRENT_DATE) * (lp.yearly_entitlement / 12.0)
-  ),
-  updated_at = now()
-FROM leave_policy lp
-WHERE lb.leave_type_id = lp.leave_type_id
-  AND lp.accrual_type = 'monthly'
-  AND lp.is_active = true
-  AND lb.year = EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER;
+CREATE POLICY "Managers can view their direct reports' leave applications"
+  ON public.leave_applications
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.employees e
+      WHERE e.user_id = leave_applications.user_id
+        AND e.manager_id = auth.uid()
+    )
+  );
 ```
 
-This will update all 21 rows: opening_balance goes from 12 → 2.
-
-Since `remaining_balance` is a generated column (computed as `opening_balance - used_balance`), it will automatically update to 2 as well.
-
-### Step 2 — Schedule the pg_cron Job
-
+**Policy 2 — UPDATE for managers:**
+Allow a manager to approve or reject leave applications from their direct reports.
 ```sql
-SELECT cron.schedule(
-  'monthly-leave-accrual',
-  '0 0 1 * *',
-  $$SELECT public.process_monthly_leave_accrual();$$
-);
+CREATE POLICY "Managers can update their direct reports' leave applications"
+  ON public.leave_applications
+  FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.employees e
+      WHERE e.user_id = leave_applications.user_id
+        AND e.manager_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.employees e
+      WHERE e.user_id = leave_applications.user_id
+        AND e.manager_id = auth.uid()
+    )
+  );
 ```
 
-This ensures that on March 1, April 1, etc. the balances automatically increment by 1 day.
+### Technical Details
 
-## Expected Result After Fix
+- **File to create**: `supabase/migrations/[timestamp]_manager_leave_applications_rls.sql`
+- **No code changes needed** — the frontend query and hook logic is already correct
+- The `employees` table is used as the source of truth for the manager–subordinate relationship (same table used by `get_all_subordinates`)
+- This is a **direct-reports-only** policy (one level deep), matching the existing app behavior where approvals only show immediate subordinates
 
-| Before | After |
-|--------|-------|
-| Opening Balance: 12 | Opening Balance: 2 |
-| Remaining Balance: 12 | Remaining Balance: 2 |
-| (February 2026 — month 2 of 12) | Correctly reflects 2 months elapsed |
+### Expected Result After Fix
 
-The Leave Balances page and the user-facing Leave Balance card will both show 2 days available.
+Prajwal logs in → navigates to Team Approvals → sees Suyog's pending Sick Leave for Feb 18 → can Approve or Reject it.
