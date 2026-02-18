@@ -214,7 +214,7 @@ const LeaveBalancesManager = () => {
           .from('leave_balance')
           .update({
             used_balance: usedDays,
-            remaining_balance: remaining,
+            // remaining_balance is a GENERATED column — do NOT include it
           })
           .eq('id', balance.id);
       }
