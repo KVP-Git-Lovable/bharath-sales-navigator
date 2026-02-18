@@ -183,6 +183,7 @@ export const MyVisits = () => {
   const [plannedDates, setPlannedDates] = useState<Set<string>>(new Set());
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(() => initialDayInfo.fullDate);
   const [isCreateVisitModalOpen, setIsCreateVisitModalOpen] = useState(false);
+  const [hasActivities, setHasActivities] = useState(false);
   const [isOrdersDialogOpen, setIsOrdersDialogOpen] = useState(false);
   const [ordersData, setOrdersData] = useState<any[]>([]);
   const [isTimelineOpen, setIsTimelineOpen] = useState(() => timelineParam === 'true');
@@ -1494,11 +1495,11 @@ export const MyVisits = () => {
           
           {/* Activity Events Table - shown above visit list */}
           {(isViewingSelf ? user?.id : selectedUserIds[0]) && (
-            <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} />
+            <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} onActivitiesLoaded={(count) => setHasActivities(count > 0)} />
           )}
 
           {/* No visits message - ONLY after loading completes */}
-          {!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && (plannedBeats.length === 0 || searchTerm !== '') ? <Card className="shadow-card">
+          {!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && !hasActivities && (plannedBeats.length === 0 || searchTerm !== '') ? <Card className="shadow-card">
               <CardContent className="p-4 sm:p-8 text-center">
                 <CalendarIcon size={32} className="sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
                 <h3 className="font-semibold text-muted-foreground mb-2 text-sm sm:text-base">{t('visits.noVisitsFound')}</h3>
