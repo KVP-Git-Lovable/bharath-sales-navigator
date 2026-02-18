@@ -40,8 +40,8 @@ export const TodaySummary = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const initialLoadDone = useRef(false);
-  const { user, userRole } = useAuth();
-  const isAdmin = userRole === 'admin';
+  const { user, securityProfileName } = useAuth();
+  const isAdmin = securityProfileName === 'System Administrator';
   
   // Hierarchical user filter (for managers)
   const { isManager, subordinateIds, subordinates } = useSubordinates();

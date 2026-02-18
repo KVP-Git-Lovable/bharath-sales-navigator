@@ -463,8 +463,7 @@ export const AdminDashboard = () => {
                     <div>
                       <h4 className="text-lg font-semibold">Total Users: {users.length}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Admins: {users.filter(u => u.role === 'admin').length} | 
-                        Users: {users.filter(u => u.role === 'user').length}
+                        {users.filter(u => u.securityProfile).length} users with security profiles assigned
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -906,41 +905,7 @@ export const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Role Change Dialog */}
-        <Dialog open={isRoleChangeOpen} onOpenChange={setIsRoleChangeOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Change User Role</DialogTitle>
-              <DialogDescription>
-                Change the role for {selectedUser?.username}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p>Current role: <Badge>{selectedUser?.role}</Badge></p>
-              <div className="flex gap-2">
-                <Button
-                  variant={selectedUser?.role === 'user' ? 'default' : 'outline'}
-                  onClick={() => selectedUser && changeUserRole(selectedUser.id, 'user')}
-                  disabled={selectedUser?.role === 'user'}
-                >
-                  Make User
-                </Button>
-                <Button
-                  variant={selectedUser?.role === 'admin' ? 'default' : 'outline'}
-                  onClick={() => selectedUser && changeUserRole(selectedUser.id, 'admin')}
-                  disabled={selectedUser?.role === 'admin'}
-                >
-                  Make Admin
-                </Button>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsRoleChangeOpen(false)}>
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Role Change Dialog - Removed: Roles are now managed via Security & Access Control */}
 
         {/* Edit User Dialog */}
         <EditUserDialog

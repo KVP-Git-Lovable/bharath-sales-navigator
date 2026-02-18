@@ -51,15 +51,16 @@ serve(async (req) => {
       );
     }
 
-    // Check if user is admin
-    const { data: roleData, error: roleError } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
+    // Check if user has System Administrator security profile
+    const { data: profileData } = await supabaseAdmin
+      .from('user_profiles')
+      .select('profile_id, security_profiles(name)')
       .eq('user_id', user.id)
       .single();
 
-    if (roleError || roleData?.role !== 'admin') {
-      console.error('User is not admin');
+    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
+    if (!isSystemAdmin) {
+      console.error('User is not System Administrator');
       return new Response(
         JSON.stringify({ error: 'Unauthorized - Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

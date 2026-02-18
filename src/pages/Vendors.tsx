@@ -23,7 +23,8 @@ interface VendorRow {
 }
 
 const Vendors = () => {
-  const { userRole } = useAuth();
+  const { securityProfileName } = useAuth();
+  const isAdmin = securityProfileName === 'System Administrator';
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -42,7 +43,7 @@ const Vendors = () => {
   const load = async () => {
     setLoading(true);
     try {
-      if (userRole === 'admin') {
+      if (isAdmin) {
         // Admins can see full vendor data including contact information
         const { data } = await supabase
           .from('vendors')
@@ -103,7 +104,7 @@ const Vendors = () => {
 
   const toggleApproval = async (id: string, value: boolean) => {
     try {
-      if (userRole !== 'admin') return;
+      if (!isAdmin) return;
       const { error } = await supabase.from('vendors').update({ is_approved: value }).eq('id', id);
       if (error) throw error;
       setVendors(prev => prev.map(v => v.id === id ? { ...v, is_approved: value } as any : v));
@@ -117,7 +118,7 @@ const Vendors = () => {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Vendors</h1>
-          {userRole === 'admin' && (
+          {isAdmin && (
             <Button onClick={() => setOpen(true)}>Add Vendor</Button>
           )}
         </div>
@@ -131,7 +132,7 @@ const Vendors = () => {
               <TableHeader>
                  <TableRow>
                    <TableHead>Name</TableHead>
-                   {userRole === 'admin' && <TableHead>Contact</TableHead>}
+                   {isAdmin && <TableHead>Contact</TableHead>}
                    <TableHead>Skills</TableHead>
                    <TableHead>Pincodes</TableHead>
                    <TableHead>Approved</TableHead>
@@ -139,12 +140,12 @@ const Vendors = () => {
               </TableHeader>
               <TableBody>
                  {!loading && vendors.length === 0 && (
-                   <TableRow><TableCell colSpan={userRole === 'admin' ? 5 : 4} className="text-center text-muted-foreground">No vendors found</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={isAdmin ? 5 : 4} className="text-center text-muted-foreground">No vendors found</TableCell></TableRow>
                  )}
                  {vendors.map(v => (
                    <TableRow key={v.id}>
                      <TableCell className="font-medium">{v.name}</TableCell>
-                     {userRole === 'admin' && (
+                     {isAdmin && (
                        <TableCell className="text-sm text-muted-foreground">
                          <div>{v.contact_name || '-'}</div>
                          <div>{v.contact_phone || v.contact_email || '-'}</div>
@@ -154,7 +155,7 @@ const Vendors = () => {
                      <TableCell className="text-sm">{v.region_pincodes?.join(', ') || '-'}</TableCell>
                      <TableCell>
                        <div className="flex items-center gap-2">
-                         <Switch checked={v.is_approved} onCheckedChange={(val) => toggleApproval(v.id, val)} disabled={userRole !== 'admin'} />
+                         <Switch checked={v.is_approved} onCheckedChange={(val) => toggleApproval(v.id, val)} disabled={!isAdmin} />
                          <span className="text-sm text-muted-foreground">{v.is_approved ? 'Yes' : 'No'}</span>
                        </div>
                      </TableCell>

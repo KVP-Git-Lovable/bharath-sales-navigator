@@ -251,15 +251,14 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Check admin role or System Administrator profile
-    const [{ data: roleData }, { data: profileData }] = await Promise.all([
-      supabaseAdmin.from('user_roles').select('role').eq('user_id', caller.id).single(),
-      supabaseAdmin.from('user_profiles').select('profile_id, security_profiles!inner(name)')
-        .eq('user_id', caller.id).single(),
-    ])
+    // Check System Administrator security profile
+    const { data: profileData } = await supabaseAdmin
+      .from('user_profiles')
+      .select('profile_id, security_profiles!inner(name)')
+      .eq('user_id', caller.id)
+      .single()
 
-    const isAdmin = roleData?.role === 'admin' ||
-      (profileData as any)?.security_profiles?.name === 'System Administrator'
+    const isAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator'
 
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: 'Admin access required' }), {

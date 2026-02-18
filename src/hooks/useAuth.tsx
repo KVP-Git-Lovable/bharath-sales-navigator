@@ -347,10 +347,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (data.user) {
-      const userRole = await fetchUserRole(data.user.id);
+      // Check security profile for admin login validation
+      const secProfile = await fetchSecurityProfileName(data.user.id);
       
-      // Only check role if user explicitly selected admin login
-      if (role === 'admin' && userRole !== 'admin') {
+      // Only check profile if user explicitly selected admin login
+      if (role === 'admin' && secProfile !== 'System Administrator') {
         await supabase.auth.signOut();
         throw new Error(`Access denied. This account does not have admin privileges.`);
       }

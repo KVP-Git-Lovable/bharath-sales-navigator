@@ -69,7 +69,8 @@ interface CompetitorContact {
 
 export default function CompetitionMaster() {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  const { securityProfileName } = useAuth();
+  const isAdmin = securityProfileName === 'System Administrator';
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
   const [skus, setSKUs] = useState<CompetitorSKU[]>([]);
@@ -281,7 +282,7 @@ export default function CompetitionMaster() {
   };
 
   const handleDeleteCompetitor = async (id: string) => {
-    if (userRole !== 'admin') {
+    if (!isAdmin) {
       toast({ title: "Permission Denied", description: "Only admins can delete competitors", variant: "destructive" });
       return;
     }
@@ -357,7 +358,7 @@ export default function CompetitionMaster() {
   };
 
   const handleDeleteContact = async (id: string) => {
-    if (userRole !== 'admin') {
+    if (!isAdmin) {
       toast({ title: "Permission Denied", description: "Only admins can delete contacts", variant: "destructive" });
       return;
     }
@@ -484,7 +485,7 @@ export default function CompetitionMaster() {
                         }}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        {userRole === 'admin' && <Button variant="outline" size="sm" onClick={() => handleDeleteCompetitor(competitor.id)}><Trash2 className="h-4 w-4" /></Button>}
+                        {isAdmin && <Button variant="outline" size="sm" onClick={() => handleDeleteCompetitor(competitor.id)}><Trash2 className="h-4 w-4" /></Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -534,7 +535,7 @@ export default function CompetitionMaster() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      {userRole === 'admin' && (
+                      {isAdmin && (
                         <Button 
                           variant="outline" 
                           size="sm" 

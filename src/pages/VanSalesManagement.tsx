@@ -92,7 +92,7 @@ interface OpeningGRNEdit {
 export default function VanSalesManagement() {
   const navigate = useNavigate();
   const { hasAdminAccess } = useAdminAccess();
-  const { userRole, user } = useAuth();
+  const { securityProfileName, user } = useAuth();
   const [vans, setVans] = useState<Van[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +111,7 @@ export default function VanSalesManagement() {
   const filteredVanStockSummaries = useMemo(() => {
     if (selectedUserId === 'all') {
       // For admin or manager viewing all, show all or subordinates only
-      if (isManager && !userRole?.includes('admin')) {
+      if (isManager && securityProfileName !== 'System Administrator') {
         return vanStockSummaries.filter(s => 
           s.user_id === user?.id || subordinateIds.includes(s.user_id)
         );
@@ -122,7 +122,7 @@ export default function VanSalesManagement() {
       return vanStockSummaries.filter(s => s.user_id === user?.id);
     }
     return vanStockSummaries.filter(s => s.user_id === selectedUserId);
-  }, [vanStockSummaries, selectedUserId, user?.id, subordinateIds, isManager, userRole]);
+  }, [vanStockSummaries, selectedUserId, user?.id, subordinateIds, isManager, securityProfileName]);
   
   const [formData, setFormData] = useState({
     registration_number: '',
@@ -765,7 +765,7 @@ export default function VanSalesManagement() {
                       All users' van stock - Real-time updates from My Visits
                     </CardDescription>
                   </div>
-                  {(isManager || userRole === 'admin') && (
+                  {(isManager || securityProfileName === 'System Administrator') && (
                     <UserSelector
                       selectedUserId={selectedUserId}
                       onUserChange={setSelectedUserId}

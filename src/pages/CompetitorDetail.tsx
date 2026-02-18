@@ -64,7 +64,8 @@ interface CompetitorContact {
 export default function CompetitorDetail() {
   const navigate = useNavigate();
   const { competitorId } = useParams();
-  const { userRole } = useAuth();
+  const { securityProfileName } = useAuth();
+  const isAdmin = securityProfileName === 'System Administrator';
   const [competitor, setCompetitor] = useState<Competitor | null>(null);
   const [skus, setSKUs] = useState<CompetitorSKU[]>([]);
   const [contacts, setContacts] = useState<CompetitorContact[]>([]);
@@ -192,7 +193,7 @@ export default function CompetitorDetail() {
   };
 
   const handleDeleteContact = async (id: string) => {
-    if (userRole !== 'admin') {
+    if (!isAdmin) {
       toast({ title: "Permission Denied", description: "Only admins can delete contacts", variant: "destructive" });
       return;
     }
@@ -456,7 +457,7 @@ export default function CompetitorDetail() {
                         <Button variant="ghost" size="sm" onClick={() => { setContactForm(contact); setIsEditingContact(true); setIsContactDialogOpen(true); }}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        {userRole === 'admin' && (
+                        {isAdmin && (
                           <Button variant="ghost" size="sm" onClick={() => handleDeleteContact(contact.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -492,7 +493,7 @@ export default function CompetitorDetail() {
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    {userRole === 'admin' && (
+                    {isAdmin && (
                       <Button variant="outline" size="sm" onClick={() => handleDeleteContact(contact.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>

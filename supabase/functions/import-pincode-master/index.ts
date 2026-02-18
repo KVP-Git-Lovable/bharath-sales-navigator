@@ -53,15 +53,15 @@
        );
      }
  
-     // Check admin role
-     const { data: roleData } = await supabase
-       .from('user_roles')
-       .select('role')
+     // Check System Administrator security profile
+     const { data: profileData } = await supabase
+       .from('user_profiles')
+       .select('profile_id, security_profiles(name)')
        .eq('user_id', userData.user.id)
-       .eq('role', 'admin')
        .single();
  
-     if (!roleData) {
+     const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
+     if (!isSystemAdmin) {
        return new Response(
          JSON.stringify({ error: 'Admin access required' }),
          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
