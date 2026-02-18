@@ -140,7 +140,6 @@ const LeaveBalancesManager = () => {
         leave_type_id: string;
         opening_balance: number;
         used_balance: number;
-        remaining_balance: number;
         year: number;
       }> = [];
 
@@ -152,8 +151,9 @@ const LeaveBalancesManager = () => {
             leave_type_id: policy.leave_type_id,
             opening_balance: policy.yearly_entitlement,
             used_balance: 0,
-            remaining_balance: policy.yearly_entitlement,
             year,
+            // NOTE: remaining_balance is a GENERATED column (opening_balance - used_balance)
+            // and must NOT be included in insert/update payloads
           });
         }
       }
