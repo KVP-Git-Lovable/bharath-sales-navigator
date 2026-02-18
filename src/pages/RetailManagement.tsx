@@ -265,7 +265,9 @@ export default function RetailManagement() {
       
       const { error: uploadError } = await supabase.storage
         .from('retailer-photos')
-        .upload(fileName, compressedBlob);
+        .upload(fileName, compressedBlob, {
+          contentType: 'image/jpeg'
+        });
 
       if (uploadError) throw uploadError;
 
