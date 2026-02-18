@@ -5,14 +5,15 @@ import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Shield, Lock, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, Shield, Lock, Loader2, Users, UserCog } from 'lucide-react';
 import { RolePermissionsTab } from '@/components/security/RolePermissionsTab';
 import { PermissionSetGroupsTab } from '@/components/security/PermissionSetGroupsTab';
+import { ProfileManagement } from '@/components/security/ProfileManagement';
 
 export default function SecurityManagement() {
   const navigate = useNavigate();
   const { userRole, securityProfileName, loading, user } = useAuth();
-  const [activeTab, setActiveTab] = useState('role-permissions');
+  const [activeTab, setActiveTab] = useState('profiles');
 
   // Check if user has admin access - via System Administrator security profile
   const hasAdminAccess = securityProfileName === 'System Administrator';
@@ -88,6 +89,10 @@ export default function SecurityManagement() {
         {/* Permission Set Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
+            <TabsTrigger value="profiles" className="flex items-center gap-2">
+              <UserCog className="h-4 w-4" />
+              Profiles
+            </TabsTrigger>
             <TabsTrigger value="role-permissions" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Role Permissions
@@ -97,6 +102,10 @@ export default function SecurityManagement() {
               Permission Set Groups
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="profiles" className="mt-6">
+            <ProfileManagement />
+          </TabsContent>
 
           <TabsContent value="role-permissions" className="mt-6">
             <div className="bg-card border rounded-xl p-6">
