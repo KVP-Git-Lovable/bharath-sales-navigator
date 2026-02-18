@@ -136,19 +136,9 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
   } = useQuery({
     queryKey: ['week-off-config'],
     queryFn: async () => {
-      // Check if cache is fresh (less than 6 hours old)
-      try {
-        const cachedAt = localStorage.getItem('week_off_config_cached_at');
-        if (cachedAt) {
-          const age = Date.now() - parseInt(cachedAt);
-          if (age < 6 * 60 * 60 * 1000) {
-            return cachedWeekOffSync;
-          }
-        }
-      } catch (e) {}
+      const DEFAULT_WEEK_OFF: WeekOffConfig[] = [{ id: 'default', day_of_week: 0, is_off: true, alternate_pattern: 'all' }];
 
-      // Fetch from network if online and cache is stale
-      if (!isOnline) return cachedWeekOffSync;
+      if (!isOnline) return cachedWeekOffSync.length > 0 ? cachedWeekOffSync : DEFAULT_WEEK_OFF;
 
       const { data, error } = await supabase
         .from('week_off_config')
@@ -156,21 +146,19 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
       if (error) throw error;
 
-      // Cache for future instant loads
       if (data && data.length > 0) {
         localStorage.setItem('week_off_config', JSON.stringify(data));
         localStorage.setItem('week_off_config_cached_at', Date.now().toString());
         return data;
       }
 
-      // If table is empty, return default (Sunday off)
-      return cachedWeekOffSync;
+      // Table is empty — always use hardcoded default (Sunday off)
+      return DEFAULT_WEEK_OFF;
     },
     placeholderData: cachedWeekOffSync,
-    staleTime: 6 * 60 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
   });
 
   // Load holidays with correct column name (holiday_name)
@@ -181,19 +169,7 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
     queryKey: ['holidays', start, end],
     queryFn: async () => {
       const cacheKey = `holidays_${start}_${end}`;
-      
-      // Check if cache is fresh
-      try {
-        const cachedAt = localStorage.getItem(`${cacheKey}_cached_at`);
-        if (cachedAt) {
-          const age = Date.now() - parseInt(cachedAt);
-          if (age < 6 * 60 * 60 * 1000) {
-            return cachedHolidaysSync;
-          }
-        }
-      } catch (e) {}
 
-      // Fetch from network if online
       if (!isOnline) return cachedHolidaysSync;
 
       const { data, error } = await supabase
@@ -204,7 +180,6 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
       if (error) throw error;
 
-      // Cache for instant loads
       if (data) {
         localStorage.setItem(cacheKey, JSON.stringify(data));
         localStorage.setItem(`${cacheKey}_cached_at`, Date.now().toString());
@@ -213,10 +188,9 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
       return data || cachedHolidaysSync;
     },
     placeholderData: cachedHolidaysSync.length > 0 ? cachedHolidaysSync : undefined,
-    staleTime: 6 * 60 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
   });
 
   // Load admin-saved working_days_config as source of truth
