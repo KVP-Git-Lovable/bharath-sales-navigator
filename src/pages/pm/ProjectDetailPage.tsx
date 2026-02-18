@@ -1,0 +1,188 @@
+import { useState, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Layout } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  useProject, useTasks, useSprints, useMilestones, useRisks,
+  useUpdateTask, useDeleteTask, Task, TaskStatus
+} from "@/hooks/useProjects";
+import { CreateTaskModal } from "@/components/pm/CreateTaskModal";
+import { GanttChart } from "@/components/pm/GanttChart";
+import { KanbanBoard } from "@/components/pm/KanbanBoard";
+import { BacklogView } from "@/components/pm/BacklogView";
+import { RisksPanel } from "@/components/pm/RisksPanel";
+import { MilestonesPanel } from "@/components/pm/MilestonesPanel";
+import { SprintsPanel } from "@/components/pm/SprintsPanel";
+import { ProjectOverview } from "@/components/pm/ProjectOverview";
+import {
+  ArrowLeft, Plus, Kanban, List, BarChart3, Flag,
+  AlertTriangle, Layers, Grid, FolderOpen
+} from "lucide-react";
+
+export default function ProjectDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { data: project, isLoading: loadingProject } = useProject(id!);
+  const { data: tasks = [] } = useTasks(id!);
+  const { data: sprints = [] } = useSprints(id!);
+  const { data: milestones = [] } = useMilestones(id!);
+  const { data: risks = [] } = useRisks(id!);
+  const updateTask = useUpdateTask();
+  const [tab, setTab] = useState("board");
+  const [showCreateTask, setShowCreateTask] = useState(false);
+
+  const taskStats = useMemo(() => ({
+    total: tasks.length,
+    todo: tasks.filter(t => t.status === "todo").length,
+    in_progress: tasks.filter(t => t.status === "in_progress").length,
+    done: tasks.filter(t => t.status === "done").length,
+    backlog: tasks.filter(t => t.status === "backlog").length,
+  }), [tasks]);
+
+  const progress = taskStats.total > 0
+    ? Math.round((taskStats.done / taskStats.total) * 100)
+    : 0;
+
+  if (loadingProject) {
+    return (
+      <Layout>
+        <div className="p-6 space-y-4">
+          <div className="h-8 bg-muted animate-pulse rounded w-48" />
+          <div className="h-32 bg-muted animate-pulse rounded" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!project) {
+    return (
+      <Layout>
+        <div className="p-6 text-center">
+          <p className="text-muted-foreground">Project not found.</p>
+          <Button variant="outline" onClick={() => navigate("/projects")} className="mt-4">Back to Projects</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Project Header */}
+        <div className="border-b bg-card px-6 py-4 flex-shrink-0">
+          <button
+            onClick={() => navigate("/projects")}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> All Projects
+          </button>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold text-foreground truncate">{project.name}</h1>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{project.description}</p>
+                )}
+              </div>
+            </div>
+            <Button onClick={() => setShowCreateTask(true)} size="sm" className="gap-2 flex-shrink-0">
+              <Plus className="w-4 h-4" /> Add Task
+            </Button>
+          </div>
+
+          {/* Mini stats */}
+          <div className="flex items-center gap-4 mt-3">
+            <div className="flex gap-3 text-xs text-muted-foreground">
+              <span>{taskStats.total} tasks</span>
+              <span className="text-amber-600">{taskStats.in_progress} in progress</span>
+              <span className="text-green-600">{taskStats.done} done</span>
+              {risks.filter(r => r.status === "open").length > 0 && (
+                <span className="text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {risks.filter(r => r.status === "open").length} risks
+                </span>
+              )}
+            </div>
+            <div className="flex-1 max-w-48">
+              <Progress value={progress} className="h-1.5" />
+            </div>
+            <span className="text-xs text-muted-foreground">{progress}%</span>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex-1 overflow-hidden">
+          <Tabs value={tab} onValueChange={setTab} className="h-full flex flex-col">
+            <div className="border-b bg-card px-6">
+              <TabsList className="h-9 bg-transparent gap-0 p-0">
+                {[
+                  { value: "board", label: "Board", icon: Kanban },
+                  { value: "backlog", label: "Backlog", icon: List },
+                  { value: "gantt", label: "Gantt", icon: BarChart3 },
+                  { value: "sprints", label: "Sprints", icon: Layers },
+                  { value: "milestones", label: "Milestones", icon: Flag },
+                  { value: "risks", label: "Risks", icon: AlertTriangle },
+                  { value: "overview", label: "Overview", icon: Grid },
+                ].map(({ value, label, icon: Icon }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent h-9 px-3 text-sm gap-1.5"
+                  >
+                    <Icon className="w-3.5 h-3.5" /> {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <TabsContent value="board" className="mt-0 h-full">
+                <KanbanBoard
+                  tasks={tasks}
+                  onUpdateTask={(id, status) => updateTask.mutate({ id, status })}
+                  onAddTask={(status) => setShowCreateTask(true)}
+                  projectId={project.id}
+                  sprints={sprints}
+                  milestones={milestones}
+                />
+              </TabsContent>
+              <TabsContent value="backlog" className="mt-0 p-6">
+                <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} />
+              </TabsContent>
+              <TabsContent value="gantt" className="mt-0 p-4">
+                <GanttChart tasks={tasks} project={project} milestones={milestones} />
+              </TabsContent>
+              <TabsContent value="sprints" className="mt-0 p-6">
+                <SprintsPanel projectId={project.id} sprints={sprints} tasks={tasks} />
+              </TabsContent>
+              <TabsContent value="milestones" className="mt-0 p-6">
+                <MilestonesPanel projectId={project.id} milestones={milestones} tasks={tasks} />
+              </TabsContent>
+              <TabsContent value="risks" className="mt-0 p-6">
+                <RisksPanel projectId={project.id} risks={risks} />
+              </TabsContent>
+              <TabsContent value="overview" className="mt-0 p-6">
+                <ProjectOverview project={project} tasks={tasks} sprints={sprints} milestones={milestones} risks={risks} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+      </div>
+
+      <CreateTaskModal
+        open={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        projectId={project.id}
+        sprints={sprints}
+        milestones={milestones}
+      />
+    </Layout>
+  );
+}
