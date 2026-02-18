@@ -1373,6 +1373,15 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
             orders: snapshot.orders || [],
             timestamp: Date.now()
           });
+          
+          // CRITICAL FIX: Also trigger background network sync after loading snapshot
+          // Snapshot may be stale (e.g., visit was just created but snapshot was saved before)
+          // Without this, newly added visits disappear because stale snapshot overwrites fresh data
+          if (navigator.onLine && !isSlowConnection() && isToday(currentDate)) {
+            // Clear sync timestamp to force re-sync
+            lastSyncTimeRef.current.delete(currentDate);
+            setTimeout(() => smartDeltaSync(currentUserId, currentDate), 300);
+          }
           return;
         } else {
           console.log('[LocalEvent] No snapshot found - will trigger network sync');
