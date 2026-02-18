@@ -9,12 +9,23 @@ interface WeekOffConfig {
   id: string;
   day_of_week: number;
   is_off: boolean;
+  alternate_pattern: string | null; // 'all' | '1st_3rd' | '2nd_4th' | null
 }
 
 interface Holiday {
   id: string;
   date: string;
-  name: string;
+  holiday_name: string;
+}
+
+interface WorkingDaysConfig {
+  id: string;
+  year: number;
+  month: number;
+  total_days: number;
+  working_days: number;
+  week_offs: number;
+  holidays: number;
 }
 
 // Helper to get date range based on filter
@@ -47,6 +58,33 @@ const getDateRange = (dateFilter: string) => {
   };
 };
 
+// Check if a specific date is a week-off based on alternate_pattern
+const isWeekOffDate = (date: Date, weekOffConfigs: WeekOffConfig[]): boolean => {
+  const dayOfWeek = date.getDay();
+  const dayConfig = weekOffConfigs.filter(c => c.day_of_week === dayOfWeek && c.is_off);
+
+  for (const config of dayConfig) {
+    const pattern = config.alternate_pattern || 'all';
+
+    if (pattern === 'all') {
+      return true;
+    }
+
+    // Calculate which occurrence of this weekday in the month (1st, 2nd, 3rd, 4th)
+    const dayOfMonth = date.getDate();
+    const weekNumber = Math.ceil(dayOfMonth / 7);
+
+    if (pattern === '1st_3rd' && (weekNumber === 1 || weekNumber === 3)) {
+      return true;
+    }
+    if (pattern === '2nd_4th' && (weekNumber === 2 || weekNumber === 4)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 // Synchronous cache loaders for instant UI display
 const getCachedWeekOffSync = (): WeekOffConfig[] => {
   try {
@@ -57,7 +95,7 @@ const getCachedWeekOffSync = (): WeekOffConfig[] => {
     }
   } catch (e) {}
   // Default: Sunday off
-  return [{ id: 'default', day_of_week: 0, is_off: true }];
+  return [{ id: 'default', day_of_week: 0, is_off: true, alternate_pattern: 'all' }];
 };
 
 const getCachedHolidaysSync = (start: string, end: string): Holiday[] => {
@@ -75,13 +113,17 @@ const getCachedHolidaysSync = (start: string, end: string): Holiday[] => {
 /**
  * Hook for caching week-off configuration and holidays
  * Uses localStorage for INSTANT synchronous loading
- * These rarely change, so we cache aggressively (6 hours)
+ * Reads from working_days_config (admin-saved) as source of truth with fallback to calculation
  */
 export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
   const connectivityStatus = useConnectivity();
   const isOnline = connectivityStatus === 'online';
 
   const { start, end, startDate, endDate } = getDateRange(dateFilter);
+
+  // Determine month/year for working_days_config lookup
+  const targetMonth = startDate.getMonth() + 1;
+  const targetYear = startDate.getFullYear();
 
   // INSTANT: Synchronous cache load
   const cachedWeekOffSync = useMemo(() => getCachedWeekOffSync(), []);
@@ -110,26 +152,28 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
       const { data, error } = await supabase
         .from('week_off_config')
-        .select('id, day_of_week, is_off');
+        .select('id, day_of_week, is_off, alternate_pattern');
 
       if (error) throw error;
 
       // Cache for future instant loads
-      if (data) {
+      if (data && data.length > 0) {
         localStorage.setItem('week_off_config', JSON.stringify(data));
         localStorage.setItem('week_off_config_cached_at', Date.now().toString());
+        return data;
       }
 
-      return data || cachedWeekOffSync;
+      // If table is empty, return default (Sunday off)
+      return cachedWeekOffSync;
     },
     placeholderData: cachedWeekOffSync,
-    staleTime: 6 * 60 * 60 * 1000, // 6 hours
+    staleTime: 6 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
 
-  // Load holidays with instant placeholder
+  // Load holidays with correct column name (holiday_name)
   const {
     data: holidays = cachedHolidaysSync,
     isLoading: isLoadingHolidays
@@ -154,7 +198,7 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
 
       const { data, error } = await supabase
         .from('holidays')
-        .select('id, date, name')
+        .select('id, date, holiday_name')
         .gte('date', start)
         .lte('date', end);
 
@@ -175,12 +219,40 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
     refetchOnMount: false,
   });
 
-  // Computed: Set of week-off days (0=Sunday, 1=Monday, etc.)
+  // Load admin-saved working_days_config as source of truth
+  const { data: savedConfig } = useQuery({
+    queryKey: ['working-days-config', targetYear, targetMonth],
+    queryFn: async () => {
+      if (!isOnline) return null;
+
+      const { data, error } = await supabase
+        .from('working_days_config')
+        .select('*')
+        .eq('year', targetYear)
+        .eq('month', targetMonth)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[WorkingDays] Error fetching saved config:', error);
+        return null;
+      }
+
+      return data as WorkingDaysConfig | null;
+    },
+    staleTime: 6 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Computed: Set of week-off days (simple check for backward compat)
   const weekOffDays = useMemo(() => {
     const days = new Set<number>();
-    weekOffConfig.filter(c => c.is_off).forEach(c => days.add(c.day_of_week));
-    // Default to Sunday if no config
-    if (days.size === 0) days.add(0);
+    weekOffConfig.filter(c => c.is_off && (!c.alternate_pattern || c.alternate_pattern === 'all'))
+      .forEach(c => days.add(c.day_of_week));
+    // Default to Sunday if no config at all
+    if (weekOffConfig.length === 0 || (weekOffConfig.length === 1 && weekOffConfig[0].id === 'default')) {
+      days.add(0);
+    }
     return days;
   }, [weekOffConfig]);
 
@@ -190,56 +262,69 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
   }, [holidays]);
 
   // Calculate working days stats for the period
+  // Uses savedConfig (admin source of truth) when available, falls back to calculation
   const workingDaysStats = useMemo(() => {
     const now = new Date();
     const currentDate = now.getDate();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
 
     let totalWorkingDays = 0;
     let elapsedWorkingDays = 0;
     const elapsedWorkingDates: string[] = [];
 
     if (dateFilter === 'current-week') {
-      // Week view
+      // Week view — always calculate (no saved config for weeks)
       const dayOfWeek = now.getDay();
-      elapsedWorkingDays = dayOfWeek === 0 ? 6 : dayOfWeek;
-      totalWorkingDays = 6;
-
       const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      for (let i = 0; i < 6 && i < dayOfWeek; i++) {
+
+      // Calculate total working days in the week
+      for (let i = 0; i < 7; i++) {
         const date = new Date(weekStart);
         date.setDate(weekStart.getDate() + i);
         const dateStr = format(date, 'yyyy-MM-dd');
-        elapsedWorkingDates.push(dateStr);
+        if (!isWeekOffDate(date, weekOffConfig) && !holidayDates.has(dateStr)) {
+          totalWorkingDays++;
+        }
       }
-    } else {
-      // Month view - calculate based on config
-      const todayDate = dateFilter === 'current-month' ? currentDate : endDate.getDate();
-      const targetYear = dateFilter === 'current-month' ? year : endDate.getFullYear();
-      const targetMonth = dateFilter === 'current-month' ? month : endDate.getMonth() + 1;
 
-      // Calculate elapsed working days (from 1st to today or end of period)
-      for (let day = 1; day <= todayDate; day++) {
-        const date = new Date(targetYear, targetMonth - 1, day);
-        const dayOfWeek = date.getDay();
+      // Calculate elapsed working days
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        if (date > now) break;
         const dateStr = format(date, 'yyyy-MM-dd');
-
-        if (!weekOffDays.has(dayOfWeek) && !holidayDates.has(dateStr)) {
+        if (!isWeekOffDate(date, weekOffConfig) && !holidayDates.has(dateStr)) {
           elapsedWorkingDays++;
           elapsedWorkingDates.push(dateStr);
         }
       }
+    } else {
+      // Month view — use saved config for totalWorkingDays if available
+      if (savedConfig) {
+        totalWorkingDays = savedConfig.working_days;
+        console.log(`[WorkingDays] ✅ Using admin-saved config: ${totalWorkingDays} working days for ${targetYear}-${targetMonth}`);
+      } else {
+        // Fallback: calculate total working days for the entire month
+        const daysInMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate();
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(endDate.getFullYear(), endDate.getMonth(), day);
+          const dateStr = format(date, 'yyyy-MM-dd');
+          if (!isWeekOffDate(date, weekOffConfig) && !holidayDates.has(dateStr)) {
+            totalWorkingDays++;
+          }
+        }
+      }
 
-      // Calculate total working days for the entire month
-      const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(targetYear, targetMonth - 1, day);
-        const dayOfWeek = date.getDay();
+      // Always calculate elapsed working days (up to today or end of period)
+      const todayDate = dateFilter === 'current-month'
+        ? Math.min(currentDate, new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate())
+        : new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate();
+
+      for (let day = 1; day <= todayDate; day++) {
+        const date = new Date(startDate.getFullYear(), startDate.getMonth(), day);
         const dateStr = format(date, 'yyyy-MM-dd');
-
-        if (!weekOffDays.has(dayOfWeek) && !holidayDates.has(dateStr)) {
-          totalWorkingDays++;
+        if (!isWeekOffDate(date, weekOffConfig) && !holidayDates.has(dateStr)) {
+          elapsedWorkingDays++;
+          elapsedWorkingDates.push(dateStr);
         }
       }
     }
@@ -249,7 +334,7 @@ export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
       elapsedWorkingDays,
       elapsedWorkingDates,
     };
-  }, [dateFilter, weekOffDays, holidayDates, startDate, endDate]);
+  }, [dateFilter, weekOffConfig, holidayDates, startDate, endDate, savedConfig, targetYear, targetMonth]);
 
   return {
     // Raw data
