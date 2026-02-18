@@ -9,7 +9,8 @@ import { NetworkBadge } from "@/components/NetworkBadge";
 import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { NotificationBell } from "@/components/NotificationBell";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SignedAvatarImage } from "@/components/ui/signed-image";
 import { useTranslation } from 'react-i18next';
 import { useActivePerformanceModule } from "@/hooks/useActivePerformanceModule";
 import { usePackingListModule, useDeliveryAgentApp } from "@/hooks/useD1Delivery";
@@ -248,7 +249,7 @@ export const Navbar = memo(() => {
                 className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               >
                 <Avatar className="h-12 w-12 border-2 border-primary-foreground/30">
-                  <AvatarImage src={userProfile?.profile_picture_url || ""} />
+                  <SignedAvatarImage src={userProfile?.profile_picture_url || ""} />
                   <AvatarFallback className="bg-primary-foreground/20 text-primary-foreground">
                     {userInitials}
                   </AvatarFallback>

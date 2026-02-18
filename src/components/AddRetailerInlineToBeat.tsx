@@ -272,7 +272,8 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
             .from('retailer-photos')
             .upload(fileName, compressedFile, {
               cacheControl: '3600',
-              upsert: false
+              upsert: false,
+              contentType: 'image/jpeg'
             });
 
           if (error) throw error;
