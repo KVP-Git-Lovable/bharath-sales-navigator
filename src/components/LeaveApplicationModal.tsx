@@ -23,11 +23,13 @@ interface LeaveType {
 interface LeaveApplicationModalProps {
   trigger?: React.ReactNode;
   onApplicationSubmitted?: () => void;
+  defaultLeaveTypeId?: string;
 }
 
 const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({ 
   trigger, 
-  onApplicationSubmitted 
+  onApplicationSubmitted,
+  defaultLeaveTypeId 
 }) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -35,11 +37,18 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   
   // Form state
-  const [leaveTypeId, setLeaveTypeId] = useState('');
+  const [leaveTypeId, setLeaveTypeId] = useState(defaultLeaveTypeId || '');
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [reason, setReason] = useState('');
   const [leaveDay, setLeaveDay] = useState<'full' | 'half'>('full');
+
+  // Update leaveTypeId when defaultLeaveTypeId changes
+  useEffect(() => {
+    if (defaultLeaveTypeId) {
+      setLeaveTypeId(defaultLeaveTypeId);
+    }
+  }, [defaultLeaveTypeId]);
 
   useEffect(() => {
     console.log('LeaveApplicationModal opened:', isOpen);

@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import HolidayList from '@/components/HolidayList';
 import LeaveApplicationModal from '@/components/LeaveApplicationModal';
 import MyLeaveApplications from '@/components/MyLeaveApplications';
+import LeaveBalanceCards from '@/components/LeaveBalanceCards';
 import { useGPSTrackingOptimized } from '@/hooks/useGPSTrackingOptimized';
 import { JourneyMap } from '@/components/JourneyMap';
 import { TimelineView } from '@/components/TimelineView';
@@ -1464,19 +1465,10 @@ const Attendance = () => {
 
             <TabsContent value="leave">
               <div className="space-y-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Leave Management</CardTitle>
-                    <LeaveApplicationModal 
-                      onApplicationSubmitted={() => setLeaveRefreshTrigger(prev => prev + 1)}
-                    />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground">
-                      Apply for leave and track your applications below.
-                    </div>
-                  </CardContent>
-                </Card>
+                <LeaveBalanceCards 
+                  refreshTrigger={leaveRefreshTrigger}
+                  onApplicationSubmitted={() => setLeaveRefreshTrigger(prev => prev + 1)}
+                />
                 
                 <MyLeaveApplications refreshTrigger={leaveRefreshTrigger} />
               </div>
