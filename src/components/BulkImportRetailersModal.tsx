@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface BulkImportRetailersModalProps {
@@ -42,6 +42,16 @@ export const BulkImportRetailersModal = ({ open, onOpenChange, onSuccess }: Bulk
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRetailer[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([REQUIRED_COLUMNS]);
+    // Set column widths
+    ws['!cols'] = REQUIRED_COLUMNS.map(col => ({ wch: Math.max(col.length + 5, 18) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Retailers");
+    XLSX.writeFile(wb, "Retailer_Import_Template.xlsx");
+    toast({ title: "Template downloaded", description: "Fill in the data and upload it back here." });
+  };
 
   const normalizeColumnName = (col: string): string => {
     return col.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -295,6 +305,10 @@ export const BulkImportRetailersModal = ({ open, onOpenChange, onSuccess }: Bulk
                     <li key={col}>{col}</li>
                   ))}
                 </ul>
+                <Button variant="outline" size="sm" className="mt-3" onClick={handleDownloadTemplate}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Template
+                </Button>
               </div>
             </div>
           </div>
