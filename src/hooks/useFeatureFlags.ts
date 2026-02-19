@@ -132,8 +132,9 @@ export const useFeatureFlags = () => {
     // Step 2: Admin bypass - show all globally enabled modules
     if (isFullAdmin) return true;
 
-    // Step 3: If user has no permissions loaded (no security profile), show all
-    if (permissions.length === 0) return true;
+    // Step 3: Distinguish between "no profile assigned" and "profile with 0 permissions"
+    if (!securityProfileName) return true;  // No profile assigned = show all (backward compat)
+    if (permissions.length === 0) return false; // Profile assigned but no permissions = hide all
 
     // Step 4: Check permission prefix
     const prefix = NAV_ITEM_PERMISSION_PREFIX[navItemId];
