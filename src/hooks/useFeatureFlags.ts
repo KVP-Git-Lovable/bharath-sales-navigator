@@ -55,6 +55,8 @@ export const NAV_ITEM_PERMISSION_PREFIX: Record<string, string> = {
   'my-deliveries': 'delivery_',
   'my-competency': 'competency_',
   'recycle-bin': 'recycle_',
+  'tax-master': 'tax_master_',
+  'user-management': 'user_mgmt_',
 };
 
 interface FeatureFlag {

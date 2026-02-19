@@ -597,6 +597,31 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       { name: 'competency_team', label: 'Team Competency' },
     ]
   },
+  {
+    name: 'tax_master',
+    label: 'Tax Master',
+    features: [
+      { name: 'tax_master_list', label: 'View Tax Masters' },
+      { name: 'tax_master_create', label: 'Create Tax Master' },
+      { name: 'tax_master_edit', label: 'Edit Tax Master' },
+      { name: 'tax_master_delete', label: 'Delete Tax Master' },
+      { name: 'tax_component_manage', label: 'Manage Tax Components' },
+      { name: 'tax_product_mapping', label: 'Product Tax Mapping' },
+    ]
+  },
+  {
+    name: 'user_management',
+    label: 'User Management',
+    features: [
+      { name: 'user_mgmt_list', label: 'User List' },
+      { name: 'user_mgmt_create', label: 'Create User' },
+      { name: 'user_mgmt_edit', label: 'Edit User' },
+      { name: 'user_mgmt_delete', label: 'Delete User' },
+      { name: 'user_mgmt_activate_deactivate', label: 'Activate / Deactivate' },
+      { name: 'user_mgmt_reset_password', label: 'Reset Password' },
+      { name: 'user_mgmt_hierarchy', label: 'Hierarchy Management' },
+    ]
+  },
 ];
 
 export const PERMISSION_FIELDS = [
