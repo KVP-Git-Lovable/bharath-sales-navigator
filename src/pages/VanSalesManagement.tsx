@@ -93,7 +93,7 @@ interface OpeningGRNEdit {
 export default function VanSalesManagement() {
   const navigate = useNavigate();
   const { hasAdminAccess } = useAdminAccess();
-  const { securityProfileName, user } = useAuth();
+  const { user } = useAuth();
   const [vans, setVans] = useState<Van[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -769,7 +769,7 @@ export default function VanSalesManagement() {
                       All users' van stock - Real-time updates from My Visits
                     </CardDescription>
                   </div>
-                  {(isManager || securityProfileName === 'System Administrator') && (
+                  {(isManager || canViewAll) && (
                     <UserSelector
                       selectedUserId={selectedUserId}
                       onUserChange={setSelectedUserId}
