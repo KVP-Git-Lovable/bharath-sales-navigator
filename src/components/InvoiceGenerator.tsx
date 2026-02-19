@@ -6,7 +6,7 @@ import autoTable from "jspdf-autotable";
 import { downloadPDF } from "@/utils/fileDownloader";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getSignedStorageUrl } from "@/utils/storageUtils";
+
 
 interface InvoiceItem {
   product_name: string;
@@ -101,8 +101,7 @@ export const InvoiceGenerator = ({ orderId, className }: InvoiceGeneratorProps) 
       // Add company logo if available
       if (company?.logo_url) {
         try {
-          const signedLogoUrl = await getSignedStorageUrl(company.logo_url);
-          const response = await fetch(signedLogoUrl);
+          const response = await fetch(company.logo_url);
           const blob = await response.blob();
           const reader = new FileReader();
           await new Promise((resolve) => {

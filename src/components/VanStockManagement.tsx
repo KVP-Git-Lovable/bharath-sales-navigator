@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { getSignedStorageUrl } from '@/utils/storageUtils';
+
 import { Truck, Package, ShoppingCart, TrendingDown, Plus, Eye, Trash2, Check, ChevronsUpDown, Download, Edit, FileText, FileSpreadsheet, Printer, ChevronDown, History, RefreshCw, ClipboardCheck } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -1308,8 +1308,7 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
       // Company Logo
       if (company.logo_url) {
         try {
-          const signedLogoUrl = await getSignedStorageUrl(company.logo_url);
-          const logoResponse = await fetch(signedLogoUrl);
+          const logoResponse = await fetch(company.logo_url);
           const logoBlob = await logoResponse.blob();
           const logoBase64 = await new Promise<string>((resolve) => {
             const reader = new FileReader();
