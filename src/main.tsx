@@ -71,4 +71,12 @@ console.log('✅ App rendered successfully');
   } catch (error) {
     console.warn('⚠️ Download notifications init failed:', error);
   }
+
+  try {
+    // Initialize Firebase Crashlytics for native apps
+    const { initCrashlytics } = await import('./utils/crashlytics');
+    await initCrashlytics();
+  } catch (error) {
+    console.warn('⚠️ Crashlytics init failed:', error);
+  }
 })();
