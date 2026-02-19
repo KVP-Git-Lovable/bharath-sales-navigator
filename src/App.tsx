@@ -19,6 +19,7 @@ import { NetworkProvider } from "@/contexts/NetworkContext";
 import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import ForcedPasswordChangeDialog from "@/components/auth/ForcedPasswordChangeDialog";
+import { useActivityTracker } from "@/hooks/useActivityTracker";
 
 // Initialize visit status cache early to avoid flicker
 visitStatusCache.init();
@@ -269,6 +270,7 @@ const App = () => {
 
 const AppContent = ({ hasError }: { hasError: boolean }) => {
   useAndroidBackButton();
+  useActivityTracker();
   const { user, mustChangePassword, onPasswordChanged, dismissPasswordChange } = useAuth();
 
   if (hasError) {

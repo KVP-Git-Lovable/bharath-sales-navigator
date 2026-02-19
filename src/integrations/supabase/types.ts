@@ -12356,6 +12356,41 @@ export type Database = {
           },
         ]
       }
+      user_data_usage: {
+        Row: {
+          bytes_downloaded: number | null
+          bytes_uploaded: number | null
+          id: string
+          recorded_at: string | null
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          bytes_downloaded?: number | null
+          bytes_uploaded?: number | null
+          id?: string
+          recorded_at?: string | null
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          bytes_downloaded?: number | null
+          bytes_uploaded?: number | null
+          id?: string
+          recorded_at?: string | null
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_data_usage_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "user_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_invitations: {
         Row: {
           completed_at: string | null
@@ -12588,6 +12623,44 @@ export type Database = {
           },
         ]
       }
+      user_page_views: {
+        Row: {
+          duration_seconds: number | null
+          id: string
+          module_name: string
+          page_path: string
+          session_id: string | null
+          user_id: string
+          visited_at: string | null
+        }
+        Insert: {
+          duration_seconds?: number | null
+          id?: string
+          module_name: string
+          page_path: string
+          session_id?: string | null
+          user_id: string
+          visited_at?: string | null
+        }
+        Update: {
+          duration_seconds?: number | null
+          id?: string
+          module_name?: string
+          page_path?: string
+          session_id?: string | null
+          user_id?: string
+          visited_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_page_views_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "user_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_performance_scores: {
         Row: {
           calculated_at: string | null
@@ -12814,6 +12887,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          login_at: string | null
+          logout_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          login_at?: string | null
+          logout_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          login_at?: string | null
+          logout_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       van_beat_assignments: {
         Row: {
@@ -14129,6 +14237,7 @@ export type Database = {
         Returns: undefined
       }
       generate_invoice_number: { Args: never; Returns: string }
+      get_activity_logging_summary: { Args: { p_days?: number }; Returns: Json }
       get_all_subordinates: {
         Args: { manager_user_id: string }
         Returns: {
