@@ -207,6 +207,9 @@ const StatusDashboard = () => {
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Signing in...' : 'Sign In'}</Button>
+              <div className="text-center mt-3">
+                <a href="/auth" className="text-xs text-muted-foreground hover:text-primary underline">Back to dashboard</a>
+              </div>
             </form>
           </CardContent>
         </Card>
