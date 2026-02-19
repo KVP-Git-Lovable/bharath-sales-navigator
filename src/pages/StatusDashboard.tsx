@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogOut, RefreshCw, Database, Clock, HardDrive, Activity, ArrowUpDown, CheckCircle, XCircle, Table2, Zap, FileText, Server } from 'lucide-react';
+import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, CheckCircle, Database, Server } from 'lucide-react';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 interface MetricCard {
@@ -13,7 +13,7 @@ interface MetricCard {
   value: string | number;
   icon: React.ReactNode;
   description?: string;
-  color?: string;
+  health: 'good' | 'average' | 'bad';
 }
 
 function formatBytes(bytes: number): string {
@@ -40,6 +40,14 @@ function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
+const HEALTH_DOT: Record<string, string> = {
+  good: 'bg-green-500',
+  average: 'bg-amber-500',
+  bad: 'bg-red-500',
+};
+
+const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
+
 const StatusDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,69 +57,100 @@ const StatusDashboard = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [metrics, setMetrics] = useState<MetricCard[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [dbName, setDbName] = useState('');
+  const [isOnline, setIsOnline] = useState(true);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const { data, error } = await supabase.rpc('get_database_metrics');
       if (error) throw error;
 
       const m = data as any;
-      setDbName(m.db_name || '');
+      const uptimeSec = m.uptime_seconds;
 
+      setIsOnline(true);
       setMetrics([
-        { label: 'Database Size', value: formatBytes(m.db_size_bytes), icon: <HardDrive className="h-6 w-6" />, description: 'Total database storage used' },
-        { label: 'Uptime', value: formatUptime(m.uptime_seconds), icon: <Clock className="h-6 w-6" />, description: `Since ${new Date(m.postmaster_start_time).toLocaleDateString()}` },
-        { label: 'Status', value: 'Online', icon: <Activity className="h-6 w-6" />, description: `${m.active_connections} active / ${m.total_connections} total connections`, color: 'text-green-600' },
-        { label: 'Cache Hit Ratio', value: `${m.cache_hit_ratio}%`, icon: <Zap className="h-6 w-6" />, description: 'Buffer cache effectiveness', color: m.cache_hit_ratio >= 99 ? 'text-green-600' : m.cache_hit_ratio >= 95 ? 'text-amber-600' : 'text-red-600' },
-        { label: 'Rows Read', value: formatNumber(m.rows_read), icon: <ArrowUpDown className="h-6 w-6" />, description: 'Total tuples returned' },
-        { label: 'Rows Inserted', value: formatNumber(m.rows_inserted), icon: <ArrowUpDown className="h-6 w-6" />, description: 'Total tuples inserted' },
-        { label: 'Rows Updated', value: formatNumber(m.rows_updated), icon: <ArrowUpDown className="h-6 w-6" />, description: 'Total tuples updated' },
-        { label: 'Rows Deleted', value: formatNumber(m.rows_deleted), icon: <ArrowUpDown className="h-6 w-6" />, description: 'Total tuples deleted' },
-        { label: 'Commits', value: formatNumber(m.commits), icon: <CheckCircle className="h-6 w-6" />, description: 'Successful transactions' },
-        { label: 'Rollbacks', value: formatNumber(m.rollbacks), icon: <XCircle className="h-6 w-6" />, description: 'Failed transactions' },
-        { label: 'Disk Reads', value: formatNumber(m.blks_read), icon: <Database className="h-6 w-6" />, description: 'Blocks read from disk' },
-        { label: 'Cache Hits', value: formatNumber(m.blks_hit), icon: <Server className="h-6 w-6" />, description: 'Blocks found in buffer cache' },
-        { label: 'Deadlocks', value: formatNumber(m.deadlocks), icon: <XCircle className="h-6 w-6" />, description: 'Total deadlocks detected', color: m.deadlocks > 0 ? 'text-red-600' : undefined },
-        { label: 'Temp Files', value: formatNumber(m.temp_files), icon: <FileText className="h-6 w-6" />, description: 'Temp files created for sorts/joins' },
-        { label: 'Tables', value: m.total_table_count, icon: <Table2 className="h-6 w-6" />, description: 'Public schema tables' },
+        {
+          label: 'Database Size',
+          value: formatBytes(m.db_size_bytes),
+          icon: <Database className="h-6 w-6" />,
+          description: 'Total database storage',
+          health: m.db_size_bytes < 500 * 1024 * 1024 ? 'good' : m.db_size_bytes < 2 * 1024 * 1024 * 1024 ? 'average' : 'bad',
+        },
+        {
+          label: 'Uptime',
+          value: formatUptime(uptimeSec),
+          icon: <Clock className="h-6 w-6" />,
+          description: `Since ${new Date(m.postmaster_start_time).toLocaleDateString()}`,
+          health: uptimeSec > 86400 ? 'good' : uptimeSec > 3600 ? 'average' : 'bad',
+        },
+        {
+          label: 'Status',
+          value: 'Online',
+          icon: <Activity className="h-6 w-6" />,
+          description: `${m.active_connections} active connections`,
+          health: 'good',
+        },
+        {
+          label: 'Disk Reads',
+          value: formatNumber(m.blks_read),
+          icon: <HardDrive className="h-6 w-6" />,
+          description: 'Blocks read from disk',
+          health: m.cache_hit_ratio >= 99 ? 'good' : m.cache_hit_ratio >= 95 ? 'average' : 'bad',
+        },
+        {
+          label: 'Commits',
+          value: formatNumber(m.commits),
+          icon: <CheckCircle className="h-6 w-6" />,
+          description: 'Successful transactions',
+          health: m.rollbacks === 0 ? 'good' : m.rollbacks / (m.commits + m.rollbacks) < 0.01 ? 'good' : m.rollbacks / (m.commits + m.rollbacks) < 0.05 ? 'average' : 'bad',
+        },
+        {
+          label: 'Storage Size',
+          value: formatBytes(m.db_size_bytes),
+          icon: <Server className="h-6 w-6" />,
+          description: 'Total allocated storage',
+          health: m.db_size_bytes < 500 * 1024 * 1024 ? 'good' : m.db_size_bytes < 2 * 1024 * 1024 * 1024 ? 'average' : 'bad',
+        },
       ]);
       setLastRefreshed(new Date());
     } catch (error: any) {
       console.error('Error fetching metrics:', error);
+      setIsOnline(false);
       toast({ title: 'Error', description: error.message || 'Failed to fetch metrics', variant: 'destructive' });
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, []);
+
+  // Auto-refresh every 15 minutes
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(fetchMetrics, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, fetchMetrics]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-
       if (authError || !authData.user) {
         toast({ title: 'Authentication Failed', description: authError?.message || 'Invalid credentials', variant: 'destructive' });
         setIsLoading(false);
         return;
       }
-
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('profile_id, security_profiles(name)')
         .eq('user_id', authData.user.id)
         .single();
-
       if (profileError || !profileData || (profileData as any).security_profiles?.name !== 'System Administrator') {
         toast({ title: 'Access Denied', description: 'Only System Administrators can access this dashboard.', variant: 'destructive' });
         await supabase.auth.signOut();
         setIsLoading(false);
         return;
       }
-
       setIsAuthenticated(true);
       toast({ title: 'Welcome', description: 'Successfully authenticated as Administrator' });
       await fetchMetrics();
@@ -130,7 +169,6 @@ const StatusDashboard = () => {
     setEmail('');
     setPassword('');
     setLastRefreshed(null);
-    setDbName('');
   };
 
   // --- Login View ---
@@ -180,14 +218,25 @@ const StatusDashboard = () => {
     <div className="min-h-screen relative" style={{ background: '#1976d2' }}>
       <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 2px, transparent 2px), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 1px, transparent 1px)`, backgroundSize: '50px 50px, 25px 25px' }} />
       <div className="relative z-10">
+        {/* Healthy banner */}
+        {isOnline && metrics.length > 0 && (
+          <div className="flex justify-center pt-4">
+            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-green-500/20 text-green-100 text-sm font-medium border border-green-400/30">
+              <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+              Healthy
+            </span>
+          </div>
+        )}
+
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 md:px-8 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <img src={quickappLogo} alt="QuickApp.AI" className="h-10 w-10 rounded-lg shadow" />
             <div>
               <h1 className="text-lg md:text-xl font-bold text-white">QuickApp<span className="text-amber-400">.ai</span> Status Dashboard</h1>
               <p className="text-xs text-white/60">
-                {dbName && `Database: ${dbName} · `}
-                {lastRefreshed && `Refreshed: ${lastRefreshed.toLocaleTimeString()}`}
+                AWS ap-south-1 (Mumbai) | PostgreSQL
+                {lastRefreshed && ` · Refreshed: ${lastRefreshed.toLocaleTimeString()}`}
               </p>
             </div>
           </div>
@@ -203,19 +252,22 @@ const StatusDashboard = () => {
           </div>
         </div>
 
+        {/* Metrics grid */}
         <div className="px-4 md:px-8 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {metrics.map((metric, idx) => (
               <Card key={idx} className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">{metric.icon}</div>
-                  <p className={`text-2xl md:text-3xl font-bold ${metric.color || 'text-foreground'}`}>{metric.value}</p>
+                  <p className={`text-2xl md:text-3xl font-bold text-foreground`}>{metric.value}</p>
                   <p className="text-sm font-medium text-foreground">{metric.label}</p>
                   {metric.description && <p className="text-xs text-muted-foreground">{metric.description}</p>}
+                  <span className={`h-2.5 w-2.5 rounded-full ${HEALTH_DOT[metric.health]}`} title={metric.health} />
                 </CardContent>
               </Card>
             ))}
           </div>
+          <p className="text-xs text-white/40 text-center mt-6">Auto-refreshes every 15 minutes</p>
         </div>
       </div>
     </div>
