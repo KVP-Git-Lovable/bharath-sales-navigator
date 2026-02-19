@@ -1,20 +1,18 @@
 apply plugin: 'com.android.application'
-// ADDED: The Crashlytics plugin must be applied after the Android application plugin
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'
 
 android {
-    namespace "io.ionic.starter"
+    namespace "com.kvp.salesnavigator"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.ionic.starter"
+        applicationId "com.kvp.salesnavigator"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Values quoted for common subsequent integrations
              nocompress 'googledrive-630.1.0.tar.gz'
         }
     }
@@ -24,7 +22,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    compilationOptions {
+    compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
@@ -43,11 +41,11 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     implementation "androidx.webkit:webkit:$androidxWebkitVersion"
-    
-    // ADDED: Firebase Bill of Materials (BoM) manages versions for all Firebase libraries
+
+    // Firebase Bill of Materials (BoM) manages versions for all Firebase libraries
     implementation platform('com.google.firebase:firebase-bom:33.9.0')
-    
-    // ADDED: Crashlytics and Analytics SDKs
+
+    // Crashlytics and Analytics SDKs
     implementation 'com.google.firebase:firebase-crashlytics'
     implementation 'com.google.firebase:firebase-analytics'
 
