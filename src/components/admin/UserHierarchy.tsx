@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface HierarchyUser {
   id: string;
@@ -123,6 +124,60 @@ const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number
           </CollapsibleContent>
         )}
       </Collapsible>
+    </div>
+  );
+};
+
+// ========== Org Chart Tree View ==========
+const OrgChartNode = ({ user }: { user: HierarchyUser }) => {
+  const colors = getRoleColors(user.role_name);
+  const hasReports = user.directReports.length > 0;
+
+  return (
+    <div className="flex flex-col items-center">
+      {/* Node */}
+      <div className="flex flex-col items-center w-24">
+        <div className={cn("rounded-full p-[2px] ring-2", colors.border.replace('border-', 'ring-'))}>
+          <Avatar className="h-12 w-12">
+            <SignedAvatarImage src={user.profile_picture_url} />
+            <AvatarFallback className={cn("text-sm font-semibold text-white", colors.badge)}>
+              {user.full_name?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <p className="text-[11px] font-medium text-center mt-1 leading-tight truncate w-full">
+          {user.full_name || user.username}
+        </p>
+        <p className={cn("text-[9px] text-center truncate w-full", colors.text)}>
+          {user.role_name || 'No Role'}
+        </p>
+      </div>
+
+      {/* Connector line down + children */}
+      {hasReports && (
+        <>
+          <div className="w-px h-4 bg-border" />
+          <div className="relative flex items-start">
+            {user.directReports.length > 1 && (
+              <div
+                className="absolute top-0 h-px bg-border"
+                style={{
+                  left: `calc(50% - ${(user.directReports.length - 1) * 52}px)`,
+                  width: `${(user.directReports.length - 1) * 104}px`,
+                }}
+              />
+            )}
+            <div className="flex gap-2">
+              {user.directReports.map(child => (
+                <div key={child.id} className="flex flex-col items-center">
+                  <div className="w-px h-4 bg-border" />
+                  <OrgChartNode user={child} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -339,15 +394,20 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
             <p className="text-sm">No hierarchy configured</p>
           </div>
         ) : viewMode === 'tree' ? (
+          <ScrollArea className="w-full">
+            <div className="flex justify-center py-4 min-w-max">
+              <div className="flex gap-6">
+                {hierarchy.map(user => (
+                  <OrgChartNode key={user.id} user={user} />
+                ))}
+              </div>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        ) : (
           <div className="space-y-1">
             {hierarchy.map(user => (
               <HierarchyRow key={user.id} user={user} level={0} />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            {flattenHierarchy(hierarchy).map(user => (
-              <FlatUserRow key={user.id} user={user} />
             ))}
           </div>
         )}
