@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl, isStorageUrl } from '@/utils/storageUtils';
 
 interface CompanyData {
   id: string;
@@ -72,13 +73,18 @@ export const useCompanyData = () => {
         const newHeaderName = data.header_name || data.name || null;
         const newHeaderLogo = data.header_logo_url || data.logo_url || null;
         
-        setHeaderName(newHeaderName);
-        setHeaderLogo(newHeaderLogo);
+        // Sign the logo URL if it's a private storage URL
+        const resolvedLogo = newHeaderLogo && isStorageUrl(newHeaderLogo)
+          ? await getSignedStorageUrl(newHeaderLogo)
+          : newHeaderLogo;
         
-        // Update cache
+        setHeaderName(newHeaderName);
+        setHeaderLogo(resolvedLogo);
+        
+        // Update cache with signed URL
         setCachedBranding({
           headerName: newHeaderName,
-          headerLogo: newHeaderLogo,
+          headerLogo: resolvedLogo,
           cachedAt: Date.now()
         });
       }
