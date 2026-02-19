@@ -13,16 +13,51 @@ export const useActivityTracker = () => {
   const lastVisitTimeRef = useRef<number>(Date.now());
   const bytesRef = useRef({ uploaded: 0, downloaded: 0 });
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const creatingRef = useRef(false);
+  const endingRef = useRef(false);
 
   const getModuleName = (path: string): string => {
     const segment = path.split('/').filter(Boolean)[0];
     return segment || 'home';
   };
 
-  // Create session on login
+  // Create session on login — with guards against duplicates
   const createSession = useCallback(async () => {
     if (!user) return;
+    // Prevent concurrent creation (StrictMode double-mount)
+    if (creatingRef.current) return;
+    // Already have a session
+    if (sessionIdRef.current) return;
+
+    // Check localStorage for an existing session
+    const existingId = localStorage.getItem(SESSION_KEY);
+    if (existingId) {
+      // Verify the session still exists and belongs to this user
+      const { data: existing } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .eq('id', existingId)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existing) {
+        sessionIdRef.current = existing.id;
+        return; // Reuse existing session
+      }
+      // Stale key — remove it
+      localStorage.removeItem(SESSION_KEY);
+    }
+
+    creatingRef.current = true;
     try {
+      // Close any prior orphaned sessions for this user before creating a new one
+      await supabase
+        .from('user_sessions')
+        .update({ logout_at: new Date().toISOString(), is_active: false })
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
       const { data, error } = await supabase
         .from('user_sessions')
         .insert({ user_id: user.id })
@@ -34,13 +69,17 @@ export const useActivityTracker = () => {
       }
     } catch (e) {
       console.error('Failed to create activity session:', e);
+    } finally {
+      creatingRef.current = false;
     }
   }, [user]);
 
-  // End session
+  // End session — with guard against double-ending
   const endSession = useCallback(async () => {
+    if (endingRef.current) return;
     const sid = sessionIdRef.current || localStorage.getItem(SESSION_KEY);
     if (!sid) return;
+    endingRef.current = true;
     try {
       await supabase
         .from('user_sessions')
@@ -51,6 +90,7 @@ export const useActivityTracker = () => {
     }
     sessionIdRef.current = null;
     localStorage.removeItem(SESSION_KEY);
+    endingRef.current = false;
   }, []);
 
   // Log page view
@@ -59,7 +99,6 @@ export const useActivityTracker = () => {
     // Update duration of previous page
     if (lastPathRef.current && lastPathRef.current !== path) {
       const duration = Math.round((Date.now() - lastVisitTimeRef.current) / 1000);
-      // fire and forget duration update for the previous view
       supabase
         .from('user_page_views')
         .update({ duration_seconds: duration })
@@ -136,7 +175,6 @@ export const useActivityTracker = () => {
         for (const entry of list.getEntries()) {
           const res = entry as PerformanceResourceTiming;
           bytesRef.current.downloaded += res.transferSize || 0;
-          // Estimate upload from encodedBodySize of POST/PUT requests (rough)
           if (res.initiatorType === 'fetch' || res.initiatorType === 'xmlhttprequest') {
             bytesRef.current.uploaded += res.encodedBodySize || 0;
           }
@@ -144,7 +182,6 @@ export const useActivityTracker = () => {
       });
       observer.observe({ type: 'resource', buffered: false });
 
-      // Flush every 60s
       flushTimerRef.current = setInterval(flushDataUsage, 60_000);
 
       return () => {
