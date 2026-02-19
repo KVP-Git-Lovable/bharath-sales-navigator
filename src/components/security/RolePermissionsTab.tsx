@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +25,16 @@ export const RolePermissionsTab = () => {
       return data;
     },
   });
+
+  // Auto-select System Administrator profile on first load
+  useEffect(() => {
+    if (profiles && profiles.length > 0 && !selectedProfileId) {
+      const adminProfile = profiles.find(p => p.name === SYSTEM_ADMINISTRATOR_PROFILE);
+      if (adminProfile) {
+        setSelectedProfileId(adminProfile.id);
+      }
+    }
+  }, [profiles, selectedProfileId]);
 
   const selectedProfileName = profiles?.find(p => p.id === selectedProfileId)?.name;
   const isSystemAdmin = selectedProfileName === SYSTEM_ADMINISTRATOR_PROFILE;

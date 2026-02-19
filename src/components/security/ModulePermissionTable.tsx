@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { PERMISSION_MODULES } from './permissionModules';
 
 const PERM_COLUMNS = [
@@ -26,67 +28,88 @@ interface ModulePermissionTableProps {
   disabled?: boolean;
 }
 
-export const ModulePermissionTable = ({ permissions, onChange, disabled }: ModulePermissionTableProps) => {
-  const getVal = (name: string, field: string) => {
-    return permissions[name]?.[field as keyof PermissionMap[string]] ?? false;
-  };
-
-  const isAllChecked = (name: string) => {
-    return INDIVIDUAL_FIELDS.every(f => getVal(name, f));
-  };
-
-  const handleAllToggle = (name: string, checked: boolean) => {
-    INDIVIDUAL_FIELDS.forEach(f => onChange(name, f, checked));
-  };
-
-  // Flatten modules into rows with hierarchy info
-  type Row = { name: string; label: string; level: number; isParent: boolean; childNames?: string[] };
-  const rows: Row[] = [];
-
-  PERMISSION_MODULES.forEach(mod => {
-    // Module-level row (parent)
-    const modChildNames: string[] = [];
-    mod.features.forEach(feat => {
-      if (feat.subFeatures && feat.subFeatures.length > 0) {
-        feat.subFeatures.forEach(sf => modChildNames.push(sf.name));
-      } else {
-        modChildNames.push(feat.name);
-      }
-    });
-    rows.push({ name: mod.name, label: mod.label, level: 0, isParent: true, childNames: modChildNames });
-
-    mod.features.forEach(feat => {
-      if (feat.subFeatures && feat.subFeatures.length > 0) {
-        // Feature with sub-features (parent)
-        const featChildNames = feat.subFeatures.map(sf => sf.name);
-        rows.push({ name: feat.name, label: feat.label, level: 1, isParent: true, childNames: featChildNames });
-        feat.subFeatures.forEach(sf => {
-          rows.push({ name: sf.name, label: sf.label, level: 2, isParent: false });
-        });
-      } else {
-        rows.push({ name: feat.name, label: feat.label, level: 1, isParent: false });
-      }
-    });
+// Collect all leaf permission names under a module
+function getModuleLeafNames(mod: typeof PERMISSION_MODULES[0]): string[] {
+  const names: string[] = [];
+  mod.features.forEach(feat => {
+    if (feat.subFeatures && feat.subFeatures.length > 0) {
+      feat.subFeatures.forEach(sf => names.push(sf.name));
+    } else {
+      names.push(feat.name);
+    }
   });
+  return names;
+}
 
-  // For parent rows: compute aggregate
-  const isParentAllField = (childNames: string[], field: string) => {
-    return childNames.every(cn => getVal(cn, field));
-  };
+// Collect leaf names under a feature
+function getFeatureLeafNames(feat: typeof PERMISSION_MODULES[0]['features'][0]): string[] {
+  if (feat.subFeatures && feat.subFeatures.length > 0) {
+    return feat.subFeatures.map(sf => sf.name);
+  }
+  return [feat.name];
+}
 
-  const isParentAllCheckedAll = (childNames: string[]) => {
-    return INDIVIDUAL_FIELDS.every(f => childNames.every(cn => getVal(cn, f)));
-  };
+export const ModulePermissionTable = ({ permissions, onChange, disabled }: ModulePermissionTableProps) => {
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
 
-  const handleParentFieldToggle = (childNames: string[], field: string, checked: boolean) => {
-    childNames.forEach(cn => onChange(cn, field, checked));
-  };
+  const getVal = (name: string, field: string) =>
+    permissions[name]?.[field as keyof PermissionMap[string]] ?? false;
 
-  const handleParentAllToggle = (childNames: string[], checked: boolean) => {
-    childNames.forEach(cn => {
-      INDIVIDUAL_FIELDS.forEach(f => onChange(cn, f, checked));
+  const isAllFieldChecked = (leafNames: string[], field: string) =>
+    leafNames.every(n => getVal(n, field));
+
+  const isAllCheckedAll = (leafNames: string[]) =>
+    INDIVIDUAL_FIELDS.every(f => leafNames.every(n => getVal(n, f)));
+
+  const toggleField = (leafNames: string[], field: string, checked: boolean) =>
+    leafNames.forEach(n => onChange(n, field, checked));
+
+  const toggleAll = (leafNames: string[], checked: boolean) =>
+    leafNames.forEach(n => INDIVIDUAL_FIELDS.forEach(f => onChange(n, f, checked)));
+
+  const toggleModule = (name: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
     });
   };
+
+  const toggleFeature = (name: string) => {
+    setExpandedFeatures(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
+
+  const renderCheckboxes = (leafNames: string[], isSingleLeaf = false) => (
+    <>
+      {/* All column */}
+      <div className="flex justify-center">
+        <Checkbox
+          checked={isAllCheckedAll(leafNames)}
+          onCheckedChange={(checked) => toggleAll(leafNames, checked as boolean)}
+          disabled={disabled}
+        />
+      </div>
+      {/* Individual columns */}
+      {INDIVIDUAL_FIELDS.map(f => (
+        <div key={f} className="flex justify-center">
+          <Checkbox
+            checked={isSingleLeaf ? getVal(leafNames[0], f) : isAllFieldChecked(leafNames, f)}
+            onCheckedChange={(checked) =>
+              isSingleLeaf
+                ? onChange(leafNames[0], f, checked as boolean)
+                : toggleField(leafNames, f, checked as boolean)
+            }
+            disabled={disabled}
+          />
+        </div>
+      ))}
+    </>
+  );
 
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -98,63 +121,76 @@ export const ModulePermissionTable = ({ permissions, onChange, disabled }: Modul
         ))}
       </div>
 
-      {/* Rows */}
+      {/* Module rows */}
       <div className="divide-y">
-        {rows.map((row) => {
-          const pl = row.level === 0 ? 'pl-4' : row.level === 1 ? 'pl-8' : 'pl-12';
-          const bg = row.level === 0 ? 'bg-muted/30' : '';
-          const fontWeight = row.isParent ? 'font-semibold' : 'font-normal';
-          const prefix = row.level >= 1 && !row.isParent ? '└ ' : row.level === 1 && row.isParent ? '' : '';
+        {PERMISSION_MODULES.map(mod => {
+          const modLeaves = getModuleLeafNames(mod);
+          const isExpanded = expandedModules.has(mod.name);
 
           return (
-            <div key={row.name} className={`grid grid-cols-[1fr_repeat(5,64px)] items-center px-4 py-3 ${bg}`}>
-              <span className={`text-sm ${fontWeight} ${pl}`}>
-                {prefix}{row.label}
-              </span>
+            <div key={mod.name}>
+              {/* Module header row */}
+              <div
+                className="grid grid-cols-[1fr_repeat(5,64px)] items-center px-4 py-3 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => toggleModule(mod.name)}
+              >
+                <span className="text-sm font-semibold flex items-center gap-2">
+                  {isExpanded
+                    ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  }
+                  {mod.label}
+                </span>
+                {/* Stop click propagation on checkboxes */}
+                <div onClick={e => e.stopPropagation()} className="contents">
+                  {renderCheckboxes(modLeaves)}
+                </div>
+              </div>
 
-              {row.isParent && row.childNames ? (
-                <>
-                  {/* All column */}
-                  <div className="flex justify-center">
-                    <Checkbox
-                      checked={isParentAllCheckedAll(row.childNames)}
-                      onCheckedChange={(checked) => handleParentAllToggle(row.childNames!, checked as boolean)}
-                      disabled={disabled}
-                    />
-                  </div>
-                  {/* Individual columns */}
-                  {INDIVIDUAL_FIELDS.map(f => (
-                    <div key={f} className="flex justify-center">
-                      <Checkbox
-                        checked={isParentAllField(row.childNames!, f)}
-                        onCheckedChange={(checked) => handleParentFieldToggle(row.childNames!, f, checked as boolean)}
-                        disabled={disabled}
-                      />
+              {/* Expanded features */}
+              {isExpanded && mod.features.map(feat => {
+                const hasSubFeatures = feat.subFeatures && feat.subFeatures.length > 0;
+                const featLeaves = getFeatureLeafNames(feat);
+                const isFeatExpanded = expandedFeatures.has(feat.name);
+
+                return (
+                  <div key={feat.name}>
+                    {/* Feature row */}
+                    <div
+                      className={`grid grid-cols-[1fr_repeat(5,64px)] items-center px-4 py-2.5 ${hasSubFeatures ? 'cursor-pointer hover:bg-muted/20' : ''} transition-colors`}
+                      onClick={hasSubFeatures ? () => toggleFeature(feat.name) : undefined}
+                    >
+                      <span className="text-sm pl-8 flex items-center gap-2">
+                        {hasSubFeatures && (
+                          isFeatExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                        {feat.label}
+                      </span>
+                      <div onClick={e => e.stopPropagation()} className="contents">
+                        {hasSubFeatures
+                          ? renderCheckboxes(featLeaves)
+                          : renderCheckboxes(featLeaves, true)
+                        }
+                      </div>
                     </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {/* All column */}
-                  <div className="flex justify-center">
-                    <Checkbox
-                      checked={isAllChecked(row.name)}
-                      onCheckedChange={(checked) => handleAllToggle(row.name, checked as boolean)}
-                      disabled={disabled}
-                    />
+
+                    {/* Sub-features */}
+                    {hasSubFeatures && isFeatExpanded && feat.subFeatures!.map(sf => (
+                      <div
+                        key={sf.name}
+                        className="grid grid-cols-[1fr_repeat(5,64px)] items-center px-4 py-2"
+                      >
+                        <span className="text-sm pl-14 text-muted-foreground">
+                          └ {sf.label}
+                        </span>
+                        {renderCheckboxes([sf.name], true)}
+                      </div>
+                    ))}
                   </div>
-                  {/* Individual columns */}
-                  {INDIVIDUAL_FIELDS.map(f => (
-                    <div key={f} className="flex justify-center">
-                      <Checkbox
-                        checked={getVal(row.name, f)}
-                        onCheckedChange={(checked) => onChange(row.name, f, checked as boolean)}
-                        disabled={disabled}
-                      />
-                    </div>
-                  ))}
-                </>
-              )}
+                );
+              })}
             </div>
           );
         })}
