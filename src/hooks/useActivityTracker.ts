@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
+
 const SESSION_KEY = 'activity_session_id';
 
 export const useActivityTracker = () => {
