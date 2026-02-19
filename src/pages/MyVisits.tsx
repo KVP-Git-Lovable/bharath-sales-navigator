@@ -207,12 +207,11 @@ export const MyVisits = () => {
   const navigate = useNavigate();
   const networkStatus = useConnectivity();
   const isOnline = networkStatus === 'online';
-  const { isFullAdmin } = useAdminAccess();
   const { permissions, hasModuleAccess } = useProfilePermissions();
   
   // Permission-based visibility: if user has a security profile, filter buttons
   const hasSecurityProfile = permissions.length > 0;
-  const canShowButton = (prefix: string) => !hasSecurityProfile || isFullAdmin || hasModuleAccess(prefix);
+  const canShowButton = (prefix: string) => !hasSecurityProfile || hasModuleAccess(prefix);
   const showAutoPlan = canShowButton('visit_auto_plan');
   const showAllBeat = canShowButton('visit_all_beat');
   const showRetailers = canShowButton('visit_retailers');

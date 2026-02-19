@@ -350,10 +350,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Check security profile for admin login validation
       const secProfile = await fetchSecurityProfileName(data.user.id);
       
-      // Only check profile if user explicitly selected admin login
-      if (role === 'admin' && secProfile !== 'System Administrator') {
-        await supabase.auth.signOut();
-        throw new Error(`Access denied. This account does not have admin privileges.`);
+      // Check admin login via profile_object_permissions (not profile name)
+      if (role === 'admin') {
+        // Get user's profile_id
+        const { data: userProfileData } = await supabase
+          .from('user_profiles')
+          .select('profile_id')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        
+        let hasAdminPerm = false;
+        if (userProfileData?.profile_id) {
+          const { data: perms } = await supabase
+            .from('profile_object_permissions')
+            .select('object_name')
+            .eq('profile_id', userProfileData.profile_id)
+            .like('object_name', 'admin_%')
+            .eq('can_read', true)
+            .limit(1);
+          hasAdminPerm = (perms && perms.length > 0) || false;
+        }
+        
+        if (!hasAdminPerm) {
+          await supabase.auth.signOut();
+          throw new Error(`Access denied. This account does not have admin privileges.`);
+        }
       }
       
       // Check if user is active

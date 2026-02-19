@@ -8,7 +8,7 @@ import { Shield, Users, Settings, Package, ArrowLeft, CalendarDays, MapPin, Doll
 import { SearchInput } from '@/components/SearchInput';
 
 const AdminControls = () => {
-  const { hasAdminAccess, isFullAdmin, permittedAdminPaths, loading } = useAdminAccess();
+  const { hasAdminAccess, permittedAdminPaths, loading } = useAdminAccess();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -57,10 +57,8 @@ const AdminControls = () => {
     { title: "Tax Master", description: "Configure GST/IGST tax rates and map to product SKUs", icon: Percent, color: "violet", path: "/admin/tax-master" },
   ];
 
-  // Filter modules based on permissions - full admins see all, others see only permitted
-  const accessibleModules = isFullAdmin 
-    ? adminModules 
-    : adminModules.filter(module => permittedAdminPaths.has(module.path));
+  // Filter modules based on permissions only - no special bypass
+  const accessibleModules = adminModules.filter(module => permittedAdminPaths.has(module.path));
 
   const filteredModules = accessibleModules.filter(module => 
     module.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

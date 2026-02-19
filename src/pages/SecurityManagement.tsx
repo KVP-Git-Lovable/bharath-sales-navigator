@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfilePermissions } from '@/hooks/useProfilePermissions';
 import { Navigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -13,14 +14,12 @@ import { ProfileManagement } from '@/components/security/ProfileManagement';
 
 export default function SecurityManagement() {
   const navigate = useNavigate();
-  const { userRole, securityProfileName, loading, user } = useAuth();
+  const { loading, user, securityProfileName } = useAuth();
+  const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const [activeTab, setActiveTab] = useState('profiles');
 
-  // Check if user has admin access - via System Administrator security profile
-  const hasAdminAccess = securityProfileName === 'System Administrator';
-
-  // Show loading while auth is being determined
-  if (loading) {
+  // Show loading while auth/permissions are being determined
+  if (loading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -33,18 +32,9 @@ export default function SecurityManagement() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Wait a bit for role to load if user exists but role is null
-  // This handles the race condition where user is set but role fetch is still pending
-  if (userRole === null && securityProfileName === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Only redirect if we have confirmed the user doesn't have admin access
-  if (!hasAdminAccess) {
+  // No profile assigned = show all (backward compat)
+  // Profile assigned = check admin_security_ permission
+  if (securityProfileName && !hasModuleAccess('admin_security_')) {
     return <Navigate to="/dashboard" replace />;
   }
 

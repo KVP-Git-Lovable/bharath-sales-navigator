@@ -191,17 +191,27 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Check System Administrator security profile
+    // Check permission via profile_object_permissions
     const { data: profileData } = await supabaseAdmin
       .from('user_profiles')
-      .select('profile_id, security_profiles!inner(name)')
+      .select('profile_id')
       .eq('user_id', callerId)
       .single()
 
-    const isAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator'
+    let hasPermission = false
+    if (profileData?.profile_id) {
+      const { data: perms } = await supabaseAdmin
+        .from('profile_object_permissions')
+        .select('can_delete')
+        .eq('profile_id', profileData.profile_id)
+        .eq('object_name', 'admin_user_delete')
+        .eq('can_delete', true)
+        .limit(1)
+      hasPermission = (perms && perms.length > 0) || false
+    }
 
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+    if (!hasPermission) {
+      return new Response(JSON.stringify({ error: 'You do not have permission to delete users' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }

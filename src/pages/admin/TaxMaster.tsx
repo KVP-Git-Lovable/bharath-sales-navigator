@@ -58,7 +58,7 @@ const DEFAULT_COMPONENTS: TaxComponent[] = [
 
 const TaxMaster = () => {
   const navigate = useNavigate();
-  const { hasAdminAccess, isFullAdmin, loading: authLoading } = useAdminAccess();
+  const { hasAdminAccess, loading: authLoading } = useAdminAccess();
   const [taxes, setTaxes] = useState<TaxMasterRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

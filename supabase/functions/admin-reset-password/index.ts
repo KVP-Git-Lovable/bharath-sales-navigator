@@ -39,20 +39,30 @@ serve(async (req) => {
       );
     }
 
-    // Verify caller has System Administrator security profile
+    // Verify caller has permission via profile_object_permissions
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    const { data: profileData, error: profileError } = await supabaseAdmin
+    const { data: profileData } = await supabaseAdmin
       .from('user_profiles')
-      .select('profile_id, security_profiles(name)')
+      .select('profile_id')
       .eq('user_id', caller.id)
       .single();
 
-    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
+    let hasPermission = false;
+    if (profileData?.profile_id) {
+      const { data: perms } = await supabaseAdmin
+        .from('profile_object_permissions')
+        .select('can_edit')
+        .eq('profile_id', profileData.profile_id)
+        .eq('object_name', 'admin_user_reset_password')
+        .eq('can_edit', true)
+        .limit(1);
+      hasPermission = (perms && perms.length > 0) || false;
+    }
 
-    if (profileError || !isSystemAdmin) {
+    if (!hasPermission) {
       return new Response(
-        JSON.stringify({ error: "Only System Administrators can reset user passwords" }),
+        JSON.stringify({ error: "You do not have permission to reset user passwords" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -35,11 +35,10 @@ const Index = () => {
   const signedProfilePicture = useSignedUrl(profilePictureUrl);
   const { isNavItemEnabled } = useFeatureFlags();
   const { permissions, hasModuleAccess } = useProfilePermissions();
-  const { isFullAdmin } = useAdminAccess();
   const hasSecurityProfile = !!securityProfileName;
 
   const canShow = (prefix: string) =>
-    !hasSecurityProfile || isFullAdmin || hasModuleAccess(prefix);
+    !hasSecurityProfile || hasModuleAccess(prefix);
 
   const showCheckIn = canShow('attendance_');
   const showTodaysBeat = canShow('visit_');

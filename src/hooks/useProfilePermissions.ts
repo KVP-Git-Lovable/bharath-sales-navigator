@@ -84,18 +84,8 @@ export const useProfilePermissions = () => {
 
       if (permsError) return [];
 
-      // Also get user-level overrides
-      const { data: userPerms } = await supabase
-        .from('user_object_permissions')
-        .select('object_name, can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all')
-        .eq('user_id', user.id);
-
-      // Merge: user-level overrides profile-level
-      const permMap = new Map<string, ProfilePermission>();
-      (perms || []).forEach(p => permMap.set(p.object_name, p as ProfilePermission));
-      (userPerms || []).forEach(p => permMap.set(p.object_name, p as ProfilePermission));
-
-      return Array.from(permMap.values());
+      // profile_object_permissions is the ONLY source of truth
+      return (perms || []) as ProfilePermission[];
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // cache 5 min

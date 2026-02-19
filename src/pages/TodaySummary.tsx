@@ -40,8 +40,8 @@ export const TodaySummary = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const initialLoadDone = useRef(false);
-  const { user, securityProfileName } = useAuth();
-  const isAdmin = securityProfileName === 'System Administrator';
+  const { user } = useAuth();
+  const isAdmin = false; // No longer used for gating; kept for backward compat in data loading
   
   // Hierarchical user filter (for managers)
   const { isManager, subordinateIds, subordinates } = useSubordinates();

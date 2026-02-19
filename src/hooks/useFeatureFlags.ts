@@ -63,7 +63,7 @@ interface FeatureFlag {
 }
 
 export const useFeatureFlags = () => {
-  const { userRole, securityProfileName } = useAuth();
+  const { securityProfileName } = useAuth();
   const { permissions, isLoading: permissionsLoading } = useProfilePermissions();
 
   const { data: featureFlags = [], isLoading: flagsLoading } = useQuery({
@@ -86,14 +86,12 @@ export const useFeatureFlags = () => {
 
   const isLoading = flagsLoading || permissionsLoading;
   const flagMap = new Map(featureFlags.map(f => [f.feature_key, f.is_enabled]));
-  const isFullAdmin = securityProfileName === 'System Administrator';
 
   // Build a set of permission prefixes the user has can_read on
   const userPermissionPrefixes = useMemo(() => {
     const prefixes = new Set<string>();
     permissions.forEach(p => {
       if (p.can_read) {
-        // Extract prefix: e.g. "visit_activity_log" -> check against all known prefixes
         prefixes.add(p.object_name);
       }
     });
@@ -122,26 +120,25 @@ export const useFeatureFlags = () => {
    * Check if a nav item should be visible based on:
    * 1. Global feature flag (must be enabled)
    * 2. User's profile permissions (must have can_read on at least one matching object)
-   * Admin/System Administrator bypasses permission check.
+   * No special bypass for any profile name - permissions in DB are the only authority.
    */
   const isNavItemEnabled = useCallback((navItemId: string): boolean => {
     // Step 1: Check global feature flag
     const featureKey = NAV_ITEM_FEATURE_MAP[navItemId];
     if (featureKey && !isFeatureEnabled(featureKey)) return false;
 
-    // Step 2: Admin bypass - show all globally enabled modules
-    if (isFullAdmin) return true;
+    // Step 2: No profile assigned = show all (backward compat)
+    if (!securityProfileName) return true;
 
-    // Step 3: Distinguish between "no profile assigned" and "profile with 0 permissions"
-    if (!securityProfileName) return true;  // No profile assigned = show all (backward compat)
-    if (permissions.length === 0) return false; // Profile assigned but no permissions = hide all
+    // Step 3: Profile assigned but zero permissions = hide all
+    if (permissions.length === 0) return false;
 
     // Step 4: Check permission prefix
     const prefix = NAV_ITEM_PERMISSION_PREFIX[navItemId];
     if (!prefix) return true; // No mapping = always visible
 
     return hasPermissionForPrefix(prefix);
-  }, [isFeatureEnabled, isFullAdmin, permissions.length, hasPermissionForPrefix]);
+  }, [isFeatureEnabled, securityProfileName, permissions.length, hasPermissionForPrefix]);
 
   return {
     featureFlags,

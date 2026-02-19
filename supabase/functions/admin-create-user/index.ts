@@ -52,36 +52,31 @@ serve(async (req) => {
     const adminUserId = callerUser.id;
     console.log('User authenticated:', adminUserId);
 
-    // Check if user is admin via System Administrator security profile
+    // Check if user has admin_user_create permission via profile_object_permissions
     const { data: profileData } = await supabaseAdmin
       .from('user_profiles')
-      .select('profile_id, security_profiles(name)')
+      .select('profile_id')
       .eq('user_id', adminUserId)
       .single();
 
-    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
+    let hasPermission = false;
+    if (profileData?.profile_id) {
+      const { data: perms } = await supabaseAdmin
+        .from('profile_object_permissions')
+        .select('can_create')
+        .eq('profile_id', profileData.profile_id)
+        .eq('object_name', 'admin_user_create')
+        .eq('can_create', true)
+        .limit(1);
+      hasPermission = (perms && perms.length > 0) || false;
+    }
 
-    if (!isSystemAdmin) {
-      // Also check for granular admin permissions
-      let hasAdminPermission = false;
-      if (profileData?.profile_id) {
-        const { data: perms } = await supabaseAdmin
-          .from('profile_object_permissions')
-          .select('object_name, can_read')
-          .eq('profile_id', profileData.profile_id)
-          .like('object_name', 'admin_%')
-          .eq('can_read', true)
-          .limit(1);
-        hasAdminPermission = (perms && perms.length > 0) || false;
-      }
-
-      if (!hasAdminPermission) {
-        console.error('User is not admin. Profile:', (profileData as any)?.security_profiles?.name);
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized - Admin access required' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    if (!hasPermission) {
+      console.error('User does not have admin_user_create permission');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - You do not have permission to create users' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('Admin verified');

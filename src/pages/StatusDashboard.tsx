@@ -141,13 +141,27 @@ const StatusDashboard = () => {
         setIsLoading(false);
         return;
       }
+      // Check if user has admin_dashboard permission via profile_object_permissions
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
-        .select('profile_id, security_profiles(name)')
+        .select('profile_id')
         .eq('user_id', authData.user.id)
         .single();
-      if (profileError || !profileData || (profileData as any).security_profiles?.name !== 'System Administrator') {
-        toast({ title: 'Access Denied', description: 'Only System Administrators can access this dashboard.', variant: 'destructive' });
+      
+      let hasAccess = false;
+      if (!profileError && profileData?.profile_id) {
+        const { data: perms } = await supabase
+          .from('profile_object_permissions')
+          .select('object_name')
+          .eq('profile_id', profileData.profile_id)
+          .like('object_name', 'admin_%')
+          .eq('can_read', true)
+          .limit(1);
+        hasAccess = (perms && perms.length > 0) || false;
+      }
+      
+      if (!hasAccess) {
+        toast({ title: 'Access Denied', description: 'You do not have admin permissions to access this dashboard.', variant: 'destructive' });
         await supabase.auth.signOut();
         setIsLoading(false);
         return;
