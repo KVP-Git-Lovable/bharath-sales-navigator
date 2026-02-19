@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-
 const SESSION_KEY = 'activity_session_id';
 
 export const useActivityTracker = () => {
@@ -15,7 +14,6 @@ export const useActivityTracker = () => {
   const bytesRef = useRef({ uploaded: 0, downloaded: 0 });
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const creatingRef = useRef(false);
-  const endingRef = useRef(false);
 
   const getModuleName = (path: string): string => {
     const segment = path.split('/').filter(Boolean)[0];
@@ -25,15 +23,12 @@ export const useActivityTracker = () => {
   // Create session on login — with guards against duplicates
   const createSession = useCallback(async () => {
     if (!user) return;
-    // Prevent concurrent creation (StrictMode double-mount)
     if (creatingRef.current) return;
-    // Already have a session
     if (sessionIdRef.current) return;
 
     // Check localStorage for an existing session
     const existingId = localStorage.getItem(SESSION_KEY);
     if (existingId) {
-      // Verify the session still exists and belongs to this user
       const { data: existing } = await supabase
         .from('user_sessions')
         .select('id')
@@ -46,7 +41,6 @@ export const useActivityTracker = () => {
         sessionIdRef.current = existing.id;
         return; // Reuse existing session
       }
-      // Stale key — remove it
       localStorage.removeItem(SESSION_KEY);
     }
 
@@ -75,12 +69,12 @@ export const useActivityTracker = () => {
     }
   }, [user]);
 
-  // End session — with guard against double-ending
+  // End session — only called on beforeunload or logout
   const endSession = useCallback(async () => {
-    if (endingRef.current) return;
     const sid = sessionIdRef.current || localStorage.getItem(SESSION_KEY);
     if (!sid) return;
-    endingRef.current = true;
+    sessionIdRef.current = null;
+    localStorage.removeItem(SESSION_KEY);
     try {
       await supabase
         .from('user_sessions')
@@ -89,15 +83,11 @@ export const useActivityTracker = () => {
     } catch (e) {
       console.error('Failed to end activity session:', e);
     }
-    sessionIdRef.current = null;
-    localStorage.removeItem(SESSION_KEY);
-    endingRef.current = false;
   }, []);
 
   // Log page view
   const logPageView = useCallback(async (path: string) => {
     if (!user || !sessionIdRef.current) return;
-    // Update duration of previous page
     if (lastPathRef.current && lastPathRef.current !== path) {
       const duration = Math.round((Date.now() - lastVisitTimeRef.current) / 1000);
       supabase
@@ -143,7 +133,7 @@ export const useActivityTracker = () => {
     }
   }, [user]);
 
-  // Session lifecycle
+  // Session lifecycle — DO NOT end session in cleanup (StrictMode double-mount creates duplicates)
   useEffect(() => {
     if (!user) return;
     createSession();
@@ -156,10 +146,21 @@ export const useActivityTracker = () => {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      flushDataUsage();
-      endSession();
+      // Intentionally NOT calling endSession() here — React StrictMode
+      // unmounts and re-mounts, which would clear the session and create a new one
     };
   }, [user, createSession, endSession, flushDataUsage]);
+
+  // End session on auth sign-out
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        flushDataUsage();
+        endSession();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [endSession, flushDataUsage]);
 
   // Track route changes
   useEffect(() => {
