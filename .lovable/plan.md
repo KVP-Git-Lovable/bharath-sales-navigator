@@ -1,26 +1,50 @@
 
 
-## Fix: Android Build Configuration Errors
+## Fix: Company Logo Not Showing in Header
 
-The `android/app/build.gradle` file needs to be rewritten properly with Firebase Crashlytics support while fixing the issues. The current file is also incomplete (missing dependencies block, broken `repositories` declaration).
+### Root Cause
 
-### Changes to `android/app/build.gradle`
+The `useCompanyData` hook (line 91-98) only fetches company data from the database if **no localStorage cache exists**. Once cached, the data is never refreshed — there is no cache expiration. If the logo was added/changed after the first cache was written, the stale cache (with `headerLogo: null`) persists indefinitely.
 
-**Fix 1: Namespace and applicationId** -- Keep as `"com.kvp.salesnavigator"` to match `google-services.json`
+```text
+Current flow:
+  Cache exists? --YES--> Use cached data forever (stale logo!)
+               --NO---> Fetch from DB, cache result
+```
 
-**Fix 2: `compilationOptions` to `compileOptions`** -- Fix the Gradle DSL keyword
+### Fix
 
-**Fix 3: Restore complete file** -- The file currently appears truncated/broken (ends at line 29 with just `repositories`). It needs the full dependencies block, Firebase BoM, Crashlytics SDK, and the Capacitor build gradle apply.
+**File: `src/hooks/useCompanyData.ts`**
 
-The corrected file will include:
-- `apply plugin: 'com.google.gms.google-services'` and `'com.google.firebase.crashlytics'` at the top
-- `namespace` and `applicationId` set to `"com.kvp.salesnavigator"`
-- `compileOptions` (not `compilationOptions`) with Java 21
-- Complete `dependencies` block with Firebase BoM, Crashlytics, and Analytics SDKs
-- Capacitor build gradle apply
-- Google Services plugin conditional apply at the bottom
+Change the strategy to: always use cache for instant render (no flicker), but also fetch fresh data in the background every time. This is a "stale-while-revalidate" approach.
+
+**Lines 91-98** - Remove the conditional that skips the network fetch:
+
+```typescript
+// Before:
+useEffect(() => {
+  const cached = getCachedBranding();
+  if (!cached) {
+    fetchCompany();
+  } else {
+    setIsLoading(false);
+  }
+  // ...event listener
+}, [fetchCompany]);
+
+// After:
+useEffect(() => {
+  // Always fetch fresh data in background (cache is used for initial render)
+  fetchCompany();
+  // ...event listener
+}, [fetchCompany]);
+```
+
+This way:
+- The initial render still uses the cached values (no flicker) since state is initialized from cache on line 48-52
+- Fresh data is always fetched in the background and updates both state and cache
+- Logo changes will appear on next page load or navigation
 
 ### No other files need changes
 
-The `android/build.gradle` (root) already has the correct classpath dependencies, and `google-services.json` already uses `com.kvp.salesnavigator`.
-
+The Navbar already renders the logo correctly when `companyLogo` has a value. The issue is purely that the cached value is stale.
