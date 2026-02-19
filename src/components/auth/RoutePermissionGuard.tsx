@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useProfilePermissions } from '@/hooks/useProfilePermissions';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
+import { useAuth } from '@/hooks/useAuth';
 
 interface RoutePermissionGuardProps {
   children: ReactNode;
@@ -20,6 +21,7 @@ interface RoutePermissionGuardProps {
 export const RoutePermissionGuard = ({ children, permissionPrefix }: RoutePermissionGuardProps) => {
   const { permissions, isLoading, hasModuleAccess } = useProfilePermissions();
   const { isFullAdmin, loading: adminLoading } = useAdminAccess();
+  const { securityProfileName } = useAuth();
 
   // Still loading permissions
   if (isLoading || adminLoading) {
@@ -30,10 +32,14 @@ export const RoutePermissionGuard = ({ children, permissionPrefix }: RoutePermis
     );
   }
 
-  // Bypass: admin or no security profile
-  if (isFullAdmin || permissions.length === 0) {
-    return <>{children}</>;
-  }
+  // Bypass: admin
+  if (isFullAdmin) return <>{children}</>;
+
+  // Bypass: no security profile assigned (backward compat)
+  if (!securityProfileName) return <>{children}</>;
+
+  // Profile assigned but zero permissions → deny all
+  if (permissions.length === 0) return <Navigate to="/dashboard" replace />;
 
   // Check if user has can_read on any object matching the prefix
   if (hasModuleAccess(permissionPrefix)) {
