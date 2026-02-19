@@ -100,7 +100,7 @@ const StepEmployment: React.FC<StepEmploymentProps> = ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="manager_id">Primary Manager (Reports To)</Label>
+          <Label htmlFor="manager_id">Primary Manager (Reports To) *</Label>
           <Popover open={managerOpen} onOpenChange={setManagerOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" aria-expanded={managerOpen} className="w-full justify-between font-normal">
