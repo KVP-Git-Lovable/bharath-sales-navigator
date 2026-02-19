@@ -40,6 +40,10 @@ export const ADMIN_MODULE_PERMISSION_MAP: Record<string, string> = {
   'admin_distributor_portal': '/admin/distributor-portal',
   'admin_target_vs_actual': '/admin/target-vs-actual',
   'admin_hierarchy_targets': '/admin/target-vs-actual', // same page
+  'admin_user_mgmt': '/admin#users',
+  'admin_system_settings': '/admin#settings',
+  'admin_pincode_master': '/admin/pincode-master',
+  'admin_tax_master': '/admin/tax-master',
 };
 
 // Sub-feature prefixes for modules where parent name doesn't match sub-feature naming
@@ -50,6 +54,23 @@ export const ADMIN_MODULE_SUB_PREFIXES: Record<string, string[]> = {
   'admin_territories_distributors': ['admin_territory_', 'admin_distributor_', 'admin_region_'],
   'admin_expense_mgmt': ['admin_expense_'],
   'admin_feedback_mgmt': ['admin_feedback_', 'admin_competition_', 'admin_branding_'],
+  'admin_gps_track_mgmt': ['admin_gps_'],
+  'admin_retail_mgmt': ['admin_retailer_'],
+  'admin_van_sales': ['admin_van_'],
+  'admin_security_access': ['admin_security_', 'admin_profile_'],
+  'admin_feature_mgmt': ['admin_feature_'],
+  'admin_retailer_loyalty': ['admin_loyalty_'],
+  'admin_company_profile': ['admin_company_', 'admin_bank_', 'admin_header_'],
+  'admin_invoice_mgmt': ['admin_invoice_'],
+  'admin_credit_mgmt': ['admin_credit_'],
+  'admin_notification_setup': ['admin_notification_'],
+  'admin_distributor_portal': ['admin_portal_'],
+  'admin_target_vs_actual': ['admin_target_'],
+  'admin_hierarchy_targets': ['admin_hierarchy_'],
+  'admin_user_mgmt': ['admin_user_'],
+  'admin_pincode_master': ['admin_pincode_'],
+  'admin_tax_master': ['tax_master_'],
+  'admin_system_settings': ['admin_system_', 'admin_settings_'],
 };
 
 // Reverse map: path -> feature name(s)
