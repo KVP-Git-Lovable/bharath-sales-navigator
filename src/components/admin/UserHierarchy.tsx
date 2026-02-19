@@ -3,11 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SignedAvatarImage } from '@/components/ui/signed-image';
-import { Users, User, ChevronDown, ChevronRight } from 'lucide-react';
+import { Users, User, ChevronDown, ChevronRight, Network, List } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface HierarchyUser {
   id: string;
@@ -126,9 +127,41 @@ const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number
   );
 };
 
+// Flat list row for list view
+const FlatUserRow = ({ user }: { user: HierarchyUser }) => {
+  const colors = getRoleColors(user.role_name);
+  return (
+    <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/60 transition-colors">
+      <Avatar className="h-7 w-7 shrink-0">
+        <SignedAvatarImage src={user.profile_picture_url} />
+        <AvatarFallback className={cn("text-[10px] font-semibold text-white", colors.badge)}>
+          {user.full_name?.charAt(0) || 'U'}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium truncate leading-tight">{user.full_name || user.username}</p>
+      </div>
+      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 shrink-0 font-medium border", colors.bg, colors.text, colors.border)}>
+        {user.role_name || 'No Role'}
+      </Badge>
+    </div>
+  );
+};
+
+// Flatten hierarchy into a sorted list
+const flattenHierarchy = (users: HierarchyUser[]): HierarchyUser[] => {
+  const result: HierarchyUser[] = [];
+  const walk = (list: HierarchyUser[]) => {
+    list.forEach(u => { result.push(u); walk(u.directReports); });
+  };
+  walk(users);
+  return result.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+};
+
 const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   const [hierarchy, setHierarchy] = useState<HierarchyUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
 
   useEffect(() => {
     fetchHierarchy();
@@ -270,9 +303,19 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Users className="h-4 w-4" /> User Hierarchy
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="h-4 w-4" /> User Hierarchy
+          </CardTitle>
+          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'tree' | 'list')} size="sm">
+            <ToggleGroupItem value="tree" aria-label="Tree view" className="h-7 w-7 p-0">
+              <Network className="h-3.5 w-3.5" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="list" aria-label="List view" className="h-7 w-7 p-0">
+              <List className="h-3.5 w-3.5" />
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
         {/* Role color legend */}
         <div className="flex flex-wrap gap-1.5 mt-2">
           {uniqueRoles.map(role => {
@@ -295,10 +338,16 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
             <User className="h-10 w-10 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No hierarchy configured</p>
           </div>
-        ) : (
+        ) : viewMode === 'tree' ? (
           <div className="space-y-1">
             {hierarchy.map(user => (
               <HierarchyRow key={user.id} user={user} level={0} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {flattenHierarchy(hierarchy).map(user => (
+              <FlatUserRow key={user.id} user={user} />
             ))}
           </div>
         )}
