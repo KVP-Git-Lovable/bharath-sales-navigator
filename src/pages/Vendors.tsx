@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useProfilePermissions } from "@/hooks/useProfilePermissions";
 
 interface VendorRow {
   id: string;
@@ -23,8 +23,8 @@ interface VendorRow {
 }
 
 const Vendors = () => {
-  const { securityProfileName } = useAuth();
-  const isAdmin = securityProfileName === 'System Administrator';
+  const { hasPermission } = useProfilePermissions();
+  const isAdmin = hasPermission('admin_vendor_list', 'can_edit');
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);

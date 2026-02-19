@@ -14,7 +14,7 @@ import { Plus, Edit, Trash2, ArrowLeft, Users, Sparkles, BarChart } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useProfilePermissions } from "@/hooks/useProfilePermissions";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { CompetitionDataList } from "@/components/competition/CompetitionDataList";
 import { CompetitionAISummary } from "@/components/competition/CompetitionAISummary";
@@ -69,8 +69,8 @@ interface CompetitorContact {
 
 export default function CompetitionMaster() {
   const navigate = useNavigate();
-  const { securityProfileName } = useAuth();
-  const isAdmin = securityProfileName === 'System Administrator';
+  const { hasPermission: hasCompPerm } = useProfilePermissions();
+  const isAdmin = hasCompPerm('admin_competition_master', 'can_edit');
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
   const [skus, setSKUs] = useState<CompetitorSKU[]>([]);

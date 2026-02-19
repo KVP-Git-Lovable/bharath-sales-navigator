@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useProfilePermissions } from '@/hooks/useProfilePermissions';
-import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { useAuth } from '@/hooks/useAuth';
 
 interface RoutePermissionGuardProps {
@@ -14,26 +13,23 @@ interface RoutePermissionGuardProps {
  * has `can_read` on at least one permission object matching the given prefix.
  * 
  * Bypass conditions (all content visible):
- *  - Admin / System Administrator
- *  - No security profile assigned (permissions array is empty)
+ *  - No security profile assigned (permissions array is empty AND no profile name)
  *  - Has can_read on any object starting with permissionPrefix
+ * 
+ * No special admin bypass - System Administrator has all permissions in DB.
  */
 export const RoutePermissionGuard = ({ children, permissionPrefix }: RoutePermissionGuardProps) => {
   const { permissions, isLoading, hasModuleAccess } = useProfilePermissions();
-  const { isFullAdmin, loading: adminLoading } = useAdminAccess();
-  const { securityProfileName } = useAuth();
+  const { securityProfileName, loading: authLoading } = useAuth();
 
   // Still loading permissions
-  if (isLoading || adminLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
-
-  // Bypass: admin
-  if (isFullAdmin) return <>{children}</>;
 
   // Bypass: no security profile assigned (backward compat)
   if (!securityProfileName) return <>{children}</>;

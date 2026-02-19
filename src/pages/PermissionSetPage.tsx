@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfilePermissions } from '@/hooks/useProfilePermissions';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Shield, Users, Loader2 } from 'lucide-react';
@@ -10,12 +11,11 @@ import { PermissionSetGroupsTab } from '@/components/security/PermissionSetGroup
 
 export default function PermissionSetPage() {
   const navigate = useNavigate();
-  const { user, userRole, securityProfileName, loading } = useAuth();
+  const { user, loading, securityProfileName } = useAuth();
+  const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const [activeTab, setActiveTab] = useState('role-permissions');
 
-  const hasAdminAccess = securityProfileName === 'System Administrator';
-
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -24,7 +24,11 @@ export default function PermissionSetPage() {
   }
 
   if (!user) return <Navigate to="/auth" replace />;
-  if (userRole !== null && !hasAdminAccess) return <Navigate to="/dashboard" replace />;
+  
+  // No profile = show all; profile assigned = check permission
+  if (securityProfileName && !hasModuleAccess('admin_security_')) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-subtle p-4">

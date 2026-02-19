@@ -53,17 +53,28 @@
        );
      }
  
-     // Check System Administrator security profile
+     // Check permission via profile_object_permissions
      const { data: profileData } = await supabase
        .from('user_profiles')
-       .select('profile_id, security_profiles(name)')
+       .select('profile_id')
        .eq('user_id', userData.user.id)
        .single();
  
-     const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
-     if (!isSystemAdmin) {
+     let hasPermission = false;
+     if (profileData?.profile_id) {
+       const { data: perms } = await supabase
+         .from('profile_object_permissions')
+         .select('can_create')
+         .eq('profile_id', profileData.profile_id)
+         .eq('object_name', 'admin_territory_pincode')
+         .eq('can_create', true)
+         .limit(1);
+       hasPermission = (perms && perms.length > 0) || false;
+     }
+ 
+     if (!hasPermission) {
        return new Response(
-         JSON.stringify({ error: 'Admin access required' }),
+         JSON.stringify({ error: 'You do not have permission to import pincodes' }),
          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
        );
      }

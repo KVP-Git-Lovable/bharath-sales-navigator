@@ -56,9 +56,8 @@ const Analytics = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const { permissions, hasPermission: hasFeaturePermission } = useProfilePermissions();
-  const { isFullAdmin } = useAdminAccess();
   const hasSecurityProfile = permissions.length > 0;
-  const canShowTab = (featureName: string) => !hasSecurityProfile || isFullAdmin || hasFeaturePermission(featureName, 'can_read');
+  const canShowTab = (featureName: string) => !hasSecurityProfile || hasFeaturePermission(featureName, 'can_read');
   
   const showProductivityTab = canShowTab('analytics_business_summary');
   const showTargetTab = canShowTab('analytics_order_details');

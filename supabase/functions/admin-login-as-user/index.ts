@@ -43,19 +43,29 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if requesting user has System Administrator security profile
+    // Check permission via profile_object_permissions
     const { data: userProfile } = await supabaseAdmin
       .from('user_profiles')
-      .select('security_profiles(name)')
+      .select('profile_id')
       .eq('user_id', adminUser.id)
       .single()
 
-    const isSystemAdmin = (userProfile?.security_profiles as any)?.name === 'System Administrator'
+    let hasPermission = false
+    if (userProfile?.profile_id) {
+      const { data: perms } = await supabaseAdmin
+        .from('profile_object_permissions')
+        .select('can_read')
+        .eq('profile_id', userProfile.profile_id)
+        .eq('object_name', 'admin_user_login_as')
+        .eq('can_read', true)
+        .limit(1)
+      hasPermission = (perms && perms.length > 0) || false
+    }
 
-    if (!isSystemAdmin) {
+    if (!hasPermission) {
       console.log('Access denied for user:', adminUser.id)
       return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
+        JSON.stringify({ error: 'You do not have permission to login as other users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

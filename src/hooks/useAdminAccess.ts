@@ -2,15 +2,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfilePermissions } from '@/hooks/useProfilePermissions';
 
 export const useAdminAccess = () => {
-  const { user, userRole, securityProfileName, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const { hasAnyAdminPermission, hasModuleAccess, permittedAdminPaths, isLoading: permLoading } = useProfilePermissions();
   
-  const isFullAdmin = securityProfileName === 'System Administrator';
-  const hasAdminAccess = isFullAdmin || hasAnyAdminPermission;
+  // hasAdminAccess is now purely based on profile_object_permissions
+  const hasAdminAccess = hasAnyAdminPermission;
   
   return { 
     hasAdminAccess, 
-    isFullAdmin,
     hasModuleAccess,
     permittedAdminPaths,
     loading: authLoading || permLoading, 

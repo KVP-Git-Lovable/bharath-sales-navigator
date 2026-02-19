@@ -51,18 +51,29 @@ serve(async (req) => {
       );
     }
 
-    // Check if user has System Administrator security profile
+    // Check permission via profile_object_permissions
     const { data: profileData } = await supabaseAdmin
       .from('user_profiles')
-      .select('profile_id, security_profiles(name)')
+      .select('profile_id')
       .eq('user_id', user.id)
       .single();
 
-    const isSystemAdmin = (profileData as any)?.security_profiles?.name === 'System Administrator';
-    if (!isSystemAdmin) {
-      console.error('User is not System Administrator');
+    let hasPermission = false;
+    if (profileData?.profile_id) {
+      const { data: perms } = await supabaseAdmin
+        .from('profile_object_permissions')
+        .select('can_create')
+        .eq('profile_id', profileData.profile_id)
+        .eq('object_name', 'admin_distributor_portal')
+        .eq('can_create', true)
+        .limit(1);
+      hasPermission = (perms && perms.length > 0) || false;
+    }
+
+    if (!hasPermission) {
+      console.error('User does not have distributor portal permission');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized - Admin access required' }),
+        JSON.stringify({ error: 'Unauthorized - You do not have permission for distributor portal' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

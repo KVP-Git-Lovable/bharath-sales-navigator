@@ -16,6 +16,7 @@ import { Truck, Plus, Edit, Trash2, Package, RotateCcw, ChevronDown, ChevronRigh
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
+import { useProfilePermissions } from '@/hooks/useProfilePermissions';
 import { UserSelector } from '@/components/UserSelector';
 import { useSubordinates } from '@/hooks/useSubordinates';
 
@@ -108,10 +109,13 @@ export default function VanSalesManagement() {
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   
   // Filter van stock summaries based on selected user
+  const { hasPermission: hasVanPerm } = useProfilePermissions();
+  const canViewAll = hasVanPerm('admin_van_sales', 'can_view_all');
+
   const filteredVanStockSummaries = useMemo(() => {
     if (selectedUserId === 'all') {
-      // For admin or manager viewing all, show all or subordinates only
-      if (isManager && securityProfileName !== 'System Administrator') {
+      // Show all if user has can_view_all permission, otherwise filter to subordinates
+      if (isManager && !canViewAll) {
         return vanStockSummaries.filter(s => 
           s.user_id === user?.id || subordinateIds.includes(s.user_id)
         );
@@ -122,7 +126,7 @@ export default function VanSalesManagement() {
       return vanStockSummaries.filter(s => s.user_id === user?.id);
     }
     return vanStockSummaries.filter(s => s.user_id === selectedUserId);
-  }, [vanStockSummaries, selectedUserId, user?.id, subordinateIds, isManager, securityProfileName]);
+  }, [vanStockSummaries, selectedUserId, user?.id, subordinateIds, isManager, canViewAll]);
   
   const [formData, setFormData] = useState({
     registration_number: '',
