@@ -1,64 +1,68 @@
+## Status Metrics Dashboard (`/status`)
 
+### Overview
 
-## Collapsible Module Permission UI + Auto-Select System Administrator
+Create a standalone `/status` page with its own admin login form (independent of the main app auth). This page will display key database metrics after successful administrator authentication.
 
-### What Changes
+### What Will Be Built
 
-**1. Collapsible/Expandable Module Structure (`ModulePermissionTable.tsx`)**
+**1. New Page: `src/pages/StatusDashboard.tsx**`
 
-Replace the current flat list with an accordion-style layout:
-- Only **module names** (level 0) are visible by default, each with a chevron icon
-- Clicking a module expands it to reveal its features and sub-features
-- Module-level row shows aggregate permission checkboxes (All, View, Create, Edit, Delete) that toggle all children
-- Features with sub-features get their own nested collapsible section inside the expanded module
-- Uses `Collapsible` component from Radix (already installed)
+A self-contained page with two states:
 
-**2. Auto-Select System Administrator (`RolePermissionsTab.tsx`)**
+- **Login State**: A branded login form matching the QuickApp.ai theme (blue gradient background, logo, card layout) with heading "QuickApp.ai Status Dashboard", email and password fields
+- **Dashboard State**: After successful admin login, displays database metrics in a grid of cards
 
-When profiles load, automatically pre-select the "System Administrator" profile so the table appears immediately without requiring a manual selection.
+The login will use `supabase.auth.signInWithPassword()` directly, then verify the user is a System Administrator by checking `user_profiles` + `security_profiles`. If not an admin, it shows an error and signs the user out. This keeps the `/status` page completely independent from the main app session.
+
+**2. Route Registration in `App.tsx**`
+
+Add the `/status` route as a public route (no `ProtectedRoute` wrapper) since the page handles its own authentication internally.
+
+**3. Database Metrics Displayed**
+
+The dashboard will query and display these key metrics using direct Supabase queries:  
+  
+database read-write, database uptime, and other key metrics
+
+Each metric shown in a styled card with icon, label, and count.
 
 ### Technical Details
 
-**File: `src/components/security/ModulePermissionTable.tsx`**
-- Add state: `expandedModules` (Set of expanded module names) and `expandedFeatures` (Set of expanded feature names)
-- Restructure rendering to iterate `PERMISSION_MODULES` directly instead of flattening into rows
-- Each module renders as a collapsible section:
-  - Collapsed: module name + chevron + aggregate permission checkboxes on the right
-  - Expanded: reveals feature rows (level 1) and sub-feature rows (level 2)
-- Features that have sub-features also get their own expand/collapse toggle
-- Use `ChevronRight` / `ChevronDown` icons from lucide-react for the toggle indicator
-- Keep all existing permission logic (aggregate toggles, parent-child cascading) intact
+**File: `src/pages/StatusDashboard.tsx**`
 
-**File: `src/components/security/RolePermissionsTab.tsx`**
-- After `profiles` data loads, find the profile with `name === SYSTEM_ADMINISTRATOR_PROFILE`
-- If found and no profile is currently selected, auto-set `selectedProfileId` to that profile's ID
-- Use a `useEffect` to handle this once profiles are fetched
+- Local state: `isAuthenticated`, `adminUser`, `isLoading`, `metrics`
+- Login flow:
+  1. Call `supabase.auth.signInWithPassword({ email, password })`
+  2. Query `user_profiles` joined with `security_profiles` to verify `name = 'System Administrator'`
+  3. If not admin: call `supabase.auth.signOut()`, show error toast
+  4. If admin: set `isAuthenticated = true`, fetch metrics
+- Metrics fetch: parallel `supabase.from('table').select('id', { count: 'exact', head: true })` calls
+- Logout button in dashboard header signs out and resets state
+- Uses existing QuickApp.ai logo, same gradient background, Card components, and styling from `RoleBasedAuthPage.tsx`
 
-### UI Layout (Collapsed State)
+**File: `src/App.tsx**`
 
-```text
-+----------------------------------------------------------+
-| Module                  | All | View | Create | Edit | Del |
-+----------------------------------------------------------+
-| > Admin Panel           | [x] | [x]  | [x]    | [x]  | [x] |
-| > Attendance            | [ ] | [ ]  | [ ]    | [ ]  | [ ] |
-| > My Visit              | [ ] | [ ]  | [ ]    | [ ]  | [ ] |
-| > All Retailers         | [ ] | [ ]  | [ ]    | [ ]  | [ ] |
-| ...                                                        |
-+----------------------------------------------------------+
-```
+- Import `StatusDashboard`
+- Add route: `<Route path="/status" element={<StatusDashboard />} />`
+- Placed alongside other public routes (no ProtectedRoute wrapper)
 
-### UI Layout (Expanded State - Admin Panel clicked)
+### UI Design
 
-```text
-+----------------------------------------------------------+
-| v Admin Panel           | [x] | [x]  | [x]    | [x]  | [x] |
-|   > Admin Dashboard     | [x] | [x]  | [x]    | [x]  | [x] |
-|   > Price Book Mgmt     | [x] | [x]  | [x]    | [x]  | [x] |
-|   ...                                                      |
-| > Attendance            | [ ] | [ ]  | [ ]    | [ ]  | [ ] |
-+----------------------------------------------------------+
-```
+**Login View:**
 
-When "Admin Dashboard" is expanded further, its sub-features (Dashboard Overview, User List, etc.) appear indented below it.
+- Blue gradient background matching the existing auth page
+- Centered card with QuickApp.ai logo
+- Heading: "QuickApp.ai Status Dashboard"
+- Subtitle: "Administrator Access Only"
+- Email field labeled "Admin Email Address"
+- Password field with show/hide toggle
+- "Sign In" button
 
+**Dashboard View:**
+
+- Same gradient background
+- Top bar: "QuickApp.ai Status Dashboard" title + Logout button
+- Grid of metric cards (2 columns on mobile, 4 on desktop)
+- Each card: icon, metric name, count value
+- Auto-refresh button to reload metrics
