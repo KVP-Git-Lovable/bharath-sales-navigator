@@ -44,6 +44,7 @@ interface UserProfile {
   phone_number?: string;
   recovery_email?: string;
   profile_picture_url?: string;
+  designation?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -120,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Use a simple query without any complex operations
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, full_name, phone_number, recovery_email, profile_picture_url, preferred_language')
+        .select('id, username, full_name, phone_number, recovery_email, profile_picture_url, preferred_language, designation')
         .eq('id', userId)
         .single();
 

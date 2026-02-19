@@ -89,7 +89,7 @@ const Index = () => {
     (metaName && metaName.trim()) ||
     getEmailName(user?.email) ||
     'User';
-  const roleDisplay = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : 'Field Executive';
+  const roleDisplay = userProfile?.designation || (userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : 'Field Executive');
 
   const getGreeting = () => {
     const hour = new Date().getHours();
