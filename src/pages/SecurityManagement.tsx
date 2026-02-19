@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -48,6 +49,7 @@ export default function SecurityManagement() {
   }
 
   return (
+    <Layout>
     <div className="min-h-screen bg-gradient-subtle p-4 pt-20">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
@@ -121,5 +123,6 @@ export default function SecurityManagement() {
         </Tabs>
       </div>
     </div>
+    </Layout>
   );
 }
