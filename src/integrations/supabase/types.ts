@@ -14147,6 +14147,7 @@ export type Database = {
           username: string
         }[]
       }
+      get_database_metrics: { Args: never; Returns: Json }
       get_direct_reports: {
         Args: { manager_user_id: string }
         Returns: {
