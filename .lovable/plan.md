@@ -1,87 +1,61 @@
 
 
-## Fix: Company Logo Not Displaying (Private Bucket - Signed URL Approach)
+## Fix: Make `company-assets` Bucket Public
 
-### Root Cause
+### Why This Is Safe
 
-The `company-assets` storage bucket is **private**, but the code stores and uses raw "public" URLs (generated via `getPublicUrl()`). These URLs return 403 for private buckets. The Navbar, InvoiceGenerator, and VanStockManagement all use these raw URLs directly without signing.
+The `company-assets` bucket contains **only company branding assets** (logos, header images) that are intended to be visible across the entire application. Making this single bucket public:
 
-### Approach
-
-Sign URLs at the data layer (`useCompanyData`) so all downstream consumers automatically get working URLs. Also patch the two PDF generators that fetch logos independently.
+- Eliminates the need for signed URLs for logos everywhere
+- Removes the 1-hour URL expiry problem (cached signed URLs expire, causing broken images)
+- Is the standard approach for branding/public assets
+- All other buckets (employee-photos, attendance-photos, visit-photos, avatars, visits) remain **private**
 
 ### Changes
 
-**File 1: `src/hooks/useCompanyData.ts`**
+**1. SQL Migration -- Make `company-assets` bucket public**
 
-- Import `getSignedStorageUrl` from `@/utils/storageUtils`
-- After fetching company data, sign the logo URL before storing in state and cache
-- This fixes the Navbar and any other consumer of `useCompanyData()`
-
-```text
-// After line 73 (where newHeaderLogo is computed):
-const newHeaderLogo = data.header_logo_url || data.logo_url || null;
-
-// ADD: resolve to signed URL
-const resolvedLogo = newHeaderLogo
-  ? await getSignedStorageUrl(newHeaderLogo)
-  : null;
-
-// Use resolvedLogo instead of newHeaderLogo for state + cache
-setHeaderLogo(resolvedLogo);
+```sql
+UPDATE storage.buckets SET public = true WHERE id = 'company-assets';
 ```
 
-The localStorage cache will store signed URLs (valid ~1 hour). On next app load, the cached signed URL renders immediately; if expired, `fetchCompany()` runs and refreshes it.
+This single change fixes the broken header logo immediately because the existing code already generates public URLs via `getPublicUrl()` -- those URLs will now work.
 
-**File 2: `src/components/InvoiceGenerator.tsx` (line 103)**
+**2. `src/hooks/useCompanyData.ts` -- Remove unnecessary signing logic**
 
-Sign the URL before fetching for PDF generation:
+The previous fix added `getSignedStorageUrl` calls for the logo. Since the bucket will be public, revert this to use the raw URL directly (simpler, no expiry issues):
 
-```text
-// Before:
-const response = await fetch(company.logo_url);
+- Remove the `getSignedStorageUrl` and `isStorageUrl` imports
+- Use `newHeaderLogo` directly instead of resolving it through signing
+- This eliminates a network call and the 1-hour cache expiry problem
 
-// After:
-import { getSignedStorageUrl } from "@/utils/storageUtils";
-const signedLogoUrl = await getSignedStorageUrl(company.logo_url);
-const response = await fetch(signedLogoUrl);
-```
+**3. `src/components/InvoiceGenerator.tsx` -- Remove signing for logo fetch**
 
-**File 3: `src/components/VanStockManagement.tsx` (line 1310)**
+Revert the `getSignedStorageUrl` call added previously. The public URL will work directly with `fetch()`.
 
-Same pattern for PDF logo fetch:
+**4. `src/components/VanStockManagement.tsx` -- Remove signing for logo fetch**
 
-```text
-// Before:
-const logoResponse = await fetch(company.logo_url);
+Same as above -- revert to using the raw public URL for PDF logo generation.
 
-// After:
-import { getSignedStorageUrl } from "@/utils/storageUtils";
-const signedLogoUrl = await getSignedStorageUrl(company.logo_url);
-const logoResponse = await fetch(signedLogoUrl);
-```
+### What Stays Private
 
-### Why This Works for Multi-Tenant
+| Bucket | Status | Reason |
+|--------|--------|--------|
+| company-assets | **Public** (change) | Branding logos visible to all users |
+| employee-photos | Private | Personal employee data |
+| attendance-photos | Private | Sensitive attendance records |
+| visit-photos | Private | Field visit evidence |
+| avatars | Private | User profile pictures |
+| visits | Private | Visit documents |
 
-- Bucket stays **private** -- no unauthorized cross-tenant access
-- Signed URLs are short-lived (1 hour) and cached in-memory by `storageUtils.ts`
-- RLS policies on `storage.objects` enforce per-tenant access
-- No public exposure of any asset
-- Works automatically for all future clients
+### Prerequisite
 
-### Impact Summary
-
-| Consumer | Current | After Fix |
-|----------|---------|-----------|
-| Navbar header logo | Broken (raw URL, 403) | Works (signed via `useCompanyData`) |
-| HeaderBrandingSettings preview | Already works (`useSignedUrl`) | No change |
-| InvoiceGenerator PDF logo | Broken (raw fetch, 403) | Works (signed before fetch) |
-| VanStockManagement PDF logo | Broken (raw fetch, 403) | Works (signed before fetch) |
+You must first fix the `package-lock.json` file (it has invalid JSON). Delete it and let it regenerate, or manually fix the formatting errors. The build will not work until this is resolved.
 
 ### Files to Change
 
-1. `src/hooks/useCompanyData.ts` -- sign logo URL before returning
-2. `src/components/InvoiceGenerator.tsx` -- sign before PDF fetch
-3. `src/components/VanStockManagement.tsx` -- sign before PDF fetch
+1. SQL migration: `UPDATE storage.buckets SET public = true WHERE id = 'company-assets'`
+2. `src/hooks/useCompanyData.ts` -- simplify by removing signing logic
+3. `src/components/InvoiceGenerator.tsx` -- remove signing for logo
+4. `src/components/VanStockManagement.tsx` -- remove signing for logo
 
-No database migration needed. No bucket visibility change.
