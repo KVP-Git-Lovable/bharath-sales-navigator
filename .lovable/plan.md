@@ -1,68 +1,153 @@
-## Status Metrics Dashboard (`/status`)
+
+
+## Activity Logging Section for Status Dashboard
 
 ### Overview
 
-Create a standalone `/status` page with its own admin login form (independent of the main app auth). This page will display key database metrics after successful administrator authentication.
+Add an "Activity Logging" section below the existing database metrics on the `/status` dashboard. This requires new database tables to track user sessions and page navigation, a client-side tracker that logs activity in real-time, and a server-side RPC to aggregate the data for the admin dashboard.
 
 ### What Will Be Built
 
-**1. New Page: `src/pages/StatusDashboard.tsx**`
+**1. New Database Tables (Migration)**
 
-A self-contained page with two states:
+- **`user_sessions`** -- Tracks login/logout sessions
+  - `id` (uuid, PK)
+  - `user_id` (uuid, references profiles)
+  - `login_at` (timestamptz, default now())
+  - `logout_at` (timestamptz, nullable)
+  - `duration_seconds` (integer, generated or computed)
+  - `is_active` (boolean, default true)
 
-- **Login State**: A branded login form matching the QuickApp.ai theme (blue gradient background, logo, card layout) with heading "QuickApp.ai Status Dashboard", email and password fields
-- **Dashboard State**: After successful admin login, displays database metrics in a grid of cards
+- **`user_page_views`** -- Tracks module/page navigation
+  - `id` (uuid, PK)
+  - `user_id` (uuid)
+  - `session_id` (uuid, references user_sessions)
+  - `page_path` (text) -- e.g. `/attendance`, `/my-retailers`
+  - `module_name` (text) -- extracted root path e.g. `attendance`, `my-retailers`
+  - `visited_at` (timestamptz, default now())
+  - `duration_seconds` (integer, nullable) -- time spent on that page
 
-The login will use `supabase.auth.signInWithPassword()` directly, then verify the user is a System Administrator by checking `user_profiles` + `security_profiles`. If not an admin, it shows an error and signs the user out. This keeps the `/status` page completely independent from the main app session.
+- **`user_data_usage`** -- Tracks upload/download data volume
+  - `id` (uuid, PK)
+  - `user_id` (uuid)
+  - `session_id` (uuid, references user_sessions)
+  - `bytes_uploaded` (bigint, default 0)
+  - `bytes_downloaded` (bigint, default 0)
+  - `recorded_at` (timestamptz, default now())
 
-**2. Route Registration in `App.tsx**`
+RLS policies: All tables will allow users to INSERT their own rows and admins to SELECT all rows.
 
-Add the `/status` route as a public route (no `ProtectedRoute` wrapper) since the page handles its own authentication internally.
+**2. New Database RPC: `get_activity_logging_summary`**
 
-**3. Database Metrics Displayed**
+A SECURITY DEFINER function (admin-only) that returns:
+- Per-user total usage time (sum of session durations)
+- Per-user most used module (highest page view count)
+- Per-user least used module (lowest page view count, minimum 1 visit)
+- Per-user data usage in MB (sum of bytes uploaded + downloaded)
 
-The dashboard will query and display these key metrics using direct Supabase queries:  
-  
-database read-write, database uptime, and other key metrics
+Returns a JSON array of user activity summaries.
 
-Each metric shown in a styled card with icon, label, and count.
+**3. Client-Side Activity Tracker: `src/hooks/useActivityTracker.ts`**
+
+A hook that runs inside the authenticated app (within `AuthProvider`):
+- **Session tracking**: On login (user detected), creates a `user_sessions` row. On logout/tab close, updates `logout_at`.
+- **Page view tracking**: Listens to route changes (via `useLocation` from react-router), logs each navigation to `user_page_views` with the module name extracted from the path.
+- **Data usage tracking**: Wraps or intercepts `fetch`/XHR to estimate bytes transferred, periodically batches and inserts into `user_data_usage`.
+- Uses `beforeunload` event to finalize sessions on tab close.
+
+**4. Integration in `App.tsx`**
+
+Add `useActivityTracker()` call inside the authenticated app wrapper so it runs for all logged-in users.
+
+**5. Activity Logging UI in `StatusDashboard.tsx`**
+
+Below the existing database metrics grid, add a new section:
+- Section header: "Activity Logging" with a Users icon
+- A table/card layout showing per-user rows with columns:
+  - **User Name**
+  - **Total Usage Time** (formatted as hours/minutes)
+  - **Most Used Module** (module name + visit count)
+  - **Least Used Module** (module name + visit count)
+  - **Data Usage** (formatted in MB)
+- Date range filter (today / last 7 days / last 30 days)
+- Data fetched via `supabase.rpc('get_activity_logging_summary', { days: 7 })`
 
 ### Technical Details
 
-**File: `src/pages/StatusDashboard.tsx**`
+**Migration SQL** (key parts):
 
-- Local state: `isAuthenticated`, `adminUser`, `isLoading`, `metrics`
-- Login flow:
-  1. Call `supabase.auth.signInWithPassword({ email, password })`
-  2. Query `user_profiles` joined with `security_profiles` to verify `name = 'System Administrator'`
-  3. If not admin: call `supabase.auth.signOut()`, show error toast
-  4. If admin: set `isAuthenticated = true`, fetch metrics
-- Metrics fetch: parallel `supabase.from('table').select('id', { count: 'exact', head: true })` calls
-- Logout button in dashboard header signs out and resets state
-- Uses existing QuickApp.ai logo, same gradient background, Card components, and styling from `RoleBasedAuthPage.tsx`
+```text
+CREATE TABLE user_sessions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES profiles(id),
+  login_at timestamptz DEFAULT now(),
+  logout_at timestamptz,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
 
-**File: `src/App.tsx**`
+CREATE TABLE user_page_views (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL,
+  session_id uuid REFERENCES user_sessions(id),
+  page_path text NOT NULL,
+  module_name text NOT NULL,
+  visited_at timestamptz DEFAULT now(),
+  duration_seconds integer
+);
 
-- Import `StatusDashboard`
-- Add route: `<Route path="/status" element={<StatusDashboard />} />`
-- Placed alongside other public routes (no ProtectedRoute wrapper)
+CREATE TABLE user_data_usage (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL,
+  session_id uuid REFERENCES user_sessions(id),
+  bytes_uploaded bigint DEFAULT 0,
+  bytes_downloaded bigint DEFAULT 0,
+  recorded_at timestamptz DEFAULT now()
+);
+```
 
-### UI Design
+**Activity Tracker Hook** (`src/hooks/useActivityTracker.ts`):
+- Extracts module from path: `/my-retailers/123` becomes `my-retailers`
+- Creates session on mount (when user is authenticated)
+- Tracks page changes via `useLocation()`
+- Estimates data usage by intercepting network responses via PerformanceObserver API
+- Batches data usage updates every 60 seconds
+- Finalizes session on unmount/beforeunload
 
-**Login View:**
+**RPC function** (`get_activity_logging_summary`):
+- Accepts `p_days integer` parameter (default 7)
+- Joins `user_sessions`, `user_page_views`, `user_data_usage` with `profiles`
+- Returns per-user aggregated stats
+- Restricted to System Administrators only
 
-- Blue gradient background matching the existing auth page
-- Centered card with QuickApp.ai logo
-- Heading: "QuickApp.ai Status Dashboard"
-- Subtitle: "Administrator Access Only"
-- Email field labeled "Admin Email Address"
-- Password field with show/hide toggle
-- "Sign In" button
+### Files to Create/Modify
 
-**Dashboard View:**
+| File | Action |
+|------|--------|
+| Migration SQL | Create -- 3 tables + RPC function + RLS policies |
+| `src/hooks/useActivityTracker.ts` | Create -- client-side tracking hook |
+| `src/App.tsx` | Modify -- add `useActivityTracker()` inside auth wrapper |
+| `src/pages/StatusDashboard.tsx` | Modify -- add Activity Logging section below metrics |
 
-- Same gradient background
-- Top bar: "QuickApp.ai Status Dashboard" title + Logout button
-- Grid of metric cards (2 columns on mobile, 4 on desktop)
-- Each card: icon, metric name, count value
-- Auto-refresh button to reload metrics
+### UI Layout (Dashboard View)
+
+```text
++--------------------------------------------------+
+|  [Healthy]                                        |
+|  QuickApp.ai Status Dashboard        [Refresh]    |
+|  AWS ap-south-1 (Mumbai) | PostgreSQL  [Logout]   |
++--------------------------------------------------+
+|  [DB Size] [Uptime] [Status] [Reads] [Commits]    |
+|  [Storage]                                         |
++--------------------------------------------------+
+|                                                    |
+|  Activity Logging            [Today|7d|30d]        |
+|  +---------+----------+--------+--------+-------+  |
+|  | User    | Usage    | Most   | Least  | Data  |  |
+|  |         | Time     | Used   | Used   | Usage |  |
+|  +---------+----------+--------+--------+-------+  |
+|  | John D. | 4h 32m   | attend.| beats  | 12 MB |  |
+|  | Jane S. | 2h 15m   | retail.| orders | 8 MB  |  |
+|  +---------+----------+--------+--------+-------+  |
++--------------------------------------------------+
+```
