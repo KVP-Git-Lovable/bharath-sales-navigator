@@ -1,77 +1,101 @@
 
 
-## Fix: Admin Modules Not Showing Due to Prefix Mismatch
+## Validation Report: Permission-Based Access Control (PBAC) Architecture
 
-### Root Cause
+### 1. Hidden Features for System Administrator -- FIXED (with 1 remaining issue)
 
-The `AdminControls` page filters modules using `permittedAdminPaths`. This set is built by checking if any permission object name **starts with** the module key from `ADMIN_MODULE_PERMISSION_MAP`. However, most module keys don't match the actual permission object prefixes in the database.
+**Status: MOSTLY RESOLVED**
 
-For example:
-- Module key `admin_security_access` expects objects starting with `admin_security_access...`
-- But actual objects are named `admin_security_profiles`, `admin_profile_permissions` -- they don't start with `admin_security_access`
+- All ~249+ permission objects seeded in `profile_object_permissions` for System Administrator
+- Prefix mismatches fixed with `ADMIN_MODULE_SUB_PREFIXES`
+- Missing path mappings added to `ADMIN_MODULE_PERMISSION_MAP`
+- Feature flags enabled for Gamification, Packing List, Deliveries
 
-**Result**: 15 of 25 modules fail the prefix check and are hidden. Only 6 are rescued by existing `ADMIN_MODULE_SUB_PREFIXES` entries, leaving **9 modules invisible**.
+**Remaining issue**: `UserObjectPermissions.tsx` still exists and reads from `user_object_permissions` table. This is a per-user override layer. The plan said this was removed, but the component and table still exist.
 
-Additionally, 4 admin cards have paths not listed in `ADMIN_MODULE_PERMISSION_MAP` at all:
-- `/admin#users` (User Management)
-- `/admin#settings` (System Settings)
-- `/admin/pincode-master` (Pincode Master)
-- `/admin/tax-master` (Tax Master)
+---
 
-### Modules Currently Missing (and why)
+### 2. Security and Access Control as Single Source of Truth -- 3 violations found
 
-| Module | Key | Actual DB prefix | Status |
-|--------|-----|-------------------|--------|
-| GPS Track Mgmt | `admin_gps_track_mgmt` | `admin_gps_` | Hidden |
-| Retail Management | `admin_retail_mgmt` | `admin_retailer_` | Hidden |
-| Van Sales | `admin_van_sales` | `admin_van_` | Hidden |
-| Security and Access | `admin_security_access` | `admin_security_`, `admin_profile_` | Hidden |
-| Feature Management | `admin_feature_mgmt` | `admin_feature_` | Hidden |
-| Retailer Loyalty | `admin_retailer_loyalty` | `admin_loyalty_` | Hidden |
-| Company Profile | `admin_company_profile` | `admin_company_`, `admin_bank_`, `admin_header_` | Hidden |
-| Invoice Management | `admin_invoice_mgmt` | `admin_invoice_` | Hidden |
-| Credit Management | `admin_credit_mgmt` | `admin_credit_` | Hidden |
-| Notification Setup | `admin_notification_setup` | `admin_notification_` | Hidden |
-| Distributor Portal | `admin_distributor_portal` | `admin_portal_` | Hidden |
-| Target Management | `admin_target_vs_actual` | `admin_target_` | Hidden |
-| User Management | `/admin#users` | Not mapped | Hidden |
-| System Settings | `/admin#settings` | Not mapped | Hidden |
-| Pincode Master | `/admin/pincode-master` | Not mapped | Hidden |
-| Tax Master | `/admin/tax-master` | Not mapped | Hidden |
+**Status: 3 HARDCODED GATES REMAIN**
 
-### Fix (Single File Change)
+| Location | Violation | Fix |
+|----------|-----------|-----|
+| `src/pages/VanSalesManagement.tsx:772` | `securityProfileName === 'System Administrator'` controls UserSelector visibility | Replace with `canViewAll` from `hasPermission('admin_van_sales', 'can_view_all')` (already partially done on line 113) |
+| `supabase/functions/chat-assistant/index.ts:92` | `security_profiles.name === 'System Administrator'` sets `isAdmin` flag | Replace with `profile_object_permissions` check for relevant admin objects |
+| `src/components/security/UserObjectPermissions.tsx` | Component reads from `user_object_permissions` table (per-user override layer) | Either remove entirely or keep as deliberate override feature |
 
-**File: `src/hooks/useProfilePermissions.ts`**
+The `RolePermissionsTab.tsx` and `ObjectPermissions.tsx` references to `SYSTEM_ADMINISTRATOR_PROFILE` are acceptable -- they auto-grant all permissions in the management UI (visual convenience, not an access gate).
 
-Add missing sub-prefix mappings to `ADMIN_MODULE_SUB_PREFIXES` and add missing path mappings to `ADMIN_MODULE_PERMISSION_MAP`:
+---
 
-```text
-// Add to ADMIN_MODULE_PERMISSION_MAP:
-'admin_user_mgmt': '/admin#users',
-'admin_system_settings': '/admin#settings',
-'admin_pincode_master': '/admin/pincode-master',
-'admin_tax_master': '/admin/tax-master',
+### 3. Role Permissions (View / Create / Edit / Delete) -- CORRECT
 
-// Add to ADMIN_MODULE_SUB_PREFIXES:
-'admin_gps_track_mgmt': ['admin_gps_'],
-'admin_retail_mgmt': ['admin_retailer_'],
-'admin_van_sales': ['admin_van_'],
-'admin_security_access': ['admin_security_', 'admin_profile_'],
-'admin_feature_mgmt': ['admin_feature_'],
-'admin_retailer_loyalty': ['admin_loyalty_'],
-'admin_company_profile': ['admin_company_', 'admin_bank_', 'admin_header_'],
-'admin_invoice_mgmt': ['admin_invoice_'],
-'admin_credit_mgmt': ['admin_credit_'],
-'admin_notification_setup': ['admin_notification_'],
-'admin_distributor_portal': ['admin_portal_'],
-'admin_target_vs_actual': ['admin_target_'],
-'admin_hierarchy_targets': ['admin_hierarchy_'],
-'admin_user_mgmt': ['admin_user_'],
-'admin_pincode_master': ['admin_pincode_'],  // if objects exist
-'admin_tax_master': ['tax_master_'],
-```
+**Status: WORKING**
 
-**Database migration**: Seed any missing permission objects (pincode master, system settings) for the System Administrator profile.
+- Frontend uses `hasPermission(objectName, 'can_read'|'can_create'|'can_edit'|'can_delete')` consistently
+- All 9 edge functions check `profile_object_permissions` with specific object names and action flags
+- No edge function uses `has_role` or `is_system_admin` for authorization (only DB functions do, which is separate)
+- `RoutePermissionGuard` checks `can_read` via `hasModuleAccess(prefix)`
 
-No other files need changes. The `AdminControls.tsx` page already reads from `permittedAdminPaths` which will automatically include the newly matched paths.
+---
+
+### 4. Permission Set Groups (Per-User Overrides) -- Decision needed
+
+**Status: TABLE EXISTS BUT NOT ENFORCED**
+
+The `user_object_permissions` table and `UserObjectPermissions.tsx` component still exist. However, they are NOT checked anywhere in the access control flow:
+- `useProfilePermissions.ts` only reads from `profile_object_permissions`
+- Edge functions only check `profile_object_permissions`
+- No code merges user-level overrides with profile-level permissions
+
+**Decision point**: This is currently dead code. Either:
+- Remove it (cleaner, true single source of truth)
+- Wire it in (more flexible, but adds complexity)
+
+---
+
+### 5. Manager Hierarchy (Team Data Visibility) -- CORRECT
+
+**Status: SAFE AND INDEPENDENT**
+
+- Manager hierarchy uses `employees.manager_id` and `get_all_subordinates()` DB function
+- Team data visibility is controlled by RLS policies and reporting structure
+- Does NOT use profile name checks
+- Fully independent from the permission refactor
+
+---
+
+### 6. Database Function Audit -- 2 legacy patterns found
+
+| Function | Issue | Risk |
+|----------|-------|------|
+| `is_system_admin()` | Checks `security_profiles.name = 'System Administrator'` | Used by `can_view_profile`, `can_view_employee`, `pm_is_project_member`, `get_database_metrics` -- these are RLS/DB-level gates that bypass the PBAC model |
+| `has_role(_, 'admin')` | Redirects to `is_system_admin()` check | Used in `can_access_object`, `get_profiles_for_selector`, `list_team_members`, RLS policies |
+
+These DB functions provide a safety net at the database layer. They are acceptable as a defense-in-depth measure since they grant access to System Administrators at the data level, not the UI level. However, they do mean "System Administrator" profile name is still significant in the DB layer.
+
+---
+
+### Summary
+
+| Check | Status | Action Needed |
+|-------|--------|---------------|
+| No hidden features for System Admin | FIXED | None |
+| Single source of truth | 3 violations | Fix VanSales + chat-assistant hardcoded checks |
+| Role permissions (CRUD flags) | CORRECT | None |
+| Per-user overrides | Dead code | Decide: remove or wire in |
+| Manager hierarchy | CORRECT | None |
+| DB functions | Legacy patterns | Acceptable as defense-in-depth |
+
+### Proposed Fixes (3 changes)
+
+**File 1: `src/pages/VanSalesManagement.tsx` (line 772)**
+Replace `securityProfileName === 'System Administrator'` with the existing `canViewAll` variable (already computed on line 113).
+
+**File 2: `supabase/functions/chat-assistant/index.ts` (line 92)**
+Replace `security_profiles.name === 'System Administrator'` with a `profile_object_permissions` check for any `admin_` prefixed object.
+
+**File 3 (optional): `src/components/security/UserObjectPermissions.tsx`**
+Remove component and related dead code if per-user overrides are not wanted.
 
