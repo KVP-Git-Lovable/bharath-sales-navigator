@@ -1,32 +1,49 @@
 
 
-## Make Primary Manager and Phone Number Mandatory in Create User
+## Fix: Modules Showing for Users With No Permissions
 
-Two fields need to be made required in the Create User wizard:
+### Root Cause
 
-### Changes
+The bug is in the permission bypass logic. Currently, both `useFeatureFlags.ts` (line 136) and `RoutePermissionGuard.tsx` (line 34) have this check:
 
-**File: `src/components/admin/create-user/StepBasics.tsx`**
-- Add a required asterisk (*) to the "Phone Number" label
-- No other changes needed here since phone_number is already in this step
-
-**File: `src/components/admin/create-user/StepEmployment.tsx`**
-- Add a required asterisk (*) to the "Primary Manager (Reports To)" label
-
-**File: `src/components/admin/create-user/CreateUserWizard.tsx`**
-- Update `validateStep('basics')` to include `phone_number` in the required fields check
-- Update `validateStep('employment')` to require `manager_id` (currently returns `true` with no validation)
-- Update error messages to mention the newly required fields
-
-### Validation Logic
-
-```text
-// basics step - add phone_number check
-if (!formData.phone_number) -> show error "Phone Number is required"
-
-// employment step - add manager_id check  
-if (!formData.manager_id) -> show error "Primary Manager is required"
+```
+if (permissions.length === 0) return true; // show all
 ```
 
-No database or edge function changes needed -- these are purely UI-level validations.
+This was intended to handle users with **no security profile assigned** (backward compatibility). However, it also matches users who **have a profile assigned but zero permissions configured** -- like Vikhyath (Sales Manager profile, 0 permissions). Both cases produce an empty permissions array, so all modules become visible.
+
+### The Fix
+
+Use `securityProfileName` (already available from `useAuth`) to distinguish:
+- **No profile assigned** (`securityProfileName` is null) -- show all (backward compat)
+- **Profile assigned but 0 permissions** -- hide everything (correctly enforce restrictions)
+
+### Files to Change
+
+**1. `src/hooks/useFeatureFlags.ts`** (line 135-136)
+
+Change from:
+```
+if (permissions.length === 0) return true;
+```
+To:
+```
+if (!securityProfileName) return true;  // No profile assigned = show all
+if (permissions.length === 0) return false; // Profile assigned, no permissions = hide
+```
+
+**2. `src/components/auth/RoutePermissionGuard.tsx`** (line 33-34)
+
+Same logic change -- add `useAuth` import and check `securityProfileName`:
+- If `securityProfileName` is null, bypass (show all)
+- If profile is assigned but `permissions.length === 0`, redirect to dashboard
+
+### What This Means for Users
+
+| Scenario | Before (Bug) | After (Fixed) |
+|----------|-------------|---------------|
+| System Administrator | All visible | All visible (no change) |
+| No security profile assigned | All visible | All visible (no change) |
+| Profile assigned + permissions configured | Correct filtering | Correct filtering (no change) |
+| Profile assigned + 0 permissions (Vikhyath) | All visible (BUG) | Nothing visible (FIXED) |
 
