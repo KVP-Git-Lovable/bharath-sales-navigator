@@ -214,7 +214,7 @@ export const MyVisits = () => {
   const canShowButton = (prefix: string) => !hasSecurityProfile || hasModuleAccess(prefix);
   const showAutoPlan = canShowButton('visit_auto_plan');
   const showAllBeat = canShowButton('visit_all_beat');
-  const showRetailers = canShowButton('visit_retailers');
+  const showRetailers = canShowButton('visit_retailer');
   const showSummary = canShowButton('visit_summary');
   const showTimeline = canShowButton('visit_timeline');
   const showGpsTrack = canShowButton('visit_gps_track');
