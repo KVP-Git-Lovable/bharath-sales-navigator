@@ -89,13 +89,8 @@ export const useCompanyData = () => {
   }, []);
 
   useEffect(() => {
-    // Only fetch from network if no cache exists
-    const cached = getCachedBranding();
-    if (!cached) {
-      fetchCompany();
-    } else {
-      setIsLoading(false);
-    }
+    // Always fetch fresh data in background (cache is used for initial render)
+    fetchCompany();
 
     // Listen for header branding updates (triggered on Save)
     const handleBrandingUpdate = () => {
