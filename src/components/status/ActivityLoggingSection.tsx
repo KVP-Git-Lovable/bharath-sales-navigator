@@ -3,9 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { SignedAvatarImage } from '@/components/ui/signed-image';
+import { Separator } from '@/components/ui/separator';
+import { Users, RefreshCw, Mail, Phone, MapPin, Briefcase, Calendar, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ActivityRow {
+  user_id: string;
   full_name: string;
   total_usage_seconds: number;
   most_used_module: string;
@@ -13,6 +19,20 @@ interface ActivityRow {
   least_used_module: string;
   least_used_count: number;
   data_usage_bytes: number;
+}
+
+interface UserProfileData {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  username: string | null;
+  phone_number: string | null;
+  designation: string | null;
+  profile_picture_url: string | null;
+  date_of_joining: string | null;
+  hq: string | null;
+  band: string | null;
+  address: string | null;
 }
 
 function formatUsageTime(seconds: number): string {
@@ -35,10 +55,25 @@ const RANGE_OPTIONS = [
   { label: '30d', days: 30 },
 ];
 
+function ProfileInfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+      <div className="text-muted-foreground mt-0.5">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 export const ActivityLoggingSection = () => {
   const [days, setDays] = useState(7);
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<UserProfileData | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const fetchActivity = useCallback(async () => {
     setLoading(true);
@@ -57,72 +92,154 @@ export const ActivityLoggingSection = () => {
     fetchActivity();
   }, [fetchActivity]);
 
+  const handleViewProfile = async (userId: string) => {
+    setProfileOpen(true);
+    setProfileLoading(true);
+    setSelectedProfile(null);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, username, phone_number, designation, profile_picture_url, date_of_joining, hq, band, address')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      setSelectedProfile(data as UserProfileData);
+    } catch (e: any) {
+      console.error('Profile fetch error:', e);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   return (
-    <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg font-bold text-foreground">Activity Logging</CardTitle>
-          </div>
-          <div className="flex items-center gap-1">
-            {RANGE_OPTIONS.map((opt) => (
-              <Button
-                key={opt.days}
-                variant={days === opt.days ? 'default' : 'outline'}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setDays(opt.days)}
-              >
-                {opt.label}
+    <>
+      <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg font-bold text-foreground">Activity Logging</CardTitle>
+            </div>
+            <div className="flex items-center gap-1">
+              {RANGE_OPTIONS.map((opt) => (
+                <Button
+                  key={opt.days}
+                  variant={days === opt.days ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setDays(opt.days)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+              <Button variant="outline" size="sm" className="h-7 ml-1" onClick={fetchActivity} disabled={loading}>
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
               </Button>
-            ))}
-            <Button variant="outline" size="sm" className="h-7 ml-1" onClick={fetchActivity} disabled={loading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {rows.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground text-center py-6">No activity data for this period.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Usage Time</TableHead>
-                  <TableHead>Most Used</TableHead>
-                  <TableHead>Least Used</TableHead>
-                  <TableHead>Data Usage</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{row.full_name}</TableCell>
-                    <TableCell>{formatUsageTime(row.total_usage_seconds)}</TableCell>
-                    <TableCell>
-                      <span>{row.most_used_module}</span>
-                      {row.most_used_count > 0 && (
-                        <span className="text-xs text-muted-foreground ml-1">({row.most_used_count})</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span>{row.least_used_module}</span>
-                      {row.least_used_count > 0 && (
-                        <span className="text-xs text-muted-foreground ml-1">({row.least_used_count})</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDataUsage(row.data_usage_bytes)}</TableCell>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {rows.length === 0 && !loading ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No activity data for this period.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Usage Time</TableHead>
+                    <TableHead>Most Used</TableHead>
+                    <TableHead>Least Used</TableHead>
+                    <TableHead>Data Usage</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        <button
+                          className="font-medium text-primary hover:underline cursor-pointer text-left"
+                          onClick={() => handleViewProfile(row.user_id)}
+                        >
+                          {row.full_name}
+                        </button>
+                      </TableCell>
+                      <TableCell>{formatUsageTime(row.total_usage_seconds)}</TableCell>
+                      <TableCell>
+                        <span>{row.most_used_module}</span>
+                        {row.most_used_count > 0 && (
+                          <span className="text-xs text-muted-foreground ml-1">({row.most_used_count})</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span>{row.least_used_module}</span>
+                        {row.least_used_count > 0 && (
+                          <span className="text-xs text-muted-foreground ml-1">({row.least_used_count})</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDataUsage(row.data_usage_bytes)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* User Profile Dialog */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>User Profile</DialogTitle>
+          </DialogHeader>
+          {profileLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : selectedProfile ? (
+            <div className="space-y-4">
+              {/* Avatar and Name */}
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16 ring-2 ring-background shadow-md">
+                  <SignedAvatarImage src={selectedProfile.profile_picture_url || undefined} alt={selectedProfile.full_name || ''} />
+                  <AvatarFallback className="text-lg bg-primary/10 text-primary font-semibold">
+                    {selectedProfile.full_name?.substring(0, 2).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedProfile.full_name || 'Unknown'}</h3>
+                  {selectedProfile.designation && (
+                    <p className="text-sm text-muted-foreground">{selectedProfile.designation}</p>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Profile Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <ProfileInfoItem icon={<Mail className="h-4 w-4" />} label="Email" value={selectedProfile.email || '-'} />
+                <ProfileInfoItem icon={<Phone className="h-4 w-4" />} label="Phone" value={selectedProfile.phone_number || '-'} />
+                <ProfileInfoItem icon={<Briefcase className="h-4 w-4" />} label="Band" value={selectedProfile.band || '-'} />
+                <ProfileInfoItem icon={<MapPin className="h-4 w-4" />} label="HQ" value={selectedProfile.hq || '-'} />
+                {selectedProfile.date_of_joining && (
+                  <ProfileInfoItem
+                    icon={<Calendar className="h-4 w-4" />}
+                    label="Date of Joining"
+                    value={format(new Date(selectedProfile.date_of_joining), 'PP')}
+                  />
+                )}
+                {selectedProfile.address && (
+                  <ProfileInfoItem icon={<MapPin className="h-4 w-4" />} label="Address" value={selectedProfile.address} />
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Could not load profile.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
