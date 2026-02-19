@@ -1,40 +1,26 @@
 
 
-## Fix: Missing "Retailers" Button on My Visits Page
+## Fix: Android Build Configuration Errors
 
-### Root Cause
+The `android/app/build.gradle` file needs to be rewritten properly with Firebase Crashlytics support while fixing the issues. The current file is also incomplete (missing dependencies block, broken `repositories` declaration).
 
-A simple typo in the permission prefix check. The code uses `'visit_retailers'` (plural) but the database permissions use `'visit_retailer_'` (singular).
+### Changes to `android/app/build.gradle`
 
-**Database permissions found for this user:**
-- `visit_retailer_list`
-- `visit_retailer_check_in`
-- `visit_retailer_order_entry`
-- `visit_retailer_no_order`
-- `visit_retailer_create_visit`
+**Fix 1: Namespace and applicationId** -- Keep as `"com.kvp.salesnavigator"` to match `google-services.json`
 
-**Code check (line 217):**
-```
-const showRetailers = canShowButton('visit_retailers');
-// hasModuleAccess looks for permissions starting with 'visit_retailers' — finds NONE
-```
+**Fix 2: `compilationOptions` to `compileOptions`** -- Fix the Gradle DSL keyword
 
-### Fix
+**Fix 3: Restore complete file** -- The file currently appears truncated/broken (ends at line 29 with just `repositories`). It needs the full dependencies block, Firebase BoM, Crashlytics SDK, and the Capacitor build gradle apply.
 
-**File: `src/pages/MyVisits.tsx` (line 217)**
+The corrected file will include:
+- `apply plugin: 'com.google.gms.google-services'` and `'com.google.firebase.crashlytics'` at the top
+- `namespace` and `applicationId` set to `"com.kvp.salesnavigator"`
+- `compileOptions` (not `compilationOptions`) with Java 21
+- Complete `dependencies` block with Firebase BoM, Crashlytics, and Analytics SDKs
+- Capacitor build gradle apply
+- Google Services plugin conditional apply at the bottom
 
-Change:
-```
-const showRetailers = canShowButton('visit_retailers');
-```
-To:
-```
-const showRetailers = canShowButton('visit_retailer');
-```
+### No other files need changes
 
-This single-character fix (`visit_retailers` to `visit_retailer`) will restore the Retailers button.
-
-### Important Note
-
-The build is currently broken due to invalid JSON in `package-lock.json` (merge conflict markers). You must delete that file manually so it can regenerate before the fix can be verified in preview.
+The `android/build.gradle` (root) already has the correct classpath dependencies, and `google-services.json` already uses `com.kvp.salesnavigator`.
 
