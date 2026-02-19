@@ -89,7 +89,15 @@ async function getUserContext(supabase: any, userId: string) {
         Promise.resolve({ data: [] })
     ]);
 
-    const isAdmin = (rolesResult as any).data?.security_profiles?.name === 'System Administrator' || false;
+    // Check admin via profile_object_permissions instead of profile name
+    const { data: adminPerms } = await supabase
+      .from('profile_object_permissions')
+      .select('object_name')
+      .eq('profile_id', (rolesResult as any).data?.profile_id || '')
+      .like('object_name', 'admin_%')
+      .eq('can_read', true)
+      .limit(1);
+    const isAdmin = (adminPerms && adminPerms.length > 0) || false;
     
     // Calculate business context
     const now = new Date();
