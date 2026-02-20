@@ -193,6 +193,17 @@ const AttendanceManagement = () => {
 
       if (error) throw error;
 
+      // Sync approval_requests table so approval engine stays consistent
+      await supabase
+        .from('approval_requests')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+          ...(newStatus === 'approved' && user ? { final_approved_by: user.id } : {}),
+        })
+        .eq('entity_id', applicationId)
+        .eq('entity_type', 'leave');
+
       toast.success(`Leave application ${newStatus} successfully`);
       fetchLeaveApplications();
     } catch (error) {
