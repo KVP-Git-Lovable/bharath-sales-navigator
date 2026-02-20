@@ -8664,6 +8664,7 @@ export type Database = {
       }
       pm_time_logs: {
         Row: {
+          allocation: string
           created_at: string
           date: string
           description: string | null
@@ -8674,6 +8675,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allocation?: string
           created_at?: string
           date?: string
           description?: string | null
@@ -8684,6 +8686,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allocation?: string
           created_at?: string
           date?: string
           description?: string | null
