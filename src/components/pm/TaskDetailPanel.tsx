@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Task, useUpdateTask, useDeleteTask, useCreateTask, useTaskCollaborators, useAddTaskCollaborator, useRemoveTaskCollaborator } from "@/hooks/useProjects";
+import { Task, TaskStatus, useUpdateTask, useDeleteTask, useCreateTask, useTaskCollaborators, useAddTaskCollaborator, useRemoveTaskCollaborator } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskAttachments } from "./TaskAttachments";
@@ -266,6 +266,12 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
     el?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+
+  const handleMoveTask = () => {
+    setShowMoveDialog(true);
+  };
+
 
   return (
     <div ref={panelRef} className="h-full flex flex-col bg-card">
@@ -323,10 +329,10 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
                 <DropdownMenuItem onClick={handleCopyLink}>
                   <Link2 className="w-3.5 h-3.5 mr-2" /> Copy task link
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDuplicate}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}>
                   <Copy className="w-3.5 h-3.5 mr-2" /> Duplicate task
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMoveTask(); }}>
                   <Move className="w-3.5 h-3.5 mr-2" /> Move task
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -506,6 +512,31 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
           {task.updated_at && <p>Updated {format(new Date(task.updated_at), "MMM d, yyyy 'at' h:mm a")}</p>}
         </div>
       </div>
+
+      {/* Move Task Dialog */}
+      {showMoveDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onClick={() => setShowMoveDialog(false)}>
+          <div className="bg-card border rounded-lg shadow-lg p-4 w-72 space-y-3" onClick={e => e.stopPropagation()}>
+            <h4 className="text-sm font-semibold">Move Task to Status</h4>
+            <div className="space-y-1">
+              {(["backlog", "todo", "in_progress", "in_review", "done"] as TaskStatus[]).filter(s => s !== task.status).map(s => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    updateTask.mutate({ id: task.id, status: s });
+                    setShowMoveDialog(false);
+                    toast.success(`Task moved to ${s.replace(/_/g, " ")}`);
+                  }}
+                  className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-muted transition-colors capitalize"
+                >
+                  {s.replace(/_/g, " ")}
+                </button>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="w-full" onClick={() => setShowMoveDialog(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
