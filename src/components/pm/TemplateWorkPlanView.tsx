@@ -610,6 +610,9 @@ function TemplateBuilder({ templateId, onBack }: { templateId: string; onBack: (
   const startInlineAdd = (sectionId: string | null, parentTaskId: string | null = null) => {
     setInlineAddTarget({ sectionId, parentTaskId });
     setInlineTitle("");
+    if (parentTaskId) {
+      setExpandedTasks(prev => new Set(prev).add(parentTaskId));
+    }
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
