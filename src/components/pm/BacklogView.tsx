@@ -315,6 +315,8 @@ export function BacklogView({ tasks, sprints, milestones, projectId }: Props) {
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
             projectId={projectId}
+            allTasks={tasks}
+            onSelectTask={(t) => setSelectedTask(t)}
           />
         </div>
       )}

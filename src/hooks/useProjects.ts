@@ -419,3 +419,113 @@ export function useLogTime() {
     onError: (e: any) => toast.error(e.message),
   });
 }
+
+// ─── TASK ATTACHMENTS ─────────────────────────────────────────────────────────
+
+export function useTaskAttachments(taskId: string) {
+  return useQuery({
+    queryKey: ['pm_task_attachments', taskId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pm_task_attachments')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useCreateTaskAttachment() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (values: { task_id: string; file_name: string; file_url: string; file_size?: number; file_type?: string; note?: string | null }) => {
+      const { data, error } = await supabase
+        .from('pm_task_attachments')
+        .insert({ ...values, uploaded_by: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_task_attachments', data.task_id] });
+      toast.success('Attachment added');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTaskAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, taskId, fileUrl }: { id: string; taskId: string; fileUrl: string }) => {
+      await supabase.storage.from('pm-attachments').remove([fileUrl]);
+      const { error } = await supabase.from('pm_task_attachments').delete().eq('id', id);
+      if (error) throw error;
+      return taskId;
+    },
+    onSuccess: (taskId) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_task_attachments', taskId] });
+      toast.success('Attachment removed');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+// ─── TASK DEPENDENCIES ────────────────────────────────────────────────────────
+
+export function useTaskDependencies(taskId: string) {
+  return useQuery({
+    queryKey: ['pm_task_dependencies', taskId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pm_task_dependencies')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useCreateTaskDependency() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: { task_id: string; depends_on_task_id: string; dependency_type: string }) => {
+      const { data, error } = await supabase
+        .from('pm_task_dependencies')
+        .insert(values)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_task_dependencies', data.task_id] });
+      toast.success('Dependency added');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTaskDependency() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, taskId }: { id: string; taskId: string }) => {
+      const { error } = await supabase.from('pm_task_dependencies').delete().eq('id', id);
+      if (error) throw error;
+      return taskId;
+    },
+    onSuccess: (taskId) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_task_dependencies', taskId] });
+      toast.success('Dependency removed');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
