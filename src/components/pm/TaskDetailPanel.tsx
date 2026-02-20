@@ -15,8 +15,12 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// ── Task Owner Field with user lookup ──────────────────────────────
-function TaskOwnerField({ task, onSave }: { task: Task; onSave: (userId: string | null) => void }) {
+// ── Reusable User Picker Field ──────────────────────────────
+function UserPickerField({ label, currentUser, onSave }: {
+  label: string;
+  currentUser?: { full_name: string; profile_picture_url?: string } | null;
+  onSave: (userId: string | null) => void;
+}) {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<{ id: string; full_name: string }[]>([]);
@@ -45,18 +49,18 @@ function TaskOwnerField({ task, onSave }: { task: Task; onSave: (userId: string 
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Task Owner</span>
+      <span className="text-sm text-muted-foreground w-24 flex-shrink-0">{label}</span>
       <div className="relative" ref={searchRef}>
         <button
           onClick={() => setShowSearch(!showSearch)}
           className="flex items-center gap-2 text-sm hover:bg-muted px-2 py-1 rounded transition-colors"
         >
-          {task.assignee ? (
+          {currentUser ? (
             <>
               <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-medium">
-                {task.assignee.full_name?.charAt(0) ?? "?"}
+                {currentUser.full_name?.charAt(0) ?? "?"}
               </div>
-              <span>{task.assignee.full_name}</span>
+              <span>{currentUser.full_name}</span>
             </>
           ) : (
             <span className="text-muted-foreground">Unassigned</span>
@@ -74,12 +78,12 @@ function TaskOwnerField({ task, onSave }: { task: Task; onSave: (userId: string 
                 className="flex-1 text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
-            {task.assignee && (
+            {currentUser && (
               <button
                 onClick={() => { onSave(null); setShowSearch(false); setQuery(""); }}
                 className="w-full text-left text-xs text-destructive px-2 py-1.5 rounded hover:bg-muted transition-colors mb-1"
               >
-                Remove owner
+                Remove
               </button>
             )}
             {results.map(u => (
@@ -289,7 +293,9 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
 
         {/* Meta fields — two column layout */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          <TaskOwnerField task={task} onSave={(userId) => handleSave("assignee_id", userId)} />
+          <UserPickerField label="Task Owner" currentUser={task.assignee} onSave={(userId) => handleSave("assignee_id", userId)} />
+
+          <UserPickerField label="Collaborator" currentUser={task.collaborator} onSave={(userId) => handleSave("collaborator_id", userId)} />
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Status</span>
