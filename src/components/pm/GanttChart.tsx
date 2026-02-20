@@ -13,7 +13,10 @@ interface Props {
 
 export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
   const updateTask = useUpdateTask();
+  // Show all tasks: those with dates get bars, those without get listed but no bar
   const tasksWithDates = tasks.filter(t => t.start_date && t.due_date);
+  const tasksWithoutDates = tasks.filter(t => !t.start_date || !t.due_date);
+  const allDisplayTasks = [...tasksWithDates, ...tasksWithoutDates];
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
   const [dragState, setDragState] = useState<{
     taskId: string;
@@ -136,12 +139,12 @@ export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
     document.addEventListener("mouseup", handleMouseUp);
   }, [DAY_WIDTH, updateTask]);
 
-  if (tasksWithDates.length === 0) {
+  if (tasks.length === 0) {
     return (
       <div className="text-center py-16">
         <div className="text-4xl mb-3">📊</div>
-        <h3 className="font-semibold text-foreground mb-1">No timeline data</h3>
-        <p className="text-muted-foreground text-sm">Add start and due dates to tasks to see the Gantt chart.</p>
+        <h3 className="font-semibold text-foreground mb-1">No tasks</h3>
+        <p className="text-muted-foreground text-sm">Add tasks to see the Gantt chart.</p>
       </div>
     );
   }
@@ -154,7 +157,7 @@ export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
           <div className="h-10 border-b border-r bg-muted/40 flex items-center px-4">
             <span className="text-xs font-semibold text-muted-foreground">Task</span>
           </div>
-          {tasksWithDates.map(task => (
+          {allDisplayTasks.map(task => (
             <div
               key={task.id}
               className={cn(
@@ -166,7 +169,7 @@ export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
               onMouseLeave={() => setHoveredTask(null)}
               onClick={() => onTaskClick?.(task)}
             >
-              <span className="truncate font-medium text-xs text-foreground">{task.title}</span>
+              <span className={cn("truncate font-medium text-xs", task.start_date && task.due_date ? "text-foreground" : "text-muted-foreground italic")}>{task.title}</span>
             </div>
           ))}
           {milestones.filter(m => m.due_date).map(m => (
@@ -194,8 +197,26 @@ export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
             ))}
           </div>
 
-          {/* Task bars */}
-          {tasksWithDates.map(task => {
+          {/* Task bars — show for all tasks, empty row for those without dates */}
+          {allDisplayTasks.map(task => {
+            if (!task.start_date || !task.due_date) {
+              return (
+                <div
+                  key={task.id}
+                  className={cn("border-b relative", hoveredTask === task.id && "bg-primary/5")}
+                  style={{ height: ROW_H, minWidth: days * DAY_WIDTH }}
+                  onMouseEnter={() => setHoveredTask(task.id)}
+                  onMouseLeave={() => setHoveredTask(null)}
+                >
+                  {dayArray.map((_, i) => (
+                    <div key={i} className="absolute top-0 bottom-0 border-r border-muted/50" style={{ left: i * DAY_WIDTH }} />
+                  ))}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground italic">No dates set</span>
+                  </div>
+                </div>
+              );
+            }
             const { left, width } = getBar(task.start_date!, task.due_date!);
             const isHovered = hoveredTask === task.id;
             return (
