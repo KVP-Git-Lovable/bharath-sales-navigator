@@ -34,18 +34,21 @@ const Index = () => {
   const isOnline = navigator.onLine;
   const signedProfilePicture = useSignedUrl(profilePictureUrl);
   const { isNavItemEnabled } = useFeatureFlags();
-  const { permissions, hasModuleAccess } = useProfilePermissions();
+  const { permissions, hasModuleAccess, hasFieldPermission, hasActionPermission, hasWidgetPermission } = useProfilePermissions();
   const hasSecurityProfile = !!securityProfileName;
 
   const canShow = (prefix: string) =>
     !hasSecurityProfile || hasModuleAccess(prefix);
 
-  const showCheckIn = canShow('attendance_');
-  const showTodaysBeat = canShow('visit_');
-  const showAIInsights = canShow('visit_ai_recommendations') || canShow('visit_');
-  const showPerfCalendar = canShow('performance_');
-  const showPendingPay = canShow('analytics_pending_payments') || canShow('analytics_');
-  const showTarget = canShow('target_');
+  const showCheckIn = canShow('attendance_') || hasWidgetPermission('widget_homepage_attendance');
+  const showTodaysBeat = canShow('visit_') || hasWidgetPermission('widget_homepage_visit_plan');
+  const showAIInsights = canShow('visit_ai_recommendations') || canShow('visit_') || hasWidgetPermission('widget_homepage_performance');
+  const showPerfCalendar = canShow('performance_') || hasWidgetPermission('widget_homepage_target_achievement');
+  const showPendingPay = canShow('analytics_pending_payments') || canShow('analytics_') || hasFieldPermission('field_homepage_quick_stats');
+  const showTarget = canShow('target_') || hasFieldPermission('field_homepage_target_progress');
+  const showGreeting = canShow('attendance_') || hasFieldPermission('field_homepage_greeting');
+  const showQuickAdd = !hasSecurityProfile || canShow('visit_') || hasActionPermission('action_homepage_quick_add');
+  const showQuickNav = !hasSecurityProfile || hasWidgetPermission('widget_homepage_quick_links');
 
   const refreshProfilePicture = async () => {
     if (!user?.id) return;
@@ -134,58 +137,62 @@ const Index = () => {
                   </div>
                 )}
                 <div>
-                  <p className="text-[10px] opacity-80">
-                    {getGreeting()}!
-                  </p>
+                  {showGreeting && (
+                    <p className="text-[10px] opacity-80">
+                      {getGreeting()}!
+                    </p>
+                  )}
                   <h1 className="text-base font-bold leading-tight">{displayName}</h1>
                   <p className="text-[10px] opacity-70">{roleDisplay}</p>
                 </div>
               </div>
 
               {/* Quick Actions Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    size="sm" 
-                    className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 px-3"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    <span className="text-xs">{t('home.quickAdd')}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                 <DropdownMenuContent align="end" className="w-[180px]">
-                  {canShow('visit_') && (
-                    <DropdownMenuItem onClick={() => navigate('/visits/retailers')} className="cursor-pointer">
-                      <ShoppingCart className="h-4 w-4 mr-2 text-blue-500" />
-                      <span>{t('home.todaysVisit')}</span>
-                    </DropdownMenuItem>
-                  )}
-                  {canShow('retailer_') && (
-                    <DropdownMenuItem onClick={() => navigate('/retailers/add')} className="cursor-pointer">
-                      <Plus className="h-4 w-4 mr-2 text-green-500" />
-                      <span>{t('home.addRetailer')}</span>
-                    </DropdownMenuItem>
-                  )}
-                  {canShow('competition_') && (
-                    <DropdownMenuItem onClick={() => navigate('/competition')} className="cursor-pointer">
-                      <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
-                      <span>{t('home.addCompetition')}</span>
-                    </DropdownMenuItem>
-                  )}
-                  {canShow('scheme_') && (
-                    <DropdownMenuItem onClick={() => navigate('/schemes')} className="cursor-pointer">
-                      <Tag className="h-4 w-4 mr-2 text-purple-500" />
-                      <span>{t('home.checkSchemes')}</span>
-                    </DropdownMenuItem>
-                  )}
-                  {canShow('gamification_') && (
-                    <DropdownMenuItem onClick={() => navigate('/leaderboard')} className="cursor-pointer">
-                      <Award className="h-4 w-4 mr-2 text-yellow-500" />
-                      <span>{t('home.leaderboard')}</span>
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {showQuickAdd && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 px-3"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      <span className="text-xs">{t('home.quickAdd')}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                   <DropdownMenuContent align="end" className="w-[180px]">
+                    {(canShow('visit_') || hasActionPermission('action_homepage_check_in')) && (
+                      <DropdownMenuItem onClick={() => navigate('/visits/retailers')} className="cursor-pointer">
+                        <ShoppingCart className="h-4 w-4 mr-2 text-blue-500" />
+                        <span>{t('home.todaysVisit')}</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canShow('retailer_') && (
+                      <DropdownMenuItem onClick={() => navigate('/retailers/add')} className="cursor-pointer">
+                        <Plus className="h-4 w-4 mr-2 text-green-500" />
+                        <span>{t('home.addRetailer')}</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canShow('competition_') && (
+                      <DropdownMenuItem onClick={() => navigate('/competition')} className="cursor-pointer">
+                        <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
+                        <span>{t('home.addCompetition')}</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canShow('scheme_') && (
+                      <DropdownMenuItem onClick={() => navigate('/schemes')} className="cursor-pointer">
+                        <Tag className="h-4 w-4 mr-2 text-purple-500" />
+                        <span>{t('home.checkSchemes')}</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canShow('gamification_') && (
+                      <DropdownMenuItem onClick={() => navigate('/leaderboard')} className="cursor-pointer">
+                        <Award className="h-4 w-4 mr-2 text-yellow-500" />
+                        <span>{t('home.leaderboard')}</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </div>
@@ -243,7 +250,7 @@ const Index = () => {
               {showPendingPay && userProfile?.id && <PendingPayments userId={userProfile.id} />}
 
               {/* Quick Navigation */}
-              <QuickNavGrid items={quickNavItems} />
+              {showQuickNav && <QuickNavGrid items={quickNavItems} />}
 
               {/* Device Info - hidden for now */}
               {/* <DeviceInfoCard /> */}
