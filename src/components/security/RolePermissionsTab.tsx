@@ -5,8 +5,59 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Shield, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { ModulePermissionTable, PermissionMap } from './ModulePermissionTable';
-import { SYSTEM_ADMINISTRATOR_PROFILE, getAllModulePermissionItems } from './permissionModules';
+import { CRUDFlags, PermissionMap } from './PermissionLayerTable';
+import { HierarchicalPermissionEditor } from './HierarchicalPermissionEditor';
+import { SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
+import {
+  HIERARCHICAL_MODULES,
+  getAllModuleNames,
+  getAllFieldNames,
+  getAllActionNames,
+  getAllWidgetNames,
+  getPermissionType,
+} from './hierarchicalPermissions';
+
+// Composite key: `${object_name}__${permission_type}`
+const makeKey = (object_name: string, permission_type: string) =>
+  `${object_name}__${permission_type}`;
+
+const getPermissionTypeForName = (name: string): string => {
+  if (name.startsWith('module_')) return 'module';
+  if (name.startsWith('field_')) return 'field';
+  if (name.startsWith('action_')) return 'action';
+  if (name.startsWith('widget_')) return 'widget';
+  return 'feature';
+};
+
+const getParentModuleForName = (name: string): string | null => {
+  const modKey = name.replace(/^module_/, '');
+  if (HIERARCHICAL_MODULES.find(m => m.name === modKey)) return modKey;
+  for (const mod of HIERARCHICAL_MODULES) {
+    const all = [
+      ...mod.fields.map(f => f.name),
+      ...mod.actions.map(a => a.name),
+      ...mod.widgets.map(w => w.name),
+    ];
+    if (all.includes(name)) return mod.name;
+  }
+  return null;
+};
+
+// All hierarchical item names (modules + fields + actions + widgets)
+const getAllHierarchicalNames = (): string[] => [
+  ...getAllModuleNames(),
+  ...getAllFieldNames(),
+  ...getAllActionNames(),
+  ...getAllWidgetNames(),
+];
+
+const buildAllGranted = (): PermissionMap => {
+  const map: PermissionMap = {};
+  getAllHierarchicalNames().forEach(name => {
+    map[name] = { can_read: true, can_create: true, can_edit: true, can_delete: true };
+  });
+  return map;
+};
 
 export const RolePermissionsTab = () => {
   const queryClient = useQueryClient();
@@ -30,9 +81,7 @@ export const RolePermissionsTab = () => {
   useEffect(() => {
     if (profiles && profiles.length > 0 && !selectedProfileId) {
       const adminProfile = profiles.find(p => p.name === SYSTEM_ADMINISTRATOR_PROFILE);
-      if (adminProfile) {
-        setSelectedProfileId(adminProfile.id);
-      }
+      if (adminProfile) setSelectedProfileId(adminProfile.id);
     }
   }, [profiles, selectedProfileId]);
 
@@ -40,30 +89,33 @@ export const RolePermissionsTab = () => {
   const isSystemAdmin = selectedProfileName === SYSTEM_ADMINISTRATOR_PROFILE;
 
   const { isLoading } = useQuery({
-    queryKey: ['profile-object-permissions', selectedProfileId],
+    queryKey: ['profile-hierarchical-permissions', selectedProfileId],
     queryFn: async () => {
+      if (isSystemAdmin) {
+        const granted = buildAllGranted();
+        setLocalPerms(granted);
+        setDirty(false);
+        return granted;
+      }
+
       const { data, error } = await supabase
         .from('profile_object_permissions')
-        .select('object_name, can_read, can_create, can_edit, can_delete')
-        .eq('profile_id', selectedProfileId);
+        .select('object_name, permission_type, can_read, can_create, can_edit, can_delete')
+        .eq('profile_id', selectedProfileId)
+        .in('permission_type', ['module', 'field', 'action', 'widget']);
+
       if (error) throw error;
 
       const map: PermissionMap = {};
       (data || []).forEach(p => {
-        map[p.object_name] = {
-          can_read: p.can_read,
-          can_create: p.can_create,
-          can_edit: p.can_edit,
-          can_delete: p.can_delete,
+        const key = p.object_name;
+        map[key] = {
+          can_read: p.can_read ?? false,
+          can_create: p.can_create ?? false,
+          can_edit: p.can_edit ?? false,
+          can_delete: p.can_delete ?? false,
         };
       });
-
-      // For System Administrator, auto-grant all
-      if (isSystemAdmin) {
-        getAllModulePermissionItems().forEach(name => {
-          map[name] = { can_read: true, can_create: true, can_edit: true, can_delete: true };
-        });
-      }
 
       setLocalPerms(map);
       setDirty(false);
@@ -72,37 +124,47 @@ export const RolePermissionsTab = () => {
     enabled: !!selectedProfileId,
   });
 
-  const handleChange = useCallback((objectName: string, field: string, value: boolean) => {
-    setLocalPerms(prev => ({
-      ...prev,
-      [objectName]: {
-        can_read: false,
-        can_create: false,
-        can_edit: false,
-        can_delete: false,
-        ...prev[objectName],
-        [field]: value,
-      },
-    }));
-    setDirty(true);
-  }, []);
+  const handleChange = useCallback(
+    (name: string, field: keyof CRUDFlags, value: boolean) => {
+      setLocalPerms(prev => ({
+        ...prev,
+        [name]: {
+          can_read: false,
+          can_create: false,
+          can_edit: false,
+          can_delete: false,
+          ...prev[name],
+          [field]: value,
+        },
+      }));
+      setDirty(true);
+    },
+    []
+  );
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const updates = Object.entries(localPerms).map(([object_name, perms]) => ({
         profile_id: selectedProfileId,
         object_name,
-        ...perms,
+        permission_type: getPermissionTypeForName(object_name),
+        parent_module: getParentModuleForName(object_name),
+        can_read: perms.can_read,
+        can_create: perms.can_create,
+        can_edit: perms.can_edit,
+        can_delete: perms.can_delete,
         can_view_all: false,
         can_modify_all: false,
       }));
+
       const { error } = await supabase
         .from('profile_object_permissions')
-        .upsert(updates, { onConflict: 'profile_id,object_name' });
+        .upsert(updates, { onConflict: 'profile_id,object_name,permission_type' });
+
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile-object-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-hierarchical-permissions'] });
       setDirty(false);
       toast.success('Permissions saved successfully');
     },
@@ -114,7 +176,13 @@ export const RolePermissionsTab = () => {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold">Select Role</h2>
-          <Select value={selectedProfileId} onValueChange={(v) => { setSelectedProfileId(v); setDirty(false); }}>
+          <Select
+            value={selectedProfileId}
+            onValueChange={(v) => {
+              setSelectedProfileId(v);
+              setDirty(false);
+            }}
+          >
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Choose role" />
             </SelectTrigger>
@@ -132,25 +200,29 @@ export const RolePermissionsTab = () => {
         </div>
 
         {dirty && (
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="gap-2"
+          >
             <Save className="h-4 w-4" />
             {saveMutation.isPending ? 'Saving...' : 'Save Permissions'}
           </Button>
         )}
       </div>
 
-      {selectedProfileId && !isLoading && (
-        <ModulePermissionTable
-          permissions={localPerms}
-          onChange={handleChange}
-          disabled={isSystemAdmin}
-        />
-      )}
-
       {isLoading && (
         <div className="flex justify-center p-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
+      )}
+
+      {selectedProfileId && !isLoading && (
+        <HierarchicalPermissionEditor
+          permissions={localPerms}
+          onChange={handleChange}
+          disabled={isSystemAdmin}
+        />
       )}
     </div>
   );
