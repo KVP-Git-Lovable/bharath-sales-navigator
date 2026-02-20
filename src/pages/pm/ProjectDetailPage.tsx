@@ -19,9 +19,10 @@ import { MilestonesPanel } from "@/components/pm/MilestonesPanel";
 import { SprintsPanel } from "@/components/pm/SprintsPanel";
 import { ProjectOverview } from "@/components/pm/ProjectOverview";
 import { TaskDetailPanel } from "@/components/pm/TaskDetailPanel";
+import { TimesheetView } from "@/components/pm/TimesheetView";
 import {
   ArrowLeft, Plus, Kanban, List, BarChart3,
-  AlertTriangle, Layers, Grid, Calendar
+  AlertTriangle, Layers, Grid, Calendar, Clock
 } from "lucide-react";
 
 export default function ProjectDetailPage() {
@@ -133,6 +134,7 @@ export default function ProjectDetailPage() {
                   { value: "board", label: "Board", icon: Kanban },
                   { value: "backlog", label: "Work Plan", icon: List },
                   { value: "calendar", label: "Calendar", icon: Calendar },
+                  { value: "timesheet", label: "Timesheet", icon: Clock },
                   { value: "gantt", label: "Gantt", icon: BarChart3 },
                   { value: "sprints", label: "Sprints", icon: Layers },
                   { value: "risks", label: "Risks", icon: AlertTriangle },
@@ -168,6 +170,9 @@ export default function ProjectDetailPage() {
                 </TabsContent>
                 <TabsContent value="calendar" className="mt-0">
                   <CalendarView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
+                </TabsContent>
+                <TabsContent value="timesheet" className="mt-0">
+                  <TimesheetView tasks={tasks} projectId={project.id} />
                 </TabsContent>
                 <TabsContent value="gantt" className="mt-0 p-4">
                   <GanttChart tasks={tasks} project={project} milestones={milestones} onTaskClick={(task) => setSelectedTask(task)} />
