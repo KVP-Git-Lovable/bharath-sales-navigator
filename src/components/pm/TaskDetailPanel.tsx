@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Task, useUpdateTask, useDeleteTask } from "@/hooks/useProjects";
+import { Task, useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskAttachments } from "./TaskAttachments";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { X, Check, Calendar, Trash2, Search, Maximize2, Paperclip, Link2, Copy, MoreHorizontal, ThumbsUp } from "lucide-react";
+import { X, Check, Calendar, Trash2, Search, Maximize2, Paperclip, Link2, Copy, MoreHorizontal, ThumbsUp, Plus, GitBranch, Move } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -116,12 +116,25 @@ interface Props {
 export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSelectTask, onExpand }: Props) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const createTask = useCreateTask();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
+  const [startDate, setStartDate] = useState(task.start_date || "");
   const [dueDate, setDueDate] = useState(task.due_date || "");
   const [status, setStatus] = useState(task.status);
   const [priority, setPriority] = useState(task.priority);
   const [estimatedHours, setEstimatedHours] = useState(task.estimated_hours?.toString() || "");
+
+  // Sync state when task changes
+  useEffect(() => {
+    setTitle(task.title);
+    setDescription(task.description || "");
+    setStartDate(task.start_date || "");
+    setDueDate(task.due_date || "");
+    setStatus(task.status);
+    setPriority(task.priority);
+    setEstimatedHours(task.estimated_hours?.toString() || "");
+  }, [task.id]);
 
   const handleSave = (field: string, value: any) => {
     updateTask.mutate({ id: task.id, [field]: value || null });
@@ -143,15 +156,43 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
     toast.success("Task link copied");
   };
 
-  const handleDuplicate = () => {
-    // Duplicate by creating a new task with same fields
-    const { id, created_at, updated_at, assignee, subtasks, ...rest } = task;
-    updateTask; // just to reference
-    toast.info("Duplicate not yet implemented");
+  const handleDuplicate = async () => {
+    await createTask.mutateAsync({
+      project_id: projectId,
+      parent_task_id: task.parent_task_id || undefined,
+      title: `${task.title} (copy)`,
+      description: task.description || undefined,
+      type: task.type,
+      status: "todo",
+      priority: task.priority,
+      section_id: task.section_id || undefined,
+      start_date: task.start_date || undefined,
+      due_date: task.due_date || undefined,
+      estimated_hours: task.estimated_hours || undefined,
+      story_points: task.story_points || undefined,
+      tags: task.tags || undefined,
+    });
+    toast.success("Task duplicated");
+  };
+
+  const handleAddSubtask = () => {
+    // Scroll to subtasks section and trigger inline add
+    const subtasksEl = document.getElementById("task-subtasks-section");
+    subtasksEl?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleSelectTask = (t: Task) => {
     onSelectTask?.(t);
+  };
+
+  const scrollToAttachments = () => {
+    const el = document.getElementById("task-attachments-section");
+    el?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToDependencies = () => {
+    const el = document.getElementById("task-dependencies-section");
+    el?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -177,16 +218,22 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
             </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Like</TooltipContent></Tooltip>
 
             <Tooltip><TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={scrollToAttachments}>
                 <Paperclip className="w-3.5 h-3.5" />
               </Button>
             </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Attachments</TooltipContent></Tooltip>
 
             <Tooltip><TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleCopyLink}>
-                <Link2 className="w-3.5 h-3.5" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleAddSubtask}>
+                <Plus className="w-3.5 h-3.5" />
               </Button>
-            </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Copy link</TooltipContent></Tooltip>
+            </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Add sub-task</TooltipContent></Tooltip>
+
+            <Tooltip><TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={scrollToDependencies}>
+                <GitBranch className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger><TooltipContent side="bottom" className="text-xs">Add dependency</TooltipContent></Tooltip>
 
             <Tooltip><TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={onExpand}>
@@ -207,6 +254,9 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleDuplicate}>
                   <Copy className="w-3.5 h-3.5 mr-2" /> Duplicate task
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Move className="w-3.5 h-3.5 mr-2" /> Move task
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>
@@ -237,35 +287,14 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
           placeholder="Task title"
         />
 
-        {/* Meta fields */}
-        <div className="space-y-3">
+        {/* Meta fields — two column layout */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
           <TaskOwnerField task={task} onSave={(userId) => handleSave("assignee_id", userId)} />
-
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Due date</span>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={dueDate}
-                onChange={e => {
-                  setDueDate(e.target.value);
-                  handleSave("due_date", e.target.value);
-                }}
-                className="h-8 w-40 text-sm"
-              />
-              {dueDate && (
-                <button onClick={() => { setDueDate(""); handleSave("due_date", null); }} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Status</span>
             <Select value={status} onValueChange={v => { setStatus(v as any); handleSave("status", v); }}>
-              <SelectTrigger className="h-8 w-40 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 flex-1 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="backlog">Backlog</SelectItem>
                 <SelectItem value="todo">To Do</SelectItem>
@@ -279,9 +308,30 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
           </div>
 
           <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Start date</span>
+            <div className="flex items-center gap-2 flex-1">
+              <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={e => {
+                  setStartDate(e.target.value);
+                  handleSave("start_date", e.target.value);
+                }}
+                className="h-8 flex-1 text-sm"
+              />
+              {startDate && (
+                <button onClick={() => { setStartDate(""); handleSave("start_date", null); }} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Priority</span>
             <Select value={priority} onValueChange={v => { setPriority(v as any); handleSave("priority", v); }}>
-              <SelectTrigger className="h-8 w-40 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 flex-1 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="critical">🔴 Critical</SelectItem>
                 <SelectItem value="high">🟠 High</SelectItem>
@@ -292,9 +342,30 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
           </div>
 
           <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Due date</span>
+            <div className="flex items-center gap-2 flex-1">
+              <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={e => {
+                  setDueDate(e.target.value);
+                  handleSave("due_date", e.target.value);
+                }}
+                className="h-8 flex-1 text-sm"
+              />
+              {dueDate && (
+                <button onClick={() => { setDueDate(""); handleSave("due_date", null); }} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Type</span>
             <Select value={task.type} onValueChange={v => handleSave("type", v)}>
-              <SelectTrigger className="h-8 w-40 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 flex-1 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="task">✅ Task</SelectItem>
                 <SelectItem value="bug">🐛 Bug</SelectItem>
@@ -310,7 +381,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
               value={estimatedHours}
               onChange={e => setEstimatedHours(e.target.value)}
               onBlur={() => handleSave("estimated_hours", estimatedHours ? parseFloat(estimatedHours) : null)}
-              className="h-8 w-24 text-sm"
+              className="h-8 flex-1 text-sm"
               placeholder="0"
             />
           </div>
@@ -336,22 +407,28 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
         </div>
 
         {/* Sub-tasks */}
-        <TaskSubtasks
-          task={task}
-          allTasks={allTasks}
-          projectId={projectId}
-          onSelectTask={handleSelectTask}
-        />
+        <div id="task-subtasks-section">
+          <TaskSubtasks
+            task={task}
+            allTasks={allTasks}
+            projectId={projectId}
+            onSelectTask={handleSelectTask}
+          />
+        </div>
+
+        {/* Dependencies (moved above attachments) */}
+        <div id="task-dependencies-section">
+          <TaskDependencies
+            task={task}
+            allTasks={allTasks}
+            onSelectTask={handleSelectTask}
+          />
+        </div>
 
         {/* Attachments */}
-        <TaskAttachments taskId={task.id} />
-
-        {/* Dependencies */}
-        <TaskDependencies
-          task={task}
-          allTasks={allTasks}
-          onSelectTask={handleSelectTask}
-        />
+        <div id="task-attachments-section">
+          <TaskAttachments taskId={task.id} />
+        </div>
 
         {/* Tags */}
         {task.tags && task.tags.length > 0 && (
