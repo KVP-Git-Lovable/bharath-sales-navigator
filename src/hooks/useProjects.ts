@@ -80,6 +80,7 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   assignee_id?: string;
+  collaborator_id?: string;
   reporter_id?: string;
   start_date?: string;
   due_date?: string;
@@ -94,6 +95,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   assignee?: { full_name: string; profile_picture_url?: string };
+  collaborator?: { full_name: string; profile_picture_url?: string };
   subtasks?: Task[];
 }
 
@@ -222,7 +224,7 @@ export function useTasks(projectId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pm_tasks')
-        .select(`*, assignee:profiles!pm_tasks_assignee_id_fkey(full_name, profile_picture_url)`)
+        .select(`*, assignee:profiles!pm_tasks_assignee_id_fkey(full_name, profile_picture_url), collaborator:profiles!pm_tasks_collaborator_id_fkey(full_name, profile_picture_url)`)
         .eq('project_id', projectId)
         .order('sort_order', { ascending: true });
       if (error) throw error;
@@ -245,7 +247,7 @@ export function useCreateTask() {
       const { data, error } = await supabase
         .from('pm_tasks')
         .insert([payload] as any)
-        .select(`*, assignee:profiles!pm_tasks_assignee_id_fkey(full_name, profile_picture_url)`)
+        .select(`*, assignee:profiles!pm_tasks_assignee_id_fkey(full_name, profile_picture_url), collaborator:profiles!pm_tasks_collaborator_id_fkey(full_name, profile_picture_url)`)
         .single();
       if (error) throw error;
       return data;

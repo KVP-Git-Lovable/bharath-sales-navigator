@@ -8486,6 +8486,7 @@ export type Database = {
         Row: {
           assignee_id: string | null
           block_reason: string | null
+          collaborator_id: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -8513,6 +8514,7 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           block_reason?: string | null
+          collaborator_id?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -8540,6 +8542,7 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           block_reason?: string | null
+          collaborator_id?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -8568,6 +8571,13 @@ export type Database = {
           {
             foreignKeyName: "pm_tasks_assignee_id_fkey"
             columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_tasks_collaborator_id_fkey"
+            columns: ["collaborator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
