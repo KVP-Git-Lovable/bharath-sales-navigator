@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { Task, Sprint, Milestone } from "@/hooks/useProjects";
-import { useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/useProjects";
+import { Task, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/useProjects";
+import { useSections } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { Button } from "@/components/ui/button";
@@ -216,8 +216,6 @@ export function BacklogView({ tasks, sprints, milestones, projectId }: Props) {
             <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Type" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="epic">Epic</SelectItem>
-              <SelectItem value="story">Story</SelectItem>
               <SelectItem value="task">Task</SelectItem>
               <SelectItem value="bug">Bug</SelectItem>
               <SelectItem value="idea">Idea</SelectItem>

@@ -8042,6 +8042,44 @@ export type Database = {
           },
         ]
       }
+      pm_sections: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          position: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_sections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "pm_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pm_sprints: {
         Row: {
           created_at: string
@@ -8295,6 +8333,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["pm_priority"]
           project_id: string
           reporter_id: string | null
+          section_id: string | null
           sort_order: number | null
           sprint_id: string | null
           start_date: string | null
@@ -8321,6 +8360,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["pm_priority"]
           project_id: string
           reporter_id?: string | null
+          section_id?: string | null
           sort_order?: number | null
           sprint_id?: string | null
           start_date?: string | null
@@ -8347,6 +8387,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["pm_priority"]
           project_id?: string
           reporter_id?: string | null
+          section_id?: string | null
           sort_order?: number | null
           sprint_id?: string | null
           start_date?: string | null
@@ -8398,6 +8439,13 @@ export type Database = {
             columns: ["reporter_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_tasks_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "pm_sections"
             referencedColumns: ["id"]
           },
           {

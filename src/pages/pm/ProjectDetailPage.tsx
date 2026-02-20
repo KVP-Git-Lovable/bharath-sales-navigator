@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  useProject, useTasks, useSprints, useMilestones, useRisks,
+  useProject, useTasks, useSprints, useMilestones, useRisks, useSections,
   useUpdateTask, useDeleteTask, Task, TaskStatus
 } from "@/hooks/useProjects";
 import { CreateTaskModal } from "@/components/pm/CreateTaskModal";
@@ -34,6 +34,7 @@ export default function ProjectDetailPage() {
   const { data: sprints = [] } = useSprints(id!);
   const { data: milestones = [] } = useMilestones(id!);
   const { data: risks = [] } = useRisks(id!);
+  const { data: sections = [] } = useSections(id!);
   const updateTask = useUpdateTask();
   const [tab, setTab] = useState("board");
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -152,6 +153,7 @@ export default function ProjectDetailPage() {
                   projectId={project.id}
                   sprints={sprints}
                   milestones={milestones}
+                  sections={sections}
                 />
               </TabsContent>
               <TabsContent value="backlog" className="mt-0 p-6">
@@ -183,6 +185,7 @@ export default function ProjectDetailPage() {
         projectId={project.id}
         sprints={sprints}
         milestones={milestones}
+        sections={sections}
       />
     </Layout>
   );

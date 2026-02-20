@@ -6,7 +6,7 @@ import { toast } from "sonner";
 export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'cancelled';
-export type TaskType = 'epic' | 'story' | 'task' | 'bug' | 'idea' | 'milestone';
+export type TaskType = 'task' | 'bug' | 'idea' | 'milestone';
 export type SprintStatus = 'planning' | 'active' | 'completed' | 'cancelled';
 export type MemberRole = 'owner' | 'manager' | 'developer' | 'designer' | 'tester' | 'viewer';
 
@@ -57,12 +57,23 @@ export interface Milestone {
   updated_at: string;
 }
 
+export interface Section {
+  id: string;
+  project_id: string;
+  name: string;
+  position: number;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Task {
   id: string;
   project_id: string;
   sprint_id?: string;
   milestone_id?: string;
   parent_task_id?: string;
+  section_id?: string;
   title: string;
   description?: string;
   type: TaskType;
@@ -273,6 +284,80 @@ export function useDeleteTask() {
     onSuccess: (projectId) => {
       queryClient.invalidateQueries({ queryKey: ['pm_tasks', projectId] });
       toast.success('Task deleted');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+// ─── SECTIONS ────────────────────────────────────────────────────────────────
+
+export function useSections(projectId: string) {
+  return useQuery({
+    queryKey: ['pm_sections', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pm_sections')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('position', { ascending: true });
+      if (error) throw error;
+      return data as Section[];
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: { project_id: string; name: string; position: number; color?: string }) => {
+      const { data, error } = await supabase
+        .from('pm_sections')
+        .insert([values])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_sections', data.project_id] });
+      toast.success('Section created');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useUpdateSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId, ...values }: { id: string; projectId: string; name?: string; position?: number; color?: string }) => {
+      const { data, error } = await supabase
+        .from('pm_sections')
+        .update(values)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return { ...data, project_id: projectId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_sections', data.project_id] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useDeleteSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
+      const { error } = await supabase.from('pm_sections').delete().eq('id', id);
+      if (error) throw error;
+      return projectId;
+    },
+    onSuccess: (projectId) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_sections', projectId] });
+      toast.success('Section deleted');
     },
     onError: (e: any) => toast.error(e.message),
   });
