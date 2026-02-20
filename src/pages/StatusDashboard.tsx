@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, CheckCircle, Database, Server } from 'lucide-react';
+import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, CheckCircle, Database } from 'lucide-react';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 import { ActivityLoggingSection } from '@/components/status/ActivityLoggingSection';
 
@@ -105,13 +105,6 @@ const StatusDashboard = () => {
           icon: <CheckCircle className="h-6 w-6" />,
           description: 'Successful transactions',
           health: m.rollbacks === 0 ? 'good' : m.rollbacks / (m.commits + m.rollbacks) < 0.01 ? 'good' : m.rollbacks / (m.commits + m.rollbacks) < 0.05 ? 'average' : 'bad',
-        },
-        {
-          label: 'Storage Size',
-          value: formatBytes(m.db_size_bytes),
-          icon: <Server className="h-6 w-6" />,
-          description: 'Total allocated storage',
-          health: m.db_size_bytes < 500 * 1024 * 1024 ? 'good' : m.db_size_bytes < 2 * 1024 * 1024 * 1024 ? 'average' : 'bad',
         },
       ]);
       setLastRefreshed(new Date());
@@ -272,7 +265,7 @@ const StatusDashboard = () => {
 
         {/* Metrics grid */}
         <div className="px-4 md:px-8 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {metrics.map((metric, idx) => (
               <Card key={idx} className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
