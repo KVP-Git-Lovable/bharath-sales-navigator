@@ -33,6 +33,8 @@ import RegularizationRequestModal from '@/components/RegularizationRequestModal'
 import { useAttendanceCache } from '@/hooks/useAttendanceCache';
 import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
 import { getSignedStorageUrl } from '@/utils/storageUtils';
+import { PermissionGate } from '@/components/auth/PermissionGate';
+import { usePermissionCheck } from '@/hooks/usePermissionCheck';
 
 // Processing steps for attendance
 type ProcessingStep = 'location' | 'photo' | 'face' | 'saving' | 'complete';
@@ -132,6 +134,7 @@ const Attendance = () => {
   });
   const { compareImages, getMatchStatusIcon, getMatchStatusText } = useFaceMatching();
   const { isVanSalesEnabled } = useVanSales();
+  const { guardAction } = usePermissionCheck();
 
   // Regularization request states - use cached data
   const [regularizationRequests, setRegularizationRequests] = useState<Map<string, any>>(new Map());
@@ -913,6 +916,7 @@ const Attendance = () => {
           {isManager && (
             <div className="sticky top-0 z-10 bg-gradient-subtle pt-1 pb-2">
               <div className="flex bg-[hsl(0,0%,96%)] rounded-full p-1 border border-border/40">
+                <PermissionGate permissionName="widget_attendance_my_attendance_tab">
                 <button
                   className={cn(
                     'flex-1 text-sm font-semibold py-2.5 rounded-full transition-all',
@@ -924,6 +928,8 @@ const Attendance = () => {
                 >
                   My Attendance
                 </button>
+                </PermissionGate>
+                <PermissionGate permissionName="widget_attendance_my_team_tab">
                 <button
                   className={cn(
                     'flex-1 text-sm font-semibold py-2.5 rounded-full transition-all',
@@ -935,6 +941,7 @@ const Attendance = () => {
                 >
                   My Team
                 </button>
+                </PermissionGate>
               </div>
             </div>
           )}
@@ -960,6 +967,7 @@ const Attendance = () => {
 
             {/* Day Action Buttons */}
             <div className="flex gap-3">
+              <PermissionGate permissionName="action_attendance_check_in">
               <button
                 onClick={() => !todaysAttendance?.check_in_time && markAttendance('check-in')}
                 disabled={isMarkingAttendance || !!todaysAttendance?.check_in_time}
@@ -973,7 +981,9 @@ const Attendance = () => {
                 <CheckCircle className="h-4 w-4 text-[hsl(150,50%,45%)]" />
                 {todaysAttendance?.check_in_time ? t('attendance.dayStarted') : isMarkingAttendance ? t('attendance.startingDay') : t('attendance.startMyDay')}
               </button>
+              </PermissionGate>
 
+              <PermissionGate permissionName="action_attendance_check_out">
               <button
                 onClick={() => markAttendance('check-out')}
                 disabled={isMarkingAttendance || !todaysAttendance?.check_in_time || !!todaysAttendance?.check_out_time}
@@ -987,6 +997,7 @@ const Attendance = () => {
                 <Clock className="h-4 w-4" />
                 {todaysAttendance?.check_out_time ? t('attendance.dayEnded') : isMarkingAttendance ? t('attendance.endingDay') : t('attendance.endMyDay')}
               </button>
+              </PermissionGate>
             </div>
 
             {/* Processing Progress Overlay */}
@@ -1243,9 +1254,15 @@ const Attendance = () => {
           {/* Tabs for different sections */}
           <Tabs defaultValue="attendance" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="attendance">{t('attendance.myAttendance')}</TabsTrigger>
-              <TabsTrigger value="leave">{t('attendance.leave')}</TabsTrigger>
-              <TabsTrigger value="holiday">{t('attendance.holiday')}</TabsTrigger>
+              <PermissionGate permissionName="widget_attendance_records_table">
+                <TabsTrigger value="attendance">{t('attendance.myAttendance')}</TabsTrigger>
+              </PermissionGate>
+              <PermissionGate permissionName="widget_attendance_leave_tab">
+                <TabsTrigger value="leave">{t('attendance.leave')}</TabsTrigger>
+              </PermissionGate>
+              <PermissionGate permissionName="widget_attendance_holiday_tab">
+                <TabsTrigger value="holiday">{t('attendance.holiday')}</TabsTrigger>
+              </PermissionGate>
             </TabsList>
 
             <TabsContent value="attendance" className="space-y-4">
@@ -1368,6 +1385,7 @@ const Attendance = () => {
                             <div className="flex flex-wrap gap-2">
                               {/* Regularization Button */}
                               {showRegularizationButton && (
+                                <PermissionGate permissionName="action_attendance_regularize">
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -1377,6 +1395,7 @@ const Attendance = () => {
                                 >
                                   <Edit3 className="h-4 w-4" />
                                 </Button>
+                                </PermissionGate>
                               )}
                               
                               {/* Other action buttons - Only show for present/regularized days */}
