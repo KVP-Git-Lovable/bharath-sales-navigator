@@ -21,9 +21,10 @@ import { ProjectOverview } from "@/components/pm/ProjectOverview";
 import { TaskDetailPanel } from "@/components/pm/TaskDetailPanel";
 import { TimesheetView } from "@/components/pm/TimesheetView";
 import { cn } from "@/lib/utils";
+import { TemplateWorkPlanView } from "@/components/pm/TemplateWorkPlanView";
 import {
   ArrowLeft, Plus, Kanban, List, BarChart3,
-  AlertTriangle, Layers, Grid, Calendar, Clock
+  AlertTriangle, Layers, Grid, Calendar, Clock, FileText
 } from "lucide-react";
 
 export default function ProjectDetailPage() {
@@ -143,6 +144,7 @@ export default function ProjectDetailPage() {
                   { value: "sprints", label: "Sprints", icon: Layers },
                   { value: "risks", label: "Risks", icon: AlertTriangle },
                   { value: "overview", label: "Overview", icon: Grid },
+                  { value: "templates", label: "Templates", icon: FileText },
                 ].map(({ value, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
@@ -189,6 +191,9 @@ export default function ProjectDetailPage() {
                 </TabsContent>
                 <TabsContent value="overview" className="mt-0 p-6">
                   <ProjectOverview project={project} tasks={tasks} sprints={sprints} milestones={milestones} risks={risks} />
+                </TabsContent>
+                <TabsContent value="templates" className="mt-0 p-6">
+                  <TemplateWorkPlanView />
                 </TabsContent>
               </div>
 
