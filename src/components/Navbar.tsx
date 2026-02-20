@@ -51,6 +51,7 @@ import {
   BarChart3,
   ClipboardList,
   Truck,
+  FolderKanban,
 } from "lucide-react";
 
 // Memoized Navbar component for better performance
@@ -112,6 +113,7 @@ export const Navbar = memo(() => {
 
     // Add remaining items
     baseItems.push(
+      { id: 'projects', icon: FolderKanban, label: 'Projects', href: "/projects", color: "from-sky-500 to-sky-600" },
       { id: 'my-competency', icon: Target, label: t('nav.competency'), href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
       { id: 'recycle-bin', icon: Trash2, label: t('nav.recycleBin'), href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
     );

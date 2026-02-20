@@ -14,6 +14,7 @@ import {
 } from "@/hooks/useProjects";
 import { CreateTaskModal } from "@/components/pm/CreateTaskModal";
 import { GanttChart } from "@/components/pm/GanttChart";
+import { CalendarView } from "@/components/pm/CalendarView";
 import { KanbanBoard } from "@/components/pm/KanbanBoard";
 import { BacklogView } from "@/components/pm/BacklogView";
 import { RisksPanel } from "@/components/pm/RisksPanel";
@@ -21,8 +22,8 @@ import { MilestonesPanel } from "@/components/pm/MilestonesPanel";
 import { SprintsPanel } from "@/components/pm/SprintsPanel";
 import { ProjectOverview } from "@/components/pm/ProjectOverview";
 import {
-  ArrowLeft, Plus, Kanban, List, BarChart3, Flag,
-  AlertTriangle, Layers, Grid, FolderOpen
+  ArrowLeft, Plus, Kanban, List, BarChart3,
+  AlertTriangle, Layers, Grid, Calendar
 } from "lucide-react";
 
 export default function ProjectDetailPage() {
@@ -125,9 +126,9 @@ export default function ProjectDetailPage() {
                 {[
                   { value: "board", label: "Board", icon: Kanban },
                   { value: "backlog", label: "Backlog", icon: List },
+                  { value: "calendar", label: "Calendar", icon: Calendar },
                   { value: "gantt", label: "Gantt", icon: BarChart3 },
                   { value: "sprints", label: "Sprints", icon: Layers },
-                  { value: "milestones", label: "Milestones", icon: Flag },
                   { value: "risks", label: "Risks", icon: AlertTriangle },
                   { value: "overview", label: "Overview", icon: Grid },
                 ].map(({ value, label, icon: Icon }) => (
@@ -156,14 +157,14 @@ export default function ProjectDetailPage() {
               <TabsContent value="backlog" className="mt-0 p-6">
                 <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} />
               </TabsContent>
+              <TabsContent value="calendar" className="mt-0">
+                <CalendarView tasks={tasks} projectId={project.id} />
+              </TabsContent>
               <TabsContent value="gantt" className="mt-0 p-4">
                 <GanttChart tasks={tasks} project={project} milestones={milestones} />
               </TabsContent>
               <TabsContent value="sprints" className="mt-0 p-6">
                 <SprintsPanel projectId={project.id} sprints={sprints} tasks={tasks} />
-              </TabsContent>
-              <TabsContent value="milestones" className="mt-0 p-6">
-                <MilestonesPanel projectId={project.id} milestones={milestones} tasks={tasks} />
               </TabsContent>
               <TabsContent value="risks" className="mt-0 p-6">
                 <RisksPanel projectId={project.id} risks={risks} />

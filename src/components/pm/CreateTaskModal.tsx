@@ -125,27 +125,15 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
             </div>
           </div>
           {sprints.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Sprint</Label>
-                <Select value={form.sprint_id || "__none"} onValueChange={v => setForm(f => ({ ...f, sprint_id: v === "__none" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="No sprint" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">No sprint</SelectItem>
-                    {sprints.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Milestone</Label>
-                <Select value={form.milestone_id || "__none"} onValueChange={v => setForm(f => ({ ...f, milestone_id: v === "__none" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="No milestone" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">No milestone</SelectItem>
-                    {milestones.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label>Sprint</Label>
+              <Select value={form.sprint_id || "__none"} onValueChange={v => setForm(f => ({ ...f, sprint_id: v === "__none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="No sprint" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No sprint</SelectItem>
+                  {sprints.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
