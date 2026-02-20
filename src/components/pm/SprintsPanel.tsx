@@ -40,7 +40,14 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
     setShowCreate(false);
   };
 
-  const getSprintTasks = (sprintId: string) => tasks.filter(t => t.sprint_id === sprintId);
+  // Auto-map tasks to sprints by due_date falling within sprint date range
+  const getSprintTasks = (sprint: Sprint) => {
+    if (!sprint.start_date || !sprint.end_date) return [];
+    return tasks.filter(t => {
+      if (!t.due_date) return false;
+      return t.due_date >= sprint.start_date! && t.due_date <= sprint.end_date!;
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -62,7 +69,7 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
       ) : (
         <div className="space-y-4">
           {sprints.map(sprint => {
-            const sprintTasks = getSprintTasks(sprint.id);
+            const sprintTasks = getSprintTasks(sprint);
             const done = sprintTasks.filter(t => t.status === "done").length;
             const progress = sprintTasks.length > 0 ? Math.round((done / sprintTasks.length) * 100) : 0;
             const totalPoints = sprintTasks.reduce((sum, t) => sum + (t.story_points ?? 0), 0);

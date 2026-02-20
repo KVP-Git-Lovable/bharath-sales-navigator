@@ -13,7 +13,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   projectId: string;
-  sprints: Sprint[];
+  sprints?: Sprint[];
   milestones: Milestone[];
   sections: Section[];
   parentTaskId?: string;
@@ -29,7 +29,6 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
     type: "task" as TaskType,
     status: (defaultStatus ?? "todo") as TaskStatus,
     priority: "medium" as Priority,
-    sprint_id: "",
     milestone_id: "",
     section_id: defaultSectionId || "",
     start_date: "",
@@ -60,7 +59,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
       type: form.type,
       status: form.status,
       priority: form.priority,
-      sprint_id: form.sprint_id || undefined,
+      
       milestone_id: form.milestone_id || undefined,
       section_id: form.section_id || undefined,
       start_date: form.start_date || undefined,
@@ -69,7 +68,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
       story_points: form.story_points ? parseInt(form.story_points) : undefined,
       tags: form.tags.length ? form.tags : undefined,
     });
-    setForm({ title: "", description: "", type: "task", status: defaultStatus ?? "todo", priority: "medium", sprint_id: "", milestone_id: "", section_id: defaultSectionId || "", start_date: "", due_date: "", estimated_hours: "", story_points: "", tagInput: "", tags: [] });
+    setForm({ title: "", description: "", type: "task", status: defaultStatus ?? "todo", priority: "medium", milestone_id: "", section_id: defaultSectionId || "", start_date: "", due_date: "", estimated_hours: "", story_points: "", tagInput: "", tags: [] });
     onClose();
   };
 
@@ -126,18 +125,6 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
               </Select>
             </div>
           </div>
-          {sprints.length > 0 && (
-            <div>
-              <Label>Sprint</Label>
-              <Select value={form.sprint_id || "__none"} onValueChange={v => setForm(f => ({ ...f, sprint_id: v === "__none" ? "" : v }))}>
-                <SelectTrigger><SelectValue placeholder="No sprint" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none">No sprint</SelectItem>
-                  {sprints.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           {sections.length > 0 && (
             <div>
               <Label>Section</Label>
