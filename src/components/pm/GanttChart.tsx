@@ -60,7 +60,7 @@ export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
 
   const statusColors: Record<string, string> = {
     backlog: "bg-muted", todo: "bg-blue-400", in_progress: "bg-amber-400",
-    in_review: "bg-purple-400", done: "bg-green-500", cancelled: "bg-red-400",
+    in_review: "bg-purple-400", done: "bg-green-500", cancelled: "bg-red-400", overdue: "bg-red-500",
   };
 
   const priorityBorder: Record<string, string> = {

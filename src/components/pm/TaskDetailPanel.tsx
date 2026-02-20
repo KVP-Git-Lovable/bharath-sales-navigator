@@ -273,6 +273,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
                 <SelectItem value="in_review">In Review</SelectItem>
                 <SelectItem value="done">Done</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
               </SelectContent>
             </Select>
           </div>

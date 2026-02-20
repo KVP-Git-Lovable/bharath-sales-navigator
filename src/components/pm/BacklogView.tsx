@@ -1,12 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Task, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection } from "@/hooks/useProjects";
-import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
+import { StatusBadge, PriorityBadge } from "./TaskStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Search, MoreVertical, Trash2, ChevronRight, ChevronDown, GripVertical } from "lucide-react";
-import { format, isToday, isYesterday, startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth } from "date-fns";
+import { format, isToday, isYesterday, startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -38,6 +38,13 @@ function matchesDueDateFilter(dueDate: string | undefined, filter: DueDateFilter
   }
 }
 
+// Helper: check if a task is overdue (due date passed, status not done/backlog)
+function isTaskOverdue(task: Task): boolean {
+  if (!task.due_date) return false;
+  if (['done', 'backlog'].includes(task.status)) return false;
+  return isBefore(new Date(task.due_date), startOfDay(new Date()));
+}
+
 export function BacklogView({ tasks, sprints, milestones, projectId, sections, onTaskClick }: Props) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -49,6 +56,15 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
   const [statusFilter, setStatusFilter] = useState("all");
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  // Auto-set overdue status for tasks whose due date has passed
+  useEffect(() => {
+    tasks.forEach(task => {
+      if (isTaskOverdue(task) && task.status !== 'overdue') {
+        updateTask.mutate({ id: task.id, status: 'overdue' });
+      }
+    });
+  }, [tasks]);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
   // Inline add state
@@ -162,11 +178,10 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
                   {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 </button>
               ) : <span className="w-3.5" />}
-              <TypeBadge type={task.type} />
-              <span className="text-sm text-foreground font-medium">{task.title}</span>
+              <span className={cn("text-sm font-medium", isTaskOverdue(task) ? "text-red-600 dark:text-red-400" : "text-foreground")}>{task.title}</span>
             </div>
           </td>
-          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+          <td className={cn("py-2 px-3 text-xs whitespace-nowrap", isTaskOverdue(task) ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground")}>
             {task.due_date ? format(new Date(task.due_date), "MMM d") : "—"}
           </td>
           <td className="py-2 px-3 whitespace-nowrap">
@@ -176,7 +191,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
               onChange={e => updateTask.mutate({ id: task.id, status: e.target.value as any })}
               className="text-xs bg-transparent border-none outline-none cursor-pointer"
             >
-              {["backlog","todo","in_progress","in_review","done","cancelled"].map(s => (
+              {["backlog","todo","in_progress","in_review","done","cancelled","overdue"].map(s => (
                 <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
               ))}
             </select>
@@ -263,6 +278,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
             <SelectItem value="todo">To Do</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="done">Done</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
           </SelectContent>
         </Select>
         <Select value={dueDateFilter} onValueChange={v => setDueDateFilter(v as DueDateFilter)}>

@@ -8,6 +8,7 @@ const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
   in_review:   { label: "In Review",   className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
   done:        { label: "Done",        className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
   cancelled:   { label: "Cancelled",   className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+  overdue:     { label: "Overdue",     className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
 };
 
 const priorityConfig: Record<Priority, { label: string; className: string; dot: string }> = {

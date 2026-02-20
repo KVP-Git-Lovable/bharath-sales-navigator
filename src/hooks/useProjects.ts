@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
-export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'cancelled';
+export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'cancelled' | 'overdue';
 export type TaskType = 'task' | 'bug' | 'idea' | 'milestone';
 export type SprintStatus = 'planning' | 'active' | 'completed' | 'cancelled';
 export type MemberRole = 'owner' | 'manager' | 'developer' | 'designer' | 'tester' | 'viewer';

@@ -109,6 +109,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="in_review">In Review</SelectItem>
                   <SelectItem value="done">Done</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
                 </SelectContent>
               </Select>
             </div>

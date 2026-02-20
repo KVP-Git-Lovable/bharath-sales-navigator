@@ -14781,6 +14781,7 @@ export type Database = {
         | "in_review"
         | "done"
         | "cancelled"
+        | "overdue"
       pm_task_type: "epic" | "story" | "task" | "bug" | "idea" | "milestone"
       user_status:
         | "pending_completion"
@@ -14952,6 +14953,7 @@ export const Constants = {
         "in_review",
         "done",
         "cancelled",
+        "overdue",
       ],
       pm_task_type: ["epic", "story", "task", "bug", "idea", "milestone"],
       user_status: [
