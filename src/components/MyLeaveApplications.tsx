@@ -42,30 +42,38 @@ const MyLeaveApplications: React.FC<MyLeaveApplicationsProps> = ({ refreshTrigge
 
     setIsLoading(true);
     try {
-      console.log('Fetching my leave applications for user:', user.id);
+      // Fetch leave applications without join to avoid FK ambiguity (two FK constraints exist)
       const { data, error } = await supabase
         .from('leave_applications')
-        .select(`
-          *,
-          leave_types!leave_applications_leave_type_id_fkey (
-            name
-          )
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .order('applied_date', { ascending: false });
 
-      console.log('Leave applications data:', data, 'error:', error);
       if (error) throw error;
-      
-      // Transform the data to match our interface
-      const transformedData = (data || []).map(item => ({
+      if (!data || data.length === 0) {
+        setApplications([]);
+        return;
+      }
+
+      // Fetch leave type names separately to avoid FK hint ambiguity
+      const leaveTypeIds = [...new Set(data.map(a => a.leave_type_id).filter(Boolean))];
+      let leaveTypeMap = new Map<string, string>();
+      if (leaveTypeIds.length > 0) {
+        const { data: types } = await supabase
+          .from('leave_types')
+          .select('id, name')
+          .in('id', leaveTypeIds);
+        (types || []).forEach(t => leaveTypeMap.set(t.id, t.name));
+      }
+
+      const transformedData: LeaveApplication[] = data.map(item => ({
         ...item,
-        leave_types: Array.isArray(item.leave_types) && item.leave_types.length > 0 
-          ? item.leave_types[0] 
-          : null
+        leave_types: item.leave_type_id && leaveTypeMap.has(item.leave_type_id)
+          ? { name: leaveTypeMap.get(item.leave_type_id)! }
+          : null,
       }));
-      
-      setApplications(transformedData as LeaveApplication[]);
+
+      setApplications(transformedData);
     } catch (error) {
       console.error('Error fetching leave applications:', error);
     } finally {
