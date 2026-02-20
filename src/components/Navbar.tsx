@@ -1,4 +1,7 @@
-import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff, AlertTriangle } from "lucide-react";
+import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff, AlertTriangle, Bug } from "lucide-react";
+import { Capacitor } from '@capacitor/core';
+import { testCrash } from '@/utils/crashlytics';
+import { toast } from 'sonner';
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useMemo, useCallback, memo, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -344,8 +347,23 @@ export const Navbar = memo(() => {
             />
           </div>
 
-          {/* Logout Button at the bottom */}
-          <div className="mt-6 pt-4 border-t">
+          {/* Test Crash & Logout Buttons */}
+          <div className="mt-6 pt-4 border-t space-y-1">
+            <button
+              onClick={() => {
+                if (Capacitor.isNativePlatform()) {
+                  testCrash();
+                } else {
+                  toast.info('Test Crash only works on native Android/iOS devices');
+                }
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-amber-600 hover:bg-amber-500/10 transition-colors group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                <Bug className="h-4 w-4 text-amber-600" />
+              </div>
+              <span className="text-sm font-medium">Test Crash</span>
+            </button>
             <button
               onClick={() => setIsLogoutDialogOpen(true)}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors group"
