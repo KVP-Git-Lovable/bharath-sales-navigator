@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Building2 } from "lucide-react";
+import { ArrowLeft, Save, Building2, Network, Layers3, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -17,17 +17,45 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OwnerSelector } from "@/components/distributor/OwnerSelector";
+import { Badge } from "@/components/ui/badge";
 
 interface Distributor {
   id: string;
   name: string;
 }
 
+const DMS_TYPE_META = {
+  direct_distributor: {
+    label: 'Direct Distributor',
+    icon: Store,
+    description: 'Places primary orders directly with the company (SFA). Supplies goods to retailers.',
+    color: 'bg-primary/10 text-primary',
+  },
+  super_stockist: {
+    label: 'Super Stockist',
+    icon: Layers3,
+    description: 'Places primary orders from the company. Distributes to USS distributors and retailers.',
+    color: 'bg-amber-100 text-amber-700',
+  },
+  under_super_stockist: {
+    label: 'Under Super Stockist',
+    icon: Network,
+    description: 'Places primary orders via a Super Stockist parent. Supplies to retailers.',
+    color: 'bg-purple-100 text-purple-700',
+  },
+};
+
 export default function AddDistributor() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [parentDistributors, setParentDistributors] = useState<Distributor[]>([]);
+  const [superStockists, setSuperStockists] = useState<Distributor[]>([]);
   
+  // Read DMS type from URL query param
+  const urlType = searchParams.get('type') || 'direct_distributor';
+  const validTypes = Object.keys(DMS_TYPE_META);
+  const initialDmsType = validTypes.includes(urlType) ? urlType : 'direct_distributor';
+
   const [formData, setFormData] = useState({
     name: "",
     contact_person: "",
@@ -42,7 +70,7 @@ export default function AddDistributor() {
     assets_trucks: "",
     network_retailers_count: "",
     region_coverage: "",
-    distribution_level: "distributor",
+    distribution_level: initialDmsType,
     parent_id: "",
     distributor_status: "initial_connect",
     partnership_status: "registered",
@@ -61,20 +89,26 @@ export default function AddDistributor() {
   });
 
   useEffect(() => {
-    loadParentDistributors();
+    // Load Super Stockists for USS parent dropdown
+    loadSuperStockists();
   }, []);
 
-  const loadParentDistributors = async () => {
+  const loadSuperStockists = async () => {
     const { data } = await supabase
       .from('distributors')
       .select('id, name')
+      .eq('distribution_level', 'super_stockist')
       .order('name');
-    setParentDistributors(data || []);
+    setSuperStockists(data || []);
   };
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const typeMeta = DMS_TYPE_META[formData.distribution_level as keyof typeof DMS_TYPE_META] || DMS_TYPE_META.direct_distributor;
+  const TypeIcon = typeMeta.icon;
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,13 +174,22 @@ export default function AddDistributor() {
     <Layout>
       <div className="p-4 pb-24">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <h1 className="text-xl font-bold text-foreground">Add Distributor</h1>
             <p className="text-sm text-muted-foreground">Onboard a new distribution partner</p>
+          </div>
+        </div>
+
+        {/* DMS Type Card */}
+        <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 mb-4 flex items-start gap-3">
+          <TypeIcon className="h-6 w-6 mt-0.5 flex-shrink-0 text-primary" />
+          <div>
+            <p className="font-semibold text-primary">{typeMeta.label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{typeMeta.description}</p>
           </div>
         </div>
 
@@ -271,27 +314,32 @@ export default function AddDistributor() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="direct_distributor">Direct Distributor</SelectItem>
                       <SelectItem value="super_stockist">Super Stockist</SelectItem>
-                      <SelectItem value="distributor">Distributor</SelectItem>
-                      <SelectItem value="sub_distributor">Sub-Distributor</SelectItem>
-                      <SelectItem value="agent">Agent</SelectItem>
+                      <SelectItem value="under_super_stockist">Under Super Stockist</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>Related To (Parent)</Label>
-                  <Select value={formData.parent_id || "none"} onValueChange={(v) => handleChange("parent_id", v === "none" ? "" : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select parent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {parentDistributors.map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Parent SS selector — only visible for USS */}
+                {formData.distribution_level === 'under_super_stockist' && (
+                  <div>
+                    <Label>Parent Super Stockist *</Label>
+                    <Select value={formData.parent_id || "none"} onValueChange={(v) => handleChange("parent_id", v === "none" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Super Stockist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {superStockists.map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {superStockists.length === 0 && (
+                      <p className="text-xs text-warning mt-1">No Super Stockists found. Add one first.</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
