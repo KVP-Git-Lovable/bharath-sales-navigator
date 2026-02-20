@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateTask, TaskStatus, TaskType, Priority, Sprint, Milestone } from "@/hooks/useProjects";
+import { useCreateTask, TaskStatus, TaskType, Priority, Sprint, Milestone, Section } from "@/hooks/useProjects";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 
@@ -15,11 +15,13 @@ interface Props {
   projectId: string;
   sprints: Sprint[];
   milestones: Milestone[];
+  sections: Section[];
   parentTaskId?: string;
   defaultStatus?: TaskStatus;
+  defaultSectionId?: string;
 }
 
-export function CreateTaskModal({ open, onClose, projectId, sprints, milestones, parentTaskId, defaultStatus }: Props) {
+export function CreateTaskModal({ open, onClose, projectId, sprints, milestones, sections, parentTaskId, defaultStatus, defaultSectionId }: Props) {
   const createTask = useCreateTask();
   const [form, setForm] = useState({
     title: "",
@@ -29,6 +31,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
     priority: "medium" as Priority,
     sprint_id: "",
     milestone_id: "",
+    section_id: defaultSectionId || "",
     start_date: "",
     due_date: "",
     estimated_hours: "",
@@ -59,13 +62,14 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
       priority: form.priority,
       sprint_id: form.sprint_id || undefined,
       milestone_id: form.milestone_id || undefined,
+      section_id: form.section_id || undefined,
       start_date: form.start_date || undefined,
       due_date: form.due_date || undefined,
       estimated_hours: form.estimated_hours ? parseFloat(form.estimated_hours) : undefined,
       story_points: form.story_points ? parseInt(form.story_points) : undefined,
       tags: form.tags.length ? form.tags : undefined,
     });
-    setForm({ title: "", description: "", type: "task", status: defaultStatus ?? "todo", priority: "medium", sprint_id: "", milestone_id: "", start_date: "", due_date: "", estimated_hours: "", story_points: "", tagInput: "", tags: [] });
+    setForm({ title: "", description: "", type: "task", status: defaultStatus ?? "todo", priority: "medium", sprint_id: "", milestone_id: "", section_id: defaultSectionId || "", start_date: "", due_date: "", estimated_hours: "", story_points: "", tagInput: "", tags: [] });
     onClose();
   };
 
@@ -90,8 +94,6 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
               <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v as TaskType }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="epic">⚡ Epic</SelectItem>
-                  <SelectItem value="story">📖 Story</SelectItem>
                   <SelectItem value="task">✅ Task</SelectItem>
                   <SelectItem value="bug">🐛 Bug</SelectItem>
                   <SelectItem value="idea">💡 Idea</SelectItem>
@@ -132,6 +134,18 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
                 <SelectContent>
                   <SelectItem value="__none">No sprint</SelectItem>
                   {sprints.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {sections.length > 0 && (
+            <div>
+              <Label>Section</Label>
+              <Select value={form.section_id || "__none"} onValueChange={v => setForm(f => ({ ...f, section_id: v === "__none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="No section" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No section</SelectItem>
+                  {sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -151,7 +151,14 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Type</span>
-            <TypeBadge type={task.type} />
+            <Select value={task.type} onValueChange={v => handleSave("type", v)}>
+              <SelectTrigger className="h-8 w-40 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="task">✅ Task</SelectItem>
+                <SelectItem value="bug">🐛 Bug</SelectItem>
+                <SelectItem value="idea">💡 Idea</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-3">
