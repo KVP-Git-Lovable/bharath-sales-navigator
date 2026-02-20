@@ -125,7 +125,7 @@ export default function ProjectDetailPage() {
               <TabsList className="h-9 bg-transparent gap-0 p-0">
                 {[
                   { value: "board", label: "Board", icon: Kanban },
-                  { value: "backlog", label: "Backlog", icon: List },
+                  { value: "backlog", label: "My Tasks", icon: List },
                   { value: "calendar", label: "Calendar", icon: Calendar },
                   { value: "gantt", label: "Gantt", icon: BarChart3 },
                   { value: "sprints", label: "Sprints", icon: Layers },

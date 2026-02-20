@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { Task, useUpdateTask, useDeleteTask } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
+import { TaskSubtasks } from "./TaskSubtasks";
+import { TaskAttachments } from "./TaskAttachments";
+import { TaskDependencies } from "./TaskDependencies";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Check, Calendar, User, Clock, Trash2 } from "lucide-react";
+import { X, Check, Calendar, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 interface Props {
   task: Task;
   onClose: () => void;
   projectId: string;
+  allTasks?: Task[];
+  onSelectTask?: (task: Task) => void;
 }
 
-export function TaskDetailPanel({ task, onClose, projectId }: Props) {
+export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSelectTask }: Props) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const [title, setTitle] = useState(task.title);
@@ -38,6 +42,10 @@ export function TaskDetailPanel({ task, onClose, projectId }: Props) {
     const newStatus = task.status === "done" ? "todo" : "done";
     setStatus(newStatus);
     updateTask.mutate({ id: task.id, status: newStatus });
+  };
+
+  const handleSelectTask = (t: Task) => {
+    onSelectTask?.(t);
   };
 
   return (
@@ -177,6 +185,24 @@ export function TaskDetailPanel({ task, onClose, projectId }: Props) {
             className="min-h-[120px] text-sm"
           />
         </div>
+
+        {/* Sub-tasks */}
+        <TaskSubtasks
+          task={task}
+          allTasks={allTasks}
+          projectId={projectId}
+          onSelectTask={handleSelectTask}
+        />
+
+        {/* Attachments */}
+        <TaskAttachments taskId={task.id} />
+
+        {/* Dependencies */}
+        <TaskDependencies
+          task={task}
+          allTasks={allTasks}
+          onSelectTask={handleSelectTask}
+        />
 
         {/* Tags */}
         {task.tags && task.tags.length > 0 && (
