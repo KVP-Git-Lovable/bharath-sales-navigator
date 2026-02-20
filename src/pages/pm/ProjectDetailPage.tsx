@@ -190,7 +190,7 @@ export default function ProjectDetailPage() {
 
               {/* Shared Task Detail Side Panel — overlapping */}
               {currentSelectedTask && (
-                <div className="fixed right-0 top-0 bottom-0 w-[480px] max-w-[90vw] z-50 border-l bg-card overflow-hidden shadow-[-8px_0_24px_-4px_hsl(var(--foreground)/0.1)]">
+                <div className="fixed right-0 bottom-0 w-[480px] max-w-[90vw] z-50 border-l bg-card overflow-hidden shadow-[-8px_0_24px_-4px_hsl(var(--foreground)/0.1)]" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
                   <TaskDetailPanel
                     task={currentSelectedTask}
                     onClose={() => setSelectedTask(null)}
