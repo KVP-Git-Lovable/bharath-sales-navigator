@@ -185,7 +185,7 @@ export default function ProjectDetailPage() {
 
               {/* Shared Task Detail Side Panel */}
               {currentSelectedTask && (
-                <div className="w-96 flex-shrink-0 border-l overflow-hidden">
+                <div className="w-[480px] flex-shrink-0 border-l overflow-hidden shadow-[-4px_0_16px_-4px_hsl(var(--foreground)/0.06)]">
                   <TaskDetailPanel
                     task={currentSelectedTask}
                     onClose={() => setSelectedTask(null)}
