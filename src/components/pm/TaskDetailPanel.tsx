@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Task, useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/useProjects";
+import { Task, useUpdateTask, useDeleteTask, useCreateTask, useTaskCollaborators, useAddTaskCollaborator, useRemoveTaskCollaborator } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskAttachments } from "./TaskAttachments";
 import { TaskDependencies } from "./TaskDependencies";
+import { MultiUserPicker } from "./MultiUserPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -174,6 +175,9 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const createTask = useCreateTask();
+  const { data: collaborators = [] } = useTaskCollaborators(task.id);
+  const addCollaborator = useAddTaskCollaborator();
+  const removeCollaborator = useRemoveTaskCollaborator();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [startDate, setStartDate] = useState(task.start_date || "");
@@ -356,7 +360,16 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
         {/* Meta fields — clean vertical stack */}
         <div className="space-y-3 bg-muted/20 rounded-lg p-4 border border-border/50">
           <UserPickerField label="Owner" currentUser={task.assignee} onSave={(userId) => handleSave("assignee_id", userId)} />
-          <UserPickerField label="Collaborator" currentUser={task.collaborator} onSave={(userId) => handleSave("collaborator_id", userId)} />
+          <MultiUserPicker
+            label="Collaborators"
+            selectedUsers={collaborators.map(c => ({
+              id: c.user_id,
+              full_name: c.user?.full_name || "Unknown",
+              profile_picture_url: c.user?.profile_picture_url,
+            }))}
+            onAdd={(user) => addCollaborator.mutate({ taskId: task.id, userId: user.id })}
+            onRemove={(userId) => removeCollaborator.mutate({ taskId: task.id, userId })}
+          />
 
           <div className="h-px bg-border/50" />
 

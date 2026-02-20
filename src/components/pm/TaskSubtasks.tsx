@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Task, useCreateTask } from "@/hooks/useProjects";
+import { useState, useRef, useEffect } from "react";
+import { Task, useCreateTask, useTaskCollaborators, useAddTaskCollaborator } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { Plus } from "lucide-react";
 
@@ -12,11 +12,27 @@ interface Props {
 
 export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props) {
   const createTask = useCreateTask();
+  const { data: collaborators = [] } = useTaskCollaborators(task.id);
+  const addCollaborator = useAddTaskCollaborator();
   const [inlineTitle, setInlineTitle] = useState("");
   const [showInline, setShowInline] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const subtasks = allTasks.filter(t => t.parent_task_id === task.id);
+
+  // Auto-add subtask owners as collaborators on the parent task
+  useEffect(() => {
+    if (!subtasks.length) return;
+    const parentOwnerId = task.assignee_id;
+    const collabUserIds = new Set(collaborators.map(c => c.user_id));
+
+    subtasks.forEach(sub => {
+      if (sub.assignee_id && sub.assignee_id !== parentOwnerId && !collabUserIds.has(sub.assignee_id)) {
+        addCollaborator.mutate({ taskId: task.id, userId: sub.assignee_id });
+        collabUserIds.add(sub.assignee_id); // prevent duplicate calls in same render
+      }
+    });
+  }, [subtasks.map(s => s.assignee_id).join(','), collaborators.length]);
 
   const handleSubmit = async () => {
     if (!inlineTitle.trim()) {

@@ -1,13 +1,92 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateTask, TaskStatus, TaskType, Priority, Sprint, Milestone, Section } from "@/hooks/useProjects";
+import { useCreateTask, useAddTaskCollaborator, TaskStatus, TaskType, Priority, Sprint, Milestone, Section } from "@/hooks/useProjects";
+import { MultiUserPicker } from "./MultiUserPicker";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface UserInfo {
+  id: string;
+  full_name: string;
+  profile_picture_url?: string;
+}
+
+// ── Reusable Owner Picker for the form ──────────────────────
+function OwnerPickerField({ value, onChange }: { value: UserInfo | null; onChange: (u: UserInfo | null) => void }) {
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<UserInfo[]>([]);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, profile_picture_url").ilike("full_name", `%${query}%`).limit(8);
+      setResults(data || []);
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShowSearch(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div>
+      <Label>Task Owner</Label>
+      <div className="relative mt-1" ref={ref}>
+        <button
+          type="button"
+          onClick={() => setShowSearch(!showSearch)}
+          className="w-full flex items-center gap-2 text-sm border rounded-md px-3 py-2 hover:bg-muted/50 transition-colors text-left"
+        >
+          {value ? (
+            <>
+              <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[10px] font-semibold">
+                {value.full_name?.charAt(0) ?? "?"}
+              </div>
+              <span>{value.full_name}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); onChange(null); }} className="ml-auto text-muted-foreground hover:text-destructive">
+                <X className="w-3 h-3" />
+              </button>
+            </>
+          ) : (
+            <span className="text-muted-foreground italic">Auto-assigned to you</span>
+          )}
+        </button>
+        {showSearch && (
+          <div className="absolute top-full left-0 mt-1 w-full bg-popover border rounded-lg shadow-lg z-50 p-2">
+            <div className="flex items-center gap-2 border-b pb-2 mb-1">
+              <Search className="w-3.5 h-3.5 text-muted-foreground" />
+              <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search users..."
+                className="flex-1 text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50" />
+            </div>
+            {results.map(u => (
+              <button key={u.id} type="button" onClick={() => { onChange(u); setShowSearch(false); setQuery(""); }}
+                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted transition-colors">
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[10px] font-semibold">
+                  {u.full_name?.charAt(0) ?? "?"}
+                </div>
+                <span className="text-sm">{u.full_name}</span>
+              </button>
+            ))}
+            {query && results.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1.5">No users found</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -23,6 +102,7 @@ interface Props {
 
 export function CreateTaskModal({ open, onClose, projectId, sprints, milestones, sections, parentTaskId, defaultStatus, defaultSectionId }: Props) {
   const createTask = useCreateTask();
+  const addCollaborator = useAddTaskCollaborator();
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -38,6 +118,8 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
     tagInput: "",
     tags: [] as string[],
   });
+  const [owner, setOwner] = useState<UserInfo | null>(null);
+  const [collaborators, setCollaborators] = useState<UserInfo[]>([]);
 
   const addTag = () => {
     const t = form.tagInput.trim();
@@ -51,7 +133,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    await createTask.mutateAsync({
+    const newTask = await createTask.mutateAsync({
       project_id: projectId,
       parent_task_id: parentTaskId ?? undefined,
       title: form.title,
@@ -59,7 +141,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
       type: form.type,
       status: form.status,
       priority: form.priority,
-      
+      assignee_id: owner?.id || undefined,
       milestone_id: form.milestone_id || undefined,
       section_id: form.section_id || undefined,
       start_date: form.start_date || undefined,
@@ -68,7 +150,13 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
       story_points: form.story_points ? parseInt(form.story_points) : undefined,
       tags: form.tags.length ? form.tags : undefined,
     });
+    // Add collaborators
+    for (const collab of collaborators) {
+      await addCollaborator.mutateAsync({ taskId: newTask.id, userId: collab.id });
+    }
     setForm({ title: "", description: "", type: "task", status: defaultStatus ?? "todo", priority: "medium", milestone_id: "", section_id: defaultSectionId || "", start_date: "", due_date: "", estimated_hours: "", story_points: "", tagInput: "", tags: [] });
+    setOwner(null);
+    setCollaborators([]);
     onClose();
   };
 
@@ -87,6 +175,19 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
             <Label>Description</Label>
             <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Details, acceptance criteria..." />
           </div>
+
+          {/* Owner */}
+          <OwnerPickerField value={owner} onChange={setOwner} />
+
+          {/* Collaborators */}
+          <MultiUserPicker
+            label="Collaborators"
+            selectedUsers={collaborators}
+            onAdd={(u) => setCollaborators(prev => [...prev, u])}
+            onRemove={(id) => setCollaborators(prev => prev.filter(c => c.id !== id))}
+            compact
+          />
+
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label>Type</Label>
@@ -180,6 +281,11 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
               </div>
             )}
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            💡 Sub-tasks, dependencies, and attachments can be added after creating the task via the task detail panel.
+          </p>
+
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={createTask.isPending}>
