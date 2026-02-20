@@ -3,11 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   useProject, useTasks, useSprints, useMilestones, useRisks, useSections,
   useUpdateTask, useDeleteTask, Task, TaskStatus
@@ -21,6 +18,7 @@ import { RisksPanel } from "@/components/pm/RisksPanel";
 import { MilestonesPanel } from "@/components/pm/MilestonesPanel";
 import { SprintsPanel } from "@/components/pm/SprintsPanel";
 import { ProjectOverview } from "@/components/pm/ProjectOverview";
+import { TaskDetailPanel } from "@/components/pm/TaskDetailPanel";
 import {
   ArrowLeft, Plus, Kanban, List, BarChart3,
   AlertTriangle, Layers, Grid, Calendar
@@ -38,6 +36,7 @@ export default function ProjectDetailPage() {
   const updateTask = useUpdateTask();
   const [tab, setTab] = useState("board");
   const [showCreateTask, setShowCreateTask] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const taskStats = useMemo(() => ({
     total: tasks.length,
@@ -50,6 +49,12 @@ export default function ProjectDetailPage() {
   const progress = taskStats.total > 0
     ? Math.round((taskStats.done / taskStats.total) * 100)
     : 0;
+
+  // Keep selected task in sync with latest data
+  const currentSelectedTask = useMemo(() => {
+    if (!selectedTask) return null;
+    return tasks.find(t => t.id === selectedTask.id) || null;
+  }, [selectedTask, tasks]);
 
   if (loadingProject) {
     return (
@@ -144,36 +149,52 @@ export default function ProjectDetailPage() {
               </TabsList>
             </div>
 
-            <div className="flex-1 overflow-auto">
-              <TabsContent value="board" className="mt-0 h-full">
-                <KanbanBoard
-                  tasks={tasks}
-                  onUpdateTask={(id, status) => updateTask.mutate({ id, status })}
-                  onAddTask={(status) => setShowCreateTask(true)}
-                  projectId={project.id}
-                  sprints={sprints}
-                  milestones={milestones}
-                  sections={sections}
-                />
-              </TabsContent>
-              <TabsContent value="backlog" className="mt-0 p-6">
-                <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} />
-              </TabsContent>
-              <TabsContent value="calendar" className="mt-0">
-                <CalendarView tasks={tasks} projectId={project.id} />
-              </TabsContent>
-              <TabsContent value="gantt" className="mt-0 p-4">
-                <GanttChart tasks={tasks} project={project} milestones={milestones} />
-              </TabsContent>
-              <TabsContent value="sprints" className="mt-0 p-6">
-                <SprintsPanel projectId={project.id} sprints={sprints} tasks={tasks} />
-              </TabsContent>
-              <TabsContent value="risks" className="mt-0 p-6">
-                <RisksPanel projectId={project.id} risks={risks} />
-              </TabsContent>
-              <TabsContent value="overview" className="mt-0 p-6">
-                <ProjectOverview project={project} tasks={tasks} sprints={sprints} milestones={milestones} risks={risks} />
-              </TabsContent>
+            <div className="flex-1 overflow-hidden flex">
+              <div className="flex-1 overflow-auto">
+                <TabsContent value="board" className="mt-0 h-full">
+                  <KanbanBoard
+                    tasks={tasks}
+                    onUpdateTask={(id, status) => updateTask.mutate({ id, status })}
+                    onAddTask={(status) => setShowCreateTask(true)}
+                    projectId={project.id}
+                    sprints={sprints}
+                    milestones={milestones}
+                    sections={sections}
+                    onTaskClick={(task) => setSelectedTask(task)}
+                  />
+                </TabsContent>
+                <TabsContent value="backlog" className="mt-0 p-6">
+                  <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} />
+                </TabsContent>
+                <TabsContent value="calendar" className="mt-0">
+                  <CalendarView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
+                </TabsContent>
+                <TabsContent value="gantt" className="mt-0 p-4">
+                  <GanttChart tasks={tasks} project={project} milestones={milestones} onTaskClick={(task) => setSelectedTask(task)} />
+                </TabsContent>
+                <TabsContent value="sprints" className="mt-0 p-6">
+                  <SprintsPanel projectId={project.id} sprints={sprints} tasks={tasks} />
+                </TabsContent>
+                <TabsContent value="risks" className="mt-0 p-6">
+                  <RisksPanel projectId={project.id} risks={risks} />
+                </TabsContent>
+                <TabsContent value="overview" className="mt-0 p-6">
+                  <ProjectOverview project={project} tasks={tasks} sprints={sprints} milestones={milestones} risks={risks} />
+                </TabsContent>
+              </div>
+
+              {/* Shared Task Detail Side Panel */}
+              {currentSelectedTask && (
+                <div className="w-96 flex-shrink-0 border-l overflow-hidden">
+                  <TaskDetailPanel
+                    task={currentSelectedTask}
+                    onClose={() => setSelectedTask(null)}
+                    projectId={project.id}
+                    allTasks={tasks}
+                    onSelectTask={(t) => setSelectedTask(t)}
+                  />
+                </div>
+              )}
             </div>
           </Tabs>
         </div>

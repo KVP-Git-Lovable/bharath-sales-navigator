@@ -20,9 +20,10 @@ interface Props {
   sprints: Sprint[];
   milestones: Milestone[];
   sections: Section[];
+  onTaskClick?: (task: Task) => void;
 }
 
-export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestones, sections }: Props) {
+export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestones, sections, onTaskClick }: Props) {
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
@@ -208,6 +209,7 @@ export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestone
                   onDragEnd={handleDragEnd}
                   onUpdateTask={onUpdateTask}
                   onDelete={() => deleteTask.mutate({ id: task.id, projectId: task.project_id })}
+                  onClick={() => onTaskClick?.(task)}
                 />
               ))}
             </div>
@@ -281,13 +283,14 @@ export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestone
 
 // ── Task Card ──────────────────────────────────────────────────────
 
-function TaskCard({ task, dragging, onDragStart, onDragEnd, onUpdateTask, onDelete }: {
+function TaskCard({ task, dragging, onDragStart, onDragEnd, onUpdateTask, onDelete, onClick }: {
   task: Task;
   dragging: string | null;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onUpdateTask: (id: string, status: TaskStatus) => void;
   onDelete: () => void;
+  onClick: () => void;
 }) {
   const STATUS_OPTIONS: { status: TaskStatus; label: string }[] = [
     { status: "backlog", label: "Backlog" },
@@ -302,8 +305,9 @@ function TaskCard({ task, dragging, onDragStart, onDragEnd, onUpdateTask, onDele
       draggable
       onDragStart={() => onDragStart(task.id)}
       onDragEnd={onDragEnd}
+      onClick={onClick}
       className={cn(
-        "bg-card border rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all group",
+        "bg-card border rounded-lg p-3 cursor-pointer active:cursor-grabbing shadow-sm hover:shadow-md hover:border-primary/30 transition-all group",
         dragging === task.id ? "opacity-40 scale-95" : ""
       )}
     >
