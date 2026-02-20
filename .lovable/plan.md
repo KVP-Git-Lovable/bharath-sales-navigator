@@ -1,55 +1,50 @@
 
-
-## Add "Homepage" Module to Security & Access Control
-
-This plan adds a new **Homepage** module to the hierarchical permission system, allowing admins to control which homepage elements each profile/role can access.
+## Wire Homepage Permissions to Dashboard Rendering
 
 ### What Changes
 
-**1. Register the Homepage module in `src/components/security/hierarchicalPermissions.ts`**
+**Single file edit: `src/pages/Index.tsx`**
 
-Add a new entry to the `HIERARCHICAL_MODULES` array with the following structure:
+### Step 1 -- Destructure additional permission helpers
 
-- **Module name:** `homepage`
-- **Module label:** `Homepage`
+Update line 37 to also destructure `hasFieldPermission`, `hasActionPermission`, and `hasWidgetPermission`:
 
-**Fields** (visible elements on the homepage):
-| Permission Name | Label |
-|---|---|
-| `field_homepage_greeting` | Greeting Text |
-| `field_homepage_attendance_summary` | Attendance Summary |
-| `field_homepage_sales_summary` | Sales Summary |
-| `field_homepage_notifications` | Notifications |
-| `field_homepage_quick_stats` | Quick Stats |
-| `field_homepage_beat_plan` | Beat Plan |
-| `field_homepage_target_progress` | Target Progress |
+```typescript
+const { permissions, hasModuleAccess, hasFieldPermission, hasActionPermission, hasWidgetPermission } = useProfilePermissions();
+```
 
-**Actions** (user interactions on the homepage):
-| Permission Name | Label |
-|---|---|
-| `action_homepage_check_in` | Check In |
-| `action_homepage_check_out` | Check Out |
-| `action_homepage_end_day` | End My Day |
-| `action_homepage_refresh` | Refresh Dashboard |
-| `action_homepage_quick_add` | Quick Add |
-| `action_homepage_quick_nav` | Quick Navigation |
+### Step 2 -- Update visibility booleans (lines 43-48)
 
-**Widgets** (dashboard components):
-| Permission Name | Label |
-|---|---|
-| `widget_homepage_attendance` | Attendance Widget |
-| `widget_homepage_sales_summary` | Sales Summary Widget |
-| `widget_homepage_visit_plan` | Visit Plan Widget |
-| `widget_homepage_announcements` | Announcements |
-| `widget_homepage_quick_links` | Quick Links |
-| `widget_homepage_performance` | Performance Widget |
-| `widget_homepage_target_achievement` | Target Achievement Widget |
-| `widget_homepage_day_status` | Day Status Bar |
+Each boolean uses OR logic: legacy check **or** new homepage permission. This ensures backward compatibility while enabling the new homepage-level grants.
 
-### Technical Details
+| Boolean | Current | New (added OR condition) |
+|---|---|---|
+| `showCheckIn` | `canShow('attendance_')` | `\|\| hasWidgetPermission('widget_homepage_attendance')` |
+| `showTodaysBeat` | `canShow('visit_')` | `\|\| hasWidgetPermission('widget_homepage_visit_plan')` |
+| `showAIInsights` | `canShow('visit_ai_recommendations') \|\| canShow('visit_')` | `\|\| hasWidgetPermission('widget_homepage_performance')` |
+| `showPerfCalendar` | `canShow('performance_')` | `\|\| hasWidgetPermission('widget_homepage_target_achievement')` |
+| `showPendingPay` | `canShow('analytics_pending_payments') \|\| canShow('analytics_')` | `\|\| hasFieldPermission('field_homepage_quick_stats')` |
+| `showTarget` | `canShow('target_')` | `\|\| hasFieldPermission('field_homepage_target_progress')` |
 
-- **Single file change:** Only `src/components/security/hierarchicalPermissions.ts` needs editing -- the new module entry is added to the existing `HIERARCHICAL_MODULES` array.
-- **No database migration needed.** Permission rows are dynamically created via upsert when an admin saves permissions for a profile, so no schema changes are required.
-- **Automatic propagation.** The `HierarchicalPermissionEditor`, `RolePermissionsTab`, and `PermissionSetGroupsTab` components all derive their UI from `HIERARCHICAL_MODULES`, so the new Homepage module will appear automatically under Module, Field, Action, and Widget tabs.
-- **System Administrator** profile will automatically show all Homepage permissions as granted (handled by the existing `buildAllGranted()` logic).
+New booleans to add:
+- `showGreeting`: `canShow('attendance_') || hasFieldPermission('field_homepage_greeting')` -- controls the greeting header section
+- `showQuickAdd`: `!hasSecurityProfile || canShow('visit_') || hasActionPermission('action_homepage_quick_add')` -- controls the Quick Add dropdown button
+- `showQuickNav`: `!hasSecurityProfile || hasWidgetPermission('widget_homepage_quick_links')` -- controls the Quick Navigation grid (fallback: always show if no security profile)
 
+### Step 3 -- Apply new booleans to the template
+
+- **Greeting header** (line 136-142): Wrap the greeting text (`getGreeting()!`) rendering with `showGreeting` -- if false, still show the name and role but skip the greeting line.
+- **Quick Add button** (lines 146-188): Wrap the entire `DropdownMenu` with `{showQuickAdd && (...)}`.
+- **Quick Navigation grid** (line 246): Wrap with `{showQuickNav && <QuickNavGrid ... />}`.
+
+### Step 4 -- Quick Add dropdown items also get homepage action checks
+
+Each dropdown item inside the Quick Add menu will additionally check its homepage action:
+- "Today's Visit": also `|| hasActionPermission('action_homepage_check_in')`
+- Other items keep their existing legacy checks (they map to module-level permissions, not homepage-specific)
+
+### Summary
+
+- **No database changes** -- permission rows are created dynamically when admin saves
+- **No new files** -- single file edit to `src/pages/Index.tsx`
+- **Backward compatible** -- OR logic means existing legacy permissions continue to work; new homepage permissions add an additional grant path
