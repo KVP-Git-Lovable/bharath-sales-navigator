@@ -1,13 +1,71 @@
 import { useState, useRef, useEffect } from "react";
-import { Task, useCreateTask, useTaskCollaborators, useAddTaskCollaborator } from "@/hooks/useProjects";
-import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
-import { Plus } from "lucide-react";
+import { Task, useCreateTask, useTaskCollaborators, useAddTaskCollaborator, useUpdateTask } from "@/hooks/useProjects";
+import { StatusBadge, PriorityBadge } from "./TaskStatusBadge";
+import { Plus, Calendar } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   task: Task;
   allTasks: Task[];
   projectId: string;
   onSelectTask: (task: Task) => void;
+}
+
+// Small inline user avatar
+function MiniUserAvatar({ userId }: { userId: string | null }) {
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("profiles").select("full_name").eq("id", userId).single().then(({ data }) => {
+      setName(data?.full_name || null);
+    });
+  }, [userId]);
+  if (!userId || !name) return <span className="text-[10px] text-muted-foreground">—</span>;
+  return (
+    <div className="flex items-center gap-1" title={name}>
+      <div className="w-4 h-4 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[8px] font-semibold flex-shrink-0">
+        {name.charAt(0)}
+      </div>
+      <span className="text-[11px] text-muted-foreground truncate max-w-[60px]">{name}</span>
+    </div>
+  );
+}
+
+// Inline due date for subtask row
+function SubtaskDueDate({ subtask }: { subtask: Task }) {
+  const updateTask = useUpdateTask();
+  const [open, setOpen] = useState(false);
+  const dateObj = subtask.due_date ? new Date(subtask.due_date + "T00:00:00") : undefined;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          onClick={e => e.stopPropagation()}
+          className="text-[11px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
+        >
+          <Calendar className="w-3 h-3" />
+          {subtask.due_date ? format(new Date(subtask.due_date), "MMM d") : "No date"}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start" side="bottom" onClick={e => e.stopPropagation()}>
+        <CalendarComponent
+          mode="single"
+          selected={dateObj}
+          onSelect={(d) => {
+            if (d) updateTask.mutate({ id: subtask.id, due_date: format(d, "yyyy-MM-dd") });
+            setOpen(false);
+          }}
+          initialFocus
+          className={cn("p-3 pointer-events-auto")}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props) {
@@ -20,6 +78,9 @@ export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props)
 
   const subtasks = allTasks.filter(t => t.parent_task_id === task.id);
 
+  // Show parent task link if this task IS a subtask
+  const parentTask = task.parent_task_id ? allTasks.find(t => t.id === task.parent_task_id) : null;
+
   // Auto-add subtask owners as collaborators on the parent task
   useEffect(() => {
     if (!subtasks.length) return;
@@ -29,7 +90,7 @@ export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props)
     subtasks.forEach(sub => {
       if (sub.assignee_id && sub.assignee_id !== parentOwnerId && !collabUserIds.has(sub.assignee_id)) {
         addCollaborator.mutate({ taskId: task.id, userId: sub.assignee_id });
-        collabUserIds.add(sub.assignee_id); // prevent duplicate calls in same render
+        collabUserIds.add(sub.assignee_id);
       }
     });
   }, [subtasks.map(s => s.assignee_id).join(','), collaborators.length]);
@@ -49,7 +110,6 @@ export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props)
       priority: "medium",
     });
     setInlineTitle("");
-    // Keep inline visible for chaining
   };
 
   const startAdd = () => {
@@ -60,6 +120,19 @@ export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props)
 
   return (
     <div className="space-y-2">
+      {/* Parent task link (if this task is a sub-task) */}
+      {parentTask && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+          <span className="uppercase tracking-wider font-medium">Parent</span>
+          <button
+            onClick={() => onSelectTask(parentTask)}
+            className="text-primary hover:underline truncate"
+          >
+            {parentTask.title}
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Sub-tasks</h3>
         <span className="text-xs text-muted-foreground">{subtasks.length}</span>
@@ -72,8 +145,9 @@ export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props)
             onClick={() => onSelectTask(sub)}
             className="flex items-center gap-2 px-3 py-2 border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
           >
-            <TypeBadge type={sub.type} />
             <span className="text-sm flex-1 truncate">{sub.title}</span>
+            <MiniUserAvatar userId={sub.assignee_id} />
+            <SubtaskDueDate subtask={sub} />
             <StatusBadge status={sub.status} />
             <PriorityBadge priority={sub.priority} />
           </div>

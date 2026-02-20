@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { Task, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection } from "@/hooks/useProjects";
+import { Task, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection, useTaskDependencies, useTaskAttachments } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge } from "./TaskStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreVertical, Trash2, ChevronRight, ChevronDown, GripVertical } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Search, MoreVertical, Trash2, ChevronRight, ChevronDown, Paperclip, GitBranch, Calendar } from "lucide-react";
 import { format, isToday, isYesterday, startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -38,11 +40,94 @@ function matchesDueDateFilter(dueDate: string | undefined, filter: DueDateFilter
   }
 }
 
-// Helper: check if a task is overdue (due date passed, status not done/backlog)
 function isTaskOverdue(task: Task): boolean {
   if (!task.due_date) return false;
   if (['done', 'backlog'].includes(task.status)) return false;
   return isBefore(new Date(task.due_date), startOfDay(new Date()));
+}
+
+// ── Inline Due Date Picker ──────────────────────────────
+function InlineDueDatePicker({ task }: { task: Task }) {
+  const updateTask = useUpdateTask();
+  const [open, setOpen] = useState(false);
+  const dateObj = task.due_date ? new Date(task.due_date + "T00:00:00") : undefined;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          onClick={e => e.stopPropagation()}
+          className={cn(
+            "text-xs whitespace-nowrap hover:text-primary transition-colors",
+            isTaskOverdue(task) ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"
+          )}
+        >
+          {task.due_date ? format(new Date(task.due_date), "MMM d") : "—"}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start" side="bottom" onClick={e => e.stopPropagation()}>
+        <CalendarComponent
+          mode="single"
+          selected={dateObj}
+          onSelect={(d) => {
+            if (d) {
+              updateTask.mutate({ id: task.id, due_date: format(d, "yyyy-MM-dd") });
+            }
+            setOpen(false);
+          }}
+          initialFocus
+          className={cn("p-3 pointer-events-auto")}
+        />
+        {task.due_date && (
+          <div className="px-3 pb-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                updateTask.mutate({ id: task.id, due_date: null });
+                setOpen(false);
+              }}
+              className="text-xs text-destructive hover:underline"
+            >
+              Clear date
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ── Dependency indicator ──────────────────────────────
+function DependencyIndicator({ taskId, allTasks }: { taskId: string; allTasks: Task[] }) {
+  const { data: deps = [] } = useTaskDependencies(taskId);
+  if (deps.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+
+  const firstDep = deps[0] as any;
+  const firstTask = allTasks.find(t => t.id === firstDep.depends_on_task_id);
+  const firstName = firstTask?.title || "Unknown";
+  const truncated = firstName.length > 14 ? firstName.slice(0, 14) + "…" : firstName;
+
+  return (
+    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+      <GitBranch className="w-3 h-3 flex-shrink-0" />
+      <span className="truncate max-w-[100px]">{truncated}</span>
+      {deps.length > 1 && (
+        <span className="text-[10px] font-medium text-primary">+({deps.length - 1})</span>
+      )}
+    </div>
+  );
+}
+
+// ── Attachment indicator ──────────────────────────────
+function AttachmentIndicator({ taskId }: { taskId: string }) {
+  const { data: attachments = [] } = useTaskAttachments(taskId);
+  if (attachments.length === 0) return null;
+  return (
+    <div className="flex items-center gap-0.5 text-muted-foreground" title={`${attachments.length} attachment(s)`}>
+      <Paperclip className="w-3 h-3" />
+      {attachments.length > 1 && <span className="text-[10px]">{attachments.length}</span>}
+    </div>
+  );
 }
 
 export function BacklogView({ tasks, sprints, milestones, projectId, sections, onTaskClick }: Props) {
@@ -57,7 +142,6 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  // Auto-set overdue status for tasks whose due date has passed
   useEffect(() => {
     tasks.forEach(task => {
       if (isTaskOverdue(task) && task.status !== 'overdue') {
@@ -67,12 +151,10 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
   }, [tasks]);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
-  // Inline add state
   const [inlineAddTarget, setInlineAddTarget] = useState<{ sectionId: string | null; parentTaskId: string | null } | null>(null);
   const [inlineTitle, setInlineTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Add section state
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const sectionInputRef = useRef<HTMLInputElement>(null);
@@ -88,46 +170,25 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
     return matchSearch && matchType && matchStatus && matchDue;
   };
 
-  // Group tasks by section
   const sectionGroups: { id: string; name: string; tasks: Task[] }[] = [];
-
-  // Add sections in order
   sections.forEach(s => {
-    sectionGroups.push({
-      id: s.id,
-      name: s.name,
-      tasks: rootTasks.filter(t => t.section_id === s.id && filterTask(t)),
-    });
+    sectionGroups.push({ id: s.id, name: s.name, tasks: rootTasks.filter(t => t.section_id === s.id && filterTask(t)) });
   });
-
-  // Unsectioned tasks
   const unsectioned = rootTasks.filter(t => !t.section_id && filterTask(t));
   if (unsectioned.length > 0 || sections.length === 0) {
     sectionGroups.unshift({ id: "__unsectioned", name: "No section", tasks: unsectioned });
   }
 
   const toggleSection = (id: string) => {
-    setCollapsedSections(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+    setCollapsedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
   const toggleTaskExpand = (id: string) => {
-    setExpandedTasks(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+    setExpandedTasks(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
   const handleInlineSubmit = async () => {
-    if (!inlineTitle.trim()) {
-      setInlineAddTarget(null);
-      setInlineTitle("");
-      return;
-    }
+    if (!inlineTitle.trim()) { setInlineAddTarget(null); setInlineTitle(""); return; }
     await createTask.mutateAsync({
       project_id: projectId,
       parent_task_id: inlineAddTarget?.parentTaskId || undefined,
@@ -138,7 +199,6 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
       priority: "medium",
     });
     setInlineTitle("");
-    // Keep inline add visible for chaining
   };
 
   const startInlineAdd = (sectionId: string | null, parentTaskId: string | null = null) => {
@@ -148,15 +208,8 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
   };
 
   const handleAddSection = async () => {
-    if (!newSectionName.trim()) {
-      setShowAddSection(false);
-      return;
-    }
-    await createSection.mutateAsync({
-      project_id: projectId,
-      name: newSectionName.trim(),
-      position: sections.length,
-    });
+    if (!newSectionName.trim()) { setShowAddSection(false); return; }
+    await createSection.mutateAsync({ project_id: projectId, name: newSectionName.trim(), position: sections.length });
     setNewSectionName("");
     setShowAddSection(false);
   };
@@ -171,6 +224,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
           className="border-b hover:bg-muted/30 transition-colors group cursor-pointer"
           onClick={() => onTaskClick?.(task)}
         >
+          {/* Name */}
           <td className="py-2 px-4">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 20}px` }}>
               {subtasks.length > 0 ? (
@@ -178,12 +232,15 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
                   {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 </button>
               ) : <span className="w-3.5" />}
-              <span className={cn("text-sm font-medium", isTaskOverdue(task) ? "text-red-600 dark:text-red-400" : "text-foreground")}>{task.title}</span>
+              <span className={cn("text-sm font-medium truncate", isTaskOverdue(task) ? "text-red-600 dark:text-red-400" : "text-foreground")}>{task.title}</span>
+              <AttachmentIndicator taskId={task.id} />
             </div>
           </td>
-          <td className={cn("py-2 px-3 text-xs whitespace-nowrap", isTaskOverdue(task) ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground")}>
-            {task.due_date ? format(new Date(task.due_date), "MMM d") : "—"}
+          {/* Due date - clickable */}
+          <td className="py-2 px-3">
+            <InlineDueDatePicker task={task} />
           </td>
+          {/* Status */}
           <td className="py-2 px-3 whitespace-nowrap">
             <select
               value={task.status}
@@ -196,27 +253,28 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
               ))}
             </select>
           </td>
+          {/* Owner */}
           <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
             {task.assignee ? (
               <div className="flex items-center gap-1.5">
                 <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-medium">
                   {task.assignee.full_name?.charAt(0) ?? "?"}
                 </div>
-                <span>{task.assignee.full_name}</span>
+                <span className="truncate max-w-[100px]">{task.assignee.full_name}</span>
               </div>
             ) : "—"}
           </td>
-          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
-            {task.collaborator ? (
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground text-[10px] font-medium">
-                  {task.collaborator.full_name?.charAt(0) ?? "?"}
-                </div>
-                <span>{task.collaborator.full_name}</span>
-              </div>
-            ) : "—"}
+          {/* Est. Hours */}
+          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap text-center">
+            {task.estimated_hours ? `${task.estimated_hours}h` : "—"}
           </td>
+          {/* Dependencies */}
+          <td className="py-2 px-3 whitespace-nowrap">
+            <DependencyIndicator taskId={task.id} allTasks={tasks} />
+          </td>
+          {/* Priority */}
           <td className="py-2 px-3"><PriorityBadge priority={task.priority} /></td>
+          {/* Actions */}
           <td className="py-2 px-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -238,7 +296,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
         {isExpanded && subtasks.map(sub => <TaskRow key={sub.id} task={sub} depth={depth + 1} sectionId={sectionId} />)}
         {isExpanded && isInlineTarget && (
           <tr className="border-b bg-muted/10">
-            <td colSpan={7} className="py-1.5 px-4">
+            <td colSpan={8} className="py-1.5 px-4">
               <div className="flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 20}px` }}>
                 <span className="w-3.5" />
                 <span className="text-xs text-muted-foreground">↳ subtask</span>
@@ -310,11 +368,12 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
           <thead>
             <tr className="border-b bg-muted/40">
               <th className="text-left py-2.5 px-4 text-xs font-semibold text-muted-foreground">Name</th>
-              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Due date</th>
-              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Status</th>
-              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Task Owner</th>
-              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Collaborator</th>
-              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Priority</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-24">Due date</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-28">Status</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Owner</th>
+              <th className="text-center py-2.5 px-3 text-xs font-semibold text-muted-foreground w-16">Hours</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-36">Depends on</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-20">Priority</th>
               <th className="py-2.5 px-3 w-10" />
             </tr>
           </thead>
@@ -401,7 +460,7 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
     <>
       {/* Section header */}
       <tr className="bg-muted/20 border-b">
-        <td colSpan={7} className="py-2 px-4">
+        <td colSpan={8} className="py-2 px-4">
           <div className="flex items-center gap-2">
             <button onClick={onToggle} className="text-muted-foreground hover:text-foreground">
               {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -434,7 +493,7 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
       {/* Inline add row */}
       {!isCollapsed && (
         <tr className="border-b hover:bg-muted/10 transition-colors">
-          <td colSpan={7} className="py-1.5 px-4">
+          <td colSpan={8} className="py-1.5 px-4">
             {isInlineAdd ? (
               <div className="flex items-center gap-2 pl-6">
                 <Plus className="w-3.5 h-3.5 text-muted-foreground" />
@@ -466,4 +525,3 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
     </>
   );
 }
-
