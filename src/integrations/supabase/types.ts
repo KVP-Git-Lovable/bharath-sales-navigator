@@ -599,6 +599,110 @@ export type Database = {
           },
         ]
       }
+      attendance_daily_admin_summary: {
+        Row: {
+          avg_hours: number | null
+          created_at: string
+          date: string
+          id: string
+          total_absent: number
+          total_employees: number
+          total_half_day: number
+          total_hours_sum: number | null
+          total_on_leave: number
+          total_present: number
+          updated_at: string
+        }
+        Insert: {
+          avg_hours?: number | null
+          created_at?: string
+          date: string
+          id?: string
+          total_absent?: number
+          total_employees?: number
+          total_half_day?: number
+          total_hours_sum?: number | null
+          total_on_leave?: number
+          total_present?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_hours?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          total_absent?: number
+          total_employees?: number
+          total_half_day?: number
+          total_hours_sum?: number | null
+          total_on_leave?: number
+          total_present?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      attendance_user_monthly_summary: {
+        Row: {
+          absent_days: number
+          avg_daily_hours: number | null
+          created_at: string
+          half_day_leave_days: number
+          id: string
+          leave_days: number
+          lop_days: number | null
+          month: number
+          present_days: number
+          regularized_days: number
+          total_hours: number | null
+          updated_at: string
+          user_id: string
+          working_days: number | null
+          year: number
+        }
+        Insert: {
+          absent_days?: number
+          avg_daily_hours?: number | null
+          created_at?: string
+          half_day_leave_days?: number
+          id?: string
+          leave_days?: number
+          lop_days?: number | null
+          month: number
+          present_days?: number
+          regularized_days?: number
+          total_hours?: number | null
+          updated_at?: string
+          user_id: string
+          working_days?: number | null
+          year: number
+        }
+        Update: {
+          absent_days?: number
+          avg_daily_hours?: number | null
+          created_at?: string
+          half_day_leave_days?: number
+          id?: string
+          leave_days?: number
+          lop_days?: number | null
+          month?: number
+          present_days?: number
+          regularized_days?: number
+          total_hours?: number | null
+          updated_at?: string
+          user_id?: string
+          working_days?: number | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_user_monthly_summary_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       badges: {
         Row: {
           badge_color: string | null
@@ -14519,6 +14623,14 @@ export type Database = {
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
       process_monthly_leave_accrual: { Args: never; Returns: undefined }
       process_year_end_carry_forward: { Args: never; Returns: undefined }
+      refresh_daily_admin_summary: {
+        Args: { p_date: string }
+        Returns: undefined
+      }
+      refresh_user_monthly_summary: {
+        Args: { p_month: number; p_user_id: string; p_year: number }
+        Returns: undefined
+      }
       send_notification: {
         Args: {
           message_param: string
