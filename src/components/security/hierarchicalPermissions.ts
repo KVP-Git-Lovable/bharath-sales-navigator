@@ -475,6 +475,37 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       { name: 'widget_competency_badges', label: 'Badges' },
     ],
   },
+  {
+    name: 'homepage',
+    label: 'Homepage',
+    fields: [
+      { name: 'field_homepage_greeting', label: 'Greeting Text' },
+      { name: 'field_homepage_attendance_summary', label: 'Attendance Summary' },
+      { name: 'field_homepage_sales_summary', label: 'Sales Summary' },
+      { name: 'field_homepage_notifications', label: 'Notifications' },
+      { name: 'field_homepage_quick_stats', label: 'Quick Stats' },
+      { name: 'field_homepage_beat_plan', label: 'Beat Plan' },
+      { name: 'field_homepage_target_progress', label: 'Target Progress' },
+    ],
+    actions: [
+      { name: 'action_homepage_check_in', label: 'Check In' },
+      { name: 'action_homepage_check_out', label: 'Check Out' },
+      { name: 'action_homepage_end_day', label: 'End My Day' },
+      { name: 'action_homepage_refresh', label: 'Refresh Dashboard' },
+      { name: 'action_homepage_quick_add', label: 'Quick Add' },
+      { name: 'action_homepage_quick_nav', label: 'Quick Navigation' },
+    ],
+    widgets: [
+      { name: 'widget_homepage_attendance', label: 'Attendance Widget' },
+      { name: 'widget_homepage_sales_summary', label: 'Sales Summary Widget' },
+      { name: 'widget_homepage_visit_plan', label: 'Visit Plan Widget' },
+      { name: 'widget_homepage_announcements', label: 'Announcements' },
+      { name: 'widget_homepage_quick_links', label: 'Quick Links' },
+      { name: 'widget_homepage_performance', label: 'Performance Widget' },
+      { name: 'widget_homepage_target_achievement', label: 'Target Achievement Widget' },
+      { name: 'widget_homepage_day_status', label: 'Day Status Bar' },
+    ],
+  },
 ];
 
 // Get all module names (for module-level permissions)
