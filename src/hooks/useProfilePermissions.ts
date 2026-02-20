@@ -161,6 +161,33 @@ export const useProfilePermissions = () => {
     permittedAdminModules.map(f => ADMIN_MODULE_PERMISSION_MAP[f])
   );
 
+  // Check field-level permission (permission_type = 'field')
+  const hasFieldPermission = useCallback(
+    (fieldName: string, permType: 'can_read' | 'can_create' | 'can_edit' | 'can_delete' = 'can_read') => {
+      const perm = permissions.find(p => p.object_name === fieldName);
+      return perm ? !!perm[permType] : false;
+    },
+    [permissions]
+  );
+
+  // Check action-level permission (permission_type = 'action')
+  const hasActionPermission = useCallback(
+    (actionName: string, permType: 'can_read' | 'can_create' | 'can_edit' | 'can_delete' = 'can_read') => {
+      const perm = permissions.find(p => p.object_name === actionName);
+      return perm ? !!perm[permType] : false;
+    },
+    [permissions]
+  );
+
+  // Check widget-level permission (permission_type = 'widget')
+  const hasWidgetPermission = useCallback(
+    (widgetName: string, permType: 'can_read' | 'can_create' | 'can_edit' | 'can_delete' = 'can_read') => {
+      const perm = permissions.find(p => p.object_name === widgetName);
+      return perm ? !!perm[permType] : false;
+    },
+    [permissions]
+  );
+
   return {
     permissions,
     isLoading,
@@ -168,6 +195,9 @@ export const useProfilePermissions = () => {
     hasAnyAdminPermission,
     hasPermission,
     hasModuleAccess,
+    hasFieldPermission,
+    hasActionPermission,
+    hasWidgetPermission,
     permittedAdminModules,
     permittedAdminPaths,
   };
