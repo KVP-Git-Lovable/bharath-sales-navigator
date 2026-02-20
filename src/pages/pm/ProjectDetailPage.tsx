@@ -131,7 +131,7 @@ export default function ProjectDetailPage() {
               <TabsList className="h-9 bg-transparent gap-0 p-0">
                 {[
                   { value: "board", label: "Board", icon: Kanban },
-                  { value: "backlog", label: "My Tasks", icon: List },
+                  { value: "backlog", label: "Work Plan", icon: List },
                   { value: "calendar", label: "Calendar", icon: Calendar },
                   { value: "gantt", label: "Gantt", icon: BarChart3 },
                   { value: "sprints", label: "Sprints", icon: Layers },
@@ -164,7 +164,7 @@ export default function ProjectDetailPage() {
                   />
                 </TabsContent>
                 <TabsContent value="backlog" className="mt-0 p-6">
-                  <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} />
+                  <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} sections={sections} onTaskClick={(task) => setSelectedTask(task)} />
                 </TabsContent>
                 <TabsContent value="calendar" className="mt-0">
                   <CalendarView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
