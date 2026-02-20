@@ -282,8 +282,12 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
     monthlyCounts.set(r.user_id, (monthlyCounts.get(r.user_id) || 0) + 1);
   });
 
-  // Compute sets
-  const presentUserIds = new Set(todayAttendance.map((a: any) => a.user_id));
+  // Compute sets (exclude 'leave'/'half_day_leave' from present so counts are accurate)
+  const presentUserIds = new Set(
+    todayAttendance
+      .filter((a: any) => !['leave', 'half_day_leave'].includes(a.status))
+      .map((a: any) => a.user_id)
+  );
   const onLeaveUserIds = new Set(todayLeaves.map((l: any) => l.user_id));
 
   // Summary counts
@@ -306,7 +310,13 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
 
       let todayStatus: TeamMemberAttendance['todayStatus'] = 'absent';
       if (att) {
-        todayStatus = att.status === 'regularized' ? 'regularized' : 'present';
+        if (att.status === 'leave' || att.status === 'half_day_leave') {
+          todayStatus = 'on_leave';
+        } else if (att.status === 'regularized') {
+          todayStatus = 'regularized';
+        } else {
+          todayStatus = 'present';
+        }
       } else if (isOnLeave) {
         todayStatus = 'on_leave';
       }

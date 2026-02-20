@@ -6910,13 +6910,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_leave_applications_leave_type_id"
-            columns: ["leave_type_id"]
-            isOneToOne: false
-            referencedRelation: "leave_types"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "leave_applications_leave_type_id_fkey"
             columns: ["leave_type_id"]
             isOneToOne: false

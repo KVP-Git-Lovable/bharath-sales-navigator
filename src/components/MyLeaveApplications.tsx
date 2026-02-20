@@ -57,12 +57,12 @@ const MyLeaveApplications: React.FC<MyLeaveApplicationsProps> = ({ refreshTrigge
       console.log('Leave applications data:', data, 'error:', error);
       if (error) throw error;
       
-      // Transform the data to match our interface
+      // Transform the data to match our interface (handle both object and array shapes)
       const transformedData = (data || []).map(item => ({
         ...item,
-        leave_types: Array.isArray(item.leave_types) && item.leave_types.length > 0 
-          ? item.leave_types[0] 
-          : null
+        leave_types: Array.isArray(item.leave_types)
+          ? (item.leave_types.length > 0 ? item.leave_types[0] : null)
+          : (item.leave_types || null)
       }));
       
       setApplications(transformedData as LeaveApplication[]);
