@@ -1,4 +1,4 @@
-import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff } from "lucide-react";
+import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useMemo, useCallback, memo, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -28,6 +28,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   UserCheck, 
   Car, 
@@ -63,6 +73,7 @@ export const Navbar = memo(() => {
   const connectivityStatus = useConnectivity();
   const { t } = useTranslation('common');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const { isGamificationActive } = useActivePerformanceModule();
   const { isEnabled: isPackingListEnabled } = usePackingListModule();
   const { isEnabled: isDeliveryAgentEnabled } = useDeliveryAgentApp();
@@ -268,18 +279,6 @@ export const Navbar = memo(() => {
                   )}
                 </div>
               </button>
-              <div className="flex items-center flex-shrink-0">
-                <button
-                  onClick={() => {
-                    signOut();
-                    handleMenuItemClick();
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors"
-                >
-                  <LogOut className="h-4 w-4 text-primary-foreground" />
-                  <span className="text-sm text-primary-foreground font-medium">{t('nav.logout')}</span>
-                </button>
-              </div>
             </div>
           </SheetHeader>
 
@@ -344,8 +343,50 @@ export const Navbar = memo(() => {
               onItemClick={handleMenuItemClick}
             />
           </div>
+
+          {/* Logout Button at the bottom */}
+          <div className="mt-6 pt-4 border-t">
+            <button
+              onClick={() => setIsLogoutDialogOpen(true)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center group-hover:bg-destructive/20 transition-colors">
+                <LogOut className="h-4 w-4 text-destructive" />
+              </div>
+              <span className="text-sm font-medium">{t('nav.logout')}</span>
+            </button>
+          </div>
         </SheetContent>
       </Sheet>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Confirm Logout
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out? You will need to sign in again to access the app.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                signOut();
+                setIsLogoutDialogOpen(false);
+                handleMenuItemClick();
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 });
