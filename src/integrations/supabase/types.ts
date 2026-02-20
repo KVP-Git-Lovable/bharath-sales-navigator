@@ -8084,6 +8084,7 @@ export type Database = {
           name: string
           owner_id: string | null
           priority: Database["public"]["Enums"]["pm_priority"]
+          source_template_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["pm_project_status"]
           template_name: string | null
@@ -8103,6 +8104,7 @@ export type Database = {
           name: string
           owner_id?: string | null
           priority?: Database["public"]["Enums"]["pm_priority"]
+          source_template_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["pm_project_status"]
           template_name?: string | null
@@ -8122,6 +8124,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           priority?: Database["public"]["Enums"]["pm_priority"]
+          source_template_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["pm_project_status"]
           template_name?: string | null
@@ -8140,6 +8143,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_projects_source_template_id_fkey"
+            columns: ["source_template_id"]
+            isOneToOne: false
+            referencedRelation: "pm_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -8661,6 +8671,241 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pm_template_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          note: string | null
+          task_id: string
+          template_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          note?: string | null
+          task_id: string
+          template_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          note?: string | null
+          task_id?: string
+          template_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_template_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "pm_template_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_template_attachments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pm_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pm_template_dependencies: {
+        Row: {
+          created_at: string
+          dependency_type: string
+          depends_on_task_id: string
+          id: string
+          task_id: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          dependency_type?: string
+          depends_on_task_id: string
+          id?: string
+          task_id: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          dependency_type?: string
+          depends_on_task_id?: string
+          id?: string
+          task_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_template_dependencies_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "pm_template_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_template_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "pm_template_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_template_dependencies_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pm_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pm_template_sections: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          position: number
+          template_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          template_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_template_sections_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pm_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pm_template_tasks: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_days: number
+          estimated_hours: number | null
+          id: string
+          parent_task_id: string | null
+          priority: string
+          section_id: string | null
+          sort_order: number
+          tags: string[] | null
+          template_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          estimated_hours?: number | null
+          id?: string
+          parent_task_id?: string | null
+          priority?: string
+          section_id?: string | null
+          sort_order?: number
+          tags?: string[] | null
+          template_id: string
+          title: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          estimated_hours?: number | null
+          id?: string
+          parent_task_id?: string | null
+          priority?: string
+          section_id?: string | null
+          sort_order?: number
+          tags?: string[] | null
+          template_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_template_tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "pm_template_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_template_tasks_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "pm_template_sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_template_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pm_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pm_templates: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       pm_time_logs: {
         Row: {
