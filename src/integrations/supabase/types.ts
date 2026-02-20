@@ -14840,15 +14840,7 @@ export type Database = {
       hash_hint_answer: { Args: { answer: string }; Returns: string }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       is_admin_or_manager: { Args: never; Returns: boolean }
-      is_approver_for_request: {
-        Args: { request_id: string; user_id: string }
-        Returns: boolean
-      }
       is_manager: { Args: { user_id_param: string }; Returns: boolean }
-      is_requester_for_request: {
-        Args: { request_id: string; user_id: string }
-        Returns: boolean
-      }
       is_system_admin: { Args: { _user_id: string }; Returns: boolean }
       list_team_members: {
         Args: never

@@ -20,7 +20,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
-import { PermissionGate } from "@/components/auth/PermissionGate";
 import { AddRetailerToVisitModal } from "@/components/AddRetailerToVisitModal";
 import { MassEditBeatsModal } from "@/components/MassEditBeatsModal";
 import { RetailerDetailModal } from "@/components/RetailerDetailModal";
@@ -718,7 +717,6 @@ export const MyRetailers = () => {
                 <Input placeholder="Search by name, phone, address, category, beat" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 pr-10" />
               </div>
               <VoiceSearchButton onSearchResult={(text) => setSearch(text)} />
-              <PermissionGate permissionName="action_retailer_add">
               <Button 
                 variant="secondary" 
                 onClick={() => {
@@ -728,29 +726,22 @@ export const MyRetailers = () => {
               >
                 <Plus className="mr-2 h-4 w-4" /> Add
               </Button>
-              </PermissionGate>
             </div>
             
             <div className="flex flex-wrap gap-3 mb-4">
-              <PermissionGate permissionName="action_retailer_mass_edit_beats">
               <Button onClick={openMassEdit} variant="outline" size="sm" className="flex items-center gap-1">
                 <Users size={16} />
                 Mass Edit Beats
               </Button>
-              </PermissionGate>
-              <PermissionGate permissionName="action_retailer_bulk_import">
               <Button onClick={() => setBulkImportModalOpen(true)} variant="outline" size="sm" className="flex items-center gap-1">
                 <Plus size={16} />
                 Bulk Import
               </Button>
-              </PermissionGate>
               {selectedRetailerIds.length > 0 && (
-                <PermissionGate permissionName="action_retailer_delete">
                 <Button onClick={handleBulkDeleteClick} variant="destructive" size="sm" className="flex items-center gap-1">
                   <Trash2 size={16} />
                   Delete Selected ({selectedRetailerIds.length})
                 </Button>
-                </PermissionGate>
               )}
 
             </div>

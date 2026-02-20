@@ -37,7 +37,6 @@ import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
-import { PermissionGate } from "@/components/auth/PermissionGate";
 
 
 interface Beat {
@@ -1077,7 +1076,6 @@ export const MyBeats = () => {
                   </div>
                 </div>
               </div>
-              <PermissionGate permissionName="action_beat_create">
               <Button 
                 onClick={handleCreateBeat}
                 variant="secondary"
@@ -1086,7 +1084,6 @@ export const MyBeats = () => {
                 <Plus className="h-4 w-4" />
                 Create New Beat
               </Button>
-              </PermissionGate>
             </div>
           </CardHeader>
         </Card>

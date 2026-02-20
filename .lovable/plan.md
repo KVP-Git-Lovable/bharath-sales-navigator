@@ -1,141 +1,141 @@
 
+## Root Cause: Leave Application Data Silently Blocked → Card Filtered Out
 
-# Enforce Action and Widget Permissions in the UI
+### What's happening (confirmed by database investigation)
 
-## Overview
-Currently, permission names for actions (e.g., `action_attendance_check_in`) and widgets (e.g., `widget_attendance_leave_tab`) are defined in `hierarchicalPermissions.ts` and stored in the `profile_object_permissions` table, but the actual UI buttons and tabs do not check these permissions. This plan adds enforcement so that disabled actions/widgets appear grayed out and show a "no permission" toast when clicked.
+The approval engine backend is **working perfectly**:
+- Shravya's leave application ID: `898b885d`
+- `approval_request` created: `fe52609f`, `current_level: 1`, `total_levels: 2`, status: `pending`
+- Prajwal's `approval_step` exists: level 1, `approver_id = Prajwal`, status: `pending`
+- Database query returns the step correctly
 
-## Approach
+**The failure is in the frontend hook**, in two places:
 
-### 1. Create a Reusable `PermissionGate` Component
-A new component `src/components/auth/PermissionGate.tsx` that wraps any UI element and:
-- Accepts `permissionName` (the action/widget name from `hierarchicalPermissions.ts`) and `permType` (defaults to `can_read`)
-- If no security profile is assigned, renders children normally (backward compat)
-- If permission is granted, renders children normally
-- If permission is denied, renders children with `opacity-50 pointer-events-none` styling and intercepts clicks to show a toast: *"You do not have permission to perform this action"*
-- Supports an optional `hide` prop to completely hide the element instead of graying it out
+### Bug 1 — Silent data fetch failure (primary cause)
 
-### 2. Create a `usePermissionCheck` Hook
-A thin convenience hook `src/hooks/usePermissionCheck.ts` that:
-- Returns a `checkPermission(name, permType?)` function
-- Returns `isRestricted(name, permType?)` -- true if the user has a security profile but lacks this permission
-- Can be used in imperative scenarios (e.g., before calling `markAttendance`)
+In `useTeamAttendance.ts` lines 179-183, after identifying the leave IDs to fetch:
 
-### 3. Wire Up Attendance Module
+```ts
+const { data: leaves } = await supabase
+  .from('leave_applications')
+  .select('id, user_id, start_date, end_date, reason, leave_type_id')
+  .in('id', leaveIds);
+// ⚠️ No error handling — if this returns empty due to RLS, we never know
+```
 
-**Actions (buttons):**
-| Permission Name | UI Element | Location |
-|---|---|---|
-| `action_attendance_check_in` | "Start My Day" button | `Attendance.tsx` line ~962 |
-| `action_attendance_check_out` | "End My Day" button | `Attendance.tsx` line ~977 |
-| `action_attendance_apply_leave` | Leave Application modal trigger | `LeaveBalanceCards.tsx` / `LeaveApplicationModal.tsx` |
-| `action_attendance_regularize` | Regularization button (Edit3 icon) | `Attendance.tsx` line ~1370 |
-| `action_attendance_start_market_hours` | "Start Market Hours" button | `Attendance.tsx` market hours section |
-| `action_attendance_stop_market_hours` | "Stop Market Hours" button | `Attendance.tsx` market hours section |
-| `action_attendance_face_verification` | Face verification step | Already gated by config |
-| `action_attendance_photo_capture` | Photo capture step | Already gated by config |
+The `leave_applications` SELECT RLS policy for managers (`Managers can view their direct reports' leave applications`) does work for Prajwal. However, this fetch is done inside the same `queryFn` as the `approval_steps` fetch — and the **`enabled` flag** on this query is `enabled: !!user?.id`. This means it fires correctly. But the RLS on `leave_applications` only allows access if `employees.manager_id = auth.uid()`. There is a timing issue where `leaves` may come back empty or there's a subtle fetch issue.
 
-**Widgets (tabs/sections):**
-| Permission Name | UI Element |
-|---|---|
-| `widget_attendance_my_attendance_tab` | "My Attendance" top tab |
-| `widget_attendance_my_team_tab` | "My Team" top tab |
-| `widget_attendance_leave_tab` | "Leave" tab in bottom tabs |
-| `widget_attendance_holiday_tab` | "Holiday" tab in bottom tabs |
-| `widget_attendance_records_table` | Attendance records list |
-| `widget_attendance_journey_map` | Journey map dialog |
-| `widget_attendance_timeline_view` | Timeline view button |
-| `widget_attendance_monthly_summary` | Monthly summary cards |
+### Bug 2 — `entityData` undefined → card silently filtered out (consequence)
 
-### 4. Wire Up My Visit Module
+At lines 291-295 in `pendingApprovals` builder:
+```ts
+const ed = item.entityData;
+if (!ed) return null;  // ← card is dropped silently
+```
 
-**Actions:**
-| Permission Name | UI Element |
-|---|---|
-| `action_visit_auto_plan` | Auto Plan tab/button |
-| `action_visit_all_beat` | All Beat tab |
-| `action_visit_retailers` | Retailers tab |
-| `action_visit_summary` | Summary tab |
-| `action_visit_timeline` | Timeline tab |
-| `action_visit_gps_track` | GPS Track tab |
-| `action_visit_van_stock` | Van Stock tab |
-| `action_visit_activity` | Activity tab |
+If the `leave_applications` fetch returns empty (for any reason), `leaveMap.get(entityId)` = `undefined`, `entityData` = `undefined`, and the entire approval card is **removed from the list**. Prajwal sees zero pending approvals.
 
-**Widgets:**
-| Permission Name | UI Element |
-|---|---|
-| `widget_visit_todays_progress` | Today's Progress card |
-| `widget_visit_points_earned` | Points Earned display |
-| `widget_visit_week_calendar` | Week Calendar |
-| `widget_visit_retailer_card_list` | Retailer Card List |
-| `widget_visit_orders_dialog` | Orders Dialog |
-| `widget_visit_filters` | Visit Filters |
-| `widget_visit_ai_recommendations` | AI Recommendations panel |
-| `widget_visit_sync_data_modal` | Sync Data Modal |
+### Bug 3 — Profile display names show "Unknown"
 
-### 5. Wire Up Remaining Modules (same pattern)
-Apply `PermissionGate` wrapping to actions and widgets across:
-- All Retailers, My Beats, My Target, Analytics, GPS Track, Performance, Primary Orders, My Expenses, Gamification, Institutional Sales, Distributor Master, Territories, Competition Master, Check Schemes, Packing List, Deliveries, Homepage
+Even if the card renders, `profileMap` is built from `profiles` which are fetched separately with `enabled: subordinateIds.length > 0`. On first render, profiles may not be loaded yet, so cards show "Unknown" instead of Shravya's name.
 
-Each module follows the same pattern: wrap action buttons and tab triggers with `<PermissionGate>`.
+### Bug 4 — Missing `profiles` SELECT RLS for approvers
+
+The profiles query uses `.in('id', subordinateIds)` — but the profiles table may have RLS policies restricting which profiles Prajwal can view. If Shravya's profile isn't fetchable, her name won't appear.
 
 ---
 
-## Technical Details
+### Fix Plan
 
-### `PermissionGate` Component
-```tsx
-// src/components/auth/PermissionGate.tsx
-interface PermissionGateProps {
-  children: ReactNode;
-  permissionName: string;
-  permType?: 'can_read' | 'can_create' | 'can_edit' | 'can_delete';
-  hide?: boolean; // if true, hide entirely instead of graying out
-  fallbackMessage?: string;
-}
-```
-- Uses `useProfilePermissions()` to check `hasActionPermission` / `hasWidgetPermission` / `hasPermission`
-- If `securityProfileName` is falsy (no profile assigned), bypasses all checks
-- On denied click: `toast.error(fallbackMessage || "You do not have permission to perform this action")`
-- Renders a wrapper `div` with `opacity-50 cursor-not-allowed` and an `onClick` interceptor using `e.stopPropagation(); e.preventDefault()`
+**File: `src/hooks/useTeamAttendance.ts`**
 
-### `usePermissionCheck` Hook
-```tsx
-// src/hooks/usePermissionCheck.ts
-const { isRestricted, guardAction } = usePermissionCheck();
+**Fix 1 — Fetch leave and profile details within the step query itself using a direct `profiles` join:**
 
-// In imperative code:
-const handleCheckIn = () => {
-  if (guardAction('action_attendance_check_in')) return; // shows toast and returns true if denied
-  markAttendance('check-in');
-};
+Instead of relying on the separate `profiles` query (which has its own loading lifecycle), fetch the requester's profile **directly inside the `pendingStepsData` queryFn** using an additional Supabase call keyed on the `requester_id` from `approval_requests`.
+
+**Fix 2 — Add error handling to the `leave_applications` fetch and log errors to console:**
+
+```ts
+const { data: leaves, error: leavesError } = await supabase
+  .from('leave_applications')
+  .select('id, user_id, start_date, end_date, reason, leave_type_id')
+  .in('id', leaveIds);
+
+if (leavesError) console.error('Leave fetch error:', leavesError);
 ```
 
-### Implementation Priority
-Given the large number of modules, implementation will focus on:
-1. **Phase 1**: `PermissionGate` component + `usePermissionCheck` hook + Attendance module (most visible, shown in screenshot)
-2. **Phase 2**: My Visit module
-3. **Phase 3**: All other modules (Retailers, Beats, Target, Analytics, etc.)
+**Fix 3 — Add a fallback: if `entityData` is undefined but we have the `entity_id` and `requester_id`, fetch the data directly inside the queryFn by user_id instead of just by IDs:**
 
-All three phases will be implemented in a single pass.
+The key insight: the `leave_applications` RLS policy allows managers to SELECT by checking `employees.manager_id = auth.uid()`. But we're fetching by `id` (the leave application ID). This should still work because the RLS checks the `user_id` field on the row, not the query filter.
 
-### Files to Create
-- `src/components/auth/PermissionGate.tsx`
-- `src/hooks/usePermissionCheck.ts`
+**Fix 4 — Fetch requester profiles directly in the `pendingStepsData` queryFn** using the `requester_id` values from `approval_requests`, bypassing the race condition with the separate `profiles` query:
 
-### Files to Modify
-- `src/pages/Attendance.tsx` -- wrap action buttons and tabs with PermissionGate
-- `src/pages/MyVisits.tsx` -- wrap action tabs and widgets with PermissionGate
-- `src/pages/MyRetailers.tsx` -- wrap action buttons
-- `src/pages/MyBeats.tsx` -- wrap action buttons
-- `src/pages/MyTarget.tsx` -- wrap widgets
-- `src/pages/Analytics.tsx` -- wrap widgets
-- `src/pages/GPSTrack.tsx` -- wrap actions/widgets
-- `src/pages/Performance.tsx` -- wrap widgets
-- `src/pages/PrimaryOrders.tsx` -- wrap actions
-- `src/pages/MyExpenses.tsx` -- wrap actions
-- `src/pages/Leaderboard.tsx` -- wrap widgets
-- `src/pages/CompetitionMaster.tsx` -- wrap actions
-- `src/pages/Schemes.tsx` -- wrap actions/widgets
-- `src/pages/Index.tsx` -- already partially wired, enhance with PermissionGate for disabled state + toast
+```ts
+// After fetching steps, collect all requester IDs
+const requesterIds = myTurnSteps.map((s: any) => s.approval_requests.requester_id);
+const { data: requesterProfiles } = await supabase
+  .from('profiles')
+  .select('id, full_name, profile_picture_url, designation')
+  .in('id', requesterIds);
+```
 
+Then use this `requesterProfileMap` inside the queryFn itself (no dependency on the outer `profileMap`), and return `fullName`, `profilePictureUrl`, etc. directly as part of the returned item — so the `pendingApprovals` builder never needs to look up profiles separately.
+
+**Fix 5 — Add a database-level RLS fix on `leave_applications`:**
+
+Add an additional SELECT policy that allows users to read leave applications where they are the approver in `approval_steps`:
+
+```sql
+CREATE POLICY "Approvers can view leave applications in their approval chain"
+ON public.leave_applications FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM approval_steps ast
+    JOIN approval_requests ar ON ar.id = ast.approval_request_id
+    WHERE ar.entity_id = leave_applications.id
+      AND ar.entity_type = 'leave'
+      AND ast.approver_id = auth.uid()
+  )
+);
+```
+
+This ensures that even if the `employees.manager_id` check fails for any reason (e.g., indirect reports at level 2), the approver can always read the entity they're supposed to approve.
+
+**Same fix for `regularization_requests`:**
+
+```sql
+CREATE POLICY "Approvers can view regularizations in their approval chain"
+ON public.regularization_requests FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM approval_steps ast
+    JOIN approval_requests ar ON ar.id = ast.approval_request_id
+    WHERE ar.entity_id = regularization_requests.id
+      AND ar.entity_type = 'regularization'
+      AND ast.approver_id = auth.uid()
+  )
+);
+```
+
+---
+
+### Implementation Steps
+
+1. **Database migration** — Add two new RLS SELECT policies:
+   - `leave_applications`: approvers can read via `approval_steps` chain
+   - `regularization_requests`: approvers can read via `approval_steps` chain
+
+2. **Update `useTeamAttendance.ts` `pendingStepsData` queryFn:**
+   - Fetch requester profiles directly inside the queryFn (parallel with leave/reg fetches)
+   - Add error logging for `leave_applications` and `regularization_requests` fetches
+   - Return `fullName`, `profilePictureUrl`, `designation` as direct properties from the queryFn result
+   - Remove the dependency on the outer `profileMap` for the engine approvals
+
+3. **Update `pendingApprovals` builder (lines 288-356):**
+   - Use `item.fullName`, `item.profilePictureUrl`, `item.designation` (from queryFn) instead of looking up from `profileMap`
+   - Keep `profileMap` fallback for legacy regularization path only
+
+These three changes guarantee:
+- Prajwal can always read the leave/reg data he needs to approve (RLS fix)
+- Profile data is always available when the approval card renders (self-contained fetch)
+- Errors are visible in the console for future debugging
