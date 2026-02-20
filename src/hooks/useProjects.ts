@@ -404,6 +404,38 @@ export function useCreateSprint() {
   });
 }
 
+export function useUpdateSprint() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId, ...values }: { id: string; projectId: string } & Partial<Sprint>) => {
+      const { data, error } = await supabase.from('pm_sprints').update(values as any).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_sprints', data.project_id] });
+      toast.success('Sprint updated');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useDeleteSprint() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
+      const { error } = await supabase.from('pm_sprints').delete().eq('id', id);
+      if (error) throw error;
+      return projectId;
+    },
+    onSuccess: (projectId) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_sprints', projectId] });
+      toast.success('Sprint deleted');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
 // ─── MILESTONES ──────────────────────────────────────────────────────────────
 
 export function useMilestones(projectId: string) {
