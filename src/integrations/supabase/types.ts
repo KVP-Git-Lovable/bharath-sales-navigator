@@ -444,6 +444,163 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_audit_log: {
+        Row: {
+          action: string
+          approval_request_id: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          level: number | null
+          metadata: Json | null
+          performed_by: string
+          timestamp: string
+        }
+        Insert: {
+          action: string
+          approval_request_id?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          level?: number | null
+          metadata?: Json | null
+          performed_by: string
+          timestamp?: string
+        }
+        Update: {
+          action?: string
+          approval_request_id?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          level?: number | null
+          metadata?: Json | null
+          performed_by?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_audit_log_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_config: {
+        Row: {
+          created_at: string
+          entity_type: string
+          final_approval_role: string | null
+          id: string
+          max_levels: number
+          skip_levels: boolean
+          updated_at: string
+          use_full_hierarchy: boolean
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          final_approval_role?: string | null
+          id?: string
+          max_levels?: number
+          skip_levels?: boolean
+          updated_at?: string
+          use_full_hierarchy?: boolean
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          final_approval_role?: string | null
+          id?: string
+          max_levels?: number
+          skip_levels?: boolean
+          updated_at?: string
+          use_full_hierarchy?: boolean
+        }
+        Relationships: []
+      }
+      approval_requests: {
+        Row: {
+          created_at: string
+          current_level: number
+          entity_id: string
+          entity_type: string
+          final_approved_by: string | null
+          id: string
+          requester_id: string
+          status: string
+          total_levels: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_level?: number
+          entity_id: string
+          entity_type: string
+          final_approved_by?: string | null
+          id?: string
+          requester_id: string
+          status?: string
+          total_levels?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_level?: number
+          entity_id?: string
+          entity_type?: string
+          final_approved_by?: string | null
+          id?: string
+          requester_id?: string
+          status?: string
+          total_levels?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      approval_steps: {
+        Row: {
+          action_taken_at: string | null
+          approval_request_id: string
+          approver_id: string
+          created_at: string
+          id: string
+          level: number
+          rejection_reason: string | null
+          status: string
+        }
+        Insert: {
+          action_taken_at?: string | null
+          approval_request_id: string
+          approver_id: string
+          created_at?: string
+          id?: string
+          level: number
+          rejection_reason?: string | null
+          status?: string
+        }
+        Update: {
+          action_taken_at?: string | null
+          approval_request_id?: string
+          approver_id?: string
+          created_at?: string
+          id?: string
+          level?: number
+          rejection_reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_steps_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approvers: {
         Row: {
           approver_level: number
@@ -536,6 +693,9 @@ export type Database = {
           face_verification_status: string | null
           face_verification_status_out: string | null
           id: string
+          locked: boolean
+          locked_at: string | null
+          locked_by: string | null
           notes: string | null
           regularized_request_id: string | null
           status: string
@@ -559,6 +719,9 @@ export type Database = {
           face_verification_status?: string | null
           face_verification_status_out?: string | null
           id?: string
+          locked?: boolean
+          locked_at?: string | null
+          locked_by?: string | null
           notes?: string | null
           regularized_request_id?: string | null
           status?: string
@@ -582,6 +745,9 @@ export type Database = {
           face_verification_status?: string | null
           face_verification_status_out?: string | null
           id?: string
+          locked?: boolean
+          locked_at?: string | null
+          locked_by?: string | null
           notes?: string | null
           regularized_request_id?: string | null
           status?: string
@@ -14441,6 +14607,14 @@ export type Database = {
       cleanup_expired_recommendations: { Args: never; Returns: undefined }
       cleanup_expired_reset_tokens: { Args: never; Returns: undefined }
       cleanup_old_execution_logs: { Args: never; Returns: undefined }
+      create_approval_request: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_requester_id: string
+        }
+        Returns: string
+      }
       create_approval_workflow: {
         Args: { user_id_param: string }
         Returns: undefined
@@ -14573,6 +14747,14 @@ export type Database = {
           state: string
         }[]
       }
+      get_reporting_chain: {
+        Args: { p_user_id: string }
+        Returns: {
+          full_name: string
+          level: number
+          manager_id: string
+        }[]
+      }
       get_subordinate_users: {
         Args: { user_id_param: string }
         Returns: {
@@ -14670,6 +14852,15 @@ export type Database = {
         Returns: boolean
       }
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
+      process_approval_step: {
+        Args: {
+          p_action: string
+          p_approval_request_id: string
+          p_approver_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       process_monthly_leave_accrual: { Args: never; Returns: undefined }
       process_year_end_carry_forward: { Args: never; Returns: undefined }
       refresh_daily_admin_summary: {

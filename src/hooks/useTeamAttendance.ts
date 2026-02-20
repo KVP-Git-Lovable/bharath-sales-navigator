@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,12 @@ export interface PendingApproval {
   requestedCheckIn?: string | null;
   requestedCheckOut?: string | null;
   attendanceDate?: string;
+  // approval engine fields
+  approvalRequestId?: string;
+  currentLevel?: number;
+  totalLevels?: number;
+  isFinalLevel?: boolean;
+  myLevel?: number;
 }
 
 const today = format(new Date(), 'yyyy-MM-dd');
@@ -124,36 +130,96 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
     staleTime: 5 * 60 * 1000,
   });
 
-  // 5. Pending leave approvals (only from direct reports)
-  const { data: pendingLeaves = [] } = useQuery({
-    queryKey: ['team-pending-leaves', approvalUserIds],
+  // 5. Pending approvals via approval engine (my turn = current_level matches my step level)
+  const { data: pendingStepsData = [] } = useQuery({
+    queryKey: ['team-pending-leaves', approvalUserIds, user?.id],
     queryFn: async () => {
-      if (!approvalUserIds.length) return [];
-      const { data, error } = await supabase
-        .from('leave_applications')
-        .select('id, user_id, start_date, end_date, reason, leave_type_id, status')
-        .in('user_id', approvalUserIds)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      if (!user?.id) return [];
+
+      const { data: steps, error } = await supabase
+        .from('approval_steps')
+        .select(`
+          id,
+          level,
+          approver_id,
+          status,
+          approval_request_id,
+          approval_requests!inner(
+            id,
+            entity_type,
+            entity_id,
+            current_level,
+            total_levels,
+            status,
+            requester_id
+          )
+        `)
+        .eq('approver_id', user.id)
+        .eq('status', 'pending');
+
       if (error) throw error;
-      
-      // Get leave type names
-      if (data && data.length > 0) {
-        const typeIds = [...new Set(data.map(d => d.leave_type_id).filter(Boolean))];
-        const { data: types } = await supabase
-          .from('leave_types')
-          .select('id, name')
-          .in('id', typeIds);
-        const typeMap = new Map(types?.map(t => [t.id, t.name]) || []);
-        return data.map(d => ({ ...d, leaveTypeName: typeMap.get(d.leave_type_id) || 'Leave' }));
+
+      // Filter: only show when it's MY turn AND request is still pending
+      const myTurnSteps = (steps || []).filter((s: any) =>
+        s.approval_requests?.current_level === s.level &&
+        s.approval_requests?.status === 'pending'
+      );
+
+      if (myTurnSteps.length === 0) return [];
+
+      const leaveIds = myTurnSteps
+        .filter((s: any) => s.approval_requests.entity_type === 'leave')
+        .map((s: any) => s.approval_requests.entity_id);
+      const regIds = myTurnSteps
+        .filter((s: any) => s.approval_requests.entity_type === 'regularization')
+        .map((s: any) => s.approval_requests.entity_id);
+
+      // Fetch leave details
+      let leaveMap = new Map<string, any>();
+      if (leaveIds.length > 0) {
+        const { data: leaves } = await supabase
+          .from('leave_applications')
+          .select('id, user_id, start_date, end_date, reason, leave_type_id')
+          .in('id', leaveIds);
+
+        const typeIds = [...new Set((leaves || []).map((l: any) => l.leave_type_id).filter(Boolean))];
+        let typeMap = new Map<string, string>();
+        if (typeIds.length > 0) {
+          const { data: types } = await supabase.from('leave_types').select('id, name').in('id', typeIds);
+          types?.forEach((t: any) => typeMap.set(t.id, t.name));
+        }
+        leaves?.forEach((l: any) => leaveMap.set(l.id, { ...l, leaveTypeName: typeMap.get(l.leave_type_id) || 'Leave' }));
       }
-      return data || [];
+
+      // Fetch regularization details
+      let regMap = new Map<string, any>();
+      if (regIds.length > 0) {
+        const { data: regs } = await supabase
+          .from('regularization_requests')
+          .select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time')
+          .in('id', regIds);
+        regs?.forEach((r: any) => regMap.set(r.id, r));
+      }
+
+      return myTurnSteps.map((s: any) => ({
+        step: s,
+        entityType: s.approval_requests.entity_type as 'leave' | 'regularization',
+        entityId: s.approval_requests.entity_id,
+        approvalRequestId: s.approval_request_id,
+        currentLevel: s.approval_requests.current_level,
+        totalLevels: s.approval_requests.total_levels,
+        isFinalLevel: s.level >= s.approval_requests.total_levels,
+        myLevel: s.level,
+        entityData: s.approval_requests.entity_type === 'leave'
+          ? leaveMap.get(s.approval_requests.entity_id)
+          : regMap.get(s.approval_requests.entity_id),
+      }));
     },
-    enabled,
-    staleTime: 2 * 60 * 1000,
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
   });
 
-  // 6. Pending regularization approvals (only from direct reports)
+  // Legacy pending regularizations (for direct reports not yet using engine)
   const { data: pendingRegularizations = [] } = useQuery({
     queryKey: ['team-pending-regularizations', approvalUserIds],
     queryFn: async () => {
@@ -186,10 +252,10 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
   const onLeaveCount = [...onLeaveUserIds].filter(id => !presentUserIds.has(id)).length;
   const absentCount = subordinateIds.length - presentCount - onLeaveCount;
 
-  // Working days in month - dynamically calculated from config
+  // Working days in month
   const { totalWorkingDays: totalWorkingDaysInMonth } = useWorkingDaysConfig(dateFilter);
 
-  // Build team members list (memoized to prevent flickering)
+  // Build team members list (memoized)
   const teamMembers: TeamMemberAttendance[] = useMemo(() => {
     const profileMap = new Map(profiles.map(p => [p.id, p]));
     const attendanceMap = new Map(todayAttendance.map((a: any) => [a.user_id, a]));
@@ -198,7 +264,7 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
       const profile = profileMap.get(id) || { id, full_name: 'Unknown', profile_picture_url: null, designation: null, phone_number: null };
       const att = attendanceMap.get(id);
       const isOnLeave = onLeaveUserIds.has(id) && !presentUserIds.has(id);
-      
+
       let todayStatus: TeamMemberAttendance['todayStatus'] = 'absent';
       if (att) {
         todayStatus = att.status === 'regularized' ? 'regularized' : 'present';
@@ -218,23 +284,61 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
     });
   }, [subordinateIds, profiles, todayAttendance, todayLeaves, monthlyCountsRaw, totalWorkingDaysInMonth]);
 
-  // Build pending approvals list (memoized)
+  // Build pending approvals from approval engine (primary) + legacy fallback
   const pendingApprovals: PendingApproval[] = useMemo(() => {
     const profileMap = new Map(profiles.map(p => [p.id, p]));
-    return [
-      ...pendingLeaves.map((l: any) => ({
-        id: l.id,
-        type: 'leave' as const,
-        userId: l.user_id,
-        fullName: profileMap.get(l.user_id)?.full_name || 'Unknown',
-        profilePictureUrl: profileMap.get(l.user_id)?.profile_picture_url || null,
-        designation: profileMap.get(l.user_id)?.designation || null,
-        date: l.start_date,
-        endDate: l.end_date,
-        reason: l.reason,
-        leaveTypeName: l.leaveTypeName,
-      })),
-      ...pendingRegularizations.map((r: any) => ({
+
+    const engineApprovals: PendingApproval[] = (pendingStepsData as any[]).map((item: any) => {
+      const ed = item.entityData;
+      if (!ed) return null;
+      const userId = ed.user_id;
+      const profile = profileMap.get(userId);
+
+      if (item.entityType === 'leave') {
+        return {
+          id: ed.id,
+          type: 'leave' as const,
+          userId,
+          fullName: profile?.full_name || 'Unknown',
+          profilePictureUrl: profile?.profile_picture_url || null,
+          designation: profile?.designation || null,
+          date: ed.start_date,
+          endDate: ed.end_date,
+          reason: ed.reason,
+          leaveTypeName: ed.leaveTypeName,
+          approvalRequestId: item.approvalRequestId,
+          currentLevel: item.currentLevel,
+          totalLevels: item.totalLevels,
+          isFinalLevel: item.isFinalLevel,
+          myLevel: item.myLevel,
+        } as PendingApproval;
+      } else {
+        return {
+          id: ed.id,
+          type: 'regularization' as const,
+          userId,
+          fullName: profile?.full_name || 'Unknown',
+          profilePictureUrl: profile?.profile_picture_url || null,
+          designation: profile?.designation || null,
+          date: ed.attendance_date,
+          reason: ed.reason,
+          requestedCheckIn: ed.requested_check_in_time,
+          requestedCheckOut: ed.requested_check_out_time,
+          attendanceDate: ed.attendance_date,
+          approvalRequestId: item.approvalRequestId,
+          currentLevel: item.currentLevel,
+          totalLevels: item.totalLevels,
+          isFinalLevel: item.isFinalLevel,
+          myLevel: item.myLevel,
+        } as PendingApproval;
+      }
+    }).filter(Boolean) as PendingApproval[];
+
+    // Legacy: direct report pending regs not yet in engine
+    const engineEntityIds = new Set(engineApprovals.map(a => a.id));
+    const legacyRegApprovals: PendingApproval[] = (pendingRegularizations as any[])
+      .filter((r: any) => !engineEntityIds.has(r.id) && approvalUserIds.includes(r.user_id))
+      .map((r: any) => ({
         id: r.id,
         type: 'regularization' as const,
         userId: r.user_id,
@@ -246,26 +350,41 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
         requestedCheckIn: r.requested_check_in_time,
         requestedCheckOut: r.requested_check_out_time,
         attendanceDate: r.attendance_date,
-      })),
-    ];
-  }, [pendingLeaves, pendingRegularizations, profiles]);
+      }));
 
-  // Approve/Reject leave
-  const handleLeaveAction = async (applicationId: string, newStatus: 'approved' | 'rejected') => {
+    return [...engineApprovals, ...legacyRegApprovals];
+  }, [pendingStepsData, pendingRegularizations, profiles, approvalUserIds]);
+
+  // handleLeaveAction: uses approval engine if approvalRequestId present, else legacy direct update
+  const handleLeaveAction = async (applicationId: string, newStatus: 'approved' | 'rejected', approvalRequestId?: string) => {
     try {
-      const updateData: any = {
-        status: newStatus,
-        approved_date: newStatus === 'approved' ? new Date().toISOString() : null,
-      };
-      if (user) updateData.approved_by = user.id;
-
-      const { error } = await supabase
-        .from('leave_applications')
-        .update(updateData)
-        .eq('id', applicationId);
-      if (error) throw error;
-
-      toast({ title: `Leave ${newStatus} successfully` });
+      if (approvalRequestId) {
+        const { data: result, error } = await supabase.rpc('process_approval_step', {
+          p_approval_request_id: approvalRequestId,
+          p_approver_id: user?.id,
+          p_action: newStatus,
+          p_reason: null,
+        });
+        if (error) throw error;
+        const res = result as any;
+        if (!res.success) throw new Error(res.message);
+        if (newStatus === 'rejected') {
+          toast({ title: 'Leave rejected' });
+        } else if (res.is_final) {
+          toast({ title: '✅ Leave approved', description: 'Fully approved and processed.' });
+        } else {
+          toast({ title: '✅ Approved & forwarded', description: `Forwarded to Level ${res.next_level}.` });
+        }
+      } else {
+        const updateData: any = {
+          status: newStatus,
+          approved_date: newStatus === 'approved' ? new Date().toISOString() : null,
+        };
+        if (user) updateData.approved_by = user.id;
+        const { error } = await supabase.from('leave_applications').update(updateData).eq('id', applicationId);
+        if (error) throw error;
+        toast({ title: `Leave ${newStatus} successfully` });
+      }
       queryClient.invalidateQueries({ queryKey: ['team-pending-leaves'] });
       queryClient.invalidateQueries({ queryKey: ['team-today-leaves'] });
       queryClient.invalidateQueries({ queryKey: ['team-today-attendance'] });
@@ -275,30 +394,85 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
     }
   };
 
-  // Approve/Reject regularization
-  const handleRegularizationAction = async (requestId: string, newStatus: 'approved' | 'rejected', rejectionReason?: string) => {
+  // handleRegularizationAction: uses approval engine if approvalRequestId present, else legacy
+  const handleRegularizationAction = async (
+    requestId: string,
+    newStatus: 'approved' | 'rejected',
+    rejectionReason?: string,
+    approvalRequestId?: string
+  ) => {
     try {
-      if (newStatus === 'approved') {
-        // Get request details
-        const { data: request, error: fetchError } = await supabase
-          .from('regularization_requests')
-          .select('*')
-          .eq('id', requestId)
-          .single();
-        if (fetchError) throw fetchError;
+      if (approvalRequestId) {
+        if (newStatus === 'approved') {
+          // Check if this is the final level — if so, upsert attendance before engine processes
+          const { data: arData } = await supabase
+            .from('approval_requests')
+            .select('current_level, total_levels')
+            .eq('id', approvalRequestId)
+            .maybeSingle();
 
-        // Calculate total hours
-        let totalHours = null;
-        if (request.requested_check_in_time && request.requested_check_out_time) {
-          const checkIn = new Date(request.requested_check_in_time);
-          const checkOut = new Date(request.requested_check_out_time);
-          totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+          if (arData && arData.current_level >= arData.total_levels) {
+            const { data: request } = await supabase
+              .from('regularization_requests')
+              .select('*')
+              .eq('id', requestId)
+              .maybeSingle();
+
+            if (request) {
+              let totalHours = null;
+              if (request.requested_check_in_time && request.requested_check_out_time) {
+                const checkIn = new Date(request.requested_check_in_time);
+                const checkOut = new Date(request.requested_check_out_time);
+                totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+              }
+              await supabase.from('attendance').upsert({
+                user_id: request.user_id,
+                date: request.attendance_date,
+                check_in_time: request.requested_check_in_time,
+                check_out_time: request.requested_check_out_time,
+                status: 'regularized',
+                total_hours: totalHours,
+                notes: `Regularized via request #${requestId.slice(0, 8)}`,
+                regularized_request_id: requestId,
+              }, { onConflict: 'user_id,date' });
+            }
+          }
         }
 
-        // Upsert attendance
-        const { error: attendanceError } = await supabase
-          .from('attendance')
-          .upsert({
+        const { data: result, error } = await supabase.rpc('process_approval_step', {
+          p_approval_request_id: approvalRequestId,
+          p_approver_id: user?.id,
+          p_action: newStatus,
+          p_reason: rejectionReason || null,
+        });
+        if (error) throw error;
+        const res = result as any;
+        if (!res.success) throw new Error(res.message);
+
+        if (newStatus === 'rejected') {
+          toast({ title: 'Regularization rejected', variant: 'destructive' });
+        } else if (res.is_final) {
+          toast({ title: '✅ Regularization approved' });
+        } else {
+          toast({ title: '✅ Approved & forwarded', description: `Forwarded to Level ${res.next_level}.` });
+        }
+      } else {
+        // Legacy direct update
+        if (newStatus === 'approved') {
+          const { data: request, error: fetchError } = await supabase
+            .from('regularization_requests')
+            .select('*')
+            .eq('id', requestId)
+            .single();
+          if (fetchError) throw fetchError;
+
+          let totalHours = null;
+          if (request.requested_check_in_time && request.requested_check_out_time) {
+            const checkIn = new Date(request.requested_check_in_time);
+            const checkOut = new Date(request.requested_check_out_time);
+            totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+          }
+          const { error: attendanceError } = await supabase.from('attendance').upsert({
             user_id: request.user_id,
             date: request.attendance_date,
             check_in_time: request.requested_check_in_time,
@@ -308,23 +482,20 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
             notes: `Regularized via request #${requestId.slice(0, 8)}`,
             regularized_request_id: requestId,
           }, { onConflict: 'user_id,date' });
-        if (attendanceError) throw attendanceError;
+          if (attendanceError) throw attendanceError;
+        }
+
+        const updateData: any = {
+          status: newStatus,
+          approved_at: newStatus === 'approved' ? new Date().toISOString() : null,
+          rejection_reason: rejectionReason || null,
+        };
+        if (user) updateData.approved_by = user.id;
+        const { error } = await supabase.from('regularization_requests').update(updateData).eq('id', requestId);
+        if (error) throw error;
+        toast({ title: `Regularization ${newStatus} successfully` });
       }
 
-      const updateData: any = {
-        status: newStatus,
-        approved_at: newStatus === 'approved' ? new Date().toISOString() : null,
-        rejection_reason: rejectionReason || null,
-      };
-      if (user) updateData.approved_by = user.id;
-
-      const { error } = await supabase
-        .from('regularization_requests')
-        .update(updateData)
-        .eq('id', requestId);
-      if (error) throw error;
-
-      toast({ title: `Regularization ${newStatus} successfully` });
       queryClient.invalidateQueries({ queryKey: ['team-pending-regularizations'] });
       queryClient.invalidateQueries({ queryKey: ['team-today-attendance'] });
       queryClient.invalidateQueries({ queryKey: ['team-monthly-counts'] });

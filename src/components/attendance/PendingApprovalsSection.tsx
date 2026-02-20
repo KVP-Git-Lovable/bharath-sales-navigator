@@ -3,15 +3,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { Check, X, AlertCircle, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { PendingApproval } from '@/hooks/useTeamAttendance';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 
 interface PendingApprovalsSectionProps {
   approvals: PendingApproval[];
-  onLeaveAction: (id: string, status: 'approved' | 'rejected') => Promise<void>;
-  onRegularizationAction: (id: string, status: 'approved' | 'rejected', reason?: string) => Promise<void>;
+  onLeaveAction: (id: string, status: 'approved' | 'rejected', approvalRequestId?: string) => Promise<void>;
+  onRegularizationAction: (id: string, status: 'approved' | 'rejected', reason?: string, approvalRequestId?: string) => Promise<void>;
 }
 
 export const PendingApprovalsSection = ({
@@ -20,7 +21,7 @@ export const PendingApprovalsSection = ({
   onRegularizationAction,
 }: PendingApprovalsSectionProps) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [rejectionTarget, setRejectionTarget] = useState<{ id: string; type: 'leave' | 'regularization' } | null>(null);
+  const [rejectionTarget, setRejectionTarget] = useState<{ id: string; type: 'leave' | 'regularization'; approvalRequestId?: string } | null>(null);
 
   if (approvals.length === 0) return null;
 
@@ -28,9 +29,9 @@ export const PendingApprovalsSection = ({
     setProcessingId(approval.id);
     try {
       if (approval.type === 'leave') {
-        await onLeaveAction(approval.id, 'approved');
+        await onLeaveAction(approval.id, 'approved', approval.approvalRequestId);
       } else {
-        await onRegularizationAction(approval.id, 'approved');
+        await onRegularizationAction(approval.id, 'approved', undefined, approval.approvalRequestId);
       }
     } finally {
       setProcessingId(null);
@@ -39,10 +40,10 @@ export const PendingApprovalsSection = ({
 
   const handleReject = (approval: PendingApproval) => {
     if (approval.type === 'regularization') {
-      setRejectionTarget({ id: approval.id, type: 'regularization' });
+      setRejectionTarget({ id: approval.id, type: 'regularization', approvalRequestId: approval.approvalRequestId });
     } else {
       setProcessingId(approval.id);
-      onLeaveAction(approval.id, 'rejected').finally(() => setProcessingId(null));
+      onLeaveAction(approval.id, 'rejected', approval.approvalRequestId).finally(() => setProcessingId(null));
     }
   };
 
@@ -50,7 +51,7 @@ export const PendingApprovalsSection = ({
     if (!rejectionTarget) return;
     setProcessingId(rejectionTarget.id);
     try {
-      await onRegularizationAction(rejectionTarget.id, 'rejected', reason);
+      await onRegularizationAction(rejectionTarget.id, 'rejected', reason, rejectionTarget.approvalRequestId);
     } finally {
       setProcessingId(null);
       setRejectionTarget(null);
@@ -58,6 +59,12 @@ export const PendingApprovalsSection = ({
   };
 
   const getInitials = (name: string) => name?.substring(0, 2).toUpperCase() || '??';
+
+  const getApproveLabel = (approval: PendingApproval) => {
+    if (!approval.approvalRequestId) return 'Approve';
+    if (approval.isFinalLevel) return 'Final Approve';
+    return 'Approve & Forward';
+  };
 
   return (
     <div className="space-y-3">
@@ -90,6 +97,20 @@ export const PendingApprovalsSection = ({
                   >
                     {approval.type === 'leave' ? approval.leaveTypeName || 'Leave' : 'Regularization'}
                   </Badge>
+                  {/* Level badge */}
+                  {approval.approvalRequestId && approval.totalLevels && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'text-[10px] px-1.5 py-0',
+                        approval.isFinalLevel
+                          ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-700'
+                          : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
+                      )}
+                    >
+                      L{approval.myLevel}/{approval.totalLevels}
+                    </Badge>
+                  )}
                 </div>
 
                 {approval.designation && (
@@ -106,15 +127,28 @@ export const PendingApprovalsSection = ({
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{approval.reason}</p>
                 )}
 
+                {/* Forward indicator */}
+                {approval.approvalRequestId && !approval.isFinalLevel && (
+                  <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 mt-1">
+                    <ChevronRight className="h-3 w-3" />
+                    <span>Forwards to Level {(approval.myLevel || 0) + 1} after approval</span>
+                  </div>
+                )}
+
                 <div className="flex gap-2 mt-2">
                   <Button
                     size="sm"
-                    className="h-9 flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    className={cn(
+                      'h-9 flex-1 text-white',
+                      approval.isFinalLevel || !approval.approvalRequestId
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    )}
                     onClick={() => handleApprove(approval)}
                     disabled={processingId === approval.id}
                   >
                     <Check className="h-4 w-4 mr-1" />
-                    Approve
+                    {getApproveLabel(approval)}
                   </Button>
                   <Button
                     size="sm"
@@ -137,8 +171,8 @@ export const PendingApprovalsSection = ({
         isOpen={!!rejectionTarget}
         onClose={() => setRejectionTarget(null)}
         onConfirm={handleConfirmRejection}
-        title="Reject Regularization"
-        description="Please provide a reason for rejecting this regularization request."
+        title="Reject Request"
+        description="Please provide a reason for rejecting this request."
       />
     </div>
   );

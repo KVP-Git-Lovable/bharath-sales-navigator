@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, CalendarDays, ClipboardCheck, Check, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ClipboardCheck, Check, X, ChevronRight } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTeamAttendance, PendingApproval } from '@/hooks/useTeamAttendance';
@@ -26,7 +26,7 @@ export const TeamApprovals = () => {
 
   const [activeTab, setActiveTab] = useState<ApprovalTab>('leave');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [rejectionTarget, setRejectionTarget] = useState<{ id: string; type: ApprovalTab } | null>(null);
+  const [rejectionTarget, setRejectionTarget] = useState<{ id: string; type: ApprovalTab; approvalRequestId?: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const leaveApprovals = useMemo(() => pendingApprovals.filter(a => a.type === 'leave'), [pendingApprovals]);
@@ -43,9 +43,9 @@ export const TeamApprovals = () => {
     setProcessingId(approval.id);
     try {
       if (approval.type === 'leave') {
-        await handleLeaveAction(approval.id, 'approved');
+        await handleLeaveAction(approval.id, 'approved', approval.approvalRequestId);
       } else {
-        await handleRegularizationAction(approval.id, 'approved');
+        await handleRegularizationAction(approval.id, 'approved', undefined, approval.approvalRequestId);
       }
     } finally {
       setProcessingId(null);
@@ -54,10 +54,10 @@ export const TeamApprovals = () => {
 
   const handleReject = (approval: PendingApproval) => {
     if (approval.type === 'regularization') {
-      setRejectionTarget({ id: approval.id, type: 'regularization' });
+      setRejectionTarget({ id: approval.id, type: 'regularization', approvalRequestId: approval.approvalRequestId });
     } else {
       setProcessingId(approval.id);
-      handleLeaveAction(approval.id, 'rejected').finally(() => setProcessingId(null));
+      handleLeaveAction(approval.id, 'rejected', approval.approvalRequestId).finally(() => setProcessingId(null));
     }
   };
 
@@ -65,7 +65,7 @@ export const TeamApprovals = () => {
     if (!rejectionTarget) return;
     setProcessingId(rejectionTarget.id);
     try {
-      await handleRegularizationAction(rejectionTarget.id, 'rejected', reason);
+      await handleRegularizationAction(rejectionTarget.id, 'rejected', reason, rejectionTarget.approvalRequestId);
     } finally {
       setProcessingId(null);
       setRejectionTarget(null);
@@ -83,6 +83,29 @@ export const TeamApprovals = () => {
   const switchTab = (tab: ApprovalTab) => {
     setActiveTab(tab);
     setCurrentPage(1);
+  };
+
+  const getLevelBadge = (approval: PendingApproval) => {
+    if (!approval.approvalRequestId || !approval.totalLevels) return null;
+    return (
+      <Badge
+        variant="outline"
+        className={cn(
+          'text-[10px] px-1.5 py-0 h-4',
+          approval.isFinalLevel
+            ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-700'
+            : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
+        )}
+      >
+        L{approval.myLevel}/{approval.totalLevels}
+      </Badge>
+    );
+  };
+
+  const getApproveLabel = (approval: PendingApproval) => {
+    if (!approval.approvalRequestId) return 'Approve';
+    if (approval.isFinalLevel) return 'Final Approve';
+    return 'Approve & Forward';
   };
 
   return (
@@ -152,13 +175,14 @@ export const TeamApprovals = () => {
                       <AvatarFallback className="text-xs font-medium">{getInitials(approval.fullName)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold truncate">{approval.fullName}</span>
                         {approval.type === 'regularization' && (
                           <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 border-0 text-[10px] px-1.5 py-0">
                             Regularization
                           </Badge>
                         )}
+                        {getLevelBadge(approval)}
                       </div>
                       {approval.designation && (
                         <p className="text-xs text-muted-foreground">{approval.designation}</p>
@@ -170,10 +194,10 @@ export const TeamApprovals = () => {
                   <div className="px-3 pb-2 space-y-1">
                     <p className="text-xs font-medium">
                       <span className="text-green-700 dark:text-green-400">
-                        {approval.type === 'leave' ? 'Leave' : 'Leave'}:
+                        {approval.type === 'leave' ? 'Leave' : 'Type'}:
                       </span>{' '}
                       <span className="font-semibold text-foreground">
-                        {approval.type === 'leave' ? (approval.leaveTypeName || 'Leave') : (approval.leaveTypeName || 'Regularization')}
+                        {approval.type === 'leave' ? (approval.leaveTypeName || 'Leave') : 'Regularization'}
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -186,18 +210,30 @@ export const TeamApprovals = () => {
                         {approval.type === 'leave' ? 'Reason' : 'Issue'}: {approval.reason}
                       </p>
                     )}
+                    {/* Forward indicator */}
+                    {approval.approvalRequestId && !approval.isFinalLevel && (
+                      <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 mt-1">
+                        <ChevronRight className="h-3 w-3" />
+                        <span>Will forward to Level {(approval.myLevel || 0) + 1} after approval</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action buttons */}
                   <div className="flex gap-2 px-3 pb-3">
                     <Button
                       size="sm"
-                      className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg"
+                      className={cn(
+                        'flex-1 h-8 text-white text-xs rounded-lg',
+                        approval.isFinalLevel
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      )}
                       onClick={() => handleApprove(approval)}
                       disabled={processingId === approval.id}
                     >
                       <Check className="h-3.5 w-3.5 mr-1" />
-                      Approve
+                      {getApproveLabel(approval)}
                     </Button>
                     <Button
                       size="sm"
@@ -234,8 +270,8 @@ export const TeamApprovals = () => {
         isOpen={!!rejectionTarget}
         onClose={() => setRejectionTarget(null)}
         onConfirm={handleConfirmRejection}
-        title="Reject Regularization"
-        description="Please provide a reason for rejecting this regularization request."
+        title="Reject Request"
+        description="Please provide a reason for rejecting this request."
       />
     </div>
   );
