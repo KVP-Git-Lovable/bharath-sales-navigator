@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Task, useUpdateTask, useDeleteTask } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { TaskSubtasks } from "./TaskSubtasks";
@@ -8,8 +8,98 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Check, Calendar, Trash2 } from "lucide-react";
+import { X, Check, Calendar, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+
+// ── Task Owner Field with user lookup ──────────────────────────────
+function TaskOwnerField({ task, onSave }: { task: Task; onSave: (userId: string | null) => void }) {
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ id: string; full_name: string }[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .ilike("full_name", `%${query}%`)
+        .limit(8);
+      setResults(data || []);
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSearch(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Task Owner</span>
+      <div className="relative" ref={searchRef}>
+        <button
+          onClick={() => setShowSearch(!showSearch)}
+          className="flex items-center gap-2 text-sm hover:bg-muted px-2 py-1 rounded transition-colors"
+        >
+          {task.assignee ? (
+            <>
+              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-medium">
+                {task.assignee.full_name?.charAt(0) ?? "?"}
+              </div>
+              <span>{task.assignee.full_name}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">Unassigned</span>
+          )}
+        </button>
+        {showSearch && (
+          <div className="absolute top-full left-0 mt-1 w-64 bg-popover border rounded-lg shadow-lg z-50 p-2">
+            <div className="flex items-center gap-2 border-b pb-2 mb-1">
+              <Search className="w-3.5 h-3.5 text-muted-foreground" />
+              <input
+                autoFocus
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search users..."
+                className="flex-1 text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50"
+              />
+            </div>
+            {task.assignee && (
+              <button
+                onClick={() => { onSave(null); setShowSearch(false); setQuery(""); }}
+                className="w-full text-left text-xs text-destructive px-2 py-1.5 rounded hover:bg-muted transition-colors mb-1"
+              >
+                Remove owner
+              </button>
+            )}
+            {results.map(u => (
+              <button
+                key={u.id}
+                onClick={() => { onSave(u.id); setShowSearch(false); setQuery(""); }}
+                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted transition-colors"
+              >
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-medium">
+                  {u.full_name?.charAt(0) ?? "?"}
+                </div>
+                <span className="text-sm">{u.full_name}</span>
+              </button>
+            ))}
+            {query && results.length === 0 && (
+              <p className="text-xs text-muted-foreground px-2 py-1.5">No users found</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   task: Task;
@@ -84,21 +174,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
 
         {/* Meta fields */}
         <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Assignee</span>
-            <div className="flex items-center gap-2">
-              {task.assignee ? (
-                <>
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-medium">
-                    {task.assignee.full_name?.charAt(0) ?? "?"}
-                  </div>
-                  <span className="text-sm">{task.assignee.full_name}</span>
-                </>
-              ) : (
-                <span className="text-sm text-muted-foreground">Unassigned</span>
-              )}
-            </div>
-          </div>
+          <TaskOwnerField task={task} onSave={(userId) => handleSave("assignee_id", userId)} />
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-24 flex-shrink-0">Due date</span>

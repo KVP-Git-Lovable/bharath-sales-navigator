@@ -337,8 +337,22 @@ function TaskCard({ task, dragging, onDragStart, onDragEnd, onUpdateTask, onDele
 
       <p className="text-sm font-medium text-foreground leading-tight mb-2">{task.title}</p>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Status + Priority row */}
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <span className={cn(
+          "text-[10px] px-1.5 py-0.5 rounded font-medium",
+          task.status === "done" ? "bg-green-500/10 text-green-600" :
+          task.status === "in_progress" ? "bg-blue-500/10 text-blue-600" :
+          task.status === "in_review" ? "bg-purple-500/10 text-purple-600" :
+          task.status === "todo" ? "bg-amber-500/10 text-amber-600" :
+          "bg-muted text-muted-foreground"
+        )}>
+          {task.status.replace(/_/g, ' ')}
+        </span>
         <PriorityBadge priority={task.priority} />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
         {task.due_date && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Calendar className="w-3 h-3" />
@@ -353,6 +367,7 @@ function TaskCard({ task, dragging, onDragStart, onDragEnd, onUpdateTask, onDele
         )}
       </div>
 
+      {/* Task Owner */}
       {task.assignee && (
         <div className="mt-2 flex items-center gap-1.5">
           <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-medium">

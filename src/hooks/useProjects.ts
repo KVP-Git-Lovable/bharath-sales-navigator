@@ -237,10 +237,15 @@ export function useCreateTask() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (values: Partial<Task>) => {
+      const payload = { ...values, created_by: user!.id };
+      // Auto-set assignee to creator if not explicitly provided
+      if (!payload.assignee_id) {
+        payload.assignee_id = user!.id;
+      }
       const { data, error } = await supabase
         .from('pm_tasks')
-        .insert([{ ...values, created_by: user!.id }] as any)
-        .select()
+        .insert([payload] as any)
+        .select(`*, assignee:profiles!pm_tasks_assignee_id_fkey(full_name, profile_picture_url)`)
         .single();
       if (error) throw error;
       return data;
