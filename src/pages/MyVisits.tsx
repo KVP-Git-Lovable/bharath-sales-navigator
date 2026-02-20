@@ -37,6 +37,7 @@ import { schedulePrefetch } from "@/utils/backgroundProductPrefetch";
 import { Preferences } from "@capacitor/preferences";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { useProfilePermissions } from "@/hooks/useProfilePermissions";
+import { PermissionGate } from "@/components/auth/PermissionGate";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
@@ -1257,55 +1258,71 @@ export const MyVisits = () => {
             {isViewingSelf && (() => {
               const row1Buttons = [
                 showAutoPlan && (
+                  <PermissionGate key="auto-plan-gate" permissionName="action_visit_auto_plan">
                   <Button key="auto-plan" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={handleAutoGeneratePlan} disabled={isGeneratingPlan} title="AI generates optimized weekly beat plans">
                     {isGeneratingPlan ? <Loader2 size={12} className="mr-1 sm:mr-1.5 animate-spin" /> : <Sparkles size={12} className="mr-1 sm:mr-1.5" />}
                     <span className="whitespace-nowrap">{isGeneratingPlan ? t('visits.planning') : t('visits.autoPlan')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
                 showAllBeat && (
+                  <PermissionGate key="all-beat-gate" permissionName="action_visit_all_beat">
                   <Button key="all-beat" variant="secondary" size="sm" className={`bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3 ${selectedDate < new Date().toISOString().split('T')[0] ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => navigate(`/beat-planning?date=${selectedDate}`)} disabled={selectedDate < new Date().toISOString().split('T')[0]}>
                     <Route size={12} className="mr-1 sm:mr-1.5" />
                     <span className="whitespace-nowrap">{t('visits.journeyPlan')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
                 showRetailers && (
+                  <PermissionGate key="retailers-gate" permissionName="action_visit_retailers">
                   <Button key="retailers" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={() => navigate('/my-retailers', { state: { returnTo: '/visits/retailers' } })}>
                     <Users size={12} className="mr-1 sm:mr-1.5" />
                     <span className="whitespace-nowrap">{t('visits.retailers')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
                 showSummary && (
+                  <PermissionGate key="summary-gate" permissionName="action_visit_summary">
                   <Button key="summary" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3 overflow-hidden" onClick={() => navigate(`/today-summary?date=${selectedDate}`)}>
                     <FileText size={10} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                     <span className="truncate">{t('visits.summary')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
               ].filter(Boolean);
 
               const row2Buttons = [
                 showTimeline && (
+                  <PermissionGate key="timeline-gate" permissionName="action_visit_timeline">
                   <Button key="timeline" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => { setTimelineDate(selectedDate ? new Date(selectedDate) : new Date()); setIsTimelineOpen(true); }}>
                     <Clock size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                     <span className="truncate">{t('visits.timeline')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
                 showGpsTrack && (
+                  <PermissionGate key="gps-gate" permissionName="action_visit_gps_track">
                   <Button key="gps-track" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => navigate('/gps-track')}>
                     <MapPin size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                     <span className="truncate">{t('visits.gpsTrack')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
                 showVanStock && (
+                  <PermissionGate key="van-gate" permissionName="action_visit_van_stock">
                   <Button key="van-stock" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsVanStockOpen(true)}>
                     <Truck size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                     <span className="truncate">{t('visits.vanStock')}</span>
                   </Button>
+                  </PermissionGate>
                 ),
                 showActivity && (
+                  <PermissionGate key="activity-gate" permissionName="action_visit_activity">
                   <Button key="activity" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsActivityModalOpen(true)}>
                     <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                     <span className="truncate">Activity</span>
                   </Button>
+                  </PermissionGate>
                 ),
               ].filter(Boolean);
 

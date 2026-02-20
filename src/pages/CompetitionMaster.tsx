@@ -21,6 +21,7 @@ import { CompetitionAISummary } from "@/components/competition/CompetitionAISumm
 import { CompetitionRetailerAnalytics } from "@/components/competition/CompetitionRetailerAnalytics";
 import { SKUDetailModal } from "@/components/competition/SKUDetailModal";
 import { Layout } from "@/components/Layout";
+import { PermissionGate } from "@/components/auth/PermissionGate";
 
 interface Competitor {
   id: string;
@@ -418,9 +419,11 @@ export default function CompetitionMaster() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="text-lg md:text-xl">Competitors</CardTitle>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <PermissionGate permissionName="action_comp_add_insight">
               <DialogTrigger asChild>
                 <Button size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />Add Competitor</Button>
               </DialogTrigger>
+              </PermissionGate>
               <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Add New Competitor</DialogTitle></DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
