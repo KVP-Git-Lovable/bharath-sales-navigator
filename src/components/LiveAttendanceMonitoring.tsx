@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Download, Users, Clock, MapPin, UserCheck, User, Calendar } from 'lucide-react';
+import { Search, Download, Users, Clock, MapPin, UserCheck, User, Calendar, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { downloadCSV } from '@/utils/fileDownloader';
 import { AttendanceDetailsDialog } from './attendance/AttendanceDetailsDialog';
@@ -54,7 +54,20 @@ interface SummaryStats {
   totalPresent: number;
   totalAbsent: number;
   totalHalfDay: number;
+  totalOnLeave: number;
   averageHours: number;
+  totalEmployees: number;
+}
+
+interface DailySummary {
+  date: string;
+  total_employees: number;
+  total_present: number;
+  total_absent: number;
+  total_on_leave: number;
+  total_half_day: number;
+  avg_hours: number;
+  total_hours_sum: number;
 }
 
 const LiveAttendanceMonitoring = () => {
@@ -70,8 +83,12 @@ const LiveAttendanceMonitoring = () => {
     totalPresent: 0,
     totalAbsent: 0,
     totalHalfDay: 0,
-    averageHours: 0
+    totalOnLeave: 0,
+    averageHours: 0,
+    totalEmployees: 0,
   });
+  // Tracks whether summary came from pre-computed table or client fallback
+  const [summaryFromCache, setSummaryFromCache] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showLocationId, setShowLocationId] = useState<string | null>(null);
   const [detailsDialog, setDetailsDialog] = useState<{
@@ -80,22 +97,57 @@ const LiveAttendanceMonitoring = () => {
     title: string;
   }>({ open: false, type: 'present', title: '' });
 
+  // Fetch pre-computed daily summary (O(1) — single row read)
+  const fetchDailySummary = useCallback(async (date: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('attendance_daily_admin_summary')
+        .select('*')
+        .eq('date', date)
+        .maybeSingle();
+
+      if (!error && data) {
+        setSummaryStats({
+          totalPresent: data.total_present,
+          totalAbsent: data.total_absent,
+          totalHalfDay: data.total_half_day,
+          totalOnLeave: data.total_on_leave,
+          averageHours: Number(data.avg_hours) || 0,
+          totalEmployees: data.total_employees,
+        });
+        setSummaryFromCache(true);
+        return true;
+      }
+    } catch {
+      // Fall through to client-side calculation
+    }
+    return false;
+  }, []);
+
   useEffect(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    // Fetch summary O(1) first, then load detail rows
+    fetchDailySummary(today);
     fetchUsers();
     fetchAttendanceData();
     
-    // Set up real-time subscription
+    // Real-time subscription: refresh summary + detail rows on any attendance change
     const channel = supabase
       .channel('attendance-monitoring')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'attendance'
-        },
+        { event: '*', schema: 'public', table: 'attendance' },
         () => {
+          fetchDailySummary(format(new Date(), 'yyyy-MM-dd'));
           fetchAttendanceData();
+        }
+      )
+      // Also listen for summary table updates
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'attendance_daily_admin_summary' },
+        () => {
+          fetchDailySummary(format(new Date(), 'yyyy-MM-dd'));
         }
       )
       .subscribe();
@@ -103,7 +155,7 @@ const LiveAttendanceMonitoring = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchDailySummary]);
 
   useEffect(() => {
     applyFilters();
@@ -285,21 +337,29 @@ const LiveAttendanceMonitoring = () => {
     calculateSummaryStats(filtered);
   };
 
+  // Client-side fallback: only used if pre-computed summary isn't available yet
   const calculateSummaryStats = (data: AttendanceData[]) => {
+    // Skip client-side calculation if we already have data from the summary table
+    if (summaryFromCache) return;
+
     const todaysData = data.filter(record => record.date === format(new Date(), 'yyyy-MM-dd'));
     
-    const totalPresent = todaysData.filter(record => record.status === 'present').length;
+    const totalPresent = todaysData.filter(record => record.status === 'present' || record.status === 'regularized').length;
     const totalAbsent = todaysData.filter(record => record.status === 'absent').length;
-    const totalHalfDay = todaysData.filter(record => record.status === 'half-day').length;
+    const totalHalfDay = todaysData.filter(record => record.status === 'half_day_leave' || record.status === 'half-day').length;
+    const totalOnLeave = todaysData.filter(record => record.status === 'leave').length;
     
-    const totalHours = data.reduce((sum, record) => sum + (record.total_hours || 0), 0);
-    const averageHours = data.length > 0 ? totalHours / data.length : 0;
+    const presentData = todaysData.filter(r => (r.status === 'present' || r.status === 'regularized') && r.total_hours);
+    const totalHours = presentData.reduce((sum, record) => sum + (record.total_hours || 0), 0);
+    const averageHours = presentData.length > 0 ? totalHours / presentData.length : 0;
 
     setSummaryStats({
       totalPresent,
       totalAbsent,
       totalHalfDay,
-      averageHours
+      totalOnLeave,
+      averageHours,
+      totalEmployees: todaysData.length,
     });
   };
 
@@ -327,22 +387,26 @@ const LiveAttendanceMonitoring = () => {
     const isToday = record.date === format(new Date(), 'yyyy-MM-dd');
     if (isToday) {
       if (record.first_visit_check_in && !record.last_visit_check_in) {
-        return <span className="text-green-500">🟢</span>; // Online (has first check-in)
+        return <span className="text-green-500" aria-label="Online">🟢</span>;
       } else if (record.last_visit_check_in) {
-        return <span className="text-red-500">🔴</span>; // Offline (has last check-in)
+        return <span className="text-destructive" aria-label="Offline">🔴</span>;
       }
     }
     return null;
   };
 
   const getStatusBadge = (status: string) => {
-    const config = {
-      present: { color: 'bg-green-100 text-green-800', label: 'Present' },
-      absent: { color: 'bg-red-100 text-red-800', label: 'Absent' },
-      'half-day': { color: 'bg-yellow-100 text-yellow-800', label: 'Half Day' }
+    const config: Record<string, { color: string; label: string }> = {
+      present:        { color: 'bg-green-100 text-green-800', label: 'Present' },
+      regularized:    { color: 'bg-blue-100 text-blue-800', label: 'Regularized' },
+      absent:         { color: 'bg-red-100 text-red-800', label: 'Absent' },
+      'half-day':     { color: 'bg-amber-100 text-amber-800', label: 'Half Day' },
+      half_day_leave: { color: 'bg-amber-100 text-amber-800', label: 'Half Day Leave' },
+      leave:          { color: 'bg-purple-100 text-purple-800', label: 'On Leave' },
+      auto_closed:    { color: 'bg-orange-100 text-orange-800', label: 'Auto-Closed' },
     };
 
-    const statusConfig = config[status] || { color: 'bg-gray-100 text-gray-800', label: status };
+    const statusConfig = config[status] || { color: 'bg-muted text-muted-foreground', label: status };
     
     return (
       <Badge className={statusConfig.color}>
@@ -413,8 +477,19 @@ const LiveAttendanceMonitoring = () => {
 
   return (
     <div className="space-y-6">
-      {/* Summary Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Summary Dashboard — reads from pre-computed attendance_daily_admin_summary (O(1)) */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summaryStats.totalEmployees}</div>
+            {summaryFromCache && <p className="text-xs text-muted-foreground mt-1">Pre-computed</p>}
+          </CardContent>
+        </Card>
+
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setDetailsDialog({ open: true, type: 'present', title: 'Present Today' })}
@@ -424,7 +499,12 @@ const LiveAttendanceMonitoring = () => {
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{summaryStats.totalPresent}</div>
+            <div className="text-2xl font-bold text-green-700 dark:text-green-400">{summaryStats.totalPresent}</div>
+            {summaryStats.totalEmployees > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {Math.round((summaryStats.totalPresent / summaryStats.totalEmployees) * 100)}% attendance
+              </p>
+            )}
           </CardContent>
         </Card>
         
@@ -437,30 +517,34 @@ const LiveAttendanceMonitoring = () => {
             <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{summaryStats.totalAbsent}</div>
+            <div className="text-2xl font-bold text-destructive">{summaryStats.totalAbsent}</div>
           </CardContent>
         </Card>
-        
+
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => setDetailsDialog({ open: true, type: 'half-day', title: 'Half Day' })}
+          onClick={() => setDetailsDialog({ open: true, type: 'half-day', title: 'Half Day / On Leave' })}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Half Day</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">On Leave</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{summaryStats.totalHalfDay}</div>
+            <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{summaryStats.totalOnLeave + summaryStats.totalHalfDay}</div>
+            {summaryStats.totalHalfDay > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">{summaryStats.totalHalfDay} half-day</p>
+            )}
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Hours</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{summaryStats.averageHours.toFixed(1)}h</div>
+            <div className="text-2xl font-bold text-primary">{summaryStats.averageHours.toFixed(1)}h</div>
+            <p className="text-xs text-muted-foreground mt-1">per present employee</p>
           </CardContent>
         </Card>
       </div>

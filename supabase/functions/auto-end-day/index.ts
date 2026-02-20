@@ -202,6 +202,35 @@ Deno.serve(async (req) => {
 
     console.log('🌙 Auto End Day: Completed!', summary)
 
+    // Refresh pre-computed admin summary tables for today
+    // This ensures LiveAttendanceMonitoring stat cards reflect auto-close results immediately
+    try {
+      console.log('📊 Refreshing admin summary tables...')
+      const { error: refreshDailyError } = await supabase.rpc('refresh_daily_admin_summary', { p_date: dateStr })
+      if (refreshDailyError) {
+        console.error('Warning: Failed to refresh daily summary:', refreshDailyError.message)
+      } else {
+        console.log('✅ Daily admin summary refreshed')
+      }
+
+      // Refresh monthly summary for each processed user
+      for (const userId of processedUsers) {
+        const [yearStr, monthStr] = dateStr.split('-')
+        const { error: refreshMonthlyError } = await supabase.rpc('refresh_user_monthly_summary', {
+          p_user_id: userId,
+          p_year: parseInt(yearStr),
+          p_month: parseInt(monthStr)
+        })
+        if (refreshMonthlyError) {
+          console.error(`Warning: Failed to refresh monthly summary for ${userId}:`, refreshMonthlyError.message)
+        }
+      }
+      console.log(`✅ Monthly summaries refreshed for ${processedUsers.length} users`)
+    } catch (refreshError) {
+      // Non-fatal: summaries will be refreshed by the DB trigger on next attendance change
+      console.error('Warning: Summary refresh failed (non-fatal):', refreshError.message)
+    }
+
     return new Response(
       JSON.stringify(summary),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
