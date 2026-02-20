@@ -198,7 +198,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
   return (
     <div className="h-full flex flex-col bg-card">
       {/* Toolbar — Asana-style action bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 flex-shrink-0 min-h-[44px]">
         <Button
           variant={task.status === "done" ? "secondary" : "outline"}
           size="sm"
@@ -209,7 +209,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
           {task.status === "done" ? "Completed" : "Mark complete"}
         </Button>
 
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 flex-shrink-0 overflow-x-auto">
           <TooltipProvider delayDuration={300}>
             <Tooltip><TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => toast.info("👍 Liked!")}>
