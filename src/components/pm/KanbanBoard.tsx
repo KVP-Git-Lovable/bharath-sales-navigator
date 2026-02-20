@@ -1,12 +1,12 @@
 import { useState, useRef } from "react";
-import { Task, TaskStatus, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection } from "@/hooks/useProjects";
+import { Task, TaskStatus, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection, useUpdateSection } from "@/hooks/useProjects";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { PriorityBadge } from "./TaskStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreVertical, Trash2, Calendar, Clock, Filter, Group, X } from "lucide-react";
+import { Plus, MoreVertical, Trash2, Calendar, Clock, Filter, Group, X, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,7 @@ export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestone
   const createTask = useCreateTask();
   const createSection = useCreateSection();
   const deleteSection = useDeleteSection();
+  const updateSection = useUpdateSection();
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [createFor, setCreateFor] = useState<{ sectionId?: string; status?: TaskStatus } | null>(null);
@@ -38,6 +39,8 @@ export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestone
   const [showFilters, setShowFilters] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [showAddSection, setShowAddSection] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState("");
   const addSectionRef = useRef<HTMLInputElement>(null);
 
   // Filter tasks
@@ -158,7 +161,31 @@ export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestone
             {/* Column Header */}
             <div className="flex items-center justify-between px-3 py-2.5 rounded-t-xl border-b bg-muted/40">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">{col.label}</span>
+                {editingSectionId === col.id ? (
+                  <input
+                    autoFocus
+                    value={editingSectionName}
+                    onChange={e => setEditingSectionName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        if (editingSectionName.trim()) {
+                          updateSection.mutate({ id: col.id, projectId, name: editingSectionName.trim() });
+                        }
+                        setEditingSectionId(null);
+                      }
+                      if (e.key === "Escape") setEditingSectionId(null);
+                    }}
+                    onBlur={() => {
+                      if (editingSectionName.trim() && editingSectionName.trim() !== col.label) {
+                        updateSection.mutate({ id: col.id, projectId, name: editingSectionName.trim() });
+                      }
+                      setEditingSectionId(null);
+                    }}
+                    className="text-sm font-semibold bg-transparent border-none outline-none text-foreground w-full"
+                  />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">{col.label}</span>
+                )}
                 <Badge variant="secondary" className="text-xs h-5 min-w-5 px-1.5">{col.tasks.length}</Badge>
               </div>
               <div className="flex items-center gap-0.5">
@@ -186,6 +213,14 @@ export function KanbanBoard({ tasks, onUpdateTask, projectId, sprints, milestone
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setEditingSectionId(col.id);
+                          setEditingSectionName(col.label);
+                        }}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-2" /> Rename section
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => deleteSection.mutate({ id: col.id, projectId })}
