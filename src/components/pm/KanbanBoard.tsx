@@ -367,13 +367,25 @@ function TaskCard({ task, dragging, onDragStart, onDragEnd, onUpdateTask, onDele
         )}
       </div>
 
-      {/* Task Owner */}
-      {task.assignee && (
-        <div className="mt-2 flex items-center gap-1.5">
-          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-medium">
-            {task.assignee.full_name?.charAt(0) ?? "?"}
-          </div>
-          <span className="text-xs text-muted-foreground truncate">{task.assignee.full_name}</span>
+      {/* Task Owner & Collaborator */}
+      {(task.assignee || task.collaborator) && (
+        <div className="mt-2 space-y-1">
+          {task.assignee && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-medium">
+                {task.assignee.full_name?.charAt(0) ?? "?"}
+              </div>
+              <span className="text-xs text-muted-foreground truncate">{task.assignee.full_name}</span>
+            </div>
+          )}
+          {task.collaborator && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground text-xs font-medium">
+                {task.collaborator.full_name?.charAt(0) ?? "?"}
+              </div>
+              <span className="text-xs text-muted-foreground truncate">{task.collaborator.full_name}</span>
+            </div>
+          )}
         </div>
       )}
 

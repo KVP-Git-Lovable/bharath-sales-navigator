@@ -206,6 +206,16 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
               </div>
             ) : "—"}
           </td>
+          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+            {task.collaborator ? (
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground text-[10px] font-medium">
+                  {task.collaborator.full_name?.charAt(0) ?? "?"}
+                </div>
+                <span>{task.collaborator.full_name}</span>
+              </div>
+            ) : "—"}
+          </td>
           <td className="py-2 px-3"><PriorityBadge priority={task.priority} /></td>
           <td className="py-2 px-3">
             <DropdownMenu>
@@ -228,7 +238,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
         {isExpanded && subtasks.map(sub => <TaskRow key={sub.id} task={sub} depth={depth + 1} sectionId={sectionId} />)}
         {isExpanded && isInlineTarget && (
           <tr className="border-b bg-muted/10">
-            <td colSpan={6} className="py-1.5 px-4">
+            <td colSpan={7} className="py-1.5 px-4">
               <div className="flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 20}px` }}>
                 <span className="w-3.5" />
                 <span className="text-xs text-muted-foreground">↳ subtask</span>
@@ -303,6 +313,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Due date</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Status</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Task Owner</th>
+              <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Collaborator</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Priority</th>
               <th className="py-2.5 px-3 w-10" />
             </tr>
@@ -390,7 +401,7 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
     <>
       {/* Section header */}
       <tr className="bg-muted/20 border-b">
-        <td colSpan={6} className="py-2 px-4">
+        <td colSpan={7} className="py-2 px-4">
           <div className="flex items-center gap-2">
             <button onClick={onToggle} className="text-muted-foreground hover:text-foreground">
               {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -423,7 +434,7 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
       {/* Inline add row */}
       {!isCollapsed && (
         <tr className="border-b hover:bg-muted/10 transition-colors">
-          <td colSpan={6} className="py-1.5 px-4">
+          <td colSpan={7} className="py-1.5 px-4">
             {isInlineAdd ? (
               <div className="flex items-center gap-2 pl-6">
                 <Plus className="w-3.5 h-3.5 text-muted-foreground" />
