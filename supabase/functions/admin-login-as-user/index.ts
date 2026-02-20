@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     }
 
     // Check permission via profile_object_permissions
+    // Checks for user management permissions (admin_user_mgmt OR admin_user_list)
     const { data: userProfile } = await supabaseAdmin
       .from('user_profiles')
       .select('profile_id')
@@ -56,8 +57,8 @@ Deno.serve(async (req) => {
         .from('profile_object_permissions')
         .select('can_read')
         .eq('profile_id', userProfile.profile_id)
-        .eq('object_name', 'admin_user_login_as')
         .eq('can_read', true)
+        .in('object_name', ['admin_user_login_as', 'admin_user_mgmt', 'admin_user_list', 'user_mgmt_list'])
         .limit(1)
       hasPermission = (perms && perms.length > 0) || false
     }
