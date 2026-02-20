@@ -59,10 +59,23 @@ export const NAV_ITEM_PERMISSION_PREFIX: Record<string, string> = {
   'user-management': 'user_mgmt_',
 };
 
+const FEATURE_FLAGS_CACHE_KEY = 'feature_flags_cache';
+
 interface FeatureFlag {
   feature_key: string;
   is_enabled: boolean;
 }
+
+const loadCachedFeatureFlags = (): FeatureFlag[] | undefined => {
+  try {
+    const raw = localStorage.getItem(FEATURE_FLAGS_CACHE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export const useFeatureFlags = () => {
   const { securityProfileName } = useAuth();
@@ -79,11 +92,24 @@ export const useFeatureFlags = () => {
         console.error('Error loading feature flags:', error);
         return [];
       }
-      return (data || []) as FeatureFlag[];
+
+      const result = (data || []) as FeatureFlag[];
+
+      // ✅ Persist feature flags to localStorage for offline use
+      try {
+        localStorage.setItem(FEATURE_FLAGS_CACHE_KEY, JSON.stringify(result));
+      } catch {
+        // fail silently
+      }
+
+      return result;
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    // ✅ Load from localStorage instantly so nav flags are available offline
+    placeholderData: () => loadCachedFeatureFlags(),
+    staleTime: 30 * 60 * 1000,   // 30 min — background refresh only
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const isLoading = flagsLoading || permissionsLoading;
@@ -122,7 +148,11 @@ export const useFeatureFlags = () => {
    * Check if a nav item should be visible based on:
    * 1. Global feature flag (must be enabled)
    * 2. User's profile permissions (must have can_read on at least one matching object)
-   * No special bypass for any profile name - permissions in DB are the only authority.
+   *
+   * Loading guard:
+   * - While loading with no cache → show all (never blank nav)
+   * - While loading with cache (placeholderData) → filter correctly from cache
+   * - After load with zero permissions → deny (profile assigned but nothing granted)
    */
   const isNavItemEnabled = useCallback((navItemId: string): boolean => {
     // Step 1: Check global feature flag
@@ -132,15 +162,19 @@ export const useFeatureFlags = () => {
     // Step 2: No profile assigned = show all (backward compat)
     if (!securityProfileName) return true;
 
-    // Step 3: Profile assigned but zero permissions = hide all
-    if (permissions.length === 0) return false;
+    // Step 3: ✅ FIXED — distinguish "loading" from "loaded and empty"
+    // If still loading AND no cached permissions yet → show items (never blank nav)
+    if (isLoading && permissions.length === 0) return true;
 
-    // Step 4: Check permission prefix
+    // Step 4: Loaded but confirmed zero permissions → deny all
+    if (!isLoading && permissions.length === 0) return false;
+
+    // Step 5: Check permission prefix
     const prefix = NAV_ITEM_PERMISSION_PREFIX[navItemId];
     if (!prefix) return true; // No mapping = always visible
 
     return hasPermissionForPrefix(prefix);
-  }, [isFeatureEnabled, securityProfileName, permissions.length, hasPermissionForPrefix]);
+  }, [isFeatureEnabled, securityProfileName, permissions.length, isLoading, hasPermissionForPrefix]);
 
   return {
     featureFlags,

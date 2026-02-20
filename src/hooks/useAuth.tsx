@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { setCachedUser, clearCachedAuth } from '@/utils/cachedAuthIntegrity';
+import { setCachedUser, clearCachedAuth, clearCachedPermissions } from '@/utils/cachedAuthIntegrity';
 import { devLog, devError } from '@/utils/devLog';
 import { Preferences } from '@capacitor/preferences';
 import { offlineStorage } from '@/lib/offlineStorage';
@@ -454,6 +454,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSecurityProfileName(null);
     
     // Clear all auth-related storage with integrity cleanup
+    // Also clear this user's permission cache to prevent cross-user data leakage
+    const currentUserId = user?.id;
+    if (currentUserId) {
+      clearCachedPermissions(currentUserId);
+    }
     clearCachedAuth();
     sessionStorage.clear();
     
