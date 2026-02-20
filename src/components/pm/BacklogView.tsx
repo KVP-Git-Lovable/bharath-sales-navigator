@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Task, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection, useTaskDependencies, useTaskAttachments } from "@/hooks/useProjects";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Task, Sprint, Milestone, Section, useUpdateTask, useDeleteTask, useCreateTask, useCreateSection, useDeleteSection, useTaskDependencies, useCreateTaskDependency, useDeleteTaskDependency, useTaskAttachments } from "@/hooks/useProjects";
 import { StatusBadge, PriorityBadge } from "./TaskStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Search, MoreVertical, Trash2, ChevronRight, ChevronDown, Paperclip, GitBranch, Calendar } from "lucide-react";
+import { Plus, Search, MoreVertical, Trash2, ChevronRight, ChevronDown, Paperclip, GitBranch, Calendar, ChevronsUpDown, ChevronsDownUp } from "lucide-react";
 import { format, isToday, isYesterday, startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth, isBefore, startOfDay } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -97,10 +98,172 @@ function InlineDueDatePicker({ task }: { task: Task }) {
   );
 }
 
-// ── Dependency indicator ──────────────────────────────
-function DependencyIndicator({ taskId, allTasks }: { taskId: string; allTasks: Task[] }) {
+// ── Inline Owner Picker ──────────────────────────────
+function InlineOwnerPicker({ task }: { task: Task }) {
+  const updateTask = useUpdateTask();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ id: string; full_name: string }[]>([]);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name").ilike("full_name", `%${query}%`).limit(6);
+      setResults(data || []);
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQuery(""); }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {task.assignee ? (
+          <>
+            <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-medium">
+              {task.assignee.full_name?.charAt(0) ?? "?"}
+            </div>
+            <span className="truncate max-w-[100px]">{task.assignee.full_name}</span>
+          </>
+        ) : "—"}
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-52 bg-popover border rounded-lg shadow-lg z-50 p-2">
+          <input
+            autoFocus
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search users..."
+            className="w-full text-xs bg-transparent border-b pb-1.5 mb-1 outline-none text-foreground placeholder:text-muted-foreground/50"
+          />
+          {results.map(u => (
+            <button
+              key={u.id}
+              onClick={() => { updateTask.mutate({ id: task.id, assignee_id: u.id }); setOpen(false); setQuery(""); }}
+              className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted transition-colors text-xs"
+            >
+              <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[10px] font-semibold">
+                {u.full_name?.charAt(0) ?? "?"}
+              </div>
+              {u.full_name}
+            </button>
+          ))}
+          {query && results.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1">No users found</p>}
+          {task.assignee && (
+            <button
+              onClick={() => { updateTask.mutate({ id: task.id, assignee_id: null }); setOpen(false); }}
+              className="w-full text-left text-xs text-destructive hover:underline px-2 pt-1"
+            >Clear owner</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Inline Hours Editor ──────────────────────────────
+function InlineHoursEditor({ task }: { task: Task }) {
+  const updateTask = useUpdateTask();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(task.estimated_hours?.toString() || "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const save = () => {
+    const num = value ? parseFloat(value) : null;
+    if (num !== task.estimated_hours) {
+      updateTask.mutate({ id: task.id, estimated_hours: num });
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        autoFocus
+        type="number"
+        step="0.5"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+        onClick={e => e.stopPropagation()}
+        className="w-12 text-xs text-center bg-transparent border border-input rounded px-1 py-0.5 outline-none"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); setValue(task.estimated_hours?.toString() || ""); setEditing(true); }}
+      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      {task.estimated_hours ? `${task.estimated_hours}h` : "—"}
+    </button>
+  );
+}
+
+// ── Inline Dependency Editor ──────────────────────────────
+function InlineDependencyEditor({ taskId, allTasks }: { taskId: string; allTasks: Task[] }) {
   const { data: deps = [] } = useTaskDependencies(taskId);
-  if (deps.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  const createDep = useCreateTaskDependency();
+  const deleteDep = useDeleteTaskDependency();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQuery(""); }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const depTaskIds = deps.map((d: any) => d.depends_on_task_id);
+  const filtered = allTasks.filter(t => t.id !== taskId && !depTaskIds.includes(t.id) && t.title.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
+
+  if (deps.length === 0 && !open) {
+    return (
+      <div ref={ref} onClick={e => e.stopPropagation()}>
+        <button onClick={() => setOpen(true)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">—</button>
+        {open && renderDropdown()}
+      </div>
+    );
+  }
+
+  function renderDropdown() {
+    return (
+      <div className="absolute top-full left-0 mt-1 w-56 bg-popover border rounded-lg shadow-lg z-50 p-2">
+        <input
+          autoFocus
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search tasks..."
+          className="w-full text-xs bg-transparent border-b pb-1.5 mb-1 outline-none text-foreground placeholder:text-muted-foreground/50"
+        />
+        {filtered.map(t => (
+          <button
+            key={t.id}
+            onClick={() => { createDep.mutate({ task_id: taskId, depends_on_task_id: t.id, dependency_type: "blocked_by" }); setQuery(""); }}
+            className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors truncate"
+          >{t.title}</button>
+        ))}
+        {query && filtered.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1">No tasks found</p>}
+      </div>
+    );
+  }
 
   const firstDep = deps[0] as any;
   const firstTask = allTasks.find(t => t.id === firstDep.depends_on_task_id);
@@ -108,11 +271,41 @@ function DependencyIndicator({ taskId, allTasks }: { taskId: string; allTasks: T
   const truncated = firstName.length > 14 ? firstName.slice(0, 14) + "…" : firstName;
 
   return (
-    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-      <GitBranch className="w-3 h-3 flex-shrink-0" />
-      <span className="truncate max-w-[100px]">{truncated}</span>
-      {deps.length > 1 && (
-        <span className="text-[10px] font-medium text-primary">+({deps.length - 1})</span>
+    <div className="relative" ref={ref} onClick={e => e.stopPropagation()}>
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <GitBranch className="w-3 h-3 flex-shrink-0" />
+        <span className="truncate max-w-[100px]">{truncated}</span>
+        {deps.length > 1 && <span className="text-[10px] font-medium text-primary">+({deps.length - 1})</span>}
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-56 bg-popover border rounded-lg shadow-lg z-50 p-2">
+          <div className="text-[10px] font-medium text-muted-foreground uppercase mb-1.5">Current</div>
+          {deps.map((d: any) => {
+            const t = allTasks.find(x => x.id === d.depends_on_task_id);
+            return (
+              <div key={d.id} className="flex items-center justify-between text-xs px-2 py-1 rounded hover:bg-muted/50">
+                <span className="truncate">{t?.title || "Unknown"}</span>
+                <button onClick={() => deleteDep.mutate({ id: d.id, taskId })} className="text-destructive hover:underline text-[10px]">×</button>
+              </div>
+            );
+          })}
+          <div className="border-t mt-1.5 pt-1.5">
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Add dependency..."
+              className="w-full text-xs bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50"
+            />
+            {filtered.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { createDep.mutate({ task_id: taskId, depends_on_task_id: t.id, dependency_type: "blocked_by" }); setQuery(""); }}
+                className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors truncate"
+              >{t.title}</button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -253,24 +446,17 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
               ))}
             </select>
           </td>
-          {/* Owner */}
-          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
-            {task.assignee ? (
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-medium">
-                  {task.assignee.full_name?.charAt(0) ?? "?"}
-                </div>
-                <span className="truncate max-w-[100px]">{task.assignee.full_name}</span>
-              </div>
-            ) : "—"}
-          </td>
-          {/* Est. Hours */}
-          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap text-center">
-            {task.estimated_hours ? `${task.estimated_hours}h` : "—"}
-          </td>
-          {/* Dependencies */}
+          {/* Owner - inline editable */}
           <td className="py-2 px-3 whitespace-nowrap">
-            <DependencyIndicator taskId={task.id} allTasks={tasks} />
+            <InlineOwnerPicker task={task} />
+          </td>
+          {/* Est. Hours - inline editable */}
+          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap text-center">
+            <InlineHoursEditor task={task} />
+          </td>
+          {/* Dependencies - inline editable */}
+          <td className="py-2 px-3 whitespace-nowrap">
+            <InlineDependencyEditor taskId={task.id} allTasks={tasks} />
           </td>
           {/* Priority */}
           <td className="py-2 px-3"><PriorityBadge priority={task.priority} /></td>
@@ -360,6 +546,28 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
             <SelectItem value="this_month">This Month</SelectItem>
           </SelectContent>
         </Select>
+        {/* Collapse/Expand all subtasks */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5"
+            onClick={() => {
+              const parentIds = tasks.filter(t => tasks.some(s => s.parent_task_id === t.id)).map(t => t.id);
+              setExpandedTasks(new Set(parentIds));
+            }}
+          >
+            <ChevronsUpDown className="w-3.5 h-3.5" /> Expand all
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5"
+            onClick={() => setExpandedTasks(new Set())}
+          >
+            <ChevronsDownUp className="w-3.5 h-3.5" /> Collapse all
+          </Button>
+        </div>
       </div>
 
       {/* Section-based list */}
