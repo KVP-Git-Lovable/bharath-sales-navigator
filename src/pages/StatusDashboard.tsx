@@ -59,6 +59,16 @@ const StatusDashboard = () => {
   const [metrics, setMetrics] = useState<MetricCard[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [isOnline, setIsOnline] = useState(true);
+  const [memoryPercent, setMemoryPercent] = useState<number | null>(null);
+
+  const fetchMemoryUsage = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_estimated_memory_usage');
+      if (!error && data !== null) {
+        setMemoryPercent(typeof data === 'object' ? (data as any).estimated_memory_usage_percent : data);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const fetchMetrics = useCallback(async () => {
     setIsRefreshing(true);
@@ -86,13 +96,6 @@ const StatusDashboard = () => {
           health: uptimeSec > 86400 ? 'good' : uptimeSec > 3600 ? 'average' : 'bad',
         },
         {
-          label: 'Status',
-          value: 'Online',
-          icon: <Activity className="h-6 w-6" />,
-          description: `${m.active_connections} active connections`,
-          health: 'good',
-        },
-        {
           label: 'Disk Reads',
           value: formatNumber(m.blks_read),
           icon: <HardDrive className="h-6 w-6" />,
@@ -108,6 +111,7 @@ const StatusDashboard = () => {
         },
       ]);
       setLastRefreshed(new Date());
+      await fetchMemoryUsage();
     } catch (error: any) {
       console.error('Error fetching metrics:', error);
       setIsOnline(false);
@@ -115,7 +119,7 @@ const StatusDashboard = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [fetchMemoryUsage]);
 
   // Auto-refresh every 15 minutes
   useEffect(() => {
@@ -229,12 +233,12 @@ const StatusDashboard = () => {
     <div className="min-h-screen relative" style={{ background: '#1976d2' }}>
       <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 2px, transparent 2px), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 1px, transparent 1px)`, backgroundSize: '50px 50px, 25px 25px' }} />
       <div className="relative z-10">
-        {/* Healthy banner */}
+        {/* Healthy + Online banner */}
         {isOnline && metrics.length > 0 && (
           <div className="flex justify-center pt-4">
-            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-green-500/20 text-green-100 text-sm font-medium border border-green-400/30">
-              <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-              Healthy
+            <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-green-500/20 text-green-100 text-base md:text-lg font-semibold border border-green-400/30">
+              <span className="h-2.5 w-2.5 rounded-full bg-green-400 animate-pulse" />
+              Healthy · Online
             </span>
           </div>
         )}
@@ -245,7 +249,7 @@ const StatusDashboard = () => {
             <img src={quickappLogo} alt="QuickApp.AI" className="h-10 w-10 rounded-lg shadow" />
             <div>
               <h1 className="text-lg md:text-xl font-bold text-white">QuickApp<span className="text-amber-400">.ai</span> Status Dashboard</h1>
-              <p className="text-xs text-white/60">
+              <p className="text-sm md:text-base text-white/60">
                 AWS ap-south-1 (Mumbai) | PostgreSQL
                 {lastRefreshed && ` · Refreshed: ${lastRefreshed.toLocaleTimeString()}`}
               </p>
@@ -270,13 +274,25 @@ const StatusDashboard = () => {
               <Card key={idx} className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">{metric.icon}</div>
-                  <p className={`text-2xl md:text-3xl font-bold text-foreground`}>{metric.value}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">{metric.value}</p>
                   <p className="text-sm font-medium text-foreground">{metric.label}</p>
                   {metric.description && <p className="text-xs text-muted-foreground">{metric.description}</p>}
                   <span className={`h-2.5 w-2.5 rounded-full ${HEALTH_DOT[metric.health]}`} title={metric.health} />
                 </CardContent>
               </Card>
             ))}
+            {/* Memory card */}
+            {memoryPercent !== null && (
+              <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
+                <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+                  <div className="p-2 rounded-full bg-primary/10 text-primary"><Activity className="h-6 w-6" /></div>
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">{Number(memoryPercent).toFixed(1)}%</p>
+                  <p className="text-sm font-medium text-foreground">Memory</p>
+                  <p className="text-xs text-muted-foreground">Estimated memory usage</p>
+                  <span className={`h-2.5 w-2.5 rounded-full ${memoryPercent < 60 ? HEALTH_DOT.good : memoryPercent < 85 ? HEALTH_DOT.average : HEALTH_DOT.bad}`} />
+                </CardContent>
+              </Card>
+            )}
           </div>
           <p className="text-xs text-white/40 text-center mt-6">Auto-refreshes every 15 minutes</p>
 
