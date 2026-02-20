@@ -1,16 +1,19 @@
 import { useState } from "react";
-import { Sprint, Task } from "@/hooks/useProjects";
-import { useCreateSprint } from "@/hooks/useProjects";
+import { Sprint, Task, useCreateSprint, useUpdateSprint, useDeleteSprint } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Layers, Plus, Play, CheckCircle2, Clock } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { Layers, Plus, Clock, MoreVertical, Pencil, Trash2, Sparkles, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 interface Props { projectId: string; sprints: Sprint[]; tasks: Task[]; }
 
@@ -23,10 +26,23 @@ const sprintStatusColor: Record<string, string> = {
 
 export function SprintsPanel({ projectId, sprints, tasks }: Props) {
   const createSprint = useCreateSprint();
+  const updateSprint = useUpdateSprint();
+  const deleteSprint = useDeleteSprint();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", goal: "", start_date: "", end_date: "" });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Edit state
+  const [editSprint, setEditSprint] = useState<Sprint | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", goal: "", start_date: "", end_date: "" });
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+
+  // AI summary state
+  const [summaryLoading, setSummaryLoading] = useState<string | null>(null);
+  const [summaries, setSummaries] = useState<Record<string, string>>({});
+
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     await createSprint.mutateAsync({
       project_id: projectId,
@@ -40,13 +56,55 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
     setShowCreate(false);
   };
 
-  // Auto-map tasks to sprints by due_date falling within sprint date range
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editSprint) return;
+    await updateSprint.mutateAsync({
+      id: editSprint.id,
+      projectId,
+      name: editForm.name,
+      goal: editForm.goal || undefined,
+      start_date: editForm.start_date || undefined,
+      end_date: editForm.end_date || undefined,
+    });
+    setEditSprint(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteSprint.mutateAsync({ id: deleteTarget.id, projectId });
+    setDeleteTarget(null);
+  };
+
+  const handleSummary = async (sprint: Sprint) => {
+    setSummaryLoading(sprint.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("sprint-summary", {
+        body: { sprintId: sprint.id, projectId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setSummaries(prev => ({ ...prev, [sprint.id]: data.summary }));
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate summary");
+    } finally {
+      setSummaryLoading(null);
+    }
+  };
+
+  const openEdit = (sprint: Sprint) => {
+    setEditForm({
+      name: sprint.name,
+      goal: sprint.goal || "",
+      start_date: sprint.start_date || "",
+      end_date: sprint.end_date || "",
+    });
+    setEditSprint(sprint);
+  };
+
   const getSprintTasks = (sprint: Sprint) => {
     if (!sprint.start_date || !sprint.end_date) return [];
-    return tasks.filter(t => {
-      if (!t.due_date) return false;
-      return t.due_date >= sprint.start_date! && t.due_date <= sprint.end_date!;
-    });
+    return tasks.filter(t => t.due_date && t.due_date >= sprint.start_date! && t.due_date <= sprint.end_date!);
   };
 
   return (
@@ -83,7 +141,7 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
                       {sprint.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     {sprint.start_date && sprint.end_date && (
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
@@ -91,6 +149,21 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
                       </span>
                     )}
                     {totalPoints > 0 && <span>{donePoints}/{totalPoints} pts</span>}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(sprint)}>
+                          <Pencil className="w-3.5 h-3.5 mr-2" /> Edit Sprint
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget({ id: sprint.id, name: sprint.name })}>
+                          <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete Sprint
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
                 {sprint.goal && <p className="text-sm text-muted-foreground px-4 py-2 border-b italic">Goal: {sprint.goal}</p>}
@@ -113,6 +186,29 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
                       {sprintTasks.length > 5 && <span className="text-xs text-muted-foreground">+{sprintTasks.length - 5} more</span>}
                     </div>
                   )}
+
+                  {/* AI Summary */}
+                  <div className="mt-3 pt-3 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={summaryLoading === sprint.id}
+                      onClick={() => handleSummary(sprint)}
+                    >
+                      {summaryLoading === sprint.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      {summaries[sprint.id] ? "Regenerate Summary" : "AI Summary"}
+                    </Button>
+                    {summaries[sprint.id] && (
+                      <div className="mt-3 p-3 rounded-lg bg-muted/50 text-sm prose prose-sm max-w-none">
+                        <ReactMarkdown>{summaries[sprint.id]}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -120,10 +216,11 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
         </div>
       )}
 
+      {/* Create Sprint Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>New Sprint</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleCreate} className="space-y-4">
             <div><Label>Sprint Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="e.g. Sprint 1" /></div>
             <div><Label>Sprint Goal</Label><Textarea value={form.goal} onChange={e => setForm(f => ({ ...f, goal: e.target.value }))} rows={2} placeholder="What will we achieve this sprint?" /></div>
             <div className="grid grid-cols-2 gap-3">
@@ -137,6 +234,35 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Sprint Dialog */}
+      <Dialog open={!!editSprint} onOpenChange={(open) => !open && setEditSprint(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit Sprint</DialogTitle></DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div><Label>Sprint Name *</Label><Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} required /></div>
+            <div><Label>Sprint Goal</Label><Textarea value={editForm.goal} onChange={e => setEditForm(f => ({ ...f, goal: e.target.value }))} rows={2} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Start Date</Label><Input type="date" value={editForm.start_date} onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} /></div>
+              <div><Label>End Date</Label><Input type="date" value={editForm.end_date} onChange={e => setEditForm(f => ({ ...f, end_date: e.target.value }))} /></div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setEditSprint(null)}>Cancel</Button>
+              <Button type="submit" disabled={updateSprint.isPending}>Save Changes</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm */}
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete Sprint"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone.`}
+        isLoading={deleteSprint.isPending}
+      />
     </div>
   );
 }

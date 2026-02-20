@@ -102,9 +102,11 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
-            <Button onClick={() => setShowCreateTask(true)} size="sm" className="gap-2 flex-shrink-0">
-              <Plus className="w-4 h-4" /> Add Task
-            </Button>
+            {tab !== "sprints" && (
+              <Button onClick={() => setShowCreateTask(true)} size="sm" className="gap-2 flex-shrink-0">
+                <Plus className="w-4 h-4" /> Add Task
+              </Button>
+            )}
           </div>
 
           {/* Mini stats */}
