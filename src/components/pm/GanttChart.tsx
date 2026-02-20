@@ -1,16 +1,27 @@
-import { Task, Project, Milestone } from "@/hooks/useProjects";
-import { useMemo } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
+import { Task, Project, Milestone, useUpdateTask } from "@/hooks/useProjects";
 import { format, differenceInDays, parseISO, addDays } from "date-fns";
 import { Flag } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   tasks: Task[];
   project: Project;
   milestones: Milestone[];
+  onTaskClick?: (task: Task) => void;
 }
 
-export function GanttChart({ tasks, project, milestones }: Props) {
+export function GanttChart({ tasks, project, milestones, onTaskClick }: Props) {
+  const updateTask = useUpdateTask();
   const tasksWithDates = tasks.filter(t => t.start_date && t.due_date);
+  const [hoveredTask, setHoveredTask] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<{
+    taskId: string;
+    type: "move" | "resize-left" | "resize-right";
+    startX: number;
+    origStart: string;
+    origEnd: string;
+  } | null>(null);
 
   const { startDate, endDate, days } = useMemo(() => {
     const allDates: Date[] = [];
@@ -27,8 +38,8 @@ export function GanttChart({ tasks, project, milestones }: Props) {
       const end = addDays(start, 30);
       return { startDate: start, endDate: end, days: 30 };
     }
-    const start = new Date(Math.min(...allDates.map(d => d.getTime())));
-    const end = new Date(Math.max(...allDates.map(d => d.getTime())));
+    const start = addDays(new Date(Math.min(...allDates.map(d => d.getTime()))), -2);
+    const end = addDays(new Date(Math.max(...allDates.map(d => d.getTime()))), 2);
     const totalDays = Math.max(differenceInDays(end, start) + 1, 30);
     return { startDate: start, endDate: end, days: totalDays };
   }, [project, tasksWithDates, milestones]);
@@ -59,6 +70,72 @@ export function GanttChart({ tasks, project, milestones }: Props) {
     low: "border-l-4 border-l-green-500",
   };
 
+  // Drag handlers for moving/resizing bars
+  const handleBarMouseDown = useCallback((e: React.MouseEvent, task: Task, type: "move" | "resize-left" | "resize-right") => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragState({
+      taskId: task.id,
+      type,
+      startX: e.clientX,
+      origStart: task.start_date!,
+      origEnd: task.due_date!,
+    });
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - e.clientX;
+      const deltaDays = Math.round(deltaX / DAY_WIDTH);
+      if (deltaDays === 0) return;
+
+      const origS = parseISO(task.start_date!);
+      const origE = parseISO(task.due_date!);
+
+      let newStart: Date, newEnd: Date;
+      if (type === "move") {
+        newStart = addDays(origS, deltaDays);
+        newEnd = addDays(origE, deltaDays);
+      } else if (type === "resize-left") {
+        newStart = addDays(origS, deltaDays);
+        newEnd = origE;
+        if (newStart >= newEnd) return;
+      } else {
+        newStart = origS;
+        newEnd = addDays(origE, deltaDays);
+        if (newEnd <= newStart) return;
+      }
+
+      // Update visually via dataset for performance, commit on mouseup
+      const bar = document.querySelector(`[data-gantt-bar="${task.id}"]`) as HTMLElement;
+      if (bar) {
+        const { left, width } = getBar(format(newStart, "yyyy-MM-dd"), format(newEnd, "yyyy-MM-dd"));
+        bar.style.left = `${left}px`;
+        bar.style.width = `${Math.max(width, 20)}px`;
+        bar.dataset.newStart = format(newStart, "yyyy-MM-dd");
+        bar.dataset.newEnd = format(newEnd, "yyyy-MM-dd");
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setDragState(null);
+
+      const bar = document.querySelector(`[data-gantt-bar="${task.id}"]`) as HTMLElement;
+      if (bar?.dataset.newStart && bar?.dataset.newEnd) {
+        const newStart = bar.dataset.newStart;
+        const newEnd = bar.dataset.newEnd;
+        if (newStart !== task.start_date || newEnd !== task.due_date) {
+          updateTask.mutate({ id: task.id, start_date: newStart, due_date: newEnd });
+        }
+        delete bar.dataset.newStart;
+        delete bar.dataset.newEnd;
+      }
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [DAY_WIDTH, updateTask]);
+
   if (tasksWithDates.length === 0) {
     return (
       <div className="text-center py-16">
@@ -80,10 +157,16 @@ export function GanttChart({ tasks, project, milestones }: Props) {
           {tasksWithDates.map(task => (
             <div
               key={task.id}
-              className="border-b border-r flex items-center px-4 text-sm text-foreground"
+              className={cn(
+                "border-b border-r flex items-center px-4 text-sm cursor-pointer transition-colors",
+                hoveredTask === task.id ? "bg-primary/5" : "hover:bg-muted/30"
+              )}
               style={{ height: ROW_H }}
+              onMouseEnter={() => setHoveredTask(task.id)}
+              onMouseLeave={() => setHoveredTask(null)}
+              onClick={() => onTaskClick?.(task)}
             >
-              <span className="truncate font-medium text-xs">{task.title}</span>
+              <span className="truncate font-medium text-xs text-foreground">{task.title}</span>
             </div>
           ))}
           {milestones.filter(m => m.due_date).map(m => (
@@ -114,11 +197,14 @@ export function GanttChart({ tasks, project, milestones }: Props) {
           {/* Task bars */}
           {tasksWithDates.map(task => {
             const { left, width } = getBar(task.start_date!, task.due_date!);
+            const isHovered = hoveredTask === task.id;
             return (
               <div
                 key={task.id}
-                className="border-b relative"
+                className={cn("border-b relative", isHovered && "bg-primary/5")}
                 style={{ height: ROW_H, minWidth: days * DAY_WIDTH }}
+                onMouseEnter={() => setHoveredTask(task.id)}
+                onMouseLeave={() => setHoveredTask(null)}
               >
                 {/* Grid lines */}
                 {dayArray.map((_, i) => (
@@ -126,12 +212,43 @@ export function GanttChart({ tasks, project, milestones }: Props) {
                 ))}
                 {/* Bar */}
                 <div
-                  className={`absolute top-2 bottom-2 rounded flex items-center px-2 text-white text-xs font-medium ${statusColors[task.status]} ${priorityBorder[task.priority]}`}
+                  data-gantt-bar={task.id}
+                  className={cn(
+                    "absolute top-2 bottom-2 rounded flex items-center px-2 text-white text-xs font-medium cursor-pointer transition-shadow",
+                    statusColors[task.status],
+                    priorityBorder[task.priority],
+                    isHovered && "shadow-lg ring-2 ring-primary/50"
+                  )}
                   style={{ left, width: Math.max(width, 20) }}
-                  title={`${task.title}: ${task.start_date} → ${task.due_date}`}
+                  title={`${task.title}\n${task.start_date} → ${task.due_date}\nDrag to move, drag edges to resize`}
+                  onClick={() => onTaskClick?.(task)}
+                  onMouseDown={e => handleBarMouseDown(e, task, "move")}
                 >
-                  <span className="truncate">{task.title}</span>
+                  {/* Left resize handle */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-black/20 rounded-l"
+                    onMouseDown={e => handleBarMouseDown(e, task, "resize-left")}
+                  />
+                  <span className="truncate select-none">{task.title}</span>
+                  {/* Right resize handle */}
+                  <div
+                    className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-black/20 rounded-r"
+                    onMouseDown={e => handleBarMouseDown(e, task, "resize-right")}
+                  />
                 </div>
+
+                {/* Hover tooltip */}
+                {isHovered && (
+                  <div className="absolute z-20 bg-popover text-popover-foreground border rounded-lg shadow-lg p-3 text-xs pointer-events-none"
+                    style={{ left: left + width + 8, top: 0 }}
+                  >
+                    <p className="font-semibold mb-1">{task.title}</p>
+                    <p className="text-muted-foreground">{task.start_date} → {task.due_date}</p>
+                    <p className="text-muted-foreground capitalize">Status: {task.status.replace(/_/g, " ")}</p>
+                    <p className="text-muted-foreground capitalize">Priority: {task.priority}</p>
+                    {task.assignee && <p className="text-muted-foreground">Assignee: {task.assignee.full_name}</p>}
+                  </div>
+                )}
               </div>
             );
           })}
