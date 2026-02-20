@@ -14494,6 +14494,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_estimated_memory_usage: { Args: never; Returns: Json }
       get_limited_profiles_for_admin: {
         Args: never
         Returns: {
