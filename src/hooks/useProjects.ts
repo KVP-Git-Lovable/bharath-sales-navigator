@@ -621,3 +621,73 @@ export function useDeleteTaskDependency() {
     onError: (e: any) => toast.error(e.message),
   });
 }
+
+// ─── TASK COLLABORATORS ───────────────────────────────────────────────────────
+
+export interface TaskCollaborator {
+  id: string;
+  task_id: string;
+  user_id: string;
+  created_at: string;
+  user?: { full_name: string; profile_picture_url?: string };
+}
+
+export function useTaskCollaborators(taskId: string) {
+  return useQuery({
+    queryKey: ['pm_task_collaborators', taskId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pm_task_collaborators')
+        .select('*, user:profiles!pm_task_collaborators_user_id_fkey(full_name, profile_picture_url)')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data as TaskCollaborator[];
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useAddTaskCollaborator() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, userId }: { taskId: string; userId: string }) => {
+      const { data, error } = await supabase
+        .from('pm_task_collaborators')
+        .insert({ task_id: taskId, user_id: userId })
+        .select('*, user:profiles!pm_task_collaborators_user_id_fkey(full_name, profile_picture_url)')
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_task_collaborators', data.task_id] });
+    },
+    onError: (e: any) => {
+      if (e.message?.includes('duplicate')) {
+        toast.info('User is already a collaborator');
+      } else {
+        toast.error(e.message);
+      }
+    },
+  });
+}
+
+export function useRemoveTaskCollaborator() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, userId }: { taskId: string; userId: string }) => {
+      const { error } = await supabase
+        .from('pm_task_collaborators')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', userId);
+      if (error) throw error;
+      return taskId;
+    },
+    onSuccess: (taskId) => {
+      queryClient.invalidateQueries({ queryKey: ['pm_task_collaborators', taskId] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
