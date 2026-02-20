@@ -59,6 +59,33 @@ export const NAV_ITEM_PERMISSION_PREFIX: Record<string, string> = {
   'user-management': 'user_mgmt_',
 };
 
+/**
+ * Maps navigation item IDs to their hierarchical module base name.
+ * Used to check permissions like module_<name>, field_<name>_*, action_<name>_*, widget_<name>_*
+ */
+export const NAV_ITEM_MODULE_NAME: Record<string, string> = {
+  'attendance': 'attendance',
+  'my-visit': 'visit',
+  'all-retailers': 'retailer',
+  'my-target': 'target',
+  'performance': 'performance',
+  'analytics': 'analytics',
+  'institutional-sales': 'institutional',
+  'distributor-master': 'distributor',
+  'primary-orders': 'primary_order',
+  'territories': 'territory',
+  'gps-track': 'gps_track',
+  'my-beats': 'beat',
+  'competition-master': 'competition',
+  'schemes': 'scheme',
+  'expenses': 'expense',
+  'leaderboard': 'gamification',
+  'packing-list': 'packing_list',
+  'my-deliveries': 'delivery',
+  'my-competency': 'competency',
+  'recycle-bin': 'recycle',
+};
+
 const FEATURE_FLAGS_CACHE_KEY = 'feature_flags_cache';
 
 interface FeatureFlag {
@@ -135,11 +162,29 @@ export const useFeatureFlags = () => {
   }, [flagMap]);
 
   /**
-   * Check if user has can_read permission on any object matching the given prefix.
+   * Check if user has can_read permission on any object matching the given prefix (legacy).
    */
   const hasPermissionForPrefix = useCallback((prefix: string): boolean => {
     for (const objName of userPermissionPrefixes) {
       if (objName.startsWith(prefix)) return true;
+    }
+    return false;
+  }, [userPermissionPrefixes]);
+
+  /**
+   * Check if user has can_read permission via the new hierarchical naming convention.
+   * Matches: module_<name>, field_<name>_*, action_<name>_*, widget_<name>_*
+   */
+  const hasHierarchicalPermission = useCallback((moduleName: string): boolean => {
+    for (const objName of userPermissionPrefixes) {
+      if (
+        objName === `module_${moduleName}` ||
+        objName.startsWith(`field_${moduleName}_`) ||
+        objName.startsWith(`action_${moduleName}_`) ||
+        objName.startsWith(`widget_${moduleName}_`)
+      ) {
+        return true;
+      }
     }
     return false;
   }, [userPermissionPrefixes]);
@@ -169,12 +214,19 @@ export const useFeatureFlags = () => {
     // Step 4: Loaded but confirmed zero permissions → deny all
     if (!isLoading && permissions.length === 0) return false;
 
-    // Step 5: Check permission prefix
+    // Step 5a: Check legacy permission prefix (e.g., attendance_list, visit_retailer)
     const prefix = NAV_ITEM_PERMISSION_PREFIX[navItemId];
-    if (!prefix) return true; // No mapping = always visible
+    if (prefix && hasPermissionForPrefix(prefix)) return true;
 
-    return hasPermissionForPrefix(prefix);
-  }, [isFeatureEnabled, securityProfileName, permissions.length, isLoading, hasPermissionForPrefix]);
+    // Step 5b: Check new hierarchical permission names (e.g., module_attendance, field_attendance_*)
+    const moduleName = NAV_ITEM_MODULE_NAME[navItemId];
+    if (moduleName && hasHierarchicalPermission(moduleName)) return true;
+
+    // Step 5c: No mapping at all = always visible
+    if (!prefix && !moduleName) return true;
+
+    return false;
+  }, [isFeatureEnabled, securityProfileName, permissions.length, isLoading, hasPermissionForPrefix, hasHierarchicalPermission]);
 
   return {
     featureFlags,
@@ -182,6 +234,7 @@ export const useFeatureFlags = () => {
     isFeatureEnabled,
     isNavItemEnabled,
     hasPermissionForPrefix,
+    hasHierarchicalPermission,
     permissions,
   };
 };
