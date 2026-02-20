@@ -2,8 +2,9 @@ import { useState, useRef } from "react";
 import { useTaskAttachments, useCreateTaskAttachment, useDeleteTaskAttachment } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Paperclip, Trash2, Download, Plus, X } from "lucide-react";
+import { Paperclip, Trash2, Download, Plus, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Props {
   taskId: string;
@@ -30,10 +31,15 @@ export function TaskAttachments({ taskId }: Props) {
     if (!pendingFile) return;
     setUploading(true);
     try {
-      const filePath = `${taskId}/${Date.now()}_${pendingFile.name}`;
+      // Sanitize filename to remove special characters that may cause storage issues
+      const safeName = pendingFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${taskId}/${Date.now()}_${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("pm-attachments")
-        .upload(filePath, pendingFile);
+        .upload(filePath, pendingFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
       if (uploadError) throw uploadError;
 
       await createAttachment.mutateAsync({
@@ -46,8 +52,10 @@ export function TaskAttachments({ taskId }: Props) {
       });
       setPendingFile(null);
       setNote("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
       console.error("Upload failed:", err);
+      toast.error(err.message || "Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -113,7 +121,8 @@ export function TaskAttachments({ taskId }: Props) {
             placeholder="Add a note about this file..."
             className="h-8 text-sm"
           />
-          <Button size="sm" onClick={handleUpload} disabled={uploading} className="w-full">
+          <Button size="sm" onClick={handleUpload} disabled={uploading} className="w-full gap-2">
+            {uploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {uploading ? "Uploading..." : "Upload"}
           </Button>
         </div>
