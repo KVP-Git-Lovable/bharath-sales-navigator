@@ -288,12 +288,21 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
       .filter((a: any) => !['leave', 'half_day_leave'].includes(a.status))
       .map((a: any) => a.user_id)
   );
-  const onLeaveUserIds = new Set(todayLeaves.map((l: any) => l.user_id));
+
+  // Unified on-leave detection: attendance rows with leave status OR approved leave applications
+  const onLeaveUserIds = new Set<string>([
+    ...todayAttendance
+      .filter((a: any) => ['leave', 'half_day_leave'].includes(a.status))
+      .map((a: any) => a.user_id as string),
+    ...todayLeaves
+      .map((l: any) => l.user_id as string)
+      .filter((id: string) => !presentUserIds.has(id)),
+  ]);
 
   // Summary counts
   const presentCount = presentUserIds.size;
-  const onLeaveCount = [...onLeaveUserIds].filter(id => !presentUserIds.has(id)).length;
-  const absentCount = subordinateIds.length - presentCount - onLeaveCount;
+  const onLeaveCount = onLeaveUserIds.size;
+  const absentCount = Math.max(0, subordinateIds.length - presentCount - onLeaveCount);
 
   // Working days in month
   const { totalWorkingDays: totalWorkingDaysInMonth } = useWorkingDaysConfig(dateFilter);
@@ -439,9 +448,10 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
         if (error) throw error;
         toast({ title: `Leave ${newStatus} successfully` });
       }
-      queryClient.invalidateQueries({ queryKey: ['team-pending-leaves'] });
-      queryClient.invalidateQueries({ queryKey: ['team-today-leaves'] });
-      queryClient.invalidateQueries({ queryKey: ['team-today-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['team-pending-leaves'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-today-leaves'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-today-attendance'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['my-pending-steps'], exact: false });
     } catch (error) {
       console.error('Error updating leave:', error);
       toast({ title: 'Failed to update leave', variant: 'destructive' });
@@ -550,9 +560,11 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
         toast({ title: `Regularization ${newStatus} successfully` });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['team-pending-regularizations'] });
-      queryClient.invalidateQueries({ queryKey: ['team-today-attendance'] });
-      queryClient.invalidateQueries({ queryKey: ['team-monthly-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['team-pending-regularizations'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-pending-leaves'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-today-attendance'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-monthly-counts'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['my-pending-steps'], exact: false });
     } catch (error) {
       console.error('Error updating regularization:', error);
       toast({ title: 'Failed to update regularization', variant: 'destructive' });
