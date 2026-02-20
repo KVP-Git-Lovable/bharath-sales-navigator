@@ -79,9 +79,57 @@ export const getValidatedCachedUser = (): object | null => {
  * Clear all cached authentication data.
  */
 export const clearCachedAuth = (): void => {
+  // Clear user auth keys
   localStorage.removeItem('cached_user');
   localStorage.removeItem('cached_user_id');
   localStorage.removeItem('cached_role');
   localStorage.removeItem('cached_profile');
   localStorage.removeItem(CACHE_SIGNATURE_KEY);
+  
+  // Clear any permissions_ prefixed keys
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('permissions_')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+  
+  // Clear feature flags cache
+  localStorage.removeItem('feature_flags_cache');
+};
+
+/**
+ * Save permissions for a user to localStorage.
+ */
+export const setCachedPermissions = (userId: string, permissions: object[]): void => {
+  try {
+    localStorage.setItem(`permissions_${userId}`, JSON.stringify(permissions));
+  } catch {
+    // Storage quota exceeded or unavailable — fail silently
+  }
+};
+
+/**
+ * Retrieve cached permissions for a user from localStorage.
+ * Returns null if not found or invalid.
+ */
+export const getCachedPermissions = (userId: string): object[] | null => {
+  try {
+    const raw = localStorage.getItem(`permissions_${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Clear cached permissions for a specific user.
+ */
+export const clearCachedPermissions = (userId: string): void => {
+  localStorage.removeItem(`permissions_${userId}`);
 };

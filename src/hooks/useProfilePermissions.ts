@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCallback } from 'react';
+import { setCachedPermissions, getCachedPermissions } from '@/utils/cachedAuthIntegrity';
 
 interface ProfilePermission {
   object_name: string;
@@ -84,7 +85,7 @@ Object.entries(ADMIN_MODULE_PERMISSION_MAP).forEach(([feature, path]) => {
 export const useProfilePermissions = () => {
   const { user } = useAuth();
 
-  const { data: permissions = [], isLoading } = useQuery({
+  const { data: permissions = [], isLoading, isPlaceholderData } = useQuery({
     queryKey: ['profile-permissions', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -105,11 +106,24 @@ export const useProfilePermissions = () => {
 
       if (permsError) return [];
 
-      // profile_object_permissions is the ONLY source of truth
-      return (perms || []) as ProfilePermission[];
+      const result = (perms || []) as ProfilePermission[];
+
+      // ✅ Persist to localStorage after every successful fetch
+      setCachedPermissions(user.id, result);
+
+      return result;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // cache 5 min
+    // ✅ Load from localStorage instantly — no blank nav on startup
+    placeholderData: () => {
+      if (!user?.id) return undefined;
+      const cached = getCachedPermissions(user.id);
+      return cached ? (cached as ProfilePermission[]) : undefined;
+    },
+    staleTime: 30 * 60 * 1000,    // 30 min — background refresh only
+    gcTime: 60 * 60 * 1000,       // keep in memory for 1 hour
+    refetchOnWindowFocus: false,   // don't re-fetch on tab switch
+    refetchOnMount: false,         // cached data is sufficient on mount
   });
 
   const hasAnyAdminPermission = permissions.some(
@@ -150,6 +164,7 @@ export const useProfilePermissions = () => {
   return {
     permissions,
     isLoading,
+    isPlaceholderData, // useful for debugging: true = showing cached data
     hasAnyAdminPermission,
     hasPermission,
     hasModuleAccess,
