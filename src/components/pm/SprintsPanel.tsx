@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { Layers, Plus, Clock, MoreVertical, Pencil, Trash2, Sparkles, Loader2 } from "lucide-react";
+import { Layers, Plus, Clock, MoreVertical, Pencil, Trash2, Sparkles, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -189,24 +190,37 @@ export function SprintsPanel({ projectId, sprints, tasks }: Props) {
 
                   {/* AI Summary */}
                   <div className="mt-3 pt-3 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={summaryLoading === sprint.id}
-                      onClick={() => handleSummary(sprint)}
-                    >
-                      {summaryLoading === sprint.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-3.5 h-3.5 text-primary" />
-                      )}
-                      {summaries[sprint.id] ? "Regenerate Summary" : "AI Summary"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn("gap-1.5", summaries[sprint.id] && "border-green-500 bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50")}
+                        disabled={summaryLoading === sprint.id}
+                        onClick={() => handleSummary(sprint)}
+                      >
+                        {summaryLoading === sprint.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className={cn("w-3.5 h-3.5", summaries[sprint.id] ? "text-green-600" : "text-primary")} />
+                        )}
+                        {summaries[sprint.id] ? "Regenerate Summary" : "AI Summary"}
+                      </Button>
+                    </div>
                     {summaries[sprint.id] && (
-                      <div className="mt-3 p-3 rounded-lg bg-muted/50 text-sm prose prose-sm max-w-none">
-                        <ReactMarkdown>{summaries[sprint.id]}</ReactMarkdown>
-                      </div>
+                      <Collapsible defaultOpen className="mt-2">
+                        <CollapsibleTrigger asChild>
+                          <button className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400 hover:underline group">
+                            <ChevronDown className="w-3.5 h-3.5 group-data-[state=closed]:hidden" />
+                            <ChevronRight className="w-3.5 h-3.5 group-data-[state=open]:hidden" />
+                            AI Summary
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="mt-2 p-3 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 text-sm prose prose-sm max-w-none">
+                            <ReactMarkdown>{summaries[sprint.id]}</ReactMarkdown>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     )}
                   </div>
                 </div>

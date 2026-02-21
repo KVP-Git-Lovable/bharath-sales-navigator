@@ -147,11 +147,10 @@ export default function ProjectDetailPage() {
                   { value: "board", label: "Board", icon: Kanban },
                   { value: "backlog", label: "Work Plan", icon: List },
                   { value: "calendar", label: "Calendar", icon: Calendar },
-                  { value: "timesheet", label: "Timesheet", icon: Clock },
                   { value: "gantt", label: "Gantt", icon: BarChart3 },
+                  { value: "timesheet", label: "Timesheet", icon: Clock },
                   { value: "sprints", label: "Sprints", icon: Layers },
                   { value: "resources", label: "Resources", icon: Users },
-                  { value: "templates", label: "Templates", icon: FileText },
                 ].map(({ value, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
@@ -166,7 +165,7 @@ export default function ProjectDetailPage() {
                   <DropdownMenuTrigger asChild>
                     <button className={cn(
                       "inline-flex items-center justify-center whitespace-nowrap h-9 px-3 text-sm font-medium gap-1.5 rounded-none border-b-2 transition-all",
-                      ["overview", "risks", "ideas", "knowledge", "support"].includes(tab)
+                      ["overview", "risks", "ideas", "knowledge", "support", "templates"].includes(tab)
                         ? "border-primary text-foreground"
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     )}>
@@ -180,6 +179,7 @@ export default function ProjectDetailPage() {
                       { value: "ideas", label: "Ideas", icon: Lightbulb },
                       { value: "knowledge", label: "Knowledge", icon: BookOpen },
                       { value: "support", label: "Support", icon: HelpCircle },
+                      { value: "templates", label: "Templates", icon: FileText },
                     ].map(({ value, label, icon: Icon }) => (
                       <DropdownMenuItem key={value} onClick={() => setTab(value)} className={cn("gap-2", tab === value && "bg-accent")}>
                         <Icon className="w-4 h-4" /> {label}
@@ -208,7 +208,7 @@ export default function ProjectDetailPage() {
                   <BacklogView tasks={tasks} sprints={sprints} milestones={milestones} projectId={project.id} sections={sections} onTaskClick={(task) => setSelectedTask(task)} />
                 </TabsContent>
                 <TabsContent value="calendar" className="mt-0">
-                  <CalendarView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
+                  <CalendarView tasks={tasks} projectId={project.id} sections={sections} onTaskClick={(task) => setSelectedTask(task)} />
                 </TabsContent>
                 <TabsContent value="timesheet" className="mt-0">
                   <TimesheetView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
@@ -217,7 +217,7 @@ export default function ProjectDetailPage() {
                   <ResourcesPanel projectId={project.id} />
                 </TabsContent>
                 <TabsContent value="gantt" className="mt-0 p-4">
-                  <GanttChart tasks={tasks} project={project} milestones={milestones} onTaskClick={(task) => setSelectedTask(task)} />
+                  <GanttChart tasks={tasks} project={project} milestones={milestones} sections={sections} onTaskClick={(task) => setSelectedTask(task)} />
                 </TabsContent>
                 <TabsContent value="sprints" className="mt-0 p-6">
                   <SprintsPanel projectId={project.id} sprints={sprints} tasks={tasks} />
