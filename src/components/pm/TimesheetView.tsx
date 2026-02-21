@@ -23,6 +23,7 @@ import { toast } from "sonner";
 interface Props {
   tasks: Task[];
   projectId: string;
+  onTaskClick?: (task: Task) => void;
 }
 
 interface TimeEntryForm {
@@ -35,7 +36,7 @@ interface TimeEntryForm {
 
 type ViewMode = "week" | "month";
 
-export function TimesheetView({ tasks, projectId }: Props) {
+export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: timeLogs = [] } = useTimeLogs(projectId);
@@ -462,9 +463,13 @@ export function TimesheetView({ tasks, projectId }: Props) {
                             "bg-green-500"
                           )}
                         />
-                        <span className="truncate text-foreground text-xs" title={task.title}>
+                        <button
+                          onClick={() => onTaskClick?.(task)}
+                          className="truncate text-foreground text-xs hover:text-primary hover:underline text-left cursor-pointer transition-colors"
+                          title={task.title}
+                        >
                           {task.title}
-                        </span>
+                        </button>
                       </div>
                     </td>
                     <td className="text-center px-2 py-2 text-muted-foreground text-xs tabular-nums">

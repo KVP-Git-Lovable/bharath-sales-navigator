@@ -178,7 +178,7 @@ export default function ProjectDetailPage() {
                   <CalendarView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
                 </TabsContent>
                 <TabsContent value="timesheet" className="mt-0">
-                  <TimesheetView tasks={tasks} projectId={project.id} />
+                  <TimesheetView tasks={tasks} projectId={project.id} onTaskClick={(task) => setSelectedTask(task)} />
                 </TabsContent>
                 <TabsContent value="gantt" className="mt-0 p-4">
                   <GanttChart tasks={tasks} project={project} milestones={milestones} onTaskClick={(task) => setSelectedTask(task)} />
