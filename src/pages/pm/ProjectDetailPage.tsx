@@ -23,9 +23,13 @@ import { TimesheetView } from "@/components/pm/TimesheetView";
 import { ResourcesPanel } from "@/components/pm/ResourcesPanel";
 import { cn } from "@/lib/utils";
 import { TemplateWorkPlanView } from "@/components/pm/TemplateWorkPlanView";
+import { IdeasPanel } from "@/components/pm/IdeasPanel";
+import { KnowledgePanel } from "@/components/pm/KnowledgePanel";
+import { SupportPanel } from "@/components/pm/SupportPanel";
 import {
   ArrowLeft, Plus, Kanban, List, BarChart3,
-  AlertTriangle, Layers, Grid, Calendar, Clock, FileText, Users
+  AlertTriangle, Layers, Grid, Calendar, Clock, FileText, Users,
+  Lightbulb, BookOpen, HelpCircle
 } from "lucide-react";
 
 export default function ProjectDetailPage() {
@@ -147,6 +151,9 @@ export default function ProjectDetailPage() {
                   { value: "risks", label: "Risks", icon: AlertTriangle },
                   { value: "overview", label: "Overview", icon: Grid },
                   { value: "templates", label: "Templates", icon: FileText },
+                  { value: "ideas", label: "Ideas", icon: Lightbulb },
+                  { value: "knowledge", label: "Knowledge", icon: BookOpen },
+                  { value: "support", label: "Support", icon: HelpCircle },
                 ].map(({ value, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
@@ -199,6 +206,15 @@ export default function ProjectDetailPage() {
                 </TabsContent>
                 <TabsContent value="templates" className="mt-0 p-6">
                   <TemplateWorkPlanView />
+                </TabsContent>
+                <TabsContent value="ideas" className="mt-0">
+                  <IdeasPanel projectId={project.id} />
+                </TabsContent>
+                <TabsContent value="knowledge" className="mt-0">
+                  <KnowledgePanel projectId={project.id} />
+                </TabsContent>
+                <TabsContent value="support" className="mt-0">
+                  <SupportPanel projectId={project.id} />
                 </TabsContent>
               </div>
 
