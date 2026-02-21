@@ -30,9 +30,18 @@ interface TimeEntryForm {
   taskId: string;
   date: string;
   hours: string;
+  workType: string;
   description: string;
   allocation: "billable" | "non-billable";
 }
+
+const WORK_TYPES = [
+  "Internal Meeting / Planning",
+  "Development or Executing",
+  "Testing",
+  "Customer Meeting",
+  "Documentation",
+] as const;
 
 type ViewMode = "week" | "month";
 
@@ -220,6 +229,7 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
       taskId,
       date,
       hours: existing ? String(existing.hours) : "",
+      workType: (existing as any)?.work_type || "",
       description: existing?.description || "",
       allocation: (existing as any)?.allocation || "billable",
     });
@@ -228,8 +238,20 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
   const handleSave = useCallback(async () => {
     if (!entryForm || !user) return;
     const hours = parseFloat(entryForm.hours);
-    if (isNaN(hours) || hours < 0) {
-      setEntryForm(null);
+    if (isNaN(hours) || hours <= 0) {
+      toast.error("Please enter valid hours");
+      return;
+    }
+    if (!entryForm.workType) {
+      toast.error("Please select a work type");
+      return;
+    }
+    if (!entryForm.description.trim()) {
+      toast.error("Please enter a description");
+      return;
+    }
+    if (!entryForm.allocation) {
+      toast.error("Please select an allocation");
       return;
     }
 
@@ -252,6 +274,7 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
             user_id: user.id,
             date: entryForm.date,
             hours,
+            work_type: entryForm.workType,
             description: entryForm.description || null,
             allocation: entryForm.allocation,
           });
@@ -625,13 +648,28 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
           <DialogHeader>
             <DialogTitle className="text-base">Log Time</DialogTitle>
           </DialogHeader>
-          {entryForm && (
+          {entryForm && (() => {
+            const entryTask = stableTasks.find(t => t.id === entryForm.taskId);
+            return (
             <div className="space-y-4">
               <div className="text-sm text-muted-foreground">
-                {stableTasks.find(t => t.id === entryForm.taskId)?.title || "Task"} — {format(new Date(entryForm.date + "T00:00:00"), "EEE, MMM d")}
+                {entryTask?.title || "Task"} — {format(new Date(entryForm.date + "T00:00:00"), "EEE, MMM d")}
               </div>
+
+              {/* Read-only task info */}
+              <div className="flex gap-4 text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2 border border-border/50">
+                <div>
+                  <span className="uppercase tracking-wider font-medium">Est. Hours: </span>
+                  <span className="tabular-nums">{entryTask?.estimated_hours ? `${entryTask.estimated_hours}h` : "–"}</span>
+                </div>
+                <div>
+                  <span className="uppercase tracking-wider font-medium">Due Date: </span>
+                  <span>{entryTask?.due_date ? format(new Date(entryTask.due_date + "T00:00:00"), "MMM d, yyyy") : "–"}</span>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label className="text-xs">Hours</Label>
+                <Label className="text-xs">Hours <span className="text-destructive">*</span></Label>
                 <Input
                   autoFocus
                   type="number"
@@ -645,7 +683,23 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Brief Description</Label>
+                <Label className="text-xs">Work Type <span className="text-destructive">*</span></Label>
+                <Select
+                  value={entryForm.workType}
+                  onValueChange={(v) => setEntryForm({ ...entryForm, workType: v })}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select work type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WORK_TYPES.map(wt => (
+                      <SelectItem key={wt} value={wt}>{wt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Brief Description <span className="text-destructive">*</span></Label>
                 <Textarea
                   value={entryForm.description}
                   onChange={e => setEntryForm({ ...entryForm, description: e.target.value })}
@@ -654,7 +708,7 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Allocation</Label>
+                <Label className="text-xs">Allocation <span className="text-destructive">*</span></Label>
                 <Select
                   value={entryForm.allocation}
                   onValueChange={(v: "billable" | "non-billable") => setEntryForm({ ...entryForm, allocation: v })}
@@ -669,7 +723,8 @@ export function TimesheetView({ tasks, projectId, onTaskClick }: Props) {
                 </Select>
               </div>
             </div>
-          )}
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setEntryForm(null)}>Cancel</Button>
             <Button size="sm" onClick={handleSave} disabled={saving}>
