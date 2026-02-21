@@ -185,6 +185,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
   const removeCollaborator = useRemoveTaskCollaborator();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
+  const [descExpanded, setDescExpanded] = useState(false);
   const [startDate, setStartDate] = useState(task.start_date || "");
   const [dueDate, setDueDate] = useState(task.due_date || "");
   const [status, setStatus] = useState(task.status);
@@ -385,7 +386,7 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
           <div className="px-6">
             <TabsList className="h-8 w-auto">
               <TabsTrigger value="details" className="text-xs h-7 px-3">Details</TabsTrigger>
-              <TabsTrigger value="timesheet" className="text-xs h-7 px-3">Timesheet</TabsTrigger>
+              <TabsTrigger value="timesheet" className="text-xs h-7 px-3">Timesheet Analysis</TabsTrigger>
             </TabsList>
           </div>
 
@@ -510,8 +511,18 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
 
             {/* Description */}
             <div className="space-y-2">
-            <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-1.5 text-[10px] text-muted-foreground"
+                    onClick={() => setDescExpanded(!descExpanded)}
+                  >
+                    {descExpanded ? "Collapse" : "Expand"}
+                  </Button>
+                </div>
                 <AIDescriptionWriter
                   projectId={projectId}
                   taskTitle={title}
@@ -519,24 +530,31 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
                   onGenerated={(desc) => { setDescription(desc); handleSave("description", desc); }}
                 />
               </div>
-              <Textarea
-                value={description}
-                onChange={e => {
-                  setDescription(e.target.value);
-                  const el = e.target;
-                  el.style.height = "auto";
-                  el.style.height = el.scrollHeight + "px";
-                }}
-                onBlur={() => { if (description !== (task.description || "")) handleSave("description", description); }}
-                placeholder="What is this task about?"
-                className="min-h-[100px] text-sm resize-none overflow-hidden"
-                ref={(el) => {
-                  if (el) {
+              {descExpanded && (
+                <Textarea
+                  value={description}
+                  onChange={e => {
+                    setDescription(e.target.value);
+                    const el = e.target;
                     el.style.height = "auto";
                     el.style.height = el.scrollHeight + "px";
-                  }
-                }}
-              />
+                  }}
+                  onBlur={() => { if (description !== (task.description || "")) handleSave("description", description); }}
+                  placeholder="What is this task about?"
+                  className="min-h-[80px] text-sm resize-none overflow-hidden"
+                  ref={(el) => {
+                    if (el) {
+                      el.style.height = "auto";
+                      el.style.height = el.scrollHeight + "px";
+                    }
+                  }}
+                />
+              )}
+              {!descExpanded && description && (
+                <p className="text-sm text-muted-foreground line-clamp-2 cursor-pointer" onClick={() => setDescExpanded(true)}>
+                  {description}
+                </p>
+              )}
             </div>
 
             {/* Sub-tasks */}

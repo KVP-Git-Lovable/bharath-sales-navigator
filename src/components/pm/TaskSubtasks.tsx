@@ -120,24 +120,6 @@ export function TaskSubtasks({ task, allTasks, projectId, onSelectTask }: Props)
 
   return (
     <div className="space-y-2">
-      {/* Parent task link (if this task is a sub-task) */}
-      {parentTask && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-          <span className="uppercase tracking-wider font-medium">Parent</span>
-          <button
-            onClick={() => onSelectTask(parentTask)}
-            className="text-primary hover:underline truncate"
-          >
-            {parentTask.title}
-          </button>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Sub-tasks</h3>
-        <span className="text-xs text-muted-foreground">{subtasks.length}</span>
-      </div>
-
       <div className="space-y-0 border rounded-lg overflow-hidden">
         {subtasks.map(sub => (
           <div
