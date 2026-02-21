@@ -187,6 +187,7 @@ import OrderCommitments from "./pages/institutional/OrderCommitments";
 import InstitutionalInvoices from "./pages/institutional/InstitutionalInvoices";
 import ProjectsPage from "./pages/pm/ProjectsPage";
 import ProjectDetailPage from "./pages/pm/ProjectDetailPage";
+import ResourceDetailPage from "./pages/pm/ResourceDetailPage";
 import TemplatesPage from "./pages/pm/TemplatesPage";
 import TemplateBuilderPage from "./pages/pm/TemplateBuilderPage";
 import PriceBooks from "./pages/institutional/PriceBooks";
@@ -486,6 +487,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         {/* Project Management */}
         <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
         <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
+        <Route path="/projects/:id/resources/:resourceId" element={<ProtectedRoute><ResourceDetailPage /></ProtectedRoute>} />
         <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
         <Route path="/templates/:id" element={<ProtectedRoute><TemplateBuilderPage /></ProtectedRoute>} />
 
