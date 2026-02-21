@@ -4,6 +4,7 @@ import { StatusBadge, PriorityBadge, TypeBadge } from "./TaskStatusBadge";
 import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskAttachments } from "./TaskAttachments";
 import { TaskDependencies } from "./TaskDependencies";
+import { TaskTimesheetSection } from "./TaskTimesheetSection";
 import { MultiUserPicker } from "./MultiUserPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -450,6 +451,29 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
             />
           </div>
 
+          {/* Consumed Hours - read-only, from timesheet */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Consumed</span>
+            <span className="text-sm text-foreground tabular-nums h-9 flex items-center">
+              {(task.logged_hours ?? 0) > 0 ? `${task.logged_hours}h` : "0h"}
+            </span>
+          </div>
+
+          {/* Available Hours - formula: estimated - consumed */}
+          {task.estimated_hours != null && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Available</span>
+              <span className={cn(
+                "text-sm tabular-nums h-9 flex items-center font-medium",
+                (task.estimated_hours - (task.logged_hours ?? 0)) < 0
+                  ? "text-destructive"
+                  : "text-green-600 dark:text-green-400"
+              )}>
+                {(task.estimated_hours - (task.logged_hours ?? 0)).toFixed(1)}h
+              </span>
+            </div>
+          )}
+
           {task.story_points !== undefined && task.story_points !== null && (
             <div className="flex items-center gap-3">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Points</span>
@@ -492,6 +516,11 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
         {/* Attachments */}
         <div id="task-attachments-section">
           <TaskAttachments taskId={task.id} />
+        </div>
+
+        {/* Timesheet related list */}
+        <div id="task-timesheet-section">
+          <TaskTimesheetSection taskId={task.id} projectId={projectId} />
         </div>
 
         {/* Tags */}
