@@ -8069,6 +8069,66 @@ export type Database = {
           },
         ]
       }
+      pm_project_resources: {
+        Row: {
+          budget_allocated: number | null
+          cost_rate: number | null
+          created_at: string
+          deployment_type: string
+          id: string
+          project_id: string
+          release_date: string | null
+          role: string
+          selling_rate: number | null
+          start_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_allocated?: number | null
+          cost_rate?: number | null
+          created_at?: string
+          deployment_type?: string
+          id?: string
+          project_id: string
+          release_date?: string | null
+          role?: string
+          selling_rate?: number | null
+          start_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_allocated?: number | null
+          cost_rate?: number | null
+          created_at?: string
+          deployment_type?: string
+          id?: string
+          project_id?: string
+          release_date?: string | null
+          role?: string
+          selling_rate?: number | null
+          start_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_project_resources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "pm_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_project_resources_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pm_projects: {
         Row: {
           budget: number | null
