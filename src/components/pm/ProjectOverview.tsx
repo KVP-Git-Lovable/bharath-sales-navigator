@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Project, Task, Sprint, Milestone, Risk } from "@/hooks/useProjects";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -5,6 +6,11 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 
 import { Calendar, Clock, AlertTriangle, CheckCircle2, Users, TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { AIHealthCheck } from "./AIHealthCheck";
+import { usePMAI } from "@/hooks/usePMAI";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Props {
   project: Project;
@@ -15,6 +21,7 @@ interface Props {
 }
 
 export function ProjectOverview({ project, tasks, sprints, milestones, risks }: Props) {
+  const { invoke: aiInvoke, loading: summaryLoading, data: summaryData } = usePMAI();
   const byStatus = ["todo", "in_progress", "in_review", "done", "backlog", "cancelled"].map(s => ({
     name: s.replace("_", " "),
     count: tasks.filter(t => t.status === s).length,
@@ -114,6 +121,31 @@ export function ProjectOverview({ project, tasks, sprints, milestones, risks }: 
           </Card>
         )}
       </div>
+
+      {/* AI Health Check */}
+      <AIHealthCheck projectId={project.id} />
+
+      {/* AI Project Summary */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" /> AI Project Report
+            </CardTitle>
+            <Button size="sm" variant="outline" onClick={() => aiInvoke("project_summary", project.id)} disabled={summaryLoading} className="gap-1 text-xs h-7">
+              {summaryLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {summaryLoading ? "Generating..." : "Generate Report"}
+            </Button>
+          </div>
+        </CardHeader>
+        {summaryData?.summary && (
+          <CardContent>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground border border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800 rounded-lg p-4">
+              <ReactMarkdown>{summaryData.summary}</ReactMarkdown>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Milestones summary */}
       {milestones.length > 0 && (

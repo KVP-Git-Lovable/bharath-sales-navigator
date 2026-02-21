@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateTask, useAddTaskCollaborator, TaskStatus, TaskType, Priority, Sprint, Milestone, Section } from "@/hooks/useProjects";
+import { AIDescriptionWriter } from "./AIDescriptionWriter";
 import { MultiUserPicker } from "./MultiUserPicker";
 import { Badge } from "@/components/ui/badge";
 import { X, Search } from "lucide-react";
@@ -172,7 +173,14 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
             <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Task title..." required />
           </div>
           <div>
-            <Label>Description</Label>
+            <div className="flex items-center justify-between">
+              <Label>Description</Label>
+              <AIDescriptionWriter
+                projectId={projectId}
+                taskTitle={form.title}
+                onGenerated={(desc) => setForm(f => ({ ...f, description: desc }))}
+              />
+            </div>
             <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Details, acceptance criteria..." />
           </div>
 

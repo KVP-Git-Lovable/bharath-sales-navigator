@@ -6,6 +6,9 @@ import { TaskAttachments } from "./TaskAttachments";
 import { TaskDependencies } from "./TaskDependencies";
 import { TaskTimesheetSection } from "./TaskTimesheetSection";
 import { MultiUserPicker } from "./MultiUserPicker";
+import { AISubtaskGenerator } from "./AISubtaskGenerator";
+import { AIDescriptionWriter } from "./AIDescriptionWriter";
+import { AIKnowledgeAssistant } from "./AIKnowledgeAssistant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -496,7 +499,14 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
 
             {/* Description */}
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
+                <AIDescriptionWriter
+                  projectId={projectId}
+                  taskTitle={title}
+                  onGenerated={(desc) => { setDescription(desc); handleSave("description", desc); }}
+                />
+              </div>
               <Textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
@@ -506,6 +516,14 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
               />
             </div>
 
+            {/* AI Sub-task Generator */}
+            <AISubtaskGenerator
+              projectId={projectId}
+              taskId={task.id}
+              taskTitle={task.title}
+              taskDescription={task.description}
+            />
+
             {/* Sub-tasks */}
             <div id="task-subtasks-section">
               <TaskSubtasks
@@ -513,6 +531,16 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
                 allTasks={allTasks}
                 projectId={projectId}
                 onSelectTask={handleSelectTask}
+              />
+            </div>
+
+            {/* AI Knowledge Assistant */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ask Knowledge Base</h3>
+              <AIKnowledgeAssistant
+                projectId={projectId}
+                taskTitle={task.title}
+                taskDescription={task.description}
               />
             </div>
 

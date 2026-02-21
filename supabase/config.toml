@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sprint-summary]
 verify_jwt = false
+
+[functions.pm-ai-assistant]
+verify_jwt = false
