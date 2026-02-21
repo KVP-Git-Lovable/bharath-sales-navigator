@@ -454,6 +454,22 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
           <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap text-center">
             <InlineHoursEditor task={task} />
           </td>
+          {/* Consumed Hours (from timesheet) */}
+          <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap text-center">
+            {(task.logged_hours ?? 0) > 0 ? `${task.logged_hours}h` : "—"}
+          </td>
+          {/* Available Hours (estimated - consumed) */}
+          <td className="py-2 px-3 text-xs whitespace-nowrap text-center">
+            {task.estimated_hours != null ? (
+              <span className={cn(
+                (task.estimated_hours - (task.logged_hours ?? 0)) < 0
+                  ? "text-red-600 dark:text-red-400 font-medium"
+                  : "text-muted-foreground"
+              )}>
+                {(task.estimated_hours - (task.logged_hours ?? 0)).toFixed(1)}h
+              </span>
+            ) : "—"}
+          </td>
           {/* Dependencies - inline editable */}
           <td className="py-2 px-3 whitespace-nowrap">
             <InlineDependencyEditor taskId={task.id} allTasks={tasks} />
@@ -482,7 +498,7 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
         {isExpanded && subtasks.map(sub => <TaskRow key={sub.id} task={sub} depth={depth + 1} sectionId={sectionId} />)}
         {isExpanded && isInlineTarget && (
           <tr className="border-b bg-muted/10">
-            <td colSpan={8} className="py-1.5 px-4">
+            <td colSpan={10} className="py-1.5 px-4">
               <div className="flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 20}px` }}>
                 <span className="w-3.5" />
                 <span className="text-xs text-muted-foreground">↳ subtask</span>
@@ -579,7 +595,9 @@ export function BacklogView({ tasks, sprints, milestones, projectId, sections, o
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-24">Due date</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-28">Status</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Owner</th>
-              <th className="text-center py-2.5 px-3 text-xs font-semibold text-muted-foreground w-16">Hours</th>
+              <th className="text-center py-2.5 px-3 text-xs font-semibold text-muted-foreground w-16">Est. Hrs</th>
+              <th className="text-center py-2.5 px-3 text-xs font-semibold text-muted-foreground w-20">Consumed</th>
+              <th className="text-center py-2.5 px-3 text-xs font-semibold text-muted-foreground w-20">Available</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-36">Depends on</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground w-20">Priority</th>
               <th className="py-2.5 px-3 w-10" />
@@ -668,7 +686,7 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
     <>
       {/* Section header */}
       <tr className="bg-muted/20 border-b">
-        <td colSpan={8} className="py-2 px-4">
+        <td colSpan={10} className="py-2 px-4">
           <div className="flex items-center gap-2">
             <button onClick={onToggle} className="text-muted-foreground hover:text-foreground">
               {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -701,7 +719,7 @@ function SectionGroup({ group, isCollapsed, onToggle, onDeleteSection, isInlineA
       {/* Inline add row */}
       {!isCollapsed && (
         <tr className="border-b hover:bg-muted/10 transition-colors">
-          <td colSpan={8} className="py-1.5 px-4">
+          <td colSpan={10} className="py-1.5 px-4">
             {isInlineAdd ? (
               <div className="flex items-center gap-2 pl-6">
                 <Plus className="w-3.5 h-3.5 text-muted-foreground" />
