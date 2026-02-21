@@ -8918,6 +8918,7 @@ export type Database = {
           project_id: string
           task_id: string
           user_id: string
+          work_type: string | null
         }
         Insert: {
           allocation?: string
@@ -8929,6 +8930,7 @@ export type Database = {
           project_id: string
           task_id: string
           user_id: string
+          work_type?: string | null
         }
         Update: {
           allocation?: string
@@ -8940,6 +8942,7 @@ export type Database = {
           project_id?: string
           task_id?: string
           user_id?: string
+          work_type?: string | null
         }
         Relationships: [
           {
