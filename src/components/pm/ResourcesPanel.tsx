@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +60,7 @@ const DEPLOYMENT_OPTIONS = [
 const COLORS = ["#6366f1", "#ec4899", "#f97316", "#22c55e", "#06b6d4", "#eab308", "#8b5cf6", "#ef4444"];
 
 export function ResourcesPanel({ projectId }: Props) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
@@ -105,15 +107,23 @@ export function ResourcesPanel({ projectId }: Props) {
     },
   });
 
-  // Create resource
+  // Create resource + auto-add as project member
   const createResource = useMutation({
     mutationFn: async (values: Partial<Resource>) => {
       const { error } = await supabase.from("pm_project_resources").insert([values] as any);
       if (error) throw error;
+      // Also add as project member (collaborator) if not already
+      if (values.user_id) {
+        await supabase.from("pm_project_members").upsert(
+          { project_id: projectId, user_id: values.user_id, role: "member" as any },
+          { onConflict: "project_id,user_id" }
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pm_project_resources", projectId] });
-      toast.success("Resource added");
+      queryClient.invalidateQueries({ queryKey: ["pm_project_members", projectId] });
+      toast.success("Resource added & added as project collaborator");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -151,7 +161,7 @@ export function ResourcesPanel({ projectId }: Props) {
       const totalHoursLogged = userLogs.reduce((s, l) => s + l.hours, 0);
       const billableHours = userLogs.filter((l) => l.allocation === "Billable").reduce((s, l) => s + l.hours, 0);
 
-      const revenue = billableHours * r.selling_rate;
+      const revenue = totalHoursLogged * r.selling_rate;
       const cost = totalHoursLogged * r.cost_rate;
       const profit = revenue - cost;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
@@ -318,7 +328,7 @@ export function ResourcesPanel({ projectId }: Props) {
                 <tbody>
                   {resourceMetrics.map((r) => (
                     <tr key={r.id} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="py-2 px-2 font-medium text-foreground">{r.profile?.full_name || "Unknown"}</td>
+                      <td className="py-2 px-2 font-medium text-primary hover:underline cursor-pointer" onClick={() => navigate(`/projects/${projectId}/resources/${r.id}`)}>{r.profile?.full_name || "Unknown"}</td>
                       <td className="py-2 px-2 text-muted-foreground">{r.role}</td>
                       <td className="py-2 px-2 text-center">
                         <Badge variant={r.deployment_type === "full_time" ? "default" : "secondary"} className="text-[10px]">
