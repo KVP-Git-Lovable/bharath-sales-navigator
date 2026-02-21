@@ -178,6 +178,7 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
               <AIDescriptionWriter
                 projectId={projectId}
                 taskTitle={form.title}
+                existingDescription={form.description}
                 onGenerated={(desc) => setForm(f => ({ ...f, description: desc }))}
               />
             </div>

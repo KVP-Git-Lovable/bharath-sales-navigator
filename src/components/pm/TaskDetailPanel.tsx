@@ -504,7 +504,10 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
                 <AIDescriptionWriter
                   projectId={projectId}
                   taskTitle={title}
+                  taskId={task.id}
+                  existingDescription={description}
                   onGenerated={(desc) => { setDescription(desc); handleSave("description", desc); }}
+                  onSubtasksCreated={() => {}}
                 />
               </div>
               <Textarea
