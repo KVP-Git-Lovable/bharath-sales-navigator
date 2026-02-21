@@ -309,6 +309,7 @@ export function ResourcesPanel({ projectId }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground text-xs">
+                    <th className="text-left py-2 px-2">ID</th>
                     <th className="text-left py-2 px-2">Name</th>
                     <th className="text-left py-2 px-2">Role</th>
                     <th className="text-center py-2 px-2">Type</th>
@@ -328,7 +329,12 @@ export function ResourcesPanel({ projectId }: Props) {
                 <tbody>
                   {resourceMetrics.map((r) => (
                     <tr key={r.id} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="py-2 px-2 font-medium text-primary hover:underline cursor-pointer" onClick={() => navigate(`/projects/${projectId}/resources/${r.id}`)}>{r.profile?.full_name || "Unknown"}</td>
+                      <td className="py-2 px-2">
+                        <span className="text-primary hover:underline cursor-pointer font-mono text-xs" onClick={() => navigate(`/projects/${projectId}/resources/${r.id}`)}>
+                          {r.id.slice(0, 8).toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 font-medium text-foreground">{r.profile?.full_name || "Unknown"}</td>
                       <td className="py-2 px-2 text-muted-foreground">{r.role}</td>
                       <td className="py-2 px-2 text-center">
                         <Badge variant={r.deployment_type === "full_time" ? "default" : "secondary"} className="text-[10px]">
@@ -372,7 +378,7 @@ export function ResourcesPanel({ projectId }: Props) {
                 {/* Totals row */}
                 <tfoot>
                   <tr className="border-t-2 font-semibold text-foreground">
-                    <td className="py-2 px-2" colSpan={7}>Total</td>
+                    <td className="py-2 px-2" colSpan={8}>Total</td>
                     <td className="py-2 px-2 text-right">{projectProfitability.totalHours.toFixed(1)}h</td>
                     <td className="py-2 px-2 text-center">{projectProfitability.avgUtilization.toFixed(0)}%</td>
                     <td className="py-2 px-2 text-right text-green-600">₹{projectProfitability.totalRevenue.toFixed(0)}</td>
