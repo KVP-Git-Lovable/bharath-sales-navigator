@@ -602,6 +602,14 @@ export function useDeleteTaskAttachment() {
 
 // ─── TASK DEPENDENCIES ────────────────────────────────────────────────────────
 
+export interface TaskDependency {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+  dependency_type: string;
+  created_at: string;
+}
+
 export function useTaskDependencies(taskId: string) {
   return useQuery({
     queryKey: ['pm_task_dependencies', taskId],
@@ -612,9 +620,31 @@ export function useTaskDependencies(taskId: string) {
         .eq('task_id', taskId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return data as TaskDependency[];
     },
     enabled: !!taskId,
+  });
+}
+
+export function useAllProjectDependencies(projectId: string) {
+  return useQuery({
+    queryKey: ['pm_all_dependencies', projectId],
+    queryFn: async () => {
+      const { data: taskIds, error: tErr } = await supabase
+        .from('pm_tasks')
+        .select('id')
+        .eq('project_id', projectId);
+      if (tErr) throw tErr;
+      if (!taskIds?.length) return [] as TaskDependency[];
+      const ids = taskIds.map(t => t.id);
+      const { data, error } = await supabase
+        .from('pm_task_dependencies')
+        .select('*')
+        .in('task_id', ids);
+      if (error) throw error;
+      return data as TaskDependency[];
+    },
+    enabled: !!projectId,
   });
 }
 
