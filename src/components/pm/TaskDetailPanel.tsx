@@ -368,6 +368,17 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
             className="text-lg font-semibold w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground leading-snug"
             placeholder="Task title"
           />
+          {task.parent_task_id && (() => {
+            const parentTask = allTasks.find(t => t.id === task.parent_task_id);
+            return parentTask ? (
+              <button
+                onClick={() => handleSelectTask(parentTask)}
+                className="text-xs text-muted-foreground hover:text-primary mt-1 flex items-center gap-1 transition-colors"
+              >
+                <GitBranch className="w-3 h-3" /> Parent: {parentTask.title}
+              </button>
+            ) : null;
+          })()}
         </div>
 
         <Tabs defaultValue="details" className="flex-1">
@@ -499,36 +510,46 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
 
             {/* Description */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
                 <AIDescriptionWriter
                   projectId={projectId}
                   taskTitle={title}
-                  taskId={task.id}
                   existingDescription={description}
                   onGenerated={(desc) => { setDescription(desc); handleSave("description", desc); }}
-                  onSubtasksCreated={() => {}}
                 />
               </div>
               <Textarea
                 value={description}
-                onChange={e => setDescription(e.target.value)}
+                onChange={e => {
+                  setDescription(e.target.value);
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = el.scrollHeight + "px";
+                }}
                 onBlur={() => { if (description !== (task.description || "")) handleSave("description", description); }}
                 placeholder="What is this task about?"
-                className="min-h-[100px] text-sm resize-none"
+                className="min-h-[100px] text-sm resize-none overflow-hidden"
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = el.scrollHeight + "px";
+                  }
+                }}
               />
             </div>
 
-            {/* AI Sub-task Generator */}
-            <AISubtaskGenerator
-              projectId={projectId}
-              taskId={task.id}
-              taskTitle={task.title}
-              taskDescription={task.description}
-            />
-
             {/* Sub-tasks */}
             <div id="task-subtasks-section">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sub-tasks</h3>
+                <AISubtaskGenerator
+                  projectId={projectId}
+                  taskId={task.id}
+                  taskTitle={task.title}
+                  taskDescription={task.description}
+                />
+              </div>
               <TaskSubtasks
                 task={task}
                 allTasks={allTasks}

@@ -182,7 +182,24 @@ export function CreateTaskModal({ open, onClose, projectId, sprints, milestones,
                 onGenerated={(desc) => setForm(f => ({ ...f, description: desc }))}
               />
             </div>
-            <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Details, acceptance criteria..." />
+            <Textarea
+              value={form.description}
+              onChange={e => {
+                setForm(f => ({ ...f, description: e.target.value }));
+                const el = e.target;
+                el.style.height = "auto";
+                el.style.height = el.scrollHeight + "px";
+              }}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = "auto";
+                  el.style.height = el.scrollHeight + "px";
+                }
+              }}
+              rows={3}
+              placeholder="Details, acceptance criteria..."
+              className="resize-none overflow-hidden"
+            />
           </div>
 
           {/* Owner */}

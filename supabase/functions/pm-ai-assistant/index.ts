@@ -114,53 +114,16 @@ serve(async (req) => {
         const { taskTitle, sectionName, projectName, existingDescription } = context || {};
         const isElaboration = !!existingDescription?.trim();
 
-        const tools = [{
-          type: "function",
-          function: {
-            name: "write_description_with_subtasks",
-            description: "Write or elaborate a task description and suggest sub-tasks",
-            parameters: {
-              type: "object",
-              properties: {
-                description: { type: "string", description: "The elaborated task description in markdown" },
-                suggested_subtasks: {
-                  type: "array",
-                  description: "3-7 suggested sub-tasks based on the description",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
-                      estimated_hours: { type: "number" },
-                    },
-                    required: ["title", "priority", "estimated_hours"],
-                    additionalProperties: false,
-                  },
-                },
-              },
-              required: ["description", "suggested_subtasks"],
-              additionalProperties: false,
-            },
-          },
-        }];
-
         const prompt = isElaboration
-          ? `The user has written a short note for a task. Elaborate it into a professional, detailed task description.\n\nTask Title: ${taskTitle}\nProject: ${projectName || "Unknown"}\nSection: ${sectionName || "General"}\nUser's Note:\n${existingDescription}\n\nElaborate and expand the note into a complete description with:\n1. Objective (1-2 sentences expanding on the note)\n2. Detailed scope & requirements\n3. Acceptance criteria (as markdown checklist)\n4. Notes/considerations\n\nPreserve the user's intent and key points. Use markdown.\n\nAlso suggest 3-7 actionable sub-tasks that would be needed to complete this task.`
-          : `Write a professional task description for:\n\nTask: ${taskTitle}\nProject: ${projectName || "Unknown"}\nSection: ${sectionName || "General"}\n\nInclude:\n1. Objective (1-2 sentences)\n2. Scope & requirements\n3. Acceptance criteria (as markdown checklist)\n4. Notes/considerations\n\nKeep it concise and actionable. Use markdown.\n\nAlso suggest 3-7 actionable sub-tasks that would be needed to complete this task.`;
+          ? `The user has written a short note for a task. Elaborate it into a professional, detailed task description.\n\nTask Title: ${taskTitle}\nProject: ${projectName || "Unknown"}\nSection: ${sectionName || "General"}\nUser's Note:\n${existingDescription}\n\nElaborate and expand the note into a complete description with:\n1. Objective (1-2 sentences expanding on the note)\n2. Detailed scope & requirements\n3. Acceptance criteria (as markdown checklist)\n4. Notes/considerations\n\nPreserve the user's intent and key points. Use markdown. Do NOT suggest sub-tasks.`
+          : `Write a professional task description for:\n\nTask: ${taskTitle}\nProject: ${projectName || "Unknown"}\nSection: ${sectionName || "General"}\n\nInclude:\n1. Objective (1-2 sentences)\n2. Scope & requirements\n3. Acceptance criteria (as markdown checklist)\n4. Notes/considerations\n\nKeep it concise and actionable. Use markdown. Do NOT suggest sub-tasks.`;
 
         const aiData = await callAI(
-          "You are a project management expert. Write clear task descriptions and break down work into sub-tasks.",
-          prompt,
-          tools,
-          { type: "function", function: { name: "write_description_with_subtasks" } }
+          "You are a project management expert. Write clear, detailed task descriptions. Only return the description text, no sub-tasks.",
+          prompt
         );
 
-        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-        if (toolCall) {
-          result = JSON.parse(toolCall.function.arguments);
-        } else {
-          result = { description: aiData.choices?.[0]?.message?.content || "", suggested_subtasks: [] };
-        }
+        result = { description: aiData.choices?.[0]?.message?.content || "" };
         break;
       }
 
