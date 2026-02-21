@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePMAI } from "@/hooks/usePMAI";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, FileText, Trash2, Download, Upload } from "lucide-react";
+import { Plus, FileText, Trash2, Download, Upload, Sparkles, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -21,6 +22,8 @@ export function KnowledgePanel({ projectId }: Props) {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const { invoke: aiInvoke, loading: gapsLoading, data: gapsData, setData: setGapsData } = usePMAI();
+  const [showGaps, setShowGaps] = useState(false);
 
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ["pm_knowledge_documents", projectId],
@@ -107,10 +110,15 @@ export function KnowledgePanel({ projectId }: Props) {
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <FileText className="w-5 h-5 text-blue-500" /> Knowledge Base
         </h2>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1"><Plus className="w-4 h-4" /> Add Document</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={async () => { const r = await aiInvoke("knowledge_gaps", projectId); if (r) setShowGaps(true); }} disabled={gapsLoading} className="gap-1">
+            {gapsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-500" />}
+            {gapsLoading ? "Analyzing..." : "AI: Suggest Missing"}
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1"><Plus className="w-4 h-4" /> Add Document</Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Knowledge Document</DialogTitle></DialogHeader>
             <div className="space-y-3">
@@ -138,7 +146,29 @@ export function KnowledgePanel({ projectId }: Props) {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* AI Knowledge Gaps */}
+      {showGaps && gapsData?.suggestions?.length > 0 && (
+        <div className="border border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800 rounded-lg p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-green-700 dark:text-green-400 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4" /> Suggested Missing Knowledge
+            </span>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowGaps(false)}>
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          {gapsData.suggestions.map((s: any, i: number) => (
+            <div key={i} className="p-2 rounded border bg-background text-sm">
+              <h4 className="font-medium text-foreground">{s.document_name}</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>
+              <p className="text-[10px] text-muted-foreground mt-1 italic">Why: {s.reason}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>

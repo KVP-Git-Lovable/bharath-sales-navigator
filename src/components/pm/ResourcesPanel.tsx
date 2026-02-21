@@ -20,6 +20,7 @@ import {
   Plus, Trash2, Edit2, Users, TrendingUp, DollarSign,
   Clock, ChevronDown, ChevronUp, IndianRupee,
 } from "lucide-react";
+import { AIWorkloadAnalysis } from "./AIWorkloadAnalysis";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -292,9 +293,12 @@ export function ResourcesPanel({ projectId }: Props) {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Team Resources</CardTitle>
-            <Button size="sm" onClick={() => { setEditingResource(null); setShowForm(true); }} className="gap-1">
-              <Plus className="w-4 h-4" /> Add Resource
-            </Button>
+            <div className="flex gap-2">
+              <AIWorkloadAnalysis projectId={projectId} />
+              <Button size="sm" onClick={() => { setEditingResource(null); setShowForm(true); }} className="gap-1">
+                <Plus className="w-4 h-4" /> Add Resource
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

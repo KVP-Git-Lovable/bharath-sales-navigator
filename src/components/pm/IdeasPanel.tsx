@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePMAI } from "@/hooks/usePMAI";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Lightbulb, Trash2 } from "lucide-react";
+import { Plus, Lightbulb, Trash2, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import ReactMarkdown from "react-markdown";
 
 interface Props {
   projectId: string;
@@ -30,6 +32,20 @@ export function IdeasPanel({ projectId }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
+  const [evaluations, setEvaluations] = useState<Record<string, any>>({});
+  const { invoke: aiInvoke, loading: aiLoading } = usePMAI();
+  const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
+
+  const evaluateIdea = async (idea: any) => {
+    setEvaluatingId(idea.id);
+    const result = await aiInvoke("evaluate_idea", projectId, {
+      ideaTitle: idea.title,
+      ideaDescription: idea.description,
+      ideaPriority: idea.priority,
+    });
+    if (result) setEvaluations(prev => ({ ...prev, [idea.id]: result }));
+    setEvaluatingId(null);
+  };
 
   const { data: ideas = [], isLoading } = useQuery({
     queryKey: ["pm_ideas", projectId],
@@ -157,8 +173,26 @@ export function IdeasPanel({ projectId }: Props) {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteIdea.mutate(idea.id)}>
                       <Trash2 className="w-3.5 h-3.5 text-destructive" />
                     </Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={() => evaluateIdea(idea)} disabled={evaluatingId === idea.id}>
+                      {evaluatingId === idea.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-amber-500" />}
+                      Evaluate
+                    </Button>
                   </div>
                 </div>
+                {evaluations[idea.id] && (
+                  <div className="mt-3 p-3 border border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800 rounded-lg text-xs space-y-1.5">
+                    <div className="flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold">
+                      <Sparkles className="w-3 h-3" /> AI Evaluation
+                    </div>
+                    <div className="flex gap-3 text-muted-foreground">
+                      <span>Feasibility: <strong className="text-foreground">{evaluations[idea.id].feasibility_score}/10</strong></span>
+                      <span>Impact: <strong className="text-foreground">{evaluations[idea.id].impact_score}/10</strong></span>
+                      <span>Effort: <strong className="text-foreground capitalize">{evaluations[idea.id].effort_estimate?.replace("_", " ")}</strong></span>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] capitalize">{evaluations[idea.id].recommendation?.replace(/_/g, " ")}</Badge>
+                    <p className="text-muted-foreground">{evaluations[idea.id].reasoning}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

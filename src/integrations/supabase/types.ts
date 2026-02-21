@@ -7983,8 +7983,47 @@ export type Database = {
         }
         Relationships: []
       }
+      pm_ai_insights: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          insight_type: string
+          project_id: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          insight_type: string
+          project_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          insight_type?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_ai_insights_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "pm_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pm_ideas: {
         Row: {
+          ai_evaluation: Json | null
           created_at: string
           description: string | null
           id: string
@@ -7996,6 +8035,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_evaluation?: Json | null
           created_at?: string
           description?: string | null
           id?: string
@@ -8007,6 +8047,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_evaluation?: Json | null
           created_at?: string
           description?: string | null
           id?: string
@@ -8318,6 +8359,7 @@ export type Database = {
       }
       pm_risks: {
         Row: {
+          ai_generated: boolean | null
           created_at: string
           description: string | null
           id: string
@@ -8331,6 +8373,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_generated?: boolean | null
           created_at?: string
           description?: string | null
           id?: string
@@ -8344,6 +8387,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_generated?: boolean | null
           created_at?: string
           description?: string | null
           id?: string
@@ -8460,6 +8504,7 @@ export type Database = {
       }
       pm_support_requests: {
         Row: {
+          ai_suggestion: string | null
           created_at: string
           description: string | null
           id: string
@@ -8472,6 +8517,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_suggestion?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -8484,6 +8530,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_suggestion?: string | null
           created_at?: string
           description?: string | null
           id?: string

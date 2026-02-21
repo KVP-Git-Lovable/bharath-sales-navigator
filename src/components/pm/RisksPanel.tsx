@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Risk } from "@/hooks/useProjects";
 import { useCreateRisk } from "@/hooks/useProjects";
+import { AIRiskPredictor } from "./AIRiskPredictor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Plus, Shield, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Plus, Shield, CheckCircle2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props { projectId: string; risks: Risk[]; }
@@ -43,9 +44,12 @@ export function RisksPanel({ projectId, risks }: Props) {
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-red-500" /> Project Risks
         </h2>
-        <Button size="sm" onClick={() => setShowCreate(true)} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Add Risk
-        </Button>
+        <div className="flex gap-2">
+          <AIRiskPredictor projectId={projectId} />
+          <Button size="sm" onClick={() => setShowCreate(true)} className="gap-1.5">
+            <Plus className="w-4 h-4" /> Add Risk
+          </Button>
+        </div>
       </div>
 
       {risks.length === 0 ? (
@@ -62,8 +66,13 @@ export function RisksPanel({ projectId, risks }: Props) {
             return (
               <div
                 key={risk.id}
-                className={cn("p-4 rounded-xl border", risk.status === "open" ? riskLevel : "bg-muted text-muted-foreground border-muted")}
+                className={cn("p-4 rounded-xl border relative", risk.status === "open" ? riskLevel : "bg-muted text-muted-foreground border-muted")}
               >
+                {(risk as any).ai_generated && (
+                  <Badge variant="outline" className="absolute top-2 right-2 text-[9px] gap-0.5 bg-amber-50 text-amber-700 border-amber-200">
+                    <Sparkles className="w-2.5 h-2.5" /> AI
+                  </Badge>
+                )}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold text-sm">{risk.title}</h3>
                   <div className="flex gap-1 flex-shrink-0">
