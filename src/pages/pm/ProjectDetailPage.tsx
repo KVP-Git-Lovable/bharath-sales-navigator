@@ -29,8 +29,11 @@ import { SupportPanel } from "@/components/pm/SupportPanel";
 import {
   ArrowLeft, Plus, Kanban, List, BarChart3,
   AlertTriangle, Layers, Grid, Calendar, Clock, FileText, Users,
-  Lightbulb, BookOpen, HelpCircle
+  Lightbulb, BookOpen, HelpCircle, ChevronDown, MoreHorizontal
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -145,15 +148,10 @@ export default function ProjectDetailPage() {
                   { value: "backlog", label: "Work Plan", icon: List },
                   { value: "calendar", label: "Calendar", icon: Calendar },
                   { value: "timesheet", label: "Timesheet", icon: Clock },
-                  { value: "resources", label: "Resources", icon: Users },
                   { value: "gantt", label: "Gantt", icon: BarChart3 },
                   { value: "sprints", label: "Sprints", icon: Layers },
-                  { value: "risks", label: "Risks", icon: AlertTriangle },
-                  { value: "overview", label: "Overview", icon: Grid },
+                  { value: "resources", label: "Resources", icon: Users },
                   { value: "templates", label: "Templates", icon: FileText },
-                  { value: "ideas", label: "Ideas", icon: Lightbulb },
-                  { value: "knowledge", label: "Knowledge", icon: BookOpen },
-                  { value: "support", label: "Support", icon: HelpCircle },
                 ].map(({ value, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
@@ -163,6 +161,32 @@ export default function ProjectDetailPage() {
                     <Icon className="w-3.5 h-3.5" /> {label}
                   </TabsTrigger>
                 ))}
+                {/* More dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className={cn(
+                      "inline-flex items-center justify-center whitespace-nowrap h-9 px-3 text-sm font-medium gap-1.5 rounded-none border-b-2 transition-all",
+                      ["overview", "risks", "ideas", "knowledge", "support"].includes(tab)
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}>
+                      <MoreHorizontal className="w-3.5 h-3.5" /> More <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {[
+                      { value: "overview", label: "Overview", icon: Grid },
+                      { value: "risks", label: "Risks", icon: AlertTriangle },
+                      { value: "ideas", label: "Ideas", icon: Lightbulb },
+                      { value: "knowledge", label: "Knowledge", icon: BookOpen },
+                      { value: "support", label: "Support", icon: HelpCircle },
+                    ].map(({ value, label, icon: Icon }) => (
+                      <DropdownMenuItem key={value} onClick={() => setTab(value)} className={cn("gap-2", tab === value && "bg-accent")}>
+                        <Icon className="w-4 h-4" /> {label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TabsList>
             </div>
 
