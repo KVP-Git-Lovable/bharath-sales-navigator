@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X, Check, Calendar, Trash2, Search, Maximize2, Paperclip, Link2, Copy, MoreHorizontal, ThumbsUp, Plus, GitBranch, Move } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -354,192 +355,204 @@ export function TaskDetailPanel({ task, onClose, projectId, allTasks = [], onSel
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-        {/* Title */}
-        <input
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onBlur={() => { if (title !== task.title) handleSave("title", title); }}
-          className="text-lg font-semibold w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground leading-snug"
-          placeholder="Task title"
-        />
-
-        {/* Meta fields — clean vertical stack */}
-        <div className="space-y-3 bg-muted/20 rounded-lg p-4 border border-border/50">
-          <UserPickerField label="Owner" currentUser={task.assignee} onSave={(userId) => handleSave("assignee_id", userId)} />
-          <MultiUserPicker
-            label="Collaborators"
-            selectedUsers={collaborators.map(c => ({
-              id: c.user_id,
-              full_name: c.user?.full_name || "Unknown",
-              profile_picture_url: c.user?.profile_picture_url,
-            }))}
-            onAdd={(user) => addCollaborator.mutate({ taskId: task.id, userId: user.id })}
-            onRemove={(userId) => removeCollaborator.mutate({ taskId: task.id, userId })}
+      <div className="flex-1 overflow-y-auto">
+        {/* Title - always visible */}
+        <div className="px-6 pt-5 pb-2">
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onBlur={() => { if (title !== task.title) handleSave("title", title); }}
+            className="text-lg font-semibold w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground leading-snug"
+            placeholder="Task title"
           />
+        </div>
 
-          <div className="h-px bg-border/50" />
-
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Status</span>
-            <Select value={status} onValueChange={v => { setStatus(v as any); handleSave("status", v); }}>
-              <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="backlog">Backlog</SelectItem>
-                <SelectItem value="todo">To Do</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="in_review">In Review</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+        <Tabs defaultValue="details" className="flex-1">
+          <div className="px-6">
+            <TabsList className="h-8 w-auto">
+              <TabsTrigger value="details" className="text-xs h-7 px-3">Details</TabsTrigger>
+              <TabsTrigger value="timesheet" className="text-xs h-7 px-3">Timesheet</TabsTrigger>
+            </TabsList>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Priority</span>
-            <Select value={priority} onValueChange={v => { setPriority(v as any); handleSave("priority", v); }}>
-              <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="critical">🔴 Critical</SelectItem>
-                <SelectItem value="high">🟠 High</SelectItem>
-                <SelectItem value="medium">🟡 Medium</SelectItem>
-                <SelectItem value="low">🟢 Low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <TabsContent value="details" className="px-6 pb-5 space-y-6 mt-4">
+            {/* Meta fields */}
+            <div className="space-y-3 bg-muted/20 rounded-lg p-4 border border-border/50">
+              <UserPickerField label="Owner" currentUser={task.assignee} onSave={(userId) => handleSave("assignee_id", userId)} />
+              <MultiUserPicker
+                label="Collaborators"
+                selectedUsers={collaborators.map(c => ({
+                  id: c.user_id,
+                  full_name: c.user?.full_name || "Unknown",
+                  profile_picture_url: c.user?.profile_picture_url,
+                }))}
+                onAdd={(user) => addCollaborator.mutate({ taskId: task.id, userId: user.id })}
+                onRemove={(userId) => removeCollaborator.mutate({ taskId: task.id, userId })}
+              />
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Type</span>
-            <Select value={task.type} onValueChange={v => handleSave("type", v)}>
-              <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="task">✅ Task</SelectItem>
-                <SelectItem value="bug">🐛 Bug</SelectItem>
-                <SelectItem value="idea">💡 Idea</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="h-px bg-border/50" />
 
-          <div className="h-px bg-border/50" />
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Status</span>
+                <Select value={status} onValueChange={v => { setStatus(v as any); handleSave("status", v); }}>
+                  <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">To Do</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="in_review">In Review</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <DatePickerField
-            label="Start date"
-            value={startDate}
-            onChange={(v) => { setStartDate(v); handleSave("start_date", v); }}
-            onClear={() => { setStartDate(""); handleSave("start_date", null); }}
-          />
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Priority</span>
+                <Select value={priority} onValueChange={v => { setPriority(v as any); handleSave("priority", v); }}>
+                  <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="critical">🔴 Critical</SelectItem>
+                    <SelectItem value="high">🟠 High</SelectItem>
+                    <SelectItem value="medium">🟡 Medium</SelectItem>
+                    <SelectItem value="low">🟢 Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <DatePickerField
-            label="Due date"
-            value={dueDate}
-            onChange={(v) => { setDueDate(v); handleSave("due_date", v); }}
-            onClear={() => { setDueDate(""); handleSave("due_date", null); }}
-          />
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Type</span>
+                <Select value={task.type} onValueChange={v => handleSave("type", v)}>
+                  <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="task">✅ Task</SelectItem>
+                    <SelectItem value="bug">🐛 Bug</SelectItem>
+                    <SelectItem value="idea">💡 Idea</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="h-px bg-border/50" />
+              <div className="h-px bg-border/50" />
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Est. Hours</span>
-            <Input
-              type="number"
-              value={estimatedHours}
-              onChange={e => setEstimatedHours(e.target.value)}
-              onBlur={() => handleSave("estimated_hours", estimatedHours ? parseFloat(estimatedHours) : null)}
-              className="h-9 flex-1 text-sm"
-              placeholder="0"
-            />
-          </div>
+              <DatePickerField
+                label="Start date"
+                value={startDate}
+                onChange={(v) => { setStartDate(v); handleSave("start_date", v); }}
+                onClear={() => { setStartDate(""); handleSave("start_date", null); }}
+              />
 
-          {/* Consumed Hours - read-only, from timesheet */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Consumed</span>
-            <span className="text-sm text-foreground tabular-nums h-9 flex items-center">
-              {(task.logged_hours ?? 0) > 0 ? `${task.logged_hours}h` : "0h"}
-            </span>
-          </div>
+              <DatePickerField
+                label="Due date"
+                value={dueDate}
+                onChange={(v) => { setDueDate(v); handleSave("due_date", v); }}
+                onClear={() => { setDueDate(""); handleSave("due_date", null); }}
+              />
 
-          {/* Available Hours - formula: estimated - consumed */}
-          {task.estimated_hours != null && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Available</span>
-              <span className={cn(
-                "text-sm tabular-nums h-9 flex items-center font-medium",
-                (task.estimated_hours - (task.logged_hours ?? 0)) < 0
-                  ? "text-destructive"
-                  : "text-green-600 dark:text-green-400"
-              )}>
-                {(task.estimated_hours - (task.logged_hours ?? 0)).toFixed(1)}h
-              </span>
+              <div className="h-px bg-border/50" />
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Est. Hours</span>
+                <Input
+                  type="number"
+                  value={estimatedHours}
+                  onChange={e => setEstimatedHours(e.target.value)}
+                  onBlur={() => handleSave("estimated_hours", estimatedHours ? parseFloat(estimatedHours) : null)}
+                  className="h-9 flex-1 text-sm"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Consumed Hours */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Consumed</span>
+                <span className="text-sm text-foreground tabular-nums h-9 flex items-center">
+                  {(task.logged_hours ?? 0) > 0 ? `${task.logged_hours}h` : "0h"}
+                </span>
+              </div>
+
+              {/* Available Hours */}
+              {task.estimated_hours != null && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Available</span>
+                  <span className={cn(
+                    "text-sm tabular-nums h-9 flex items-center font-medium",
+                    (task.estimated_hours - (task.logged_hours ?? 0)) < 0
+                      ? "text-destructive"
+                      : "text-green-600 dark:text-green-400"
+                  )}>
+                    {(task.estimated_hours - (task.logged_hours ?? 0)).toFixed(1)}h
+                  </span>
+                </div>
+              )}
+
+              {task.story_points !== undefined && task.story_points !== null && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Points</span>
+                  <span className="text-sm">{task.story_points} pts</span>
+                </div>
+              )}
             </div>
-          )}
 
-          {task.story_points !== undefined && task.story_points !== null && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-24 flex-shrink-0">Points</span>
-              <span className="text-sm">{task.story_points} pts</span>
+            {/* Description */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
+              <Textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                onBlur={() => { if (description !== (task.description || "")) handleSave("description", description); }}
+                placeholder="What is this task about?"
+                className="min-h-[100px] text-sm resize-none"
+              />
             </div>
-          )}
-        </div>
 
-        {/* Description */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</h3>
-          <Textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            onBlur={() => { if (description !== (task.description || "")) handleSave("description", description); }}
-            placeholder="What is this task about?"
-            className="min-h-[100px] text-sm resize-none"
-          />
-        </div>
-
-        {/* Sub-tasks */}
-        <div id="task-subtasks-section">
-          <TaskSubtasks
-            task={task}
-            allTasks={allTasks}
-            projectId={projectId}
-            onSelectTask={handleSelectTask}
-          />
-        </div>
-
-        {/* Dependencies */}
-        <div id="task-dependencies-section">
-          <TaskDependencies
-            task={task}
-            allTasks={allTasks}
-            onSelectTask={handleSelectTask}
-          />
-        </div>
-
-        {/* Attachments */}
-        <div id="task-attachments-section">
-          <TaskAttachments taskId={task.id} />
-        </div>
-
-        {/* Timesheet related list */}
-        <div id="task-timesheet-section">
-          <TaskTimesheetSection taskId={task.id} projectId={projectId} />
-        </div>
-
-        {/* Tags */}
-        {task.tags && task.tags.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tags</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {task.tags.map(tag => (
-                <span key={tag} className="text-xs px-2.5 py-1 bg-secondary text-secondary-foreground rounded-full">{tag}</span>
-              ))}
+            {/* Sub-tasks */}
+            <div id="task-subtasks-section">
+              <TaskSubtasks
+                task={task}
+                allTasks={allTasks}
+                projectId={projectId}
+                onSelectTask={handleSelectTask}
+              />
             </div>
-          </div>
-        )}
 
-        {/* Created info */}
-        <div className="text-xs text-muted-foreground pt-3 border-t space-y-0.5">
-          <p>Created {format(new Date(task.created_at), "MMM d, yyyy 'at' h:mm a")}</p>
-          {task.updated_at && <p>Updated {format(new Date(task.updated_at), "MMM d, yyyy 'at' h:mm a")}</p>}
-        </div>
+            {/* Dependencies */}
+            <div id="task-dependencies-section">
+              <TaskDependencies
+                task={task}
+                allTasks={allTasks}
+                onSelectTask={handleSelectTask}
+              />
+            </div>
+
+            {/* Attachments */}
+            <div id="task-attachments-section">
+              <TaskAttachments taskId={task.id} />
+            </div>
+
+            {/* Tags */}
+            {task.tags && task.tags.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tags</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {task.tags.map(tag => (
+                    <span key={tag} className="text-xs px-2.5 py-1 bg-secondary text-secondary-foreground rounded-full">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Created info */}
+            <div className="text-xs text-muted-foreground pt-3 border-t space-y-0.5">
+              <p>Created {format(new Date(task.created_at), "MMM d, yyyy 'at' h:mm a")}</p>
+              {task.updated_at && <p>Updated {format(new Date(task.updated_at), "MMM d, yyyy 'at' h:mm a")}</p>}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="timesheet" className="px-6 pb-5 mt-4">
+            <TaskTimesheetSection taskId={task.id} projectId={projectId} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Move Task Dialog */}
