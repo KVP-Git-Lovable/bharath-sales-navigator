@@ -19,7 +19,7 @@ import {
   Plus, Trash2, Edit2, Users, TrendingUp, DollarSign,
   Clock, ChevronDown, ChevronUp, IndianRupee,
 } from "lucide-react";
-import { format, parseISO, differenceInBusinessDays } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -156,12 +156,8 @@ export function ResourcesPanel({ projectId }: Props) {
       const profit = revenue - cost;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 
-      // Utilization: hours logged vs available (business days * 8h or 4h for part-time)
-      let availableHours = 0;
-      if (r.start_date && r.release_date) {
-        const bDays = differenceInBusinessDays(parseISO(r.release_date), parseISO(r.start_date)) + 1;
-        availableHours = bDays * (r.deployment_type === "full_time" ? 8 : 4);
-      }
+      // Utilization: hours logged vs effort budget (hours)
+      const availableHours = r.budget_allocated || 0;
       const utilization = availableHours > 0 ? Math.min((totalHoursLogged / availableHours) * 100, 100) : 0;
 
       return {
@@ -217,6 +213,7 @@ export function ResourcesPanel({ projectId }: Props) {
         {[
           { label: "Team Size", value: resources.length, icon: Users, color: "text-primary" },
           { label: "Total Hours", value: `${projectProfitability.totalHours.toFixed(1)}h`, icon: Clock, color: "text-blue-500" },
+          { label: "Effort Budget", value: `${projectProfitability.totalBudget.toFixed(0)}h`, icon: Clock, color: "text-indigo-500" },
           { label: "Revenue", value: `₹${(projectProfitability.totalRevenue / 1000).toFixed(1)}K`, icon: IndianRupee, color: "text-green-600" },
           { label: "Cost", value: `₹${(projectProfitability.totalCost / 1000).toFixed(1)}K`, icon: IndianRupee, color: "text-red-500" },
           { label: "Profit", value: `₹${(projectProfitability.totalProfit / 1000).toFixed(1)}K`, icon: TrendingUp, color: projectProfitability.totalProfit >= 0 ? "text-green-600" : "text-red-500" },
@@ -307,7 +304,7 @@ export function ResourcesPanel({ projectId }: Props) {
                     <th className="text-center py-2 px-2">Type</th>
                     <th className="text-right py-2 px-2">Sell Rate/hr</th>
                     <th className="text-right py-2 px-2">Cost/hr</th>
-                    <th className="text-right py-2 px-2">Budget</th>
+                    <th className="text-right py-2 px-2">Effort Budget</th>
                     <th className="text-center py-2 px-2">Period</th>
                     <th className="text-right py-2 px-2">Hours</th>
                     <th className="text-center py-2 px-2">Utilization</th>
@@ -330,7 +327,7 @@ export function ResourcesPanel({ projectId }: Props) {
                       </td>
                       <td className="py-2 px-2 text-right">₹{r.selling_rate}</td>
                       <td className="py-2 px-2 text-right">₹{r.cost_rate}</td>
-                      <td className="py-2 px-2 text-right">₹{r.budget_allocated.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right">{r.budget_allocated}h</td>
                       <td className="py-2 px-2 text-center text-[10px] text-muted-foreground">
                         {r.start_date ? format(parseISO(r.start_date), "dd MMM") : "—"} – {r.release_date ? format(parseISO(r.release_date), "dd MMM") : "—"}
                       </td>
@@ -520,7 +517,7 @@ function ResourceFormDialog({ open, onClose, resource, availableUsers, onSave }:
               <Input type="number" step="0.01" value={form.cost_rate} onChange={(e) => setForm((f) => ({ ...f, cost_rate: e.target.value }))} placeholder="0" />
             </div>
             <div>
-              <Label>Budget (₹)</Label>
+              <Label>Effort Budget (hrs)</Label>
               <Input type="number" value={form.budget_allocated} onChange={(e) => setForm((f) => ({ ...f, budget_allocated: e.target.value }))} placeholder="0" />
             </div>
           </div>
