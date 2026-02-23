@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, CheckCircle, Database } from 'lucide-react';
+import { monitoring } from '@/services/MonitoringService';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 import { ActivityLoggingSection } from '@/components/status/ActivityLoggingSection';
 import { LicenseDetailsSection } from '@/components/status/LicenseDetailsSection';
@@ -133,40 +134,46 @@ const StatusDashboard = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError || !authData.user) {
-        toast({ title: 'Authentication Failed', description: authError?.message || 'Invalid credentials', variant: 'destructive' });
-        setIsLoading(false);
-        return;
-      }
-      // Check if user has admin_dashboard permission via profile_object_permissions
-      const { data: profileData, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('profile_id')
-        .eq('user_id', authData.user.id)
-        .single();
-      
-      let hasAccess = false;
-      if (!profileError && profileData?.profile_id) {
-        const { data: perms } = await supabase
-          .from('profile_object_permissions')
-          .select('object_name')
-          .eq('profile_id', profileData.profile_id)
-          .like('object_name', 'admin_%')
-          .eq('can_read', true)
-          .limit(1);
-        hasAccess = (perms && perms.length > 0) || false;
-      }
-      
-      if (!hasAccess) {
-        toast({ title: 'Access Denied', description: 'You do not have admin permissions to access this dashboard.', variant: 'destructive' });
-        await supabase.auth.signOut();
-        setIsLoading(false);
-        return;
-      }
-      setIsAuthenticated(true);
-      toast({ title: 'Welcome', description: 'Successfully authenticated as Administrator' });
-      await fetchMetrics();
+      await monitoring.trace('status_dashboard_login_process', async () => {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError || !authData.user) {
+          toast({ title: 'Authentication Failed', description: authError?.message || 'Invalid credentials', variant: 'destructive' });
+          setIsLoading(false);
+          return;
+        }
+
+        // Identify user for Firebase Performance tracing
+        await monitoring.identifyUser(authData.user.id);
+
+        // Check if user has admin_dashboard permission via profile_object_permissions
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('profile_id')
+          .eq('user_id', authData.user.id)
+          .single();
+        
+        let hasAccess = false;
+        if (!profileError && profileData?.profile_id) {
+          const { data: perms } = await supabase
+            .from('profile_object_permissions')
+            .select('object_name')
+            .eq('profile_id', profileData.profile_id)
+            .like('object_name', 'admin_%')
+            .eq('can_read', true)
+            .limit(1);
+          hasAccess = (perms && perms.length > 0) || false;
+        }
+        
+        if (!hasAccess) {
+          toast({ title: 'Access Denied', description: 'You do not have admin permissions to access this dashboard.', variant: 'destructive' });
+          await supabase.auth.signOut();
+          setIsLoading(false);
+          return;
+        }
+        setIsAuthenticated(true);
+        toast({ title: 'Welcome', description: 'Successfully authenticated as Administrator' });
+        await fetchMetrics();
+      });
     } catch (error) {
       console.error('Login error:', error);
       toast({ title: 'Error', description: 'An unexpected error occurred', variant: 'destructive' });
