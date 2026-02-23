@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@capacitor-community/firebase-crashlytics": "^3.0.0",
+    "@capacitor-firebase/performance": "^7.5.0",
     "@capacitor/android": "^7.4.2",
     "@capacitor/app": "^7.1.0",
     "@capacitor/camera": "^7.0.2",
@@ -22,7 +23,7 @@
     "@capacitor/geolocation": "^7.1.5",
     "@capacitor/ios": "^7.4.2",
     "@capacitor/local-notifications": "^7.0.0",
-    "@capacitor/network":"^7.0.0",
+    "@capacitor/network": "^7.0.0",
     "@capacitor/preferences": "^7.0.2",
     "@elevenlabs/react": "^0.13.1",
     "@hookform/resolvers": "^3.9.0",
