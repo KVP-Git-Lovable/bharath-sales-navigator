@@ -1,5 +1,4 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf, jspdf-autotable loaded dynamically in functions
 import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
@@ -193,36 +192,45 @@ const normalizeItemForDisplay = (item: any) => {
  * This is the ONLY template used throughout the application
  */
 export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob> {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const { orderId, company, retailer, cartItems, displayInvoiceNumber, displayInvoiceDate, displayInvoiceTime, beatName, salesmanName, schemeDetails, orderDiscount, orderTotal } = data;
   
-  // Fetch display settings if not provided
-  const displaySettings = data.displaySettings || await getInvoiceDisplaySettingsMap();
+  // Fetch display settings for customizable invoice fields
+  let displaySettings: DisplaySettingsMap | null = null;
+  try {
+    displaySettings = await getInvoiceDisplaySettingsMap();
+  } catch (e) {
+    console.warn('Failed to fetch display settings, using defaults:', e);
+  }
   
-  // Helper to check if a setting is enabled (defaults to true if not set)
-  const isEnabled = (key: string) => displaySettings[key] !== false;
+  const isEnabled = (key: string): boolean => {
+    if (!displaySettings) return true; // Default: show everything
+    return displaySettings[key] !== false;
+  };
 
-  // Translate retailer address if it contains non-English characters
-  const translatedRetailerAddress = await translateAddressToEnglish(retailer?.address || '');
-  const retailerWithTranslatedAddress = { ...retailer, address: translatedRetailerAddress };
-
-  // Get display name - show only variant name if it's a variant, or base product name
-  const getDisplayName = (item: any) => {
-    const fullName = item.product_name || item.name || "";
-    // Check if this is a variant (contains " - ")
-    if (fullName.includes(" - ")) {
-      const parts = fullName.split(" - ");
-      const variantPart = parts[1];
-      // If variant is "Base variant", show only the base product name
-      if (variantPart.toLowerCase() === "base variant") {
-        return parts[0];
-      }
-      // Otherwise show only the variant name
-      return variantPart;
+  // Translate retailer address if it contains regional language characters
+  const retailerWithTranslatedAddress = { ...retailer };
+  if (retailer.address) {
+    retailerWithTranslatedAddress.address = await translateAddressToEnglish(retailer.address);
+  }
+  
+  // Helper to get short display name (variant only, not "Product - Variant")
+  const getShortDisplayName = (fullName: string): string => {
+    if (!fullName) return '';
+    // Check if format is "Product - Variant"
+    const dashIndex = fullName.indexOf(' - ');
+    if (dashIndex > 0) {
+      const variantPart = fullName.substring(dashIndex + 3).trim();
+      if (variantPart) return variantPart;
     }
-    // If no variant, return the full name
     return fullName;
   };
   
+  const getDisplayName = (item: any): string => {
+    return getShortDisplayName(item.product_name || item.name || '');
+  };
+
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;

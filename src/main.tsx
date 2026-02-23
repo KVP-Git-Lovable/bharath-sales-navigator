@@ -6,6 +6,10 @@ import App from './App.tsx';
 import './index.css';
 // Import i18n BEFORE app renders to ensure translations are available
 import './i18n/config';
+// Core modules - static imports (always in main bundle)
+import { offlineStorage } from './lib/offlineStorage';
+import { initCrashlytics } from './utils/crashlytics';
+import { initDownloadNotifications } from './utils/fileDownloader';
 
 console.log('🚀 App starting...');
 
@@ -52,20 +56,14 @@ console.log('✅ App rendered successfully');
   }
 
   try {
-    // Initialize offline storage in background
     console.log('📦 Initializing offline storage...');
-    const { offlineStorage } = await import('./lib/offlineStorage');
     await offlineStorage.init();
     console.log('✅ Offline storage ready');
   } catch (error) {
     console.warn('⚠️ Offline storage init failed:', error);
   }
 
-  // i18n is already loaded synchronously at startup
-
   try {
-    // Initialize download notifications channel for native apps
-    const { initDownloadNotifications } = await import('./utils/fileDownloader');
     await initDownloadNotifications();
     console.log('✅ Download notifications initialized');
   } catch (error) {
@@ -73,8 +71,6 @@ console.log('✅ App rendered successfully');
   }
 
   try {
-    // Initialize Firebase Crashlytics for native apps
-    const { initCrashlytics } = await import('./utils/crashlytics');
     await initCrashlytics();
   } catch (error) {
     console.warn('⚠️ Crashlytics init failed:', error);

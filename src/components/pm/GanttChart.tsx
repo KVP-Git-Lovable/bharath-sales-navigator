@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// jspdf loaded dynamically in handler
 
 interface Props {
   tasks: Task[];
@@ -240,6 +240,7 @@ export function GanttChart({ tasks, project, milestones, sections, onTaskClick }
     if (!chartRef.current) return;
     const canvas = await html2canvas(chartRef.current, { useCORS: true, scale: 2 });
     const imgData = canvas.toDataURL("image/png");
+    const { default: jsPDF } = await import('jspdf');
     const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width / 2, canvas.height / 2] });
     pdf.addImage(imgData, "PNG", 0, 0, canvas.width / 2, canvas.height / 2);
     pdf.save("gantt-chart.pdf");

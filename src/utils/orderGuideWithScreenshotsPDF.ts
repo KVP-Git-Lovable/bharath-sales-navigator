@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import type jsPDF from 'jspdf';
 import { format } from 'date-fns';
 
 // Constants
@@ -608,7 +608,8 @@ const drawConfirmationScreen = (doc: jsPDF) => {
 // ========== MAIN GENERATOR ==========
 
 export async function generateOrderGuideWithScreenshotsPDF(): Promise<void> {
-  const doc = new jsPDF();
+  const { default: jsPDFConstructor } = await import('jspdf');
+  const doc = new jsPDFConstructor() as jsPDF;
   currentPage = 1;
   yPos = MARGIN;
   

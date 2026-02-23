@@ -27,6 +27,7 @@ import { useFaceMatching } from '@/hooks/useFaceMatching';
 import { CameraCapture } from '@/components/CameraCapture';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { shouldSuppressError } from '@/utils/offlineErrorHandler';
+import { requestLocationPermission } from '@/utils/permissions';
 import { useVanSales } from '@/hooks/useVanSales';
 import { getLocalTodayDate, toLocalISODate } from '@/utils/dateUtils';
 import RegularizationRequestModal from '@/components/RegularizationRequestModal';
@@ -280,7 +281,6 @@ const Attendance = () => {
   const getCurrentLocation = async () => {
     // Request location permission first
     try {
-      const { requestLocationPermission } = await import('@/utils/permissions');
       const granted = await requestLocationPermission();
       
       if (!granted) {

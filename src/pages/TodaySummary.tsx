@@ -20,8 +20,7 @@ import { loadMyVisitsSnapshot } from "@/lib/myVisitsSnapshot";
 import { isSlowConnection } from "@/utils/internetSpeedCheck";
 import { getLocalTodayDate } from "@/utils/dateUtils";
 import { getOrdersForDate } from "@/utils/ordersForDate";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf, jspdf-autotable loaded dynamically in handler
 import { downloadPDF } from "@/utils/fileDownloader";
 import { ReportGenerator } from "@/components/ReportGenerator";
 import { calculateJointVisitScore } from "@/components/JointSalesFeedbackModal";
@@ -1547,6 +1546,8 @@ export const TodaySummary = () => {
 
   const handleDownloadPDF = async () => {
     try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       let yPosition = 20;

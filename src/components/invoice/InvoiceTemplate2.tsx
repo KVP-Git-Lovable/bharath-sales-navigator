@@ -1,5 +1,4 @@
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf, jspdf-autotable loaded dynamically in handler
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +19,8 @@ export default function InvoiceTemplate2({
 }: InvoiceTemplate2Props) {
   const generatePDF = async () => {
     try {
+      const { jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       

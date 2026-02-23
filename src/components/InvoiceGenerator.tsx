@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf, jspdf-autotable loaded dynamically in handler
 import { downloadPDF } from "@/utils/fileDownloader";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -93,6 +92,8 @@ export const InvoiceGenerator = ({ orderId, className }: InvoiceGeneratorProps) 
       }
 
       // Generate PDF
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       

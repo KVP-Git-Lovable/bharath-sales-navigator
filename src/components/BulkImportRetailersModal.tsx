@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from "lucide-react";
-import * as XLSX from "xlsx";
+// xlsx loaded dynamically in handlers
 
 interface BulkImportRetailersModalProps {
   open: boolean;
@@ -43,7 +43,8 @@ export const BulkImportRetailersModal = ({ open, onOpenChange, onSuccess }: Bulk
   const [parsedData, setParsedData] = useState<ParsedRetailer[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.aoa_to_sheet([REQUIRED_COLUMNS]);
     // Set column widths
     ws['!cols'] = REQUIRED_COLUMNS.map(col => ({ wch: Math.max(col.length + 5, 18) }));
@@ -71,6 +72,7 @@ export const BulkImportRetailersModal = ({ open, onOpenChange, onSuccess }: Bulk
     setParsedData([]);
     
     try {
+      const XLSX = await import('xlsx');
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];

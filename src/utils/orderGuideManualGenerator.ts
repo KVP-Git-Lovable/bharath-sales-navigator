@@ -1,4 +1,3 @@
-import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 
 // PDF Configuration
@@ -18,6 +17,7 @@ interface SectionContent {
 }
 
 export async function generateOrderGuideManualPDF(): Promise<void> {
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
   let yPos = MARGIN;
   let currentPage = 1;

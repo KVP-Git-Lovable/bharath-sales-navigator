@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { FileSpreadsheet, TrendingUp, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import * as XLSX from 'xlsx';
+// xlsx loaded dynamically in handler
 import { format } from "date-fns";
 import { downloadExcel } from "@/utils/fileDownloader";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -242,6 +242,7 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
 
   const handleExportExcel = async () => {
     try {
+      const XLSX = await import('xlsx');
       const exportData = filteredPoints.map(point => ({
         "Date & Time": format(new Date(point.earned_at), "dd MMM yyyy, HH:mm"),
         "Game Name": point.game_name,

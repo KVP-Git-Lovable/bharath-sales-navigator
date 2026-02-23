@@ -7,8 +7,7 @@ import { Input } from './ui/input';
 import { toast } from 'sonner';
 import { Edit, Package, Search, Check, X, Download } from 'lucide-react';
 import { VanMorningInventory } from './VanMorningInventory';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// jspdf, jspdf-autotable loaded dynamically in handler
 import { downloadPDF } from '@/utils/fileDownloader';
 
 interface VanStockItem {
@@ -272,6 +271,8 @@ export function VanStockView({ selectedDate }: VanStockViewProps) {
       return;
     }
 
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
     const dateStr = selectedDate.toLocaleDateString('en-IN', { 
       day: '2-digit', 
