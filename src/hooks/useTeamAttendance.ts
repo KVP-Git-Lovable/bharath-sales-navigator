@@ -47,11 +47,19 @@ export interface PendingApproval {
   myLevel?: number;
 }
 
-const today = format(new Date(), 'yyyy-MM-dd');
-const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-
-export const useTeamAttendance = (subordinateIds: string[], directReportIds?: string[], dateFilter: string = 'current-month') => {
+export const useTeamAttendance = (
+  subordinateIds: string[],
+  directReportIds?: string[],
+  dateFilter: string = 'current-month',
+  dateRangeStart?: string,
+  dateRangeEnd?: string,
+) => {
+  // Compute date boundaries based on filter
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const targetStart = dateRangeStart || today;
+  const targetEnd = dateRangeEnd || today;
+  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
   // Use directReportIds for approvals (only immediate reports), fall back to subordinateIds
   const approvalUserIds = directReportIds && directReportIds.length > 0 ? directReportIds : subordinateIds;
   const { user } = useAuth();
@@ -75,16 +83,21 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
     staleTime: 5 * 60 * 1000,
   });
 
-  // 2. Today's attendance
+  // 2. Attendance for the selected date range
   const { data: todayAttendance = [] } = useQuery({
-    queryKey: ['team-today-attendance', subordinateIds, today],
+    queryKey: ['team-today-attendance', subordinateIds, targetStart, targetEnd],
     queryFn: async () => {
       if (!subordinateIds.length) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('attendance')
         .select('*')
-        .in('user_id', subordinateIds)
-        .eq('date', today);
+        .in('user_id', subordinateIds);
+      if (targetStart === targetEnd) {
+        query = query.eq('date', targetStart);
+      } else {
+        query = query.gte('date', targetStart).lte('date', targetEnd);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
@@ -92,9 +105,9 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
     staleTime: 2 * 60 * 1000,
   });
 
-  // 3. Today's approved leaves
+  // 3. Approved leaves overlapping the selected date range
   const { data: todayLeaves = [] } = useQuery({
-    queryKey: ['team-today-leaves', subordinateIds, today],
+    queryKey: ['team-today-leaves', subordinateIds, targetStart, targetEnd],
     queryFn: async () => {
       if (!subordinateIds.length) return [];
       const { data, error } = await supabase
@@ -102,8 +115,8 @@ export const useTeamAttendance = (subordinateIds: string[], directReportIds?: st
         .select('user_id, start_date, end_date')
         .in('user_id', subordinateIds)
         .eq('status', 'approved')
-        .lte('start_date', today)
-        .gte('end_date', today);
+        .lte('start_date', targetEnd)
+        .gte('end_date', targetStart);
       if (error) throw error;
       return data || [];
     },
