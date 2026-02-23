@@ -239,6 +239,27 @@ const App = () => {
     };
 
     const rejectionHandler = (event: PromiseRejectionEvent) => {
+      const message = event.reason?.message || event.reason?.toString() || '';
+      
+      const ignoredErrors = [
+        'ServiceWorker',
+        'service-worker',
+        'Failed to fetch',
+        'Network request failed',
+        'NetworkError',
+        'Load failed',
+        'AbortError',
+        'chunk',
+      ];
+      
+      const isIgnored = ignoredErrors.some(err => message.includes(err));
+      
+      if (isIgnored) {
+        console.warn("Non-critical rejection suppressed:", message);
+        event.preventDefault();
+        return;
+      }
+      
       console.error("Unhandled rejection:", event.reason);
       setHasError(true);
     };
