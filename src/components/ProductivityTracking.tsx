@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, isSameDay } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
+// xlsx loaded dynamically in handler
 
 interface ProductivityData {
   user_id: string;
@@ -236,7 +236,8 @@ const ProductivityTracking = () => {
     navigate(`/today-summary?date=${date}`);
   };
 
-  const handleDownloadXLS = () => {
+  const handleDownloadXLS = async () => {
+    const XLSX = await import('xlsx');
     const exportData = filteredData.map(item => ({
       'User Name': item.user_name,
       'Beat Name': item.beat_name,

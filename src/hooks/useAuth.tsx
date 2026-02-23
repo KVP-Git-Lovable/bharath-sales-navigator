@@ -7,6 +7,7 @@ import { devLog, devError } from '@/utils/devLog';
 import { Preferences } from '@capacitor/preferences';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { clearRetailerIndex } from '@/lib/retailerIndex';
+import { requestLocationPermission, requestStoragePermission } from '@/utils/permissions';
 import i18n from '@/i18n/config';
 
 interface AuthContextType {
@@ -413,9 +414,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Request permissions after successful sign-in (both web and native)
       setTimeout(async () => {
         try {
-          const { requestLocationPermission, requestStoragePermission } = await import('@/utils/permissions');
-          
-          // Request location permission first
           const locationGranted = await requestLocationPermission();
           if (!locationGranted) {
             toast.info('Location permission is needed for check-ins and GPS tracking');

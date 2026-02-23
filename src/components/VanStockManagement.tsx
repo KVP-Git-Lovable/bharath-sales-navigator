@@ -16,9 +16,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from "@/lib/utils";
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { offlineStorage, STORES } from '@/lib/offlineStorage';
+// xlsx, jspdf, jspdf-autotable loaded dynamically in handlers
 import { syncOrdersToVanStock, recalculateVanStock } from '@/utils/vanStockSync';
 import { downloadExcel, downloadPDF } from '@/utils/fileDownloader';
 import { cacheVanStockForOffline } from '@/utils/localVanStockSync';
@@ -312,7 +311,6 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
   const loadProducts = async () => {
     try {
       // Try loading from IndexedDB first (offline-first)
-      const { offlineStorage, STORES } = await import('@/lib/offlineStorage');
       let cachedProducts = await offlineStorage.getAll(STORES.PRODUCTS);
       let cachedVariants = await offlineStorage.getAll(STORES.VARIANTS);
       
@@ -402,7 +400,6 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
           setProducts(allProducts);
           
           // Update cache
-          const { offlineStorage, STORES } = await import('@/lib/offlineStorage');
           for (const product of productsData) {
             await offlineStorage.save(STORES.PRODUCTS, product);
           }
@@ -1225,6 +1222,7 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
       ['']
     ];
 
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.aoa_to_sheet(headerData);
     XLSX.utils.sheet_add_json(ws, itemsData, { origin: 'A15' });
     
@@ -1289,6 +1287,8 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
       // Get beat name
       const beatName = beats.find(b => b.id === selectedBeat)?.beat_name || '';
 
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -1533,7 +1533,7 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const rawItems = todayStock?.van_stock_items || [];
     if (rawItems.length === 0) {
       toast.error('No stock items to print');
@@ -1543,6 +1543,8 @@ export function VanStockManagement({ open, onOpenChange, selectedDate }: VanStoc
     // Sort items by product group (base products with variants together)
     const savedItems = groupProductsWithVariants(rawItems, products);
 
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
     const dateStr = new Date(selectedDate).toLocaleDateString('en-IN', { 
       day: '2-digit', 

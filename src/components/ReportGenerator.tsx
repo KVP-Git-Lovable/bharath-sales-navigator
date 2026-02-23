@@ -6,9 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileSpreadsheet, FileText, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import * as XLSX from 'xlsx';
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// xlsx, jspdf, jspdf-autotable loaded dynamically in export handlers
 import { downloadPDF, downloadExcel } from "@/utils/fileDownloader";
 
 interface RetailerReportData {
@@ -151,8 +149,9 @@ export const ReportGenerator = ({ data, dateRange, generalReportData = [], selec
     });
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
+      const XLSX = await import('xlsx');
       const isGeneralReport = activeTab === "general";
       const selectedData = isGeneralReport ? getSelectedGeneralData() : getSelectedData();
       
@@ -229,6 +228,8 @@ export const ReportGenerator = ({ data, dateRange, generalReportData = [], selec
 
   const handleExportPDF = async () => {
     try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
       const isGeneralReport = activeTab === "general";
       const selectedData = isGeneralReport ? getSelectedGeneralData() : getSelectedData();
       

@@ -11,8 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { UserCheck, TrendingUp, Store, IndianRupee, CalendarIcon, Download } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf, jspdf-autotable loaded dynamically in handler
 import { downloadPDF } from "@/utils/fileDownloader";
 
 export default function JointSalesAnalytics() {
@@ -117,6 +116,8 @@ export default function JointSalesAnalytics() {
   };
 
   const downloadReport = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
     
     doc.setFontSize(18);

@@ -5,9 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { FileSpreadsheet, FileText, Download, Languages, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from 'xlsx';
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf, jspdf-autotable, xlsx loaded dynamically in export handlers
 import { downloadPDF } from "@/utils/fileDownloader";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -138,6 +136,7 @@ export const BeatRetailerExport = ({ beatName, retailers }: BeatRetailerExportPr
   };
 
   const exportExcel = async (selectedData: Record<string, string | number>[]) => {
+    const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
     
     // Header rows
@@ -183,6 +182,8 @@ export const BeatRetailerExport = ({ beatName, retailers }: BeatRetailerExportPr
   };
 
   const exportPDF = async (selectedData: Record<string, string | number>[]) => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
     // Always use landscape for better address visibility
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.getWidth();

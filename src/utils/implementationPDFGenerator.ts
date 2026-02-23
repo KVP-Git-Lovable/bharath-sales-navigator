@@ -1,8 +1,8 @@
-import jsPDF from 'jspdf';
 import { format, addWeeks } from 'date-fns';
 import { ImplementationData } from '@/pages/website/ImplementationToolkitPage';
 
 export async function generateImplementationPDF(data: ImplementationData): Promise<void> {
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
   let yPos = 20;
   const pageWidth = doc.internal.pageSize.getWidth();

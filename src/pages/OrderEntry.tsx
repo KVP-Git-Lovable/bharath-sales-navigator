@@ -312,7 +312,6 @@ export const OrderEntry = () => {
         console.log('Auto-selected "Over Stocked" for visit:', visitId);
         
         // Also update cache to ensure immediate reflection
-        const offlineStorage = (await import('@/lib/offlineStorage')).offlineStorage;
         try {
           const cachedVisit = await offlineStorage.getById<any>('visits', visitId);
           if (cachedVisit) {
@@ -485,7 +484,6 @@ export const OrderEntry = () => {
     const loadRetailerCoordinates = async () => {
       // 1) Try cache first (instant) - from offlineStorage
       try {
-        const { offlineStorage, STORES } = await import('@/lib/offlineStorage');
         const cachedRetailers = await offlineStorage.getAll<any>(STORES.RETAILERS);
         const cachedRetailer = cachedRetailers.find((r: any) => r.id === validRetailerId);
 

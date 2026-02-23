@@ -32,6 +32,7 @@ import { format, addDays, addWeeks, addMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 import { AddRetailerInlineToBeat } from "@/components/AddRetailerInlineToBeat";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
+import { clearMyVisitsSnapshot } from "@/lib/myVisitsSnapshot";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
@@ -947,7 +948,6 @@ export const MyBeats = () => {
         const date = new Date(today);
         date.setDate(date.getDate() + i);
         const dateStr = date.toISOString().split('T')[0];
-        const { clearMyVisitsSnapshot } = await import('@/lib/myVisitsSnapshot');
         await clearMyVisitsSnapshot(user.id, dateStr);
       }
 

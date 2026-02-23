@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, Eye, Volume2, Filter, X } from "lucide-react";
-import * as XLSX from "xlsx";
+// xlsx loaded dynamically in handler
 import { downloadExcel } from "@/utils/fileDownloader";
 
 interface CompetitionDataListProps {
@@ -41,6 +41,7 @@ export function CompetitionDataList({ data, skus }: CompetitionDataListProps) {
   });
 
   const exportToExcel = async () => {
+    const XLSX = await import('xlsx');
     const exportData = filteredData.map(item => ({
       "SKU Name": skus.find(s => s.id === item.sku_id)?.sku_name || 'Unknown',
       "Retailer": item.retailers?.name || 'N/A',

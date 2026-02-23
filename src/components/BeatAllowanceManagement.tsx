@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import AdditionalExpenses from '@/components/AdditionalExpenses';
 import ProductivityTracking from '@/components/ProductivityTracking';
-import * as XLSX from 'xlsx';
+// xlsx loaded dynamically in handler
 import { CompactMultiUserSelector } from '@/components/CompactMultiUserSelector';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useAuth } from '@/hooks/useAuth';
@@ -490,7 +490,8 @@ const BeatAllowanceManagement = () => {
   const totalDA = useMemo(() => filteredDARecords.reduce((sum, record) => sum + record.da_amount, 0), [filteredDARecords]);
   const totalAdditionalExpenses = useMemo(() => filteredAdditionalExpenses.reduce((sum, item) => sum + item.value, 0), [filteredAdditionalExpenses]);
 
-  const downloadXLS = () => {
+  const downloadXLS = async () => {
+    const XLSX = await import('xlsx');
     const { start, end } = getDateRange();
     const dateStr = `${format(start, 'dd-MMM-yyyy')}_to_${format(end, 'dd-MMM-yyyy')}`;
     

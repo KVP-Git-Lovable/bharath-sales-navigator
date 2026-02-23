@@ -539,7 +539,6 @@ export const Cart = () => {
           const localUrl = URL.createObjectURL(blob);
           
           // Store base64 data in IndexedDB for later upload
-          const { offlineStorage, STORES } = await import('@/lib/offlineStorage');
           await offlineStorage.addToSyncQueue('UPLOAD_PAYMENT_PROOF', {
             fileName,
             blobBase64: base64data,

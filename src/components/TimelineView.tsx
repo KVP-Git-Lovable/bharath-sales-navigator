@@ -7,7 +7,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import jsPDF from 'jspdf';
+// jspdf loaded dynamically in handler
 import { downloadPDF } from '@/utils/fileDownloader';
 
 interface Visit {
@@ -85,6 +85,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   const handleDownloadPDF = async () => {
+    const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPosition = 20;
