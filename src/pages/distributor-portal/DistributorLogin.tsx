@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Building2, LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { monitoring } from '@/services/MonitoringService';
 
 const DistributorLogin = () => {
   const navigate = useNavigate();
@@ -98,42 +99,47 @@ const DistributorLogin = () => {
     setLoading(true);
 
     try {
-      // First authenticate with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      await monitoring.trace('distributor_login_process', async () => {
+        // First authenticate with Supabase
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (authError) throw authError;
+
+        // Identify user for Firebase Performance tracing
+        await monitoring.identifyUser(authData.user.id);
+
+        // Check if user is a distributor user
+        const { data: distributorUser, error: distributorError } = await supabase
+          .from('distributor_users')
+          .select('*, distributors(name)')
+          .eq('email', email)
+          .eq('is_active', true)
+          .single();
+
+        if (distributorError || !distributorUser) {
+          await supabase.auth.signOut();
+          throw new Error('You are not authorized to access the distributor portal');
+        }
+
+        // Update last login and status
+        await supabase
+          .from('distributor_users')
+          .update({ 
+            last_login_at: new Date().toISOString(),
+            user_status: 'active',
+          })
+          .eq('id', distributorUser.id);
+
+        // Store distributor context
+        localStorage.setItem('distributor_user', JSON.stringify(distributorUser));
+        localStorage.setItem('distributor_id', distributorUser.distributor_id);
+
+        toast.success(`Welcome back, ${distributorUser.full_name}!`);
+        navigate('/distributor-portal/dashboard');
       });
-
-      if (authError) throw authError;
-
-      // Check if user is a distributor user
-      const { data: distributorUser, error: distributorError } = await supabase
-        .from('distributor_users')
-        .select('*, distributors(name)')
-        .eq('email', email)
-        .eq('is_active', true)
-        .single();
-
-      if (distributorError || !distributorUser) {
-        await supabase.auth.signOut();
-        throw new Error('You are not authorized to access the distributor portal');
-      }
-
-      // Update last login and status
-      await supabase
-        .from('distributor_users')
-        .update({ 
-          last_login_at: new Date().toISOString(),
-          user_status: 'active',
-        })
-        .eq('id', distributorUser.id);
-
-      // Store distributor context
-      localStorage.setItem('distributor_user', JSON.stringify(distributorUser));
-      localStorage.setItem('distributor_id', distributorUser.distributor_id);
-
-      toast.success(`Welcome back, ${distributorUser.full_name}!`);
-      navigate('/distributor-portal/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Failed to login');

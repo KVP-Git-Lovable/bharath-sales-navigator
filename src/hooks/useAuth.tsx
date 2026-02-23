@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { setCachedUser, clearCachedAuth, clearCachedPermissions } from '@/utils/cachedAuthIntegrity';
 import { devLog, devError } from '@/utils/devLog';
+import { monitoring } from '@/services/MonitoringService';
 import { Preferences } from '@capacitor/preferences';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { clearRetailerIndex } from '@/lib/retailerIndex';
@@ -338,102 +339,103 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string, role?: 'admin' | 'user') => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    await monitoring.trace('user_login_process', async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      toast.error(error.message);
-      throw error;
-    }
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
 
-    if (data.user) {
-      // Check security profile for admin login validation
-      const secProfile = await fetchSecurityProfileName(data.user.id);
-      
-      // Check admin login via profile_object_permissions (not profile name)
-      if (role === 'admin') {
-        // Get user's profile_id
-        const { data: userProfileData } = await supabase
-          .from('user_profiles')
-          .select('profile_id')
-          .eq('user_id', data.user.id)
-          .maybeSingle();
+      if (data.user) {
+        // Check security profile for admin login validation
+        const secProfile = await fetchSecurityProfileName(data.user.id);
         
-        let hasAdminPerm = false;
-        if (userProfileData?.profile_id) {
-          const { data: perms } = await supabase
-            .from('profile_object_permissions')
-            .select('object_name')
-            .eq('profile_id', userProfileData.profile_id)
-            .like('object_name', 'admin_%')
-            .eq('can_read', true)
-            .limit(1);
-          hasAdminPerm = (perms && perms.length > 0) || false;
-        }
-        
-        if (!hasAdminPerm) {
-          await supabase.auth.signOut();
-          throw new Error(`Access denied. This account does not have admin privileges.`);
-        }
-      }
-      
-      // Check if user is active
-      const { data: statusCheck } = await supabase
-        .from('profiles')
-        .select('user_status')
-        .eq('id', data.user.id)
-        .maybeSingle();
-      
-      if (statusCheck?.user_status === 'inactive') {
-        await supabase.auth.signOut();
-        toast.error('Your account has been deactivated. Please contact your administrator.');
-        throw new Error('Account is inactive');
-      }
-      
-      const profile = await fetchUserProfile(data.user.id);
-      setUserProfile(profile);
-      
-      // Check if user must change password
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('must_change_password')
-        .eq('id', data.user.id)
-        .maybeSingle();
-      
-      if (profileData?.must_change_password) {
-        setMustChangePassword(true);
-        toast.info('Please change your password to continue');
-        // Don't redirect here - let RoleBasedAuthPage handle it with query params preserved
-        return;
-      }
-      
-      toast.success('Signed in successfully!');
-      
-      // Request permissions after successful sign-in (both web and native)
-      setTimeout(async () => {
-        try {
-          const locationGranted = await requestLocationPermission();
-          if (!locationGranted) {
-            toast.info('Location permission is needed for check-ins and GPS tracking');
+        // Check admin login via profile_object_permissions (not profile name)
+        if (role === 'admin') {
+          // Get user's profile_id
+          const { data: userProfileData } = await supabase
+            .from('user_profiles')
+            .select('profile_id')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+          
+          let hasAdminPerm = false;
+          if (userProfileData?.profile_id) {
+            const { data: perms } = await supabase
+              .from('profile_object_permissions')
+              .select('object_name')
+              .eq('profile_id', userProfileData.profile_id)
+              .like('object_name', 'admin_%')
+              .eq('can_read', true)
+              .limit(1);
+            hasAdminPerm = (perms && perms.length > 0) || false;
           }
           
-          // Request storage permission for offline mode
-          await requestStoragePermission();
-          
-        } catch (error) {
-          devError('Error requesting permissions:', error);
+          if (!hasAdminPerm) {
+            await supabase.auth.signOut();
+            throw new Error(`Access denied. This account does not have admin privileges.`);
+          }
         }
-      }, 1000); // Small delay to let the success toast show first
-
-      // Don't use window.location.href here - it causes a full page reload
-      // which loses the query params. Let RoleBasedAuthPage handle the redirect
-      // via React Router's Navigate component, which preserves the URL params.
-    }
+        
+        // Check if user is active
+        const { data: statusCheck } = await supabase
+          .from('profiles')
+          .select('user_status')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        
+        if (statusCheck?.user_status === 'inactive') {
+          await supabase.auth.signOut();
+          toast.error('Your account has been deactivated. Please contact your administrator.');
+          throw new Error('Account is inactive');
+        }
+        
+        // Identify user for Firebase Performance tracing
+        await monitoring.identifyUser(data.user.id);
+        
+        const profile = await fetchUserProfile(data.user.id);
+        setUserProfile(profile);
+        
+        // Check if user must change password
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('must_change_password')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        
+        if (profileData?.must_change_password) {
+          setMustChangePassword(true);
+          toast.info('Please change your password to continue');
+          return;
+        }
+        
+        toast.success('Signed in successfully!');
+        
+        // Request permissions after successful sign-in (both web and native)
+        setTimeout(async () => {
+          try {
+            const locationGranted = await requestLocationPermission();
+            if (!locationGranted) {
+              toast.info('Location permission is needed for check-ins and GPS tracking');
+            }
+            
+            // Request storage permission for offline mode
+            await requestStoragePermission();
+            
+          } catch (error) {
+            devError('Error requesting permissions:', error);
+          }
+        }, 1000);
+      }
+    });
   };
 
   const signOut = async () => {
+    monitoring.logout();
     try {
       // Sign out from Supabase (no longer auto-cancels visits)
       const { error } = await supabase.auth.signOut({ scope: 'local' });
