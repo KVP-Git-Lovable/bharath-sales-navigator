@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, CheckCircle, Database } from 'lucide-react';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 import { ActivityLoggingSection } from '@/components/status/ActivityLoggingSection';
+import { LicenseDetailsSection } from '@/components/status/LicenseDetailsSection';
 
 interface MetricCard {
   label: string;
@@ -295,6 +296,11 @@ const StatusDashboard = () => {
             )}
           </div>
           <p className="text-xs text-white/40 text-center mt-6">Auto-refreshes every 15 minutes</p>
+
+          {/* License Details Section */}
+          <div className="mt-6">
+            <LicenseDetailsSection />
+          </div>
 
           {/* Activity Logging Section */}
           <div className="mt-6">
