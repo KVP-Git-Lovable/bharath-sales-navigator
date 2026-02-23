@@ -53,8 +53,11 @@ export const LicenseDetailsSection = () => {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-lg font-semibold text-foreground">License Details</CardTitle>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">Current license plan:</span>
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Current license plan:</span>
+              <a href="https://quickapp.ai/pricing" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View pricing plans</a>
+            </div>
             <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
               <SelectTrigger className="w-[140px] bg-white border-border">
                 <SelectValue />
