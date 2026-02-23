@@ -9,6 +9,7 @@ interface TeamSummaryCardsProps {
   absentCount: number;
   activeFilter: TeamFilter;
   onFilterChange: (filter: TeamFilter) => void;
+  periodLabel?: string;
 }
 
 export const TeamSummaryCards = ({
@@ -17,13 +18,14 @@ export const TeamSummaryCards = ({
   absentCount,
   activeFilter,
   onFilterChange,
+  periodLabel,
 }: TeamSummaryCardsProps) => {
   const totalMembers = presentCount + onLeaveCount + absentCount;
 
   const cards = [
     {
       key: 'present' as TeamFilter,
-      label: 'Present\nToday',
+      label: periodLabel ? `Present\n${periodLabel}` : 'Present\nToday',
       count: presentCount,
       icon: CheckCircle,
       bg: 'bg-[hsl(150,40%,94%)]',

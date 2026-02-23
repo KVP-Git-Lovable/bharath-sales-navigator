@@ -1,12 +1,18 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
+import { CalendarIcon, ChevronRight } from 'lucide-react';
 import { useTeamAttendance } from '@/hooks/useTeamAttendance';
 import { TeamSummaryCards, TeamFilter } from './TeamSummaryCards';
 import { TeamMemberHierarchyRow, HierarchyMemberNode } from './TeamMemberHierarchyRow';
 import { TeamMemberDetailSheet } from './TeamMemberDetailSheet';
 import { SearchInput } from '@/components/SearchInput';
-import { ChevronRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { TeamMemberAttendance } from '@/hooks/useTeamAttendance';
@@ -70,6 +76,40 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
   const [filter, setFilter] = useState<TeamFilter>('all');
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<string>('today');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+
+  // Compute date range from filter
+  const { dateRangeStart, dateRangeEnd } = useMemo(() => {
+    const now = new Date();
+    const todayStr = format(now, 'yyyy-MM-dd');
+    switch (dateFilter) {
+      case 'this-week': {
+        const s = startOfWeek(now, { weekStartsOn: 1 });
+        const e = endOfWeek(now, { weekStartsOn: 1 });
+        return { dateRangeStart: format(s, 'yyyy-MM-dd'), dateRangeEnd: format(e, 'yyyy-MM-dd') };
+      }
+      case 'last-week': {
+        const lastW = subWeeks(now, 1);
+        const s = startOfWeek(lastW, { weekStartsOn: 1 });
+        const e = endOfWeek(lastW, { weekStartsOn: 1 });
+        return { dateRangeStart: format(s, 'yyyy-MM-dd'), dateRangeEnd: format(e, 'yyyy-MM-dd') };
+      }
+      case 'custom':
+        return {
+          dateRangeStart: customStartDate ? format(customStartDate, 'yyyy-MM-dd') : todayStr,
+          dateRangeEnd: customEndDate ? format(customEndDate, 'yyyy-MM-dd') : todayStr,
+        };
+      default: // today
+        return { dateRangeStart: todayStr, dateRangeEnd: todayStr };
+    }
+  }, [dateFilter, customStartDate, customEndDate]);
+
+  const periodLabel = dateFilter === 'today' ? undefined
+    : dateFilter === 'this-week' ? 'This Week'
+    : dateFilter === 'last-week' ? 'Last Week'
+    : 'Range';
 
   const {
     teamMembers,
@@ -79,7 +119,7 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
     absentCount,
     handleLeaveAction,
     handleRegularizationAction,
-  } = useTeamAttendance(subordinateIds, directReportIds);
+  } = useTeamAttendance(subordinateIds, directReportIds, 'current-month', dateRangeStart, dateRangeEnd);
 
   // Fetch manager relationships using useQuery for stable caching
   const { data: managerMap = new Map<string, string | null>(), isLoading: managerMapLoading } = useQuery({
@@ -111,12 +151,54 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
 
   return (
     <div className="space-y-4">
+      {/* Date Filter Row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={dateFilter} onValueChange={(v) => { setDateFilter(v); if (v !== 'custom') { setCustomStartDate(undefined); setCustomEndDate(undefined); } }}>
+          <SelectTrigger className="w-[140px] h-9 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="this-week">This Week</SelectItem>
+            <SelectItem value="last-week">Last Week</SelectItem>
+            <SelectItem value="custom">Date Range</SelectItem>
+          </SelectContent>
+        </Select>
+        {dateFilter === 'custom' && (
+          <>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn('h-9 text-xs px-2.5', !customStartDate && 'text-muted-foreground')}>
+                  <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                  {customStartDate ? format(customStartDate, 'dd MMM') : 'Start'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customStartDate} onSelect={setCustomStartDate} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn('h-9 text-xs px-2.5', !customEndDate && 'text-muted-foreground')}>
+                  <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                  {customEndDate ? format(customEndDate, 'dd MMM') : 'End'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customEndDate} onSelect={setCustomEndDate} disabled={(date) => customStartDate ? date < customStartDate : false} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
+      </div>
+
       <TeamSummaryCards
         presentCount={presentCount}
         onLeaveCount={onLeaveCount}
         absentCount={absentCount}
         activeFilter={filter}
         onFilterChange={(f) => { setFilter(f); }}
+        periodLabel={periodLabel}
       />
 
       {/* Approvals Button */}
