@@ -1,64 +1,56 @@
 
 
-## Add "License Details" Section to Status Dashboard
+## Add "Admin Control" Module to Role Permissions
 
-### What
-A new card section titled **License Details** placed between the metrics grid / auto-refresh text and the Activity Logging section. It shows counts of **Retailers**, **Orders**, and **Visits** created in the selected period, with a dropdown to switch between "This Month" and "Last Month".
+### Overview
+Add a new top-level "Admin Control" module to the hierarchical permission system, with sub-modules for every item in the Admin Panel. Each sub-module gets field, action, and widget permissions following the existing naming conventions.
 
-### Layout
+### File Changed: `src/components/security/hierarchicalPermissions.ts`
 
-```text
-+------------------------------------------------------------------+
-| License Details                                                    |
-|                                                                    |
-| Current license plan:                    [ This Month v ]          |
-|                                                                    |
-|   +-----------+   +-----------+   +-----------+                    |
-|   | Retailers |   |  Orders   |   |  Visits   |                    |
-|   |    142    |   |    87     |   |   310     |                    |
-|   +-----------+   +-----------+   +-----------+                    |
-+------------------------------------------------------------------+
-```
+Add a new entry to `HIERARCHICAL_MODULES` array named `admin_control` with label "Admin Control". This module will contain fields, actions, and widgets representing all admin sub-modules and their granular permissions.
 
-### New Component
+Since the existing architecture uses a flat field/action/widget list per module, each admin sub-module will be represented as a set of field + action + widget entries grouped by prefix. This follows the same pattern used for other modules.
 
-**File: `src/components/status/LicenseDetailsSection.tsx`**
+### Sub-modules and their permissions
 
-- State: `period` ("this_month" | "last_month"), `loading`, `counts` ({ retailers, orders, visits })
-- On mount and period change, queries Supabase:
-  - `retailers` table: `COUNT(*)` where `created_at` is within the date range
-  - `orders` table: `COUNT(*)` where `created_at` is within the date range
-  - `visits` table: `COUNT(*)` where `created_at` is within the date range
-- Date range calculation:
-  - **This Month**: 1st of current month at midnight to now
-  - **Last Month**: 1st of previous month to last day of previous month (end of day)
-- Uses `Select` from `@radix-ui/react-select` (already in the project) for the dropdown
-- Card style matches existing cards: `bg-white/95 backdrop-blur-sm border-white/20 shadow-lg`
-- Three stat boxes in a 3-column grid, each showing the label and bold count
+Each admin sub-module gets a consistent set of permissions:
 
-### StatusDashboard.tsx Change
-
-Insert the new `<LicenseDetailsSection />` between the auto-refresh text (line 297) and the Activity Logging section (line 299):
-
-```text
-<p className="text-xs text-white/40 ...">Auto-refreshes every 15 minutes</p>
-
-<!-- NEW: License Details -->
-<div className="mt-6">
-  <LicenseDetailsSection />
-</div>
-
-<!-- Existing: Activity Logging -->
-<div className="mt-6">
-  <ActivityLoggingSection />
-</div>
-```
+| Sub-module | Field Prefix | Actions | Widgets |
+|---|---|---|---|
+| Admin Dashboard | `field_admin_dashboard_*` | view, export | dashboard, stats, charts |
+| Price Book Management | `field_admin_pricebook_*` | create, edit, delete, export | list, detail |
+| User Management | `field_admin_user_*` | create, edit, delete, reset_password, login_as | list, detail, hierarchy |
+| Attendance Management | `field_admin_attendance_*` | approve, reject, export | list, summary, holidays |
+| Product Management | `field_admin_product_*` | create, edit, delete, import | list, detail, categories |
+| Scheme Master | `field_admin_scheme_*` | create, edit, delete, activate | list, detail, eligibility |
+| Vendor Management | `field_admin_vendor_*` | add, edit, approve | list, detail |
+| Territories & Distributors | `field_admin_territory_*` | create, edit, assign | list, map, distributors |
+| Expense Management | `field_admin_expense_*` | approve, reject, export | list, summary, claims |
+| Feedback Management | `field_admin_feedback_*` | view, respond, export | list, detail |
+| Operations | `field_admin_operations_*` | view, export, filter | dashboard, live_tracking |
+| GPS Track Management | `field_admin_gps_*` | track, export, playback | map, timeline |
+| Retail Management | `field_admin_retail_*` | verify, edit, delete | list, detail |
+| Van Sales Management | `field_admin_vansales_*` | create, edit, assign | list, detail |
+| Security & Access Control | `field_admin_security_*` | create_profile, edit_profile, assign_role | profiles, permissions, groups |
+| Feature Management | `field_admin_feature_*` | toggle, configure | list, detail |
+| Gamification | `field_admin_gamification_*` | configure, manage, redeem | dashboard, settings |
+| Retailer Loyalty | `field_admin_loyalty_*` | configure, manage | dashboard, settings |
+| Company Profile | `field_admin_company_*` | edit, upload | detail, branding |
+| Invoice Management | `field_admin_invoice_*` | create, edit, configure | list, templates |
+| Credit Management | `field_admin_credit_*` | configure, approve | list, settings |
+| Notification Setup | `field_admin_notification_*` | create, edit, schedule | list, templates |
+| Recycle Bin Master | `field_admin_recycle_*` | restore, permanent_delete | list, logs |
+| Distributor Portal Admin | `field_admin_distportal_*` | manage, approve | dashboard, orders |
+| Target Management | `field_admin_target_*` | create, assign, cascade | list, detail, tracking |
+| Pincode Master | `field_admin_pincode_*` | import, edit | list, search |
+| Tax Master | `field_admin_tax_*` | create, edit, map | list, detail |
 
 ### Technical Details
 
-- Queries use `.select('id', { count: 'exact', head: true })` for efficient counting without fetching rows
-- Date math uses local timezone helpers from `src/utils/dateUtils.ts`
-- The dropdown has a solid white background (`bg-white`) with high z-index to avoid transparency issues
-- No database migrations needed -- reads existing `retailers`, `orders`, and `visits` tables
-- The component is self-contained with its own data fetching, keeping StatusDashboard clean
+- Only one file is modified: `src/components/security/hierarchicalPermissions.ts`
+- The new module is appended to the `HIERARCHICAL_MODULES` array
+- All helper functions (`getAllModuleNames`, `getAllFieldNames`, etc.) automatically pick up the new entries
+- The `HierarchicalPermissionEditor` UI will display the new module in Module Permission tab, and its fields/actions/widgets in respective tabs grouped under "Admin Control"
+- No database migration needed -- permissions are stored dynamically via `profile_object_permissions` upserts
+- Naming follows the existing `field_`, `action_`, `widget_` prefix convention
 
