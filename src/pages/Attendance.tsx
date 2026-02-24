@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Layout } from '@/components/Layout';
-import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3, LayoutGrid, List } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
@@ -97,7 +97,6 @@ const Attendance = () => {
   } = useWorkingDaysConfig(dateFilter);
 
   // Calendar view state
-  const [calendarViewMode, setCalendarViewMode] = useState<'calendar' | 'list'>('calendar');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   // Fetch user's leave applications for calendar
@@ -1126,6 +1125,18 @@ const Attendance = () => {
               </div>
             </div>
 
+            {/* Calendar View */}
+            <div className="bg-[hsl(210,20%,97%)] rounded-2xl p-4 shadow-sm">
+              <AttendanceCalendarView
+                attendanceRecords={cachedAttendanceRecords}
+                leaveRecords={userLeaveRecords}
+                weekOffConfig={weekOffConfig}
+                holidayDates={holidayDates}
+                currentMonth={calendarMonth}
+                onMonthChange={setCalendarMonth}
+              />
+            </div>
+
             {/* Present Days Dialog */}
             <Dialog open={showPresentDaysDialog} onOpenChange={setShowPresentDaysDialog}>
               <DialogContent className="max-w-md max-h-[70vh] overflow-auto">
@@ -1277,28 +1288,7 @@ const Attendance = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t('attendance.recentAttendance')}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    {/* Calendar/List Toggle */}
-                    <div className="flex bg-muted rounded-lg p-0.5">
-                      <button
-                        onClick={() => setCalendarViewMode('calendar')}
-                        className={cn(
-                          'p-1.5 rounded-md transition-colors',
-                          calendarViewMode === 'calendar' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
-                        )}
-                      >
-                        <LayoutGrid className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setCalendarViewMode('list')}
-                        className={cn(
-                          'p-1.5 rounded-md transition-colors',
-                          calendarViewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
-                        )}
-                      >
-                        <List className="h-4 w-4" />
-                      </button>
-                    </div>
+                   <div className="flex items-center gap-2">
                     <Select value={dateFilter} onValueChange={setDateFilter}>
                       <SelectTrigger className="w-[140px]">
                         <SelectValue />
@@ -1311,16 +1301,6 @@ const Attendance = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {calendarViewMode === 'calendar' ? (
-                    <AttendanceCalendarView
-                      attendanceRecords={cachedAttendanceRecords}
-                      leaveRecords={userLeaveRecords}
-                      weekOffConfig={weekOffConfig}
-                      holidayDates={holidayDates}
-                      currentMonth={calendarMonth}
-                      onMonthChange={setCalendarMonth}
-                    />
-                  ) : (
                   <div className="space-y-2">
                     {attendanceData.length > 0 ? (
                       attendanceData.slice(0, 15).map((record) => {
@@ -1513,7 +1493,6 @@ const Attendance = () => {
                       </div>
                     )}
                   </div>
-                  )}
                 </CardContent>
               </Card>
             </TabsContent>
