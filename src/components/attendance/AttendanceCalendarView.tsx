@@ -182,8 +182,8 @@ export const AttendanceCalendarView = ({
       case 'present': return 'bg-[hsl(142,71%,45%)] text-white';
       case 'absent': return 'bg-[hsl(0,84%,60%)] text-white';
       case 'leave': return 'bg-[hsl(25,95%,53%)] text-white';
-      case 'week-off':
-      case 'holiday': return 'bg-[hsl(220,9%,46%)] text-white opacity-60';
+      case 'week-off': return 'bg-[hsl(220,9%,46%)] text-white opacity-60';
+      case 'holiday': return 'bg-[hsl(217,91%,60%)] text-white';
       case 'future': return 'border border-border text-muted-foreground';
       case 'outside': return 'text-transparent';
       default: return '';
@@ -251,6 +251,7 @@ export const AttendanceCalendarView = ({
           { label: 'Absent', color: 'bg-[hsl(0,84%,60%)]' },
           { label: 'Leave', color: 'bg-[hsl(25,95%,53%)]' },
           { label: 'Half Day', gradient: true },
+          { label: 'Holiday', color: 'bg-[hsl(217,91%,60%)]' },
           { label: 'Week Off', color: 'bg-[hsl(220,9%,46%)] opacity-60' },
         ].map(item => (
           <div key={item.label} className="flex items-center gap-1">
