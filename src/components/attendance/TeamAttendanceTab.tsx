@@ -151,46 +151,7 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
 
   return (
     <div className="space-y-4">
-      {/* Date Filter Row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Select value={dateFilter} onValueChange={(v) => { setDateFilter(v); if (v !== 'custom') { setCustomStartDate(undefined); setCustomEndDate(undefined); } }}>
-          <SelectTrigger className="w-[140px] h-9 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">Today</SelectItem>
-            <SelectItem value="this-week">This Week</SelectItem>
-            <SelectItem value="last-week">Last Week</SelectItem>
-            <SelectItem value="custom">Date Range</SelectItem>
-          </SelectContent>
-        </Select>
-        {dateFilter === 'custom' && (
-          <>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn('h-9 text-xs px-2.5', !customStartDate && 'text-muted-foreground')}>
-                  <CalendarIcon className="h-3.5 w-3.5 mr-1" />
-                  {customStartDate ? format(customStartDate, 'dd MMM') : 'Start'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={customStartDate} onSelect={setCustomStartDate} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn('h-9 text-xs px-2.5', !customEndDate && 'text-muted-foreground')}>
-                  <CalendarIcon className="h-3.5 w-3.5 mr-1" />
-                  {customEndDate ? format(customEndDate, 'dd MMM') : 'End'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={customEndDate} onSelect={setCustomEndDate} disabled={(date) => customStartDate ? date < customStartDate : false} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </>
-        )}
-      </div>
+      {/* Date filter removed */}
 
       <TeamSummaryCards
         presentCount={presentCount}
