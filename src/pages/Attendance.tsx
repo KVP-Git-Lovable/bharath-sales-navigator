@@ -1098,7 +1098,7 @@ const Attendance = () => {
             </Dialog>
 
             {/* Calendar View with Present/Absent Summary */}
-            <div className="bg-[hsl(210,20%,99%)] rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="bg-background rounded-2xl p-4 shadow-sm space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div
                   className="bg-[hsl(150,35%,93%)] rounded-xl p-2.5 text-center cursor-pointer hover:shadow-md transition-shadow"
