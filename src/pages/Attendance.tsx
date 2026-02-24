@@ -1097,36 +1097,30 @@ const Attendance = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Today's Market Hours Section */}
+            {/* Calendar View with Present/Absent Summary */}
             <div className="bg-[hsl(210,20%,97%)] rounded-2xl p-4 shadow-sm space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div
-                  className="bg-[hsl(150,35%,93%)] rounded-2xl p-4 text-center cursor-pointer hover:shadow-md transition-shadow"
+                  className="bg-[hsl(150,35%,93%)] rounded-xl p-2.5 text-center cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => setShowPresentDaysDialog(true)}
                 >
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <CheckCircle className="h-5 w-5 text-[hsl(150,50%,45%)]" />
-                    <span className="text-2xl font-bold text-[hsl(150,45%,30%)]">{stats.presentDays}</span>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <CheckCircle className="h-4 w-4 text-[hsl(150,50%,45%)]" />
+                    <span className="text-lg font-bold text-[hsl(150,45%,30%)]">{stats.presentDays}</span>
                   </div>
-                  <div className="text-xs font-medium text-[hsl(150,35%,40%)]">{t('attendance.presentDays')}</div>
-                  <div className="text-[10px] text-[hsl(150,25%,55%)] mt-1">{t('attendance.tapToViewDates')}</div>
+                  <div className="text-[11px] font-medium text-[hsl(150,35%,40%)]">{t('attendance.presentDays')}</div>
                 </div>
                 <div
-                  className="bg-[hsl(0,40%,95%)] rounded-2xl p-4 text-center cursor-pointer hover:shadow-md transition-shadow"
+                  className="bg-[hsl(0,40%,95%)] rounded-xl p-2.5 text-center cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => setShowAbsentDaysDialog(true)}
                 >
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <XCircle className="h-5 w-5 text-[hsl(0,50%,55%)]" />
-                    <span className="text-2xl font-bold text-[hsl(0,45%,35%)]">{stats.absentDays}</span>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <XCircle className="h-4 w-4 text-[hsl(0,50%,55%)]" />
+                    <span className="text-lg font-bold text-[hsl(0,45%,35%)]">{stats.absentDays}</span>
                   </div>
-                  <div className="text-xs font-medium text-[hsl(0,35%,45%)]">{t('attendance.absentDays')}</div>
-                  <div className="text-[10px] text-[hsl(0,25%,60%)] mt-1">{t('attendance.tapToViewDates')}</div>
+                  <div className="text-[11px] font-medium text-[hsl(0,35%,45%)]">{t('attendance.absentDays')}</div>
                 </div>
               </div>
-            </div>
-
-            {/* Calendar View */}
-            <div className="bg-[hsl(210,20%,97%)] rounded-2xl p-4 shadow-sm">
               <AttendanceCalendarView
                 attendanceRecords={cachedAttendanceRecords}
                 leaveRecords={userLeaveRecords}
