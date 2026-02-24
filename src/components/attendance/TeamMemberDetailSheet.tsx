@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { AttendanceCalendarView } from './AttendanceCalendarView';
+import { useQuery } from '@tanstack/react-query';
 
 interface TeamMemberDetailSheetProps {
   isOpen: boolean;
@@ -16,31 +17,85 @@ interface TeamMemberDetailSheetProps {
 }
 
 export const TeamMemberDetailSheet = ({ isOpen, onClose, userId, userName }: TeamMemberDetailSheetProps) => {
-  const [attendance, setAttendance] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
   const [regularizations, setRegularizations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
-  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+  const monthStart = format(startOfMonth(calendarMonth), 'yyyy-MM-dd');
+  const monthEnd = format(endOfMonth(calendarMonth), 'yyyy-MM-dd');
+
+  // Fetch attendance for selected month
+  const { data: attendance = [] } = useQuery({
+    queryKey: ['team-member-attendance', userId, monthStart, monthEnd],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('date', monthStart)
+        .lte('date', monthEnd)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+    enabled: isOpen && !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch leave applications for calendar
+  const { data: leaveRecords = [] } = useQuery({
+    queryKey: ['team-member-leaves-calendar', userId, monthStart, monthEnd],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('leave_applications')
+        .select('id, start_date, end_date, status, is_half_day, half_day_period, leave_types(name)')
+        .eq('user_id', userId)
+        .eq('status', 'approved')
+        .or(`start_date.lte.${monthEnd},end_date.gte.${monthStart}`);
+      return data || [];
+    },
+    enabled: isOpen && !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch week-off config
+  const { data: weekOffConfig = [{ id: 'default', day_of_week: 0, is_off: true, alternate_pattern: 'all' }] } = useQuery({
+    queryKey: ['week-off-config-team'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('week_off_config')
+        .select('id, day_of_week, is_off, alternate_pattern');
+      return data && data.length > 0 ? data : [{ id: 'default', day_of_week: 0, is_off: true, alternate_pattern: 'all' }];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Fetch holidays
+  const { data: holidays = [] } = useQuery({
+    queryKey: ['holidays-team', monthStart, monthEnd],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('holidays')
+        .select('id, date, holiday_name')
+        .gte('date', monthStart)
+        .lte('date', monthEnd);
+      return data || [];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const holidayDates = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
 
   useEffect(() => {
     if (isOpen && userId) {
-      fetchData();
+      fetchNonAttendanceData();
     }
   }, [isOpen, userId]);
 
-  const fetchData = async () => {
+  const fetchNonAttendanceData = async () => {
     setIsLoading(true);
     try {
-      const [attRes, leaveRes, regRes] = await Promise.all([
-        supabase
-          .from('attendance')
-          .select('*')
-          .eq('user_id', userId)
-          .gte('date', monthStart)
-          .lte('date', monthEnd)
-          .order('date', { ascending: false }),
+      const [leaveRes, regRes] = await Promise.all([
         supabase
           .from('leave_applications')
           .select('*, leave_types(name)')
@@ -55,7 +110,6 @@ export const TeamMemberDetailSheet = ({ isOpen, onClose, userId, userName }: Tea
           .limit(20),
       ]);
 
-      setAttendance(attRes.data || []);
       setLeaves(leaveRes.data || []);
       setRegularizations(regRes.data || []);
     } catch (error) {
@@ -98,56 +152,16 @@ export const TeamMemberDetailSheet = ({ isOpen, onClose, userId, userName }: Tea
             <TabsTrigger value="regularization" className="text-xs">Regularization</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="attendance" className="space-y-2 mt-2">
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>
-            ) : attendance.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No attendance records</p>
-            ) : (
-              attendance.map((record) => {
-                const isPresent = record.status === 'present' || record.status === 'regularized';
-                return (
-                  <div
-                    key={record.id}
-                    className={cn(
-                      'flex items-center justify-between p-3 rounded-lg border',
-                      isPresent
-                        ? 'bg-green-50/50 border-green-200 dark:bg-green-950/30 dark:border-green-800'
-                        : 'bg-red-50/50 border-red-200 dark:bg-red-950/30 dark:border-red-800'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      {isPresent ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-red-600" />
-                      )}
-                      <div>
-                        <div className="text-sm font-medium">
-                          {format(new Date(record.date), 'EEE, MMM dd')}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          In: {formatTime(record.check_in_time)} | Out: {formatTime(record.check_out_time)}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        'text-[10px]',
-                        record.status === 'regularized'
-                          ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                          : isPresent
-                          ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
-                          : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
-                      )}
-                    >
-                      {record.status}
-                    </Badge>
-                  </div>
-                );
-              })
-            )}
+          <TabsContent value="attendance" className="space-y-3 mt-2">
+            {/* Calendar View */}
+            <AttendanceCalendarView
+              attendanceRecords={attendance}
+              leaveRecords={leaveRecords}
+              weekOffConfig={weekOffConfig}
+              holidayDates={holidayDates}
+              currentMonth={calendarMonth}
+              onMonthChange={setCalendarMonth}
+            />
           </TabsContent>
 
           <TabsContent value="leaves" className="space-y-2 mt-2">

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Layout } from '@/components/Layout';
-import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3 } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3, LayoutGrid, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
@@ -34,6 +34,8 @@ import RegularizationRequestModal from '@/components/RegularizationRequestModal'
 import { useAttendanceCache } from '@/hooks/useAttendanceCache';
 import { useWorkingDaysConfig } from '@/hooks/useWorkingDaysConfig';
 import { getSignedStorageUrl } from '@/utils/storageUtils';
+import { AttendanceCalendarView } from '@/components/attendance/AttendanceCalendarView';
+import { useQuery } from '@tanstack/react-query';
 
 // Processing steps for attendance
 type ProcessingStep = 'location' | 'photo' | 'face' | 'saving' | 'complete';
@@ -90,9 +92,32 @@ const Attendance = () => {
     elapsedWorkingDays,
     elapsedWorkingDates,
     holidayDates,
+    weekOffConfig,
     isLoading: isLoadingConfig
   } = useWorkingDaysConfig(dateFilter);
-  
+
+  // Calendar view state
+  const [calendarViewMode, setCalendarViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
+  // Fetch user's leave applications for calendar
+  const { data: userLeaveRecords = [] } = useQuery({
+    queryKey: ['my-leave-applications-calendar', user?.id, format(calendarMonth, 'yyyy-MM')],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const monthStart = format(startOfMonth(calendarMonth), 'yyyy-MM-dd');
+      const monthEnd = format(endOfMonth(calendarMonth), 'yyyy-MM-dd');
+      const { data } = await supabase
+        .from('leave_applications')
+        .select('id, start_date, end_date, status, is_half_day, half_day_period, leave_types(name)')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+        .or(`start_date.lte.${monthEnd},end_date.gte.${monthStart}`);
+      return data || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
   // Use cached data IMMEDIATELY for instant UI - don't wait for loading
   // The hooks now return cached data synchronously via placeholderData
   const [attendanceData, setAttendanceData] = useState<any[]>(() => cachedAttendanceRecords);
@@ -1253,13 +1278,32 @@ const Attendance = () => {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t('attendance.recentAttendance')}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    {/* Calendar/List Toggle */}
+                    <div className="flex bg-muted rounded-lg p-0.5">
+                      <button
+                        onClick={() => setCalendarViewMode('calendar')}
+                        className={cn(
+                          'p-1.5 rounded-md transition-colors',
+                          calendarViewMode === 'calendar' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
+                        )}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setCalendarViewMode('list')}
+                        className={cn(
+                          'p-1.5 rounded-md transition-colors',
+                          calendarViewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
+                        )}
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
+                    </div>
                     <Select value={dateFilter} onValueChange={setDateFilter}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-[140px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="current-week">{t('common.thisWeek')}</SelectItem>
                         <SelectItem value="current-month">{t('common.thisMonth')}</SelectItem>
                         <SelectItem value="last-month">{t('common.lastMonth')}</SelectItem>
                       </SelectContent>
@@ -1267,6 +1311,16 @@ const Attendance = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {calendarViewMode === 'calendar' ? (
+                    <AttendanceCalendarView
+                      attendanceRecords={cachedAttendanceRecords}
+                      leaveRecords={userLeaveRecords}
+                      weekOffConfig={weekOffConfig}
+                      holidayDates={holidayDates}
+                      currentMonth={calendarMonth}
+                      onMonthChange={setCalendarMonth}
+                    />
+                  ) : (
                   <div className="space-y-2">
                     {attendanceData.length > 0 ? (
                       attendanceData.slice(0, 15).map((record) => {
@@ -1459,6 +1513,7 @@ const Attendance = () => {
                       </div>
                     )}
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
