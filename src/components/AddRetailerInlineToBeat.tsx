@@ -266,7 +266,9 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
           };
           reader.readAsDataURL(file);
 
+          console.log(`[RetailerPhoto:InlineToBeat] Before compress: type="${file.type}", size=${(file.size / 1024).toFixed(0)}KB`);
           const compressedFile = await compressImageForUpload(file);
+          console.log(`[RetailerPhoto:InlineToBeat] After compress: size=${(compressedFile.size / 1024).toFixed(0)}KB`);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')

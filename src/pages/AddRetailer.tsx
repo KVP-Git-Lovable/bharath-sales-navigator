@@ -513,7 +513,9 @@ export const AddRetailer = () => {
           reader.readAsDataURL(file);
 
           // Compress and upload to Supabase Storage
+          console.log(`[RetailerPhoto:AddRetailer] Before compress: type="${file.type}", size=${(file.size / 1024).toFixed(0)}KB`);
           const compressedFile = await compressImageForUpload(file);
+          console.log(`[RetailerPhoto:AddRetailer] After compress: size=${(compressedFile.size / 1024).toFixed(0)}KB`);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')
@@ -638,7 +640,9 @@ export const AddRetailer = () => {
               // Convert compressed base64 to blob for upload
               const fetchRes = await fetch(compressedImage);
               const blob = await fetchRes.blob();
+              console.log(`[RetailerPhoto:AddRetailer:scan] Before compress: type="${blob.type}", size=${(blob.size / 1024).toFixed(0)}KB`);
               const compressedBlob = await compressImageForUpload(blob);
+              console.log(`[RetailerPhoto:AddRetailer:scan] After compress: size=${(compressedBlob.size / 1024).toFixed(0)}KB`);
               
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('retailer-photos')

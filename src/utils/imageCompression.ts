@@ -43,7 +43,8 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
 
 /**
  * Compress an image File or Blob for upload.
- * - Skips non-image types (returns as-is)
+ * - Skips known non-image types (returns as-is)
+ * - Treats missing/empty MIME type as image (camera blobs often lack type)
  * - Scales down to max 1200px
  * - Iteratively lowers JPEG quality to stay ≤ 600KB
  */
@@ -54,15 +55,26 @@ export async function compressImageForUpload(
   const maxDim = options?.maxDimension ?? MAX_DIMENSION;
   const maxSize = options?.maxSizeBytes ?? MAX_FILE_SIZE;
 
-  // Skip non-image files
-  if (!file.type.startsWith('image/')) {
+  const fileType = file.type || '';
+  const isImage = fileType.startsWith('image/') || fileType === '';
+
+  // Skip known non-image files (e.g. application/pdf)
+  if (!isImage) {
+    console.log(`[ImageCompression] Skipping non-image file: type="${fileType}", size=${(file.size / 1024).toFixed(0)}KB`);
     return file;
+  }
+
+  if (fileType === '') {
+    console.warn(`[ImageCompression] File has no MIME type (size=${(file.size / 1024).toFixed(0)}KB). Treating as image.`);
   }
 
   // Already small enough? Skip compression
   if (file.size <= maxSize) {
+    console.log(`[ImageCompression] Already under ${(maxSize / 1024).toFixed(0)}KB: size=${(file.size / 1024).toFixed(0)}KB — skipping`);
     return file;
   }
+
+  console.log(`[ImageCompression] Starting compression: type="${fileType}", original=${(file.size / 1024).toFixed(0)}KB`);
 
   try {
     const url = URL.createObjectURL(file);
@@ -75,7 +87,10 @@ export async function compressImageForUpload(
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return file;
+    if (!ctx) {
+      console.warn('[ImageCompression] Could not get canvas context, returning original');
+      return file;
+    }
 
     ctx.drawImage(img, 0, 0, width, height);
 
@@ -93,7 +108,8 @@ export async function compressImageForUpload(
     console.log(`[ImageCompression] Final compress: ${(file.size / 1024).toFixed(0)}KB → ${(finalBlob.size / 1024).toFixed(0)}KB (quality=0.15)`);
     return finalBlob;
   } catch (error) {
-    console.error('[ImageCompression] Compression failed, using original:', error);
+    console.error('[ImageCompression] Compression FAILED, returning original uncompressed:', error);
+    console.error(`[ImageCompression] Original file: type="${fileType}", size=${(file.size / 1024).toFixed(0)}KB`);
     return file;
   }
 }
