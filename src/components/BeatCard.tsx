@@ -14,6 +14,7 @@ interface BeatCardProps {
     category?: string;
     created_at: string;
     territory_name?: string;
+    owner_name?: string;
   };
   userId: string;
   onEdit: () => void;
@@ -163,9 +164,15 @@ export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsigh
           </Button>
         </div>
 
-        {/* Creation Date */}
-        <div className="text-xs text-muted-foreground pt-2 border-t">
-          Created: {new Date(beat.created_at).toLocaleDateString()}
+        {/* Creation Date & Owner */}
+        <div className="text-xs text-muted-foreground pt-2 border-t space-y-1">
+          <div>Created: {new Date(beat.created_at).toLocaleDateString()}</div>
+          {beat.owner_name && (
+            <div className="flex items-center gap-1">
+              <Users size={12} />
+              <span>Owner: {beat.owner_name}</span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

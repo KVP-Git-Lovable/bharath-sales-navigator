@@ -375,11 +375,44 @@ export const BeatPlanning = () => {
     }));
   };
 
-  const handleRemoveBeat = (beatId: string) => {
+  const handleRemoveBeat = async (beatId: string) => {
+    // Remove from local state
     setPlannedBeats(prev => ({
       ...prev,
       [selectedDay]: (prev[selectedDay] || []).filter(id => id !== beatId)
     }));
+
+    // Also delete from database if this beat was previously saved
+    if (effectiveUserId && selectedDate) {
+      const dateString = toLocalISODate(selectedDate);
+      try {
+        const { error } = await supabase
+          .from('beat_plans')
+          .delete()
+          .eq('user_id', effectiveUserId)
+          .eq('beat_id', beatId)
+          .eq('plan_date', dateString);
+
+        if (error) throw error;
+
+        // Clear My Visits snapshot for this date
+        await clearMyVisitsSnapshot(effectiveUserId, dateString);
+
+        // Update planned dates marker
+        setPlannedDates(prev => {
+          const dateKey = selectedDate.toLocaleDateString('en-US', { weekday: 'short' });
+          const remaining = (plannedBeats[dateKey] || []).filter(id => id !== beatId);
+          const next = new Set(prev);
+          if (remaining.length === 0) next.delete(dateString);
+          return next;
+        });
+
+        toast.success('Beat plan removed successfully');
+      } catch (err) {
+        console.error('Error removing beat plan:', err);
+        toast.error('Failed to remove beat plan from database');
+      }
+    }
   };
 
   const createExpenseRecords = async (selectedBeatIds: string[], dateString: string) => {
@@ -813,17 +846,10 @@ export const BeatPlanning = () => {
                       size="sm"
                       variant={isBeatSelected(beat.id) ? "destructive" : "default"}
                       onClick={() => {
-                        const dateKey = selectedDate.toLocaleDateString('en-US', { weekday: 'short' });
                         if (isBeatSelected(beat.id)) {
-                          setPlannedBeats(prev => ({
-                            ...prev,
-                            [dateKey]: (prev[dateKey] || []).filter(id => id !== beat.id)
-                          }));
+                          handleRemoveBeat(beat.id);
                         } else {
-                          setPlannedBeats(prev => ({
-                            ...prev,
-                            [dateKey]: [...(prev[dateKey] || []), beat.id]
-                          }));
+                          handleSelectBeat(beat.id);
                         }
                       }}
                     >

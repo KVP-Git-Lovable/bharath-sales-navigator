@@ -55,6 +55,7 @@ interface Beat {
   average_time_minutes?: number;
   territory_id?: string;
   territory_name?: string;
+  owner_name?: string;
 }
 
 interface Retailer {
@@ -344,7 +345,8 @@ export const MyBeats = () => {
                 beat_number: index + 1,
                 retailers: [],
                 territory_id: beat.territory_id,
-                territory_name: beat.territory_id ? territoriesMap.get(beat.territory_id) : null
+                territory_name: beat.territory_id ? territoriesMap.get(beat.territory_id) : null,
+                owner_name: beat.owner_name || null
               })).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
               setBeats(beatsArray);
@@ -615,7 +617,7 @@ export const MyBeats = () => {
       // Create beat plans if recurrence is enabled
       if (repeatEnabled) {
         const endDate = repeatUntilMode === "permanent" ? addDays(new Date(), 365) : repeatEndDate;
-        await generateBeatPlans(beatId, endDate);
+        await generateBeatPlans(beatId, endDate, beatName.trim());
       }
 
       // Show options dialog for beat placement
@@ -629,7 +631,13 @@ export const MyBeats = () => {
     }
   };
 
-  const generateBeatPlans = async (beatId: string, endDate: Date) => {
+  const generateBeatPlans = async (beatId: string, endDate: Date, beatNameParam?: string) => {
+    const resolvedBeatName = beatNameParam || beatName.trim();
+    if (!user?.id || !resolvedBeatName) {
+      console.error('generateBeatPlans: missing user or beat name');
+      return;
+    }
+    
     try {
       const beatPlans: any[] = [];
       const today = new Date();
@@ -648,25 +656,18 @@ export const MyBeats = () => {
           shouldAddDate = repeatDays.includes(dayOfWeek);
         } else if (repeatType === 'monthly') {
           if (monthlyType === 'date') {
-            // Specific date of the month (e.g., 20th of each month)
             shouldAddDate = currentDate.getDate() === monthlyDateOfMonth;
           } else {
-            // Specific week and day (e.g., First Monday)
             const dayOfWeek = currentDate.getDay();
             if (dayOfWeek === monthlyDayOfWeek) {
               const dateOfMonth = currentDate.getDate();
               const weekOfMonth = Math.ceil(dateOfMonth / 7);
               
-              if (monthlyWeek === 'first') {
-                shouldAddDate = weekOfMonth === 1;
-              } else if (monthlyWeek === 'second') {
-                shouldAddDate = weekOfMonth === 2;
-              } else if (monthlyWeek === 'third') {
-                shouldAddDate = weekOfMonth === 3;
-              } else if (monthlyWeek === 'fourth') {
-                shouldAddDate = weekOfMonth === 4;
-              } else if (monthlyWeek === 'last') {
-                // Check if this is the last occurrence of this day in the month
+              if (monthlyWeek === 'first') shouldAddDate = weekOfMonth === 1;
+              else if (monthlyWeek === 'second') shouldAddDate = weekOfMonth === 2;
+              else if (monthlyWeek === 'third') shouldAddDate = weekOfMonth === 3;
+              else if (monthlyWeek === 'fourth') shouldAddDate = weekOfMonth === 4;
+              else if (monthlyWeek === 'last') {
                 const nextWeek = addDays(currentDate, 7);
                 shouldAddDate = nextWeek.getMonth() !== currentDate.getMonth();
               }
@@ -679,9 +680,9 @@ export const MyBeats = () => {
 
         if (shouldAddDate) {
           beatPlans.push({
-            user_id: user?.id,
+            user_id: user.id,
             beat_id: beatId,
-            beat_name: beatName.trim(),
+            beat_name: resolvedBeatName,
             plan_date: format(currentDate, 'yyyy-MM-dd'),
             beat_data: {
               retailer_ids: Array.from(selectedRetailers)
@@ -692,20 +693,32 @@ export const MyBeats = () => {
         currentDate = addDays(currentDate, 1);
       }
 
-      if (beatPlans.length > 0) {
-        const { error: planError } = await supabase
-          .from('beat_plans')
-          .insert(beatPlans);
+      console.log(`[generateBeatPlans] Generated ${beatPlans.length} plans for beat "${resolvedBeatName}" (${beatId})`);
 
-        if (planError) {
-          console.error('Error creating beat plans:', planError);
-        } else {
-          toast.success(`Created ${beatPlans.length} scheduled visits`);
+      if (beatPlans.length > 0) {
+        // Insert in batches of 500 to avoid payload limits
+        const batchSize = 500;
+        let inserted = 0;
+        for (let i = 0; i < beatPlans.length; i += batchSize) {
+          const batch = beatPlans.slice(i, i + batchSize);
+          const { error: planError } = await supabase
+            .from('beat_plans')
+            .insert(batch);
+
+          if (planError) {
+            console.error('Error creating beat plans batch:', planError);
+            toast.error(`Failed to create some scheduled visits: ${planError.message}`);
+            return;
+          }
+          inserted += batch.length;
         }
+        toast.success(`Created ${inserted} scheduled visits for "${resolvedBeatName}"`);
+      } else {
+        toast.info('No dates matched the selected schedule pattern');
       }
     } catch (error: any) {
       console.error('Error generating beat plans:', error);
-      toast.error('Failed to create beat schedule');
+      toast.error(`Failed to create beat schedule: ${error.message}`);
     }
   };
   const handleRetailerAdded = (retailerId: string, retailerName: string) => {
@@ -1489,7 +1502,14 @@ export const MyBeats = () => {
                   placeholder="Enter beat name"
                   value={beatName}
                   onChange={(e) => setBeatName(e.target.value)}
+                  className={beats.some(b => b.name.toLowerCase() === beatName.trim().toLowerCase()) && beatName.trim() ? 'border-destructive' : ''}
                 />
+                {beatName.trim() && beats.some(b => b.name.toLowerCase() === beatName.trim().toLowerCase()) && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    A beat with this name already exists
+                  </p>
+                )}
               </div>
 
               {/* Schedule Recurring Visits - Moved here from bottom */}
