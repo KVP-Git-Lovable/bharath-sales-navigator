@@ -213,12 +213,21 @@ export const CameraCapture = ({
       
       const vw = video.videoWidth || 1280;
       const vh = video.videoHeight || 720;
-      canvas.width = vw;
-      canvas.height = vh;
+      // Cap canvas dimensions at 1200px for smaller output
+      const maxDim = 1200;
+      let cw = vw;
+      let ch = vh;
+      if (vw > maxDim || vh > maxDim) {
+        const ratio = Math.min(maxDim / vw, maxDim / vh);
+        cw = Math.round(vw * ratio);
+        ch = Math.round(vh * ratio);
+      }
+      canvas.width = cw;
+      canvas.height = ch;
       
       const context = canvas.getContext('2d');
       if (context) {
-        context.drawImage(video, 0, 0, vw, vh);
+        context.drawImage(video, 0, 0, cw, ch);
         
         canvas.toBlob(async (blob) => {
           if (blob) {
@@ -227,7 +236,7 @@ export const CameraCapture = ({
             setCapturedImage(imageUrl);
           } else {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
               const resp = await fetch(dataUrl);
               const b = await resp.blob();
               setCapturedBlob(b);
@@ -239,7 +248,7 @@ export const CameraCapture = ({
             }
           }
           setIsCapturing(false);
-        }, 'image/jpeg', 0.95);
+        }, 'image/jpeg', 0.5);
       }
     }
   };
@@ -266,7 +275,7 @@ export const CameraCapture = ({
         } else {
           toast.error('Could not process image. Please retake.');
         }
-      }, 'image/jpeg', 0.95);
+      }, 'image/jpeg', 0.5);
     } else {
       toast.error('Camera not ready. Please try again.');
     }

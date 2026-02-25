@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Camera, Upload, User, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { compressImageForUpload } from "@/utils/imageCompression";
 
 interface BaselinePhotoManagementProps {
   userId: string;
@@ -70,12 +71,13 @@ export const BaselinePhotoManagement = ({ userId, userProfile }: BaselinePhotoMa
 
     try {
       // Upload to Supabase Storage
+      const compressed = await compressImageForUpload(file);
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}/baseline_photo_${Date.now()}.${fileExt}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('employee-photos')
-        .upload(fileName, file);
+        .upload(fileName, compressed);
 
       if (uploadError) {
         throw uploadError;

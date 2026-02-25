@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { compressImageForUpload } from "@/utils/imageCompression";
 
 interface ProfilePictureUploadProps {
   userId: string;
@@ -47,12 +48,13 @@ export const ProfilePictureUpload = ({
     setIsUploading(true);
 
     try {
+      const compressed = await compressImageForUpload(file);
       const fileExt = file.name.split(".").pop();
       const fileName = `${userId}/profile_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("employee-photos")
-        .upload(fileName, file);
+        .upload(fileName, compressed);
 
       if (uploadError) throw uploadError;
 
