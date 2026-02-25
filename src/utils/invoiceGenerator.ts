@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
+import { compressImageForUpload } from './imageCompression';
 
 // Helper function to check if text contains non-English characters (Indian languages)
 const containsNonEnglishChars = (text: string): boolean => {
@@ -236,14 +237,15 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   if (isEnabled('header_company_logo') && company.logo_url) {
     try {
       const response = await fetch(company.logo_url);
-      const blob = await response.blob();
+      const rawBlob = await response.blob();
+      const blob = await compressImageForUpload(rawBlob, { maxDimension: 400, maxSizeBytes: 80_000 });
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onloadend = () => resolve(reader.result as string);
         reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
-      const imgFormat = company.logo_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+      const imgFormat = 'JPEG';
       
       // Get image dimensions to maintain aspect ratio
       const img = new Image();
@@ -735,7 +737,8 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   if (company.qr_code_url) {
     try {
       const response = await fetch(company.qr_code_url);
-      const blob = await response.blob();
+      const rawBlob = await response.blob();
+      const blob = await compressImageForUpload(rawBlob, { maxDimension: 300, maxSizeBytes: 60_000 });
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onloadend = () => resolve(reader.result as string);
@@ -763,8 +766,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
       doc.setTextColor(55, 65, 81);
       doc.text("Scan QR for Payment", boxX + boxW / 2, boxY + 8, { align: "center" });
 
-      const imgFormat = company.qr_code_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-      doc.addImage(base64, imgFormat, boxX + (boxW - 34) / 2, boxY + 14, 34, 34);
+      doc.addImage(base64, 'JPEG', boxX + (boxW - 34) / 2, boxY + 14, 34, 34);
 
       if (company.qr_upi) {
         doc.setFontSize(7);
@@ -804,7 +806,14 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setFont("helvetica", "bold");
   doc.text("THANK YOU FOR YOUR BUSINESS", pageWidth / 2, footerY + 12, { align: "center" });
 
-  return doc.output('blob');
+  const pdfBlob = doc.output('blob') as Blob;
+  const MAX_PDF_SIZE = 500 * 1024; // 500KB
+  if (pdfBlob.size > MAX_PDF_SIZE) {
+    console.warn(`[InvoiceGenerator] PDF size ${(pdfBlob.size / 1024).toFixed(0)}KB exceeds 500KB limit`);
+  } else {
+    console.log(`[InvoiceGenerator] PDF size: ${(pdfBlob.size / 1024).toFixed(0)}KB (within 500KB limit)`);
+  }
+  return pdfBlob;
 }
 
 /**
