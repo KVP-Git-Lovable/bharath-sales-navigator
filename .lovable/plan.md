@@ -1,43 +1,58 @@
 
 
-## Plan: Cap Invoice PDF Size at 500KB
+## Analysis: Why retailer-photos compression may not be working
 
-### Problem
-Invoice PDFs can exceed 500KB, primarily due to embedded images (company logo and QR code for payment) being included at full resolution without compression.
+### What I found
 
-### Root Cause
-In `src/utils/invoiceGenerator.ts`, both the company logo (line 238-274) and QR code (line 735-779) are fetched as raw blobs, converted to base64, and embedded directly into the PDF without any size reduction.
+**All upload paths DO call `compressImageForUpload`** — there are 4 upload points across 3 files (`AddRetailer.tsx`, `AddRetailerInlineToBeat.tsx`, `RetailManagement.tsx`), and every one invokes the compression utility.
 
-### Approach
-Reuse the existing `compressImageForUpload` utility from `src/utils/imageCompression.ts` to compress both images before embedding them into the PDF. Additionally, add a final PDF size check — if the generated PDF still exceeds 500KB, reduce JPEG quality of embedded images further and regenerate.
+**Root cause: The compression function silently skips files in two scenarios:**
 
-### Changes
-
-**File: `src/utils/invoiceGenerator.ts`** (single file, two sections)
-
-1. **Import the compression utility** at the top of the file:
-   ```ts
-   import { compressImageForUpload } from './imageCompression';
+1. **Blob type not set** (`src/utils/imageCompression.ts`, line 63):
    ```
+   if (!file.type.startsWith('image/')) return file;
+   ```
+   When `CameraCapture.tsx` produces a blob via `canvas.toBlob`, the type is set. But when a blob arrives from other paths (e.g., `fetch().blob()` or certain mobile browsers with `<input capture="environment">`), the `type` property can be empty or undefined, causing the function to return the original file uncompressed.
 
-2. **Compress the company logo before embedding** (around lines 238-246):
-   - After fetching the logo blob, pass it through `compressImageForUpload` with `{ maxDimension: 400, maxSizeBytes: 80_000 }` (80KB max for a small logo)
-   - Then convert the compressed blob to base64 for `addImage`
+2. **Already under 600KB** (`src/utils/imageCompression.ts`, line 68):
+   ```
+   if (file.size <= maxSize) return file;
+   ```
+   The `CameraCapture` component already caps the canvas at 1200px and uses JPEG quality 0.5, so its output is often already under 600KB — this path is fine.
 
-3. **Compress the QR code before embedding** (around lines 737-743):
-   - After fetching the QR code blob, pass it through `compressImageForUpload` with `{ maxDimension: 300, maxSizeBytes: 60_000 }` (60KB max for a small QR image)
-   - Then convert the compressed blob to base64 for `addImage`
+3. **Silent catch block** (`src/utils/imageCompression.ts`, line 88):
+   If `loadImage()` or canvas operations fail on mobile (memory limits, CORS), the catch block returns the original file with only a `console.error`, so the user never knows compression was skipped.
 
-4. **Final PDF size guard** (before returning on line 807):
-   - After `doc.output('blob')`, check if the blob exceeds 500KB
-   - If it does, log a warning (the image compression above should prevent this in practice, but this is a safety net)
+### Plan
 
-### Why This Works
-- The jsPDF text + tables portion of the PDF is typically under 50KB
-- The logo and QR code images account for almost all remaining size
-- Compressing both to reasonable maximums (80KB + 60KB) ensures the total PDF stays well under 500KB
-- The existing `compressImageForUpload` function already handles dimension scaling and iterative JPEG quality reduction
+**File: `src/utils/imageCompression.ts`**
+- Add a fallback for the `file.type` check: if type is empty/undefined but the file was passed as a Blob (not a known non-image format), treat it as an image and attempt compression
+- Add `console.log` statements at each skip/return point so you can diagnose on-device whether compression ran or was bypassed
+- Log the before/after file size clearly
 
-### No Other Files Need Changes
-The `generateTemplate4Invoice` function is the single entry point used by `InvoicePDFGenerator.tsx`, `VisitInvoicePDFGenerator.tsx`, `InvoiceTemplate4.tsx`, and `fetchAndGenerateInvoice`. Fixing it here covers all invoice generation paths.
+**File: `src/pages/AddRetailer.tsx`** (two upload paths — file input ~line 516 and board scan ~line 641)
+- Add a log before and after `compressImageForUpload` showing `file.size`, `file.type`, and the compressed result size
+- This will confirm on-device whether the issue is the compression utility or the file input itself
+
+**File: `src/components/AddRetailerInlineToBeat.tsx`** (~line 269)
+- Same logging around the `compressImageForUpload` call
+
+**File: `src/pages/RetailManagement.tsx`** (~line 263)
+- Same logging around the `compressImageForUpload` call
+
+### Technical detail
+
+The key change in `imageCompression.ts`:
+
+```text
+BEFORE:
+  if (!file.type.startsWith('image/')) return file;
+
+AFTER:
+  const isImage = file.type.startsWith('image/') || !file.type || file.type === '';
+  if (!isImage) return file;
+  // If type is missing, assume image (camera blobs often lack type)
+```
+
+This ensures blobs from camera capture that lack a MIME type are still compressed. A `console.warn` will be added when type is missing so it's traceable.
 
