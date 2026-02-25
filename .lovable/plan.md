@@ -1,71 +1,43 @@
 
 
-## Plan: Client-Side Image Compression for Storage Uploads
+## Plan: Cap Invoice PDF Size at 500KB
 
 ### Problem
-Images and files uploaded to `invoices`, `employee-photos`, `attendance-photos`, `visit-photos`, and `retailer-photos` buckets are not compressed. The user wants all uploads compressed by 50% with a maximum file size of 600KB.
+Invoice PDFs can exceed 500KB, primarily due to embedded images (company logo and QR code for payment) being included at full resolution without compression.
+
+### Root Cause
+In `src/utils/invoiceGenerator.ts`, both the company logo (line 238-274) and QR code (line 735-779) are fetched as raw blobs, converted to base64, and embedded directly into the PDF without any size reduction.
 
 ### Approach
-Create a shared utility function `compressImageFile` that compresses any image (File or Blob) using an HTML Canvas before upload. Then integrate it at every upload point for the 5 target buckets. For PDFs (invoices bucket), compression won't apply since Canvas only handles images — PDFs will be left as-is.
+Reuse the existing `compressImageForUpload` utility from `src/utils/imageCompression.ts` to compress both images before embedding them into the PDF. Additionally, add a final PDF size check — if the generated PDF still exceeds 500KB, reduce JPEG quality of embedded images further and regenerate.
 
-### Technical Details
+### Changes
 
-#### 1. New Utility: `src/utils/imageCompression.ts`
+**File: `src/utils/invoiceGenerator.ts`** (single file, two sections)
 
-A single reusable function that:
-- Takes a `Blob` or `File` input
-- Draws it onto a Canvas at 50% reduced dimensions (width/height scaled by ~0.7 each, yielding ~50% pixel reduction)
-- Exports as JPEG with iteratively lowered quality until under 600KB
-- Returns the compressed Blob
-- Skips non-image files (e.g., PDFs) and returns them unchanged
+1. **Import the compression utility** at the top of the file:
+   ```ts
+   import { compressImageForUpload } from './imageCompression';
+   ```
 
-```text
-compressImageForUpload(file: Blob | File, options?)
-  → If not image type, return as-is
-  → Load into Image element
-  → Scale dimensions down (max 1200px wide)
-  → Draw to canvas
-  → Export JPEG starting at quality 0.7, reduce until ≤ 600KB
-  → Return compressed Blob
-```
+2. **Compress the company logo before embedding** (around lines 238-246):
+   - After fetching the logo blob, pass it through `compressImageForUpload` with `{ maxDimension: 400, maxSizeBytes: 80_000 }` (80KB max for a small logo)
+   - Then convert the compressed blob to base64 for `addImage`
 
-#### 2. Integration Points (8 files, ~12 upload calls)
+3. **Compress the QR code before embedding** (around lines 737-743):
+   - After fetching the QR code blob, pass it through `compressImageForUpload` with `{ maxDimension: 300, maxSizeBytes: 60_000 }` (60KB max for a small QR image)
+   - Then convert the compressed blob to base64 for `addImage`
 
-Each file below has upload calls that will be wrapped with the compression utility before the `supabase.storage.upload()` call:
+4. **Final PDF size guard** (before returning on line 807):
+   - After `doc.output('blob')`, check if the blob exceeds 500KB
+   - If it does, log a warning (the image compression above should prevent this in practice, but this is a safety net)
 
-| File | Bucket | Upload Type |
-|------|--------|-------------|
-| `src/components/ProfilePictureUpload.tsx` | employee-photos | File input |
-| `src/components/ProfileSetupModal.tsx` | employee-photos | Camera blob |
-| `src/components/profile/CompactProfilePhoto.tsx` | employee-photos | File input |
-| `src/components/BaselinePhotoManagement.tsx` | employee-photos | File input |
-| `src/components/CameraCapture.tsx` | (used for attendance/profile) | Camera capture blob — reduce JPEG quality to 0.5 and cap canvas size |
-| `src/components/VisitCard.tsx` | visit-photos | Camera blob |
-| `src/pages/AddRetailer.tsx` | retailer-photos | File + Camera |
-| `src/pages/RetailManagement.tsx` | retailer-photos | Camera blob |
-| `src/components/AddRetailerInlineToBeat.tsx` | retailer-photos | File + Camera |
-| `src/pages/Cart.tsx` | invoices | PDF — skip (not an image) |
-| `src/components/VisitInvoicePDFGenerator.tsx` | invoices | PDF — skip |
+### Why This Works
+- The jsPDF text + tables portion of the PDF is typically under 50KB
+- The logo and QR code images account for almost all remaining size
+- Compressing both to reasonable maximums (80KB + 60KB) ensures the total PDF stays well under 500KB
+- The existing `compressImageForUpload` function already handles dimension scaling and iterative JPEG quality reduction
 
-#### 3. Changes Summary
-
-- **Create** `src/utils/imageCompression.ts` — the shared compression utility
-- **Edit 9 files** — add `import { compressImageForUpload } from '@/utils/imageCompression'` and wrap blobs/files through it before every `.upload()` call to the 5 target buckets
-- **CameraCapture.tsx** — reduce default JPEG quality from 0.95 to 0.5 and cap canvas dimensions at 1200px to produce smaller blobs at source
-
-#### 4. Compression Strategy
-
-```text
-1. If file is not image/* → return unchanged (handles PDFs)
-2. Load image into HTMLImageElement
-3. Calculate scaled dimensions:
-   - Max width: 1200px, max height: 1200px
-   - Maintain aspect ratio
-4. Draw to offscreen canvas at scaled size
-5. Export as JPEG starting at quality 0.6
-6. If result > 600KB, retry at quality 0.4, then 0.3
-7. Return compressed blob (guaranteed ≤ 600KB for typical photos)
-```
-
-No database changes required — this is purely a client-side optimization.
+### No Other Files Need Changes
+The `generateTemplate4Invoice` function is the single entry point used by `InvoicePDFGenerator.tsx`, `VisitInvoicePDFGenerator.tsx`, `InvoiceTemplate4.tsx`, and `fetchAndGenerateInvoice`. Fixing it here covers all invoice generation paths.
 
