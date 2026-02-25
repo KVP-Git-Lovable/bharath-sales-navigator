@@ -1,10 +1,11 @@
 import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2, PackageCheck } from "lucide-react";
 import InvoiceTemplateSelector from "@/components/invoice/InvoiceTemplateSelector";
 import AllInvoicesList from "@/components/invoice/AllInvoicesList";
 import InvoiceDisplaySettings from "@/components/invoice/InvoiceDisplaySettings";
+import BulkInvoiceDownload from "@/components/invoice/BulkInvoiceDownload";
 import { Layout } from "@/components/Layout";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 
@@ -46,7 +47,7 @@ export default function InvoiceManagement() {
         </div>
 
         <Tabs defaultValue="display-settings" className="space-y-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="display-settings" className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline">Display Settings</span>
@@ -61,6 +62,11 @@ export default function InvoiceManagement() {
               <span className="hidden sm:inline">All Invoices</span>
               <span className="sm:hidden">Invoices</span>
             </TabsTrigger>
+            <TabsTrigger value="bulk-download" className="flex items-center gap-2">
+              <PackageCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Bulk Download</span>
+              <span className="sm:hidden">Bulk</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="display-settings">
@@ -73,6 +79,10 @@ export default function InvoiceManagement() {
 
           <TabsContent value="invoices">
             <AllInvoicesList />
+          </TabsContent>
+
+          <TabsContent value="bulk-download">
+            <BulkInvoiceDownload />
           </TabsContent>
         </Tabs>
       </div>
