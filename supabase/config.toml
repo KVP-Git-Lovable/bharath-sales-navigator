@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.admin-delete-user-data]
 verify_jwt = false
+
+[functions.delete-old-invoices]
+verify_jwt = false
