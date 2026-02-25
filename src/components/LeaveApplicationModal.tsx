@@ -81,6 +81,12 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      // Calculate days requested
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const daysRequested = leaveDay === 'half' ? 0.5 : diffDays;
+      const isHalfDay = leaveDay === 'half';
+
       const { error } = await supabase
         .from('leave_applications')
         .insert({
@@ -89,7 +95,9 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           start_date: format(startDate, 'yyyy-MM-dd'),
           end_date: format(endDate, 'yyyy-MM-dd'),
           reason: reason.trim(),
-          status: 'pending'
+          status: 'pending',
+          days_requested: daysRequested,
+          is_half_day: isHalfDay,
         });
 
       if (error) throw error;
@@ -105,9 +113,14 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       setIsOpen(false);
       
       onApplicationSubmitted?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting leave application:', error);
-      toast.error('Failed to submit leave application');
+      const dbMessage = error?.message || '';
+      if (dbMessage.includes('Insufficient leave balance')) {
+        toast.error(dbMessage);
+      } else {
+        toast.error('Failed to submit leave application');
+      }
     } finally {
       setIsSubmitting(false);
     }
