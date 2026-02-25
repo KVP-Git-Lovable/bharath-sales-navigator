@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -16,29 +16,32 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify the caller is an admin
+    // Verify the caller via getClaims
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: { user }, error: authError } = await createClient(
-      supabaseUrl,
-      Deno.env.get("SUPABASE_ANON_KEY")!
-    ).auth.getUser(authHeader.replace("Bearer ", ""));
+    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    if (authError || !user) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const userId = claimsData.claims.sub;
 
     // Check admin role
-    const { data: isAdmin } = await supabase.rpc("is_system_admin", { _user_id: user.id });
+    const { data: isAdmin } = await supabase.rpc("is_system_admin", { _user_id: userId });
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
@@ -48,62 +51,49 @@ serve(async (req) => {
 
     const cutoffDate = new Date("2026-01-31T23:59:59.999Z");
 
-    // List all files in invoices bucket
-    const allFiles: { name: string; created_at: string }[] = [];
-    let offset = 0;
-    const limit = 1000;
+    // List all files in invoices bucket (root level and subdirectories)
+    const allFiles: string[] = [];
 
-    while (true) {
-      const { data: files, error } = await supabase.storage
-        .from("invoices")
-        .list("", { limit, offset, sortBy: { column: "created_at", order: "asc" } });
+    // First get top-level items
+    const { data: topLevel, error: topErr } = await supabase.storage
+      .from("invoices")
+      .list("", { limit: 1000, sortBy: { column: "created_at", order: "asc" } });
 
-      if (error) throw error;
-      if (!files || files.length === 0) break;
+    if (topErr) throw topErr;
 
-      // Filter by date - files in subfolders need separate listing
-      for (const file of files) {
-        if (file.id) {
-          // It's a file
-          const fileDate = new Date(file.created_at);
-          if (fileDate <= cutoffDate) {
-            allFiles.push({ name: file.name, created_at: file.created_at });
-          }
+    const folders: string[] = [];
+
+    for (const item of topLevel || []) {
+      if (item.id) {
+        // It's a file
+        if (new Date(item.created_at) <= cutoffDate) {
+          allFiles.push(item.name);
         }
+      } else {
+        // It's a folder
+        folders.push(item.name);
       }
-
-      if (files.length < limit) break;
-      offset += limit;
     }
 
-    // Also list files in subdirectories (user folders)
-    const { data: topLevel } = await supabase.storage
-      .from("invoices")
-      .list("", { limit: 1000 });
-
-    const folders = (topLevel || []).filter(f => !f.id); // folders have no id
-
+    // List files in each subdirectory
     for (const folder of folders) {
-      let folderOffset = 0;
+      let offset = 0;
       while (true) {
         const { data: folderFiles, error } = await supabase.storage
           .from("invoices")
-          .list(folder.name, { limit, offset: folderOffset, sortBy: { column: "created_at", order: "asc" } });
+          .list(folder, { limit: 1000, offset, sortBy: { column: "created_at", order: "asc" } });
 
         if (error) break;
         if (!folderFiles || folderFiles.length === 0) break;
 
         for (const file of folderFiles) {
-          if (file.id) {
-            const fileDate = new Date(file.created_at);
-            if (fileDate <= cutoffDate) {
-              allFiles.push({ name: `${folder.name}/${file.name}`, created_at: file.created_at });
-            }
+          if (file.id && new Date(file.created_at) <= cutoffDate) {
+            allFiles.push(`${folder}/${file.name}`);
           }
         }
 
-        if (folderFiles.length < limit) break;
-        folderOffset += limit;
+        if (folderFiles.length < 1000) break;
+        offset += 1000;
       }
     }
 
@@ -112,10 +102,9 @@ serve(async (req) => {
     // Delete in batches of 100
     let deleted = 0;
     let failed = 0;
-    const batchSize = 100;
 
-    for (let i = 0; i < allFiles.length; i += batchSize) {
-      const batch = allFiles.slice(i, i + batchSize).map(f => f.name);
+    for (let i = 0; i < allFiles.length; i += 100) {
+      const batch = allFiles.slice(i, i + 100);
       const { error } = await supabase.storage.from("invoices").remove(batch);
       if (error) {
         console.error(`Batch delete error:`, error);
