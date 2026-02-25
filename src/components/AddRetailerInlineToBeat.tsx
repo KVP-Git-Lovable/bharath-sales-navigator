@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { addRetailerToSnapshot, updateBeatPlanInSnapshot } from "@/lib/myVisitsSnapshot";
+import { compressImageForUpload } from "@/utils/imageCompression";
 
 interface AddRetailerInlineToBeatProps {
   open: boolean;
@@ -265,10 +266,11 @@ export const AddRetailerInlineToBeat = ({ open, onClose, beatName, beatId, onRet
           };
           reader.readAsDataURL(file);
 
+          const compressedFile = await compressImageForUpload(file);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')
-            .upload(fileName, file, {
+            .upload(fileName, compressedFile, {
               cacheControl: '3600',
               upsert: false
             });

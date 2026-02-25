@@ -6,6 +6,7 @@ import { Camera, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CameraCapture } from './CameraCapture';
+import { compressImageForUpload } from '@/utils/imageCompression';
 
 interface ProfileSetupModalProps {
   userId: string;
@@ -62,12 +63,13 @@ export const ProfileSetupModal = ({ userId, fullName, onComplete }: ProfileSetup
     
     try {
       // Upload to employee-photos bucket
+      const compressed = await compressImageForUpload(blob);
       const fileName = `${userId}/baseline_${Date.now()}.jpg`;
       console.log('Uploading to:', fileName);
       
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('employee-photos')
-        .upload(fileName, blob);
+        .upload(fileName, compressed);
 
       if (uploadError) {
         console.error('Upload error:', uploadError);

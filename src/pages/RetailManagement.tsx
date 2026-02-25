@@ -17,6 +17,7 @@ import { Search, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, Camera, Image 
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { CameraCapture } from "@/components/CameraCapture";
+import { compressImageForUpload } from "@/utils/imageCompression";
 import { format, subMonths, isAfter, isBefore, startOfMonth } from "date-fns";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
@@ -259,11 +260,12 @@ export default function RetailManagement() {
     
     setUploadingPhoto(true);
     try {
+      const compressedBlob = await compressImageForUpload(blob);
       const fileName = `${selectedRetailer.id}/store_${Date.now()}.jpg`;
       
       const { error: uploadError } = await supabase.storage
         .from('retailer-photos')
-        .upload(fileName, blob);
+        .upload(fileName, compressedBlob);
 
       if (uploadError) throw uploadError;
 

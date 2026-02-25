@@ -26,6 +26,7 @@ import { VisitAIInsightsModal } from "./VisitAIInsightsModal";
 import { VanSalesModal } from "./VanSalesModal";
 import { useVanSales } from "@/hooks/useVanSales";
 import { checkUploadSpeed } from "@/utils/internetSpeedCheck";
+import { compressImageForUpload } from "@/utils/imageCompression";
 import { hasRecentUploadErrors, hasRecentUploadAttempts } from "@/utils/uploadErrorChecker";
 import { CameraCapture } from "./CameraCapture";
 import { useCheckInMandatory } from "@/hooks/useCheckInMandatory";
@@ -1661,11 +1662,12 @@ export const VisitCard = ({
         match
       } = checkData;
 
-      // Upload photo first
+      // Compress and upload photo
+      const compressedBlob = await compressImageForUpload(photoBlob);
       const path = `${userId}/${visitId}-${action}-${Date.now()}.jpg`;
       const {
         error: uploadError
-      } = await supabase.storage.from('visit-photos').upload(path, photoBlob, {
+      } = await supabase.storage.from('visit-photos').upload(path, compressedBlob, {
         contentType: 'image/jpeg',
         upsert: false
       });

@@ -5,6 +5,7 @@ import { Camera, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { compressImageForUpload } from "@/utils/imageCompression";
 
 interface CompactProfilePhotoProps {
   userId: string;
@@ -41,12 +42,13 @@ export function CompactProfilePhoto({ userId, userProfile }: CompactProfilePhoto
     setUploadSuccess(false);
 
     try {
+      const compressed = await compressImageForUpload(file);
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}/profile_${Date.now()}.${fileExt}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('employee-photos')
-        .upload(fileName, file);
+        .upload(fileName, compressed);
 
       if (uploadError) throw uploadError;
 

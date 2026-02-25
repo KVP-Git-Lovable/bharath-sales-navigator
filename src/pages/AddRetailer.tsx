@@ -23,6 +23,7 @@ import { useOfflineRetailers } from "@/hooks/useOfflineRetailers";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { compressImageForUpload } from "@/utils/imageCompression";
 
 export const AddRetailer = () => {
   const { t } = useTranslation();
@@ -511,11 +512,12 @@ export const AddRetailer = () => {
           };
           reader.readAsDataURL(file);
 
-          // Upload to Supabase Storage
+          // Compress and upload to Supabase Storage
+          const compressedFile = await compressImageForUpload(file);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')
-            .upload(fileName, file, {
+            .upload(fileName, compressedFile, {
               cacheControl: '3600',
               upsert: false
             });
@@ -636,10 +638,11 @@ export const AddRetailer = () => {
               // Convert compressed base64 to blob for upload
               const fetchRes = await fetch(compressedImage);
               const blob = await fetchRes.blob();
+              const compressedBlob = await compressImageForUpload(blob);
               
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('retailer-photos')
-                .upload(fileName, blob, {
+                .upload(fileName, compressedBlob, {
                   cacheControl: '3600',
                   upsert: false
                 });
