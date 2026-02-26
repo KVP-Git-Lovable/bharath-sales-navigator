@@ -1,58 +1,48 @@
 
 
-## Analysis: Why retailer-photos compression may not be working
+## Root Cause: Service Worker Caching Supabase Auth Requests
 
-### What I found
+**The Problem:**
+In `src/service-worker.ts` (lines 170-184), there is a catch-all route that caches **all** requests to `*.supabase.co`:
 
-**All upload paths DO call `compressImageForUpload`** — there are 4 upload points across 3 files (`AddRetailer.tsx`, `AddRetailerInlineToBeat.tsx`, `RetailManagement.tsx`), and every one invokes the compression utility.
-
-**Root cause: The compression function silently skips files in two scenarios:**
-
-1. **Blob type not set** (`src/utils/imageCompression.ts`, line 63):
-   ```
-   if (!file.type.startsWith('image/')) return file;
-   ```
-   When `CameraCapture.tsx` produces a blob via `canvas.toBlob`, the type is set. But when a blob arrives from other paths (e.g., `fetch().blob()` or certain mobile browsers with `<input capture="environment">`), the `type` property can be empty or undefined, causing the function to return the original file uncompressed.
-
-2. **Already under 600KB** (`src/utils/imageCompression.ts`, line 68):
-   ```
-   if (file.size <= maxSize) return file;
-   ```
-   The `CameraCapture` component already caps the canvas at 1200px and uses JPEG quality 0.5, so its output is often already under 600KB — this path is fine.
-
-3. **Silent catch block** (`src/utils/imageCompression.ts`, line 88):
-   If `loadImage()` or canvas operations fail on mobile (memory limits, CORS), the catch block returns the original file with only a `console.error`, so the user never knows compression was skipped.
-
-### Plan
-
-**File: `src/utils/imageCompression.ts`**
-- Add a fallback for the `file.type` check: if type is empty/undefined but the file was passed as a Blob (not a known non-image format), treat it as an image and attempt compression
-- Add `console.log` statements at each skip/return point so you can diagnose on-device whether compression ran or was bypassed
-- Log the before/after file size clearly
-
-**File: `src/pages/AddRetailer.tsx`** (two upload paths — file input ~line 516 and board scan ~line 641)
-- Add a log before and after `compressImageForUpload` showing `file.size`, `file.type`, and the compressed result size
-- This will confirm on-device whether the issue is the compression utility or the file input itself
-
-**File: `src/components/AddRetailerInlineToBeat.tsx`** (~line 269)
-- Same logging around the `compressImageForUpload` call
-
-**File: `src/pages/RetailManagement.tsx`** (~line 263)
-- Same logging around the `compressImageForUpload` call
-
-### Technical detail
-
-The key change in `imageCompression.ts`:
-
-```text
-BEFORE:
-  if (!file.type.startsWith('image/')) return file;
-
-AFTER:
-  const isImage = file.type.startsWith('image/') || !file.type || file.type === '';
-  if (!isImage) return file;
-  // If type is missing, assume image (camera blobs often lack type)
+```typescript
+registerRoute(
+  ({ url }) => url.hostname.endsWith('.supabase.co'),
+  new NetworkFirst({
+    cacheName: `api-cache-${RUNTIME_CACHE_VERSION}`,
+    networkTimeoutSeconds: 3, // <-- Falls back to cache after 3 seconds
+    ...
+  }),
+);
 ```
 
-This ensures blobs from camera capture that lack a MIME type are still compressed. A `console.warn` will be added when type is missing so it's traceable.
+This includes Supabase **auth endpoints** (`/auth/v1/token`, `/auth/v1/signup`, etc.). Here's what happens:
+
+1. User logs in successfully -- the auth token response gets cached by the Service Worker
+2. User logs out -- `signOut({ scope: 'local' })` clears local state but the **Service Worker cache still holds the old auth response**
+3. User tries to log in again -- if the network is even slightly slow (>3 seconds), the Service Worker serves the **stale cached auth response** instead of the real one
+4. The stale/invalid token causes "Login Failed"
+5. On a different Wi-Fi network, the Service Worker cache may not trigger the same way (different latency characteristics, or cache miss), so login works
+
+## Fix
+
+**File: `src/service-worker.ts`**
+
+Update the Supabase API caching route (line 172) to **exclude auth endpoints** from being cached. Auth requests (login, token refresh, signup, etc.) should always go directly to the network and never be served from cache.
+
+Change the route matcher from:
+```typescript
+({ url }) => url.hostname.endsWith('.supabase.co')
+```
+to:
+```typescript
+({ url }) =>
+  url.hostname.endsWith('.supabase.co') &&
+  !url.pathname.startsWith('/auth/')
+```
+
+This is a one-line change that ensures:
+- Auth requests (login, logout, token refresh) always hit the network directly -- no caching
+- Other Supabase API requests (data queries, storage) continue to benefit from the NetworkFirst cache for offline support
+- The issue of stale auth responses being served after logout is completely eliminated
 
