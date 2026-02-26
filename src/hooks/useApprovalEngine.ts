@@ -82,9 +82,8 @@ export const useMyPendingSteps = () => {
 
       return (data || [])
         .filter((s: any) => {
-          // Only show when it's MY turn (current_level matches my level)
-          return s.approval_requests?.current_level === s.level
-            && s.approval_requests?.status === 'pending';
+          // Parallel: show all pending steps for pending requests
+          return s.approval_requests?.status === 'pending';
         })
         .map((s: any): PendingStep => ({
           approvalRequestId: s.approval_request_id,
@@ -213,13 +212,8 @@ export const useProcessApprovalStep = () => {
     // Show contextual toast
     if (action === 'rejected') {
       toast({ title: 'Request rejected', variant: 'destructive' });
-    } else if (result.is_final) {
-      toast({ title: '✅ Finally approved', description: 'Request fully approved and processed.' });
     } else {
-      toast({
-        title: '✅ Approved & forwarded',
-        description: `Forwarded to Level ${result.next_level} for further approval.`,
-      });
+      toast({ title: '✅ Request approved' });
     }
 
     // Invalidate relevant queries

@@ -3,9 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Check, X, AlertCircle, ChevronRight } from 'lucide-react';
+import { Check, X, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+// cn import kept for potential future use
 import { PendingApproval } from '@/hooks/useTeamAttendance';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 
@@ -60,10 +60,8 @@ export const PendingApprovalsSection = ({
 
   const getInitials = (name: string) => name?.substring(0, 2).toUpperCase() || '??';
 
-  const getApproveLabel = (approval: PendingApproval) => {
-    if (!approval.approvalRequestId) return 'Approve';
-    if (approval.isFinalLevel) return 'Final Approve';
-    return 'Approve & Forward';
+  const getApproveLabel = (_approval: PendingApproval) => {
+    return 'Approve';
   };
 
   return (
@@ -97,20 +95,6 @@ export const PendingApprovalsSection = ({
                   >
                     {approval.type === 'leave' ? approval.leaveTypeName || 'Leave' : 'Regularization'}
                   </Badge>
-                  {/* Level badge */}
-                  {approval.approvalRequestId && approval.totalLevels && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        'text-[10px] px-1.5 py-0',
-                        approval.isFinalLevel
-                          ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-700'
-                          : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
-                      )}
-                    >
-                      L{approval.myLevel}/{approval.totalLevels}
-                    </Badge>
-                  )}
                 </div>
 
                 {approval.designation && (
@@ -127,23 +111,10 @@ export const PendingApprovalsSection = ({
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{approval.reason}</p>
                 )}
 
-                {/* Forward indicator */}
-                {approval.approvalRequestId && !approval.isFinalLevel && (
-                  <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 mt-1">
-                    <ChevronRight className="h-3 w-3" />
-                    <span>Forwards to Level {(approval.myLevel || 0) + 1} after approval</span>
-                  </div>
-                )}
-
                 <div className="flex gap-2 mt-2">
                   <Button
                     size="sm"
-                    className={cn(
-                      'h-9 flex-1 text-white',
-                      approval.isFinalLevel || !approval.approvalRequestId
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-blue-600 hover:bg-blue-700'
-                    )}
+                    className="h-9 flex-1 text-white bg-green-600 hover:bg-green-700"
                     onClick={() => handleApprove(approval)}
                     disabled={processingId === approval.id}
                   >
