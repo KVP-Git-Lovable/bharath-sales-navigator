@@ -172,9 +172,8 @@ export const useTeamAttendance = (
 
       if (error) throw error;
 
-      // Filter: only show when it's MY turn AND request is still pending
+      // Parallel: show all pending steps for pending requests
       const myTurnSteps = (steps || []).filter((s: any) =>
-        s.approval_requests?.current_level === s.level &&
         s.approval_requests?.status === 'pending'
       );
 
@@ -446,10 +445,8 @@ export const useTeamAttendance = (
         if (!res.success) throw new Error(res.message);
         if (newStatus === 'rejected') {
           toast({ title: 'Leave rejected' });
-        } else if (res.is_final) {
-          toast({ title: '✅ Leave approved', description: 'Fully approved and processed.' });
         } else {
-          toast({ title: '✅ Approved & forwarded', description: `Forwarded to Level ${res.next_level}.` });
+          toast({ title: '✅ Leave approved' });
         }
       } else {
         const updateData: any = {
@@ -481,38 +478,30 @@ export const useTeamAttendance = (
     try {
       if (approvalRequestId) {
         if (newStatus === 'approved') {
-          // Check if this is the final level — if so, upsert attendance before engine processes
-          const { data: arData } = await supabase
-            .from('approval_requests')
-            .select('current_level, total_levels')
-            .eq('id', approvalRequestId)
+          // Parallel: approval is always final, upsert attendance
+          const { data: request } = await supabase
+            .from('regularization_requests')
+            .select('*')
+            .eq('id', requestId)
             .maybeSingle();
 
-          if (arData && arData.current_level >= arData.total_levels) {
-            const { data: request } = await supabase
-              .from('regularization_requests')
-              .select('*')
-              .eq('id', requestId)
-              .maybeSingle();
-
-            if (request) {
-              let totalHours = null;
-              if (request.requested_check_in_time && request.requested_check_out_time) {
-                const checkIn = new Date(request.requested_check_in_time);
-                const checkOut = new Date(request.requested_check_out_time);
-                totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
-              }
-              await supabase.from('attendance').upsert({
-                user_id: request.user_id,
-                date: request.attendance_date,
-                check_in_time: request.requested_check_in_time,
-                check_out_time: request.requested_check_out_time,
-                status: 'regularized',
-                total_hours: totalHours,
-                notes: `Regularized via request #${requestId.slice(0, 8)}`,
-                regularized_request_id: requestId,
-              }, { onConflict: 'user_id,date' });
+          if (request) {
+            let totalHours = null;
+            if (request.requested_check_in_time && request.requested_check_out_time) {
+              const checkIn = new Date(request.requested_check_in_time);
+              const checkOut = new Date(request.requested_check_out_time);
+              totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
             }
+            await supabase.from('attendance').upsert({
+              user_id: request.user_id,
+              date: request.attendance_date,
+              check_in_time: request.requested_check_in_time,
+              check_out_time: request.requested_check_out_time,
+              status: 'regularized',
+              total_hours: totalHours,
+              notes: `Regularized via request #${requestId.slice(0, 8)}`,
+              regularized_request_id: requestId,
+            }, { onConflict: 'user_id,date' });
           }
         }
 
@@ -528,10 +517,8 @@ export const useTeamAttendance = (
 
         if (newStatus === 'rejected') {
           toast({ title: 'Regularization rejected', variant: 'destructive' });
-        } else if (res.is_final) {
-          toast({ title: '✅ Regularization approved' });
         } else {
-          toast({ title: '✅ Approved & forwarded', description: `Forwarded to Level ${res.next_level}.` });
+          toast({ title: '✅ Regularization approved' });
         }
       } else {
         // Legacy direct update
