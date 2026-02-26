@@ -408,6 +408,7 @@ export const BeatPlanning = () => {
         });
 
         toast.success('Beat plan removed successfully');
+        window.dispatchEvent(new Event('visitDataChanged'));
       } catch (err) {
         console.error('Error removing beat plan:', err);
         toast.error('Failed to remove beat plan from database');
