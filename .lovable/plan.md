@@ -1,53 +1,36 @@
 
 
-## Fix: Auto-Update Attendance on Regularization Approval
+## Add First Half / Second Half Selection for Half-Day Leave
 
-### Problem Found
-
-The regularization approval flow has a **critical gap**: when a regularization request is fully approved through all hierarchy levels, the system updates `regularization_requests.status` to `'approved'` but **never writes the requested times back to the `attendance` table**.
-
-Current flow:
-1. Employee submits regularization request (requested check-in: 9:00 AM, actual: 11:50 AM)
-2. Approval engine processes through hierarchy levels
-3. Final approval triggers `trigger_sync_entity_status` which sets `regularization_requests.status = 'approved'`
-4. **STOP** -- Nothing updates the `attendance` record
+### Problem
+When a user selects "Half Day" leave, the system automatically sets `half_day_period` to `'first_half'` without asking the user. There is no UI to choose between First Half and Second Half.
 
 ### Solution
+Add a conditional radio group that appears when "Half Day" is selected, allowing the user to pick "First Half" or "Second Half". The selection is saved to the existing `half_day_period` column in `leave_applications`.
 
-Add a new trigger on the `regularization_requests` table that fires when `status` changes to `'approved'`, and updates (or creates) the corresponding `attendance` record with the requested times.
+### Changes
 
-### Database Migration
+**File: `src/components/LeaveApplicationModal.tsx`**
 
-Create a new trigger function `apply_regularization_to_attendance()` on `regularization_requests`:
+1. **Update state**: Change `half_day_period` from being hardcoded to a user-selectable state variable:
+   - Add new state: `halfDayPeriod` with type `'first_half' | 'second_half'`, defaulting to `'first_half'`
+   - Reset it when `leaveDay` changes back to `'full'`
 
-```text
-When regularization_requests.status changes to 'approved':
-  1. Find the attendance record for (user_id, attendance_date)
-  2. If found:
-     - Update check_in_time to requested_check_in_time (if provided)
-     - Update check_out_time to requested_check_out_time (if provided)
-     - Set status to 'regularized'
-     - Set regularized_request_id to the request ID
-     - Recalculate total_hours based on new times
-  3. If NOT found (absent day being regularized):
-     - INSERT a new attendance record with the requested times
-     - Set status to 'regularized'
-     - Set regularized_request_id
-```
+2. **Add UI**: After the Full Day / Half Day radio group, conditionally render a "First Half" / "Second Half" selector when `leaveDay === 'half'`:
+   - Two styled radio buttons or toggle buttons
+   - First Half = morning session
+   - Second Half = afternoon session
 
-Key details:
-- Uses `COALESCE` so that if only check-in OR check-out is requested, the other field keeps its original value
-- Recalculates `total_hours` as the difference between check-out and check-in in decimal hours
-- Sets `attendance.status = 'regularized'` so it's visually distinct from normal 'present'
-- Links via `regularized_request_id` for audit trail (column already exists)
+3. **Update submit logic**: Change line 103 from:
+   ```
+   half_day_period: leaveDay === 'half' ? 'first_half' : null
+   ```
+   to:
+   ```
+   half_day_period: leaveDay === 'half' ? halfDayPeriod : null
+   ```
 
-### Files Changed
+4. **Reset on close**: Include `halfDayPeriod` in the form reset after successful submission.
 
-**Database only** -- single migration, no application code changes needed:
-
-1. **New migration SQL**: Creates `apply_regularization_to_attendance()` function and attaches it as an `AFTER UPDATE` trigger on `regularization_requests`
-
-### No Frontend Changes Needed
-
-The `RegularizationRequestModal.tsx` already submits `requested_check_in_time` and `requested_check_out_time` correctly. The approval engine already sets the status to 'approved'. The only missing piece is this database trigger to propagate the approved times into `attendance`.
+No database changes needed -- the `half_day_period` column already stores text values like `'first_half'` and `'second_half'`.
 
