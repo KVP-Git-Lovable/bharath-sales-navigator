@@ -42,6 +42,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [endDate, setEndDate] = useState<Date>();
   const [reason, setReason] = useState('');
   const [leaveDay, setLeaveDay] = useState<'full' | 'half'>('full');
+  const [halfDayPeriod, setHalfDayPeriod] = useState<'first_half' | 'second_half'>('first_half');
 
   // Update leaveTypeId when defaultLeaveTypeId changes
   useEffect(() => {
@@ -100,7 +101,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           reason: reason.trim(),
           status: 'pending',
           is_half_day: leaveDay === 'half',
-          half_day_period: leaveDay === 'half' ? 'first_half' : null,
+          half_day_period: leaveDay === 'half' ? halfDayPeriod : null,
           days_requested: calculateLeaveDays(),
         });
 
@@ -114,6 +115,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       setEndDate(undefined);
       setReason('');
       setLeaveDay('full');
+      setHalfDayPeriod('first_half');
       setIsOpen(false);
       
       onApplicationSubmitted?.();
@@ -194,6 +196,34 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
               </label>
             </div>
           </div>
+
+          {leaveDay === 'half' && (
+            <div className="space-y-2">
+              <Label>Half Day Period *</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="first_half"
+                    checked={halfDayPeriod === 'first_half'}
+                    onChange={(e) => setHalfDayPeriod(e.target.value as 'first_half' | 'second_half')}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <span>First Half (Morning)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="second_half"
+                    checked={halfDayPeriod === 'second_half'}
+                    onChange={(e) => setHalfDayPeriod(e.target.value as 'first_half' | 'second_half')}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <span>Second Half (Afternoon)</span>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
