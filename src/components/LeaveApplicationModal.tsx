@@ -98,7 +98,10 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           start_date: format(startDate, 'yyyy-MM-dd'),
           end_date: format(endDate, 'yyyy-MM-dd'),
           reason: reason.trim(),
-          status: 'pending'
+          status: 'pending',
+          is_half_day: leaveDay === 'half',
+          half_day_period: leaveDay === 'half' ? 'first_half' : null,
+          days_requested: calculateLeaveDays(),
         });
 
       if (error) throw error;
