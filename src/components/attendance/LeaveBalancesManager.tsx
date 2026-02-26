@@ -201,21 +201,23 @@ const LeaveBalancesManager = () => {
       // Get approved leave applications for the year
       const { data: applications, error: appError } = await supabase
         .from('leave_applications')
-        .select('user_id, leave_type_id, start_date, end_date')
-        .eq('status', 'approved')
+        .select('user_id, leave_type_id, start_date, end_date, days_requested')
+        .not('status', 'in', '("rejected","cancelled")')
         .gte('start_date', `${year}-01-01`)
         .lte('end_date', `${year}-12-31`);
 
       if (appError) throw appError;
 
-      // Calculate used days per user per leave type
+      // Calculate used days per user per leave type using days_requested
       const usedDaysMap: Record<string, number> = {};
 
       for (const app of applications || []) {
         const key = `${app.user_id}_${app.leave_type_id}`;
         const startDate = new Date(app.start_date);
         const endDate = new Date(app.end_date);
-        const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const days = app.days_requested != null
+          ? app.days_requested
+          : Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         usedDaysMap[key] = (usedDaysMap[key] || 0) + days;
       }
 
@@ -543,8 +545,9 @@ const LeaveBalancesManager = () => {
               <Label>Opening Balance (days)</Label>
               <Input
                 type="number"
+                step="0.5"
                 value={formData.opening_balance}
-                onChange={(e) => setFormData({ ...formData, opening_balance: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, opening_balance: parseFloat(e.target.value) || 0 })}
                 min={0}
               />
             </div>
@@ -552,8 +555,9 @@ const LeaveBalancesManager = () => {
               <Label>Used Balance (days)</Label>
               <Input
                 type="number"
+                step="0.5"
                 value={formData.used_balance}
-                onChange={(e) => setFormData({ ...formData, used_balance: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, used_balance: parseFloat(e.target.value) || 0 })}
                 min={0}
               />
             </div>

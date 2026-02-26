@@ -16,6 +16,9 @@ interface LeaveApplication {
   applied_date: string;
   approved_date?: string;
   rejection_reason?: string;
+  days_requested?: number | null;
+  is_half_day?: boolean | null;
+  half_day_period?: string | null;
   leave_types?: {
     name: string;
   } | null;
@@ -164,11 +167,19 @@ const MyLeaveApplications: React.FC<MyLeaveApplicationsProps> = ({ refreshTrigge
     );
   };
 
-  const calculateLeaveDays = (startDate: string, endDate: string) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  const getDisplayDays = (application: LeaveApplication) => {
+    if (application.days_requested != null) {
+      return application.days_requested;
+    }
+    const start = new Date(application.start_date);
+    const end = new Date(application.end_date);
     const timeDiff = end.getTime() - start.getTime();
     return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+  };
+
+  const formatDays = (days: number, isHalfDay?: boolean | null) => {
+    if (isHalfDay || days === 0.5) return 'Half Day';
+    return `${days} ${days === 1 ? 'day' : 'days'}`;
   };
 
   if (isLoading) {
@@ -237,7 +248,7 @@ const MyLeaveApplications: React.FC<MyLeaveApplicationsProps> = ({ refreshTrigge
                         {format(new Date(application.end_date), 'MMM dd, yyyy')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {calculateLeaveDays(application.start_date, application.end_date)} days
+                        {formatDays(getDisplayDays(application), application.is_half_day)}
                       </p>
                     </div>
 
