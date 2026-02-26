@@ -125,8 +125,8 @@ const Attendance = () => {
   const [todaysVisits, setTodaysVisits] = useState<any[]>(() => cachedTodaysVisits);
   const [activeMarketHours, setActiveMarketHours] = useState<number | null>(() => cachedActiveMarketHours);
   const [stats, setStats] = useState(() => {
-    // Calculate initial stats from cached data
-    const presentDaysCount = cachedAttendanceRecords.filter((r: any) => r.status === 'present').length;
+    // Calculate initial stats from cached data (exclude holidays from present count)
+    const presentDaysCount = cachedAttendanceRecords.filter((r: any) => r.status === 'present' && !holidayDates.has(r.date)).length;
     const workingDays = totalWorkingDays || 20;
     const attendancePercentage = workingDays > 0 ? Math.round((presentDaysCount / workingDays) * 100) : 0;
     return {
@@ -232,8 +232,8 @@ const Attendance = () => {
     // Sync attendance records from cache (runs on any update)
     if (cachedAttendanceRecords.length > 0 || !isLoadingAttendance) {
       const records = cachedAttendanceRecords.length > 0 ? cachedAttendanceRecords : [];
-      const presentDaysCount = records.filter((r: any) => r.status === 'present').length;
-      const presentDates = records.filter((r: any) => r.status === 'present').map((r: any) => r.date);
+      const presentDaysCount = records.filter((r: any) => r.status === 'present' && !holidayDates.has(r.date)).length;
+      const presentDates = records.filter((r: any) => r.status === 'present' && !holidayDates.has(r.date)).map((r: any) => r.date);
       const presentDatesSet = new Set(presentDates);
       
       // Calculate absent dates using working days config
@@ -284,7 +284,8 @@ const Attendance = () => {
     cachedRegularizationRequests,
     elapsedWorkingDates,
     totalWorkingDays,
-    isLoadingAttendance
+    isLoadingAttendance,
+    holidayDates
   ]);
 
   // Only fetch location on mount - GPS is only needed for check-in/out actions
