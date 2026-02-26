@@ -169,7 +169,9 @@ registerRoute(
 
 // Runtime caching: Supabase API - Use NetworkFirst with very short cache
 registerRoute(
-  ({ url }) => url.hostname.endsWith('.supabase.co'),
+  ({ url }) =>
+    url.hostname.endsWith('.supabase.co') &&
+    !url.pathname.startsWith('/auth/'),
   new NetworkFirst({
     cacheName: `api-cache-${RUNTIME_CACHE_VERSION}`,
     networkTimeoutSeconds: 3,
