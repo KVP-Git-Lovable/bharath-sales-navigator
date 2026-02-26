@@ -1,57 +1,130 @@
 
+### What I found (root cause confirmed)
 
-## Fix: Half-Day Leave Not Working
+Do I know what the issue is? **Yes.**
 
-### Problem
-Two bugs are causing half-day leave to be recorded as a full day:
+Half-day is being saved correctly in `leave_applications`, but it gets rounded to a full day when updating leave balances.
 
-1. **Frontend**: The `LeaveApplicationModal` collects the half-day selection (`leaveDay` state) but **never sends** `is_half_day`, `half_day_period`, or `days_requested` to the database. Only `user_id`, `leave_type_id`, `start_date`, `end_date`, `reason`, and `status` are inserted.
+I verified this from live data:
 
-2. **Database trigger**: The `update_leave_balance_on_status_change` trigger calculates leave days as `COALESCE(NEW.days_requested, end_date - start_date + 1)`. Since `days_requested` is never set, it always falls back to full-day math.
+- Latest leave application has:
+  - `days_requested = 0.5`
+  - `is_half_day = true`
+- But `leave_balance` for the same user/type shows:
+  - `used_balance = 2`
+  - `remaining_balance = 0`
+- Expected based on applications:
+  - `used_balance = 1.5`
+  - `remaining_balance = 0.5`
 
-### Fix 1: Frontend -- Send half-day fields on insert
+### Exact problem
 
-**File: `src/components/LeaveApplicationModal.tsx`**
+`leave_balance` schema currently uses **INTEGER** columns:
 
-Update the `.insert()` call (around line 93-102) to include:
-- `is_half_day: leaveDay === 'half'`
-- `half_day_period`: when half-day, default to `'first_half'` (or add a selector)
-- `days_requested`: use `calculateLeaveDays()` to send the correct value (0.5 for half-day, full count otherwise)
+- `opening_balance` = integer
+- `used_balance` = integer
+- `remaining_balance` = generated integer (`opening_balance - used_balance`)
 
-```typescript
-const { error } = await supabase
-  .from('leave_applications')
-  .insert({
-    user_id: user.id,
-    leave_type_id: leaveTypeId,
-    start_date: format(startDate, 'yyyy-MM-dd'),
-    end_date: format(endDate, 'yyyy-MM-dd'),
-    reason: reason.trim(),
-    status: 'pending',
-    is_half_day: leaveDay === 'half',
-    half_day_period: leaveDay === 'half' ? 'first_half' : null,
-    days_requested: calculateLeaveDays(),
-  });
-```
+The trigger function calculates `leave_days` as numeric, but when writing into integer columns, PostgreSQL rounds (e.g. `1.5 -> 2`), so half-day increments are lost.
 
-### Fix 2: Database trigger -- Respect `is_half_day` flag
+Also, your leave card UI currently shows duration from date-difference logic, so a same-day half leave still displays as “1 day” even when `days_requested` is 0.5.
 
-Update the trigger function so that when `days_requested` is provided, it uses that value directly (which it already does via `COALESCE`). Since we're now sending `days_requested` from the frontend, the existing trigger logic will work correctly without modification.
+---
 
-No trigger change needed -- the `COALESCE(NEW.days_requested, ...)` already prioritizes `days_requested` when provided.
+### Implementation plan
 
-### Fix 3 (optional): Add half-day period selector
+## 1) Fix DB precision so half-days persist correctly
 
-Currently the UI only has Full Day / Half Day radio buttons. Optionally add a "First Half" / "Second Half" selector when Half Day is chosen, and send that as `half_day_period`.
+**New migration** to convert balance columns to decimal:
 
-### Summary of Changes
+1. Drop generated `remaining_balance` column temporarily.
+2. Alter:
+   - `opening_balance` → `numeric(10,2)`
+   - `used_balance` → `numeric(10,2)`
+3. Recreate `remaining_balance` as generated `numeric(10,2)`:
+   - `GENERATED ALWAYS AS (opening_balance - used_balance) STORED`
+4. Keep defaults as `0`.
 
-| File | Change |
-|------|--------|
-| `src/components/LeaveApplicationModal.tsx` | Add `is_half_day`, `half_day_period`, and `days_requested` to the insert payload |
+Why first: without this, any 0.5 will keep getting rounded.
 
-This single frontend fix ensures:
-- Half-day leave is recorded as 0.5 days in `days_requested`
-- The existing DB trigger uses `days_requested` to deduct 0.5 from the balance
-- Available decrements by 0.5 and Booked increments by 0.5
+---
+
+## 2) Repair already-corrupted balance data
+
+In the same migration, run a data correction update:
+
+- Recompute `used_balance` from `leave_applications`:
+  - sum of `COALESCE(days_requested, end_date - start_date + 1)`
+  - include statuses per current policy (all except `rejected`/`cancelled`)
+- Update matching `leave_balance` rows by `(user_id, leave_type_id, year)`.
+
+This immediately fixes existing users who already got rounded values.
+
+---
+
+## 3) Ensure validation logic handles decimals safely
+
+Update DB function `validate_leave_application()`:
+
+- Change `v_days_in_month` from `INTEGER` to `NUMERIC`.
+
+Reason: monthly totals using half-days should remain decimal (avoid implicit rounding in policy checks).
+
+---
+
+## 4) Fix leave history card display (user-facing correctness)
+
+**File:** `src/components/MyLeaveApplications.tsx`
+
+- Extend interface usage to rely on existing fields from `leave_applications`:
+  - `days_requested`
+  - `is_half_day`
+  - `half_day_period`
+- Replace local date-diff display function for “X days” with `days_requested` (fallback to date diff only if null).
+- Show “0.5 day” (or “Half Day”) correctly in UI.
+
+This addresses the screenshot symptom where it currently shows “1 days” for same-day half leave.
+
+---
+
+## 5) Prevent admin recalculation from reintroducing full-day math
+
+**File:** `src/components/attendance/LeaveBalancesManager.tsx`
+
+- In `handleRecalculateBalances`, fetch `days_requested` and aggregate from that, not raw date difference.
+- Optional but recommended:
+  - switch parse handlers from `parseInt` to `parseFloat` in admin balance form inputs
+  - set `step="0.5"` for opening/used fields
+
+This avoids future accidental rounding if admin uses recalculation/manual edits.
+
+---
+
+### File-level change list
+
+1. `supabase/migrations/<new_timestamp>_fix_half_day_leave_balance_precision.sql`
+   - alter numeric types
+   - recreate generated column
+   - backfill used balances
+   - replace validation function numeric month accumulator
+
+2. `src/components/MyLeaveApplications.tsx`
+   - render `days_requested` / half-day properly
+
+3. `src/components/attendance/LeaveBalancesManager.tsx`
+   - recalc via `days_requested`
+   - decimal-safe inputs (recommended)
+
+---
+
+### Validation checklist after implementation
+
+1. Apply half-day leave for today.
+2. Confirm `leave_applications.days_requested = 0.5`.
+3. Confirm `leave_balance.used_balance` increments by `0.5`.
+4. Confirm `leave_balance.remaining_balance` decrements by `0.5`.
+5. Verify UI:
+   - Leave Balance card: Booked +0.5, Available -0.5
+   - My Leave Applications: shows 0.5 day / Half Day (not 1 day)
+6. Reject/cancel a pending half-day leave and confirm 0.5 is restored correctly.
 
