@@ -9,11 +9,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { 
   Save, AlertCircle, Loader2, ChevronDown, ChevronRight, Users, 
-  GitBranch, Table2, Equal, Percent, Edit3, ArrowUpCircle, Calendar, CalendarDays, TrendingUp
+  GitBranch, Table2, Equal, Percent, Edit3, ArrowUpCircle, Calendar, CalendarDays, TrendingUp,
+  Split, Maximize2, Minimize2, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { TargetStrategySelector, InlineStrategySelector, TargetStrategy } from './TargetStrategySelector';
+import { TargetSplitDialog } from './TargetSplitDialog';
 import {
   Tooltip,
   TooltipContent,
@@ -69,6 +71,7 @@ const FY_MONTHS_LIST = [
 
 type AllocationMethod = 'equal' | 'percentage' | 'manual';
 type ViewMode = 'tree' | 'table';
+type DisplayDensity = 'compact' | 'expanded';
 
 const getLevelBackground = (level: number) => {
   switch (level) {
@@ -248,9 +251,13 @@ export function AllocationTable({
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>('manual');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
+  const [displayDensity, setDisplayDensity] = useState<DisplayDensity>('expanded');
   const [targetStrategy, setTargetStrategy] = useState<TargetStrategy>('roll_down');
   const [managerOwnQuantity, setManagerOwnQuantity] = useState<number>(0);
   const [managerOwnRevenue, setManagerOwnRevenue] = useState<number>(0);
+  // Split dialog state
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [splitDialogManager, setSplitDialogManager] = useState<SubordinateAllocation | null>(null);
   // Per-user strategy overrides (for sub-managers)
   const [perUserStrategies, setPerUserStrategies] = useState<Map<string, TargetStrategy>>(new Map());
 
@@ -521,6 +528,62 @@ export function AllocationTable({
     });
   };
 
+  // Compute per-manager distribution status
+  const managerDistribution = useMemo(() => {
+    const result = new Map<string, { distributed: number; remaining: number; total: number }>();
+    const computeForNode = (node: SubordinateAllocation) => {
+      if (node.children.length > 0) {
+        const childSum = node.children.reduce((s, c) => s + (allocations.get(c.userId)?.quantityTarget || 0), 0);
+        const nodeTarget = allocations.get(node.userId)?.quantityTarget || 0;
+        result.set(node.userId, { distributed: childSum, remaining: nodeTarget - childSum, total: nodeTarget });
+        node.children.forEach(computeForNode);
+      }
+    };
+    directReports.forEach(computeForNode);
+    return result;
+  }, [directReports, allocations]);
+
+  // Status dot: green=assigned, grey=0, orange=partial distribution, red=over-allocated
+  const getStatusDot = useCallback((user: SubordinateAllocation) => {
+    const alloc = allocations.get(user.userId);
+    const target = alloc?.quantityTarget || 0;
+    const dist = managerDistribution.get(user.userId);
+
+    if (dist && dist.remaining < 0) return { color: 'bg-destructive', label: 'Over-allocated' };
+    if (dist && dist.remaining > 0 && dist.total > 0) return { color: 'bg-amber-500', label: 'Partially distributed' };
+    if (target === 0) return { color: 'bg-muted-foreground/40', label: 'Not assigned' };
+    return { color: 'bg-emerald-500', label: 'Assigned' };
+  }, [allocations, managerDistribution]);
+
+  // Handle split dialog open
+  const openSplitDialog = useCallback((manager: SubordinateAllocation) => {
+    setSplitDialogManager(manager);
+    setSplitDialogOpen(true);
+  }, []);
+
+  // Handle split dialog apply
+  const handleSplitApply = useCallback((updatedChildren: Array<{
+    userId: string; quantityTarget: number; revenueTarget: number; visitsTarget: number; percentage: number;
+  }>) => {
+    setAllocations(prev => {
+      const next = new Map(prev);
+      updatedChildren.forEach(child => {
+        const current = next.get(child.userId);
+        if (current) {
+          next.set(child.userId, {
+            ...current,
+            quantityTarget: child.quantityTarget,
+            revenueTarget: child.revenueTarget,
+            visitsTarget: child.visitsTarget,
+            percentage: child.percentage,
+          });
+        }
+      });
+      return next;
+    });
+    toast.success('Split applied successfully');
+  }, []);
+
   // Save mutation - saves each user's strategy + computed targets
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -599,51 +662,84 @@ export function AllocationTable({
     const isManager = user.subordinateCount > 0;
     const userIsRollUp = isRollUpUser(user.userId, user.subordinateCount);
     const effective = effectiveTargets.get(user.userId);
+    const statusDot = getStatusDot(user);
+    const dist = managerDistribution.get(user.userId);
+    const canEdit = isDirectReport; // Only direct reports are editable
 
+    // Compact mode: single line
+    if (displayDensity === 'compact') {
+      return (
+        <div key={user.userId} style={{ marginLeft: `${depth * 24}px` }}>
+          <div className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border mb-1', levelBg)}>
+            {hasChildren && (
+              <button onClick={() => toggleExpand(user.userId)} className="p-0.5 hover:bg-muted/50 rounded shrink-0">
+                {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+            )}
+            <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', statusDot.color)} title={statusDot.label} />
+            <Avatar className="h-7 w-7 shrink-0">
+              <AvatarImage src={user.profilePictureUrl || undefined} alt={user.fullName} />
+              <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary">{getInitials(user.fullName)}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium truncate">{user.fullName}</span>
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">L{user.level}</Badge>
+            {isManager && (
+              <Badge variant="secondary" className="text-[9px] gap-0.5 px-1 py-0 h-4 shrink-0">
+                <Users className="h-2.5 w-2.5" />{user.subordinateCount}
+              </Badge>
+            )}
+            <div className="flex-1" />
+            {enabledMetrics.quantity && (
+              <span className="text-sm font-mono font-medium">
+                {formatNumber(allocations.get(user.userId)?.quantityTarget || 0)} <span className="text-xs text-muted-foreground">{quantityUnit}</span>
+              </span>
+            )}
+            {enabledMetrics.revenue && (
+              <span className="text-sm font-mono font-medium">{formatCurrency(allocations.get(user.userId)?.revenueTarget || 0)}</span>
+            )}
+            {isManager && canEdit && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => openSplitDialog(user)}>
+                <Split className="h-3 w-3" /> Split
+              </Button>
+            )}
+          </div>
+          {isExpanded && hasChildren && (
+            <div>{user.children.map(child => renderUserCard(child, depth + 1))}</div>
+          )}
+        </div>
+      );
+    }
+
+    // Expanded mode (full card)
     return (
       <div key={user.userId} style={{ marginLeft: `${depth * 24}px` }}>
-        <div
-          className={cn(
-            'flex flex-col gap-1 p-3 rounded-lg border transition-all mb-2',
-            levelBg
-          )}
-        >
+        <div className={cn('flex flex-col gap-1 p-3 rounded-lg border transition-all mb-2', levelBg)}>
           <div className="flex items-center gap-3">
-            {/* Expand/Collapse - always show for daily avg */}
-            <button
-              onClick={() => toggleExpand(user.userId)}
-              className="p-1 hover:bg-muted/50 rounded shrink-0"
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
+            {/* Expand/Collapse */}
+            <button onClick={() => toggleExpand(user.userId)} className="p-1 hover:bg-muted/50 rounded shrink-0">
+              {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </button>
+
+            {/* Status dot */}
+            <div className={cn('h-3 w-3 rounded-full shrink-0', statusDot.color)} title={statusDot.label} />
 
             {/* Avatar */}
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={user.profilePictureUrl || undefined} alt={user.fullName} />
-              <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                {getInitials(user.fullName)}
-              </AvatarFallback>
+              <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">{getInitials(user.fullName)}</AvatarFallback>
             </Avatar>
 
             {/* Name and badges */}
             <div className="flex items-center gap-2 min-w-[120px]">
               <span className="font-medium text-sm truncate">{user.fullName}</span>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0">
-                L{user.level}
-              </Badge>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0">L{user.level}</Badge>
               {isManager && (
                 <Badge variant="secondary" className="text-[10px] gap-0.5 px-1.5 py-0 h-5 shrink-0">
-                  <Users className="h-3 w-3" />
-                  {user.subordinateCount}
+                  <Users className="h-3 w-3" />{user.subordinateCount}
                 </Badge>
               )}
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0 gap-1">
-                <Calendar className="h-3 w-3" />
-                {getMonthRangeLabel(targetStartMonth, targetEndMonth)}
+                <Calendar className="h-3 w-3" />{getMonthRangeLabel(targetStartMonth, targetEndMonth)}
               </Badge>
             </div>
 
@@ -657,51 +753,33 @@ export function AllocationTable({
 
             <div className="flex-1" />
 
-            {/* Input fields */}
-            {(isDirectReport || allocationMethod === 'manual') && (
+            {/* Split button for managers that are direct reports */}
+            {isManager && canEdit && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => openSplitDialog(user)}>
+                <Split className="h-3 w-3" /> Split
+              </Button>
+            )}
+
+            {/* Input fields - only editable for direct reports */}
+            {canEdit && (
               <div className="flex items-center gap-3">
-                {allocationMethod === 'percentage' && isDirectReport && !userIsRollUp && (
+                {allocationMethod === 'percentage' && !userIsRollUp && (
                   <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      value={user.percentage || ''}
-                      onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                      className="h-8 w-16 text-right text-sm"
-                      min={0}
-                      max={100}
-                      step={0.5}
-                    />
+                    <Input type="number" value={user.percentage || ''} onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)} placeholder="0" className="h-8 w-16 text-right text-sm" min={0} max={100} step={0.5} />
                     <span className="text-xs text-muted-foreground">%</span>
                   </div>
                 )}
-
                 {enabledMetrics.quantity && (
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground hidden sm:inline">Qty</span>
                     {userIsRollUp ? (
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
-                              <ArrowUpCircle className="h-3 w-3" />
-                              {formatNumber(effective?.quantity || 0)}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Auto-calculated: Sum of {user.subordinateCount} subordinates</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <TooltipProvider delayDuration={200}><Tooltip><TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
+                          <ArrowUpCircle className="h-3 w-3" />{formatNumber(effective?.quantity || 0)}
+                        </span>
+                      </TooltipTrigger><TooltipContent><p className="text-xs">Auto-calculated: Sum of {user.subordinateCount} subordinates</p></TooltipContent></Tooltip></TooltipProvider>
                     ) : (
-                      <Input
-                        type="text"
-                        value={(allocations.get(user.userId)?.quantityTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.quantityTarget) : ''}
-                        onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))}
-                        placeholder="0"
-                        className="h-8 w-20 text-right text-sm"
-                        disabled={allocationMethod === 'equal'}
-                      />
+                      <Input type="text" value={(allocations.get(user.userId)?.quantityTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.quantityTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))} placeholder="0" className="h-8 w-20 text-right text-sm" disabled={allocationMethod === 'equal'} />
                     )}
                     <span className="text-xs text-muted-foreground">{quantityUnit}</span>
                   </div>
@@ -710,28 +788,13 @@ export function AllocationTable({
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">₹</span>
                     {userIsRollUp ? (
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
-                              <ArrowUpCircle className="h-3 w-3" />
-                              {formatNumber(effective?.revenue || 0)}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Auto-calculated: Sum of {user.subordinateCount} subordinates</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <TooltipProvider delayDuration={200}><Tooltip><TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
+                          <ArrowUpCircle className="h-3 w-3" />{formatNumber(effective?.revenue || 0)}
+                        </span>
+                      </TooltipTrigger><TooltipContent><p className="text-xs">Auto-calculated: Sum of {user.subordinateCount} subordinates</p></TooltipContent></Tooltip></TooltipProvider>
                     ) : (
-                      <Input
-                        type="text"
-                        value={(allocations.get(user.userId)?.revenueTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.revenueTarget) : ''}
-                        onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))}
-                        placeholder="0"
-                        className="h-8 w-24 text-right text-sm"
-                        disabled={allocationMethod === 'equal'}
-                      />
+                      <Input type="text" value={(allocations.get(user.userId)?.revenueTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.revenueTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))} placeholder="0" className="h-8 w-24 text-right text-sm" disabled={allocationMethod === 'equal'} />
                     )}
                   </div>
                 )}
@@ -740,20 +803,31 @@ export function AllocationTable({
                     <span className="text-xs text-muted-foreground">Visits</span>
                     {userIsRollUp ? (
                       <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
-                        <ArrowUpCircle className="h-3 w-3" />
-                        {formatNumber(effective?.visits || 0)}
+                        <ArrowUpCircle className="h-3 w-3" />{formatNumber(effective?.visits || 0)}
                       </span>
                     ) : (
-                      <Input
-                        type="text"
-                        value={(allocations.get(user.userId)?.visitsTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.visitsTarget) : ''}
-                        onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
-                        placeholder="0"
-                        className="h-8 w-16 text-right text-sm"
-                        disabled={allocationMethod === 'equal'}
-                      />
+                      <Input type="text" value={(allocations.get(user.userId)?.visitsTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.visitsTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))} placeholder="0" className="h-8 w-16 text-right text-sm" disabled={allocationMethod === 'equal'} />
                     )}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Read-only display for non-direct reports */}
+            {!canEdit && (
+              <div className="flex items-center gap-3">
+                {enabledMetrics.quantity && (
+                  <span className="text-sm font-mono text-muted-foreground">
+                    {formatNumber(allocations.get(user.userId)?.quantityTarget || 0)} {quantityUnit}
+                  </span>
+                )}
+                {enabledMetrics.revenue && (
+                  <span className="text-sm font-mono text-muted-foreground">
+                    {formatCurrency(allocations.get(user.userId)?.revenueTarget || 0)}
+                  </span>
+                )}
+                {!isDirectReport && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0">Read-only</Badge>
                 )}
               </div>
             )}
@@ -762,10 +836,44 @@ export function AllocationTable({
           {/* Auto-calculated label for roll-up managers */}
           {userIsRollUp && (
             <p className="text-[11px] text-primary/70 ml-10 flex items-center gap-1">
-              <ArrowUpCircle className="h-3 w-3" />
-              Auto-calculated from {user.subordinateCount} subordinates
+              <ArrowUpCircle className="h-3 w-3" />Auto-calculated from {user.subordinateCount} subordinates
             </p>
           )}
+
+          {/* Distribution warning for managers */}
+          {dist && dist.total > 0 && dist.remaining !== 0 && (
+            <div className={cn(
+              'ml-10 flex items-center gap-1.5 text-[11px] px-2 py-1 rounded',
+              dist.remaining < 0 ? 'text-destructive bg-destructive/10' : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30'
+            )}>
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {dist.remaining > 0
+                ? `${formatNumber(dist.remaining)} ${quantityUnit} not yet distributed`
+                : `Over-allocated by ${formatNumber(Math.abs(dist.remaining))} ${quantityUnit}`
+              }
+            </div>
+          )}
+
+          {/* Distribution progress bar for managers */}
+          {dist && dist.total > 0 && (
+            <div className="ml-10 mt-1">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      dist.remaining < 0 ? 'bg-destructive' : dist.remaining === 0 ? 'bg-emerald-500' : 'bg-amber-500'
+                    )}
+                    style={{ width: `${Math.min(100, dist.total > 0 ? (dist.distributed / dist.total) * 100 : 0)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {dist.total > 0 ? Math.round((dist.distributed / dist.total) * 100) : 0}%
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Daily Average Section (expandable) */}
           {isExpanded && !hasChildren && (
             <DailyAvgPanel
@@ -782,9 +890,7 @@ export function AllocationTable({
 
         {/* Children */}
         {isExpanded && hasChildren && (
-          <div>
-            {user.children.map(child => renderUserCard(child, depth + 1))}
-          </div>
+          <div>{user.children.map(child => renderUserCard(child, depth + 1))}</div>
         )}
       </div>
     );
@@ -998,6 +1104,18 @@ export function AllocationTable({
           </CardTitle>
           
           <div className="flex items-center gap-2 sm:ml-auto">
+            {/* Compact/Expanded toggle */}
+            <ToggleGroup type="single" value={displayDensity} onValueChange={(v) => v && setDisplayDensity(v as DisplayDensity)} size="sm">
+              <ToggleGroupItem value="compact" aria-label="Compact View" className="gap-1 px-2">
+                <Minimize2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Compact</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="expanded" aria-label="Expanded View" className="gap-1 px-2">
+                <Maximize2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Expanded</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+
             <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} size="sm">
               <ToggleGroupItem value="tree" aria-label="Tree View" className="gap-1.5 px-2.5">
                 <GitBranch className="h-3.5 w-3.5" />
@@ -1214,6 +1332,30 @@ export function AllocationTable({
           </Button>
         </div>
       </CardContent>
+
+      {/* Split Dialog */}
+      {splitDialogManager && (
+        <TargetSplitDialog
+          open={splitDialogOpen}
+          onOpenChange={setSplitDialogOpen}
+          managerName={splitDialogManager.fullName}
+          managerQuantityTarget={allocations.get(splitDialogManager.userId)?.quantityTarget || 0}
+          managerRevenueTarget={allocations.get(splitDialogManager.userId)?.revenueTarget || 0}
+          managerVisitsTarget={allocations.get(splitDialogManager.userId)?.visitsTarget || 0}
+          quantityUnit={quantityUnit}
+          enabledMetrics={enabledMetrics}
+          children={splitDialogManager.children.map(c => ({
+            userId: c.userId,
+            fullName: c.fullName,
+            profilePictureUrl: c.profilePictureUrl,
+            quantityTarget: allocations.get(c.userId)?.quantityTarget || 0,
+            revenueTarget: allocations.get(c.userId)?.revenueTarget || 0,
+            visitsTarget: allocations.get(c.userId)?.visitsTarget || 0,
+            percentage: allocations.get(c.userId)?.percentage || 0,
+          }))}
+          onApply={handleSplitApply}
+        />
+      )}
     </Card>
   );
 }

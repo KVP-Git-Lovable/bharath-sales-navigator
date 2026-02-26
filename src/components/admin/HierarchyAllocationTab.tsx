@@ -4,9 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Lock } from 'lucide-react';
-import { OrganizationTree } from './OrganizationTree';
+import { DistributionSummaryHeader } from './DistributionSummaryHeader';
 import { AllocationTable } from './AllocationTable';
-import { TargetSummaryCard } from './TargetSummaryCard';
 
 interface EnabledParameters {
   product: boolean;
@@ -137,20 +136,23 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
 
   return (
     <div className="space-y-4">
-      {/* Target Summary */}
-      <TargetSummaryCard
-        config={{
-          target_plan_name: config.target_plan_name || 'FY Sales Plan',
-          enable_quantity: config.enable_quantity,
-          enable_revenue: config.enable_revenue,
-          enable_visits: config.enable_visits,
-          quantity_unit: config.quantity_unit,
-          total_quantity_target: config.total_quantity_target,
-          total_revenue_target: config.total_revenue_target,
-          total_visits_target: config.total_visits_target,
-          is_locked: config.is_locked,
-        }}
+      {/* Distribution Summary Header */}
+      <DistributionSummaryHeader
+        targetPlanName={config.target_plan_name || 'FY Sales Plan'}
         fyYear={fyYear}
+        isLocked={config.is_locked}
+        enabledMetrics={{
+          quantity: config.enable_quantity,
+          revenue: config.enable_revenue,
+          visits: config.enable_visits,
+        }}
+        quantityUnit={config.quantity_unit}
+        totalQuantity={config.total_quantity_target}
+        totalRevenue={config.total_revenue_target}
+        totalVisits={config.total_visits_target}
+        allocatedQuantity={0}
+        allocatedRevenue={0}
+        allocatedVisits={0}
         selectedUserName={selectedNode?.fullName}
       />
 
