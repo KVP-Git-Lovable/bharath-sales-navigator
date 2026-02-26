@@ -1,25 +1,55 @@
 
 
-## Plan: Fix Beat Removal Not Updating My Visits Page
+## Plan: Reorganize Attendance Management into Overview and Configuration Tabs
 
-### Problem
-When you remove an individual beat from the planned journey in "Plan My Journey", the My Visits page doesn't refresh. This is because:
+### What Changes
 
-1. The `handleRemoveBeat` function in `BeatPlanning.tsx` correctly deletes the beat_plan from the database and clears the snapshot, but it **does not dispatch** the `visitDataChanged` event that the visits page listens for.
-2. The "Save Plan" and "Clear All" buttons already dispatch this event, but the individual "Remove" action was missed.
+Replace the current flat 8-tab navigation with a **two-level tab structure**:
 
-### Fix
+- **Top level**: Two prominent tabs -- "Overview" and "Configuration" -- using the Radix Tabs component already in the project.
+- **Second level**: Context-specific sub-tabs rendered as the existing button-style row beneath the active top tab.
 
-**File: `src/pages/BeatPlanning.tsx`**
+### Tab Grouping
 
-Add `window.dispatchEvent(new Event('visitDataChanged'))` inside `handleRemoveBeat` after the successful database deletion and snapshot clearing (around line 410, after the toast). This single line will trigger the My Visits page (`useVisitsDataOptimized` hook) to reload its data from the updated database/snapshot.
+**Overview** (default, opens to "Live Attendance"):
+- Live Attendance Monitoring
+- Leave Management (approve/reject requests)
+- Regularization (approve/reject requests)
+- Leave Balances
+
+**Configuration**:
+- Leave Types
+- Holidays
+- Working Days
+- Attendance Policy
+
+### Visual Layout
+
+```text
++--------------------------------------------+
+|  [ Overview ]  [ Configuration ]           |  <-- Radix Tabs (large, prominent)
++--------------------------------------------+
+|  [Live] [Leave] [Regularization] [Balances]|  <-- sub-tabs (current button style)
++--------------------------------------------+
+|                                            |
+|           (content area)                   |
+|                                            |
++--------------------------------------------+
+```
 
 ### Technical Details
 
-| What | Detail |
-|------|--------|
-| Root cause | Missing `visitDataChanged` event dispatch in `handleRemoveBeat` |
-| Fix location | `src/pages/BeatPlanning.tsx`, line ~410 |
-| Change size | 1 line addition |
-| Risk | None -- follows the exact same pattern already used by "Save Plan" and "Clear All" |
+**Single file change: `src/pages/AttendanceManagement.tsx`**
+
+1. Import `Tabs, TabsList, TabsTrigger, TabsContent` from `@/components/ui/tabs`.
+2. Replace `activeTab` state with two states:
+   - `topTab`: `'overview'` (default) or `'configuration'`
+   - `subTab`: defaults to `'live'` for Overview, `'leave-types'` for Configuration
+3. When switching top tabs, auto-select the first sub-tab of that group.
+4. Render the top-level Radix Tabs above the existing sub-tab buttons.
+5. Filter sub-tab buttons based on which top tab is active:
+   - Overview shows: Live, Leave, Regularization, Leave Balances
+   - Configuration shows: Leave Types, Holidays, Working Days, Attendance Policy
+6. All existing content rendering stays the same -- just driven by `subTab` instead of `activeTab`.
+7. No new components or files needed.
 
