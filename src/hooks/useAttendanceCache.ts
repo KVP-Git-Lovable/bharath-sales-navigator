@@ -42,8 +42,8 @@ interface RegularizationRequest {
 }
 
 // Helper to get date range based on filter
-const getDateRange = (dateFilter: string) => {
-  const now = new Date();
+const getDateRange = (dateFilter: string, referenceDate?: Date) => {
+  const now = referenceDate || new Date();
   let startDate, endDate;
 
   switch (dateFilter) {
@@ -57,6 +57,7 @@ const getDateRange = (dateFilter: string) => {
       endDate = endOfMonth(lastMonth);
       break;
     case 'current-month':
+    case 'custom-month':
     default:
       startDate = startOfMonth(now);
       endDate = endOfMonth(now);
@@ -107,13 +108,13 @@ const getCachedVisitsSync = (userId: string | undefined): Visit[] => {
  * - Syncs with IndexedDB and network in background
  * - Prevents unnecessary network calls with stale-while-revalidate
  */
-export function useAttendanceCache(dateFilter: string = 'current-month') {
+export function useAttendanceCache(dateFilter: string = 'current-month', referenceDate?: Date) {
   const connectivityStatus = useConnectivity();
   const isOnline = connectivityStatus === 'online';
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { start, end } = getDateRange(dateFilter);
+  const { start, end } = getDateRange(dateFilter, referenceDate);
 
   // INSTANT: Get cached data synchronously for immediate UI display
   const cachedRecordsSync = useMemo(() => 
