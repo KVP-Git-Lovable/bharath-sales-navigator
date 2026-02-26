@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Check, X, Clock, User, UserCheck, Calendar, Users, ClipboardList, ArrowLeft, Settings, CalendarDays, FileText, BookOpen } from 'lucide-react';
@@ -54,7 +55,8 @@ interface RegularizationRequest {
 }
 
 const AttendanceManagement = () => {
-  const [activeTab, setActiveTab] = useState('live');
+  const [topTab, setTopTab] = useState<'overview' | 'configuration'>('overview');
+  const [subTab, setSubTab] = useState('live');
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
   const [regularizationRequests, setRegularizationRequests] = useState<RegularizationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,15 +65,37 @@ const AttendanceManagement = () => {
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [selectedRequestForRejection, setSelectedRequestForRejection] = useState<string | null>(null);
 
+  const handleTopTabChange = (value: string) => {
+    setTopTab(value as 'overview' | 'configuration');
+    if (value === 'overview') setSubTab('live');
+    else setSubTab('leave-types');
+  };
+
+  const overviewSubTabs = [
+    { id: 'live', label: 'Live Attendance', icon: User },
+    { id: 'leave', label: 'Leave Management', icon: Calendar },
+    { id: 'regularization', label: 'Regularization', icon: Users },
+    { id: 'leave-balances', label: 'Leave Balances', icon: ClipboardList },
+  ];
+
+  const configSubTabs = [
+    { id: 'leave-types', label: 'Leave Types', icon: FileText },
+    { id: 'holidays', label: 'Holidays', icon: CalendarDays },
+    { id: 'working-days', label: 'Working Days', icon: Calendar },
+    { id: 'policy', label: 'Attendance Policy', icon: Settings },
+  ];
+
+  const currentSubTabs = topTab === 'overview' ? overviewSubTabs : configSubTabs;
+
   useEffect(() => {
-    if (activeTab === 'leave') {
+    if (subTab === 'leave') {
       fetchLeaveApplications();
       fetchUsers();
-    } else if (activeTab === 'regularization') {
+    } else if (subTab === 'regularization') {
       fetchRegularizationRequests();
       fetchUsers();
     }
-  }, [activeTab, selectedUser]);
+  }, [subTab, selectedUser]);
 
   const fetchUsers = async () => {
     try {
@@ -321,104 +345,44 @@ const AttendanceManagement = () => {
         </p>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Top-Level Tabs */}
+      <Tabs value={topTab} onValueChange={handleTopTabChange} className="w-full">
+        <TabsList className="w-full justify-start h-12">
+          <TabsTrigger value="overview" className="text-base px-6">
+            <User className="w-4 h-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="configuration" className="text-base px-6">
+            <Settings className="w-4 h-4 mr-2" />
+            Configuration
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Sub-Tabs */}
       <div className="overflow-x-auto">
         <div className="flex gap-1 border-b pb-2 min-w-max">
-          <button
-            onClick={() => setActiveTab('live')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'live'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <User className="w-4 h-4 mr-1.5" />
-            Live Attendance
-          </button>
-          <button
-            onClick={() => setActiveTab('leave')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'leave'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <Calendar className="w-4 h-4 mr-1.5" />
-            Leave Management
-          </button>
-          <button
-            onClick={() => setActiveTab('regularization')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'regularization'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <Users className="w-4 h-4 mr-1.5" />
-            Regularization
-          </button>
-          <button
-            onClick={() => setActiveTab('leave-balances')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'leave-balances'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <ClipboardList className="w-4 h-4 mr-1.5" />
-            Leave Balances
-          </button>
-          <button
-            onClick={() => setActiveTab('leave-types')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'leave-types'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <FileText className="w-4 h-4 mr-1.5" />
-            Leave Types
-          </button>
-          <button
-            onClick={() => setActiveTab('holidays')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'holidays'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <CalendarDays className="w-4 h-4 mr-1.5" />
-            Holidays
-          </button>
-          <button
-            onClick={() => setActiveTab('working-days')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'working-days'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <Calendar className="w-4 h-4 mr-1.5" />
-            Working Days
-          </button>
-          <button
-            onClick={() => setActiveTab('policy')}
-            className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
-              activeTab === 'policy'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            <Settings className="w-4 h-4 mr-1.5" />
-            Attendance Policy
-          </button>
+          {currentSubTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setSubTab(tab.id)}
+              className={`py-2 px-3 rounded-t-lg transition-colors flex items-center text-sm font-medium whitespace-nowrap ${
+                subTab === tab.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              <tab.icon className="w-4 h-4 mr-1.5" />
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'live' && <LiveAttendanceMonitoring />}
+      {subTab === 'live' && <LiveAttendanceMonitoring />}
 
-      {activeTab === 'leave' && (
+      {subTab === 'leave' && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -525,7 +489,7 @@ const AttendanceManagement = () => {
         </Card>
       )}
 
-      {activeTab === 'regularization' && (
+      {subTab === 'regularization' && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -632,16 +596,16 @@ const AttendanceManagement = () => {
         </Card>
       )}
 
-      {activeTab === 'leave-balances' && <LeaveBalancesManager />}
+      {subTab === 'leave-balances' && <LeaveBalancesManager />}
 
-      {activeTab === 'leave-types' && <LeaveTypesManager />}
+      {subTab === 'leave-types' && <LeaveTypesManager />}
 
 
-      {activeTab === 'holidays' && <HolidayManagement />}
+      {subTab === 'holidays' && <HolidayManagement />}
 
-      {activeTab === 'working-days' && <WorkingDaysConfig />}
+      {subTab === 'working-days' && <WorkingDaysConfig />}
 
-      {activeTab === 'policy' && <AttendancePolicyConfig />}
+      {subTab === 'policy' && <AttendancePolicyConfig />}
     </div>
     </Layout>
   );
