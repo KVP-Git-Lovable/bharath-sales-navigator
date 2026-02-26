@@ -8,12 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Layout } from '@/components/Layout';
-import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3 } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { supabase } from '@/integrations/supabase/client';
-import { format, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import HolidayList from '@/components/HolidayList';
 import LeaveApplicationModal from '@/components/LeaveApplicationModal';
@@ -71,8 +71,9 @@ const Attendance = () => {
   // Check if viewing own data
   const isViewingOwnData = selectedUserId === 'self' || selectedUserId === user?.id;
   
-  // Date filter state - must be before hooks that use it
-  const [dateFilter, setDateFilter] = useState('current-month');
+   // Date filter state - month-based navigation
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const dateFilter = isSameMonth(selectedMonth, new Date()) ? 'current-month' : 'custom-month';
   
   // NEW: Use cached attendance data hooks (offline-first pattern)
   const {
@@ -84,7 +85,7 @@ const Attendance = () => {
     isLoading: isLoadingAttendance,
     refreshTodayOnly,
     forceRefresh
-  } = useAttendanceCache(dateFilter);
+  } = useAttendanceCache(dateFilter, selectedMonth);
   
   // NEW: Use cached working days config (offline-first pattern)
   const {
@@ -94,7 +95,7 @@ const Attendance = () => {
     holidayDates,
     weekOffConfig,
     isLoading: isLoadingConfig
-  } = useWorkingDaysConfig(dateFilter);
+  } = useWorkingDaysConfig(dateFilter, selectedMonth);
 
   // Calendar view state
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -348,22 +349,8 @@ const Attendance = () => {
     const now = new Date();
     let startDate, endDate;
 
-    switch (dateFilter) {
-      case 'current-week':
-        startDate = startOfWeek(now, { weekStartsOn: 1 }); // Monday start
-        endDate = endOfWeek(now, { weekStartsOn: 1 });
-        break;
-      case 'last-month':
-        const lastMonth = subMonths(now, 1);
-        startDate = startOfMonth(lastMonth);
-        endDate = endOfMonth(lastMonth);
-        break;
-      case 'current-month':
-      default:
-        startDate = startOfMonth(now);
-        endDate = endOfMonth(now);
-        break;
-    }
+    startDate = startOfMonth(selectedMonth);
+    endDate = endOfMonth(selectedMonth);
 
     return {
       start: format(startDate, 'yyyy-MM-dd'),
@@ -1282,16 +1269,22 @@ const Attendance = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t('attendance.recentAttendance')}</CardTitle>
-                   <div className="flex items-center gap-2">
-                    <Select value={dateFilter} onValueChange={setDateFilter}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="current-month">{t('common.thisMonth')}</SelectItem>
-                        <SelectItem value="last-month">{t('common.lastMonth')}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                   <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedMonth(m => subMonths(m, 1))}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium min-w-[100px] text-center">
+                      {format(selectedMonth, 'MMM yyyy')}
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8" 
+                      onClick={() => setSelectedMonth(m => addMonths(m, 1))}
+                      disabled={isSameMonth(selectedMonth, new Date())}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>

@@ -29,8 +29,8 @@ interface WorkingDaysConfig {
 }
 
 // Helper to get date range based on filter
-const getDateRange = (dateFilter: string) => {
-  const now = new Date();
+const getDateRange = (dateFilter: string, referenceDate?: Date) => {
+  const now = referenceDate || new Date();
   let startDate, endDate;
 
   switch (dateFilter) {
@@ -44,6 +44,7 @@ const getDateRange = (dateFilter: string) => {
       endDate = endOfMonth(lastMonth);
       break;
     case 'current-month':
+    case 'custom-month':
     default:
       startDate = startOfMonth(now);
       endDate = endOfMonth(now);
@@ -115,11 +116,11 @@ const getCachedHolidaysSync = (start: string, end: string): Holiday[] => {
  * Uses localStorage for INSTANT synchronous loading
  * Reads from working_days_config (admin-saved) as source of truth with fallback to calculation
  */
-export function useWorkingDaysConfig(dateFilter: string = 'current-month') {
+export function useWorkingDaysConfig(dateFilter: string = 'current-month', referenceDate?: Date) {
   const connectivityStatus = useConnectivity();
   const isOnline = connectivityStatus === 'online';
 
-  const { start, end, startDate, endDate } = getDateRange(dateFilter);
+  const { start, end, startDate, endDate } = getDateRange(dateFilter, referenceDate);
 
   // Determine month/year for working_days_config lookup
   const targetMonth = startDate.getMonth() + 1;
