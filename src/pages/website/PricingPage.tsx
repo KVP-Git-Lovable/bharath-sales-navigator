@@ -308,7 +308,7 @@ export const PricingPage = () => {
                   <p className="text-xs text-muted-foreground">Additional AI-powered insights</p>
                 </div>
               </div>
-              <span className="text-lg font-bold text-foreground">₹500 <span className="text-sm font-normal text-muted-foreground">/ 2,500 calls</span></span>
+              <span className="text-lg font-bold text-foreground">₹500 <span className="text-sm font-normal text-muted-foreground">/ 2,500 credits</span></span>
             </Card>
           </div>
         </div>
