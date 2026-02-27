@@ -4,7 +4,7 @@ import { Download, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateTemplate4Invoice } from "@/utils/invoiceGenerator";
-import { autoSendInvoiceWhatsApp } from "@/utils/autoSendInvoice";
+
 
 interface InvoicePDFGeneratorProps {
   invoiceId: string;
@@ -96,12 +96,6 @@ export const InvoicePDFGenerator = ({
 
       URL.revokeObjectURL(url);
 
-      // Auto-send via WhatsApp (non-blocking)
-      autoSendInvoiceWhatsApp({
-        orderId: invoiceId,
-        invoiceNumber: invoice.invoice_number || invoice.id,
-        blob,
-      });
 
       toast.success("Invoice ready");
     } catch (err: any) {

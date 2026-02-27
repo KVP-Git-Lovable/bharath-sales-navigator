@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Loader2, Edit } from "lucide-react";
+import { Download, Loader2, Edit, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
+import { autoSendInvoiceWhatsApp } from "@/utils/autoSendInvoice";
 import EditInvoiceDialog from "./EditInvoiceDialog";
 
 interface Invoice {
@@ -21,6 +22,7 @@ export default function AllInvoicesList() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<{ orderId: string; invoiceNumber: string } | null>(null);
 
   useEffect(() => {
@@ -87,6 +89,20 @@ export default function AllInvoicesList() {
       toast.error(error.message || "Failed to download invoice");
     } finally {
       setDownloadingId(null);
+    }
+  };
+
+  const handleSendWhatsApp = async (orderId: string, invoiceNumber: string) => {
+    setSendingWhatsAppId(orderId);
+    try {
+      const { blob } = await fetchAndGenerateInvoice(orderId);
+      await autoSendInvoiceWhatsApp({ orderId, invoiceNumber, blob });
+      toast.success("Invoice sent via WhatsApp!");
+    } catch (error: any) {
+      console.error("Error sending invoice via WhatsApp:", error);
+      toast.error("Failed to send invoice via WhatsApp");
+    } finally {
+      setSendingWhatsAppId(null);
     }
   };
 
@@ -168,6 +184,20 @@ export default function AllInvoicesList() {
                               <Download className="mr-2 h-4 w-4" />
                               Download
                             </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          disabled={sendingWhatsAppId === invoice.id}
+                          onClick={() => handleSendWhatsApp(invoice.id, invoice.invoice_number)}
+                          title="Send invoice via WhatsApp"
+                        >
+                          {sendingWhatsAppId === invoice.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <MessageCircle className="h-4 w-4" />
                           )}
                         </Button>
                       </div>
