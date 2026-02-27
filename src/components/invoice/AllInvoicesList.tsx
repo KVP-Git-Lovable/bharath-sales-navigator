@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Loader2, Edit, MessageCircle } from "lucide-react";
+import { Download, Loader2, Edit, MessageCircle, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
 import { autoSendInvoiceWhatsApp } from "@/utils/autoSendInvoice";
@@ -23,6 +23,7 @@ export default function AllInvoicesList() {
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<{ orderId: string; invoiceNumber: string } | null>(null);
 
   useEffect(() => {
@@ -102,6 +103,39 @@ export default function AllInvoicesList() {
       toast.error("Failed to send invoice via WhatsApp");
     } finally {
       setSendingWhatsAppId(null);
+    }
+  };
+
+  const handleUploadAndOpenLink = async (orderId: string, invoiceNumber: string) => {
+    setUploadingId(orderId);
+    try {
+      const { blob } = await fetchAndGenerateInvoice(orderId);
+      const fileName = `${invoiceNumber || orderId}.pdf`;
+      const filePath = `public/${fileName}`;
+
+      // Upload to invoices bucket (upsert to overwrite if exists)
+      const { error: uploadError } = await supabase.storage
+        .from("invoices")
+        .upload(filePath, blob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("invoices")
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData.publicUrl;
+      window.open(publicUrl, "_blank", "noopener,noreferrer");
+      toast.success("Invoice PDF link opened!");
+    } catch (error: any) {
+      console.error("Error uploading invoice:", error);
+      toast.error(error.message || "Failed to generate invoice link");
+    } finally {
+      setUploadingId(null);
     }
   };
 
@@ -197,6 +231,20 @@ export default function AllInvoicesList() {
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <MessageCircle className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          disabled={uploadingId === invoice.id}
+                          onClick={() => handleUploadAndOpenLink(invoice.id, invoice.invoice_number)}
+                          title="Open public invoice PDF link"
+                        >
+                          {uploadingId === invoice.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <BookOpen className="h-4 w-4" />
                           )}
                         </Button>
                       </div>
