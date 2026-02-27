@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
-import { autoSendInvoiceWhatsApp } from "@/utils/autoSendInvoice";
+
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
@@ -417,8 +417,6 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      // Auto-send via WhatsApp (non-blocking)
-      autoSendInvoiceWhatsApp({ orderId, invoiceNumber, blob });
       
       toast({
         title: "Invoice Downloaded",

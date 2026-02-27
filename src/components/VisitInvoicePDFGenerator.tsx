@@ -8,7 +8,7 @@ import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { downloadPDF } from "@/utils/fileDownloader";
-import { autoSendInvoiceWhatsApp } from "@/utils/autoSendInvoice";
+
 import { InvoiceSelectionModal, OrderForInvoice } from "./InvoiceSelectionModal";
 
 interface VisitInvoicePDFGeneratorProps {
@@ -32,8 +32,6 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
       const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
       await downloadPDF(blob, `invoice-${invoiceNumber}.pdf`);
 
-      // Auto-send via WhatsApp (non-blocking)
-      autoSendInvoiceWhatsApp({ orderId, invoiceNumber, blob });
 
       toast.success("Invoice downloaded successfully!");
     } catch (error: any) {
