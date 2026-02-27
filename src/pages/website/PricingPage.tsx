@@ -239,54 +239,126 @@ export const PricingPage = () => {
             </p>
           </div>
 
-          {/* Add-on Table */}
-          <Card className="overflow-hidden border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-4 font-semibold text-foreground">Add-on</th>
-                    <th className="text-center p-4 font-semibold text-foreground" colSpan={3}>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Order Pack Row */}
-                  <tr className="border-b border-border/50">
-                    <td className="p-4 text-muted-foreground">Order pack (# of orders)</td>
-                    <td className="p-4 text-center font-semibold">500</td>
-                    <td className="p-4 text-center font-semibold">1,000</td>
-                    <td className="p-4 text-center font-semibold">2,000</td>
-                  </tr>
-                  {/* Rate per Pack */}
-                  <tr className="border-b border-border/50">
-                    <td className="p-4 text-muted-foreground">Rate per pack</td>
-                    <td className="p-4 text-center font-semibold">₹3,500</td>
-                    <td className="p-4 text-center font-semibold">₹6,500</td>
-                    <td className="p-4 text-center font-semibold">₹12,000</td>
-                  </tr>
-                  {/* Storage Add-on */}
-                  <tr className="border-b border-border/50">
-                    <td className="p-4 text-muted-foreground">Storage add-on</td>
-                    <td className="p-4 text-center font-semibold" colSpan={3}>₹500 for 5 GB</td>
-                  </tr>
-                  {/* AI Credits Add-on */}
-                  <tr className="border-b border-border/50">
-                    <td className="p-4 text-muted-foreground">AI credits add-on</td>
-                    <td className="p-4 text-center font-semibold" colSpan={3}>₹500 for 2,500 calls</td>
-                  </tr>
-                  {/* Empty separator row */}
-                  <tr className="border-b border-border/50">
-                    <td className="p-4" colSpan={4}></td>
-                  </tr>
-                  {/* Support Pack */}
-                  <tr>
-                    <td className="p-4 text-muted-foreground">Support pack</td>
-                    <td className="p-4 text-center font-semibold" colSpan={3}>25% for Year #1 and 20% from Year #2</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Basic Pack */}
+            <Card className="p-6 border-border hover:border-primary/50 transition-colors">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <h3 className="font-semibold text-foreground">Basic Pack</h3>
+              </div>
+              <div className="space-y-3 text-sm mb-5">
+                <div className="flex justify-between py-2 border-b border-border/50">
+                  <span className="text-muted-foreground">Order pack (# of orders)</span>
+                  <span className="font-semibold">500</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Rate per pack</span>
+                  <span className="font-semibold">₹3,500</span>
+                </div>
+              </div>
+              <div className="border-t border-border/50 pt-4 mb-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Add-ons</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Storage</span>
+                    <span className="font-semibold">₹500 / 5 GB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">AI Credits</span>
+                    <span className="font-semibold">₹500 / 2,500 calls</span>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Support</p>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>25% of plan cost — Year 1</p>
+                  <p>20% of plan cost — Year 2+</p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Standard Pack */}
+            <Card className="p-6 border-primary bg-primary/5 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                  Best Value
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                <h3 className="font-semibold text-foreground">Standard Pack</h3>
+              </div>
+              <div className="space-y-3 text-sm mb-5">
+                <div className="flex justify-between py-2 border-b border-border/50">
+                  <span className="text-muted-foreground">Order pack (# of orders)</span>
+                  <span className="font-semibold">1,000</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Rate per pack</span>
+                  <span className="font-semibold">₹6,500</span>
+                </div>
+              </div>
+              <div className="border-t border-border/50 pt-4 mb-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Add-ons</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Storage</span>
+                    <span className="font-semibold">₹500 / 5 GB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">AI Credits</span>
+                    <span className="font-semibold">₹500 / 2,500 calls</span>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Support</p>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>25% of plan cost — Year 1</p>
+                  <p>20% of plan cost — Year 2+</p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Premium Pack */}
+            <Card className="p-6 border-border hover:border-primary/50 transition-colors">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-purple-500" />
+                <h3 className="font-semibold text-foreground">Premium Pack</h3>
+              </div>
+              <div className="space-y-3 text-sm mb-5">
+                <div className="flex justify-between py-2 border-b border-border/50">
+                  <span className="text-muted-foreground">Order pack (# of orders)</span>
+                  <span className="font-semibold">2,000</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">Rate per pack</span>
+                  <span className="font-semibold">₹12,000</span>
+                </div>
+              </div>
+              <div className="border-t border-border/50 pt-4 mb-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Add-ons</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Storage</span>
+                    <span className="font-semibold">₹500 / 5 GB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">AI Credits</span>
+                    <span className="font-semibold">₹500 / 2,500 calls</span>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Support</p>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>25% of plan cost — Year 1</p>
+                  <p>20% of plan cost — Year 2+</p>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       </section>
 
