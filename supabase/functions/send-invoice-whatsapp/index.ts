@@ -13,28 +13,28 @@ serve(async (req) => {
   try {
     const { invoiceNumber } = await req.json();
 
+    if (!invoiceNumber) {
+      throw new Error('invoiceNumber is required');
+    }
+
     const accountSid = 'AC2bed17b2742df7031ebc7de2d726b62f';
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     if (!authToken) {
       throw new Error('TWILIO_AUTH_TOKEN not configured');
     }
 
-    // Build date/time for ContentVariables
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const invoiceUrl = `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
 
     const formBody = new URLSearchParams({
       To: 'whatsapp:+919741435887',
       From: 'whatsapp:+14155238886',
-      ContentSid: 'HXb5b62575e6e4ff6129ad7c8efe1f983e',
-      ContentVariables: JSON.stringify({ "1": dateStr, "2": timeStr }),
+      Body: `Thank you for placing your order. Your invoice link is ${invoiceUrl}`,
     });
 
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const base64Auth = btoa(`${accountSid}:${authToken}`);
 
-    console.log(`Sending WhatsApp template message for invoice ${invoiceNumber}`);
+    console.log(`Sending WhatsApp for invoice ${invoiceNumber}, URL: ${invoiceUrl}`);
 
     const response = await fetch(twilioUrl, {
       method: 'POST',
@@ -55,7 +55,7 @@ serve(async (req) => {
     console.log('✅ WhatsApp sent:', result.sid);
 
     return new Response(
-      JSON.stringify({ success: true, messageId: result.sid }),
+      JSON.stringify({ success: true, messageId: result.sid, twilioResponse: result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
