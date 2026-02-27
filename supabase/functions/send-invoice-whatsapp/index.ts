@@ -28,7 +28,8 @@ serve(async (req) => {
     const formBody = new URLSearchParams({
       To: 'whatsapp:+919741435887',
       From: 'whatsapp:+14155238886',
-      Body: `Thank you for placing your order. Your invoice link is ${invoiceUrl}`,
+      Body: 'Thank you for your order. Please find your invoice attached.',
+      MediaUrl: invoiceUrl,
     });
 
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
