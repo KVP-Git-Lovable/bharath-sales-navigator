@@ -239,100 +239,54 @@ export const PricingPage = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {/* Starter Pack */}
-            <Card className="p-6 border-border hover:border-primary/50 transition-colors">
-              <div className="text-center mb-4">
-                <span className="text-3xl font-bold">₹2,000</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Orders</span>
-                  <span className="font-semibold">500</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Retailers</span>
-                  <span className="font-semibold">50</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Additional Visits</span>
-                  <span className="font-semibold">2,000</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Growth Pack */}
-            <Card className="p-6 border-primary bg-primary/5 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                  Best Value
-                </span>
-              </div>
-              <div className="text-center mb-4">
-                <span className="text-3xl font-bold">₹5,000</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Orders</span>
-                  <span className="font-semibold">1,500</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Retailers</span>
-                  <span className="font-semibold">150</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Additional Visits</span>
-                  <span className="font-semibold">6,000</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Scale Pack */}
-            <Card className="p-6 border-border hover:border-primary/50 transition-colors">
-              <div className="text-center mb-4">
-                <span className="text-3xl font-bold">₹10,000</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Orders</span>
-                  <span className="font-semibold">3,500</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Retailers</span>
-                  <span className="font-semibold">350</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Additional Visits</span>
-                  <span className="font-semibold">15,000</span>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Benefits */}
-          <div className="grid sm:grid-cols-3 gap-4 text-center">
-            <div className="flex flex-col items-center gap-2 p-4">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <RefreshCw className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-sm font-medium">Unused Quota Rolls Over</p>
-              <p className="text-xs text-muted-foreground">Never lose what you paid for</p>
+          {/* Add-on Table */}
+          <Card className="overflow-hidden border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="text-left p-4 font-semibold text-foreground">Add-on</th>
+                    <th className="text-center p-4 font-semibold text-foreground" colSpan={3}>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Order Pack Row */}
+                  <tr className="border-b border-border/50">
+                    <td className="p-4 text-muted-foreground">Order pack (# of orders)</td>
+                    <td className="p-4 text-center font-semibold">500</td>
+                    <td className="p-4 text-center font-semibold">1,000</td>
+                    <td className="p-4 text-center font-semibold">2,000</td>
+                  </tr>
+                  {/* Rate per Pack */}
+                  <tr className="border-b border-border/50">
+                    <td className="p-4 text-muted-foreground">Rate per pack</td>
+                    <td className="p-4 text-center font-semibold">₹3,500</td>
+                    <td className="p-4 text-center font-semibold">₹6,500</td>
+                    <td className="p-4 text-center font-semibold">₹12,000</td>
+                  </tr>
+                  {/* Storage Add-on */}
+                  <tr className="border-b border-border/50">
+                    <td className="p-4 text-muted-foreground">Storage add-on</td>
+                    <td className="p-4 text-center font-semibold" colSpan={3}>₹500 for 5 GB</td>
+                  </tr>
+                  {/* AI Credits Add-on */}
+                  <tr className="border-b border-border/50">
+                    <td className="p-4 text-muted-foreground">AI credits add-on</td>
+                    <td className="p-4 text-center font-semibold" colSpan={3}>₹500 for 2,500 calls</td>
+                  </tr>
+                  {/* Empty separator row */}
+                  <tr className="border-b border-border/50">
+                    <td className="p-4" colSpan={4}></td>
+                  </tr>
+                  {/* Support Pack */}
+                  <tr>
+                    <td className="p-4 text-muted-foreground">Support pack</td>
+                    <td className="p-4 text-center font-semibold" colSpan={3}>25% for Year #1 and 20% from Year #2</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <div className="flex flex-col items-center gap-2 p-4">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Package className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-sm font-medium">Stack Multiple Packs</p>
-              <p className="text-xs text-muted-foreground">Buy as many as you need</p>
-            </div>
-            <div className="flex flex-col items-center gap-2 p-4">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bolt className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-sm font-medium">Instant Activation</p>
-              <p className="text-xs text-muted-foreground">Start using immediately</p>
-            </div>
-          </div>
+          </Card>
         </div>
       </section>
 
