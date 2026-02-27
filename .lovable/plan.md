@@ -1,48 +1,25 @@
 
 
-## Root Cause: Service Worker Caching Supabase Auth Requests
+## Pricing Page Updates
 
-**The Problem:**
-In `src/service-worker.ts` (lines 170-184), there is a catch-all route that caches **all** requests to `*.supabase.co`:
+**File:** `src/pages/website/PricingPage.tsx` (lines 33-88)
 
-```typescript
-registerRoute(
-  ({ url }) => url.hostname.endsWith('.supabase.co'),
-  new NetworkFirst({
-    cacheName: `api-cache-${RUNTIME_CACHE_VERSION}`,
-    networkTimeoutSeconds: 3, // <-- Falls back to cache after 3 seconds
-    ...
-  }),
-);
-```
+### Starter Plan (lines 33-43)
+- Remove: `"500 retailers/month"` and `"10,000 visits/month"`
+- Add: `"Storage space — 5 GB"`
+- Rename: `"AI-powered insights — 2,500 AI requests/month"` to `"AI-powered insights — 2,500 AI credits/month"`
 
-This includes Supabase **auth endpoints** (`/auth/v1/token`, `/auth/v1/signup`, etc.). Here's what happens:
+### Professional Plan (lines 52-64)
+- Change: `"15,000 orders/month"` to `"10,000 orders/month"`
+- Remove: `"1,500 retailers/month"` and `"30,000 visits/month"`
+- Add: `"Storage space — 10 GB"`
+- Rename: `"AI-powered insights — 5,000 AI requests/month"` to `"AI-powered insights — 5,000 AI credits/month"`
 
-1. User logs in successfully -- the auth token response gets cached by the Service Worker
-2. User logs out -- `signOut({ scope: 'local' })` clears local state but the **Service Worker cache still holds the old auth response**
-3. User tries to log in again -- if the network is even slightly slow (>3 seconds), the Service Worker serves the **stale cached auth response** instead of the real one
-4. The stale/invalid token causes "Login Failed"
-5. On a different Wi-Fi network, the Service Worker cache may not trigger the same way (different latency characteristics, or cache miss), so login works
+### Enterprise Plan (lines 74-86)
+- Change: `"40,000 orders/month"` to `"20,000 orders/month"`
+- Remove: `"4,000 retailers/month"` and `"80,000 visits/month"`
+- Add: `"Storage space — 15 GB"`
+- Rename: `"AI-powered insights — 10,000 AI requests/month"` to `"AI-powered insights — 10,000 AI credits/month"`
 
-## Fix
-
-**File: `src/service-worker.ts`**
-
-Update the Supabase API caching route (line 172) to **exclude auth endpoints** from being cached. Auth requests (login, token refresh, signup, etc.) should always go directly to the network and never be served from cache.
-
-Change the route matcher from:
-```typescript
-({ url }) => url.hostname.endsWith('.supabase.co')
-```
-to:
-```typescript
-({ url }) =>
-  url.hostname.endsWith('.supabase.co') &&
-  !url.pathname.startsWith('/auth/')
-```
-
-This is a one-line change that ensures:
-- Auth requests (login, logout, token refresh) always hit the network directly -- no caching
-- Other Supabase API requests (data queries, storage) continue to benefit from the NetworkFirst cache for offline support
-- The issue of stale auth responses being served after logout is completely eliminated
+All changes are in a single file, updating the `plans` array data only.
 
