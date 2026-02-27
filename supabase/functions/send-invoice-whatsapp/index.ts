@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const invoiceUrl = `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
 
-    const recipients = ['whatsapp:+919741435887', 'whatsapp:+919148181465'];
+    const recipients = ['whatsapp:+919741435887', 'whatsapp:+917338319619'];
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const base64Auth = btoa(`${accountSid}:${authToken}`);
 
