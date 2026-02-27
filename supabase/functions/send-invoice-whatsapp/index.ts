@@ -25,38 +25,42 @@ serve(async (req) => {
 
     const invoiceUrl = `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
 
-    const formBody = new URLSearchParams({
-      To: 'whatsapp:+919741435887',
-      From: 'whatsapp:+14155238886',
-      Body: 'Thank you for your order. Please find your invoice attached.',
-      MediaUrl: invoiceUrl,
-    });
-
+    const recipients = ['whatsapp:+919741435887', 'whatsapp:+919148181465'];
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const base64Auth = btoa(`${accountSid}:${authToken}`);
 
     console.log(`Sending WhatsApp for invoice ${invoiceNumber}, URL: ${invoiceUrl}`);
 
-    const response = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${base64Auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formBody,
-    });
+    const results = await Promise.all(
+      recipients.map(async (to) => {
+        const formBody = new URLSearchParams({
+          To: to,
+          From: 'whatsapp:+14155238886',
+          Body: 'Thank you for your order. Please find your invoice attached.',
+          MediaUrl: invoiceUrl,
+        });
 
-    const result = await response.json();
+        const response = await fetch(twilioUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${base64Auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formBody,
+        });
 
-    if (!response.ok) {
-      console.error('Twilio error:', result);
-      throw new Error(result.message || 'Failed to send WhatsApp message');
-    }
-
-    console.log('✅ WhatsApp sent:', result.sid);
+        const result = await response.json();
+        if (!response.ok) {
+          console.error(`Twilio error for ${to}:`, result);
+        } else {
+          console.log(`✅ WhatsApp sent to ${to}:`, result.sid);
+        }
+        return { to, success: response.ok, result };
+      })
+    );
 
     return new Response(
-      JSON.stringify({ success: true, messageId: result.sid, twilioResponse: result }),
+      JSON.stringify({ success: true, results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
