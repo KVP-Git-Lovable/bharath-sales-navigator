@@ -95,8 +95,7 @@ export default function AllInvoicesList() {
   const handleSendWhatsApp = async (orderId: string, invoiceNumber: string) => {
     setSendingWhatsAppId(orderId);
     try {
-      const { blob } = await fetchAndGenerateInvoice(orderId);
-      await autoSendInvoiceWhatsApp({ orderId, invoiceNumber, blob });
+      await autoSendInvoiceWhatsApp({ invoiceNumber });
       toast.success("Invoice sent via WhatsApp!");
     } catch (error: any) {
       console.error("Error sending invoice via WhatsApp:", error);
