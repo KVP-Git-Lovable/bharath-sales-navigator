@@ -17,6 +17,7 @@ import { BeatAuditTimeline } from "@/components/BeatAuditTimeline";
 import { EditBeatModal } from "@/components/EditBeatModal";
 import { BeatAnalyticsModal } from "@/components/BeatAnalyticsModal";
 import { useRecommendations, Recommendation } from "@/hooks/useRecommendations";
+import { BeatInsightModal } from "@/components/BeatInsightModal";
 import { RetailerDetailModal } from "@/components/RetailerDetailModal";
 import { BeatRetailerExport } from "@/components/BeatRetailerExport";
 import { TargetVsActualCard } from "@/components/performance/TargetVsActualCard";
@@ -73,6 +74,7 @@ export const BeatDetail = () => {
   const [availableUsers, setAvailableUsers] = useState<{ id: string; full_name: string }[]>([]);
   const [upcomingVisitsCount, setUpcomingVisitsCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [showHealthInsight, setShowHealthInsight] = useState(false);
 
   const filteredRetailers = useMemo(() => {
     if (!beatData?.retailers) return [];
@@ -685,10 +687,7 @@ export const BeatDetail = () => {
   };
 
   const handleAIInsights = () => {
-    if (beatData) {
-      generateRecommendation('beat_visit', beatData.beat_id);
-      toast.success('Generating AI insights...');
-    }
+    setShowHealthInsight(true);
   };
 
   const getPriorityColor = (priority?: string) => {
@@ -844,68 +843,13 @@ export const BeatDetail = () => {
           </CardContent>
         </Card>
 
-        {/* AI Insights Display */}
-        {recommendations.length > 0 && (
-          <Card className="shadow-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles size={20} className="text-primary" />
-                AI Insights
-                <Badge variant="secondary" className="ml-2">{recommendations.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {recommendations.slice(0, 3).map((rec: Recommendation) => (
-                <div key={rec.id} className="p-3 bg-background rounded-lg border shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs">
-                          {Math.round(rec.confidence_score * 100)}% confidence
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(rec.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium">{rec.reasoning}</p>
-                      {rec.recommendation_data && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          {rec.recommendation_data.action_items && (
-                            <ul className="list-disc list-inside space-y-1">
-                              {(rec.recommendation_data.action_items as string[]).slice(0, 3).map((item: string, idx: number) => (
-                                <li key={idx}>{item}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => provideFeedback(rec.id, 'like')}
-                        disabled={rec.feedback?.feedback_type === 'like'}
-                      >
-                        <ThumbsUp size={14} className={rec.feedback?.feedback_type === 'like' ? 'text-green-600' : ''} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => provideFeedback(rec.id, 'implemented')}
-                        disabled={rec.feedback?.feedback_type === 'implemented'}
-                      >
-                        <CheckCircle size={14} className={rec.feedback?.feedback_type === 'implemented' ? 'text-primary' : ''} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {/* AI Health Insight Modal */}
+        <BeatInsightModal
+          isOpen={showHealthInsight}
+          onClose={() => setShowHealthInsight(false)}
+          beatId={beatData?.id || beatData?.beat_id || ''}
+          beatName={beatData?.beat_name || ''}
+        />
 
         {/* Target vs Actual Section */}
         <TargetVsActualCard entityType="beat" entityId={beatData?.id || ''} beatTextId={beatData?.beat_id} userId={user?.id} />
