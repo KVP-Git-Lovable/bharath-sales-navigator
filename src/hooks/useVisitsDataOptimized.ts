@@ -257,20 +257,47 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   }, [effectiveUserId, clearAllCachesAndState]);
   
   // CRITICAL: Listen for auth state changes (login/logout) to clear stale data
-  // This prevents showing old cached data when user logs out and logs back in
+  // FIX: Only clear on SIGNED_OUT or when user identity actually changes.
+  // On tab return, Supabase emits SIGNED_IN / TOKEN_REFRESHED for session refresh —
+  // we must NOT wipe state for the same user.
+  const lastAuthUserIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
-        console.log('[useVisitsDataOptimized] SIGNED_IN detected - clearing stale caches');
-        clearAllCachesAndState();
-      }
+    // Seed with current effective user so first SIGNED_IN for same user is a no-op
+    lastAuthUserIdRef.current = effectiveUserId || null;
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        console.log('[useVisitsDataOptimized] SIGNED_OUT detected - clearing all data');
+        console.log('[Auth] SIGNED_OUT — clearing all data');
+        lastAuthUserIdRef.current = null;
         clearAllCachesAndState();
+        return;
+      }
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        const newUserId = session?.user?.id ?? null;
+        const previousUserId = lastAuthUserIdRef.current;
+        
+        if (previousUserId && newUserId === previousUserId) {
+          // Same user — session refresh / tab return. Do NOT clear state.
+          console.log('[Auth]', event, '— same user, skipping state clear');
+          return;
+        }
+        
+        // Different user (or first login after sign-out) — clear + immediate reload
+        console.log('[Auth]', event, '— user changed from', previousUserId, 'to', newUserId, '— clearing & reloading');
+        lastAuthUserIdRef.current = newUserId;
+        clearAllCachesAndState();
+        
+        // Reset sync throttle so reload isn't blocked
+        lastSyncTimeRef.current.clear();
+        
+        // Schedule immediate reload (loadData will pick up new userId via effectiveUserId)
+        // Don't await — let it run after React re-renders with new auth state
       }
     });
     return () => subscription.unsubscribe();
-  }, [clearAllCachesAndState]);
+  }, [clearAllCachesAndState, effectiveUserId]);
   
   useEffect(() => {
     userIdRef.current = effectiveUserId;
@@ -1455,10 +1482,49 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     };
 
     // Visibility change - sync when app comes to foreground (any date, not just today)
-    const handleVisibility = () => {
+    // FIX: Bypass throttle when UI state is empty (e.g. after unexpected clear)
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return;
       const currentDate = selectedDateRef.current;
       const currentUserId = userIdRef.current;
-      if (document.visibilityState === 'visible' && navigator.onLine && currentUserId && shouldSyncNow(currentDate) && !isSlowConnection()) {
+      if (!currentUserId || !navigator.onLine || isSlowConnection()) return;
+      
+      // Check if in-memory state is empty — if so, bypass sync throttle
+      const cached = cacheRef.current.get(currentDate);
+      const isStateEmpty = !cached || (
+        (!cached.beatPlans || cached.beatPlans.length === 0) &&
+        (!cached.retailers || cached.retailers.length === 0) &&
+        (!cached.visits || cached.visits.length === 0)
+      );
+      
+      if (isStateEmpty) {
+        console.log('[Visibility] App foregrounded with EMPTY state — forcing immediate reload for:', currentDate);
+        // Try snapshot first for instant display, then sync
+        try {
+          const snapshot = await loadMyVisitsSnapshot(currentUserId, currentDate);
+          if (snapshot) {
+            setBeatPlans(snapshot.beatPlans || []);
+            setVisits(snapshot.visits || []);
+            setRetailers(snapshot.retailers || []);
+            setOrders(snapshot.orders || []);
+            setHasLoadedOnce(true);
+            setIsLoading(false);
+            cacheRef.current.set(currentDate, {
+              beatPlans: snapshot.beatPlans || [],
+              visits: snapshot.visits || [],
+              retailers: snapshot.retailers || [],
+              orders: snapshot.orders || [],
+              timestamp: Date.now()
+            });
+            console.log('[Visibility] Restored from snapshot');
+          }
+        } catch (e) {
+          console.log('[Visibility] Snapshot restore failed:', e);
+        }
+        // Always sync after restoring (or if no snapshot)
+        lastSyncTimeRef.current.delete(currentDate);
+        setTimeout(() => smartDeltaSync(currentUserId, currentDate), 300);
+      } else if (shouldSyncNow(currentDate)) {
         console.log('[Visibility] App foregrounded, syncing for date:', currentDate);
         setTimeout(() => smartDeltaSync(currentUserId, currentDate), 500);
       }
