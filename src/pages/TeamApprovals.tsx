@@ -217,6 +217,26 @@ export const TeamApprovals = () => {
                         ? `Date${approval.endDate && approval.endDate !== approval.date ? 's' : ''}: ${format(new Date(approval.date), 'MMM dd')}${approval.endDate && approval.endDate !== approval.date ? ` - ${format(new Date(approval.endDate), 'MMM dd')}` : ''} (${getDayCount(approval.date, approval.endDate)})`
                         : `Date: ${format(new Date(approval.date), 'MMM dd, yyyy')}`}
                     </p>
+                    {approval.type === 'regularization' && (
+                      <div className="mt-1.5 space-y-1 bg-muted/50 rounded-md p-2">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground w-16">Actual:</span>
+                          <span className="font-medium text-foreground">
+                            {approval.actualCheckIn ? format(new Date(approval.actualCheckIn), 'hh:mm a') : '--:--'}
+                            {' — '}
+                            {approval.actualCheckOut ? format(new Date(approval.actualCheckOut), 'hh:mm a') : '--:--'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground w-16">Requested:</span>
+                          <span className="font-semibold text-green-700 dark:text-green-400">
+                            {approval.requestedCheckIn ? format(new Date(approval.requestedCheckIn), 'hh:mm a') : '--:--'}
+                            {' — '}
+                            {approval.requestedCheckOut ? format(new Date(approval.requestedCheckOut), 'hh:mm a') : '--:--'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     {approval.reason && (
                       <p className="text-xs text-muted-foreground">
                         {approval.type === 'leave' ? 'Reason' : 'Issue'}: {approval.reason}
