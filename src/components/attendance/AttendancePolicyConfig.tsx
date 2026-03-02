@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import { Settings, Clock, Edit, Save, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import RegularizationPolicyConfig from './RegularizationPolicyConfig';
 
 interface LeaveType {
   id: string;
@@ -249,6 +250,9 @@ const AttendancePolicyConfig = () => {
               )}
             </CardContent>
           </Card>
+
+      {/* Regularization Policy Section */}
+      <RegularizationPolicyConfig />
 
       {/* Leave Policy Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

@@ -10388,6 +10388,66 @@ export type Database = {
         }
         Relationships: []
       }
+      regularization_policy: {
+        Row: {
+          adjust_leave_balance: boolean
+          allow_checkin_edit: boolean
+          allow_checkout_edit: boolean
+          allow_previous_month: boolean
+          allow_status_edit: boolean
+          approval_mode: string
+          created_at: string
+          daily_limit: number
+          id: string
+          is_enabled: boolean
+          max_backdate_days: number
+          monthly_limit: number | null
+          reason_mandatory: boolean
+          recalculate_hours: boolean
+          restrict_after_payroll_lock: boolean
+          update_attendance_on_approval: boolean
+          updated_at: string
+        }
+        Insert: {
+          adjust_leave_balance?: boolean
+          allow_checkin_edit?: boolean
+          allow_checkout_edit?: boolean
+          allow_previous_month?: boolean
+          allow_status_edit?: boolean
+          approval_mode?: string
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          is_enabled?: boolean
+          max_backdate_days?: number
+          monthly_limit?: number | null
+          reason_mandatory?: boolean
+          recalculate_hours?: boolean
+          restrict_after_payroll_lock?: boolean
+          update_attendance_on_approval?: boolean
+          updated_at?: string
+        }
+        Update: {
+          adjust_leave_balance?: boolean
+          allow_checkin_edit?: boolean
+          allow_checkout_edit?: boolean
+          allow_previous_month?: boolean
+          allow_status_edit?: boolean
+          approval_mode?: string
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          is_enabled?: boolean
+          max_backdate_days?: number
+          monthly_limit?: number | null
+          reason_mandatory?: boolean
+          recalculate_hours?: boolean
+          restrict_after_payroll_lock?: boolean
+          update_attendance_on_approval?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       regularization_requests: {
         Row: {
           approved_at: string | null
