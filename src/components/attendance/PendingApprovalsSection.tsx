@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Check, X, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-// cn import kept for potential future use
+import { cn } from '@/lib/utils';
 import { PendingApproval } from '@/hooks/useTeamAttendance';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 
@@ -111,27 +111,42 @@ export const PendingApprovalsSection = ({
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{approval.reason}</p>
                 )}
 
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    className="h-9 flex-1 text-white bg-green-600 hover:bg-green-700"
-                    onClick={() => handleApprove(approval)}
-                    disabled={processingId === approval.id}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    {getApproveLabel(approval)}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="h-9 flex-1"
-                    onClick={() => handleReject(approval)}
-                    disabled={processingId === approval.id}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Reject
-                  </Button>
-                </div>
+                {approval.approvalStatus && approval.approvalStatus !== 'pending' ? (
+                  <div className="mt-2">
+                    <Badge className={cn(
+                      'text-xs px-3 py-1.5 w-full justify-center',
+                      approval.approvalStatus === 'approved'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0 hover:bg-green-100'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-0 hover:bg-red-100'
+                    )}>
+                      {approval.approvalStatus === 'approved'
+                        ? `Approved by ${approval.approvedByName || 'Manager'}`
+                        : 'Rejected'}
+                    </Badge>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      size="sm"
+                      className="h-9 flex-1 text-white bg-green-600 hover:bg-green-700"
+                      onClick={() => handleApprove(approval)}
+                      disabled={processingId === approval.id}
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      {getApproveLabel(approval)}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-9 flex-1"
+                      onClick={() => handleReject(approval)}
+                      disabled={processingId === approval.id}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>

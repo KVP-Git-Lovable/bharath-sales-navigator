@@ -45,6 +45,10 @@ export interface PendingApproval {
   totalLevels?: number;
   isFinalLevel?: boolean;
   myLevel?: number;
+  // processed approval fields
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedByName?: string | null;
+  actionTakenAt?: string | null;
 }
 
 export const useTeamAttendance = (
@@ -270,6 +274,113 @@ export const useTeamAttendance = (
     staleTime: 30 * 1000,
   });
 
+  // 5b. Processed approvals (approved/rejected by me)
+  const { data: processedStepsData = [] } = useQuery({
+    queryKey: ['team-processed-approvals', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data: steps, error } = await supabase
+        .from('approval_steps')
+        .select(`
+          id,
+          level,
+          approver_id,
+          status,
+          action_taken_at,
+          approval_request_id,
+          approval_requests!inner(
+            id,
+            entity_type,
+            entity_id,
+            current_level,
+            total_levels,
+            status,
+            requester_id,
+            final_approved_by
+          )
+        `)
+        .eq('approver_id', user.id)
+        .in('status', ['approved', 'rejected'])
+        .order('action_taken_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const processedSteps = (steps || []).filter((s: any) =>
+        ['approved', 'rejected'].includes(s.approval_requests?.status)
+      );
+
+      if (processedSteps.length === 0) return [];
+
+      const leaveIds = processedSteps
+        .filter((s: any) => s.approval_requests.entity_type === 'leave')
+        .map((s: any) => s.approval_requests.entity_id);
+      const regIds = processedSteps
+        .filter((s: any) => s.approval_requests.entity_type === 'regularization')
+        .map((s: any) => s.approval_requests.entity_id);
+
+      const requesterIds = [...new Set(processedSteps.map((s: any) => s.approval_requests.requester_id as string))];
+      const approverIds = [...new Set(processedSteps.map((s: any) => s.approval_requests.final_approved_by as string).filter(Boolean))];
+      const allProfileIds = [...new Set([...requesterIds, ...approverIds])];
+
+      const [leavesResult, regsResult, profilesResult] = await Promise.all([
+        leaveIds.length > 0
+          ? supabase.from('leave_applications').select('id, user_id, start_date, end_date, reason, leave_type_id').in('id', leaveIds)
+          : Promise.resolve({ data: [], error: null }),
+        regIds.length > 0
+          ? supabase.from('regularization_requests').select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time').in('id', regIds)
+          : Promise.resolve({ data: [], error: null }),
+        allProfileIds.length > 0
+          ? supabase.from('profiles').select('id, full_name, profile_picture_url, designation').in('id', allProfileIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      const profileMap = new Map<string, any>();
+      (profilesResult.data || []).forEach((p: any) => profileMap.set(p.id, p));
+
+      let leaveMap = new Map<string, any>();
+      const leaves = leavesResult.data || [];
+      if (leaves.length > 0) {
+        const typeIds = [...new Set(leaves.map((l: any) => l.leave_type_id).filter(Boolean))];
+        let typeMap = new Map<string, string>();
+        if (typeIds.length > 0) {
+          const { data: types } = await supabase.from('leave_types').select('id, name').in('id', typeIds as string[]);
+          types?.forEach((t: any) => typeMap.set(t.id, t.name));
+        }
+        leaves.forEach((l: any) => leaveMap.set(l.id, { ...l, leaveTypeName: typeMap.get(l.leave_type_id) || 'Leave' }));
+      }
+
+      let regMap = new Map<string, any>();
+      (regsResult.data || []).forEach((r: any) => regMap.set(r.id, r));
+
+      return processedSteps.map((s: any) => {
+        const requesterId = s.approval_requests.requester_id;
+        const requesterProfile = profileMap.get(requesterId);
+        const approverProfile = s.approval_requests.final_approved_by ? profileMap.get(s.approval_requests.final_approved_by) : null;
+        const entityType = s.approval_requests.entity_type as 'leave' | 'regularization';
+        const entityId = s.approval_requests.entity_id;
+        const entityData = entityType === 'leave' ? leaveMap.get(entityId) : regMap.get(entityId);
+
+        return {
+          entityType,
+          entityId,
+          approvalRequestId: s.approval_request_id,
+          entityData,
+          fullName: requesterProfile?.full_name || 'Unknown',
+          profilePictureUrl: requesterProfile?.profile_picture_url || null,
+          designation: requesterProfile?.designation || null,
+          requesterId,
+          approvalStatus: s.status as 'approved' | 'rejected',
+          approvedByName: approverProfile?.full_name || requesterProfile?.full_name || null,
+          actionTakenAt: s.action_taken_at,
+        };
+      });
+    },
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
+  });
+
   // Legacy pending regularizations (for direct reports not yet using engine)
   const { data: pendingRegularizations = [] } = useQuery({
     queryKey: ['team-pending-regularizations', approvalUserIds],
@@ -354,20 +465,18 @@ export const useTeamAttendance = (
     });
   }, [subordinateIds, profiles, todayAttendance, todayLeaves, monthlyCountsRaw, totalWorkingDaysInMonth]);
 
-  // Build pending approvals from approval engine (primary) + legacy fallback
+  // Build pending approvals from approval engine (primary) + legacy fallback + processed
   const pendingApprovals: PendingApproval[] = useMemo(() => {
     const profileMap = new Map(profiles.map(p => [p.id, p]));
 
     const engineApprovals: PendingApproval[] = (pendingStepsData as any[]).map((item: any) => {
       const ed = item.entityData;
-      // Use self-contained profile data from queryFn; fall back to profileMap if available
       const profileFallback = ed?.user_id ? profileMap.get(ed.user_id) : undefined;
       const fullName = item.fullName || profileFallback?.full_name || 'Unknown';
       const profilePictureUrl = item.profilePictureUrl ?? profileFallback?.profile_picture_url ?? null;
       const designation = item.designation ?? profileFallback?.designation ?? null;
 
       if (item.entityType === 'leave') {
-        // If entityData is missing, show a placeholder card with approval engine data (Fix 3)
         const userId = ed?.user_id || item.requesterId;
         return {
           id: ed?.id || item.entityId,
@@ -385,6 +494,7 @@ export const useTeamAttendance = (
           totalLevels: item.totalLevels,
           isFinalLevel: item.isFinalLevel,
           myLevel: item.myLevel,
+          approvalStatus: 'pending' as const,
         } as PendingApproval;
       } else {
         const userId = ed?.user_id || item.requesterId;
@@ -405,6 +515,7 @@ export const useTeamAttendance = (
           totalLevels: item.totalLevels,
           isFinalLevel: item.isFinalLevel,
           myLevel: item.myLevel,
+          approvalStatus: 'pending' as const,
         } as PendingApproval;
       }
     }) as PendingApproval[];
@@ -425,10 +536,56 @@ export const useTeamAttendance = (
         requestedCheckIn: r.requested_check_in_time,
         requestedCheckOut: r.requested_check_out_time,
         attendanceDate: r.attendance_date,
+        approvalStatus: 'pending' as const,
       }));
 
-    return [...engineApprovals, ...legacyRegApprovals];
-  }, [pendingStepsData, pendingRegularizations, profiles, approvalUserIds]);
+    // Processed approvals from engine
+    const allPendingIds = new Set([...engineApprovals.map(a => a.id), ...legacyRegApprovals.map(a => a.id)]);
+    const processedApprovals: PendingApproval[] = (processedStepsData as any[])
+      .filter((item: any) => !allPendingIds.has(item.entityId))
+      .map((item: any) => {
+        const ed = item.entityData;
+        if (item.entityType === 'leave') {
+          return {
+            id: ed?.id || item.entityId,
+            type: 'leave' as const,
+            userId: ed?.user_id || item.requesterId,
+            fullName: item.fullName || 'Unknown',
+            profilePictureUrl: item.profilePictureUrl || null,
+            designation: item.designation || null,
+            date: ed?.start_date || '',
+            endDate: ed?.end_date,
+            reason: ed?.reason || null,
+            leaveTypeName: ed?.leaveTypeName || 'Leave',
+            approvalRequestId: item.approvalRequestId,
+            approvalStatus: item.approvalStatus,
+            approvedByName: item.approvedByName,
+            actionTakenAt: item.actionTakenAt,
+          } as PendingApproval;
+        } else {
+          return {
+            id: ed?.id || item.entityId,
+            type: 'regularization' as const,
+            userId: ed?.user_id || item.requesterId,
+            fullName: item.fullName || 'Unknown',
+            profilePictureUrl: item.profilePictureUrl || null,
+            designation: item.designation || null,
+            date: ed?.attendance_date || '',
+            reason: ed?.reason || null,
+            requestedCheckIn: ed?.requested_check_in_time,
+            requestedCheckOut: ed?.requested_check_out_time,
+            attendanceDate: ed?.attendance_date,
+            approvalRequestId: item.approvalRequestId,
+            approvalStatus: item.approvalStatus,
+            approvedByName: item.approvedByName,
+            actionTakenAt: item.actionTakenAt,
+          } as PendingApproval;
+        }
+      });
+
+    // Pending first, then processed (most recent first)
+    return [...engineApprovals, ...legacyRegApprovals, ...processedApprovals];
+  }, [pendingStepsData, processedStepsData, pendingRegularizations, profiles, approvalUserIds]);
 
   // handleLeaveAction: uses approval engine if approvalRequestId present, else legacy direct update
   const handleLeaveAction = async (applicationId: string, newStatus: 'approved' | 'rejected', approvalRequestId?: string) => {
@@ -459,6 +616,7 @@ export const useTeamAttendance = (
         toast({ title: `Leave ${newStatus} successfully` });
       }
       queryClient.invalidateQueries({ queryKey: ['team-pending-leaves'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-processed-approvals'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['team-today-leaves'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['team-today-attendance'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['my-pending-steps'], exact: false });
@@ -562,6 +720,7 @@ export const useTeamAttendance = (
 
       queryClient.invalidateQueries({ queryKey: ['team-pending-regularizations'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['team-pending-leaves'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['team-processed-approvals'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['team-today-attendance'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['team-monthly-counts'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['my-pending-steps'], exact: false });

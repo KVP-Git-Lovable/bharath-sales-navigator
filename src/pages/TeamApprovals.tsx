@@ -31,6 +31,9 @@ export const TeamApprovals = () => {
 
   const leaveApprovals = useMemo(() => pendingApprovals.filter(a => a.type === 'leave'), [pendingApprovals]);
   const regApprovals = useMemo(() => pendingApprovals.filter(a => a.type === 'regularization'), [pendingApprovals]);
+  const pendingCount = useMemo(() => pendingApprovals.filter(a => a.approvalStatus === 'pending').length, [pendingApprovals]);
+  const pendingLeaveCount = useMemo(() => leaveApprovals.filter(a => a.approvalStatus === 'pending').length, [leaveApprovals]);
+  const pendingRegCount = useMemo(() => regApprovals.filter(a => a.approvalStatus === 'pending').length, [regApprovals]);
 
   const currentList = activeTab === 'leave' ? leaveApprovals : regApprovals;
   const totalPages = Math.max(1, Math.ceil(currentList.length / PAGE_SIZE));
@@ -100,7 +103,8 @@ export const TeamApprovals = () => {
       <div className="p-4 space-y-4">
         {/* Summary */}
         <p className="text-center text-sm font-medium text-muted-foreground">
-          You have {pendingApprovals.length} pending request{pendingApprovals.length !== 1 ? 's' : ''}
+          You have {pendingCount} pending request{pendingCount !== 1 ? 's' : ''}
+          {pendingApprovals.length - pendingCount > 0 && ` and ${pendingApprovals.length - pendingCount} processed`}
         </p>
 
         {/* Tabs */}
@@ -117,7 +121,7 @@ export const TeamApprovals = () => {
             <CalendarDays className="h-3.5 w-3.5" />
             Leave Requests
             <Badge className="h-4 min-w-4 px-1 text-[10px] bg-green-600 text-white hover:bg-green-600">
-              {leaveApprovals.length}
+              {pendingLeaveCount}
             </Badge>
           </button>
           <button
@@ -132,7 +136,7 @@ export const TeamApprovals = () => {
             <ClipboardCheck className="h-3.5 w-3.5" />
             Regularization
             <Badge className="h-4 min-w-4 px-1 text-[10px] bg-green-600 text-white hover:bg-green-600">
-              {regApprovals.length}
+              {pendingRegCount}
             </Badge>
           </button>
         </div>
@@ -191,28 +195,43 @@ export const TeamApprovals = () => {
                     )}
                   </div>
 
-                  {/* Action buttons */}
-                  <div className="flex gap-2 px-3 pb-3">
-                    <Button
-                      size="sm"
-                      className="flex-1 h-8 text-white text-xs rounded-lg bg-green-600 hover:bg-green-700"
-                      onClick={() => handleApprove(approval)}
-                      disabled={processingId === approval.id}
-                    >
-                      <Check className="h-3.5 w-3.5 mr-1" />
-                      {getApproveLabel()}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="flex-1 h-8 text-xs rounded-lg"
-                      onClick={() => handleReject(approval)}
-                      disabled={processingId === approval.id}
-                    >
-                      <X className="h-3.5 w-3.5 mr-1" />
-                      Reject
-                    </Button>
-                  </div>
+                  {/* Action buttons or status badge */}
+                  {approval.approvalStatus && approval.approvalStatus !== 'pending' ? (
+                    <div className="flex px-3 pb-3">
+                      <Badge className={cn(
+                        'text-xs px-3 py-1.5 w-full justify-center',
+                        approval.approvalStatus === 'approved'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0 hover:bg-green-100'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-0 hover:bg-red-100'
+                      )}>
+                        {approval.approvalStatus === 'approved'
+                          ? `Approved by ${approval.approvedByName || 'Manager'}`
+                          : 'Rejected'}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 px-3 pb-3">
+                      <Button
+                        size="sm"
+                        className="flex-1 h-8 text-white text-xs rounded-lg bg-green-600 hover:bg-green-700"
+                        onClick={() => handleApprove(approval)}
+                        disabled={processingId === approval.id}
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1" />
+                        {getApproveLabel()}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1 h-8 text-xs rounded-lg"
+                        onClick={() => handleReject(approval)}
+                        disabled={processingId === approval.id}
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
