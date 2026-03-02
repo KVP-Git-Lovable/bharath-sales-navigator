@@ -1,5 +1,8 @@
 project_id = "aoxdosjkwqyuvccuwhzc"
 
+[functions.beat-health-insights]
+verify_jwt = false
+
 [functions.admin-get-users]
 verify_jwt = false
 

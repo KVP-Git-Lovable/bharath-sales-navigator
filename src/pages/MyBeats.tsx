@@ -24,6 +24,7 @@ import { useRecommendations } from "@/hooks/useRecommendations";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BeatAnalyticsModal } from "@/components/BeatAnalyticsModal";
+import { BeatInsightModal } from "@/components/BeatInsightModal";
 import { BeatCard } from "@/components/BeatCard";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -2175,39 +2176,13 @@ export const MyBeats = () => {
           />
         )}
 
-        {/* AI Insights Modal */}
-        <Dialog open={!!selectedBeatForAI} onOpenChange={(open) => !open && setSelectedBeatForAI(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Insights for Beat
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              {recsLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                </div>
-              ) : recommendations.length > 0 ? (
-                recommendations
-                  .filter(rec => rec.entity_id === selectedBeatForAI)
-                  .map((rec) => (
-                    <RecommendationCard
-                      key={rec.id}
-                      recommendation={rec}
-                      onFeedback={(liked) => provideFeedback(rec.id, liked ? 'like' : 'dislike')}
-                    />
-                  ))
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No AI insights available yet. Generating recommendations...</p>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* AI Health Insight Modal */}
+        <BeatInsightModal
+          isOpen={!!selectedBeatForAI}
+          onClose={() => setSelectedBeatForAI(null)}
+          beatId={selectedBeatForAI || ''}
+          beatName={beats.find(b => b.id === selectedBeatForAI)?.name || 'Beat'}
+        />
 
         {/* Delete Confirmation Dialog */}
         <BeatDeleteDialog
