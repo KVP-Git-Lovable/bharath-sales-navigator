@@ -112,6 +112,18 @@ export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsigh
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Quick Actions */}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={onAIInsights}>
+            <Sparkles size={14} className="mr-1" />
+            AI Insights
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={onEdit}>
+            <Edit2 size={14} className="mr-1" />
+            Edit
+          </Button>
+        </div>
+
         {/* Beat Stats */}
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-2 bg-muted/30 rounded-lg">
