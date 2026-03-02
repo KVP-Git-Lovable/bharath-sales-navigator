@@ -1,70 +1,80 @@
 
+Goal: eliminate the “data appears only after multiple clicks” behavior on My Visits after switching tabs, and ensure immediate, correct display on return.
 
-## Fix: My Visits Page Shows "No Visits Found" After Tab Navigation
+What is actually happening now
+1) In `src/hooks/useVisitsDataOptimized.ts`, the auth listener clears all in-memory state on every `SIGNED_IN` event:
+- `clearAllCachesAndState()` sets `beatPlans/visits/retailers/orders` to empty and sets loading state.
+- On browser tab return, Supabase auth can emit auth events (including sign-in/session refresh flows), so this clear can happen even when user did not truly change.
 
-### Root Cause Analysis
+2) After that clear, there is no guaranteed immediate `loadData()` re-run from that auth callback itself.
+- If date/user dependencies didn’t change, the main load effect may not re-run right away.
+- Visibility sync is throttled by `MIN_SYNC_INTERVAL_MS` (5 min), so the fallback sync may be skipped.
+- Result: page looks empty/stuck until user manually clicks and triggers another UI state change.
 
-After thorough code review, here is the exact sequence that causes the bug:
+3) This exactly matches your symptom:
+- Navigate away → come back → My Visits not shown immediately.
+- Multiple clicks eventually trigger data refresh.
 
-1. **Component remount clears in-memory cache**: When user navigates to another navbar tab (e.g., Attendance) and returns to My Visits, the `MyVisits` component fully unmounts and remounts. The `cacheRef` (useRef with a Map) is reset to empty on every mount.
+Implementation plan
 
-2. **Auth timing race**: On remount, `useAuth` may not have resolved `userId` yet on the first render. `loadData` (line 667) returns early when `effectiveUserId` is undefined -- but **never sets `isLoading = false`**. The UI stays stuck on "Loading visits..."
+1) Fix auth-event cache invalidation strategy (primary fix)
+File: `src/hooks/useVisitsDataOptimized.ts`
+- Replace unconditional `SIGNED_IN` clearing with event-safe logic:
+  - Keep clearing on `SIGNED_OUT`.
+  - For `SIGNED_IN` (or initial/session refresh events), clear only if authenticated user actually changed (compare previous effective user id vs new session user id).
+  - If same user, do not wipe existing UI state.
+- This prevents unnecessary “blanking” on tab return/session refresh.
 
-3. **Safety guard fires with empty state**: After 15 seconds, the SafetyGuard (line 1090) forces `isLoading=false` and `hasLoadedOnce=true`. Since no data was loaded, the UI shows "No visits found / No beat planned."
+2) Trigger reload immediately when a clear is truly needed
+File: `src/hooks/useVisitsDataOptimized.ts`
+- When cache/state is cleared due to real identity change:
+  - explicitly reset per-date sync throttle for `selectedDate`,
+  - invoke a controlled reload path immediately (local-first `loadData` or `invalidateData` equivalent),
+  - avoid waiting for visibility throttle/user click.
+- This ensures one deterministic recovery path after a legitimate clear.
 
-4. **Late auth resolution doesn't help enough**: When `effectiveUserId` finally resolves (a few hundred ms later), `loadData` is recreated and re-invoked. By now it should load from snapshot/offline. But because the SafetyGuard already set `hasLoadedOnce=true` and the user sees empty state, there can be a brief flash or the data may load but the user already saw the wrong state.
+3) Guard visibility/tab-return revalidation when UI is empty
+File: `src/hooks/useVisitsDataOptimized.ts`
+- Update `handleVisibility` logic:
+  - if current date state is empty (no beatPlans/retailers/visits/orders), bypass `shouldSyncNow` throttle once and force revalidation,
+  - keep existing throttle for normal/non-empty state to avoid excess network calls.
+- This handles edge cases where data was cleared unexpectedly and app returns to foreground.
 
-5. **AbortController disconnected**: In `doFullInitialLoad` (line 945-946), an AbortController is created and a timeout set, but the signal is **never passed** to the Supabase queries. Network requests can hang indefinitely, causing the full-load path to never resolve.
+4) Remove loading deadlock risk from auth callback side-effects
+File: `src/hooks/useVisitsDataOptimized.ts`
+- Ensure auth callback does not only clear state; it must either:
+  - preserve current state (same-user event), or
+  - clear + immediately schedule reload.
+- Keep safety timer as backup only, not as primary recovery mechanism.
 
-### Fix Plan
+5) Add targeted diagnostics logs for this flow
+File: `src/hooks/useVisitsDataOptimized.ts`
+- Add concise logs for:
+  - auth event type + whether clear skipped/executed,
+  - reason for clear (user changed vs sign-out),
+  - whether immediate reload started,
+  - whether visibility sync was throttle-bypassed due to empty state.
+- This will make future regressions easy to verify from console.
 
-**File: `src/hooks/useVisitsDataOptimized.ts`** (single file, 5 targeted changes)
+Why this resolves your exact issue
+- The repeated-click behavior is caused by state being wiped on auth/tab-return events without deterministic reload.
+- These changes stop unnecessary wipes and guarantee immediate reload when a wipe is legitimate.
+- So returning to My Visits will show cached/snapshot data instantly, with background sync updating it—without requiring multiple manual clicks.
 
-#### Change 1: Handle undefined userId gracefully in loadData
-At line 667, when `loadData` returns early due to missing `effectiveUserId`, also set `isLoading = false` -- but only if we don't expect the userId to arrive soon. Better approach: don't start the 15s safety timer until userId is available.
+Validation checklist (must run end-to-end)
+1) Open My Visits (today), confirm list loads.
+2) Switch to another tab/page, return to My Visits:
+- data should still be visible immediately (no repeated clicks needed).
+3) Repeat rapid tab switching 5–10 times:
+- no blank state lock, no delayed “appears after clicks”.
+4) Test previous date:
+- correct beat-linked retailers and activity details render immediately.
+5) Offline test:
+- with snapshot present, return to My Visits and confirm instant data display.
+6) Check console:
+- no repeated same-user auth-clear logs; reload only on real user change/sign-out.
 
-```
-// Before (line 667):
-if (!effectiveUserId || !selectedDate) return;
-
-// After:
-if (!effectiveUserId || !selectedDate) {
-  // Don't leave isLoading stuck -- userId will arrive and re-trigger
-  return;
-}
-```
-
-And move the safety guard to only start when userId is present (adjust the useEffect at line 1084).
-
-#### Change 2: Reset isLoading on every loadData re-entry when date/user changes
-When `loadData` is called again with a valid userId (after auth resolves), ensure `isLoading` is set properly. Currently, if SafetyGuard already forced `hasLoadedOnce=true`, the subsequent load still works but the empty-state flash already happened.
-
-Fix: In the main useEffect (line 1084), reset `isLoading=true` and `hasLoadedOnce=false` when the effect re-runs with a new `loadData` (which happens when userId/date changes). This ensures fresh loading state.
-
-#### Change 3: Pass AbortSignal to Supabase queries in doFullInitialLoad
-At line 948-953, pass the abort signal to Supabase queries so the 10s timeout actually cancels them:
-
-```typescript
-supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date).abortSignal(controller.signal),
-// ... same for all queries
-```
-
-Do the same in `smartDeltaSync` (line 450-454).
-
-#### Change 4: Make safety guard smarter
-Instead of a fixed 15s timer from mount, start the safety timer only after `loadData` actually begins fetching (i.e., after userId is available). Reduce to 10s since the actual network timeout is already 8-10s.
-
-#### Change 5: Ensure snapshot loads work on remount
-Add a log/guard at the snapshot loading path (line 757-856) to confirm the snapshot is being found. If the snapshot key includes the userId but auth hasn't resolved yet on the first call, the snapshot lookup fails silently. Ensure the snapshot path is only attempted with a valid userId.
-
-### Expected Result
-- Navigating away and returning to My Visits: data loads instantly from snapshot (no 15s wait)
-- No "No visits found" flash -- loading skeleton shows until real data arrives
-- Network timeouts actually cancel hanging requests
-- Auth race condition eliminated
-
-### Technical Details
-- Only `src/hooks/useVisitsDataOptimized.ts` needs changes
-- All 5 changes are within the existing `loadData` function and the main `useEffect`
-- No database or schema changes needed
-
+Technical scope
+- Primary file to change: `src/hooks/useVisitsDataOptimized.ts`.
+- No database/schema changes required.
+- No API contract changes required.
