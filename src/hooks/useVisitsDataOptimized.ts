@@ -839,8 +839,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           timestamp: Date.now() 
         });
         
-        // CRITICAL FIX: For today's date, sync after loading snapshot
-        // SLOW CONNECTION CHECK: Skip all syncs on slow connections - use cached data
+        // CRITICAL FIX: Sync after loading snapshot for ANY date (not just today)
         const slowConnection = isSlowConnection();
         if (slowConnection) {
           console.log('[LoadData] ⚡ Using snapshot only - slow connection detected');
@@ -849,6 +848,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           requestIdleCallback?.(() => smartDeltaSync(effectiveUserId, selectedDate)) || 
             setTimeout(() => smartDeltaSync(effectiveUserId, selectedDate), 50);
         } else if (navigator.onLine && shouldSyncNow(selectedDate)) {
+          // Also sync for historical dates when throttle allows
           requestIdleCallback?.(() => smartDeltaSync(effectiveUserId, selectedDate)) || 
             setTimeout(() => smartDeltaSync(effectiveUserId, selectedDate), 100);
         }
@@ -1085,12 +1085,23 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     mountedRef.current = true;
     loadData();
 
+    // SAFETY GUARD: Prevent loading state from staying stuck forever
+    // If loading hasn't resolved in 15 seconds, force it to complete
+    const safetyTimer = setTimeout(() => {
+      if (mountedRef.current && isLoading && !hasLoadedOnce) {
+        console.warn('[SafetyGuard] Loading stuck for 15s, forcing completion');
+        setIsLoading(false);
+        setHasLoadedOnce(true);
+      }
+    }, 15000);
+
     // IMPORTANT: In React 18 StrictMode (dev), effects mount/unmount twice.
     // Reset in-flight flags on cleanup so the second mount can fetch data.
     return () => {
       mountedRef.current = false;
       isFetchingRef.current = false;
       smartSyncLockRef.current = false;
+      clearTimeout(safetyTimer);
     };
   }, [loadData]);
 
@@ -1330,14 +1341,26 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     };
 
     // FIX: Listen to visitDataChanged - force local reload for progress stats refresh
-    // This is critical for offline No Order submissions to reflect in Today's Progress
-    const handleVisitDataChanged = async () => {
+    // Now date-aware: events carry { date } in detail, and we handle any date (not just today)
+    const handleVisitDataChanged = async (event: Event) => {
       const currentDate = selectedDateRef.current;
       const currentUserId = userIdRef.current;
       
       if (!currentUserId) return;
       
-      console.log('[LocalEvent] visitDataChanged - reloading from local cache/storage');
+      // Extract date from event detail (if CustomEvent with date context)
+      const eventDate = (event as CustomEvent)?.detail?.date;
+      
+      // If event has a specific date and it doesn't match our selected date, skip reload
+      if (eventDate && eventDate !== currentDate) {
+        console.log('[LocalEvent] visitDataChanged for different date, skipping:', eventDate, '!=', currentDate);
+        // Still invalidate cache for that date so it's fresh when user navigates to it
+        cacheRef.current.delete(eventDate);
+        lastSyncTimeRef.current.delete(eventDate);
+        return;
+      }
+      
+      console.log('[LocalEvent] visitDataChanged - reloading from local cache/storage for date:', currentDate);
       
       // Reload from snapshot first (most up-to-date for offline changes)
       try {
@@ -1351,15 +1374,12 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           });
           
           // CRITICAL FIX: Filter retailers to only those matching snapshot's beat plans
-          // This prevents stale retailers from removed beats
           const snapshotBeatIds = (snapshot.beatPlans || []).map((bp: any) => bp.beat_id);
           const snapshotVisitRetailerIds = new Set((snapshot.visits || []).map((v: any) => v.retailer_id));
           const filteredRetailers = (snapshot.retailers || []).filter((r: any) => 
             snapshotBeatIds.includes(r.beat_id) || snapshotVisitRetailerIds.has(r.id)
           );
           
-          // Update state from snapshot - REPLACE instead of fallback to prev
-          // When beat plans change, we MUST use the new data, not keep old
           setBeatPlans(snapshot.beatPlans || []);
           setVisits(snapshot.visits || []);
           setRetailers(filteredRetailers);
@@ -1374,11 +1394,8 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
             timestamp: Date.now()
           });
           
-          // CRITICAL FIX: Also trigger background network sync after loading snapshot
-          // Snapshot may be stale (e.g., visit was just created but snapshot was saved before)
-          // Without this, newly added visits disappear because stale snapshot overwrites fresh data
-          if (navigator.onLine && !isSlowConnection() && isToday(currentDate)) {
-            // Clear sync timestamp to force re-sync
+          // CRITICAL FIX: Trigger background network sync for ANY date (not just today)
+          if (navigator.onLine && !isSlowConnection()) {
             lastSyncTimeRef.current.delete(currentDate);
             setTimeout(() => smartDeltaSync(currentUserId, currentDate), 300);
           }
@@ -1390,7 +1407,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         console.error('[LocalEvent] Snapshot load failed:', e);
       }
       
-      // Fallback: reload from offline storage (properly filtered by beat)
+      // Fallback: reload from offline storage
       const offlineData = await loadFromOfflineStorage(currentUserId, currentDate);
       if (offlineData) {
         console.log('[LocalEvent] Reloaded from offline storage:', {
@@ -1398,8 +1415,6 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           visits: offlineData.visits.length,
           retailers: offlineData.retailers.length
         });
-        // CRITICAL: Use ALL offline data, not just visits/orders
-        // This ensures beat plan changes are reflected
         setBeatPlans(offlineData.beatPlans);
         setVisits(offlineData.visits);
         setRetailers(offlineData.retailers);
@@ -1414,25 +1429,24 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         });
       } else {
         console.log('[LocalEvent] No offline data - clearing state and triggering network sync');
-        // No local data exists - clear state to show empty and trigger sync
         setBeatPlans([]);
         setVisits([]);
         setRetailers([]);
         setOrders([]);
         cacheRef.current.delete(currentDate);
         
-        // Trigger network sync to get fresh data
         if (navigator.onLine && !isSlowConnection()) {
           smartDeltaSync(currentUserId, currentDate);
         }
       }
     };
 
-    // Visibility change - sync when app comes to foreground
+    // Visibility change - sync when app comes to foreground (any date, not just today)
     const handleVisibility = () => {
       const currentDate = selectedDateRef.current;
       const currentUserId = userIdRef.current;
-      if (document.visibilityState === 'visible' && navigator.onLine && currentUserId && isToday(currentDate) && shouldSyncNow(currentDate)) {
+      if (document.visibilityState === 'visible' && navigator.onLine && currentUserId && shouldSyncNow(currentDate) && !isSlowConnection()) {
+        console.log('[Visibility] App foregrounded, syncing for date:', currentDate);
         setTimeout(() => smartDeltaSync(currentUserId, currentDate), 500);
       }
     };
@@ -1543,7 +1557,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
 
     window.addEventListener('visitStatusChanged', handleStatusChange as EventListener);
     window.addEventListener('retailerAdded', handleRetailerAdded as EventListener);
-    window.addEventListener('visitDataChanged', handleVisitDataChanged);
+    window.addEventListener('visitDataChanged', handleVisitDataChanged as EventListener);
     window.addEventListener('syncComplete', handleSyncComplete);
     window.addEventListener('beatDeleted', handleBeatDeleted as EventListener);
     window.addEventListener('forceVisitsRefresh', handleForceRefresh);
@@ -1554,7 +1568,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     return () => {
       window.removeEventListener('visitStatusChanged', handleStatusChange as EventListener);
       window.removeEventListener('retailerAdded', handleRetailerAdded as EventListener);
-      window.removeEventListener('visitDataChanged', handleVisitDataChanged);
+      window.removeEventListener('visitDataChanged', handleVisitDataChanged as EventListener);
       window.removeEventListener('syncComplete', handleSyncComplete);
       window.removeEventListener('beatDeleted', handleBeatDeleted as EventListener);
       window.removeEventListener('forceVisitsRefresh', handleForceRefresh);

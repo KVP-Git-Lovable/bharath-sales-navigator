@@ -1031,7 +1031,7 @@ export const Cart = () => {
         }
         
         // Mark data changed for cross-page cache invalidation (await to ensure it's set before nav)
-        await markVisitDataChanged();
+        await markVisitDataChanged(orderDate);
         
         // Dispatch events for any components that are still mounted
         window.dispatchEvent(new CustomEvent('visitStatusChanged', {
@@ -1733,8 +1733,8 @@ export const Cart = () => {
           }
         }));
         
-        window.dispatchEvent(new Event('visitDataChanged'));
-        markVisitDataChanged();
+        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
+        markVisitDataChanged(orderDate);
       }
 
       // Navigate back to My Visits
