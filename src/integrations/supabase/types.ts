@@ -15381,6 +15381,10 @@ export type Database = {
         Returns: boolean
       }
       hash_hint_answer: { Args: { answer: string }; Returns: string }
+      initialize_leave_policy_balances: {
+        Args: { p_policy_id: string }
+        Returns: undefined
+      }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       is_admin_or_manager: { Args: never; Returns: boolean }
       is_approver_for_request: {
