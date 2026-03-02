@@ -74,38 +74,18 @@ export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsigh
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={onEdit}>
-                  <Edit2 size={14} className="mr-2" />
-                  Edit Beat
-                </DropdownMenuItem>
                 {onTransfer && (
                   <DropdownMenuItem onClick={onTransfer}>
                     <ArrowRightLeft size={14} className="mr-2" />
                     Transfer Beat
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={onDetails}>
-                  <BarChart size={14} className="mr-2" />
-                  View Analytics
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onAIInsights}>
-                  <Sparkles size={14} className="mr-2" />
-                  AI Insights
-                </DropdownMenuItem>
                 {onDeactivate && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={onDeactivate} className="text-orange-600">
-                      <Power size={14} className="mr-2" />
-                      Deactivate Beat
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem onClick={onDeactivate} className="text-orange-600">
+                    <Power size={14} className="mr-2" />
+                    Deactivate Beat
+                  </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                  <Trash2 size={14} className="mr-2" />
-                  Delete Beat
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
