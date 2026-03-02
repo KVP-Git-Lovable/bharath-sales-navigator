@@ -1,72 +1,70 @@
 
-Goal: make the My Visits page reliably show the correct retailers for the selected beat after tab navigation, and always show accurate historical (previous date) visit activity data.
 
-What I found
-- Your DB has the expected source data:
-  - Beat plan exists for 2026-03-02 (Nagasaki)
-  - 4 retailers are linked to that beat
-  - visits exist for that date (2 rows currently)
-- The current issue is mostly in client data lifecycle (cache/snapshot/sync timing), not missing DB data.
-- In `useVisitsDataOptimized`, there are a few weak points that can cause exactly what you described:
-  1) foreground/tab-return sync is today-only in key places, so historical dates can stay stale
-  2) `visitDataChanged` handling is not date-aware (events don’t carry date, and marker is today-only)
-  3) timeout controllers are created but not attached to Supabase queries in this hook, so loading can get stuck when network hangs
-  4) loading state depends on async flow that can remain in “Loading visits…” longer than expected during remount/navigation races
+## Fix: My Visits Page Shows "No Visits Found" After Tab Navigation
 
-Implementation plan
+### Root Cause Analysis
 
-1) Make sync date-aware (not only today) for My Visits reload paths
-- File: `src/hooks/useVisitsDataOptimized.ts`
-- Update `handleVisibility` and `handleVisitDataChanged` logic so selected date can revalidate even when it is a previous date.
-- Keep throttling via `shouldSyncNow(selectedDate)` to avoid excess traffic.
-- Result: when user returns to My Visits, selected date data (including older days) is refreshed and not stuck on stale snapshot.
+After thorough code review, here is the exact sequence that causes the bug:
 
-2) Make visit data change events carry date context
-- Files:
-  - `src/lib/visitChangeMarker.ts`
-  - call sites: `src/utils/noOrderUtils.ts`, `src/hooks/useOfflineOrderEntry.ts`, `src/pages/Cart.tsx` (and any other critical emitters)
-- Extend marker API to accept optional date:
-  - `markVisitDataChanged(date?: string)`
-  - default remains today for backward compatibility
-- Dispatch `visitDataChanged` as `CustomEvent` with `{ date }` where known.
-- In `useVisitsDataOptimized`, consume event date and invalidate/reload that date’s cache specifically.
-- Result: previous-date updates appear correctly instead of being treated as today-only changes.
+1. **Component remount clears in-memory cache**: When user navigates to another navbar tab (e.g., Attendance) and returns to My Visits, the `MyVisits` component fully unmounts and remounts. The `cacheRef` (useRef with a Map) is reset to empty on every mount.
 
-3) Prevent hanging loading states with real request cancellation + safe fallback
-- File: `src/hooks/useVisitsDataOptimized.ts`
-- Attach `.abortSignal(controller.signal)` to Supabase queries in `smartDeltaSync` and `doFullInitialLoad`.
-- Add a final safety guard so `isLoading`/`hasLoadedOnce` cannot remain blocked if network fetch stalls.
-- Result: eliminates recurring “Loading visits…” blocks after switching tabs/routes under unstable network.
+2. **Auth timing race**: On remount, `useAuth` may not have resolved `userId` yet on the first render. `loadData` (line 667) returns early when `effectiveUserId` is undefined -- but **never sets `isLoading = false`**. The UI stays stuck on "Loading visits..."
 
-4) Harden beat-to-retailer derivation consistency
-- File: `src/hooks/useVisitsDataOptimized.ts`
-- Centralize retailer inclusion rule for a date:
-  - retailers from selected date’s beat plans
-  - + retailers referenced by selected date’s visits/orders
-  - + explicit `beat_data.retailer_ids`
-- Use the same rule in snapshot load, offline load, and network sync paths.
-- Result: My Visits consistently shows retailers linked to the selected beat, regardless of navigation path or cache source.
+3. **Safety guard fires with empty state**: After 15 seconds, the SafetyGuard (line 1090) forces `isLoading=false` and `hasLoadedOnce=true`. Since no data was loaded, the UI shows "No visits found / No beat planned."
 
-5) Preserve UX while revalidating
-- Files:
-  - `src/hooks/useVisitsDataOptimized.ts`
-  - optionally `src/pages/MyVisits.tsx` (minor display guard)
-- Keep stale data visible while background refresh runs, but only show skeleton for true first-load.
-- Ensure no flicker and no false empty state while revalidation is in progress.
+4. **Late auth resolution doesn't help enough**: When `effectiveUserId` finally resolves (a few hundred ms later), `loadData` is recreated and re-invoked. By now it should load from snapshot/offline. But because the SafetyGuard already set `hasLoadedOnce=true` and the user sees empty state, there can be a brief flash or the data may load but the user already saw the wrong state.
 
-Validation checklist after implementation
-1) Open `/visits/retailers` for today:
-- Beat name and linked retailers appear (e.g., Nagasaki retailers) without manual refresh.
-2) Navigate to another tab (e.g., Attendance or My Beats), then return:
-- list remains correct and refreshes safely (no stuck loading, no wrong beat retailers).
-3) Select a previous date with known activity:
-- statuses/orders/unproductive counts and list match DB records for that date.
-4) Trigger update flow (order/no-order), then return to My Visits:
-- date-specific changes reflect immediately.
-5) Simulate slow/intermittent network:
-- page avoids permanent loading lock and falls back gracefully.
+5. **AbortController disconnected**: In `doFullInitialLoad` (line 945-946), an AbortController is created and a timeout set, but the signal is **never passed** to the Supabase queries. Network requests can hang indefinitely, causing the full-load path to never resolve.
 
-Technical notes
-- Primary fix surface: `useVisitsDataOptimized` (single source of truth for My Visits data).
-- Secondary fix surface: change-marker/event payloads for cross-page synchronization accuracy.
-- No backend schema changes needed.
+### Fix Plan
+
+**File: `src/hooks/useVisitsDataOptimized.ts`** (single file, 5 targeted changes)
+
+#### Change 1: Handle undefined userId gracefully in loadData
+At line 667, when `loadData` returns early due to missing `effectiveUserId`, also set `isLoading = false` -- but only if we don't expect the userId to arrive soon. Better approach: don't start the 15s safety timer until userId is available.
+
+```
+// Before (line 667):
+if (!effectiveUserId || !selectedDate) return;
+
+// After:
+if (!effectiveUserId || !selectedDate) {
+  // Don't leave isLoading stuck -- userId will arrive and re-trigger
+  return;
+}
+```
+
+And move the safety guard to only start when userId is present (adjust the useEffect at line 1084).
+
+#### Change 2: Reset isLoading on every loadData re-entry when date/user changes
+When `loadData` is called again with a valid userId (after auth resolves), ensure `isLoading` is set properly. Currently, if SafetyGuard already forced `hasLoadedOnce=true`, the subsequent load still works but the empty-state flash already happened.
+
+Fix: In the main useEffect (line 1084), reset `isLoading=true` and `hasLoadedOnce=false` when the effect re-runs with a new `loadData` (which happens when userId/date changes). This ensures fresh loading state.
+
+#### Change 3: Pass AbortSignal to Supabase queries in doFullInitialLoad
+At line 948-953, pass the abort signal to Supabase queries so the 10s timeout actually cancels them:
+
+```typescript
+supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date).abortSignal(controller.signal),
+// ... same for all queries
+```
+
+Do the same in `smartDeltaSync` (line 450-454).
+
+#### Change 4: Make safety guard smarter
+Instead of a fixed 15s timer from mount, start the safety timer only after `loadData` actually begins fetching (i.e., after userId is available). Reduce to 10s since the actual network timeout is already 8-10s.
+
+#### Change 5: Ensure snapshot loads work on remount
+Add a log/guard at the snapshot loading path (line 757-856) to confirm the snapshot is being found. If the snapshot key includes the userId but auth hasn't resolved yet on the first call, the snapshot lookup fails silently. Ensure the snapshot path is only attempted with a valid userId.
+
+### Expected Result
+- Navigating away and returning to My Visits: data loads instantly from snapshot (no 15s wait)
+- No "No visits found" flash -- loading skeleton shows until real data arrives
+- Network timeouts actually cancel hanging requests
+- Auth race condition eliminated
+
+### Technical Details
+- Only `src/hooks/useVisitsDataOptimized.ts` needs changes
+- All 5 changes are within the existing `loadData` function and the main `useEffect`
+- No database or schema changes needed
+
