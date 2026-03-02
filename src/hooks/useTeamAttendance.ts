@@ -38,6 +38,8 @@ export interface PendingApproval {
   // regularization specific
   requestedCheckIn?: string | null;
   requestedCheckOut?: string | null;
+  actualCheckIn?: string | null;
+  actualCheckOut?: string | null;
   attendanceDate?: string;
   // approval engine fields
   approvalRequestId?: string;
@@ -245,6 +247,21 @@ export const useTeamAttendance = (
       let regMap = new Map<string, any>();
       (regsResult.data || []).forEach((r: any) => regMap.set(r.id, r));
 
+      // Fetch actual attendance records for regularization dates
+      const regEntries = regsResult.data || [];
+      const attendanceMap = new Map<string, any>();
+      if (regEntries.length > 0) {
+        const userDatePairs = regEntries.map((r: any) => ({ userId: r.user_id, date: r.attendance_date }));
+        const uniqueUserIds = [...new Set(userDatePairs.map((p: any) => p.userId))];
+        const uniqueDates = [...new Set(userDatePairs.map((p: any) => p.date))];
+        const { data: attRecords } = await supabase
+          .from('attendance')
+          .select('user_id, date, check_in_time, check_out_time')
+          .in('user_id', uniqueUserIds as string[])
+          .in('date', uniqueDates as string[]);
+        (attRecords || []).forEach((a: any) => attendanceMap.set(`${a.user_id}_${a.date}`, a));
+      }
+
       return myTurnSteps.map((s: any) => {
         const requesterId = s.approval_requests.requester_id;
         const requesterProfile = requesterProfileMap.get(requesterId);
@@ -267,6 +284,13 @@ export const useTeamAttendance = (
           profilePictureUrl: requesterProfile?.profile_picture_url || null,
           designation: requesterProfile?.designation || null,
           requesterId,
+          // Actual attendance times for regularization comparison
+          actualCheckIn: entityType === 'regularization' && entityData
+            ? attendanceMap.get(`${entityData.user_id}_${entityData.attendance_date}`)?.check_in_time || null
+            : null,
+          actualCheckOut: entityType === 'regularization' && entityData
+            ? attendanceMap.get(`${entityData.user_id}_${entityData.attendance_date}`)?.check_out_time || null
+            : null,
         };
       });
     },
@@ -354,6 +378,21 @@ export const useTeamAttendance = (
       let regMap = new Map<string, any>();
       (regsResult.data || []).forEach((r: any) => regMap.set(r.id, r));
 
+      // Fetch actual attendance records for regularization dates (processed)
+      const regEntries2 = regsResult.data || [];
+      const attendanceMap2 = new Map<string, any>();
+      if (regEntries2.length > 0) {
+        const userDatePairs2 = regEntries2.map((r: any) => ({ userId: r.user_id, date: r.attendance_date }));
+        const uniqueUserIds2 = [...new Set(userDatePairs2.map((p: any) => p.userId))];
+        const uniqueDates2 = [...new Set(userDatePairs2.map((p: any) => p.date))];
+        const { data: attRecords2 } = await supabase
+          .from('attendance')
+          .select('user_id, date, check_in_time, check_out_time')
+          .in('user_id', uniqueUserIds2 as string[])
+          .in('date', uniqueDates2 as string[]);
+        (attRecords2 || []).forEach((a: any) => attendanceMap2.set(`${a.user_id}_${a.date}`, a));
+      }
+
       return processedSteps.map((s: any) => {
         const requesterId = s.approval_requests.requester_id;
         const requesterProfile = profileMap.get(requesterId);
@@ -374,6 +413,12 @@ export const useTeamAttendance = (
           approvalStatus: s.status as 'approved' | 'rejected',
           approvedByName: approverProfile?.full_name || requesterProfile?.full_name || null,
           actionTakenAt: s.action_taken_at,
+          actualCheckIn: entityType === 'regularization' && entityData
+            ? attendanceMap2.get(`${entityData.user_id}_${entityData.attendance_date}`)?.check_in_time || null
+            : null,
+          actualCheckOut: entityType === 'regularization' && entityData
+            ? attendanceMap2.get(`${entityData.user_id}_${entityData.attendance_date}`)?.check_out_time || null
+            : null,
         };
       });
     },
@@ -509,6 +554,8 @@ export const useTeamAttendance = (
           reason: ed?.reason || null,
           requestedCheckIn: ed?.requested_check_in_time,
           requestedCheckOut: ed?.requested_check_out_time,
+          actualCheckIn: item.actualCheckIn || null,
+          actualCheckOut: item.actualCheckOut || null,
           attendanceDate: ed?.attendance_date,
           approvalRequestId: item.approvalRequestId,
           currentLevel: item.currentLevel,
@@ -574,6 +621,8 @@ export const useTeamAttendance = (
             reason: ed?.reason || null,
             requestedCheckIn: ed?.requested_check_in_time,
             requestedCheckOut: ed?.requested_check_out_time,
+            actualCheckIn: item.actualCheckIn || null,
+            actualCheckOut: item.actualCheckOut || null,
             attendanceDate: ed?.attendance_date,
             approvalRequestId: item.approvalRequestId,
             approvalStatus: item.approvalStatus,
