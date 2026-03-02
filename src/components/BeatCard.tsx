@@ -1,7 +1,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Calendar, Edit2, BarChart, Trash2, MapPin, Package, Sparkles, CalendarDays, UserPlus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Users, Calendar, MoreVertical, Edit2, BarChart, Trash2, MapPin, Package, Sparkles, CalendarDays, UserPlus, ArrowRightLeft, Power } from 'lucide-react';
 import { useBeatMetrics } from '@/hooks/useBeatMetrics';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,9 +28,11 @@ interface BeatCardProps {
   onDelete: () => void;
   onDetails: () => void;
   onAIInsights: () => void;
+  onTransfer?: () => void;
+  onDeactivate?: () => void;
 }
 
-export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsights }: BeatCardProps) {
+export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsights, onTransfer, onDeactivate }: BeatCardProps) {
   const { metrics, loading } = useBeatMetrics(beat.id, userId);
   const navigate = useNavigate();
 
@@ -57,6 +66,48 @@ export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsigh
                beat.retailer_count >= 20 ? 'Silver' : 
                beat.retailer_count >= 15 ? 'Gold' : 'Bronze'}
             </Badge>
+            {/* Three-dot menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <MoreVertical size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 size={14} className="mr-2" />
+                  Edit Beat
+                </DropdownMenuItem>
+                {onTransfer && (
+                  <DropdownMenuItem onClick={onTransfer}>
+                    <ArrowRightLeft size={14} className="mr-2" />
+                    Transfer Beat
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={onDetails}>
+                  <BarChart size={14} className="mr-2" />
+                  View Analytics
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onAIInsights}>
+                  <Sparkles size={14} className="mr-2" />
+                  AI Insights
+                </DropdownMenuItem>
+                {onDeactivate && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onDeactivate} className="text-orange-600">
+                      <Power size={14} className="mr-2" />
+                      Deactivate Beat
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                  <Trash2 size={14} className="mr-2" />
+                  Delete Beat
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </CardHeader>
@@ -122,47 +173,6 @@ export function BeatCard({ beat, userId, onEdit, onDelete, onDetails, onAIInsigh
             <span className="text-sm font-medium">{beat.territory_name}</span>
           </div>
         )}
-
-        {/* AI Insights Button */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 hover:from-primary/10 hover:to-primary/20"
-          onClick={onAIInsights}
-        >
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span>AI Insights</span>
-        </Button>
-
-        {/* Beat Actions */}
-        <div className="flex gap-2 pt-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex-1 flex items-center justify-center gap-2"
-            onClick={onEdit}
-          >
-            <Edit2 className="h-4 w-4" />
-            Edit
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex-1 flex items-center justify-center gap-2"
-            onClick={onDetails}
-          >
-            <BarChart className="h-4 w-4" />
-            Analytics
-          </Button>
-          <Button 
-            size="sm" 
-            variant="destructive" 
-            className="flex items-center justify-center gap-2"
-            onClick={onDelete}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
 
         {/* Creation Date & Owner */}
         <div className="text-xs text-muted-foreground pt-2 border-t space-y-1">

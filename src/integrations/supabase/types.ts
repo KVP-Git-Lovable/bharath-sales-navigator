@@ -941,6 +941,39 @@ export type Database = {
         }
         Relationships: []
       }
+      beat_audit_log: {
+        Row: {
+          action: string
+          beat_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          new_user_id: string | null
+          old_user_id: string | null
+          performed_by: string
+        }
+        Insert: {
+          action: string
+          beat_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_user_id?: string | null
+          old_user_id?: string | null
+          performed_by: string
+        }
+        Update: {
+          action?: string
+          beat_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_user_id?: string | null
+          old_user_id?: string | null
+          performed_by?: string
+        }
+        Relationships: []
+      }
       beat_plans: {
         Row: {
           beat_data: Json
