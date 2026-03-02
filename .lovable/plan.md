@@ -1,40 +1,18 @@
 
-## Show Regularization Time Details on Approvals Page
+## Remove Duplicate Week-Off Configuration from Attendance Policy
 
-### Current State
-- The hook already fetches `requested_check_in_time` and `requested_check_out_time` and maps them to `requestedCheckIn` / `requestedCheckOut` on the `PendingApproval` object.
-- The approval handler already updates the attendance record with the requested times (via explicit upsert + a database trigger `apply_regularization_to_attendance`). So the auto-update on approval is **already working correctly**.
-- **The only problem**: The `TeamApprovals.tsx` UI card for regularization requests does not display the requested check-in/check-out times. The manager sees only the date and reason, not the actual time change being requested.
+### Problem
+The Attendance Policy page has two sub-tabs: "Leave Entitlements" and "Week-Off Configuration". The Week-Off Configuration is redundant because it already exists under the **Working Days** configuration tab (which uses it for calculating working days). Having it in two places is confusing.
 
-### What Needs to Change
+### Changes
 
-#### 1. Fetch actual attendance times for comparison
-In `useTeamAttendance.ts`, for regularization requests, also fetch the current attendance record for that date so the manager can see the **actual** check-in/check-out vs. the **requested** times.
+**File: `src/components/attendance/AttendancePolicyConfig.tsx`**
 
-- Add `actualCheckIn` and `actualCheckOut` fields to the `PendingApproval` interface.
-- After fetching regularization entity data, batch-fetch attendance records for those user+date combinations and merge the actual times into each approval item.
+1. Remove the `WeekOffConfig` interface, `dayNames`, `alternatePatterns` constants, and `weekOffConfig` state.
+2. Remove the `week_off_config` fetch from `fetchData()` and related `setWeekOffConfig` calls.
+3. Remove the `handleWeekOffChange` function entirely.
+4. Remove the Tabs wrapper (since only "Leave Entitlements" remains, no need for tabs at all) -- render the Leave Entitlements card directly.
+5. Remove the "Week-Off Configuration" `TabsContent` block (lines 319-370).
+6. Clean up unused imports (`Calendar`, `Tabs`, `TabsContent`, `TabsList`, `TabsTrigger`, `Select`-related imports if only used by week-off, and `activeSubTab` state).
 
-#### 2. Display times in TeamApprovals.tsx
-In the regularization card's details section, add two lines showing:
-- **Actual Check-in**: The current recorded time (or "No record" if absent)
-- **Requested Check-in**: The time the employee wants it changed to
-- Same for check-out times
-
-This gives the manager clear visibility before approving.
-
-### Technical Details
-
-**File: `src/hooks/useTeamAttendance.ts`**
-- Add `actualCheckIn?: string | null` and `actualCheckOut?: string | null` to `PendingApproval` interface.
-- In both pending and processed queries, after building `regMap`, fetch attendance records for regularization dates and merge actual times.
-
-**File: `src/pages/TeamApprovals.tsx`**
-- In the details section, when `approval.type === 'regularization'`, render the actual vs. requested times in a compact format:
-```
-Actual:    09:45 AM - --:--
-Requested: 09:00 AM - 06:00 PM
-```
-
-### Summary
-- **Time visibility**: Fixed by displaying `requestedCheckIn`/`requestedCheckOut` (already in data) plus newly fetched actual times.
-- **Auto-update on approval**: Already implemented correctly -- no changes needed. The attendance record is updated via both an explicit upsert in the handler and a database trigger.
+The result: Attendance Policy page shows only the Leave Entitlements configuration, with no tabs needed. Week-off configuration remains accessible solely under the **Working Days** tab where it belongs.
