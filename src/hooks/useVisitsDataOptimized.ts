@@ -448,9 +448,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       // FIX #1: ALWAYS fetch ALL visits and orders for the date (no delta filter)
       // This ensures unproductive visits are never missed due to stale delta timestamps
       const [bpRes, vRes, oRes, pointsFetched] = await Promise.all([
-        supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date),
-        supabase.from('visits').select('*').eq('user_id', uid).eq('planned_date', date),
-        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).in('status', ['confirmed', 'delivered']),
+        supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date).abortSignal(controller.signal),
+        supabase.from('visits').select('*').eq('user_id', uid).eq('planned_date', date).abortSignal(controller.signal),
+        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).in('status', ['confirmed', 'delivered']).abortSignal(controller.signal),
         fetchPointsForDate(uid, date)
       ]);
       clearTimeout(timeoutId);
@@ -664,7 +664,11 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
 
   // INITIAL LOAD: Local-first, instant display
   const loadData = useCallback(async () => {
-    if (!effectiveUserId || !selectedDate) return;
+    if (!effectiveUserId || !selectedDate) {
+      // Don't leave isLoading stuck -- userId will arrive and re-trigger via loadData dependency
+      // Don't set isLoading=false here; the safety guard (which only starts when userId is present) handles it
+      return;
+    }
     if (isFetchingRef.current && lastDateRef.current === selectedDate) return;
     
     // CRITICAL FIX: If date changed, immediately clear visits/orders to prevent
@@ -946,9 +950,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
       const [bpRes, vRes, oRes, pointsFetched] = await Promise.all([
-        supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date),
-        supabase.from('visits').select('*').eq('user_id', uid).eq('planned_date', date),
-        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).in('status', ['confirmed', 'delivered']),
+        supabase.from('beat_plans').select('*').eq('user_id', uid).eq('plan_date', date).abortSignal(controller.signal),
+        supabase.from('visits').select('*').eq('user_id', uid).eq('planned_date', date).abortSignal(controller.signal),
+        supabase.from('orders').select('*').eq('user_id', uid).eq('order_date', date).in('status', ['confirmed', 'delivered']).abortSignal(controller.signal),
         fetchPointsForDate(uid, date)
       ]);
       clearTimeout(timeoutId);
@@ -1083,17 +1087,26 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   // Load on mount and date change
   useEffect(() => {
     mountedRef.current = true;
+    
+    // CHANGE 2: Reset loading state on every re-entry so stale SafetyGuard flags don't cause empty-state flash
+    setIsLoading(true);
+    setHasLoadedOnce(false);
+    
     loadData();
 
-    // SAFETY GUARD: Prevent loading state from staying stuck forever
-    // If loading hasn't resolved in 15 seconds, force it to complete
-    const safetyTimer = setTimeout(() => {
-      if (mountedRef.current && isLoading && !hasLoadedOnce) {
-        console.warn('[SafetyGuard] Loading stuck for 15s, forcing completion');
-        setIsLoading(false);
-        setHasLoadedOnce(true);
-      }
-    }, 15000);
+    // CHANGE 4: Smart safety guard - only start timer when userId is available
+    // Reduced to 10s since network timeouts are 8-10s and AbortSignals now actually cancel requests
+    let safetyTimer: ReturnType<typeof setTimeout> | undefined;
+    if (effectiveUserId) {
+      safetyTimer = setTimeout(() => {
+        if (mountedRef.current && isLoading && !hasLoadedOnce) {
+          console.warn('[SafetyGuard] Loading stuck for 10s (userId present), forcing completion');
+          setIsLoading(false);
+          setHasLoadedOnce(true);
+        }
+      }, 10000);
+    }
+    // If effectiveUserId is undefined, NO safety timer runs — loadData will re-trigger when userId resolves
 
     // IMPORTANT: In React 18 StrictMode (dev), effects mount/unmount twice.
     // Reset in-flight flags on cleanup so the second mount can fetch data.
@@ -1101,9 +1114,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       mountedRef.current = false;
       isFetchingRef.current = false;
       smartSyncLockRef.current = false;
-      clearTimeout(safetyTimer);
+      if (safetyTimer) clearTimeout(safetyTimer);
     };
-  }, [loadData]);
+  }, [loadData, effectiveUserId]);
 
   // LOCAL-FIRST EVENT HANDLING: Update state directly without network
   useEffect(() => {
