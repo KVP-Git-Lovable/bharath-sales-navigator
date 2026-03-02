@@ -1,147 +1,218 @@
 
 
-## Beat Module Enterprise Enhancement -- Implementation Plan
+## Beat AI Insight Engine -- Transparent, Rule-Based, Scalable
 
-### Summary
-Implement the full gap analysis across 4 phases: Enhanced Delete Dialog with impact warnings and new options, Beat Transfer system with three-dot menu, Audit Log with beat history tracking, and dashboard stats enhancements.
+### Problem
+The current "AI Insights" button dumps raw JSON from a generic `generate-recommendations` edge function. It sends minimal context to the AI and renders the response as-is with no structured display, no health score, no data transparency, and no actionable layout.
 
 ---
 
-### Phase 1: Enhanced Delete Dialog + Impact Warnings
+### Data Availability Audit
 
-**1a. Database Migration -- `beat_audit_log` table**
+Here is what each required data category maps to in your existing database:
 
-Create a new table to track all beat mutations:
+| Category | Data Point | Source Table / Column | Available? |
+|----------|-----------|----------------------|------------|
+| **A. Revenue** | MTD Revenue | `orders.total_amount` (WHERE order_date >= month start, status=confirmed) | YES |
+| | Last Month Revenue | `orders.total_amount` (prev month range) | YES |
+| | Last 3 Month Avg | `orders.total_amount` (3-month window) | YES |
+| | Growth % | Calculated from above | YES |
+| | Same Period Last Year | `orders.total_amount` (year-ago range) | YES |
+| **B. Retailer Activity** | Total retailers | `retailers` WHERE beat_id = X | YES |
+| | Active (ordered this month) | JOIN orders on retailer_id, this month | YES |
+| | Inactive (no order 30+ days) | `retailers.last_order_date` | YES |
+| | New this month | `retailers.created_at` | YES |
+| | Lost (no order 60+ days) | `retailers.last_order_date` | YES |
+| **C. Visit & Coverage** | Planned visits | `visits` WHERE status IN (planned, completed) | YES |
+| | Completed visits | `visits` WHERE status = completed | YES |
+| | Missed visits | `visits` WHERE status NOT completed, date < today | YES |
+| | Coverage % | Calculated | YES |
+| | Avg visits per retailer | Calculated | YES |
+| **D. Conversion** | Visits with orders | JOIN visits + orders on visit_id | YES |
+| | Conversion rate % | Calculated | YES |
+| | Avg billing per visit | Calculated | YES |
+| **E. Productivity** | Working days | `attendance` WHERE status = present | YES |
+| | Orders per day | orders count / working days | YES |
+| | Revenue per day | Calculated | YES |
+| | Avg order value | Calculated | YES |
+| | Comparison vs other beats | Query other beats for same user | YES |
+| **F. SKU Penetration** | Total SKUs in catalog | `products` WHERE is_active = true | YES |
+| | SKUs sold in beat | `order_items.product_id` DISTINCT | YES |
+| | Top 5 SKUs | `order_items` GROUP BY product_name, SUM | YES |
+| | Slow-moving SKUs | SKUs with < threshold quantity | YES |
+| | Concentration risk | Top 3 SKU revenue / total | YES |
+
+**Conclusion**: All data points are available. No new tables needed.
+
+---
+
+### Architecture
 
 ```text
-Table: beat_audit_log
-- id: uuid PK (gen_random_uuid)
-- beat_id: text (not null)
-- action: text (create / transfer / deactivate / delete / merge / reassign / unassign)
-- old_user_id: uuid (nullable)
-- new_user_id: uuid (nullable)
-- metadata: jsonb (default '{}')
-- performed_by: uuid (references auth.users, not null)
-- created_at: timestamptz (default now())
++------------------+     +---------------------------+     +------------------+
+| BeatCard button  | --> | Edge Function             | --> | Structured JSON  |
+| "AI Insights"    |     | beat-health-insights      |     | Response         |
++------------------+     +---------------------------+     +------------------+
+                          |                           |
+                          | 1. Fetch 90-day data      |
+                          | 2. Calculate all KPIs     |
+                          | 3. Run rule engine         |
+                          | 4. Score health 0-100     |
+                          | 5. Call AI for summary    |
+                          | 6. Return structured JSON |
+                          +---------------------------+
 ```
 
-RLS: Authenticated users can INSERT; admin can SELECT all; regular users can SELECT their own (performed_by = auth.uid()).
-
-**1b. Enhance `BeatDeleteDialog.tsx`**
-
-Add three new props: `upcomingVisitsCount`, `pendingOrdersCount`, and `availableUsers`.
-
-Expand the delete options from 2 to 4:
-1. **Delete all retailers** (existing) -- move to recycle bin
-2. **Transfer to another beat** (existing) -- select target beat
-3. **Reassign to another sales user** (NEW) -- user selector dropdown + optional "Create new beat" checkbox. If checkbox is on, auto-creates a beat named "[BeatName] - [UserName]" owned by the target user and transfers retailers there
-4. **Mark as Unassigned** (NEW) -- sets `beat_id = null` on all retailers, making them visible in the "Unmapped Retailers" pool
-
-Add an **impact warning summary** section above the options showing:
-- X Retailers assigned
-- Y Upcoming planned visits
-- Z Pending orders
-
-**1c. Update `handleDeleteBeatClick` in `MyBeats.tsx`**
-
-Before opening the dialog, fetch:
-- Retailer count (existing)
-- Upcoming visits: `SELECT count(*) FROM beat_plans WHERE beat_id = X AND plan_date >= today`
-- Pending orders: `SELECT count(*) FROM orders WHERE beat_id = X AND status = 'pending'`
-
-Pass these counts to the enhanced dialog.
-
-**1d. Update `handleConfirmDeleteBeat` in `MyBeats.tsx`**
-
-Add handling for the two new options:
-- **reassign**: Update `retailers` SET `user_id = targetUserId, beat_id = newBeatId` (if auto-create) or `beat_id = null` temporarily. If "Create new beat" is checked, insert a new beat owned by the target user first.
-- **unassign**: Update `retailers` SET `beat_id = null, beat_name = null` WHERE `beat_id = deletingBeatId`.
-
-After each action, insert a row into `beat_audit_log` with the action type and metadata.
-
-**1e. Mirror changes in `BeatDetail.tsx`**
-
-The BeatDetail page also has delete functionality. Update its delete handler to match the enhanced dialog and audit logging.
+The key difference from current approach: **KPIs are calculated server-side with real math, not guessed by AI.** The AI is only used to generate the human-readable summary and action items from the pre-computed data.
 
 ---
 
-### Phase 2: Beat Transfer + Three-Dot Menu
+### Phase 1: New Edge Function `beat-health-insights`
 
-**2a. Create `BeatTransferDialog.tsx`**
+Create `supabase/functions/beat-health-insights/index.ts`:
 
-A standalone dialog component for transferring beat ownership:
-- User selector dropdown (using existing `get_profiles_for_selector` RPC or subordinate list)
-- Confirmation summary: "Transfer beat '[name]' and all [N] retailers to [User]?"
-- On confirm:
-  - Update `beats` SET `created_by = newUserId`
-  - Update `retailers` SET `user_id = newUserId` WHERE `beat_id = X`
-  - Insert audit log entry (action: 'transfer', old_user_id, new_user_id)
-  - Preserve all visit/order/collection history (no changes needed -- they reference retailer_id/beat_id, not user_id)
+**Step 1 -- Data Fetching** (all queries scoped to beat's retailers):
+- Retailers: total, by category, created_at, last_order_date, last_visit_date, potential
+- Orders: last 90 days with order_items (product_id, product_name, quantity, total)
+- Visits: last 90 days (planned_date, status, visit_id)
+- Attendance: current month working days for the user
+- Products: all active products (for catalog count)
+- Beat plans: for coverage tracking
 
-**2b. Replace Beat Card Actions with Three-Dot Menu**
+**Step 2 -- KPI Computation** (pure math, no AI):
 
-Modify `BeatCard.tsx`:
-- Remove the inline Edit / Analytics / Delete buttons
-- Add a three-dot (`MoreVertical`) dropdown menu in the card header with:
-  1. Edit Beat
-  2. Transfer Beat (opens BeatTransferDialog)
-  3. View Analytics
-  4. AI Insights
-  5. Deactivate Beat (soft delete with `is_active = false`, no recycle bin)
-  6. Delete Beat (red, last item -- opens enhanced BeatDeleteDialog)
+```text
+Revenue:
+  mtd_revenue, last_month_revenue, three_month_avg, growth_pct, yoy_comparison
 
-**2c. Add "Deactivate" action**
+Retailer Activity:
+  total, active, inactive_30d, new_this_month, lost_60d
 
-Deactivate = set `is_active = false` without moving to recycle bin. The beat disappears from daily planning but remains in reports. This is separate from "Delete" which moves to recycle bin.
+Visit Coverage:
+  planned, completed, missed, coverage_pct, avg_visits_per_retailer
 
-Add a simple confirmation dialog: "Deactivate [beat name]? It will be hidden from daily planning but remain in reports."
+Conversion:
+  total_visits, orders_from_visits, conversion_pct, avg_billing_per_visit
+
+Productivity:
+  working_days, orders_per_day, revenue_per_day, avg_order_value
+
+SKU Penetration:
+  catalog_total, skus_sold, penetration_pct, top_5_skus, slow_moving, concentration_risk_pct
+```
+
+**Step 3 -- Rule Engine** (deterministic risk detection):
+
+```text
+Rules (each produces a risk signal if triggered):
+- revenue_drop > 15%
+- conversion_drop > 10%
+- high_value_inactive >= 2 (category A/B retailers with no order 30+ days)
+- coverage < 70%
+- concentration_risk > 40% (top 3 retailers = 40%+ revenue)
+- sku_penetration < 50%
+```
+
+**Step 4 -- Health Score** (weighted 0-100):
+
+| Parameter | Weight |
+|-----------|--------|
+| Revenue Trend | 25% |
+| Coverage | 20% |
+| Conversion | 20% |
+| Retailer Activity | 15% |
+| Productivity | 10% |
+| SKU Penetration | 10% |
+
+Each sub-score normalized to 0-100 based on thresholds:
+- Revenue: 100 if growth >= 10%, scales down, 0 if drop >= 30%
+- Coverage: direct percentage (capped at 100)
+- Conversion: 100 if >= 80%, scales linearly
+- Retailer Activity: 100 if all active, penalize per inactive
+- Productivity: relative to avg order value benchmarks
+- SKU: direct penetration percentage
+
+Status labels: 85-100 Excellent, 70-84 Stable, 50-69 Needs Attention, <50 Critical
+
+**Step 5 -- AI Summary** (Lovable AI call with pre-computed data):
+- Send all KPIs + triggered risks as structured context
+- Prompt AI to generate: 1-2 sentence summary + 3-5 action items
+- AI does NOT compute numbers -- it only interprets pre-computed facts
+
+**Step 6 -- Response Format**:
+```text
+{
+  health_score: 62,
+  status: "needs_attention",
+  summary: "Beat performance declining...",
+  recommended_actions: ["Visit 3 inactive A-category retailers", ...],
+  severity_level: "warning",
+  risk_signals: ["revenue_drop", "low_coverage"],
+  data_points: {
+    revenue: { mtd, last_month, three_month_avg, growth_pct, yoy_pct },
+    retailer_activity: { total, active, inactive_30d, new_this_month, lost_60d },
+    coverage: { planned, completed, missed, coverage_pct, avg_per_retailer },
+    conversion: { total_visits, orders, rate_pct, avg_billing },
+    productivity: { working_days, orders_per_day, revenue_per_day, avg_order_value },
+    sku_penetration: { catalog, sold, pct, top_5, slow_moving, concentration_risk }
+  },
+  timestamp: "2026-03-02T..."
+}
+```
 
 ---
 
-### Phase 3: Audit Log Display
+### Phase 2: New UI Component `BeatInsightModal.tsx`
 
-**3a. Create `BeatAuditTimeline.tsx`**
+Replace the current raw JSON modal with a structured display:
 
-A timeline component that queries `beat_audit_log` for a given beat_id and displays entries chronologically:
-- Icon per action type (create, transfer, delete, etc.)
-- "Transferred from [User A] to [User B]" format
-- Timestamp display
-- Performed by user name
+**Default View (visible on open)**:
+1. **Health Score Ring** -- circular progress showing score/100 with color-coded status badge
+2. **Summary Card** -- warning/success icon + 1-2 sentence AI-generated summary
+3. **Risk Signals** -- red/orange badges for each triggered risk
+4. **Recommended Actions** -- numbered list of 3-5 actions with priority indicators
 
-**3b. Add Audit Timeline to `BeatDetail.tsx`**
+**Expandable Section** (collapsed by default, "View Data Points Considered" button):
+- 6 collapsible accordion sections (Revenue, Retailer Activity, Coverage, Conversion, Productivity, SKU)
+- Each section shows a clean table of the KPI name + value
+- Uses existing Accordion component from Radix UI
 
-Add a new collapsible section "Activity History" on the BeatDetail page that renders the `BeatAuditTimeline` component.
-
-**3c. Log existing actions**
-
-Update the beat creation flow in `MyBeats.tsx` to also insert an audit log entry (action: 'create') when a new beat is created.
+**Footer**: Like/Dislike feedback buttons (reuse existing pattern) + timestamp
 
 ---
 
-### Phase 4: Future (Not Implemented Now)
+### Phase 3: Integration
 
-These are documented for future sprints:
-- Beat Merge (select 2 beats, combine retailers, deactivate old)
-- Beat Locking (is_locked column, admin-only unlock)
-- Permission gating per role (Admin/Manager/Sales User access levels)
+**3a. Update `MyBeats.tsx`**:
+- Replace the current AI Insights Dialog (lines 2178-2210) with the new `BeatInsightModal`
+- The modal calls the new `beat-health-insights` edge function instead of `generate-recommendations`
+- Pass beatId and userId
+
+**3b. Update `BeatDetail.tsx`**:
+- Add an "AI Health Score" section or button that opens the same `BeatInsightModal`
+
+**3c. Update `BeatCard.tsx`**:
+- Optionally show a small health score badge on the card if cached insight exists (future enhancement)
+
+**3d. Config**:
+- Add `[functions.beat-health-insights]` with `verify_jwt = false` to `config.toml`
 
 ---
 
 ### Files Summary
 
-| Action | File | Changes |
-|--------|------|---------|
-| Database | Migration | Create `beat_audit_log` table with RLS |
-| Modify | `src/components/BeatDeleteDialog.tsx` | Add 2 new options, impact summary, user selector |
-| Modify | `src/pages/MyBeats.tsx` | Fetch impact counts, handle new delete options, audit logging |
-| Modify | `src/pages/BeatDetail.tsx` | Mirror delete enhancements, add audit timeline section |
-| Modify | `src/components/BeatCard.tsx` | Replace buttons with three-dot dropdown menu |
-| Create | `src/components/BeatTransferDialog.tsx` | Standalone transfer ownership dialog |
-| Create | `src/components/BeatAuditTimeline.tsx` | Timeline display for beat history |
+| Action | File | Description |
+|--------|------|-------------|
+| Create | `supabase/functions/beat-health-insights/index.ts` | Edge function: data fetch, KPI calc, rule engine, health score, AI summary |
+| Create | `src/components/BeatInsightModal.tsx` | New structured insight display with health score, summary, expandable data |
+| Create | `src/hooks/useBeatHealthInsight.ts` | Hook to call edge function and manage loading/error state |
+| Modify | `src/pages/MyBeats.tsx` | Replace AI Insights dialog with BeatInsightModal |
+| Modify | `src/pages/BeatDetail.tsx` | Add health insight trigger |
+| Modify | `supabase/config.toml` | Register new edge function |
 
-### Estimated Scope
-- Phase 1 (Delete enhancements + audit table): Primary deliverable
-- Phase 2 (Transfer + three-dot menu): Secondary deliverable
-- Phase 3 (Audit display): Tertiary deliverable
-- All three phases implemented in this iteration
+### Scalability
+- All heavy computation happens server-side in the edge function
+- Rule engine is config-driven (thresholds as constants), not hardcoded logic
+- Works identically for 20 or 10,000 retailers (queries use indexed beat_id/retailer_id)
+- AI call is minimal (only summary generation from pre-computed data, not raw data analysis)
 
