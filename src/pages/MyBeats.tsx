@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle } from "lucide-react";
+import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power } from "lucide-react";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { Button } from "@/components/ui/button";
@@ -35,9 +35,20 @@ import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { clearMyVisitsSnapshot } from "@/lib/myVisitsSnapshot";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
+import { BeatTransferDialog } from "@/components/BeatTransferDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 interface Beat {
@@ -153,6 +164,16 @@ export const MyBeats = () => {
   // Delete state
   const [isDeleting, setIsDeleting] = useState(false);
   const [affectedRetailerCount, setAffectedRetailerCount] = useState(0);
+  const [upcomingVisitsCount, setUpcomingVisitsCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [availableUsersForDialog, setAvailableUsersForDialog] = useState<{id: string; full_name: string}[]>([]);
+  
+  // Transfer state
+  const [transferBeat, setTransferBeat] = useState<{id: string; name: string; retailerCount: number} | null>(null);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  
+  // Deactivate state
+  const [deactivateBeat, setDeactivateBeat] = useState<{id: string; name: string} | null>(null);
   
   // Stats detail dialog state
   const [statsDetailDialog, setStatsDetailDialog] = useState<'beats' | 'retailers' | 'unassigned' | 'average' | null>(null);
@@ -620,6 +641,20 @@ export const MyBeats = () => {
         await generateBeatPlans(beatId, endDate, beatName.trim());
       }
 
+      // Log beat creation in audit log
+      try {
+        await supabase.from('beat_audit_log' as any).insert({
+          beat_id: beatId,
+          action: 'create',
+          old_user_id: null,
+          new_user_id: user.id,
+          metadata: { beat_name: beatName.trim(), retailer_count: selectedRetailers.size },
+          performed_by: user.id,
+        });
+      } catch (e) {
+        console.error('Error inserting audit log:', e);
+      }
+
       // Show options dialog for beat placement
       setCreatedBeatData({ beatId, beatName: beatName.trim() });
       setShowOptionsDialog(true);
@@ -813,23 +848,47 @@ export const MyBeats = () => {
   };
 
   const handleDeleteBeatClick = async (beatId: string, beatName: string) => {
-    // Count retailers that will be unassigned
     try {
-      const { count } = await supabase
+      // Fetch retailer count
+      const { count: retailerCount } = await supabase
         .from('retailers')
         .select('id', { count: 'exact', head: true })
         .eq('beat_id', beatId)
         .eq('user_id', user?.id);
-      
-      setAffectedRetailerCount(count || 0);
+      setAffectedRetailerCount(retailerCount || 0);
+
+      // Fetch upcoming visits count
+      const today = new Date().toISOString().split('T')[0];
+      const { count: visitsCount } = await supabase
+        .from('beat_plans')
+        .select('id', { count: 'exact', head: true })
+        .eq('beat_id', beatId)
+        .gte('plan_date', today);
+      setUpcomingVisitsCount(visitsCount || 0);
+
+      // Fetch pending orders count
+      const { count: ordersCount } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('beat_id', beatId)
+        .eq('status', 'pending');
+      setPendingOrdersCount(ordersCount || 0);
+
+      // Fetch available users
+      const { data: users } = await supabase.rpc('get_profiles_for_selector');
+      setAvailableUsersForDialog(
+        (users || []).filter((u: any) => u.id !== user?.id).map((u: any) => ({ id: u.id, full_name: u.full_name }))
+      );
     } catch (error) {
-      console.error('Error counting affected retailers:', error);
+      console.error('Error fetching impact data:', error);
       setAffectedRetailerCount(0);
+      setUpcomingVisitsCount(0);
+      setPendingOrdersCount(0);
     }
     openDeleteDialog(beatId, beatName);
   };
 
-  const handleConfirmDeleteBeat = async (deleteOption: 'delete' | 'transfer', targetBeatId?: string) => {
+  const handleConfirmDeleteBeat = async (deleteOption: 'delete' | 'transfer' | 'reassign' | 'unassign', targetBeatId?: string, targetUserId?: string, createNewBeat?: boolean) => {
     if (!deleteItemId || !deleteItemName || !user) {
       closeDeleteDialog();
       return;
@@ -852,7 +911,6 @@ export const MyBeats = () => {
 
       // Handle retailers based on selected option
       if (deleteOption === 'delete') {
-        // Option 1: Delete all retailers (move each to recycle bin first)
         const { data: retailersToDelete } = await supabase
           .from('retailers')
           .select('*')
@@ -870,7 +928,6 @@ export const MyBeats = () => {
             });
           }
 
-          // Hard delete from retailers table
           const { error: deleteRetailersError } = await supabase
             .from('retailers')
             .delete()
@@ -879,7 +936,6 @@ export const MyBeats = () => {
 
           if (deleteRetailersError) throw deleteRetailersError;
 
-          // Remove from offline cache
           const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
           const retailerIdsToDelete = new Set(retailersToDelete.map(r => r.id));
           for (const r of cachedRetailers as any[]) {
@@ -889,7 +945,6 @@ export const MyBeats = () => {
           }
         }
       } else if (deleteOption === 'transfer' && targetBeatId) {
-        // Option 2: Transfer retailers to another beat
         const targetBeat = beats.find(b => b.id === targetBeatId);
         const { error: transferError } = await supabase
           .from('retailers')
@@ -902,7 +957,6 @@ export const MyBeats = () => {
 
         if (transferError) throw transferError;
 
-        // Update offline cache
         const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
         const retailersToUpdate = (cachedRetailers as any[]).filter(
           (r: any) => r.beat_id === deleteItemId && r.user_id === user.id
@@ -914,6 +968,40 @@ export const MyBeats = () => {
             beat_name: targetBeat?.name || null
           });
         }
+      } else if (deleteOption === 'reassign' && targetUserId) {
+        let newBeatId: string | null = null;
+        if (createNewBeat) {
+          const targetUser = availableUsersForDialog.find(u => u.id === targetUserId);
+          const newBeatName = `${deleteItemName} - ${targetUser?.full_name || 'User'}`;
+          newBeatId = `beat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          await supabase.from('beats').insert({
+            beat_id: newBeatId,
+            beat_name: newBeatName,
+            created_by: targetUserId,
+            is_active: true,
+            category: 'General',
+            owner_name: targetUser?.full_name || null,
+          });
+        }
+
+        const updateData: any = { user_id: targetUserId };
+        if (newBeatId) {
+          updateData.beat_id = newBeatId;
+          updateData.beat_name = `${deleteItemName} - ${availableUsersForDialog.find(u => u.id === targetUserId)?.full_name || 'User'}`;
+        }
+
+        await supabase
+          .from('retailers')
+          .update(updateData)
+          .eq('beat_id', deleteItemId)
+          .eq('user_id', user.id);
+      } else if (deleteOption === 'unassign') {
+        await supabase
+          .from('retailers')
+          .update({ beat_id: null, beat_name: null })
+          .eq('beat_id', deleteItemId)
+          .eq('user_id', user.id);
       }
 
       // Delete ALL beat plans for this beat
@@ -942,6 +1030,24 @@ export const MyBeats = () => {
 
       if (beatError) throw beatError;
 
+      // Insert audit log
+      try {
+        await supabase.from('beat_audit_log' as any).insert({
+          beat_id: deleteItemId,
+          action: 'delete',
+          old_user_id: user.id,
+          new_user_id: deleteOption === 'reassign' ? targetUserId : null,
+          metadata: { 
+            beat_name: deleteItemName, 
+            delete_option: deleteOption, 
+            retailer_count: affectedRetailerCount 
+          },
+          performed_by: user.id,
+        });
+      } catch (e) {
+        console.error('Error inserting audit log:', e);
+      }
+
       // IMMEDIATE UI UPDATE
       setBeats(prev => prev.filter(b => b.id !== deleteItemId));
 
@@ -952,10 +1058,8 @@ export const MyBeats = () => {
         await offlineStorage.delete(STORES.BEAT_PLANS, (plan as any).id);
       }
 
-      // Clear the deleted beat from cache
       await offlineStorage.delete(STORES.BEATS, deleteItemId);
 
-      // Clear My Visits snapshots
       const today = new Date();
       for (let i = 0; i < 7; i++) {
         const date = new Date(today);
@@ -968,15 +1072,17 @@ export const MyBeats = () => {
         ? `and ${affectedRetailerCount} retailer(s) deleted`
         : deleteOption === 'transfer'
           ? `and retailers transferred`
-          : '';
+          : deleteOption === 'reassign'
+            ? `and retailers reassigned`
+            : deleteOption === 'unassign'
+              ? `and retailers marked as unassigned`
+              : '';
       toast.success(`Beat "${deleteItemName}" deleted ${actionText}`.trim());
       
-      // Dispatch events to refresh other components
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       window.dispatchEvent(new CustomEvent('beatDeleted', { detail: { beatId: deleteItemId } }));
       window.dispatchEvent(new CustomEvent('forceVisitsRefresh'));
       
-      // Reload data
       loadAllRetailers();
       loadBeats();
     } catch (error) {
@@ -987,6 +1093,51 @@ export const MyBeats = () => {
       setIsDeleting(false);
       closeDeleteDialog();
       setAffectedRetailerCount(0);
+      setUpcomingVisitsCount(0);
+      setPendingOrdersCount(0);
+    }
+  };
+
+  const handleTransferBeat = async (beatId: string, beatName: string) => {
+    const beat = beats.find(b => b.id === beatId);
+    // Fetch users
+    const { data: users } = await supabase.rpc('get_profiles_for_selector');
+    setAvailableUsersForDialog(
+      (users || []).filter((u: any) => u.id !== user?.id).map((u: any) => ({ id: u.id, full_name: u.full_name }))
+    );
+    setTransferBeat({ id: beatId, name: beatName, retailerCount: beat?.retailer_count || 0 });
+    setIsTransferOpen(true);
+  };
+
+  const handleDeactivateBeat = (beatId: string, beatName: string) => {
+    setDeactivateBeat({ id: beatId, name: beatName });
+  };
+
+  const confirmDeactivateBeat = async () => {
+    if (!deactivateBeat || !user) return;
+    try {
+      await supabase
+        .from('beats')
+        .update({ is_active: false })
+        .eq('beat_id', deactivateBeat.id)
+        .eq('created_by', user.id);
+
+      await supabase.from('beat_audit_log' as any).insert({
+        beat_id: deactivateBeat.id,
+        action: 'deactivate',
+        old_user_id: user.id,
+        metadata: { beat_name: deactivateBeat.name },
+        performed_by: user.id,
+      });
+
+      setBeats(prev => prev.filter(b => b.id !== deactivateBeat.id));
+      toast.success(`Beat "${deactivateBeat.name}" deactivated`);
+      window.dispatchEvent(new CustomEvent('visitDataChanged'));
+    } catch (error) {
+      console.error('Error deactivating beat:', error);
+      toast.error('Failed to deactivate beat');
+    } finally {
+      setDeactivateBeat(null);
     }
   };
 
@@ -1462,6 +1613,8 @@ export const MyBeats = () => {
                     setSelectedBeatForAI(beat.id);
                     generateRecommendation('beat_visit', beat.id);
                   }}
+                  onTransfer={() => handleTransferBeat(beat.id, beat.name)}
+                  onDeactivate={() => handleDeactivateBeat(beat.id, beat.name)}
                 />
               ))}
             </div>
@@ -2062,12 +2215,57 @@ export const MyBeats = () => {
           onOpenChange={setDeleteOpen}
           beatName={deleteItemName}
           affectedRetailerCount={affectedRetailerCount}
+          upcomingVisitsCount={upcomingVisitsCount}
+          pendingOrdersCount={pendingOrdersCount}
           availableBeats={beats
             .filter(b => b.id !== deleteItemId)
             .map(b => ({ id: b.id, name: b.name, retailer_count: b.retailer_count }))}
+          availableUsers={availableUsersForDialog}
           onConfirm={handleConfirmDeleteBeat}
           isLoading={isDeleting}
         />
+
+        {/* Transfer Dialog */}
+        {transferBeat && (
+          <BeatTransferDialog
+            open={isTransferOpen}
+            onOpenChange={(v) => {
+              setIsTransferOpen(v);
+              if (!v) setTransferBeat(null);
+            }}
+            beatId={transferBeat.id}
+            beatName={transferBeat.name}
+            retailerCount={transferBeat.retailerCount}
+            availableUsers={availableUsersForDialog}
+            onTransferred={() => {
+              setIsTransferOpen(false);
+              setTransferBeat(null);
+              loadBeats();
+              loadAllRetailers();
+            }}
+          />
+        )}
+
+        {/* Deactivate Confirmation */}
+        <AlertDialog open={!!deactivateBeat} onOpenChange={(v) => { if (!v) setDeactivateBeat(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <Power size={18} className="text-orange-500" />
+                Deactivate Beat
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Deactivate "{deactivateBeat?.name}"? It will be hidden from daily planning but remain in reports.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeactivateBeat} className="bg-orange-500 hover:bg-orange-600">
+                Deactivate
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

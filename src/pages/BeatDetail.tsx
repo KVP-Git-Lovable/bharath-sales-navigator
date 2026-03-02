@@ -13,6 +13,7 @@ import { BeatVisitCalendar } from "@/components/BeatVisitCalendar";
 import { useBeatMetrics } from "@/hooks/useBeatMetrics";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
+import { BeatAuditTimeline } from "@/components/BeatAuditTimeline";
 import { EditBeatModal } from "@/components/EditBeatModal";
 import { BeatAnalyticsModal } from "@/components/BeatAnalyticsModal";
 import { useRecommendations, Recommendation } from "@/hooks/useRecommendations";
@@ -69,6 +70,9 @@ export const BeatDetail = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [availableBeats, setAvailableBeats] = useState<{ id: string; name: string; retailer_count?: number }[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<{ id: string; full_name: string }[]>([]);
+  const [upcomingVisitsCount, setUpcomingVisitsCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
 
   const filteredRetailers = useMemo(() => {
     if (!beatData?.retailers) return [];
@@ -502,8 +506,8 @@ export const BeatDetail = () => {
   const handleDeleteClick = async () => {
     if (!beatData || !user) return;
     
-    // Fetch available beats for transfer option
     try {
+      // Fetch available beats
       const { data: allBeats } = await supabase
         .from('beats')
         .select('beat_id, beat_name')
@@ -512,7 +516,6 @@ export const BeatDetail = () => {
         .neq('beat_id', beatData.beat_id);
 
       if (allBeats) {
-        // Get retailer counts for each beat
         const { data: retailerCounts } = await supabase
           .from('retailers')
           .select('beat_id')
@@ -530,14 +533,36 @@ export const BeatDetail = () => {
           retailer_count: countMap.get(b.beat_id) || 0
         })));
       }
+
+      // Fetch impact counts
+      const today = new Date().toISOString().split('T')[0];
+      const { count: visitsCount } = await supabase
+        .from('beat_plans')
+        .select('id', { count: 'exact', head: true })
+        .eq('beat_id', beatData.beat_id)
+        .gte('plan_date', today);
+      setUpcomingVisitsCount(visitsCount || 0);
+
+      const { count: ordersCount } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('beat_id', beatData.beat_id)
+        .eq('status', 'pending');
+      setPendingOrdersCount(ordersCount || 0);
+
+      // Fetch available users
+      const { data: users } = await supabase.rpc('get_profiles_for_selector');
+      setAvailableUsers(
+        (users || []).filter((u: any) => u.id !== user.id).map((u: any) => ({ id: u.id, full_name: u.full_name }))
+      );
     } catch (error) {
-      console.error('Error fetching available beats:', error);
+      console.error('Error fetching delete data:', error);
     }
     
     setIsDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async (deleteOption: 'delete' | 'transfer', targetBeatId?: string) => {
+  const handleConfirmDelete = async (deleteOption: 'delete' | 'transfer' | 'reassign' | 'unassign', targetBeatId?: string, targetUserId?: string, createNewBeat?: boolean) => {
     if (!beatData || !user) return;
 
     setIsDeleting(true);
@@ -556,7 +581,6 @@ export const BeatDetail = () => {
 
       // Handle retailers
       if (deleteOption === 'delete') {
-        // Delete all retailers (move to recycle bin first)
         const { data: retailersToDelete } = await supabase
           .from('retailers')
           .select('*')
@@ -581,7 +605,6 @@ export const BeatDetail = () => {
             .eq('user_id', user.id);
         }
       } else if (deleteOption === 'transfer' && targetBeatId) {
-        // Transfer retailers to target beat
         const targetBeat = availableBeats.find(b => b.id === targetBeatId);
         await supabase
           .from('retailers')
@@ -589,6 +612,39 @@ export const BeatDetail = () => {
             beat_id: targetBeatId,
             beat_name: targetBeat?.name || null
           })
+          .eq('beat_id', beatData.beat_id)
+          .eq('user_id', user.id);
+      } else if (deleteOption === 'reassign' && targetUserId) {
+        let newBeatId: string | null = null;
+        if (createNewBeat) {
+          const targetUser = availableUsers.find(u => u.id === targetUserId);
+          const newBeatName = `${beatData.beat_name} - ${targetUser?.full_name || 'User'}`;
+          newBeatId = `beat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          await supabase.from('beats').insert({
+            beat_id: newBeatId,
+            beat_name: newBeatName,
+            created_by: targetUserId,
+            is_active: true,
+            category: 'General',
+            owner_name: targetUser?.full_name || null,
+          });
+        }
+
+        const updateData: any = { user_id: targetUserId };
+        if (newBeatId) {
+          updateData.beat_id = newBeatId;
+        }
+
+        await supabase
+          .from('retailers')
+          .update(updateData)
+          .eq('beat_id', beatData.beat_id)
+          .eq('user_id', user.id);
+      } else if (deleteOption === 'unassign') {
+        await supabase
+          .from('retailers')
+          .update({ beat_id: null, beat_name: null })
           .eq('beat_id', beatData.beat_id)
           .eq('user_id', user.id);
       }
@@ -599,9 +655,22 @@ export const BeatDetail = () => {
         .update({ is_active: false })
         .eq('beat_id', beatData.beat_id);
 
+      // Insert audit log
+      try {
+        await supabase.from('beat_audit_log' as any).insert({
+          beat_id: beatData.beat_id,
+          action: 'delete',
+          old_user_id: user.id,
+          new_user_id: deleteOption === 'reassign' ? targetUserId : null,
+          metadata: { beat_name: beatData.beat_name, delete_option: deleteOption, retailer_count: beatData.retailers.length },
+          performed_by: user.id,
+        });
+      } catch (e) {
+        console.error('Error inserting audit log:', e);
+      }
+
       toast.success('Beat deleted successfully');
       
-      // Dispatch events
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       window.dispatchEvent(new CustomEvent('beatDeleted', { detail: { beatId: beatData.beat_id } }));
       
@@ -1256,6 +1325,13 @@ export const BeatDetail = () => {
           </CardContent>
         </Card>
 
+        {/* Activity History (Audit Timeline) */}
+        <Card>
+          <CardContent className="p-0">
+            <BeatAuditTimeline beatId={beatData.beat_id} />
+          </CardContent>
+        </Card>
+
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" onClick={() => navigate('/add-retailer')}>
@@ -1281,7 +1357,6 @@ export const BeatDetail = () => {
           }}
           onBeatUpdated={() => {
             setIsEditOpen(false);
-            // Refetch beat data without full page reload
             setRefreshKey(k => k + 1);
           }}
         />
@@ -1309,7 +1384,6 @@ export const BeatDetail = () => {
         onSuccess={() => {
           setShowRetailerModal(false);
           setSelectedRetailer(null);
-          // Refetch beat data without full page reload
           setRefreshKey(k => k + 1);
         }}
       />
@@ -1320,7 +1394,10 @@ export const BeatDetail = () => {
         onOpenChange={setIsDeleteDialogOpen}
         beatName={beatData?.beat_name || null}
         affectedRetailerCount={beatData?.retailers?.length || 0}
+        upcomingVisitsCount={upcomingVisitsCount}
+        pendingOrdersCount={pendingOrdersCount}
         availableBeats={availableBeats}
+        availableUsers={availableUsers}
         onConfirm={handleConfirmDelete}
         isLoading={isDeleting}
       />
