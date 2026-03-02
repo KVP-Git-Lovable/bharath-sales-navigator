@@ -1,136 +1,147 @@
 
 
-## Attendance Regularization Policy -- Implementation Plan
+## Beat Module Enterprise Enhancement -- Implementation Plan
 
-### Overview
-Add a configurable "Regularization Policy" section under Admin Panel > Attendance > Configuration > Attendance Policy. This policy will dynamically control how the regularization feature behaves for employees -- no code-level customization needed per client.
-
-### Current State
-- `AttendancePolicyConfig.tsx` currently only manages **Leave Entitlements** (leave policy table)
-- `RegularizationRequestModal.tsx` has hardcoded behavior: always enabled, no limits, reason always required (min 10 chars), no backdate restriction, always manager approval
-- No `regularization_policy` table exists in the database
+### Summary
+Implement the full gap analysis across 4 phases: Enhanced Delete Dialog with impact warnings and new options, Beat Transfer system with three-dot menu, Audit Log with beat history tracking, and dashboard stats enhancements.
 
 ---
 
-### Phase 1: Database -- Create `regularization_policy` Table
+### Phase 1: Enhanced Delete Dialog + Impact Warnings
 
-Create a single-row configuration table storing all policy settings.
+**1a. Database Migration -- `beat_audit_log` table**
+
+Create a new table to track all beat mutations:
 
 ```text
-Table: regularization_policy
-+-------------------------------+-----------+---------------------------+
-| Column                        | Type      | Default                   |
-+-------------------------------+-----------+---------------------------+
-| id                            | uuid PK   | gen_random_uuid()         |
-| is_enabled                    | boolean   | true                      |
-| monthly_limit                 | integer   | null (null = unlimited)   |
-| daily_limit                   | integer   | 1                         |
-| allow_checkin_edit             | boolean   | true                      |
-| allow_checkout_edit            | boolean   | true                      |
-| allow_status_edit              | boolean   | false                     |
-| reason_mandatory               | boolean   | true                      |
-| max_backdate_days              | integer   | 7                         |
-| allow_previous_month           | boolean   | false                     |
-| restrict_after_payroll_lock    | boolean   | false                     |
-| approval_mode                  | text      | 'manager' (auto/manager/multi_level) |
-| update_attendance_on_approval  | boolean   | true                      |
-| recalculate_hours              | boolean   | true                      |
-| adjust_leave_balance           | boolean   | false                     |
-| created_at                     | timestamptz | now()                   |
-| updated_at                     | timestamptz | now()                   |
-+-------------------------------+-----------+---------------------------+
+Table: beat_audit_log
+- id: uuid PK (gen_random_uuid)
+- beat_id: text (not null)
+- action: text (create / transfer / deactivate / delete / merge / reassign / unassign)
+- old_user_id: uuid (nullable)
+- new_user_id: uuid (nullable)
+- metadata: jsonb (default '{}')
+- performed_by: uuid (references auth.users, not null)
+- created_at: timestamptz (default now())
 ```
 
-Insert a default row so the system works out of the box. Add RLS policies allowing authenticated read and admin-only write.
+RLS: Authenticated users can INSERT; admin can SELECT all; regular users can SELECT their own (performed_by = auth.uid()).
 
-### Phase 2: Admin UI -- Regularization Policy Config Component
+**1b. Enhance `BeatDeleteDialog.tsx`**
 
-**New file:** `src/components/attendance/RegularizationPolicyConfig.tsx`
+Add three new props: `upcomingVisitsCount`, `pendingOrdersCount`, and `availableUsers`.
 
-A card-based settings form with sections matching the policy structure:
+Expand the delete options from 2 to 4:
+1. **Delete all retailers** (existing) -- move to recycle bin
+2. **Transfer to another beat** (existing) -- select target beat
+3. **Reassign to another sales user** (NEW) -- user selector dropdown + optional "Create new beat" checkbox. If checkbox is on, auto-creates a beat named "[BeatName] - [UserName]" owned by the target user and transfers retailers there
+4. **Mark as Unassigned** (NEW) -- sets `beat_id = null` on all retailers, making them visible in the "Unmapped Retailers" pool
 
-1. **Enable/Disable** -- Master toggle switch at the top
-2. **Usage Limits** -- Monthly limit (number input or "Unlimited" toggle), Daily limit per date
-3. **Editable Fields** -- Toggle switches for Check-in, Check-out, Status editing; Reason mandatory toggle
-4. **Time Restrictions** -- Max backdate days (number), Allow previous month (toggle), Restrict after payroll lock (toggle)
-5. **Approval Workflow** -- Select dropdown: Auto Approval / Manager Approval / Multi-Level
-6. **Post-Approval Impact** -- Toggles for: Update attendance record, Recalculate working hours, Adjust leave balance
+Add an **impact warning summary** section above the options showing:
+- X Retailers assigned
+- Y Upcoming planned visits
+- Z Pending orders
 
-Save button upserts the single policy row. Load on mount with `supabase.from('regularization_policy').select('*').single()`.
+**1c. Update `handleDeleteBeatClick` in `MyBeats.tsx`**
 
-### Phase 3: Integrate Config into Attendance Policy Page
+Before opening the dialog, fetch:
+- Retailer count (existing)
+- Upcoming visits: `SELECT count(*) FROM beat_plans WHERE beat_id = X AND plan_date >= today`
+- Pending orders: `SELECT count(*) FROM orders WHERE beat_id = X AND status = 'pending'`
 
-**Modify:** `src/components/attendance/AttendancePolicyConfig.tsx`
+Pass these counts to the enhanced dialog.
 
-Add a second card below "Leave Entitlements" that renders the new `RegularizationPolicyConfig` component. Or render it as a sibling in the same parent. The "Attendance Policy" sub-tab will now show both Leave Entitlements and Regularization Policy.
+**1d. Update `handleConfirmDeleteBeat` in `MyBeats.tsx`**
 
-### Phase 4: Enforce Policy in Regularization Request Modal
+Add handling for the two new options:
+- **reassign**: Update `retailers` SET `user_id = targetUserId, beat_id = newBeatId` (if auto-create) or `beat_id = null` temporarily. If "Create new beat" is checked, insert a new beat owned by the target user first.
+- **unassign**: Update `retailers` SET `beat_id = null, beat_name = null` WHERE `beat_id = deletingBeatId`.
 
-**Modify:** `src/components/RegularizationRequestModal.tsx`
+After each action, insert a row into `beat_audit_log` with the action type and metadata.
 
-On mount, fetch the regularization policy. Then enforce:
+**1e. Mirror changes in `BeatDetail.tsx`**
 
-- **is_enabled = false**: Show "Regularization is not enabled for your organization." message and hide form
-- **monthly_limit**: Count pending+approved requests for current month; if >= limit, block with message
-- **daily_limit**: Count requests for the selected attendance_date; if >= limit, block
-- **allow_checkin_edit / allow_checkout_edit**: Conditionally show/hide the time input fields
-- **allow_status_edit**: Show/hide a status dropdown (Present/Half Day/Leave) -- new UI element
-- **reason_mandatory**: If false, remove the required validation on reason field
-- **max_backdate_days**: Calculate date difference; if attendance_date is older than allowed, block with message
-- **allow_previous_month**: If false and attendance_date is in previous month, block
-- **approval_mode = 'auto'**: Show info text "This request will be auto-approved" instead of "sent to manager"
+The BeatDetail page also has delete functionality. Update its delete handler to match the enhanced dialog and audit logging.
 
-### Phase 5: Enforce Policy on Backend (Approval Trigger)
+---
 
-**Modify existing trigger:** `apply_regularization_to_attendance`
+### Phase 2: Beat Transfer + Three-Dot Menu
 
-Add conditional checks based on policy settings:
-- If `update_attendance_on_approval = false`, skip the attendance upsert
-- If `recalculate_hours = false`, skip hours recalculation
-- If `adjust_leave_balance = true` and status changed, deduct/restore leave balance
+**2a. Create `BeatTransferDialog.tsx`**
 
-For **auto-approval mode**: Create a new trigger `auto_approve_regularization` on `regularization_requests` INSERT that checks if `approval_mode = 'auto'` in the policy table, and if so, immediately sets `status = 'approved'`.
+A standalone dialog component for transferring beat ownership:
+- User selector dropdown (using existing `get_profiles_for_selector` RPC or subordinate list)
+- Confirmation summary: "Transfer beat '[name]' and all [N] retailers to [User]?"
+- On confirm:
+  - Update `beats` SET `created_by = newUserId`
+  - Update `retailers` SET `user_id = newUserId` WHERE `beat_id = X`
+  - Insert audit log entry (action: 'transfer', old_user_id, new_user_id)
+  - Preserve all visit/order/collection history (no changes needed -- they reference retailer_id/beat_id, not user_id)
 
-### Phase 6: Hook for Reusable Policy Access
+**2b. Replace Beat Card Actions with Three-Dot Menu**
 
-**New file:** `src/hooks/useRegularizationPolicy.ts`
+Modify `BeatCard.tsx`:
+- Remove the inline Edit / Analytics / Delete buttons
+- Add a three-dot (`MoreVertical`) dropdown menu in the card header with:
+  1. Edit Beat
+  2. Transfer Beat (opens BeatTransferDialog)
+  3. View Analytics
+  4. AI Insights
+  5. Deactivate Beat (soft delete with `is_active = false`, no recycle bin)
+  6. Delete Beat (red, last item -- opens enhanced BeatDeleteDialog)
 
-A React Query hook to fetch and cache the policy:
-```typescript
-export const useRegularizationPolicy = () => {
-  return useQuery({
-    queryKey: ['regularization-policy'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('regularization_policy')
-        .select('*')
-        .single();
-      return data;
-    },
-    staleTime: 5 * 60 * 1000, // 5 min cache
-  });
-};
-```
+**2c. Add "Deactivate" action**
 
-This hook will be used by both the admin config page and the employee modal.
+Deactivate = set `is_active = false` without moving to recycle bin. The beat disappears from daily planning but remains in reports. This is separate from "Delete" which moves to recycle bin.
+
+Add a simple confirmation dialog: "Deactivate [beat name]? It will be hidden from daily planning but remain in reports."
+
+---
+
+### Phase 3: Audit Log Display
+
+**3a. Create `BeatAuditTimeline.tsx`**
+
+A timeline component that queries `beat_audit_log` for a given beat_id and displays entries chronologically:
+- Icon per action type (create, transfer, delete, etc.)
+- "Transferred from [User A] to [User B]" format
+- Timestamp display
+- Performed by user name
+
+**3b. Add Audit Timeline to `BeatDetail.tsx`**
+
+Add a new collapsible section "Activity History" on the BeatDetail page that renders the `BeatAuditTimeline` component.
+
+**3c. Log existing actions**
+
+Update the beat creation flow in `MyBeats.tsx` to also insert an audit log entry (action: 'create') when a new beat is created.
+
+---
+
+### Phase 4: Future (Not Implemented Now)
+
+These are documented for future sprints:
+- Beat Merge (select 2 beats, combine retailers, deactivate old)
+- Beat Locking (is_locked column, admin-only unlock)
+- Permission gating per role (Admin/Manager/Sales User access levels)
 
 ---
 
 ### Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `src/components/attendance/RegularizationPolicyConfig.tsx` |
-| Create | `src/hooks/useRegularizationPolicy.ts` |
-| Modify | `src/components/attendance/AttendancePolicyConfig.tsx` (add regularization section) |
-| Modify | `src/components/RegularizationRequestModal.tsx` (enforce all policy rules) |
-| Database | Migration: create `regularization_policy` table + default row + RLS |
-| Database | Migration: auto-approve trigger + conditional post-approval logic |
+| Action | File | Changes |
+|--------|------|---------|
+| Database | Migration | Create `beat_audit_log` table with RLS |
+| Modify | `src/components/BeatDeleteDialog.tsx` | Add 2 new options, impact summary, user selector |
+| Modify | `src/pages/MyBeats.tsx` | Fetch impact counts, handle new delete options, audit logging |
+| Modify | `src/pages/BeatDetail.tsx` | Mirror delete enhancements, add audit timeline section |
+| Modify | `src/components/BeatCard.tsx` | Replace buttons with three-dot dropdown menu |
+| Create | `src/components/BeatTransferDialog.tsx` | Standalone transfer ownership dialog |
+| Create | `src/components/BeatAuditTimeline.tsx` | Timeline display for beat history |
 
-### Key Design Decisions
-- Single-row config table (not per-user/per-department) -- matches the "organization-wide policy" requirement
-- Policy fetched via React Query with 5-min cache to avoid redundant calls
-- All validation happens both client-side (UX) and server-side (trigger/insert guards)
-- Existing approval workflow (`create_approval_request`) is preserved for manager/multi-level modes
-- Auto-approval mode bypasses the approval engine entirely via a direct status update trigger
+### Estimated Scope
+- Phase 1 (Delete enhancements + audit table): Primary deliverable
+- Phase 2 (Transfer + three-dot menu): Secondary deliverable
+- Phase 3 (Audit display): Tertiary deliverable
+- All three phases implemented in this iteration
 
