@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { LucideIcon } from 'lucide-react';
 
@@ -31,6 +31,11 @@ export const useNavCustomization = (defaultItems: NavItem[]) => {
   const { user } = useAuth();
   const [customization, setCustomization] = useState<NavCustomization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const defaultItemsRef = useRef(defaultItems);
+  defaultItemsRef.current = defaultItems;
+
+  // Stable string of IDs to avoid re-render loops from array reference changes
+  const defaultItemIds = defaultItems.map(item => item.id).join(',');
 
   // Load user's customization from localStorage
   useEffect(() => {
@@ -48,7 +53,7 @@ export const useNavCustomization = (defaultItems: NavItem[]) => {
         // Default: no customization, all items ungrouped in original order
         setCustomization({
           groups: [],
-          ungroupedItemIds: defaultItems.map(item => item.id),
+          ungroupedItemIds: defaultItemsRef.current.map(item => item.id),
           isCustomized: false,
         });
       }
@@ -56,12 +61,12 @@ export const useNavCustomization = (defaultItems: NavItem[]) => {
       console.error('[useNavCustomization] Error loading customization:', e);
       setCustomization({
         groups: [],
-        ungroupedItemIds: defaultItems.map(item => item.id),
+        ungroupedItemIds: defaultItemsRef.current.map(item => item.id),
         isCustomized: false,
       });
     }
     setIsLoading(false);
-  }, [user?.id, defaultItems]);
+  }, [user?.id, defaultItemIds]);
 
   // Save customization to localStorage
   const saveCustomization = useCallback((newCustomization: NavCustomization) => {
@@ -217,10 +222,10 @@ export const useNavCustomization = (defaultItems: NavItem[]) => {
     localStorage.removeItem(getStorageKey(user.id));
     setCustomization({
       groups: [],
-      ungroupedItemIds: defaultItems.map(item => item.id),
+      ungroupedItemIds: defaultItemsRef.current.map(item => item.id),
       isCustomized: false,
     });
-  }, [user?.id, defaultItems]);
+  }, [user?.id]);
 
   // Get organized items for display
   const getOrganizedItems = useCallback(() => {
