@@ -63,10 +63,10 @@ export async function submitNoOrderLocalFirst(params: {
       noOrderReason: reason
     }
   }));
-  window.dispatchEvent(new Event('visitDataChanged'));
+  window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: today } }));
   
   // STEP 2.5: Mark data changed for cross-page state sync
-  markVisitDataChanged();
+  markVisitDataChanged(today);
 
   // STEP 3: Background sync with 5-second timeout - ALWAYS non-blocking
   setTimeout(async () => {

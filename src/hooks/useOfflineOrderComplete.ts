@@ -248,10 +248,10 @@ export function useOfflineOrderComplete() {
             orderValue: orderData.total_amount  // Include order value for immediate UI update
           }
         }));
-        window.dispatchEvent(new Event('visitDataChanged'));
+        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
         
         // Mark data changed for cross-page state sync
-        markVisitDataChanged();
+        markVisitDataChanged(orderDate);
 
         // Add delay before returning to allow events to be processed
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -323,10 +323,10 @@ export function useOfflineOrderComplete() {
             orderValue: orderData.total_amount  // Include order value for immediate UI update
           }
         }));
-        window.dispatchEvent(new Event('visitDataChanged'));
+        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
         
         // Mark data changed for cross-page state sync
-        markVisitDataChanged();
+        markVisitDataChanged(orderDate);
 
         // Add delay before returning to allow events to be processed
         await new Promise(resolve => setTimeout(resolve, 300));

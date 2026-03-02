@@ -13,11 +13,12 @@ interface ChangeMarker {
  * Called after order submissions or no-order submissions.
  * This allows useVisitsDataOptimized to detect changes made on other pages.
  */
-export const markVisitDataChanged = async (): Promise<void> => {
+export const markVisitDataChanged = async (date?: string): Promise<void> => {
   try {
+    const effectiveDate = date || getLocalTodayDate();
     const marker: ChangeMarker = {
       timestamp: Date.now(),
-      date: getLocalTodayDate()
+      date: effectiveDate
     };
     await Preferences.set({
       key: CHANGE_KEY,

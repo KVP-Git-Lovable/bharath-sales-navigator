@@ -273,7 +273,7 @@ export function useOfflineOrderEntry() {
       });
 
       // Trigger data refresh for Today's Progress
-      window.dispatchEvent(new Event('visitDataChanged'));
+      window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: localOrderDate } }));
 
       return { success: true, offline: true, order: offlineOrder };
     } else {
@@ -320,7 +320,7 @@ export function useOfflineOrderEntry() {
       }
 
       // Trigger data refresh for Today's Progress
-      window.dispatchEvent(new Event('visitDataChanged'));
+      window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: localOrderDate } }));
 
       return { success: true, offline: false, order };
     }

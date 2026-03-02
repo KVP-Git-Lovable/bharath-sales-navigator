@@ -103,7 +103,7 @@ export async function submitOrderWithOfflineSupport(
     // visitDataChanged was causing redundant snapshot loads and potential delays
     
     // STEP 3.5: Mark data changed for cross-page state sync
-    markVisitDataChanged();
+    markVisitDataChanged(orderDate);
   }
 
   // STEP 4: Immediate sync when online, queue only when truly offline
