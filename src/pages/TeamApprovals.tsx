@@ -25,6 +25,7 @@ export const TeamApprovals = () => {
   } = useTeamAttendance(subordinateIds, directReportIds);
 
   const [activeTab, setActiveTab] = useState<ApprovalTab>('leave');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'processed'>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectionTarget, setRejectionTarget] = useState<{ id: string; type: ApprovalTab; approvalRequestId?: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,7 +36,12 @@ export const TeamApprovals = () => {
   const pendingLeaveCount = useMemo(() => leaveApprovals.filter(a => a.approvalStatus === 'pending').length, [leaveApprovals]);
   const pendingRegCount = useMemo(() => regApprovals.filter(a => a.approvalStatus === 'pending').length, [regApprovals]);
 
-  const currentList = activeTab === 'leave' ? leaveApprovals : regApprovals;
+  const filteredByTab = activeTab === 'leave' ? leaveApprovals : regApprovals;
+  const currentList = useMemo(() => {
+    if (statusFilter === 'pending') return filteredByTab.filter(a => !a.approvalStatus || a.approvalStatus === 'pending');
+    if (statusFilter === 'processed') return filteredByTab.filter(a => a.approvalStatus === 'approved' || a.approvalStatus === 'rejected');
+    return filteredByTab;
+  }, [filteredByTab, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(currentList.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedList = currentList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -85,6 +91,11 @@ export const TeamApprovals = () => {
 
   const switchTab = (tab: ApprovalTab) => {
     setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  const switchStatusFilter = (filter: 'all' | 'pending' | 'processed') => {
+    setStatusFilter(filter);
     setCurrentPage(1);
   };
 
@@ -141,10 +152,28 @@ export const TeamApprovals = () => {
           </button>
         </div>
 
+        {/* Status Filter */}
+        <div className="flex gap-1">
+          {(['all', 'pending', 'processed'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => switchStatusFilter(filter)}
+              className={cn(
+                'px-3 py-1 rounded-full text-xs font-medium transition-all border',
+                statusFilter === filter
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted text-muted-foreground border-transparent hover:text-foreground'
+              )}
+            >
+              {filter === 'all' ? 'All' : filter === 'pending' ? 'Pending' : 'Processed'}
+            </button>
+          ))}
+        </div>
+
         {/* List */}
         {currentList.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No pending {activeTab === 'leave' ? 'leave requests' : 'regularizations'}
+            No {statusFilter === 'pending' ? 'pending' : statusFilter === 'processed' ? 'processed' : ''} {activeTab === 'leave' ? 'leave requests' : 'regularizations'}{statusFilter === 'all' ? '' : ' found'}
           </p>
         ) : (
           <div className="space-y-3">
