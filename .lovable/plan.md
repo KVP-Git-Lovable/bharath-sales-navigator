@@ -1,18 +1,46 @@
 
-## Remove Duplicate Week-Off Configuration from Attendance Policy
+## Fix Monthly Leave Accrual: Auto-Scheduling + March Credit
 
 ### Problem
-The Attendance Policy page has two sub-tabs: "Leave Entitlements" and "Week-Off Configuration". The Week-Off Configuration is redundant because it already exists under the **Working Days** configuration tab (which uses it for calculating working days). Having it in two places is confusing.
+The `process_monthly_leave_accrual()` database function exists but is **never called automatically**. There is no cron job. As a result:
+- Opening balance is stuck at 2 (manually set for Jan + Feb)
+- March credit has not been applied
+- The accrual log table is empty
+
+By March, with a 12-leave/year monthly policy, employees should have **3 leaves accrued** (1 per month x 3 months).
+
+### Root Cause
+No `pg_cron` schedule was ever created to invoke `process_monthly_leave_accrual()` on the 1st of each month.
 
 ### Changes
 
-**File: `src/components/attendance/AttendancePolicyConfig.tsx`**
+**New migration file** to:
 
-1. Remove the `WeekOffConfig` interface, `dayNames`, `alternatePatterns` constants, and `weekOffConfig` state.
-2. Remove the `week_off_config` fetch from `fetchData()` and related `setWeekOffConfig` calls.
-3. Remove the `handleWeekOffChange` function entirely.
-4. Remove the Tabs wrapper (since only "Leave Entitlements" remains, no need for tabs at all) -- render the Leave Entitlements card directly.
-5. Remove the "Week-Off Configuration" `TabsContent` block (lines 319-370).
-6. Clean up unused imports (`Calendar`, `Tabs`, `TabsContent`, `TabsList`, `TabsTrigger`, `Select`-related imports if only used by week-off, and `activeSubTab` state).
+1. **Add duplicate-prevention** to `process_monthly_leave_accrual()` -- check if the current month's accrual has already been logged in `leave_accrual_log` for each user+leave_type before crediting. This prevents double-credits if the function is called more than once in a month.
 
-The result: Attendance Policy page shows only the Leave Entitlements configuration, with no tabs needed. Week-off configuration remains accessible solely under the **Working Days** tab where it belongs.
+2. **Schedule pg_cron job** -- run `process_monthly_leave_accrual()` on the 1st of every month at midnight UTC:
+   ```sql
+   SELECT cron.schedule('monthly-leave-accrual', '0 0 1 * *', 'SELECT process_monthly_leave_accrual()');
+   ```
+
+3. **Run it immediately for March** -- execute `SELECT process_monthly_leave_accrual()` so that all employees get their March credit right away (opening_balance goes from 2 to 3).
+
+### Technical Detail: Updated Function Logic
+
+```text
+FOR each active monthly policy:
+  FOR each active user:
+    IF no accrual_log entry exists for this user+leave_type+year+month:
+      - Ensure balance record exists
+      - Increment opening_balance by monthly credit
+      - Insert accrual_log entry
+    END IF
+  END FOR
+END FOR
+```
+
+### Expected Result
+- All employees' Sick Leave opening_balance updates from 2.00 to 3.00
+- "Available" displays correctly (3 - used)
+- Future months auto-credit on the 1st
+- No risk of double-crediting
