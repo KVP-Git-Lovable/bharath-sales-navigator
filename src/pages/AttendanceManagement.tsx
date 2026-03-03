@@ -82,7 +82,7 @@ const AttendanceManagement = () => {
     { id: 'leave-types', label: 'Leave Types', icon: FileText },
     { id: 'holidays', label: 'Holidays', icon: CalendarDays },
     { id: 'working-days', label: 'Working Days', icon: Calendar },
-    { id: 'policy', label: 'Attendance Policy', icon: Settings },
+    { id: 'policy', label: 'Policy', icon: Settings },
   ];
 
   const currentSubTabs = topTab === 'overview' ? overviewSubTabs : configSubTabs;
