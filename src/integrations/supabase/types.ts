@@ -5152,6 +5152,66 @@ export type Database = {
         }
         Relationships: []
       }
+      global_leave_policy: {
+        Row: {
+          allow_backdated_leave: boolean
+          allow_negative_balance: boolean
+          carry_forward_expiry_months: number | null
+          created_at: string
+          custom_reset_date: string | null
+          enable_carry_forward: boolean
+          enable_half_day: boolean
+          enable_sandwich_rule: boolean
+          id: string
+          is_enabled: boolean
+          max_backdate_days: number
+          max_carry_forward_limit: number
+          max_continuous_leave_days: number | null
+          max_negative_limit: number
+          min_notice_period_days: number
+          reset_cycle: string
+          updated_at: string
+        }
+        Insert: {
+          allow_backdated_leave?: boolean
+          allow_negative_balance?: boolean
+          carry_forward_expiry_months?: number | null
+          created_at?: string
+          custom_reset_date?: string | null
+          enable_carry_forward?: boolean
+          enable_half_day?: boolean
+          enable_sandwich_rule?: boolean
+          id?: string
+          is_enabled?: boolean
+          max_backdate_days?: number
+          max_carry_forward_limit?: number
+          max_continuous_leave_days?: number | null
+          max_negative_limit?: number
+          min_notice_period_days?: number
+          reset_cycle?: string
+          updated_at?: string
+        }
+        Update: {
+          allow_backdated_leave?: boolean
+          allow_negative_balance?: boolean
+          carry_forward_expiry_months?: number | null
+          created_at?: string
+          custom_reset_date?: string | null
+          enable_carry_forward?: boolean
+          enable_half_day?: boolean
+          enable_sandwich_rule?: boolean
+          id?: string
+          is_enabled?: boolean
+          max_backdate_days?: number
+          max_carry_forward_limit?: number
+          max_continuous_leave_days?: number | null
+          max_negative_limit?: number
+          min_notice_period_days?: number
+          reset_cycle?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gps_tracking: {
         Row: {
           accuracy: number | null
@@ -7148,6 +7208,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "leave_policy_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: true
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_type_policy_override: {
+        Row: {
+          allow_negative_balance: boolean | null
+          carry_forward_expiry_months: number | null
+          created_at: string
+          custom_reset_cycle: string | null
+          enable_carry_forward: boolean | null
+          id: string
+          leave_type_id: string
+          max_carry_forward_limit: number | null
+          max_negative_limit: number | null
+          override_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          allow_negative_balance?: boolean | null
+          carry_forward_expiry_months?: number | null
+          created_at?: string
+          custom_reset_cycle?: string | null
+          enable_carry_forward?: boolean | null
+          id?: string
+          leave_type_id: string
+          max_carry_forward_limit?: number | null
+          max_negative_limit?: number | null
+          override_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          allow_negative_balance?: boolean | null
+          carry_forward_expiry_months?: number | null
+          created_at?: string
+          custom_reset_cycle?: string | null
+          enable_carry_forward?: boolean | null
+          id?: string
+          leave_type_id?: string
+          max_carry_forward_limit?: number | null
+          max_negative_limit?: number | null
+          override_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_type_policy_override_leave_type_id_fkey"
             columns: ["leave_type_id"]
             isOneToOne: true
             referencedRelation: "leave_types"
