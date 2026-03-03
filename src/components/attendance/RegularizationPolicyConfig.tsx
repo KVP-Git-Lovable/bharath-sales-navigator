@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Save, Shield, Clock, FileEdit, CheckCircle, Loader2 } from 'lucide-react';
+import { Save, Shield, Clock, CheckCircle, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRegularizationPolicy } from '@/hooks/useRegularizationPolicy';
 
@@ -22,10 +22,6 @@ const RegularizationPolicyConfig = () => {
     is_enabled: true,
     monthly_limit: null as number | null,
     daily_limit: 1,
-    allow_checkin_edit: true,
-    allow_checkout_edit: true,
-    allow_status_edit: false,
-    reason_mandatory: true,
     max_backdate_days: 7,
     allow_previous_month: false,
     restrict_after_payroll_lock: false,
@@ -41,10 +37,6 @@ const RegularizationPolicyConfig = () => {
         is_enabled: policy.is_enabled,
         monthly_limit: policy.monthly_limit,
         daily_limit: policy.daily_limit,
-        allow_checkin_edit: policy.allow_checkin_edit,
-        allow_checkout_edit: policy.allow_checkout_edit,
-        allow_status_edit: policy.allow_status_edit,
-        reason_mandatory: policy.reason_mandatory,
         max_backdate_days: policy.max_backdate_days,
         allow_previous_month: policy.allow_previous_month,
         restrict_after_payroll_lock: policy.restrict_after_payroll_lock,
@@ -180,59 +172,6 @@ const RegularizationPolicyConfig = () => {
               </div>
             </div>
 
-            <Separator />
-
-            {/* Section 3: Editable Fields */}
-            <div>
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <FileEdit className="h-4 w-4" />
-                Editable Fields
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Check-in Time</Label>
-                    <p className="text-xs text-muted-foreground">Allow employees to edit check-in time</p>
-                  </div>
-                  <Switch
-                    checked={form.allow_checkin_edit}
-                    onCheckedChange={(checked) => setForm({ ...form, allow_checkin_edit: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Check-out Time</Label>
-                    <p className="text-xs text-muted-foreground">Allow employees to edit check-out time</p>
-                  </div>
-                  <Switch
-                    checked={form.allow_checkout_edit}
-                    onCheckedChange={(checked) => setForm({ ...form, allow_checkout_edit: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Attendance Status</Label>
-                    <p className="text-xs text-muted-foreground">Allow status change (Present → Half Day / Leave)</p>
-                  </div>
-                  <Switch
-                    checked={form.allow_status_edit}
-                    onCheckedChange={(checked) => setForm({ ...form, allow_status_edit: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Reason Mandatory</Label>
-                    <p className="text-xs text-muted-foreground">Require reason for regularization request</p>
-                  </div>
-                  <Switch
-                    checked={form.reason_mandatory}
-                    onCheckedChange={(checked) => setForm({ ...form, reason_mandatory: checked })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
 
             {/* Section 4: Time Restrictions */}
             <div>
