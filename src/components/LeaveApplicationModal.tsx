@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus } from 'lucide-react';
+import { CalendarIcon, Plus, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useEffectiveLeavePolicy } from '@/hooks/useGlobalLeavePolicy';
 
 interface LeaveType {
   id: string;
@@ -43,6 +43,17 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [reason, setReason] = useState('');
   const [leaveDay, setLeaveDay] = useState<'full' | 'half'>('full');
   const [halfDayPeriod, setHalfDayPeriod] = useState<'first_half' | 'second_half'>('first_half');
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Policy hook
+  const { policy, isLoading: policyLoading } = useEffectiveLeavePolicy(leaveTypeId);
+
+  // Force full day when half-day is disabled by policy
+  useEffect(() => {
+    if (policy && !policy.enable_half_day && leaveDay === 'half') {
+      setLeaveDay('full');
+    }
+  }, [policy, leaveDay]);
 
   // Update leaveTypeId when defaultLeaveTypeId changes
   useEffect(() => {
@@ -52,27 +63,74 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   }, [defaultLeaveTypeId]);
 
   useEffect(() => {
-    console.log('LeaveApplicationModal opened:', isOpen);
     if (isOpen) {
       fetchLeaveTypes();
+      setValidationError(null);
     }
   }, [isOpen]);
 
+  // Clear validation error when dates change
+  useEffect(() => {
+    setValidationError(null);
+  }, [startDate, endDate, leaveTypeId]);
+
   const fetchLeaveTypes = async () => {
     try {
-      console.log('Fetching leave types...');
       const { data, error } = await supabase
         .from('leave_types')
         .select('*')
         .order('name');
 
-      console.log('Leave types data:', data, 'error:', error);
       if (error) throw error;
       setLeaveTypes(data || []);
     } catch (error) {
       console.error('Error fetching leave types:', error);
       toast.error('Failed to fetch leave types');
     }
+  };
+
+  const calculateLeaveDays = () => {
+    if (startDate && endDate) {
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+      return leaveDay === 'half' ? daysDiff * 0.5 : daysDiff;
+    }
+    return 0;
+  };
+
+  const getStartDateDisabled = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!policy) {
+      // Default: no past dates
+      return date < today;
+    }
+
+    // Backdated leave check
+    if (!policy.allow_backdated_leave) {
+      if (date < today) return true;
+    } else {
+      const minBackDate = new Date(today);
+      minBackDate.setDate(minBackDate.getDate() - policy.max_backdate_days);
+      if (date < minBackDate) return true;
+    }
+
+    // Notice period check (only for future dates)
+    if (policy.min_notice_period_days > 0 && date >= today) {
+      const minNoticeDate = new Date(today);
+      minNoticeDate.setDate(minNoticeDate.getDate() + policy.min_notice_period_days);
+      if (date > today && date < minNoticeDate) return true;
+    }
+
+    return false;
+  };
+
+  const getEndDateDisabled = (date: Date): boolean => {
+    const minDate = startDate || new Date();
+    const compare = new Date(minDate);
+    compare.setHours(0, 0, 0, 0);
+    return date < compare;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,9 +146,57 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       return;
     }
 
+    // Policy: master toggle
+    if (policy && !policy.is_enabled) {
+      toast.error('Leave applications are currently disabled');
+      return;
+    }
+
+    const daysRequested = calculateLeaveDays();
+
+    // Policy: max continuous leave days
+    if (policy?.max_continuous_leave_days && daysRequested > policy.max_continuous_leave_days) {
+      setValidationError(
+        `Maximum continuous leave allowed is ${policy.max_continuous_leave_days} day(s). You requested ${daysRequested} day(s).`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
+    setValidationError(null);
 
     try {
+      // Balance check
+      if (policy) {
+        const currentYear = new Date().getFullYear();
+        const { data: balanceData } = await supabase
+          .from('leave_balance')
+          .select('remaining_balance')
+          .eq('user_id', user.id)
+          .eq('leave_type_id', leaveTypeId)
+          .eq('year', currentYear)
+          .maybeSingle();
+
+        const remainingBalance = balanceData?.remaining_balance ?? 0;
+        const balanceAfter = remainingBalance - daysRequested;
+
+        if (!policy.allow_negative_balance && balanceAfter < 0) {
+          setValidationError(
+            `Insufficient leave balance. Available: ${remainingBalance} day(s), Requested: ${daysRequested} day(s).`
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (policy.allow_negative_balance && policy.max_negative_limit > 0 && balanceAfter < -policy.max_negative_limit) {
+          setValidationError(
+            `Request exceeds maximum negative balance limit of ${policy.max_negative_limit} day(s). Available: ${remainingBalance} day(s), Requested: ${daysRequested} day(s).`
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('leave_applications')
         .insert({
@@ -102,7 +208,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           status: 'pending',
           is_half_day: leaveDay === 'half',
           half_day_period: leaveDay === 'half' ? halfDayPeriod : null,
-          days_requested: calculateLeaveDays(),
+          days_requested: daysRequested,
         });
 
       if (error) throw error;
@@ -116,6 +222,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       setReason('');
       setLeaveDay('full');
       setHalfDayPeriod('first_half');
+      setValidationError(null);
       setIsOpen(false);
       
       onApplicationSubmitted?.();
@@ -127,14 +234,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     }
   };
 
-  const calculateLeaveDays = () => {
-    if (startDate && endDate) {
-      const timeDiff = endDate.getTime() - startDate.getTime();
-      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-      return leaveDay === 'half' ? daysDiff * 0.5 : daysDiff;
-    }
-    return 0;
-  };
+  const isDisabledByPolicy = policy ? !policy.is_enabled : false;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -153,6 +253,22 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             Submit a new leave application for approval
           </DialogDescription>
         </DialogHeader>
+
+        {isDisabledByPolicy && (
+          <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-md flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <p className="text-sm text-destructive font-medium">
+              Leave applications are currently disabled by your organization's policy.
+            </p>
+          </div>
+        )}
+
+        {validationError && (
+          <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-md flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">{validationError}</p>
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
@@ -171,31 +287,34 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Leave Duration *</Label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  value="full"
-                  checked={leaveDay === 'full'}
-                  onChange={(e) => setLeaveDay(e.target.value as 'full' | 'half')}
-                  className="w-4 h-4 text-primary"
-                />
-                <span>Full Day</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  value="half"
-                  checked={leaveDay === 'half'}
-                  onChange={(e) => setLeaveDay(e.target.value as 'full' | 'half')}
-                  className="w-4 h-4 text-primary"
-                />
-                <span>Half Day</span>
-              </label>
+          {/* Only show half-day option when policy allows it */}
+          {(!policy || policy.enable_half_day) && (
+            <div className="space-y-2">
+              <Label>Leave Duration *</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="full"
+                    checked={leaveDay === 'full'}
+                    onChange={(e) => setLeaveDay(e.target.value as 'full' | 'half')}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <span>Full Day</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="half"
+                    checked={leaveDay === 'half'}
+                    onChange={(e) => setLeaveDay(e.target.value as 'full' | 'half')}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <span>Half Day</span>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           {leaveDay === 'half' && (
             <div className="space-y-2">
@@ -246,11 +365,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
                     mode="single"
                     selected={startDate}
                     onSelect={setStartDate}
-                    disabled={(date) => {
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return date < today;
-                    }}
+                    disabled={getStartDateDisabled}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
@@ -278,12 +393,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
                     mode="single"
                     selected={endDate}
                     onSelect={setEndDate}
-                    disabled={(date) => {
-                      const minDate = startDate || new Date();
-                      const compare = new Date(minDate);
-                      compare.setHours(0, 0, 0, 0);
-                      return date < compare;
-                    }}
+                    disabled={getEndDateDisabled}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
@@ -296,6 +406,11 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-md">
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 Total Leave Days: <span className="font-semibold">{calculateLeaveDays()}</span>
+                {policy?.max_continuous_leave_days && (
+                  <span className="ml-2 text-muted-foreground">
+                    (Max: {policy.max_continuous_leave_days})
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -321,7 +436,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || isDisabledByPolicy || policyLoading}>
               {isSubmitting ? 'Submitting...' : 'Submit Application'}
             </Button>
           </div>
