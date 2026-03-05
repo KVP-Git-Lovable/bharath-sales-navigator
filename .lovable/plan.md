@@ -1,46 +1,26 @@
 
 
-## Fix My Visits Page Flicker
+## Offline Multi-Order Verification
 
-### Root Cause
+### Current Status: Already Working
 
-The flicker occurs at lines 1146-1147 of `useVisitsDataOptimized.ts`:
+After thorough code analysis, the offline order flow **already supports** displaying multiple orders per retailer per day:
 
-```typescript
-setIsLoading(true);
-setHasLoadedOnce(false);
-```
+1. **Order Creation** (`offlineOrderUtils.ts`): Each order is saved to IndexedDB (`STORES.ORDERS`) with a unique UUID and embedded items array — line 66.
 
-This runs on **every mount and date change** via the `useEffect` at line 1142. It resets the UI to a loading/empty state for one render frame, then `loadData()` immediately finds cached data and sets `isLoading(false)`. The user sees a brief flash of empty content.
+2. **Order Loading on Mount** (`VisitCard.tsx` lines 486-530): On component mount, it queries ALL orders from IndexedDB matching `user_id + retailer_id + date`. Multiple matching orders are set into `ordersTodayList`, which drives the "2 orders" badge and individual order cards.
 
-A secondary flicker source is `smartDeltaSync` (line 539) doing `setVisits(newVisits)` which replaces the entire visits array even when data is identical, triggering unnecessary re-renders of all visit cards.
+3. **DB-Empty Fallback** (`VisitCard.tsx` lines 1060-1082): When the network DB returns no orders (offline scenario), it falls back to IndexedDB and loads all matching orders — preserving multi-order display.
 
-### Changes
+4. **Items Tagged with order_id** (line 526): Each item extracted from offline orders is tagged with `order_id: order.id`, ensuring items are correctly grouped per order in the expandable UI.
 
-#### 1. `src/hooks/useVisitsDataOptimized.ts` — Skip loading reset when cache exists
+5. **OrderItemsExpanded Component**: When an order is expanded and its items list is empty, it fetches from the DB. In offline mode, the items are already embedded in the cached order object, so they display immediately.
 
-**Lines 1142-1149**: Instead of always resetting `isLoading=true` and `hasLoadedOnce=false`, check if in-memory cache already has valid data for the selected date. If so, skip the reset entirely — `loadData` will use the cache path and never show loading state.
+### Conclusion
 
-```typescript
-// Before calling loadData, check if we have instant cache
-const hasCachedData = cacheRef.current.has(selectedDate);
-if (!hasCachedData) {
-  setIsLoading(true);
-  setHasLoadedOnce(false);
-}
-```
+No code changes are needed. The system already correctly stores and displays multiple independent orders per retailer in offline mode. When you place 2 orders offline for the same retailer, both will appear with the "2 orders" badge, expandable individually with their own items and invoice options.
 
-#### 2. `src/hooks/useVisitsDataOptimized.ts` — Prevent no-op visit replacements in smartDeltaSync
+### One Minor Risk
 
-**Around line 537-543**: Before doing `setVisits(newVisits)`, also compare the actual content (not just count). If visits are identical, skip the state update. The `visitsChanged` flag from `getChangedItems` should handle this, but the `visitCountDifferent` fallback at line 535 triggers unnecessary replacements. Only use the count-based fallback when counts actually differ.
-
-#### 3. `src/hooks/useVisitsDataOptimized.ts` — Batch state updates
-
-Wrap the multiple `setState` calls in the cache-hit path (lines 762-773) with `React.startTransition` or `ReactDOM.flushSync` to ensure they render as a single frame, preventing intermediate empty states.
-
-### Files to Edit
-
-| File | Change |
-|------|--------|
-| `src/hooks/useVisitsDataOptimized.ts` | Skip loading reset when cache exists; prevent no-op visit replacements; batch state updates |
+The `OrderItemsExpanded` component fetches from Supabase if `displayItems` is empty. In offline mode, this fetch will fail silently. However, the parent `VisitCard` already extracts items from the cached order and passes them as `displayItems`, so this path is not triggered offline.
 
