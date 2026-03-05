@@ -1,51 +1,38 @@
 
 
-## Attendance Retry with Reason — Plan
+## Plan: Enforce Global Leave Policy in Leave Application Flow
 
 ### Problem
-When attendance marking fails (e.g., due to network errors, GPS issues, or duplicate constraint violations), the user gets a generic error toast and has to retry blindly. The user wants: **after 2 failed attempts, show a dialog asking for a reason, then force-mark attendance**.
-
-### Current State
-- Face verification already has a retry mechanism (`faceVerificationAttempts` counter, bypasses after 2 attempts)
-- Attendance insert failures go straight to a generic error toast in the catch block (line 766-778)
-- The duplicate check (line 546-566) silently blocks re-marking with "Already Checked In" toast
-- No mechanism to track overall attendance marking failure attempts
+The `global_leave_policy` and `leave_type_policy_override` tables are populated via the admin UI, but `LeaveApplicationModal` ignores all configured rules. Users can submit leaves that violate policy settings.
 
 ### What We Will Build
 
-**Add an attendance failure attempt counter** (`attendanceFailureAttempts`) that tracks how many times the overall check-in process has failed (insert errors, network errors, etc.).
+**1. New hook: `useEffectiveLeavePolicy`** (in `src/hooks/useGlobalLeavePolicy.ts`)
 
-**After 2 failed attempts**, show a `ReasonDialog` asking the user to provide a reason (e.g., "GPS not working", "Network issue", "Photo upload failed"). On confirmation:
-- Insert attendance with the reason stored in a new `manual_override_reason` column
-- Bypass the normal flow and force-insert with `face_verification_status: 'override'`
+A utility function that merges global policy with per-type overrides. Given a `leaveTypeId`, returns the effective policy:
+- If an override exists with `override_enabled = true`, use override values for `allow_negative_balance`, `max_negative_limit`, `enable_carry_forward`, `max_carry_forward_limit`
+- Fall back to global defaults for all other fields (`enable_half_day`, `min_notice_period_days`, `max_continuous_leave_days`, `allow_backdated_leave`, `max_backdate_days`, `is_enabled`)
 
-### Database Change
-Add a `manual_override_reason` column to the `attendance` table:
-```sql
-ALTER TABLE attendance ADD COLUMN manual_override_reason text;
-```
+**2. Update `LeaveApplicationModal.tsx`** to consume the effective policy and enforce rules:
 
-### UI Changes in `src/pages/Attendance.tsx`
-1. Add state: `attendanceFailureAttempts` (number), `showOverrideReasonDialog` (boolean), `pendingOverrideData` (cached photo/location for retry)
-2. In the catch block (line 766): increment `attendanceFailureAttempts`. If count >= 2, set `showOverrideReasonDialog = true` and cache the pending data instead of just showing error toast
-3. Add a reason dialog (reuse existing `RejectionReasonDialog` pattern or create a simple dialog) that on confirm:
-   - Calls `supabase.from('attendance').insert(...)` with the cached data + `manual_override_reason`
-   - Resets failure counter
-   - Shows success toast
+| Rule | Enforcement |
+|---|---|
+| `is_enabled = false` | Show banner "Leave applications are currently disabled", disable submit button |
+| `enable_half_day = false` | Hide the half-day radio option entirely, force `leaveDay = 'full'` |
+| `allow_backdated_leave = false` | Calendar disables all past dates (current behavior, but now policy-driven) |
+| `allow_backdated_leave = true` | Allow past dates up to `max_backdate_days` ago |
+| `min_notice_period_days > 0` | Calendar disables dates within the notice period from today |
+| `max_continuous_leave_days` | Validate on submit that `(endDate - startDate + 1) <= max_continuous_leave_days`; show inline error |
+| `allow_negative_balance = false` | Fetch user's `leave_balance` for the selected type; block submit if `remaining_balance < days_requested` |
+| `allow_negative_balance = true` | Allow negative up to `max_negative_limit`; block if exceeded |
 
-### Component Flow
-```text
-User clicks Check-In → Camera → Photo captured → Face verify → Insert attendance
-  ↓ (fails)
-Attempt 1: Show error toast, increment counter
-  ↓ (user retries, fails again)
-Attempt 2: Show "Provide Reason" dialog
-  ↓ (user enters reason)
-Force-insert attendance with manual_override_reason → Success
-```
+**3. Balance check** -- On submit, query `leave_balance` for the user + selected leave type + current year. Compare `remaining_balance` against `days_requested` and the effective negative balance policy.
 
 ### Files to Modify
-1. **Database migration** — Add `manual_override_reason` column to `attendance`
-2. **`src/pages/Attendance.tsx`** — Add failure counter, override dialog, and force-insert logic
-3. **`src/integrations/supabase/types.ts`** — Auto-updated after migration
+
+1. **`src/hooks/useGlobalLeavePolicy.ts`** -- Add `useEffectiveLeavePolicy(leaveTypeId)` hook and a `getEffectivePolicy()` helper
+2. **`src/components/LeaveApplicationModal.tsx`** -- Import hooks, add policy-driven UI logic and validation
+
+### No Database Changes Required
+All policy tables already exist with the correct schema.
 
