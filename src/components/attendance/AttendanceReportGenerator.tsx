@@ -12,6 +12,8 @@ import { CalendarIcon, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/utils/fileDownloader';
+import { useSubordinates } from '@/hooks/useSubordinates';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 
 interface AttendanceRecord {
   id: string;
@@ -62,6 +64,8 @@ const formatTime = (time: string | null) => {
 };
 
 const AttendanceReportGenerator = () => {
+  const { hasAdminAccess } = useAdminAccess();
+  const { subordinateIds, isManager, isLoading: subsLoading } = useSubordinates();
   const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 7));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [selectedEmployee, setSelectedEmployee] = useState('all');
@@ -73,13 +77,32 @@ const AttendanceReportGenerator = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [hasAdminAccess, subordinateIds]);
 
   const fetchEmployees = async () => {
-    const { data, error } = await supabase.rpc('get_limited_profiles_for_admin');
-    if (!error && data) {
+    if (hasAdminAccess) {
+      // Admin sees everyone
+      const { data, error } = await supabase.rpc('get_limited_profiles_for_admin');
+      if (!error && data) {
+        setEmployees(
+          (data as Array<{ id: string; full_name: string }>)
+            .filter((p) => p.full_name)
+            .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+        );
+      }
+    } else if (subordinateIds.length > 0) {
+      // Manager sees only subordinates
+      const allEmployees: Array<{ id: string; full_name: string }> = [];
+      for (let i = 0; i < subordinateIds.length; i += 100) {
+        const batch = subordinateIds.slice(i, i + 100);
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', batch);
+        if (data) allEmployees.push(...(data as Array<{ id: string; full_name: string }>));
+      }
       setEmployees(
-        (data as Array<{ id: string; full_name: string }>)
+        allEmployees
           .filter((p) => p.full_name)
           .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
       );
@@ -114,6 +137,9 @@ const AttendanceReportGenerator = () => {
 
       if (selectedEmployee !== 'all') {
         query = query.eq('user_id', selectedEmployee);
+      } else if (!hasAdminAccess && subordinateIds.length > 0) {
+        // Manager: scope to subordinates only
+        query = query.in('user_id', subordinateIds);
       }
       if (selectedStatus !== 'all') {
         query = query.eq('status', selectedStatus);
