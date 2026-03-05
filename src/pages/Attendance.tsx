@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Layout } from '@/components/Layout';
 import { CheckCircle, XCircle, Camera, MapPin, Clock, Plus, Filter, Navigation2, Route, CalendarDays, FileText, LogOut, LogIn, Edit3, ChevronLeft, ChevronRight } from 'lucide-react';
+import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
@@ -151,6 +152,17 @@ const Attendance = () => {
   const [stopReason, setStopReason] = useState('');
   const [attendanceType, setAttendanceType] = useState<'check-in' | 'check-out' | null>(null);
   const [faceVerificationAttempts, setFaceVerificationAttempts] = useState(0);
+  const [attendanceFailureAttempts, setAttendanceFailureAttempts] = useState(0);
+  const [showOverrideReasonDialog, setShowOverrideReasonDialog] = useState(false);
+  const [pendingOverrideData, setPendingOverrideData] = useState<{
+    userId: string;
+    today: string;
+    timestamp: string;
+    freshLocation: { latitude: number; longitude: number };
+    photoPath: string;
+    matchStatus: string;
+    confidence: number;
+  } | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>({
     isProcessing: false,
     currentStep: null,
@@ -766,11 +778,48 @@ const Attendance = () => {
     } catch (error) {
       console.error('Error marking attendance:', error instanceof Error ? error.message : JSON.stringify(error));
       setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
-      toast({
-        title: "Error",
-        description: `Failed to mark ${attendanceType}. Please try again.`,
-        variant: "destructive"
-      });
+      
+      // Track attendance failure attempts for check-in only
+      if (attendanceType === 'check-in') {
+        const newFailureCount = attendanceFailureAttempts + 1;
+        setAttendanceFailureAttempts(newFailureCount);
+        
+        if (newFailureCount >= 2) {
+          // After 2 failures, show override reason dialog
+          // Cache pending data from the last attempt context
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            const todayDate = getLocalTodayDate();
+            setPendingOverrideData({
+              userId: currentUser.id,
+              today: todayDate,
+              timestamp: new Date().toISOString(),
+              freshLocation: location || { latitude: 0, longitude: 0 },
+              photoPath: '',
+              matchStatus: 'override',
+              confidence: 0
+            });
+            setShowOverrideReasonDialog(true);
+          }
+          toast({
+            title: "Multiple Failures Detected",
+            description: "Please provide a reason to manually mark your attendance.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: `Failed to mark check-in (Attempt ${newFailureCount}/2). Please try again.`,
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to mark ${attendanceType}. Please try again.`,
+          variant: "destructive"
+        });
+      }
       
       // Reset states on error
       setShowCamera(false);
@@ -1552,6 +1601,53 @@ const Attendance = () => {
         existingRequest={selectedRecordForRegularization ? regularizationRequests.get(selectedRecordForRegularization.date) : null}
         onSubmit={handleRegularizationSubmitted}
         userId={user?.id || ''}
+      />
+
+      {/* Override Reason Dialog - shown after 2 failed attendance attempts */}
+      <RejectionReasonDialog
+        isOpen={showOverrideReasonDialog}
+        onClose={() => setShowOverrideReasonDialog(false)}
+        onConfirm={async (reason: string) => {
+          if (!pendingOverrideData) return;
+          
+          const { userId, today, timestamp, freshLocation } = pendingOverrideData;
+          
+          const { error } = await supabase
+            .from('attendance')
+            .insert({
+              user_id: userId,
+              date: today,
+              check_in_time: timestamp,
+              check_in_location: freshLocation,
+              check_in_address: `${freshLocation.latitude}, ${freshLocation.longitude}`,
+              status: 'present',
+              face_verification_status: 'override',
+              face_match_confidence: 0,
+              manual_override_reason: reason
+            } as any);
+          
+          if (error) {
+            toast({
+              title: "Override Failed",
+              description: error.message || "Could not force-mark attendance.",
+              variant: "destructive"
+            });
+            throw error;
+          }
+          
+          // Reset counters and state
+          setAttendanceFailureAttempts(0);
+          setPendingOverrideData(null);
+          
+          await refreshTodayOnly();
+          
+          toast({
+            title: "Attendance Marked ✅",
+            description: "Attendance recorded with manual override reason.",
+          });
+        }}
+        title="Provide Override Reason"
+        description="After multiple failed attempts, please provide a reason to manually mark your attendance."
       />
     </Layout>
   );

@@ -696,6 +696,7 @@ export type Database = {
           locked: boolean
           locked_at: string | null
           locked_by: string | null
+          manual_override_reason: string | null
           notes: string | null
           regularized_request_id: string | null
           status: string
@@ -722,6 +723,7 @@ export type Database = {
           locked?: boolean
           locked_at?: string | null
           locked_by?: string | null
+          manual_override_reason?: string | null
           notes?: string | null
           regularized_request_id?: string | null
           status?: string
@@ -748,6 +750,7 @@ export type Database = {
           locked?: boolean
           locked_at?: string | null
           locked_by?: string | null
+          manual_override_reason?: string | null
           notes?: string | null
           regularized_request_id?: string | null
           status?: string
