@@ -1,28 +1,43 @@
 
 
-## Add Maharashtra HDI & Literacy Data to Pincode Master
+## Auto-Checkout at 10 PM IST — Implementation Plan
 
-### Overview
-When "MAHARASHTRA" is selected as state and a district is chosen, display HDI and Literacy Rate info boxes — similar to the existing Karnataka HDI display.
+### What's Being Done
+Configure the existing `auto-end-day` edge function to run automatically at 10:00 PM IST (16:30 UTC) every day using `pg_cron`.
 
 ### Changes
 
-**1. New file: `src/data/maharashtraHDI.ts`**
-- Create a new data file with a `MaharashtraDistrictHDI` interface containing `hdi` and `literacyRate` fields
-- Export `maharashtraDistrictHDI` as a `Record<string, MaharashtraDistrictHDI>` with all 36 districts from the uploaded file, keyed by lowercase district name
-- Include alternate spellings (e.g., "aurangabad" and "sambhaji nagar", "osmanabad" and "dharashiv")
+**1. File Edit: `supabase/functions/auto-end-day/index.ts`**
+- Line 11: Change comment from `Runs at 11:59 PM IST (18:29 UTC) daily via cron job` to `Runs at 10:00 PM IST (16:30 UTC) daily via pg_cron job`
+- No logic changes needed — the function already handles everything correctly.
 
-**2. Edit: `src/components/admin/PincodeMasterLookup.tsx`**
-- Import the new `maharashtraDistrictHDI` data
-- Add a new conditional block after the Karnataka HDI section: when `selectedState === 'MAHARASHTRA'` and a district is selected, look up the district data and show two info boxes:
-  - **HDI** (purple themed, same as Karnataka)
-  - **Literacy Rate %** (blue themed)
-- Include source attribution text
+**2. SQL (via Supabase SQL Editor — not migration, contains project-specific secrets)**
+
+First, enable required extensions:
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
+```
+(`pg_cron` is already enabled by default on Supabase.)
+
+Then schedule the cron job:
+```sql
+SELECT cron.schedule(
+  'auto-end-day-10pm',
+  '30 16 * * *',
+  $$
+  SELECT net.http_post(
+    url:='https://aoxdosjkwqyuvccuwhzc.supabase.co/functions/v1/auto-end-day',
+    headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveGRvc2prd3F5dXZjY3V3aHpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5ODUyOTYsImV4cCI6MjA4MjU2MTI5Nn0.KcKh1kvHtMJ0dUfgZeSwUK64vUDJZzgoXUSOzEVF5R0"}'::jsonb,
+    body:='{"time": "scheduled-10pm"}'::jsonb
+  ) AS request_id;
+  $$
+);
+```
 
 ### File Summary
 
 | File | Action |
 |------|--------|
-| `src/data/maharashtraHDI.ts` | **New** — HDI + Literacy data for 36 Maharashtra districts |
-| `src/components/admin/PincodeMasterLookup.tsx` | **Edit** — add Maharashtra HDI display block |
+| `supabase/functions/auto-end-day/index.ts` | **Edit** — update timing comment only |
+| Supabase SQL Editor | **Run** — enable `pg_net`, schedule cron job |
 
