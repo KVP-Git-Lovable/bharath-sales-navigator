@@ -8,7 +8,7 @@ const corsHeaders = {
 /**
  * Auto End Day Edge Function
  * 
- * Runs at 11:59 PM IST (18:29 UTC) daily via cron job
+ * Runs at 10:00 PM IST (16:30 UTC) daily via pg_cron job
  * Automatically closes attendance for users who forgot to check out
  * Uses last activity time from visits, orders, and retailer_visit_logs
  */
