@@ -103,7 +103,16 @@ export const PendingApprovalsSection = ({
 
                 <p className="text-xs text-muted-foreground mt-1">
                   {approval.type === 'leave'
-                    ? `${format(new Date(approval.date), 'MMM dd')}${approval.endDate && approval.endDate !== approval.date ? ` - ${format(new Date(approval.endDate), 'MMM dd')}` : ''}`
+                    ? (() => {
+                        const dateStr = `${format(new Date(approval.date), 'MMM dd')}${approval.endDate && approval.endDate !== approval.date ? ` - ${format(new Date(approval.endDate), 'MMM dd')}` : ''}`;
+                        const days = approval.daysRequested ?? (approval.endDate && approval.endDate !== approval.date
+                          ? Math.ceil((new Date(approval.endDate).getTime() - new Date(approval.date).getTime()) / (1000 * 3600 * 24)) + 1
+                          : 1);
+                        const durationLabel = approval.isHalfDay || days === 0.5
+                          ? `Half Day${approval.halfDayPeriod ? ` - ${approval.halfDayPeriod === 'first_half' ? '1st Half' : '2nd Half'}` : ''}`
+                          : `${days} ${days === 1 ? 'day' : 'days'}`;
+                        return `${dateStr} (${durationLabel})`;
+                      })()
                     : `${format(new Date(approval.date), 'MMM dd, yyyy')}`}
                 </p>
 

@@ -35,6 +35,9 @@ export interface PendingApproval {
   endDate?: string;
   reason: string | null;
   leaveTypeName?: string;
+  daysRequested?: number | null;
+  isHalfDay?: boolean | null;
+  halfDayPeriod?: string | null;
   // regularization specific
   requestedCheckIn?: string | null;
   requestedCheckOut?: string | null;
@@ -534,6 +537,9 @@ export const useTeamAttendance = (
           endDate: ed?.end_date,
           reason: ed?.reason || null,
           leaveTypeName: ed?.leaveTypeName || 'Leave',
+          daysRequested: ed?.days_requested ?? null,
+          isHalfDay: ed?.is_half_day ?? null,
+          halfDayPeriod: ed?.half_day_period ?? null,
           approvalRequestId: item.approvalRequestId,
           currentLevel: item.currentLevel,
           totalLevels: item.totalLevels,
@@ -604,6 +610,9 @@ export const useTeamAttendance = (
             endDate: ed?.end_date,
             reason: ed?.reason || null,
             leaveTypeName: ed?.leaveTypeName || 'Leave',
+            daysRequested: ed?.days_requested ?? null,
+            isHalfDay: ed?.is_half_day ?? null,
+            halfDayPeriod: ed?.half_day_period ?? null,
             approvalRequestId: item.approvalRequestId,
             approvalStatus: item.approvalStatus,
             approvedByName: item.approvedByName,
