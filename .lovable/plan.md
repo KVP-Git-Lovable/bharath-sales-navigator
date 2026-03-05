@@ -1,33 +1,23 @@
 
 
-## Analysis: Current Report Does NOT Respect Manager Hierarchy
+## Add PDF and Excel Export to Attendance → My Team
 
-The current `AttendanceReportGenerator` has two security/scoping issues:
+### What We're Building
+Two export buttons ("PDF" and "Excel") in the Team Attendance tab header, allowing managers to download the currently visible team attendance data. Follows the same pattern as Today's Summary exports.
 
-1. **Employee dropdown** uses `get_limited_profiles_for_admin` RPC, which returns ALL employees (admin-only). A manager would either get an error or see everyone.
+### Changes
 
-2. **Attendance query** has no `user_id` scoping — when "All Employees" is selected, it fetches attendance records for the entire organization, not just the manager's hierarchy.
+**File: `src/components/attendance/TeamAttendanceTab.tsx`**
 
-### What Needs to Change
+1. **Add imports**: `Download`, `FileSpreadsheet` from lucide-react; `downloadPDF`, `downloadExcel` from `@/utils/fileDownloader`; `toast` from sonner
+2. **Add two handler functions**:
+   - `handleExportPDF`: dynamically import `jspdf` + `jspdf-autotable`, build a table with columns (Employee Name, Designation, Status, Check-in, Check-out, Hours, Monthly Present) from `filteredMembers`, generate PDF with title "Team Attendance Report" + date, call `downloadPDF()`
+   - `handleExportExcel`: dynamically import `xlsx`, build worksheet with same columns from `filteredMembers`, call `downloadExcel()`
+3. **Add UI buttons**: Place two small buttons (PDF icon + Excel icon) next to the "Team Members (N)" heading / search bar area, disabled when `filteredMembers` is empty
+4. **Data source**: Uses the already-computed `filteredMembers` array which contains `profile.full_name`, `profile.designation`, `todayStatus`, `checkInTime`, `checkOutTime`, `totalHours`, `monthlyPresent`
 
-**File: `src/components/attendance/AttendanceReportGenerator.tsx`**
-
-1. **Import `useSubordinates`** hook (already exists, used in TeamAttendanceTab) and `useAdminAccess`
-2. **Employee list logic**:
-   - If user is admin → keep using `get_limited_profiles_for_admin` (sees everyone)
-   - If user is manager (not admin) → populate employee dropdown from `subordinateIds` fetched via `useSubordinates`, querying profiles for those IDs only
-3. **Report query scoping**:
-   - If user is admin → no `user_id` filter (current behavior, sees all)
-   - If user is manager → add `.in('user_id', subordinateIds)` to the attendance query, so "All Employees" only returns their hierarchy's data
-   - If a specific employee is selected → still apply `.eq('user_id', selectedEmployee)` (already done)
-4. **Edge case**: If user is neither admin nor manager, show an empty state or disable the report
-
-### Summary of behavior after fix
-
-| User Role | Employee Dropdown | "All Employees" Query Scope |
-|-----------|------------------|---------------------------|
-| Admin | All employees | Entire organization |
-| Manager | Direct reports + hierarchy only | Subordinates only |
-
-No database changes needed — uses existing `useSubordinates` hook and `get_all_subordinates` RPC.
+### No other files changed
+- No database changes
+- No new dependencies (jspdf, xlsx already installed)
+- Uses existing cross-platform `downloadPDF`/`downloadExcel` utilities for native APK compatibility
 
