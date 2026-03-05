@@ -1382,7 +1382,12 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
 
     // FIX: Listen to visitDataChanged - force local reload for progress stats refresh
     // Now date-aware: events carry { date } in detail, and we handle any date (not just today)
+    // DEBOUNCED: Prevents rapid-fire reloads from multiple sync events
+    let visitDataChangedTimer: ReturnType<typeof setTimeout> | null = null;
     const handleVisitDataChanged = async (event: Event) => {
+      // Debounce: if multiple events fire within 500ms, only process the last one
+      if (visitDataChangedTimer) clearTimeout(visitDataChangedTimer);
+      visitDataChangedTimer = setTimeout(async () => {
       const currentDate = selectedDateRef.current;
       const currentUserId = userIdRef.current;
       
@@ -1479,6 +1484,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           smartDeltaSync(currentUserId, currentDate);
         }
       }
+      }, 500); // 500ms debounce
     };
 
     // Visibility change - sync when app comes to foreground (any date, not just today)
@@ -1654,6 +1660,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       window.removeEventListener('globalDataRefresh', handleForceRefresh);
       window.removeEventListener('pointsEarned', handlePointsEarned as EventListener);
       document.removeEventListener('visibilitychange', handleVisibility);
+      if (visitDataChangedTimer) clearTimeout(visitDataChangedTimer);
     };
   }, [selectedDate, isToday, userId, smartDeltaSync, shouldSyncNow, loadFromOfflineStorage, doFullInitialLoad]);
 
