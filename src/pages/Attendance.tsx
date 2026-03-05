@@ -543,6 +543,28 @@ const Attendance = () => {
       if (attendanceType === 'check-in') {
         console.log('Starting check-in process...');
         
+        // Check if attendance already exists for today (unique constraint: user_id + date)
+        const { data: existingAttendance } = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .maybeSingle();
+
+        if (existingAttendance) {
+          console.log('Attendance already marked for today, skipping insert');
+          toast({
+            title: "Already Checked In",
+            description: "Your attendance for today has already been recorded.",
+          });
+          setShowCamera(false);
+          setAttendanceType(null);
+          setIsMarkingAttendance(false);
+          setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
+          await refreshTodayOnly();
+          return;
+        }
+
         // Mark attendance with face verification result
         const { error: attendanceError } = await supabase
           .from('attendance')
@@ -561,8 +583,8 @@ const Attendance = () => {
         const isOfflineInsertError = !!attendanceError && shouldSuppressError(attendanceError);
 
         if (attendanceError && !isOfflineInsertError) {
-          console.error('Attendance insert error:', attendanceError);
-          throw attendanceError;
+          console.error('Attendance insert error:', JSON.stringify(attendanceError));
+          throw new Error(attendanceError.message || 'Failed to insert attendance record');
         }
         
         console.log(isOfflineInsertError 
@@ -742,7 +764,7 @@ const Attendance = () => {
       }
 
     } catch (error) {
-      console.error('Error marking attendance:', error);
+      console.error('Error marking attendance:', error instanceof Error ? error.message : JSON.stringify(error));
       setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
       toast({
         title: "Error",
