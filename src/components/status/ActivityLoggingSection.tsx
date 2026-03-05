@@ -58,13 +58,13 @@ const RANGE_OPTIONS = [
   { label: '30d', days: 30 },
 ];
 
-function ProfileInfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ProfileInfoItem({ icon, label, value, containerClassName, valueClassName }: { icon: React.ReactNode; label: string; value: string; containerClassName?: string; valueClassName?: string }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+    <div className={`flex items-start gap-3 p-3 rounded-lg bg-muted/30 ${containerClassName || ''}`}>
       <div className="text-muted-foreground mt-0.5">{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium break-all">{value}</p>
+        <p className={`text-sm font-medium ${valueClassName || 'break-words'}`}>{value}</p>
       </div>
     </div>
   );
@@ -188,7 +188,7 @@ export const ActivityLoggingSection = () => {
 
       {/* User Profile Dialog */}
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>User Profile</DialogTitle>
           </DialogHeader>
@@ -218,7 +218,7 @@ export const ActivityLoggingSection = () => {
 
               {/* Profile Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <ProfileInfoItem icon={<Mail className="h-4 w-4" />} label="Email" value={selectedProfile.email || '-'} />
+                <ProfileInfoItem icon={<Mail className="h-4 w-4" />} label="Email" value={selectedProfile.email || '-'} containerClassName="sm:col-span-2" valueClassName="whitespace-nowrap overflow-x-auto" />
                 {selectedProfile.designation && (
                   <ProfileInfoItem icon={<Briefcase className="h-4 w-4" />} label="Designation" value={selectedProfile.designation} />
                 )}
