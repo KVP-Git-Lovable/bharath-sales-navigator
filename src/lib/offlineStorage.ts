@@ -229,9 +229,16 @@ class OfflineStorage {
     }
   }
 
-  // Throttle syncQueueUpdated event to prevent event storms
-  private lastSyncQueueEventTime = 0;
-  private static readonly SYNC_QUEUE_EVENT_THROTTLE = 5000; // 5 seconds
+  // Notify UI that sync queue changed
+  private emitSyncQueueUpdated(): void {
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('syncQueueUpdated'));
+      }
+    } catch {
+      // no-op
+    }
+  }
 
   // Sync queue operations for offline actions
   async addToSyncQueue(action: string, data: any): Promise<void> {
@@ -244,21 +251,8 @@ class OfflineStorage {
     };
     
     await this.save(STORES.SYNC_QUEUE, syncItem);
-
-    // THROTTLED: Notify UI that sync queue changed (max once per 5 seconds)
-    // This prevents event storms when multiple items are queued rapidly
-    try {
-      if (typeof window !== 'undefined') {
-        const now = Date.now();
-        if (now - this.lastSyncQueueEventTime > OfflineStorage.SYNC_QUEUE_EVENT_THROTTLE) {
-          this.lastSyncQueueEventTime = now;
-          window.dispatchEvent(new Event('syncQueueUpdated'));
-          console.log('[OfflineStorage] 📤 syncQueueUpdated event dispatched (throttled)');
-        }
-      }
-    } catch {
-      // no-op
-    }
+    this.emitSyncQueueUpdated();
+    console.log('[OfflineStorage] 📤 syncQueueUpdated event dispatched');
   }
 
   async getSyncQueue(): Promise<any[]> {
@@ -266,7 +260,8 @@ class OfflineStorage {
   }
 
   async clearSyncQueue(): Promise<void> {
-    return this.clear(STORES.SYNC_QUEUE);
+    await this.clear(STORES.SYNC_QUEUE);
+    this.emitSyncQueueUpdated();
   }
 
   async deleteOldSyncedItems(maxAgeMs: number = 3 * 24 * 60 * 60 * 1000): Promise<void> {

@@ -2,7 +2,7 @@ import { useEffect, useState, memo, useCallback, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Cloud, CloudOff, RefreshCw, CheckCircle2, AlertCircle, Database } from "lucide-react";
 import { useConnectivity } from "@/hooks/useConnectivity";
-import { offlineStorage, STORES } from "@/lib/offlineStorage";
+import { offlineStorage } from "@/lib/offlineStorage";
 import { toast } from "@/hooks/use-toast";
 import { SyncProgressModal } from "./SyncProgressModal";
 import { CacheWarmingProgress, useCacheWarming } from "./CacheWarmingProgress";
@@ -60,64 +60,16 @@ export const SyncStatusIndicator = memo(() => {
     };
   }, [isSyncing]);
 
-  // ONE-TIME CLEANUP: Remove old stuck items from sync queue on app open - more aggressive
-  useEffect(() => {
-    const cleanupOldStuckItems = async () => {
-      try {
-        const queue = await offlineStorage.getSyncQueue();
-        const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000; // Reduced to 15 mins
-        
-        // Find items to remove (stuck/old) - very aggressive cleanup
-        const itemsToRemove = queue.filter((item: any) => {
-          // Remove items that have failed 2+ times (very aggressive)
-          if (item.retryCount >= 2) return true;
-          // Remove items older than 15 minutes
-          if (item.timestamp && item.timestamp < fifteenMinutesAgo) return true;
-          // Remove items that were already synced
-          if (item._synced) return true;
-          return false;
-        });
-        
-        // Delete stuck items
-        for (const item of itemsToRemove) {
-          await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
-          console.log(`🧹 [SyncStatusIndicator] Removed stuck item: ${item.action}`);
-        }
-        
-        if (itemsToRemove.length > 0) {
-          console.log(`🧹 [SyncStatusIndicator] Cleaned up ${itemsToRemove.length} old/stuck sync items`);
-          // Update the count after cleanup
-          setSyncQueueCount(prev => Math.max(0, prev - itemsToRemove.length));
-        }
-      } catch (error) {
-        console.error('Error cleaning up old sync items:', error);
-      }
-    };
-    
-    cleanupOldStuckItems();
-  }, []); // Run only once on mount
+  // NOTE: Do not auto-delete queue items from UI layer.
+  // Queue lifecycle is handled by sync logic to avoid hiding unsynced orders.
 
-  // Check sync queue with managed interval (pauses when app is hidden)
+  // Check sync queue
   const checkQueue = useCallback(async () => {
     if (!mountedRef.current) return;
     try {
       const queue = await offlineStorage.getSyncQueue();
-      
-      // Filter out old items (older than 15 minutes) and items that failed 2+ times
-      // These are stuck items that shouldn't show the sync indicator
-      const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
-      const actualPendingItems = queue.filter((item: any) => {
-        // Skip items that have failed 2+ times
-        if (item.retryCount >= 2) return false;
-        // Skip items older than 15 minutes
-        if (item.timestamp && item.timestamp < fifteenMinutesAgo) return false;
-        // Skip items marked as synced
-        if (item._synced) return false;
-        return true;
-      });
-      
       if (mountedRef.current) {
-        setSyncQueueCount(actualPendingItems.length);
+        setSyncQueueCount(queue.length);
       }
     } catch (error) {
       console.error('Error checking sync queue:', error);
@@ -151,88 +103,67 @@ export const SyncStatusIndicator = memo(() => {
     };
   }, [checkQueue]);
 
-  // REMOVED: Aggressive queue polling every 5 seconds
-  // Per event-based sync architecture: Only check queue on:
-  // - Component mount (done in useEffect above)
-  // - syncQueueUpdated event (when items are actually added)
-  // - online event (when connectivity returns)
-  // This prevents constant sync indicator activity on tab switches
+  // Periodic queue refresh as safety net (in case any event is missed)
+  useManagedInterval(
+    'sync-status-indicator-queue-check',
+    checkQueue,
+    5000,
+    { runWhenHidden: false }
+  );
 
-  // Track last sync time and queue count to prevent rapid re-syncs and sync loops
+  // Track last sync time to avoid rapid re-sync loops
   const lastSyncTimeRef = useRef<number>(0);
-  const lastQueueCountRef = useRef<number>(0);
   const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Monitor syncing status when coming online - SILENT mode with extended debounce to prevent loops
+  // Monitor syncing status when coming online
   useEffect(() => {
-    // Skip if already syncing or offline
     if (isSyncing || !isOnline || syncQueueCount === 0) return;
-    
-    // SMART SYNC: Skip if queue count hasn't changed (likely stuck items)
-    if (syncQueueCount === lastQueueCountRef.current && syncQueueCount > 0) {
-      console.log('🔄 [SyncIndicator] Same queue count as before, skipping sync loop');
-      return;
-    }
-    
-    // Prevent sync if we recently synced (within last 60 seconds) - increased from 30s
+
     const now = Date.now();
-    if (now - lastSyncTimeRef.current < 60000) {
+    if (now - lastSyncTimeRef.current < 15000) {
       return;
     }
-    
-    // Debounce to prevent multiple rapid triggers (e.g., tab switching) - increased from 2s to 5s
+
     if (syncDebounceRef.current) {
       clearTimeout(syncDebounceRef.current);
     }
-    
+
     syncDebounceRef.current = setTimeout(async () => {
       if (!mountedRef.current || isSyncing) return;
-      
+
       lastSyncTimeRef.current = Date.now();
-      lastQueueCountRef.current = syncQueueCount; // Track queue count to detect stuck items
       setIsSyncing(true);
       setLastSyncStatus(null);
 
       try {
         await processSyncQueue();
-        
-        // Wait for queue to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        await checkQueue();
+
         if (!mountedRef.current) return;
-        
-        // Check final queue status - use more aggressive filtering (3 retries instead of 5)
+
         const queue = await offlineStorage.getSyncQueue();
-        const actualPending = queue.filter((item: any) => {
-          if (item.retryCount >= 3) return false;
-          return true;
-        });
-        
-        if (actualPending.length === 0) {
+        if (queue.length === 0) {
           setLastSyncStatus('success');
           setSyncQueueCount(0);
-          
-          // Clear success status after 3 seconds
           setTimeout(() => {
             if (mountedRef.current) setLastSyncStatus(null);
           }, 3000);
         } else {
-          setSyncQueueCount(actualPending.length);
-          // Don't set error status for retryable items - just leave pending
+          setSyncQueueCount(queue.length);
         }
       } catch (error) {
         if (mountedRef.current) setLastSyncStatus('error');
       } finally {
         if (mountedRef.current) setIsSyncing(false);
       }
-    }, 5000); // Increased from 2s to 5s debounce
+    }, 1200);
     
     return () => {
       if (syncDebounceRef.current) {
         clearTimeout(syncDebounceRef.current);
       }
     };
-  }, [isOnline, syncQueueCount, isSyncing, processSyncQueue]);
+  }, [isOnline, syncQueueCount, isSyncing, processSyncQueue, checkQueue]);
 
   // Handle prepare offline data click
   const handlePrepareOfflineData = useCallback(() => {
