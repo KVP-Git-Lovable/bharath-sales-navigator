@@ -207,7 +207,7 @@ export const useTeamAttendance = (
         leaveIds.length > 0
           ? supabase
               .from('leave_applications')
-              .select('id, user_id, start_date, end_date, reason, leave_type_id')
+              .select('id, user_id, start_date, end_date, reason, leave_type_id, days_requested, is_half_day, half_day_period')
               .in('id', leaveIds)
           : Promise.resolve({ data: [], error: null }),
         regIds.length > 0
@@ -353,7 +353,7 @@ export const useTeamAttendance = (
 
       const [leavesResult, regsResult, profilesResult] = await Promise.all([
         leaveIds.length > 0
-          ? supabase.from('leave_applications').select('id, user_id, start_date, end_date, reason, leave_type_id').in('id', leaveIds)
+          ? supabase.from('leave_applications').select('id, user_id, start_date, end_date, reason, leave_type_id, days_requested, is_half_day, half_day_period').in('id', leaveIds)
           : Promise.resolve({ data: [], error: null }),
         regIds.length > 0
           ? supabase.from('regularization_requests').select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time').in('id', regIds)
