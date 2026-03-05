@@ -43,7 +43,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { RetailerDetailModal } from "./RetailerDetailModal";
 import { FeedbackListView } from "./FeedbackListView";
-import { getLocalTodayDate } from "@/utils/dateUtils";
+import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
 import { CancelOrderDialog } from "./CancelOrderDialog";
@@ -2308,7 +2308,7 @@ export const VisitCard = ({
       try {
         const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
         // Format target date as YYYY-MM-DD for comparison
-        const targetDateStr = targetDate.toISOString().split('T')[0];
+        const targetDateStr = toLocalISODate(targetDate);
         
         offlineOrders = cachedOrders.filter((o: any) => {
           // Check by order_date first (exact date match), fallback to created_at
@@ -2338,8 +2338,7 @@ export const VisitCard = ({
             .eq('user_id', effectiveUserId)
             .eq('retailer_id', retailerId)
             .in('status', ['confirmed', 'delivered'])
-            .gte('created_at', dayStart.toISOString())
-            .lte('created_at', dayEnd.toISOString())
+            .eq('order_date', selectedDate || toLocalISODate(targetDate))
             .abortSignal(controller.signal);
           
           clearTimeout(timeoutId);
@@ -2453,7 +2452,7 @@ export const VisitCard = ({
         if (allItems.length === 0) {
           try {
             const allCachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
-            const targetDateStr = targetDate.toISOString().split('T')[0];
+            const targetDateStr = toLocalISODate(targetDate);
             const matchingOrder = allCachedOrders.find((o: any) => {
               if (o.retailer_id !== retailerId) return false;
               const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
