@@ -1,42 +1,46 @@
 
 
-## Invoice System — Offline Compatibility Analysis
+## Fix My Visits Page Flicker
 
-### Current State: Invoice Generation Already Works Offline
+### Root Cause
 
-The `fetchAndGenerateInvoice()` function (lines 822-1184 of `invoiceGenerator.ts`) already has comprehensive offline support:
+The flicker occurs at lines 1146-1147 of `useVisitsDataOptimized.ts`:
 
-1. **Order data**: Falls back to IndexedDB `STORES.ORDERS` if DB query returns null (lines 962-978)
-2. **Company data**: Falls back to `STORES.SYNC_METADATA` cache (lines 998-1011)
-3. **Retailer data**: Falls back to `STORES.RETAILERS` cache (lines 1028-1031)
-4. **Beat name**: Falls back to `STORES.BEAT_PLANS` cache (lines 1050-1053)
-5. **Salesman name**: Falls back to `STORES.SYNC_METADATA` profile cache (lines 1070-1073)
-6. **HSN enrichment**: Skipped when offline — `navigator.onLine` check at line 1087
-
-### The One Issue: Invoice Number for Offline Orders
-
-When an order is placed offline, the `invoice_number` column is assigned server-side by the `set_order_invoice_number` trigger on INSERT. Since the order hasn't been inserted into Supabase yet, the offline cached order has **no invoice_number**.
-
-The fallback at line 1142 handles this:
 ```typescript
-const displayInvoiceNumber = order.invoice_number || `INV-${order.id.substring(0, 8).toUpperCase()}`;
+setIsLoading(true);
+setHasLoadedOnce(false);
 ```
 
-So offline invoices get a **temporary** number like `INV-A3F2B1C4` instead of the proper `INV2026-XXX`. This is expected and acceptable — the real invoice number is assigned on sync.
+This runs on **every mount and date change** via the `useEffect` at line 1142. It resets the UI to a loading/empty state for one render frame, then `loadData()` immediately finds cached data and sets `isLoading(false)`. The user sees a brief flash of empty content.
 
-### Potential Duplicate Invoice Risk
+A secondary flicker source is `smartDeltaSync` (line 539) doing `setVisits(newVisits)` which replaces the entire visits array even when data is identical, triggering unnecessary re-renders of all visit cards.
 
-The unique constraint on `orders.invoice_number` was **dropped** in migration `20260212` to prevent order creation failures. This means duplicates are technically possible if the sequence gets out of sync, but this is a deliberate trade-off for reliability.
+### Changes
 
-### What's Already Working
-- Offline order → invoice PDF generation ✅
-- Offline order → WhatsApp/SMS queued via `SEND_INVOICE_SMS` sync queue ✅
-- Multi-device orders → unique UUIDs prevent data loss ✅
-- Invoice from cached data when DB unreachable ✅
+#### 1. `src/hooks/useVisitsDataOptimized.ts` — Skip loading reset when cache exists
 
-### No Code Changes Needed
+**Lines 1142-1149**: Instead of always resetting `isLoading=true` and `hasLoadedOnce=false`, check if in-memory cache already has valid data for the selected date. If so, skip the reset entirely — `loadData` will use the cache path and never show loading state.
 
-The invoicing system is already fully compatible with offline order placement. The only behavioral difference is the temporary invoice number format (`INV-XXXXXXXX` vs `INV2026-XXX`), which auto-corrects once the order syncs to the database.
+```typescript
+// Before calling loadData, check if we have instant cache
+const hasCachedData = cacheRef.current.has(selectedDate);
+if (!hasCachedData) {
+  setIsLoading(true);
+  setHasLoadedOnce(false);
+}
+```
 
-**Summary**: You can safely place orders offline and generate invoices immediately. The invoice will use cached local data for all fields. The invoice number will be a temporary ID until sync completes, at which point the server assigns the real sequential number.
+#### 2. `src/hooks/useVisitsDataOptimized.ts` — Prevent no-op visit replacements in smartDeltaSync
+
+**Around line 537-543**: Before doing `setVisits(newVisits)`, also compare the actual content (not just count). If visits are identical, skip the state update. The `visitsChanged` flag from `getChangedItems` should handle this, but the `visitCountDifferent` fallback at line 535 triggers unnecessary replacements. Only use the count-based fallback when counts actually differ.
+
+#### 3. `src/hooks/useVisitsDataOptimized.ts` — Batch state updates
+
+Wrap the multiple `setState` calls in the cache-hit path (lines 762-773) with `React.startTransition` or `ReactDOM.flushSync` to ensure they render as a single frame, preventing intermediate empty states.
+
+### Files to Edit
+
+| File | Change |
+|------|--------|
+| `src/hooks/useVisitsDataOptimized.ts` | Skip loading reset when cache exists; prevent no-op visit replacements; batch state updates |
 
