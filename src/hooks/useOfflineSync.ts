@@ -607,10 +607,11 @@ export function useOfflineSync() {
               }
             }));
             
-            // ALSO dispatch visitDataChanged to trigger full page reload with increased delay
+          // Dispatch visitDataChanged WITH date to trigger targeted sync (not full reload)
             setTimeout(() => {
-              console.log('✅ Dispatching visitDataChanged for full page reload');
-              window.dispatchEvent(new Event('visitDataChanged'));
+              const orderDate = data.order?.order_date || data.order?.created_at?.split('T')[0] || getTodayDateString();
+              console.log('✅ Dispatching visitDataChanged for date:', orderDate);
+              window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
             }, 1000);
             
             // Sync order quantities to van stock
@@ -694,10 +695,11 @@ export function useOfflineSync() {
               }
             }));
             
-            // ALSO dispatch visitDataChanged to trigger full page reload with increased delay
+            // Dispatch visitDataChanged WITH date to trigger targeted sync (not full reload)
             setTimeout(() => {
-              console.log('✅ Dispatching visitDataChanged for full page reload');
-              window.dispatchEvent(new Event('visitDataChanged'));
+              const oldFormatOrderDate = data.order_date || data.created_at?.split('T')[0] || getTodayDateString();
+              console.log('✅ Dispatching visitDataChanged for date:', oldFormatOrderDate);
+              window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: oldFormatOrderDate } }));
             }, 1000);
             
             // Sync order quantities to van stock (old format)
@@ -1202,7 +1204,7 @@ export function useOfflineSync() {
     }
   }, [connectivityStatus]);
 
-  // Auto-sync when connectivity is restored and cleanup old data
+  // Auto-sync when connectivity is restored, periodic retry, and cleanup old data
   useEffect(() => {
     if (connectivityStatus === 'online') {
       // Trigger sync immediately when online
@@ -1224,6 +1226,12 @@ export function useOfflineSync() {
           processSyncQueue();
         }, 30000),
       ];
+      
+      // PERIODIC SYNC: Retry every 60s to catch any queued items that failed earlier
+      const periodicSyncInterval = setInterval(() => {
+        console.log('⏰ Periodic sync check (60s)...');
+        processSyncQueue();
+      }, 60000);
       
       // Also sync when app becomes visible (user switches back to app)
       const handleVisibilityChange = () => {
@@ -1258,6 +1266,7 @@ export function useOfflineSync() {
       
       return () => {
         retryTimeouts.forEach(clearTimeout);
+        clearInterval(periodicSyncInterval);
         clearTimeout(cleanupTimeout);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleFocus);
