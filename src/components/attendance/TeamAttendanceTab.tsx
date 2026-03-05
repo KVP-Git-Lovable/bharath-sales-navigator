@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
-import { CalendarIcon, ChevronRight } from 'lucide-react';
+import { CalendarIcon, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
 import { useTeamAttendance } from '@/hooks/useTeamAttendance';
 import { TeamSummaryCards, TeamFilter } from './TeamSummaryCards';
 import { TeamMemberHierarchyRow, HierarchyMemberNode } from './TeamMemberHierarchyRow';
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { TeamMemberAttendance } from '@/hooks/useTeamAttendance';
+import { downloadPDF, downloadExcel } from '@/utils/fileDownloader';
+import { toast } from 'sonner';
 
 interface TeamAttendanceTabProps {
   subordinateIds: string[];
@@ -149,6 +151,67 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
 
   const detailMember = teamMembers.find(m => m.profile.id === detailUserId);
 
+  const handleExportPDF = async () => {
+    if (filteredMembers.length === 0) return;
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const autoTable = (await import('jspdf-autotable')).default;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text('Team Attendance Report', 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated: ${format(new Date(), 'dd MMM yyyy, hh:mm a')}`, 14, 22);
+      doc.text(`Period: ${dateRangeStart} to ${dateRangeEnd}`, 14, 28);
+
+      const rows = filteredMembers.map(m => [
+        m.profile.full_name,
+        m.profile.designation || '-',
+        m.todayStatus?.replace('_', ' ') || '-',
+        m.checkInTime || '-',
+        m.checkOutTime || '-',
+        m.totalHours != null ? `${m.totalHours}h` : '-',
+        m.monthlyPresent ?? '-',
+      ]);
+
+      autoTable(doc, {
+        startY: 33,
+        head: [['Name', 'Designation', 'Status', 'Check-in', 'Check-out', 'Hours', 'Monthly Present']],
+        body: rows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [34, 139, 34] },
+      });
+
+      const blob = doc.output('blob');
+      await downloadPDF(blob, `Team_Attendance_${dateRangeStart}.pdf`);
+    } catch (e) {
+      console.error('PDF export error:', e);
+      toast.error('Failed to export PDF');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (filteredMembers.length === 0) return;
+    try {
+      const XLSX = await import('xlsx');
+      const data = filteredMembers.map(m => ({
+        'Name': m.profile.full_name,
+        'Designation': m.profile.designation || '-',
+        'Status': m.todayStatus?.replace('_', ' ') || '-',
+        'Check-in': m.checkInTime || '-',
+        'Check-out': m.checkOutTime || '-',
+        'Hours': m.totalHours != null ? m.totalHours : '-',
+        'Monthly Present': m.monthlyPresent ?? '-',
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Team Attendance');
+      await downloadExcel(wb, `Team_Attendance_${dateRangeStart}.xlsx`, XLSX);
+    } catch (e) {
+      console.error('Excel export error:', e);
+      toast.error('Failed to export Excel');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Date filter removed */}
@@ -182,12 +245,34 @@ export const TeamAttendanceTab = ({ subordinateIds, directReportIds }: TeamAtten
           <h3 className="text-sm font-semibold text-foreground whitespace-nowrap">
             Team Members ({filteredMembers.length})
           </h3>
-          <div className="flex-1 max-w-[200px]">
-            <SearchInput
-              placeholder="Search members..."
-              value={searchQuery}
-              onChange={(v) => { setSearchQuery(v); }}
-            />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={filteredMembers.length === 0}
+              onClick={handleExportPDF}
+              title="Export PDF"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={filteredMembers.length === 0}
+              onClick={handleExportExcel}
+              title="Export Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 max-w-[200px]">
+              <SearchInput
+                placeholder="Search members..."
+                value={searchQuery}
+                onChange={(v) => { setSearchQuery(v); }}
+              />
+            </div>
           </div>
         </div>
 
