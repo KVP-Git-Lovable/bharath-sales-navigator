@@ -99,6 +99,7 @@ export const VisitCard = ({
   const [locationMatchOut, setLocationMatchOut] = useState<boolean | null>(null);
   const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [orderPreviewOpen, setOrderPreviewOpen] = useState(false);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [lastOrderItems, setLastOrderItems] = useState<Array<{
     product_name: string;
     quantity: number;
@@ -520,17 +521,19 @@ export const VisitCard = ({
                       quantity: item.quantity,
                       rate: item.rate,
                       original_rate: item.original_rate || item.rate,
-                      unit: item.unit || 'piece'
+                      unit: item.unit || 'piece',
+                      order_id: order.id
                     });
                   });
                 }
               });
               
               if (allItems.length > 0) {
-                // Group items for display
+                // Group items for display - keep per-order when multiple orders
+                const hasMultiOrders = matchingOrders.length > 1;
                 const grouped = new Map<string, any>();
                 allItems.forEach(it => {
-                  const key = it.product_name;
+                  const key = hasMultiOrders ? `${it.order_id}::${it.product_name}` : it.product_name;
                   const existing = grouped.get(key);
                   const qty = Number(it.quantity || 0);
                   const rate = Number(it.rate || 0);
@@ -553,12 +556,13 @@ export const VisitCard = ({
                     existing.quantity += qty;
                   } else {
                     grouped.set(key, {
-                      product_name: key,
+                      product_name: it.product_name,
                       quantity: qty,
                       rate: rate,
                       actualRate: displayRate,
                       displayQty: displayQty,
-                      displayUnit: displayUnit
+                      displayUnit: displayUnit,
+                      order_id: it.order_id
                     });
                   }
                 });
@@ -2499,6 +2503,8 @@ export const VisitCard = ({
         };
 
         // Group items by product for a clean summary
+        // When multiple orders exist, group per order to allow per-order display
+        const hasMultipleOrders = mergedOrders.length > 1;
         const grouped = new Map<string, {
           product_name: string;
           quantity: number;
@@ -2506,10 +2512,12 @@ export const VisitCard = ({
           actualRate: number;
           displayQty: number;
           displayUnit: string;
+          order_id?: string;
         }>();
         
         allItems.forEach(it => {
-          const key = it.product_name;
+          // Use order_id in key when multiple orders so items stay separate per order
+          const key = hasMultipleOrders ? `${it.order_id}::${it.product_name}` : it.product_name;
           const existing = grouped.get(key);
           const qty = Number(it.quantity || 0);
           const rate = Number(it.rate || 0);
@@ -2520,27 +2528,25 @@ export const VisitCard = ({
           const { displayQty, displayUnit, displayRate } = getDisplayValues(qty, rate, originalRate, total, unit);
           
           if (existing) {
-            // For aggregation, sum display quantities if same unit
             if (existing.displayUnit === displayUnit) {
               const oldTotal = existing.actualRate * existing.displayQty;
               const newTotal = total;
               existing.displayQty += displayQty;
               existing.quantity += qty;
-              // Weighted average rate
               existing.actualRate = (oldTotal + newTotal) / existing.displayQty;
             } else {
-              // Different units - keep separate (shouldn't happen for same product)
               existing.displayQty += displayQty;
               existing.quantity += qty;
             }
           } else {
             grouped.set(key, {
-              product_name: key,
+              product_name: it.product_name,
               quantity: qty,
               rate: rate,
               actualRate: displayRate,
               displayQty: displayQty,
-              displayUnit: displayUnit
+              displayUnit: displayUnit,
+              order_id: it.order_id
             });
           }
         });
@@ -2879,6 +2885,9 @@ export const VisitCard = ({
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">
                   {selectedDate ? `${new Date(selectedDate).toDateString() === new Date().toDateString() ? "Today's" : new Date(selectedDate).toLocaleDateString()} Order` : "Today's Order"}
+                  {ordersTodayList.length > 1 && (
+                    <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">{ordersTodayList.length} orders</Badge>
+                  )}
                 </span>
               <Button variant="ghost" size="sm" className="h-7" onClick={async () => {
               recordAction('view_order').catch(() => {});
@@ -2893,9 +2902,8 @@ export const VisitCard = ({
               </div>
               
               {orderPreviewOpen && <>
-                  {/* Order Summary (All payments) */}
+                  {/* Overall Summary (All payments) */}
                   <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md space-y-1">
-                    {/* Show distributor name if available */}
                     {ordersTodayList.length > 0 && ordersTodayList[0]?.distributor_name && (
                       <div className="flex justify-between items-center text-xs pb-1 border-b border-amber-200 dark:border-amber-700">
                         <span className="text-muted-foreground">Distributor:</span>
@@ -2916,35 +2924,104 @@ export const VisitCard = ({
                     </div>
                   </div>
                   
-                  {/* Order Items (Aggregated from all orders today) */}
-                  <div className="mt-2 space-y-1 overflow-hidden">
-                    {loadingOrder && <div className="text-xs text-muted-foreground">Loading...</div>}
-                    {!loadingOrder && lastOrderItems.length === 0 && <div className="text-xs text-muted-foreground">No items found.</div>}
-                    {!loadingOrder && lastOrderItems.map((it, idx) => {
-                      // Use displayQty if available, else fallback to quantity
-                      const displayQty = (it as any).displayQty ?? it.quantity;
-                      const displayUnit = (it as any).displayUnit || '';
-                      // Format quantity: show decimals only if needed
-                      const qtyStr = Number.isInteger(displayQty) ? displayQty.toString() : displayQty.toFixed(2).replace(/\.?0+$/, '');
-                      // Show unit if available (e.g., "2.5 kg")
-                      const qtyDisplay = displayUnit ? `${qtyStr} ${displayUnit}` : qtyStr;
-                      
-                      return (
-                        <div key={idx} className="flex justify-between items-start gap-2 text-xs py-1">
-                          <span className="flex-1 min-w-0 break-words">{it.product_name}</span>
-                          <div className="flex-shrink-0 text-right">
-                            <span className="font-medium">{qtyDisplay} × ₹{it.actualRate.toFixed(2)}</span>
-                            {it.actualRate.toFixed(2) !== it.rate.toFixed(2) && it.rate > 0 && (
-                              <div className="text-[10px] text-muted-foreground line-through">₹{it.rate.toFixed(2)}</div>
+                  {/* Individual Orders - show each order separately when multiple exist */}
+                  {loadingOrder && <div className="text-xs text-muted-foreground mt-2">Loading...</div>}
+                  
+                  {!loadingOrder && ordersTodayList.length > 1 ? (
+                    <div className="mt-2 space-y-2">
+                      {ordersTodayList.map((order, orderIdx) => {
+                        const isExpanded = expandedOrderId === order.id;
+                        const orderItems = lastOrderItems.filter(it => {
+                          // Match items to this order by order_id if available
+                          const itemOrderId = (it as any).order_id;
+                          return itemOrderId === order.id;
+                        });
+                        // If items don't have order_id tags, show all items only for first order (fallback)
+                        const hasTaggedItems = lastOrderItems.some(it => (it as any).order_id);
+                        const displayItems = hasTaggedItems ? orderItems : (orderIdx === 0 ? lastOrderItems : []);
+                        
+                        return (
+                          <div key={order.id} className="border border-border/50 rounded-md overflow-hidden">
+                            <button
+                              className="w-full flex items-center justify-between p-2 text-xs hover:bg-muted/30 transition-colors"
+                              onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Package size={12} className="text-primary" />
+                                <span className="font-medium">Order {orderIdx + 1}</span>
+                                {order.invoice_number && (
+                                  <span className="text-muted-foreground">({order.invoice_number})</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">₹{Math.round(order.total_amount).toLocaleString()}</span>
+                                <span className="text-muted-foreground">{isExpanded ? '▲' : '▼'}</span>
+                              </div>
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="px-2 pb-2 space-y-1 border-t border-border/30">
+                                {displayItems.length === 0 && <div className="text-xs text-muted-foreground py-1">No items found.</div>}
+                                {displayItems.map((it, idx) => {
+                                  const displayQty = (it as any).displayQty ?? it.quantity;
+                                  const displayUnit = (it as any).displayUnit || '';
+                                  const qtyStr = Number.isInteger(displayQty) ? displayQty.toString() : displayQty.toFixed(2).replace(/\.?0+$/, '');
+                                  const qtyDisplay = displayUnit ? `${qtyStr} ${displayUnit}` : qtyStr;
+                                  return (
+                                    <div key={idx} className="flex justify-between items-start gap-2 text-xs py-1">
+                                      <span className="flex-1 min-w-0 break-words">{it.product_name}</span>
+                                      <div className="flex-shrink-0 text-right">
+                                        <span className="font-medium">{qtyDisplay} × ₹{it.actualRate.toFixed(2)}</span>
+                                        {it.actualRate.toFixed(2) !== it.rate.toFixed(2) && it.rate > 0 && (
+                                          <div className="text-[10px] text-muted-foreground line-through">₹{it.rate.toFixed(2)}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                
+                                {/* Individual Invoice */}
+                                <div className="pt-1 border-t border-border/20">
+                                  <VisitInvoicePDFGenerator orders={[{
+                                    id: order.id,
+                                    invoice_number: order.invoice_number,
+                                    total_amount: order.total_amount,
+                                    created_at: order.created_at
+                                  }]} customerPhone={visit.phone} className="w-full" />
+                                </div>
+                              </div>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : !loadingOrder ? (
+                    /* Single order - show items directly as before */
+                    <div className="mt-2 space-y-1 overflow-hidden">
+                      {lastOrderItems.length === 0 && <div className="text-xs text-muted-foreground">No items found.</div>}
+                      {lastOrderItems.map((it, idx) => {
+                        const displayQty = (it as any).displayQty ?? it.quantity;
+                        const displayUnit = (it as any).displayUnit || '';
+                        const qtyStr = Number.isInteger(displayQty) ? displayQty.toString() : displayQty.toFixed(2).replace(/\.?0+$/, '');
+                        const qtyDisplay = displayUnit ? `${qtyStr} ${displayUnit}` : qtyStr;
+                        return (
+                          <div key={idx} className="flex justify-between items-start gap-2 text-xs py-1">
+                            <span className="flex-1 min-w-0 break-words">{it.product_name}</span>
+                            <div className="flex-shrink-0 text-right">
+                              <span className="font-medium">{qtyDisplay} × ₹{it.actualRate.toFixed(2)}</span>
+                              {it.actualRate.toFixed(2) !== it.rate.toFixed(2) && it.rate > 0 && (
+                                <div className="text-[10px] text-muted-foreground line-through">₹{it.rate.toFixed(2)}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   
-                  {/* Invoice Generation Button */}
+                  {/* Invoice & Cancel buttons */}
                   {ordersTodayList.length > 0 && <div className="mt-3 pt-2 border-t space-y-2">
+                      {/* Show combined invoice for all orders */}
                       <VisitInvoicePDFGenerator orders={ordersTodayList.map(o => ({
                         id: o.id,
                         invoice_number: o.invoice_number,

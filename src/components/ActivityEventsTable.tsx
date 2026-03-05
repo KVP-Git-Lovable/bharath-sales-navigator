@@ -39,7 +39,10 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
 
   const loadActivities = useCallback(async () => {
     if (!userId || !selectedDate) return;
-    setIsLoading(true);
+    // FIX: Only show loading spinner if no activities are cached yet (prevents flicker on re-entry)
+    if (activities.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const data = await fetchActivitiesForDate(userId, selectedDate);
       setActivities(data);
