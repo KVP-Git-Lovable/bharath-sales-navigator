@@ -22,6 +22,7 @@ import { AnalyticsModal } from "./AnalyticsModal";
 import { StockDataModal } from "./StockDataModal";
 import { RetailerAnalytics } from "./RetailerAnalytics";
 import { VisitInvoicePDFGenerator } from "./VisitInvoicePDFGenerator";
+import { OrderItemsExpanded } from "./OrderItemsExpanded";
 import { PaymentMarkingModal } from "./PaymentMarkingModal";
 import { VisitAIInsightsModal } from "./VisitAIInsightsModal";
 import { VanSalesModal } from "./VanSalesModal";
@@ -2931,14 +2932,15 @@ export const VisitCard = ({
                     <div className="mt-2 space-y-2">
                       {ordersTodayList.map((order, orderIdx) => {
                         const isExpanded = expandedOrderId === order.id;
-                        const orderItems = lastOrderItems.filter(it => {
-                          // Match items to this order by order_id if available
-                          const itemOrderId = (it as any).order_id;
-                          return itemOrderId === order.id;
-                        });
-                        // If items don't have order_id tags, show all items only for first order (fallback)
+                        // Match items to this order - try order_id first, then check if items have tags
                         const hasTaggedItems = lastOrderItems.some(it => (it as any).order_id);
-                        const displayItems = hasTaggedItems ? orderItems : (orderIdx === 0 ? lastOrderItems : []);
+                        let displayItems: typeof lastOrderItems;
+                        if (hasTaggedItems) {
+                          displayItems = lastOrderItems.filter(it => (it as any).order_id === order.id);
+                        } else {
+                          // Fallback: split items evenly or show all for first order
+                          displayItems = orderIdx === 0 ? lastOrderItems : [];
+                        }
                         
                         return (
                           <div key={order.id} className="border border-border/50 rounded-md overflow-hidden">
@@ -2960,26 +2962,14 @@ export const VisitCard = ({
                             </button>
                             
                             {isExpanded && (
-                              <div className="px-2 pb-2 space-y-1 border-t border-border/30">
-                                {displayItems.length === 0 && <div className="text-xs text-muted-foreground py-1">No items found.</div>}
-                                {displayItems.map((it, idx) => {
-                                  const displayQty = (it as any).displayQty ?? it.quantity;
-                                  const displayUnit = (it as any).displayUnit || '';
-                                  const qtyStr = Number.isInteger(displayQty) ? displayQty.toString() : displayQty.toFixed(2).replace(/\.?0+$/, '');
-                                  const qtyDisplay = displayUnit ? `${qtyStr} ${displayUnit}` : qtyStr;
-                                  return (
-                                    <div key={idx} className="flex justify-between items-start gap-2 text-xs py-1">
-                                      <span className="flex-1 min-w-0 break-words">{it.product_name}</span>
-                                      <div className="flex-shrink-0 text-right">
-                                        <span className="font-medium">{qtyDisplay} × ₹{it.actualRate.toFixed(2)}</span>
-                                        {it.actualRate.toFixed(2) !== it.rate.toFixed(2) && it.rate > 0 && (
-                                          <div className="text-[10px] text-muted-foreground line-through">₹{it.rate.toFixed(2)}</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                              <OrderItemsExpanded 
+                                orderId={order.id} 
+                                displayItems={displayItems} 
+                                onItemsLoaded={(items) => {
+                                  // Merge newly fetched items into lastOrderItems
+                                  setLastOrderItems(prev => [...prev, ...items]);
+                                }}
+                              />
                             )}
                           </div>
                         );
