@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES, MIN_SYNC_INTERVAL_MS } from '@/lib/offlineStorage';
 import { loadMyVisitsSnapshot, saveMyVisitsSnapshot, clearMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
@@ -535,11 +535,17 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       const visitCountDifferent = currentCache.visits?.length !== newVisits.length;
       
       if (visitsChanged || visitCountDifferent) {
-        // Full replacement for visits - don't use granular update which can miss items
-        setVisits(newVisits);
-        currentCache.visits = newVisits;
-        uiUpdated = true;
-        console.log(`[SmartSync] Visits REPLACED: ${currentCache.visits?.length || 0} → ${newVisits.length}`);
+        // FIX: Deep compare to avoid no-op replacements that cause re-renders
+        const oldJson = JSON.stringify(currentCache.visits || []);
+        const newJson = JSON.stringify(newVisits);
+        if (oldJson !== newJson) {
+          setVisits(newVisits);
+          currentCache.visits = newVisits;
+          uiUpdated = true;
+          console.log(`[SmartSync] Visits REPLACED: ${currentCache.visits?.length || 0} → ${newVisits.length}`);
+        } else {
+          console.log('[SmartSync] Visits identical, skipping state update');
+        }
       }
 
       // Update orders granularly - ALWAYS compare full list
@@ -759,18 +765,21 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     const isCacheStale = isTodayDate && cacheAge > MAX_CACHE_AGE_MS;
     
     if (hasValidCachedData && isCacheDataValid) {
-      setBeatPlans(cached.beatPlans || []);
-      setVisits(cached.visits || []);
-      setRetailers(cached.retailers || []);
-      setOrders(cached.orders || []);
-      if (cached.points) {
-        setPointsData({ 
-          total: cached.points.total, 
-          byRetailer: new Map(cached.points.byRetailer) 
-        });
-      }
-      setIsLoading(false);
-      setHasLoadedOnce(true);
+      // FIX: Batch all state updates to prevent intermediate empty renders
+      React.startTransition(() => {
+        setBeatPlans(cached.beatPlans || []);
+        setVisits(cached.visits || []);
+        setRetailers(cached.retailers || []);
+        setOrders(cached.orders || []);
+        if (cached.points) {
+          setPointsData({ 
+            total: cached.points.total, 
+            byRetailer: new Map(cached.points.byRetailer) 
+          });
+        }
+        setIsLoading(false);
+        setHasLoadedOnce(true);
+      });
       
       // Background smart sync - force if cache is stale
       // SLOW CONNECTION CHECK: Skip background sync entirely on slow connections
@@ -1142,9 +1151,13 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   useEffect(() => {
     mountedRef.current = true;
     
-    // CHANGE 2: Reset loading state on every re-entry so stale SafetyGuard flags don't cause empty-state flash
-    setIsLoading(true);
-    setHasLoadedOnce(false);
+    // FIX: Only reset loading state if no cached data exists for this date
+    // This prevents a 1-frame flicker when switching dates with cached data
+    const hasCachedData = cacheRef.current.has(selectedDate) && cacheRef.current.get(selectedDate)?.retailers?.length > 0;
+    if (!hasCachedData) {
+      setIsLoading(true);
+      setHasLoadedOnce(false);
+    }
     
     loadData();
 
