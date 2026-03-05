@@ -64,7 +64,7 @@ function ProfileInfoItem({ icon, label, value }: { icon: React.ReactNode; label:
       <div className="text-muted-foreground mt-0.5">{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium truncate">{value}</p>
+        <p className="text-sm font-medium break-all">{value}</p>
       </div>
     </div>
   );
@@ -188,7 +188,7 @@ export const ActivityLoggingSection = () => {
 
       {/* User Profile Dialog */}
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>User Profile</DialogTitle>
           </DialogHeader>
