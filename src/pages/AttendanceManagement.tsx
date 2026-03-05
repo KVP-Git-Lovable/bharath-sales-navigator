@@ -18,6 +18,7 @@ import WorkingDaysConfig from '@/components/attendance/WorkingDaysConfig';
 import LeaveTypesManager from '@/components/attendance/LeaveTypesManager';
 import { Layout } from '@/components/Layout';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
+import AttendanceReportGenerator from '@/components/attendance/AttendanceReportGenerator';
 
 interface LeaveApplication {
   id: string;
@@ -76,6 +77,7 @@ const AttendanceManagement = () => {
     { id: 'leave', label: 'Leave Management', icon: Calendar },
     { id: 'regularization', label: 'Regularization', icon: Users },
     { id: 'leave-balances', label: 'Leave Balances', icon: ClipboardList },
+    { id: 'reports', label: 'Reports', icon: BookOpen },
   ];
 
   const configSubTabs = [
@@ -597,6 +599,8 @@ const AttendanceManagement = () => {
       )}
 
       {subTab === 'leave-balances' && <LeaveBalancesManager />}
+
+      {subTab === 'reports' && <AttendanceReportGenerator />}
 
       {subTab === 'leave-types' && <LeaveTypesManager />}
 
