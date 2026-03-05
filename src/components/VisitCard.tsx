@@ -2979,16 +2979,6 @@ export const VisitCard = ({
                                     </div>
                                   );
                                 })}
-                                
-                                {/* Individual Invoice */}
-                                <div className="pt-1 border-t border-border/20">
-                                  <VisitInvoicePDFGenerator orders={[{
-                                    id: order.id,
-                                    invoice_number: order.invoice_number,
-                                    total_amount: order.total_amount,
-                                    created_at: order.created_at
-                                  }]} customerPhone={visit.phone} className="w-full" />
-                                </div>
                               </div>
                             )}
                           </div>
