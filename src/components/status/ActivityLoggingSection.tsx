@@ -33,6 +33,8 @@ interface UserProfileData {
   hq: string | null;
   band: string | null;
   address: string | null;
+  primary_manager_name: string | null;
+  secondary_manager_name: string | null;
 }
 
 function formatUsageTime(seconds: number): string {
@@ -98,13 +100,9 @@ export const ActivityLoggingSection = () => {
     setProfileLoading(true);
     setSelectedProfile(null);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, username, phone_number, designation, profile_picture_url, date_of_joining, hq, band, address')
-        .eq('id', userId)
-        .single();
+      const { data, error } = await supabase.rpc('get_user_profile_card', { p_user_id: userId });
       if (error) throw error;
-      setSelectedProfile(data as UserProfileData);
+      setSelectedProfile(data as unknown as UserProfileData);
     } catch (e: any) {
       console.error('Profile fetch error:', e);
     } finally {
@@ -221,8 +219,12 @@ export const ActivityLoggingSection = () => {
               {/* Profile Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <ProfileInfoItem icon={<Mail className="h-4 w-4" />} label="Email" value={selectedProfile.email || '-'} />
+                {selectedProfile.designation && (
+                  <ProfileInfoItem icon={<Briefcase className="h-4 w-4" />} label="Designation" value={selectedProfile.designation} />
+                )}
+                <ProfileInfoItem icon={<Users className="h-4 w-4" />} label="Primary Manager" value={selectedProfile.primary_manager_name || '-'} />
+                <ProfileInfoItem icon={<Users className="h-4 w-4" />} label="Secondary Manager" value={selectedProfile.secondary_manager_name || '-'} />
                 <ProfileInfoItem icon={<Phone className="h-4 w-4" />} label="Phone" value={selectedProfile.phone_number || '-'} />
-                <ProfileInfoItem icon={<Briefcase className="h-4 w-4" />} label="Band" value={selectedProfile.band || '-'} />
                 <ProfileInfoItem icon={<MapPin className="h-4 w-4" />} label="HQ" value={selectedProfile.hq || '-'} />
                 {selectedProfile.date_of_joining && (
                   <ProfileInfoItem
@@ -230,9 +232,6 @@ export const ActivityLoggingSection = () => {
                     label="Date of Joining"
                     value={format(new Date(selectedProfile.date_of_joining), 'PP')}
                   />
-                )}
-                {selectedProfile.address && (
-                  <ProfileInfoItem icon={<MapPin className="h-4 w-4" />} label="Address" value={selectedProfile.address} />
                 )}
               </div>
             </div>
