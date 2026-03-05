@@ -30,7 +30,7 @@ interface UserProfileData {
   designation: string | null;
   profile_picture_url: string | null;
   date_of_joining: string | null;
-  hq: string | null;
+  role: string | null;
   band: string | null;
   address: string | null;
   primary_manager_name: string | null;
@@ -225,7 +225,7 @@ export const ActivityLoggingSection = () => {
                 <ProfileInfoItem icon={<Users className="h-4 w-4" />} label="Primary Manager" value={selectedProfile.primary_manager_name || '-'} />
                 <ProfileInfoItem icon={<Users className="h-4 w-4" />} label="Secondary Manager" value={selectedProfile.secondary_manager_name || '-'} />
                 <ProfileInfoItem icon={<Phone className="h-4 w-4" />} label="Phone" value={selectedProfile.phone_number || '-'} />
-                <ProfileInfoItem icon={<MapPin className="h-4 w-4" />} label="HQ" value={selectedProfile.hq || '-'} />
+                <ProfileInfoItem icon={<Briefcase className="h-4 w-4" />} label="Role" value={selectedProfile.role ? selectedProfile.role.charAt(0).toUpperCase() + selectedProfile.role.slice(1) : '-'} />
                 {selectedProfile.date_of_joining && (
                   <ProfileInfoItem
                     icon={<Calendar className="h-4 w-4" />}
