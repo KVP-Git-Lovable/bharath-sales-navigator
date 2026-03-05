@@ -375,9 +375,11 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       );
       
       const retailerIds = new Set(filteredRetailers.map(r => r.id));
+      // FIX: Include orders matching user+date even if retailer isn't in today's beat plan
+      // This ensures offline-created orders appear immediately without waiting for sync
       const filteredOrders = cachedOrders.filter(o => 
         o.user_id === uid && o.order_date === date && 
-        o.status === 'confirmed' && retailerIds.has(o.retailer_id)
+        o.status === 'confirmed'
       );
 
       console.log('[OfflineStorage] Loaded:', {
@@ -844,10 +846,33 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           }
         }
         
+        // FIX: Also merge offline orders not yet in snapshot (handles race condition
+        // where order is saved to IndexedDB but snapshot hasn't been updated yet)
+        let mergedOrders = [...(snapshot.orders || [])];
+        if (offlineData?.orders?.length) {
+          const snapshotOrderIds = new Set(mergedOrders.map(o => o.id));
+          const newOfflineOrders = offlineData.orders.filter(o => !snapshotOrderIds.has(o.id));
+          if (newOfflineOrders.length > 0) {
+            mergedOrders = [...mergedOrders, ...newOfflineOrders];
+            console.log('[LoadData] Merged', newOfflineOrders.length, 'new orders from offline storage into snapshot');
+          }
+        }
+        
+        // Also merge visits from offline storage that may not be in snapshot
+        let mergedVisits = [...(snapshot.visits || [])];
+        if (offlineData?.visits?.length) {
+          const snapshotVisitIds = new Set(mergedVisits.map(v => v.id));
+          const newOfflineVisits = offlineData.visits.filter(v => !snapshotVisitIds.has(v.id));
+          if (newOfflineVisits.length > 0) {
+            mergedVisits = [...mergedVisits, ...newOfflineVisits];
+            console.log('[LoadData] Merged', newOfflineVisits.length, 'new visits from offline storage into snapshot');
+          }
+        }
+        
         setBeatPlans(snapshot.beatPlans || []);
-        setVisits(snapshot.visits || []);
+        setVisits(mergedVisits);
         setRetailers(mergedRetailers);
-        setOrders(snapshot.orders || []);
+        setOrders(mergedOrders);
         
         // FIX: Load points from snapshot for instant display
         if (snapshot.pointsTotal !== undefined || snapshot.pointsByRetailer) {
@@ -866,6 +891,8 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         cacheRef.current.set(selectedDate, { 
           ...snapshot, 
           retailers: mergedRetailers,
+          visits: mergedVisits,
+          orders: mergedOrders,
           points: snapshot.pointsByRetailer ? { total: snapshot.pointsTotal || 0, byRetailer: snapshot.pointsByRetailer } : undefined,
           timestamp: Date.now() 
         });
