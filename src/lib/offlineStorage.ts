@@ -264,27 +264,11 @@ class OfflineStorage {
     this.emitSyncQueueUpdated();
   }
 
-  async deleteOldSyncedItems(maxAgeMs: number = 3 * 24 * 60 * 60 * 1000): Promise<void> {
-    await this.ensureReady();
-    const now = Date.now();
-    const cutoffTime = now - maxAgeMs;
-
-    try {
-      const items = await this.getStoreData<any>(STORES.SYNC_QUEUE);
-      const recentItems = items.filter((item: any) => 
-        !item.timestamp || item.timestamp >= cutoffTime
-      );
-      
-      const deletedCount = items.length - recentItems.length;
-      
-      if (deletedCount > 0) {
-        await this.setStoreData(STORES.SYNC_QUEUE, recentItems);
-        console.log(`[OfflineStorage] 🗑️ Deleted ${deletedCount} old synced items (older than 3 days)`);
-      }
-    } catch (error) {
-      console.error('[OfflineStorage] Error deleting old items:', error);
-      throw error;
-    }
+  // No-op: items are never auto-deleted from sync queue.
+  // They remain until successfully synced and verified in the database.
+  async deleteOldSyncedItems(_maxAgeMs?: number): Promise<void> {
+    // Intentionally empty — sync queue items persist until confirmed synced
+    return;
   }
 
   // Sync metadata operations for delta sync
