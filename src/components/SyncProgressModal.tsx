@@ -35,7 +35,8 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
       setSyncItems(queue.map(item => ({
         id: item.id,
         action: item.action,
-        status: 'pending',
+        status: item.status === 'permanently_failed' ? 'error' : 'pending',
+        error: item.lastError || (item.status === 'permanently_failed' ? 'Sync failed - tap Retry' : undefined),
         data: item.data,
         timestamp: item.timestamp,
         retryCount: item.retryCount

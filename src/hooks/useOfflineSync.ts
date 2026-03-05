@@ -40,74 +40,8 @@ export function useOfflineSync() {
         return uuidRegex.test(id);
       };
 
-      // Auto-recover permanently failed CREATE_ORDER items so they get retried
-      const recoverPermanentlyFailedOrders = async (): Promise<void> => {
-        try {
-          const queue = await offlineStorage.getSyncQueue();
-          const failedOrders = queue.filter(
-            (item: any) => item.status === 'permanently_failed' && item.action === 'CREATE_ORDER'
-          );
-
-          if (failedOrders.length === 0) return;
-
-          for (const item of failedOrders) {
-            const recovered = { ...item };
-            recovered.retryCount = 0;
-            delete recovered.status;
-            delete recovered.failedAt;
-            recovered._recovered = true;
-            recovered.recoveredAt = Date.now();
-            await offlineStorage.save(STORES.SYNC_QUEUE, recovered);
-          }
-
-          console.log(`🔄 Recovered ${failedOrders.length} permanently failed orders for retry`);
-        } catch (e) {
-          console.warn('⚠️ Failed to recover permanently failed orders (non-fatal):', e);
-        }
-      };
-
-      // Clean up stale sync items with priority-based retention
-      // CREATE_ORDER items get 48-hour / 5-retry protection to prevent data loss
-      const cleanupStaleSyncItems = async (queue: any[]): Promise<any[]> => {
-        const now = Date.now();
-        const fifteenMinutesAgo = now - (15 * 60 * 1000);
-        const fortyEightHoursAgo = now - (48 * 60 * 60 * 1000);
-        const cleanQueue: any[] = [];
-        
-        for (const item of queue) {
-          const isCritical = item.action === 'CREATE_ORDER';
-          const retries = item.retryCount || 0;
-          
-          // For recovered items, use recoveredAt as the age baseline
-          const ageBaseline = item._recovered && item.recoveredAt ? item.recoveredAt : item.timestamp;
-          const ageMs = ageBaseline ? now - ageBaseline : 0;
-          
-          // Critical items (orders): 48-hour window, 5 retries max
-          // Non-critical items: 15-minute window, 2 retries max
-          const maxAge = isCritical ? fortyEightHoursAgo : fifteenMinutesAgo;
-          const maxRetries = isCritical ? 5 : 2;
-          
-          const isStale = ageBaseline && ageBaseline < maxAge;
-          const tooManyRetries = retries >= maxRetries;
-          
-          if (isStale || tooManyRetries) {
-            if (isCritical) {
-              // NEVER silently delete orders - mark as permanently_failed instead
-              console.error(`⛔ ORDER SYNC FAILED PERMANENTLY: age=${Math.round(ageMs / 60000)}min, retries=${retries}`, JSON.stringify(item.data));
-              const failedItem = { ...item, status: 'permanently_failed', failedAt: new Date().toISOString() };
-              await offlineStorage.save(STORES.SYNC_QUEUE, failedItem);
-              cleanQueue.push(failedItem);
-            } else {
-              console.log(`🧹 Removing stale sync item: ${item.action}, age=${Math.round(ageMs / 60000)}min, retries=${retries}`);
-              await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
-            }
-          } else {
-            cleanQueue.push(item);
-          }
-        }
-        
-        return cleanQueue;
-      };
+      // REMOVED: recoverPermanentlyFailedOrders — items never expire now
+      // REMOVED: cleanupStaleSyncItems — items stay in queue until successfully synced
 
       const ensureNoOrderVisitsQueued = async (existingQueue: any[]) => {
         try {
@@ -159,12 +93,8 @@ export function useOfflineSync() {
         }
       };
 
-      // Step 0: Recover any permanently failed orders before cleanup
-      await recoverPermanentlyFailedOrders();
-
-      // Step 1: Get and clean up stale items first
+      // Step 1: Get sync queue (no cleanup - all items persist until synced)
       let syncQueue = await offlineStorage.getSyncQueue();
-      syncQueue = await cleanupStaleSyncItems(syncQueue);
       
       // Step 2: Only rebuild queue if there are NO existing items
       // This prevents re-adding items that are about to be processed
@@ -191,7 +121,22 @@ export function useOfflineSync() {
           // Process each sync item based on action type
           await processSyncItem(item);
           
-          // Remove from queue after successful sync
+          // Server verification for CREATE_ORDER before removing from queue
+          if (item.action === 'CREATE_ORDER') {
+            const orderId = item.data?.order?.id;
+            if (orderId && isValidUUID(orderId)) {
+              const { data: verified } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('id', orderId)
+                .maybeSingle();
+              if (!verified) {
+                throw new Error('Order not confirmed in database after sync');
+              }
+            }
+          }
+          
+          // Remove from queue after successful sync + verification
           await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
           console.log(`✅ Successfully synced ${item.action}`);
           successCount++;
@@ -213,29 +158,18 @@ export function useOfflineSync() {
             error: errorMsg
           });
           
-          // Increment retry count
+          // Increment retry count — NEVER delete, NEVER mark permanently_failed
+          // Items stay in queue indefinitely until successfully synced
           const updatedItem = {
             ...item,
             retryCount: (item.retryCount || 0) + 1,
             lastError: errorMsg,
             lastRetryAt: new Date().toISOString()
           };
-          
-          const isCritical = item.action === 'CREATE_ORDER';
-          const maxRetries = isCritical ? 5 : 2;
-          
-          if (updatedItem.retryCount < maxRetries) {
-            await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
-          } else if (isCritical) {
-            // NEVER delete order data - mark as permanently failed for manual recovery
-            console.error(`⛔ ORDER PERMANENTLY FAILED after ${maxRetries} retries:`, JSON.stringify(item.data));
-            const failedItem = { ...updatedItem, status: 'permanently_failed', failedAt: new Date().toISOString() };
-            await offlineStorage.save(STORES.SYNC_QUEUE, failedItem);
-          } else {
-            // Non-critical items can be removed after max retries
-            console.error(`⛔ Removing non-critical item after ${maxRetries} failed attempts:`, item.action);
-            await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
-          }
+          // Remove any legacy permanently_failed status so item gets retried
+          delete updatedItem.status;
+          delete updatedItem.failedAt;
+          await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
         }
       }
 
@@ -1251,23 +1185,12 @@ export function useOfflineSync() {
       };
       window.addEventListener('focus', handleFocus);
       
-      // Clean up old synced items (older than 3 days) after successful sync
-      const cleanupOldData = async () => {
-        try {
-          await offlineStorage.deleteOldSyncedItems();
-          console.log('🧹 Old synced data cleaned up successfully');
-        } catch (error) {
-          console.error('❌ Error cleaning up old data:', error);
-        }
-      };
-      
-      // Run cleanup after sync completes
-      const cleanupTimeout = setTimeout(cleanupOldData, 15000);
+      // REMOVED: cleanup timeout that called deleteOldSyncedItems
+      // Sync queue items now persist until successfully synced and verified
       
       return () => {
         retryTimeouts.forEach(clearTimeout);
         clearInterval(periodicSyncInterval);
-        clearTimeout(cleanupTimeout);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleFocus);
       };
