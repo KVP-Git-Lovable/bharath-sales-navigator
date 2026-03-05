@@ -30,6 +30,11 @@ interface OverrideForm {
   custom_reset_cycle: string | null;
 }
 
+interface AccrualForm {
+  accrual_type: string;
+  yearly_entitlement: number;
+}
+
 const LeavePolicyConfig = () => {
   const { data: globalPolicy, isLoading: loadingGlobal } = useGlobalLeavePolicy();
   const { data: overrides, isLoading: loadingOverrides } = useLeaveTypeOverrides();
@@ -56,6 +61,7 @@ const LeavePolicyConfig = () => {
   });
 
   const [overrideForms, setOverrideForms] = useState<Record<string, OverrideForm>>({});
+  const [accrualForms, setAccrualForms] = useState<Record<string, AccrualForm>>({});
 
   useEffect(() => {
     supabase.from('leave_types').select('*').eq('is_active', true).order('name')
@@ -64,6 +70,26 @@ const LeavePolicyConfig = () => {
         setLoadingTypes(false);
       });
   }, []);
+
+  // Load existing leave_policy (accrual) data
+  useEffect(() => {
+    if (leaveTypes.length > 0) {
+      supabase.from('leave_policy').select('*').then(({ data }) => {
+        const forms: Record<string, AccrualForm> = {};
+        leaveTypes.forEach(lt => {
+          const existing = (data || []).find((p: any) => p.leave_type_id === lt.id);
+          forms[lt.id] = existing ? {
+            accrual_type: existing.accrual_type || 'yearly',
+            yearly_entitlement: existing.yearly_entitlement ?? 0,
+          } : {
+            accrual_type: 'yearly',
+            yearly_entitlement: 0,
+          };
+        });
+        setAccrualForms(forms);
+      });
+    }
+  }, [leaveTypes]);
 
   useEffect(() => {
     if (globalPolicy) {
@@ -120,6 +146,13 @@ const LeavePolicyConfig = () => {
     }));
   };
 
+  const updateAccrual = (leaveTypeId: string, field: keyof AccrualForm, value: any) => {
+    setAccrualForms(prev => ({
+      ...prev,
+      [leaveTypeId]: { ...prev[leaveTypeId], [field]: value },
+    }));
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -157,8 +190,24 @@ const LeavePolicyConfig = () => {
         }
       }
 
+      // Save accrual settings to leave_policy
+      for (const lt of leaveTypes) {
+        const accrual = accrualForms[lt.id];
+        if (!accrual) continue;
+        const { error } = await supabase
+          .from('leave_policy')
+          .upsert({
+            leave_type_id: lt.id,
+            accrual_type: accrual.accrual_type,
+            yearly_entitlement: accrual.yearly_entitlement,
+            is_active: true,
+          }, { onConflict: 'leave_type_id' });
+        if (error) throw error;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['global-leave-policy'] });
       queryClient.invalidateQueries({ queryKey: ['leave-type-overrides'] });
+      queryClient.invalidateQueries({ queryKey: ['leave-policies'] });
       toast.success('Leave policy saved successfully');
     } catch (error) {
       console.error('Error saving leave policy:', error);
@@ -446,6 +495,54 @@ const LeavePolicyConfig = () => {
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-4 pt-2">
+                          {/* Accrual & Entitlement - always visible */}
+                          <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+                            <h4 className="text-sm font-semibold flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              Accrual & Entitlement
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Accrual Type</Label>
+                                <Select
+                                  value={accrualForms[lt.id]?.accrual_type || 'yearly'}
+                                  onValueChange={(value) => updateAccrual(lt.id, 'accrual_type', value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="yearly">Yearly (full entitlement at start)</SelectItem>
+                                    <SelectItem value="monthly">Monthly (credited each month)</SelectItem>
+                                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Yearly Entitlement (days)</Label>
+                                <Input
+                                  type="number"
+                                  value={accrualForms[lt.id]?.yearly_entitlement ?? 0}
+                                  onChange={(e) => updateAccrual(lt.id, 'yearly_entitlement', parseFloat(e.target.value) || 0)}
+                                  min={0}
+                                  max={365}
+                                />
+                              </div>
+                            </div>
+                            {accrualForms[lt.id]?.accrual_type === 'monthly' && accrualForms[lt.id]?.yearly_entitlement > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                ℹ Monthly credit: {(accrualForms[lt.id].yearly_entitlement / 12).toFixed(2)} days/month
+                              </p>
+                            )}
+                            {accrualForms[lt.id]?.accrual_type === 'quarterly' && accrualForms[lt.id]?.yearly_entitlement > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                ℹ Quarterly credit: {(accrualForms[lt.id].yearly_entitlement / 4).toFixed(2)} days/quarter
+                              </p>
+                            )}
+                          </div>
+
+                          <Separator />
+
                           <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                             <div>
                               <Label className="font-semibold">Override Global Rules</Label>
