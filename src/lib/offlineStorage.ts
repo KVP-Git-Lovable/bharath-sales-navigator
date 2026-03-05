@@ -28,6 +28,7 @@ export const STORES = {
   ATTENDANCE: 'attendance',
   RETAILER_VISIT_LOGS: 'retailerVisitLogs',
   SYNC_METADATA: 'syncMetadata',
+  SYNC_LOGS: 'syncLogs',
   // Attendance-specific config caching
   WEEK_OFF_CONFIG: 'weekOffConfig',
   HOLIDAYS: 'holidays'
@@ -353,21 +354,42 @@ class OfflineStorage {
     return metadata?.lastSyncedAt || null;
   }
 
-  // CRITICAL: Clear all offline storage data (used on sign out to prevent data leakage)
-  async clearAll(): Promise<void> {
+  // Check if there are unsynced items in the sync queue
+  async hasUnsyncedItems(): Promise<boolean> {
     try {
-      // Clear all known stores
-      await Promise.all([
-        this.clear(STORES.ORDERS),
-        this.clear(STORES.PRODUCTS),
-        this.clear(STORES.RETAILERS),
-        this.clear(STORES.VISITS),
-        this.clear(STORES.BEATS),
-        this.clear(STORES.BEAT_PLANS),
-        this.clear(STORES.SYNC_QUEUE),
-        this.clear(STORES.SYNC_METADATA),
-      ]);
-      console.log('[OfflineStorage] ✅ Cleared all stores');
+      const queue = await this.getStoreData(STORES.SYNC_QUEUE);
+      return queue.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  // CRITICAL: Clear all offline storage data (used on sign out to prevent data leakage)
+  // preserveUnsynced: if true, keeps ORDERS and SYNC_QUEUE when items are pending
+  async clearAll(preserveUnsynced: boolean = false): Promise<void> {
+    try {
+      const hasUnsynced = preserveUnsynced ? await this.hasUnsyncedItems() : false;
+      
+      const storesToClear: string[] = [
+        STORES.PRODUCTS,
+        STORES.RETAILERS,
+        STORES.VISITS,
+        STORES.BEATS,
+        STORES.BEAT_PLANS,
+        STORES.SYNC_METADATA,
+        STORES.SYNC_LOGS,
+      ];
+      
+      // Only clear orders and sync queue if no unsynced items (or not preserving)
+      if (!hasUnsynced) {
+        storesToClear.push(STORES.ORDERS);
+        storesToClear.push(STORES.SYNC_QUEUE);
+      } else {
+        console.log('[OfflineStorage] ⚠️ Preserving ORDERS and SYNC_QUEUE — unsynced items exist');
+      }
+      
+      await Promise.all(storesToClear.map(store => this.clear(store)));
+      console.log('[OfflineStorage] ✅ Cleared stores', hasUnsynced ? '(preserved unsynced)' : '(all)');
     } catch (error) {
       console.error('[OfflineStorage] Error clearing all stores:', error);
       throw error;

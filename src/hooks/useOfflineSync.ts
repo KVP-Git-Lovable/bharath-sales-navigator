@@ -5,6 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { syncOrdersToVanStock, getTodayDateString } from '@/utils/vanStockSync';
 import { visitStatusCache } from '@/lib/visitStatusCache';
+import { classifySyncError, isRetryableError, getBackoffDelay, MAX_AUTO_RETRIES, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
 // Removed isSlowConnection import - sync should always attempt when online
 
 export function useOfflineSync() {
@@ -110,13 +111,58 @@ export function useOfflineSync() {
 
       console.log(`🔄 Processing ${syncQueue.length} queued sync items`);
 
+      // Helper to log sync attempts
+      const logSyncAttempt = async (item: any, success: boolean, errorType?: SyncErrorType, errorMessage?: string) => {
+        try {
+          const logEntry: SyncLogEntry = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
+            syncItemId: item.id,
+            action: item.action,
+            timestamp: new Date().toISOString(),
+            errorType,
+            errorMessage,
+            attemptNumber: (item.retryCount || 0) + 1,
+            success,
+          };
+          await offlineStorage.save(STORES.SYNC_LOGS, logEntry);
+        } catch (e) {
+          console.warn('Failed to write sync log:', e);
+        }
+      };
+
       let successCount = 0;
       let failCount = 0;
       const failedItems: any[] = [];
 
       for (const item of syncQueue) {
+        // Skip items that have exceeded max retries (FAILED_SYNC state)
+        // They need manual retry which resets the counter
+        if ((item.retryCount || 0) >= MAX_AUTO_RETRIES && item.syncState === 'FAILED_SYNC') {
+          console.log(`⏭️ Skipping ${item.action} — FAILED_SYNC (needs manual retry)`);
+          continue;
+        }
+
+        // Skip VALIDATION errors — they won't fix themselves
+        if (item.errorType === 'VALIDATION') {
+          console.log(`⏭️ Skipping ${item.action} — VALIDATION error (not retryable)`);
+          continue;
+        }
+
+        // Exponential backoff: skip if not enough time has passed since last retry
+        if (item.retryCount > 0 && item.lastRetryAt) {
+          const backoffDelay = getBackoffDelay(item.retryCount);
+          const timeSinceLastRetry = Date.now() - new Date(item.lastRetryAt).getTime();
+          if (timeSinceLastRetry < backoffDelay) {
+            console.log(`⏳ Backoff: skipping ${item.action} (${Math.round((backoffDelay - timeSinceLastRetry) / 1000)}s remaining)`);
+            continue;
+          }
+        }
+
         try {
           console.log(`⏳ Syncing ${item.action}...`, item.data);
+          
+          // Update sync state to SYNCING
+          await offlineStorage.save(STORES.SYNC_QUEUE, { ...item, syncState: 'SYNCING' });
           
           // Process each sync item based on action type
           await processSyncItem(item);
@@ -136,63 +182,77 @@ export function useOfflineSync() {
             }
           }
           
+          // Log success
+          await logSyncAttempt(item, true);
+          
           // Remove from queue after successful sync + verification
           await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
           console.log(`✅ Successfully synced ${item.action}`);
           successCount++;
         } catch (error: any) {
           const errorMsg = error?.message || error?.toString() || 'Unknown error';
-          const errorCode = error?.code || '';
+          const errorType = classifySyncError(error);
+          const retryable = isRetryableError(errorType);
+          const newRetryCount = (item.retryCount || 0) + 1;
           
           console.error(`❌ Failed to sync ${item.action}:`, {
             action: item.action,
             error: errorMsg,
-            code: errorCode,
-            details: error,
+            errorType,
+            retryable,
+            retryCount: newRetryCount,
             data: item.data
           });
           
-          failCount++;
-          failedItems.push({
-            action: item.action,
-            error: errorMsg
-          });
+          // Log failure
+          await logSyncAttempt(item, false, errorType, errorMsg);
           
-          // Increment retry count — NEVER delete, NEVER mark permanently_failed
-          // Items stay in queue indefinitely until successfully synced
+          failCount++;
+          failedItems.push({ action: item.action, error: errorMsg, errorType });
+          
+          // CONFLICT errors: item likely already synced, remove from queue
+          if (errorType === 'CONFLICT') {
+            console.log(`🔄 CONFLICT for ${item.action} — treating as already synced`);
+            await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            successCount++;
+            failCount--;
+            continue;
+          }
+          
+          // Determine new sync state
+          let syncState: string = 'RETRYING';
+          if (!retryable) {
+            syncState = 'FAILED_SYNC';
+          } else if (newRetryCount >= MAX_AUTO_RETRIES) {
+            syncState = 'FAILED_SYNC';
+          }
+          
           const updatedItem = {
             ...item,
-            retryCount: (item.retryCount || 0) + 1,
+            retryCount: newRetryCount,
             lastError: errorMsg,
+            errorType,
+            syncState,
             lastRetryAt: new Date().toISOString()
           };
-          // Remove any legacy permanently_failed status so item gets retried
-          delete updatedItem.status;
-          delete updatedItem.failedAt;
           await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
         }
       }
 
       // SILENT SYNC: Per offline-first architecture, sync should NOT dispatch UI refresh events
-      // The UI already reflects local state. Sync only backs up data to server.
-      // REMOVED: syncComplete and visitDataChanged event dispatches
-      
       if (successCount > 0) {
-        // Only run van stock sync silently in background
         console.log('🚚 Running final van stock sync after sync complete...');
         syncOrdersToVanStock(getTodayDateString()).catch(err => {
           console.error('Error in final van stock sync:', err);
         });
       }
 
-      // SILENT sync - no toasts, no notifications
       if (successCount > 0 && failCount === 0) {
         console.log(`✅ Silent sync complete: ${successCount} items synced`);
       } else if (failCount > 0) {
         console.log(`⚠️ Silent sync partial: ${successCount} succeeded, ${failCount} failed`);
       }
       
-      // Force update sync queue indicator after processing (bypass throttle)
       if (successCount > 0 || failCount > 0) {
         window.dispatchEvent(new Event('syncQueueUpdated'));
       }

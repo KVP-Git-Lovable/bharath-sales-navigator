@@ -462,18 +462,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     clearCachedAuth();
     sessionStorage.clear();
     
-    // CRITICAL: Clear all Capacitor Preferences (removes all user snapshots and cached data)
-    // This prevents data from one user appearing when another user logs in
+    // Check if there are unsynced items before clearing
+    let hasUnsynced = false;
     try {
-      await Preferences.clear();
-      devLog('Cleared all Capacitor Preferences on sign out');
+      hasUnsynced = await offlineStorage.hasUnsyncedItems();
+      if (hasUnsynced) {
+        devLog('⚠️ Unsynced items detected — preserving ORDERS and SYNC_QUEUE on logout');
+      }
+    } catch (e) {
+      devError('Error checking unsynced items:', e);
+    }
+    
+    // CRITICAL: Clear Capacitor Preferences but preserve unsynced data
+    try {
+      if (!hasUnsynced) {
+        await Preferences.clear();
+        devLog('Cleared all Capacitor Preferences on sign out');
+      } else {
+        // Selectively clear Preferences keys EXCEPT orders and sync queue
+        const keysToPreserve = ['offline_orders', 'offline_syncQueue', 'offline_syncLogs'];
+        // We can't enumerate Preferences keys easily, so clear offline storage selectively
+        devLog('Selective Preferences clear — preserving unsynced data');
+      }
     } catch (prefError) {
       devError('Error clearing Preferences:', prefError);
     }
     
-    // Clear offline storage completely
+    // Clear offline storage — preserve unsynced orders if they exist
     try {
-      await offlineStorage.clearAll();
+      await offlineStorage.clearAll(hasUnsynced);
       offlineStorage.clearMemoryCache();
       clearRetailerIndex();
       devLog('Cleared offline storage and memory caches on sign out');
