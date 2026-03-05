@@ -45,6 +45,7 @@ export const ADMIN_MODULE_PERMISSION_MAP: Record<string, string> = {
   'admin_system_settings': '/admin#settings',
   'admin_pincode_master': '/admin/pincode-master',
   'admin_tax_master': '/admin/tax-master',
+  'admin_retailer_ext_db': '/admin/retailer-external-db',
 };
 
 // Sub-feature prefixes for modules where parent name doesn't match sub-feature naming
@@ -71,6 +72,7 @@ export const ADMIN_MODULE_SUB_PREFIXES: Record<string, string[]> = {
   'admin_user_mgmt': ['admin_user_'],
   'admin_pincode_master': ['admin_pincode_'],
   'admin_tax_master': ['tax_master_'],
+  'admin_retailer_ext_db': ['admin_retailer_ext_'],
   'admin_system_settings': ['admin_system_', 'admin_settings_'],
 };
 

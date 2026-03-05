@@ -10707,6 +10707,45 @@ export type Database = {
           },
         ]
       }
+      retailer_external_db: {
+        Row: {
+          address: string | null
+          category: string | null
+          city: string
+          company_name: string
+          email: string | null
+          id: number
+          mobile: string | null
+          pincode: string | null
+          state: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          category?: string | null
+          city: string
+          company_name: string
+          email?: string | null
+          id?: never
+          mobile?: string | null
+          pincode?: string | null
+          state: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          category?: string | null
+          city?: string
+          company_name?: string
+          email?: string | null
+          id?: never
+          mobile?: string | null
+          pincode?: string | null
+          state?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       retailer_feedback: {
         Row: {
           comments: string | null
@@ -15512,6 +15551,18 @@ export type Database = {
           full_name: string
           level: number
           manager_id: string
+        }[]
+      }
+      get_retailer_ext_cities: {
+        Args: { selected_state: string }
+        Returns: {
+          city: string
+        }[]
+      }
+      get_retailer_ext_states: {
+        Args: never
+        Returns: {
+          state: string
         }[]
       }
       get_subordinate_users: {
