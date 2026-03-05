@@ -30,6 +30,12 @@ export async function submitOrderWithOfflineSupport(
   const orderId = crypto.randomUUID();
   const orderDate = orderData.order_date || getLocalTodayDate();
   const orderValue = Math.round(Number(orderData.total_amount) || orderItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0));
+
+  const isValidUUID = (id?: string | null): boolean => {
+    if (!id) return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  };
   
   const normalizedOrder = {
     ...orderData,
@@ -39,6 +45,13 @@ export async function submitOrderWithOfflineSupport(
     status: orderData.status || 'confirmed',
     created_at: new Date().toISOString(),
   };
+
+  // Sanitize payload for direct DB insert (queue sync path already sanitizes separately)
+  const { scheme_details, pending_amount, ...orderWithoutExtraFields } = normalizedOrder as any;
+  const orderForDirectInsert: any = { ...orderWithoutExtraFields };
+  if (orderForDirectInsert.visit_id && !isValidUUID(orderForDirectInsert.visit_id)) {
+    delete orderForDirectInsert.visit_id;
+  }
 
   const normalizedItems = orderItems.map(item => ({
     ...item,
@@ -120,7 +133,7 @@ export async function submitOrderWithOfflineSupport(
     // Only queue to offline when genuinely offline (not on slow connections)
     if (!navigator.onLine) {
       console.log('📴 Device offline - queuing order for later sync:', orderId);
-      offlineStorage.addToSyncQueue('CREATE_ORDER', {
+      await offlineStorage.addToSyncQueue('CREATE_ORDER', {
         order: normalizedOrder,
         items: normalizedItems,
         visitId: orderData.visit_id
@@ -139,18 +152,18 @@ export async function submitOrderWithOfflineSupport(
           .maybeSingle();
 
         if (!existingOrder) {
-          // Insert order header first - NEVER block on errors
+          // Insert order header first
           const { error: orderError } = await supabase
             .from('orders')
-            .insert({ ...normalizedOrder, id: orderId });
+            .insert({ ...orderForDirectInsert, id: orderId });
 
-          if (orderError) {
-            // Log but don't throw - duplicate invoice or any error should not block order
-            console.warn('⚠️ Order insert warning (non-blocking):', orderError.message, orderError.code);
+          // Duplicate means already inserted earlier; all other errors must queue for retry
+          if (orderError && orderError.code !== '23505') {
+            throw orderError;
           }
         }
 
-        // ALWAYS ensure order items are inserted (even if order had errors)
+        // ALWAYS ensure order items are inserted (even if order already existed)
         const { data: existingItems } = await supabase
           .from('order_items')
           .select('id')
@@ -162,8 +175,8 @@ export async function submitOrderWithOfflineSupport(
             .from('order_items')
             .insert(normalizedItems);
 
-          if (itemsError) {
-            console.warn('⚠️ Order items insert warning (non-blocking):', itemsError.message, itemsError.code);
+          if (itemsError && itemsError.code !== '23505') {
+            throw itemsError;
           }
         }
       })();
@@ -185,7 +198,7 @@ export async function submitOrderWithOfflineSupport(
         error: syncError?.message || syncError,
         timestamp: new Date().toISOString()
       });
-      offlineStorage.addToSyncQueue('CREATE_ORDER', {
+      await offlineStorage.addToSyncQueue('CREATE_ORDER', {
         order: normalizedOrder,
         items: normalizedItems,
         visitId: orderData.visit_id
