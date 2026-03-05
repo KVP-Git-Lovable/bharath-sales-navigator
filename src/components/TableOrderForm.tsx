@@ -1004,7 +1004,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                   )}
                 >
                     {/* Product Column */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col min-w-0">
                       <Popover 
                         open={openComboboxes[row.id]} 
                         onOpenChange={(open) => setOpenComboboxes(prev => ({ ...prev, [row.id]: open }))}
@@ -1014,7 +1014,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                             variant="outline"
                             role="combobox"
                             aria-expanded={openComboboxes[row.id]}
-                            className="w-full justify-start h-9 md:h-11 text-xs md:text-sm font-normal bg-background px-2"
+                            className="w-full min-w-0 justify-start h-9 md:h-11 text-xs md:text-sm font-normal bg-background px-2"
                           >
                             {row.product ? (
                               <div className="flex items-center gap-1.5 w-full overflow-hidden">
