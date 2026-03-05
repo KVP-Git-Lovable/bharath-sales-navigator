@@ -151,11 +151,13 @@ const SyncItemDetails = ({ item }: { item: SyncItem }) => {
   if (rows.length === 0) return <p className="text-xs text-muted-foreground">No additional details</p>;
 
   return (
-    <div className="mt-2 space-y-1 border-t pt-2">
+    <div className="mt-2 space-y-1.5 border-t pt-2">
       {rows.map((row, idx) => (
-        <div key={idx} className="flex justify-between text-xs gap-2">
-          <span className="text-muted-foreground whitespace-nowrap">{row.label}</span>
-          <span className="text-right truncate font-medium">{row.value}</span>
+        <div key={idx} className="flex flex-col text-xs gap-0.5">
+          {row.label && (
+            <span className="text-muted-foreground text-[10px] uppercase tracking-wide">{row.label}</span>
+          )}
+          <span className="font-medium break-words line-clamp-2">{row.value}</span>
         </div>
       ))}
     </div>
@@ -256,7 +258,7 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Sync Progress</DialogTitle>
         </DialogHeader>
@@ -336,9 +338,9 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
                                 </div>
                               )}
                               {item.lastError && (
-                                <div className="text-xs text-destructive mt-1 flex items-center gap-1">
-                                  {errorInfo && errorInfo.icon}
-                                  <span className="truncate">
+                                <div className="text-xs text-destructive mt-1 flex items-start gap-1 min-w-0">
+                                  {errorInfo && <span className="flex-shrink-0 mt-0.5">{errorInfo.icon}</span>}
+                                  <span className="break-words line-clamp-2">
                                     {errorInfo ? `${errorInfo.label}: ` : ''}{item.lastError}
                                   </span>
                                 </div>
