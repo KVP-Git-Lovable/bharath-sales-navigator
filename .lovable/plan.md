@@ -1,55 +1,49 @@
 
 
-## Plan: Never-expire sync queue with verified-delete and deduplication
+## Plan: Add Accrual Settings to Leave Type Behaviour UI
 
-### Problem Summary
-1. Sync queue items get marked `permanently_failed` after 48 hours or 5 retries, hiding them from active sync
-2. `deleteOldSyncedItems()` removes queue items older than 3 days regardless of sync status
-3. `cleanupStaleSyncItems()` enforces age/retry limits that can remove unsynced data
-4. No server-side verification before deleting from local queue
-5. No deduplication check before inserting into database
+### Problem
+The Leave Type Behaviour UI only manages behavioral overrides (`leave_type_policy_override`), but accrual configuration (`accrual_type`, `yearly_entitlement`) lives in the legacy `leave_policy` table. Admins must manually insert `leave_policy` records for accrual to work -- there is no UI for it.
+
+### Approach
+Extend each leave type's accordion section in `LeavePolicyConfig.tsx` to include **Accrual Settings** (accrual type + yearly entitlement). These fields will persist to `leave_policy` while behavioral overrides continue going to `leave_type_policy_override`. No schema changes needed -- the `leave_policy` table already has the required columns.
 
 ### Changes
 
-**1. `src/hooks/useOfflineSync.ts` — Remove all expiry/failure-cap logic**
+**1. `src/components/attendance/LeavePolicyConfig.tsx`**
 
-- **Remove `cleanupStaleSyncItems()`** function entirely (lines 71-110). This function marks items as `permanently_failed` or deletes them based on age (48h for orders, 15min for others) and retry count limits. Instead, all items stay in queue indefinitely.
-- **Remove `recoverPermanentlyFailedOrders()`** function (lines 44-67) — no longer needed since nothing gets permanently failed.
-- **Remove retry count cap in error handler** (lines 224-238): Currently items are deleted or marked `permanently_failed` after `maxRetries`. Change to: always save with incremented `retryCount` and `lastError`, never delete, never mark as permanently_failed. All items remain in queue until successfully synced.
-- **Add server verification before delete** (line 195): After `processSyncItem(item)` succeeds, verify the data exists in the database before calling `offlineStorage.delete()`. For `CREATE_ORDER`: query `orders` table by ID to confirm. For other actions: trust the successful response (non-order items are less critical).
-- **Add deduplication in `processSyncItem`**: Before inserting, check if the record already exists in the database. For `CREATE_ORDER`: check `orders` table by order ID. If already exists, treat as success and remove from queue. This is partially done already in `offlineOrderUtils.ts` but needs to be bulletproof in the sync path too.
-- **Remove the cleanup timeout** (lines 1254-1265) that calls `deleteOldSyncedItems()` after 15 seconds.
+- **Add accrual state**: Create a new state `accrualForms` (`Record<string, { accrual_type: string, yearly_entitlement: number }>`) to track per-leave-type accrual config.
+- **Load existing `leave_policy` data**: On mount, fetch from `leave_policy` table and populate `accrualForms` for each leave type. Default to `{ accrual_type: 'yearly', yearly_entitlement: 0 }` if no record exists.
+- **Render accrual fields in each accordion item**: Add an "Accrual & Entitlement" section (always visible, not behind the override toggle) with:
+  - **Accrual Type** dropdown: `yearly` | `monthly` | `quarterly`
+  - **Yearly Entitlement** number input
+  - When `monthly` is selected, show computed "Monthly credit: X days/month" helper text
+- **Save accrual data in `handleSave`**: For each leave type, upsert into `leave_policy` using `leave_type_id` as the unique key:
+  - If a `leave_policy` record exists for that `leave_type_id`, update `accrual_type`, `yearly_entitlement`, `is_active = true`
+  - If not, insert a new record with those values plus `is_active = true`
+  - This will trigger `trigger_initialize_leave_policy_balances` automatically for new monthly policies, backfilling balances for all active users
+- **Invalidate queries**: Add `leave-policies` to the query invalidation list after save.
 
-**2. `src/lib/offlineStorage.ts` — Remove `deleteOldSyncedItems()`**
+### UI Layout (per leave type accordion)
 
-- Remove or gut the `deleteOldSyncedItems()` method (lines 267-284) so it no longer auto-deletes queue items based on age. Keep the method signature but make it a no-op to avoid breaking callers.
-
-**3. `src/components/SyncProgressModal.tsx` — Show permanently_failed items properly**
-
-- Update the status mapping (line 38) to recognize items with `status: 'permanently_failed'` and display them as `error` with appropriate labeling so users can see and retry them.
-
-### Technical Details
-
-**Server verification pattern for CREATE_ORDER:**
-```typescript
-// After processSyncItem succeeds:
-if (item.action === 'CREATE_ORDER') {
-  const orderId = item.data?.order?.id;
-  const { data: verified } = await supabase
-    .from('orders')
-    .select('id')
-    .eq('id', orderId)
-    .maybeSingle();
-  if (!verified) throw new Error('Order not confirmed in database');
-}
-await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+```text
+┌─────────────────────────────────────────────┐
+│ Casual Leave                   [Custom Rules]│
+├─────────────────────────────────────────────┤
+│ Accrual & Entitlement                        │
+│ ┌─────────────────┐ ┌─────────────────────┐ │
+│ │ Accrual Type     │ │ Yearly Entitlement  │ │
+│ │ [Monthly      ▼] │ │ [12             ]   │ │
+│ └─────────────────┘ └─────────────────────┘ │
+│ ℹ Monthly credit: 1.00 days/month           │
+│                                              │
+│ ── Override Global Rules [toggle] ────────── │
+│ (existing override fields below)             │
+└─────────────────────────────────────────────┘
 ```
 
-**Deduplication in processSyncItem for CREATE_ORDER:**
-The existing code in `offlineOrderUtils.ts` already checks for existing orders before insert. The sync queue handler should do the same: if the order already exists in DB, skip insert and treat as success.
-
-**Retry behavior change:**
-- No max retry limit — items retry every sync cycle
-- `retryCount` and `lastError` still tracked for user visibility
-- Exponential backoff not needed since sync cycles are already spaced (60s intervals)
+### Key Technical Details
+- `leave_policy` has a unique constraint on `leave_type_id` (isOneToOne: true), so upsert via `.upsert()` with `onConflict: 'leave_type_id'` works cleanly.
+- The existing DB trigger `trigger_initialize_leave_policy_balances` fires on INSERT to `leave_policy` when `accrual_type = 'monthly'`, auto-backfilling balances from January through current month for all active users.
+- No database migration needed -- all required columns (`accrual_type`, `yearly_entitlement`, `is_active`) already exist on `leave_policy`.
 
