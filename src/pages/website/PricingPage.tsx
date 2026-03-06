@@ -266,6 +266,29 @@ export const PricingPage = () => {
         </div>
       </section>
 
+      {/* Distributor Portal Add-on Section */}
+      <section className="py-12 px-4">
+        <div className="container mx-auto max-w-5xl">
+          <Card className="p-8 border-primary/30 bg-primary/5 text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Users className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold mb-3">Distributor Portal Add-on</h3>
+            <p className="text-muted-foreground max-w-xl mx-auto mb-4">
+              Need additional distributor portal capacity? Get <strong>5 Distributor Portals</strong> and <strong>10 Field sales automation license</strong> at <strong>₹5,000/month</strong>
+            </p>
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => navigate("/request-demo")}
+            >
+              Contact Sales
+            </Button>
+          </Card>
+        </div>
+      </section>
+
       {/* Professional Services Section */}
       <section className="py-16 px-4 bg-muted/30">
         <div className="container mx-auto max-w-5xl">
