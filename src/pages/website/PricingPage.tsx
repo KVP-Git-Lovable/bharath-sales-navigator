@@ -33,7 +33,7 @@ const pricingTiers = [
     features: [
       "Unlimited users",
       "5,000 orders/month",
-      "Offline capabilities",
+      "GPS Tracking",
       "Secondary sales management",
       "Beat planning & tracking",
       "AI-powered insights — 2,500 AI credits/month",
