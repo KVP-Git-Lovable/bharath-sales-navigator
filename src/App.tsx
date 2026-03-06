@@ -140,6 +140,7 @@ import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
 import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
+import AIFeaturesExport from "./pages/AIFeaturesExport";
 import { TeamApprovals } from "./pages/TeamApprovals";
 
 // Distributor Portal Pages
@@ -356,6 +357,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/map-redirect" element={<MapRedirect />} />
         <Route path="/status" element={<StatusDashboard />} />
+        <Route path="/ai-features-export" element={<AIFeaturesExport />} />
         <Route path="/auth/complete-profile" element={<CompleteProfile />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         
