@@ -276,7 +276,7 @@ export const PricingPage = () => {
               </div>
               <div>
                 <p className="font-semibold text-foreground">Distributor Portal Add-on</p>
-                <p className="text-xs text-muted-foreground">Get 5 Distributor Portals and 10 Field sales automation licenses for just <strong className="text-lg text-foreground">₹5,000</strong></p>
+                <p className="text-xs text-muted-foreground">Get 5 additional Distributor Portals and 10 additional Field sales automation licenses for just <strong className="text-lg text-foreground">₹5,000</strong></p>
               </div>
             </div>
             <Button
