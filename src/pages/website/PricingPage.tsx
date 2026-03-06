@@ -267,21 +267,21 @@ export const PricingPage = () => {
       </section>
 
       {/* Distributor Portal Add-on Section */}
-      <section className="py-12 px-4">
-        <div className="container mx-auto max-w-md">
-          <Card className="p-6 border-primary/30 bg-primary/5 text-center">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+      <section className="py-6 px-4">
+        <div className="container mx-auto max-w-5xl">
+          <Card className="p-5 border-primary/30 bg-primary/5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5 text-primary" />
               </div>
+              <div>
+                <p className="font-semibold text-foreground">Distributor Portal Add-on</p>
+                <p className="text-xs text-muted-foreground">Get 5 Distributor Portals and 10 Field sales automation licenses for just <strong>₹5,000</strong></p>
+              </div>
             </div>
-            <h3 className="text-lg font-bold mb-2">Distributor Portal Add-on</h3>
-            <p className="text-sm text-muted-foreground mx-auto mb-3">
-              Need additional distributor portal capacity? Get <strong>5 Distributor Portals</strong> and <strong>10 Field sales automation licenses</strong> for just <strong>₹5,000</strong>
-            </p>
             <Button
               size="sm"
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
               onClick={() => navigate("/request-demo")}
             >
               Contact Sales
