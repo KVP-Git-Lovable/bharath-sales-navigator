@@ -185,7 +185,7 @@ export const RetailerExternalDBLookup: React.FC = () => {
                           {r.email ? (
                             <div className="flex items-center gap-1.5 text-sm">
                               <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="truncate max-w-[180px]">{r.email}</span>
+                              <span className="break-all">{r.email}</span>
                             </div>
                           ) : '—'}
                         </TableCell>
