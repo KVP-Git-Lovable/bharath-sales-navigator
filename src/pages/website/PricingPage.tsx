@@ -268,18 +268,19 @@ export const PricingPage = () => {
 
       {/* Distributor Portal Add-on Section */}
       <section className="py-12 px-4">
-        <div className="container mx-auto max-w-5xl">
-          <Card className="p-8 border-primary/30 bg-primary/5 text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary" />
+        <div className="container mx-auto max-w-md">
+          <Card className="p-6 border-primary/30 bg-primary/5 text-center">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold mb-3">Distributor Portal Add-on</h3>
-            <p className="text-muted-foreground max-w-xl mx-auto mb-4">
-              Need additional distributor portal capacity? Get <strong>5 Distributor Portals</strong> and <strong>10 Field sales automation license</strong> at <strong>₹5,000/month</strong>
+            <h3 className="text-lg font-bold mb-2">Distributor Portal Add-on</h3>
+            <p className="text-sm text-muted-foreground mx-auto mb-3">
+              Need additional distributor portal capacity? Get <strong>5 Distributor Portals</strong> and <strong>10 Field sales automation licenses</strong> for just <strong>₹5,000</strong>
             </p>
             <Button
+              size="sm"
               className="bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => navigate("/request-demo")}
             >
