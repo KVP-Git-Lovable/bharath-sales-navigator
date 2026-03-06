@@ -72,7 +72,7 @@ const pricingTiers = [
     features: [
       "Everything in Professional, plus:",
       "20,000 orders/month",
-      "200 distributor portals",
+      "100 distributor portals",
       "Institutional sales",
       "AI-powered insights — 10,000 AI credits/month",
       "15 GB storage",
