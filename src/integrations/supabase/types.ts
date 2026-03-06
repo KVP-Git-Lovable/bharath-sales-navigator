@@ -7343,6 +7343,63 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_event_log: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_code: string
+          id: string
+          metadata: Json | null
+          processed: boolean
+          record_id: string
+          source_table: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_code: string
+          id?: string
+          metadata?: Json | null
+          processed?: boolean
+          record_id: string
+          source_table: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_code?: string
+          id?: string
+          metadata?: Json | null
+          processed?: boolean
+          record_id?: string
+          source_table?: string
+        }
+        Relationships: []
+      }
+      notification_event_types: {
+        Row: {
+          description: string | null
+          event_code: string
+          id: string
+          is_active: boolean
+          label: string
+        }
+        Insert: {
+          description?: string | null
+          event_code: string
+          id?: string
+          is_active?: boolean
+          label: string
+        }
+        Update: {
+          description?: string | null
+          event_code?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -7369,6 +7426,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      notification_rules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          event_code: string
+          id: string
+          is_active: boolean
+          message_template: string
+          name: string
+          notification_channel: string
+          receiver_role: string | null
+          receiver_type: string
+          receiver_user_id: string | null
+          source_table: string
+          title_template: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          event_code: string
+          id?: string
+          is_active?: boolean
+          message_template?: string
+          name: string
+          notification_channel?: string
+          receiver_role?: string | null
+          receiver_type?: string
+          receiver_user_id?: string | null
+          source_table: string
+          title_template?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          event_code?: string
+          id?: string
+          is_active?: boolean
+          message_template?: string
+          name?: string
+          notification_channel?: string
+          receiver_role?: string | null
+          receiver_type?: string
+          receiver_user_id?: string | null
+          source_table?: string
+          title_template?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_event_code_fkey"
+            columns: ["event_code"]
+            isOneToOne: false
+            referencedRelation: "notification_event_types"
+            referencedColumns: ["event_code"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -15415,6 +15531,16 @@ export type Database = {
       }
       create_approval_workflow: {
         Args: { user_id_param: string }
+        Returns: undefined
+      }
+      emit_notification_event: {
+        Args: {
+          p_actor_user_id: string
+          p_event_code: string
+          p_metadata?: Json
+          p_record_id: string
+          p_source_table: string
+        }
         Returns: undefined
       }
       generate_invoice_number: { Args: never; Returns: string }

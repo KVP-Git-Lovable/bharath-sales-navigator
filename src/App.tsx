@@ -123,6 +123,7 @@ import PincodeMasterPage from "./pages/admin/PincodeMasterPage";
 import HierarchyTargets from "./pages/admin/HierarchyTargets";
 import TaxMaster from "./pages/admin/TaxMaster";
 import RetailerExternalDBPage from "./pages/admin/RetailerExternalDBPage";
+import NotificationRulesAdmin from "./pages/admin/NotificationRulesAdmin";
 import MyTargets from "./pages/MyTargets";
 import MyTarget from "./pages/MyTarget";
 import TeamTargets from "./pages/TeamTargets";
@@ -451,6 +452,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/admin/pincode-master" element={<ProtectedRoute><PincodeMasterPage /></ProtectedRoute>} />
         <Route path="/admin/tax-master" element={<ProtectedRoute><TaxMaster /></ProtectedRoute>} />
         <Route path="/admin/retailer-external-db" element={<ProtectedRoute><RetailerExternalDBPage /></ProtectedRoute>} />
+        <Route path="/admin/notification-rules" element={<ProtectedRoute><NotificationRulesAdmin /></ProtectedRoute>} />
         <Route path="/distributor-master" element={<ProtectedRoute><DistributorMaster /></ProtectedRoute>} />
         <Route path="/add-distributor" element={<ProtectedRoute><AddDistributor /></ProtectedRoute>} />
         <Route path="/distributor/:id" element={<ProtectedRoute><DistributorDetail /></ProtectedRoute>} />
