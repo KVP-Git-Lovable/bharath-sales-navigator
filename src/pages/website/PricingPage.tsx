@@ -33,7 +33,7 @@ const pricingTiers = [
     features: [
       "Unlimited users",
       "5,000 orders/month",
-      "Offline capabilities",
+      "GPS Tracking",
       "Secondary sales management",
       "Beat planning & tracking",
       "AI-powered insights — 2,500 AI credits/month",
@@ -72,7 +72,7 @@ const pricingTiers = [
     features: [
       "Everything in Professional, plus:",
       "20,000 orders/month",
-      "200 distributor portals",
+      "100 distributor portals",
       "Institutional sales",
       "AI-powered insights — 10,000 AI credits/month",
       "15 GB storage",
@@ -177,53 +177,7 @@ export const PricingPage = () => {
         </div>
       </section>
 
-      {/* Enterprise Plus Section */}
-      <section className="py-16 px-4">
-        <div className="container mx-auto max-w-4xl">
-          <Card className="p-8 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold mb-2">Enterprise Plus</h2>
-                <p className="text-muted-foreground mb-4">
-                  For large enterprises with large field reps and multi-region operations
-                </p>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    Unlimited everything
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    White-label options
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    Custom integrations
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    Dedicated success manager
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    SLA guarantees
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    On-premise deployment
-                  </li>
-                </ul>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-2">Custom pricing</p>
-                <Button size="lg" onClick={() => navigate("/request-demo")}>
-                  Contact Sales
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </section>
+      {/* Enterprise Plus Section - Hidden */}
 
       {/* Add-On Packs Section */}
       <section className="py-16 px-4">
