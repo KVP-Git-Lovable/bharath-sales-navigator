@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, differenceInDays } from "date-fns";
@@ -1191,9 +1192,12 @@ export const MyVisits = () => {
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
           <CardHeader className="pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
-                <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+              <div className="flex items-center gap-1.5">
+                <div>
+                  <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
+                  <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+                </div>
+                <ModuleHelpButton categoryId="my-visit" variant="onDark" />
               </div>
               <CompactMultiUserSelector
                 selectedUserIds={selectedUserIds}

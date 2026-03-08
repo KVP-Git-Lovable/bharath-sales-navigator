@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Book, MapPin, ShoppingCart, Users, Calendar, BarChart3, Award, Briefcase, Settings, ChevronRight, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -137,7 +137,21 @@ const helpCategories: HelpCategory[] = [
 
 export default function HelpCenter() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
+  const categoryParam = searchParams.get("category");
+  const scrolledRef = useRef(false);
+
+  // Auto-scroll to category when linked from module
+  useEffect(() => {
+    if (categoryParam && !scrolledRef.current) {
+      scrolledRef.current = true;
+      setTimeout(() => {
+        const el = document.getElementById(`help-cat-${categoryParam}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
+    }
+  }, [categoryParam]);
 
   const filtered = search.trim()
     ? helpCategories
@@ -182,7 +196,7 @@ export default function HelpCenter() {
       {/* Categories */}
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
         {filtered.map((cat) => (
-          <Card key={cat.id} className="overflow-hidden">
+          <Card key={cat.id} id={`help-cat-${cat.id}`} className={`overflow-hidden ${categoryParam === cat.id ? 'ring-2 ring-primary' : ''}`}>
             <CardContent className="p-0">
               {/* Category header */}
               <div className="flex items-center gap-3 p-4 pb-2">

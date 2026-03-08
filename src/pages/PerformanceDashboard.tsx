@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, Calendar, Target, ArrowLeft } from 'lucide-react';
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { useAuth } from '@/hooks/useAuth';
 import { usePerformanceSummary, type PerformancePeriod } from '@/hooks/usePerformanceSummary';
 import { OverallPerformanceHeader } from '@/components/performance/OverallPerformanceHeader';
@@ -56,6 +57,7 @@ const PerformanceDashboard = () => {
                   <h1 className="text-2xl font-bold text-foreground">Performance Dashboard</h1>
                   <p className="text-muted-foreground text-sm">Track your target vs. actual performance</p>
                 </div>
+                <ModuleHelpButton categoryId="performance" />
               </div>
             </div>
             

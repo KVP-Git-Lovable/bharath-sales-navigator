@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power } from "lucide-react";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { Button } from "@/components/ui/button";
@@ -1229,7 +1230,10 @@ export const MyBeats = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <div className="flex flex-col">
-                  <CardTitle className="text-2xl font-bold">My Beats</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-2xl font-bold">My Beats</CardTitle>
+                    <ModuleHelpButton categoryId="retailers" variant="onDark" />
+                  </div>
                   <p className="text-primary-foreground/80 mt-1">Manage your sales territories and routes</p>
                   <div className="flex items-center gap-2 flex-wrap mt-2">
                     {/* Multi-User Selector below title */}
