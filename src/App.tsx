@@ -138,6 +138,8 @@ import DistributorDetail from "./pages/DistributorDetail";
 import EditDistributor from "./pages/EditDistributor";
 import PrimaryOrders from "./pages/PrimaryOrders";
 import ResetPassword from "./pages/ResetPassword";
+import HelpCenter from "./pages/HelpCenter";
+import HelpArticle from "./pages/HelpArticle";
 import ChangePassword from "./pages/ChangePassword";
 import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
@@ -459,6 +461,8 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/edit-distributor/:id" element={<ProtectedRoute><EditDistributor /></ProtectedRoute>} />
         <Route path="/primary-orders" element={<ProtectedRoute><PrimaryOrders /></ProtectedRoute>} />
         <Route path="/my-deliveries" element={<ProtectedRoute><MyDeliveriesPage /></ProtectedRoute>} />
+        <Route path="/help-center" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
+        <Route path="/help-center/:articleId" element={<ProtectedRoute><HelpArticle /></ProtectedRoute>} />
 
         {/* Distributor Portal Routes */}
         <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
