@@ -54,6 +54,7 @@ const articlesDB: Record<string, ArticleData> = {
           "My Visit is the core module that manages your entire day in the field. From the moment you start your day to the last check-out, everything is tracked here.",
           "It shows your planned retailers for the day based on your beat schedule, lets you check in at each stop with GPS verification, and allows you to place orders directly during the visit."
         ],
+        screenshot: { src: imgMyVisitOverview, alt: "My Visit daily screen showing retailer cards with status badges", caption: "My Visit – Your daily retailer visit list with live status tracking" },
       },
       {
         title: "Key Features at a Glance",
@@ -117,6 +118,7 @@ const articlesDB: Record<string, ArticleData> = {
           "A beat is a predefined route or area containing a group of retailers. Each day of the week can have a different beat assigned, ensuring complete territory coverage over time.",
           "Your beat for the day determines which retailers appear on your My Visit screen."
         ],
+        screenshot: { src: imgBeatPlanning, alt: "Beat schedule showing weekly plan with retailer counts", caption: "Weekly beat schedule – Each day has an assigned beat with retailers" },
       },
       {
         title: "Viewing Your Beat Plan",
@@ -159,6 +161,7 @@ const articlesDB: Record<string, ArticleData> = {
         content: [
           "When you arrive at a retailer location, tap the 'Check-In' button on the retailer's visit card. The app will:"
         ],
+        screenshot: { src: imgCheckIn, alt: "GPS check-in screen with location verified", caption: "GPS-verified check-in – Location is auto-captured and verified" },
         steps: [
           "Request your current GPS location",
           "Verify you are within range of the retailer's registered address",
@@ -204,6 +207,7 @@ const articlesDB: Record<string, ArticleData> = {
         content: [
           "Once you've checked in to a retailer, you can start placing an order:"
         ],
+        screenshot: { src: imgOrderEntry, alt: "Order entry screen with product catalog and cart", caption: "Order Entry – Browse products, add quantities, and see cart totals" },
         steps: [
           "Tap the 'Order Entry' button on the visit screen",
           "Browse products by category or search by name",
@@ -248,6 +252,7 @@ const articlesDB: Record<string, ArticleData> = {
       {
         title: "Status Types",
         content: [],
+        screenshot: { src: imgVisitStatuses, alt: "Visit status cards showing Planned, In Progress, Productive, Unproductive", caption: "Visit statuses – Each visit is auto-classified based on activity" },
         steps: [
           "Planned – Visit is scheduled but not started. Default state for the day.",
           "In Progress – You have checked in but not yet checked out.",
@@ -324,6 +329,7 @@ const articlesDB: Record<string, ArticleData> = {
         content: [
           "Today's Summary is accessible from the Home screen and gives you a real-time snapshot of your day:"
         ],
+        screenshot: { src: imgTodaySummary, alt: "Today's summary dashboard with visit and order stats", caption: "Today's Summary – Real-time stats on visits, orders, and productivity" },
         steps: [
           "Total planned visits vs completed visits",
           "Number of productive and unproductive visits",
