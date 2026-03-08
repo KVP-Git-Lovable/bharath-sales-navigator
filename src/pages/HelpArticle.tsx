@@ -509,6 +509,7 @@ export default function HelpArticle() {
           </div>
           <HelpArticleLanguageSelector selectedLang={articleLang} onLangChange={setArticleLang} />
           {isTranslating && <span className="text-[10px] text-muted-foreground animate-pulse">Translating…</span>}
+        </div>
       </div>
 
       {/* Content */}
