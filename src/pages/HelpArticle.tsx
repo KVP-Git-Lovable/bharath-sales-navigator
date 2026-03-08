@@ -510,9 +510,46 @@ export default function HelpArticle() {
               </div>
             )}
 
+            {section.screenshot && (
+              <button
+                onClick={() => setLightboxImg(section.screenshot!)}
+                className="group relative w-full rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-md transition-shadow mt-2"
+              >
+                <img
+                  src={section.screenshot.src}
+                  alt={section.screenshot.alt}
+                  className="w-full max-h-[400px] object-contain bg-muted/30"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5 transition-colors flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-full p-2 shadow">
+                    <ZoomIn className="w-5 h-5 text-foreground" />
+                  </div>
+                </div>
+                {section.screenshot.caption && (
+                  <div className="px-3 py-2 bg-muted/50 border-t border-border">
+                    <p className="text-xs text-muted-foreground text-center">{section.screenshot.caption}</p>
+                  </div>
+                )}
+              </button>
+            )}
+
             {i < article.sections.length - 1 && <Separator className="mt-4" />}
           </div>
         ))}
+
+        {/* Screenshot Lightbox */}
+        <Dialog open={!!lightboxImg} onOpenChange={() => setLightboxImg(null)}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-background border-border">
+            {lightboxImg && (
+              <img
+                src={lightboxImg.src}
+                alt={lightboxImg.alt}
+                className="max-w-full max-h-[85vh] object-contain mx-auto rounded"
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Feedback */}
         <Card className="border-muted">
