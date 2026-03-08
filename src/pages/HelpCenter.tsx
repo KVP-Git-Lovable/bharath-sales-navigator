@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Book, MapPin, ShoppingCart, Users, Calendar, BarChart3, Award, Briefcase, Settings, ChevronRight, Star } from "lucide-react";
+import { ArrowLeft, Search, Book, MapPin, ShoppingCart, Users, Calendar, BarChart3, Award, Briefcase, Settings, ChevronRight, Star, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
