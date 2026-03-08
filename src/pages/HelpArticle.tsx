@@ -1,12 +1,21 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ThumbsUp, ThumbsDown, ChevronRight, CheckCircle2, Info, Lightbulb, MapPin, Clock, ShoppingCart, BarChart3, Sparkles, ClipboardList } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, ChevronRight, CheckCircle2, Info, Lightbulb, MapPin, Clock, ShoppingCart, BarChart3, Sparkles, ClipboardList, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+// Screenshot imports
+import imgMyVisitOverview from "@/assets/help/my-visit-overview.png";
+import imgBeatPlanning from "@/assets/help/beat-planning.png";
+import imgCheckIn from "@/assets/help/check-in-screen.png";
+import imgOrderEntry from "@/assets/help/order-entry.png";
+import imgTodaySummary from "@/assets/help/today-summary.png";
+import imgVisitStatuses from "@/assets/help/visit-statuses.png";
 
 interface ArticleSection {
   title: string;
@@ -14,6 +23,7 @@ interface ArticleSection {
   content: string[];
   tips?: string[];
   steps?: string[];
+  screenshot?: { src: string; alt: string; caption?: string };
 }
 
 interface ArticleData {
