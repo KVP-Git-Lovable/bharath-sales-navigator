@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ThumbsUp, ThumbsDown, ChevronRight, CheckCircle2, Info, Lightbulb, MapPin, Clock, ShoppingCart, BarChart3, Sparkles, ClipboardList, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,10 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpArticleLanguageSelector } from "@/components/help/HelpArticleLanguageSelector";
+import { HelpArticleChat } from "@/components/help/HelpArticleChat";
+import { useTranslation } from "react-i18next";
 
 // Screenshot imports
 import imgMyVisitOverview from "@/assets/help/my-visit-overview.png";
@@ -405,8 +409,58 @@ export default function HelpArticle() {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
+  const { i18n } = useTranslation();
+  const [articleLang, setArticleLang] = useState(i18n.language?.split("-")[0] || "en");
+  const [translatedSections, setTranslatedSections] = useState<Record<string, string> | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const article = articleId ? articlesDB[articleId] : null;
+
+  // Translate article content when language changes
+  useEffect(() => {
+    if (!article || articleLang === "en") {
+      setTranslatedSections(null);
+      return;
+    }
+    
+    const translateArticle = async () => {
+      setIsTranslating(true);
+      try {
+        // Collect all translatable text
+        const textsToTranslate: string[] = [article.title, article.summary];
+        article.sections.forEach((s) => {
+          textsToTranslate.push(s.title);
+          s.content.forEach((c) => textsToTranslate.push(c));
+          s.steps?.forEach((st) => textsToTranslate.push(st));
+          s.tips?.forEach((t) => textsToTranslate.push(t));
+        });
+
+        const { data, error } = await supabase.functions.invoke("translate-address", {
+          body: { addresses: textsToTranslate, targetLanguage: articleLang },
+        });
+
+        if (!error && data?.translatedAddresses) {
+          const map: Record<string, string> = {};
+          textsToTranslate.forEach((orig, i) => {
+            map[orig] = data.translatedAddresses[i] || orig;
+          });
+          setTranslatedSections(map);
+        }
+      } catch {
+        // Silently fall back to English
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    translateArticle();
+  }, [articleLang, articleId]);
+
+  // Helper to get translated text
+  const tx = (text: string) => {
+    if (!translatedSections || articleLang === "en") return text;
+    return translatedSections[text] || text;
+  };
 
   const handleFeedback = async (type: "up" | "down") => {
     setFeedback(type);
@@ -451,8 +505,10 @@ export default function HelpArticle() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-xs text-primary font-medium">{article.category}</p>
-            <h1 className="text-sm font-semibold text-foreground truncate">{article.title}</h1>
+            <h1 className="text-sm font-semibold text-foreground truncate">{tx(article.title)}</h1>
           </div>
+          <HelpArticleLanguageSelector selectedLang={articleLang} onLangChange={setArticleLang} />
+          {isTranslating && <span className="text-[10px] text-muted-foreground animate-pulse">Translating…</span>}
         </div>
       </div>
 
@@ -467,7 +523,7 @@ export default function HelpArticle() {
         {/* Summary */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
-            <p className="text-sm text-foreground leading-relaxed">{article.summary}</p>
+            <p className="text-sm text-foreground leading-relaxed">{tx(article.summary)}</p>
           </CardContent>
         </Card>
 
@@ -480,11 +536,11 @@ export default function HelpArticle() {
                   {section.icon}
                 </div>
               )}
-              <h2 className="font-semibold text-foreground text-[15px]">{section.title}</h2>
+              <h2 className="font-semibold text-foreground text-[15px]">{tx(section.title)}</h2>
             </div>
 
             {section.content.map((para, j) => (
-              <p key={j} className="text-sm text-muted-foreground leading-relaxed">{para}</p>
+              <p key={j} className="text-sm text-muted-foreground leading-relaxed">{tx(para)}</p>
             ))}
 
             {section.steps && (
@@ -492,7 +548,7 @@ export default function HelpArticle() {
                 {section.steps.map((step, k) => (
                   <div key={k} className="flex gap-2.5 items-start">
                     <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                    <span className="text-sm text-foreground">{step}</span>
+                    <span className="text-sm text-foreground">{tx(step)}</span>
                   </div>
                 ))}
               </div>
@@ -504,8 +560,8 @@ export default function HelpArticle() {
                   <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Tip</span>
                 </div>
-                {section.tips.map((tip, t) => (
-                  <p key={t} className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{tip}</p>
+                {section.tips.map((tip, idx) => (
+                  <p key={idx} className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{tx(tip)}</p>
                 ))}
               </div>
             )}
@@ -587,32 +643,51 @@ export default function HelpArticle() {
           </CardContent>
         </Card>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between gap-3 pb-6">
-          {article.prevArticle ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/help-center/${article.prevArticle!.id}`)}
-              className="text-xs gap-1 text-muted-foreground"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="max-w-[120px] truncate">{article.prevArticle.title}</span>
-            </Button>
-          ) : <div />}
-          {article.nextArticle && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/help-center/${article.nextArticle!.id}`)}
-              className="text-xs gap-1 text-muted-foreground"
-            >
-              <span className="max-w-[120px] truncate">{article.nextArticle.title}</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Button>
-          )}
-        </div>
+        {/* Navigation with Tooltips */}
+        <TooltipProvider>
+          <div className="flex items-center justify-between gap-3 pb-6">
+            {article.prevArticle ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/help-center/${article.prevArticle!.id}`)}
+                    className="text-xs gap-1 text-muted-foreground"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span className="max-w-[120px] truncate">{article.prevArticle.title}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{article.prevArticle.title}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : <div />}
+            {article.nextArticle && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/help-center/${article.nextArticle!.id}`)}
+                    className="text-xs gap-1 text-muted-foreground"
+                  >
+                    <span className="max-w-[120px] truncate">{article.nextArticle.title}</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{article.nextArticle.title}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TooltipProvider>
       </div>
+
+      {/* Chat Widget */}
+      <HelpArticleChat articleTitle={article.title} articleCategory={article.category} />
     </div>
   );
 }
