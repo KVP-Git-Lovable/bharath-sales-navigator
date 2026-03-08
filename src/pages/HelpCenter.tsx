@@ -202,11 +202,35 @@ export default function HelpCenter() {
 
       {/* Categories */}
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
+        {/* Quick Jump Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full justify-between text-sm font-medium">
+              <span className="text-muted-foreground">Jump to module…</span>
+              <ChevronsUpDown className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+            {helpCategories.map((cat) => (
+              <DropdownMenuItem
+                key={cat.id}
+                onClick={() => {
+                  const el = document.getElementById(`help-cat-${cat.id}`);
+                  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <span className="text-primary">{cat.icon}</span>
+                <span>{cat.title}</span>
+                <span className="ml-auto text-xs text-muted-foreground">{cat.articleCount}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         {filtered.map((cat) => (
           <Card key={cat.id} id={`help-cat-${cat.id}`} className={`overflow-hidden ${categoryParam === cat.id ? 'ring-2 ring-primary' : ''}`}>
             <CardContent className="p-0">
-              {/* Category header */}
-              <div className="flex items-center gap-3 p-4 pb-2">
                 <div className="p-2 rounded-lg bg-primary/10 text-primary">
                   {cat.icon}
                 </div>
