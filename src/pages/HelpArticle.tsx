@@ -524,6 +524,7 @@ export default function HelpArticle() {
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
             <p className="text-sm text-foreground leading-relaxed">{tx(article.summary)}</p>
+          </CardContent>
         </Card>
 
         {/* Sections */}
@@ -535,11 +536,11 @@ export default function HelpArticle() {
                   {section.icon}
                 </div>
               )}
-              <h2 className="font-semibold text-foreground text-[15px]">{section.title}</h2>
+              <h2 className="font-semibold text-foreground text-[15px]">{tx(section.title)}</h2>
             </div>
 
             {section.content.map((para, j) => (
-              <p key={j} className="text-sm text-muted-foreground leading-relaxed">{para}</p>
+              <p key={j} className="text-sm text-muted-foreground leading-relaxed">{tx(para)}</p>
             ))}
 
             {section.steps && (
@@ -547,7 +548,7 @@ export default function HelpArticle() {
                 {section.steps.map((step, k) => (
                   <div key={k} className="flex gap-2.5 items-start">
                     <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                    <span className="text-sm text-foreground">{step}</span>
+                    <span className="text-sm text-foreground">{tx(step)}</span>
                   </div>
                 ))}
               </div>
@@ -559,8 +560,8 @@ export default function HelpArticle() {
                   <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Tip</span>
                 </div>
-                {section.tips.map((tip, t) => (
-                  <p key={t} className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{tip}</p>
+                {section.tips.map((tip, idx) => (
+                  <p key={idx} className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{tx(tip)}</p>
                 ))}
               </div>
             )}
@@ -642,32 +643,51 @@ export default function HelpArticle() {
           </CardContent>
         </Card>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between gap-3 pb-6">
-          {article.prevArticle ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/help-center/${article.prevArticle!.id}`)}
-              className="text-xs gap-1 text-muted-foreground"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="max-w-[120px] truncate">{article.prevArticle.title}</span>
-            </Button>
-          ) : <div />}
-          {article.nextArticle && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/help-center/${article.nextArticle!.id}`)}
-              className="text-xs gap-1 text-muted-foreground"
-            >
-              <span className="max-w-[120px] truncate">{article.nextArticle.title}</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Button>
-          )}
-        </div>
+        {/* Navigation with Tooltips */}
+        <TooltipProvider>
+          <div className="flex items-center justify-between gap-3 pb-6">
+            {article.prevArticle ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/help-center/${article.prevArticle!.id}`)}
+                    className="text-xs gap-1 text-muted-foreground"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span className="max-w-[120px] truncate">{article.prevArticle.title}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{article.prevArticle.title}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : <div />}
+            {article.nextArticle && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/help-center/${article.nextArticle!.id}`)}
+                    className="text-xs gap-1 text-muted-foreground"
+                  >
+                    <span className="max-w-[120px] truncate">{article.nextArticle.title}</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{article.nextArticle.title}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TooltipProvider>
       </div>
+
+      {/* Chat Widget */}
+      <HelpArticleChat articleTitle={article.title} articleCategory={article.category} />
     </div>
   );
 }
