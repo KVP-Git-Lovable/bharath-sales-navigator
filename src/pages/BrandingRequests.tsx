@@ -90,7 +90,10 @@ const BrandingRequests = () => {
     <Layout>
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">Branding Requests</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold">Branding Requests</h1>
+            <ModuleHelpButton categoryId="branding" />
+          </div>
           <Button onClick={() => setOpen(true)}>New Request</Button>
         </div>
 

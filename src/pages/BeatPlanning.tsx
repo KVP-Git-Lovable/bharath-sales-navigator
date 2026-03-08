@@ -666,6 +666,7 @@ export const BeatPlanning = () => {
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
           <CardHeader className="pb-2 sm:pb-3">
           <div className="flex items-center justify-between w-full">
+              <ModuleHelpButton categoryId="my-visit" articleId="my-visit-beat-planning" variant="onDark" className="ml-auto" />
               <div className="flex items-start gap-2 sm:gap-3">
                 <div>
                   <CardTitle className="text-lg sm:text-xl font-bold">

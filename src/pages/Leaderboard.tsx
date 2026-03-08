@@ -456,9 +456,12 @@ export default function Leaderboard() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div className="flex-1">
-                <h1 className="text-2xl sm:text-3xl font-bold">Leaderboard</h1>
-                <p className="text-primary-foreground/80 text-sm sm:text-base mt-1">Track performance, earn points, and compete</p>
+              <div className="flex-1 flex items-center gap-2">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold">Leaderboard</h1>
+                  <p className="text-primary-foreground/80 text-sm sm:text-base mt-1">Track performance, earn points, and compete</p>
+                </div>
+                <ModuleHelpButton categoryId="gamification" variant="onDark" />
               </div>
             </div>
             

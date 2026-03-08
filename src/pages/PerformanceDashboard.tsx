@@ -57,6 +57,7 @@ const PerformanceDashboard = () => {
                   <h1 className="text-2xl font-bold text-foreground">Performance Dashboard</h1>
                   <p className="text-muted-foreground text-sm">Track your target vs. actual performance</p>
                 </div>
+                <ModuleHelpButton categoryId="performance" />
               </div>
             </div>
             

@@ -1192,9 +1192,12 @@ export const MyVisits = () => {
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
           <CardHeader className="pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
-                <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+              <div className="flex items-center gap-1.5">
+                <div>
+                  <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
+                  <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+                </div>
+                <ModuleHelpButton categoryId="my-visit" variant="onDark" />
               </div>
               <CompactMultiUserSelector
                 selectedUserIds={selectedUserIds}

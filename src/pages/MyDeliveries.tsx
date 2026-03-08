@@ -7,10 +7,15 @@ const MyDeliveries = () => {
     <Layout>
       <div className="min-h-screen bg-background">
         <div className="p-4 border-b bg-card">
-          <h1 className="text-xl font-bold">My Deliveries</h1>
-          <p className="text-sm text-muted-foreground">
-            View and manage your assigned deliveries
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">My Deliveries</h1>
+              <p className="text-sm text-muted-foreground">
+                View and manage your assigned deliveries
+              </p>
+            </div>
+            <ModuleHelpButton categoryId="orders" />
+          </div>
         </div>
         <div className="p-4">
           <MyDeliveriesTab />

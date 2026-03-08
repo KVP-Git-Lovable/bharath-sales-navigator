@@ -15,6 +15,8 @@ const MyTarget = () => {
               <h1 className="text-3xl font-bold text-foreground">My Target</h1>
               <p className="text-muted-foreground">Track your performance targets and achievements</p>
             </div>
+            <ModuleHelpButton categoryId="performance" articleId="performance-targets" />
+          </div>
           </div>
 
           {/* Target Content */}
