@@ -505,9 +505,10 @@ export default function HelpArticle() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-xs text-primary font-medium">{article.category}</p>
-            <h1 className="text-sm font-semibold text-foreground truncate">{article.title}</h1>
+            <h1 className="text-sm font-semibold text-foreground truncate">{tx(article.title)}</h1>
           </div>
-        </div>
+          <HelpArticleLanguageSelector selectedLang={articleLang} onLangChange={setArticleLang} />
+          {isTranslating && <span className="text-[10px] text-muted-foreground animate-pulse">Translating…</span>}
       </div>
 
       {/* Content */}
