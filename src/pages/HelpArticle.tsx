@@ -414,7 +414,55 @@ export default function HelpArticle() {
   const [translatedSections, setTranslatedSections] = useState<Record<string, string> | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
 
-  const handleFeedback = async (type: "up" | "down") => {
+  const article = articleId ? articlesDB[articleId] : null;
+
+  // Translate article content when language changes
+  useEffect(() => {
+    if (!article || articleLang === "en") {
+      setTranslatedSections(null);
+      return;
+    }
+    
+    const translateArticle = async () => {
+      setIsTranslating(true);
+      try {
+        // Collect all translatable text
+        const textsToTranslate: string[] = [article.title, article.summary];
+        article.sections.forEach((s) => {
+          textsToTranslate.push(s.title);
+          s.content.forEach((c) => textsToTranslate.push(c));
+          s.steps?.forEach((st) => textsToTranslate.push(st));
+          s.tips?.forEach((t) => textsToTranslate.push(t));
+        });
+
+        const { data, error } = await supabase.functions.invoke("translate-address", {
+          body: { addresses: textsToTranslate, targetLanguage: articleLang },
+        });
+
+        if (!error && data?.translatedAddresses) {
+          const map: Record<string, string> = {};
+          textsToTranslate.forEach((orig, i) => {
+            map[orig] = data.translatedAddresses[i] || orig;
+          });
+          setTranslatedSections(map);
+        }
+      } catch {
+        // Silently fall back to English
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    translateArticle();
+  }, [articleLang, articleId]);
+
+  // Helper to get translated text
+  const tx = (text: string) => {
+    if (!translatedSections || articleLang === "en") return text;
+    return translatedSections[text] || text;
+  };
+
+
     setFeedback(type);
     setFeedbackSubmitted(true);
 
