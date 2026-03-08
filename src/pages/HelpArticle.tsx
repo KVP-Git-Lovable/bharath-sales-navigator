@@ -409,8 +409,10 @@ export default function HelpArticle() {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
-
-  const article = articleId ? articlesDB[articleId] : null;
+  const { i18n } = useTranslation();
+  const [articleLang, setArticleLang] = useState(i18n.language?.split("-")[0] || "en");
+  const [translatedSections, setTranslatedSections] = useState<Record<string, string> | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const handleFeedback = async (type: "up" | "down") => {
     setFeedback(type);
