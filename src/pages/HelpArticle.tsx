@@ -404,6 +404,7 @@ export default function HelpArticle() {
   const navigate = useNavigate();
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
 
   const article = articleId ? articlesDB[articleId] : null;
 
