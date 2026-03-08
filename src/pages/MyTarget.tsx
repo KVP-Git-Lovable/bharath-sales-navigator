@@ -17,7 +17,6 @@ const MyTarget = () => {
             </div>
             <ModuleHelpButton categoryId="performance" articleId="performance-targets" />
           </div>
-          </div>
 
           {/* Target Content */}
           <UserFYPlanTarget />
