@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ThumbsUp, ThumbsDown, ChevronRight, CheckCircle2, Info, Lightbulb, MapPin, Clock, ShoppingCart, BarChart3, Sparkles, ClipboardList, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,10 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpArticleLanguageSelector } from "@/components/help/HelpArticleLanguageSelector";
+import { HelpArticleChat } from "@/components/help/HelpArticleChat";
+import { useTranslation } from "react-i18next";
 
 // Screenshot imports
 import imgMyVisitOverview from "@/assets/help/my-visit-overview.png";
