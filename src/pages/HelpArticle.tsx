@@ -523,8 +523,7 @@ export default function HelpArticle() {
         {/* Summary */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
-            <p className="text-sm text-foreground leading-relaxed">{article.summary}</p>
-          </CardContent>
+            <p className="text-sm text-foreground leading-relaxed">{tx(article.summary)}</p>
         </Card>
 
         {/* Sections */}
