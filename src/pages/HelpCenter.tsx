@@ -231,6 +231,8 @@ export default function HelpCenter() {
         {filtered.map((cat) => (
           <Card key={cat.id} id={`help-cat-${cat.id}`} className={`overflow-hidden ${categoryParam === cat.id ? 'ring-2 ring-primary' : ''}`}>
             <CardContent className="p-0">
+              {/* Category header */}
+              <div className="flex items-center gap-3 p-4 pb-2">
                 <div className="p-2 rounded-lg bg-primary/10 text-primary">
                   {cat.icon}
                 </div>
