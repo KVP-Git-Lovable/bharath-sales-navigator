@@ -4,6 +4,13 @@ import { ArrowLeft, Search, Book, MapPin, ShoppingCart, Users, Calendar, BarChar
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 interface HelpCategory {
   id: string;
