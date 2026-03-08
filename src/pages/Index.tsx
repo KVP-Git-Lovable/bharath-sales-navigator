@@ -1,4 +1,4 @@
-import { Store, Users, Trophy, BarChart, CreditCard, MapPin, Plus, ShoppingCart, TrendingUp, Tag, Award } from "lucide-react";
+import { Store, Users, Trophy, BarChart, CreditCard, MapPin, Plus, ShoppingCart, TrendingUp, Tag, Award, HelpCircle } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeDashboard } from "@/hooks/useHomeDashboard";
@@ -108,7 +108,8 @@ const Index = () => {
     { icon: BarChart, label: t('home.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600", id: 'analytics' },
     { icon: CreditCard, label: t('home.expenses'), href: "/expenses", color: "from-indigo-500 to-indigo-600", id: 'expenses' },
     { icon: MapPin, label: t('home.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600", id: 'territories' },
-  ].filter(item => isNavItemEnabled(item.id));
+    { icon: HelpCircle, label: "Help Center", href: "/help-center", color: "from-teal-500 to-teal-600", id: 'help-center' },
+  ].filter(item => item.id === 'help-center' || isNavItemEnabled(item.id));
 
   return (
     <Layout>
