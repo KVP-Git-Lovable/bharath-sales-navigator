@@ -196,7 +196,7 @@ export default function HelpCenter() {
       {/* Categories */}
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
         {filtered.map((cat) => (
-          <Card key={cat.id} className="overflow-hidden">
+          <Card key={cat.id} id={`help-cat-${cat.id}`} className={`overflow-hidden ${categoryParam === cat.id ? 'ring-2 ring-primary' : ''}`}>
             <CardContent className="p-0">
               {/* Category header */}
               <div className="flex items-center gap-3 p-4 pb-2">
