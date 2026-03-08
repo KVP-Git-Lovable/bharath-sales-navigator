@@ -462,7 +462,7 @@ export default function HelpArticle() {
     return translatedSections[text] || text;
   };
 
-
+  const handleFeedback = async (type: "up" | "down") => {
     setFeedback(type);
     setFeedbackSubmitted(true);
 
