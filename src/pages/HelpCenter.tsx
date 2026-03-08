@@ -137,7 +137,21 @@ const helpCategories: HelpCategory[] = [
 
 export default function HelpCenter() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
+  const categoryParam = searchParams.get("category");
+  const scrolledRef = useRef(false);
+
+  // Auto-scroll to category when linked from module
+  useEffect(() => {
+    if (categoryParam && !scrolledRef.current) {
+      scrolledRef.current = true;
+      setTimeout(() => {
+        const el = document.getElementById(`help-cat-${categoryParam}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
+    }
+  }, [categoryParam]);
 
   const filtered = search.trim()
     ? helpCategories
