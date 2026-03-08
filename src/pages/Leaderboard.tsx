@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Trophy, Award, Gift, Info, Loader2, Medal, TrendingUp, Target, Star, FileSpreadsheet } from "lucide-react";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { BadgesDisplay } from "@/components/BadgesDisplay";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
 import { useNavigate } from "react-router-dom";

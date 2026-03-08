@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { BrandingRequestModal } from "@/components/BrandingRequestModal";
 import { useSearchParams } from "react-router-dom";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 
 interface BrandingRequestRow {
   id: string;

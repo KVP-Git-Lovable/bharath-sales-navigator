@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power } from "lucide-react";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { Button } from "@/components/ui/button";

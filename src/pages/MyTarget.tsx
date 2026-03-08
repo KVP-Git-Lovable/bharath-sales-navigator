@@ -1,6 +1,7 @@
 import { Layout } from '@/components/Layout';
 import { UserFYPlanTarget } from '@/components/profile/UserFYPlanTarget';
 import { Target } from 'lucide-react';
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 
 const MyTarget = () => {
   return (

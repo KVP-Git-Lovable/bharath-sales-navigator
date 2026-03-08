@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, Calendar, Target, ArrowLeft } from 'lucide-react';
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { useAuth } from '@/hooks/useAuth';
 import { usePerformanceSummary, type PerformancePeriod } from '@/hooks/usePerformanceSummary';
 import { OverallPerformanceHeader } from '@/components/performance/OverallPerformanceHeader';

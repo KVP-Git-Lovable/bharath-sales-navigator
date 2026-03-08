@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layout } from '@/components/Layout';
 import BeatAllowanceManagement from '@/components/BeatAllowanceManagement';
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 
 const MyExpenses = () => {
   return (

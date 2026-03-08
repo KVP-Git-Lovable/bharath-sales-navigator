@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, differenceInDays } from "date-fns";

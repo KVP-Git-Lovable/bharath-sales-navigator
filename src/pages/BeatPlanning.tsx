@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { MapPin, Users, CheckCircle, Save, ArrowLeft, Plus, Calendar as CalendarIcon, Search, ChevronLeft, ChevronRight, CalendarDays, Sparkles, Loader2 } from "lucide-react";
+import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
