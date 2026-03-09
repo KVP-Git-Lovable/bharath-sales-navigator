@@ -595,7 +595,7 @@ export const VisitCard = ({
     };
     
     loadOfflineOrdersOnMount();
-  }, [userId, visit.retailerId, visit.id, selectedDate]); // Run on mount and when key props change
+  }, [userId, visit.retailerId, visit.id, selectedDate, updateOrderValue]); // Stable deps only
 
   // Memoized retailer ID for this card
   const myRetailerId = visit.retailerId || visit.id;
@@ -1120,7 +1120,7 @@ export const VisitCard = ({
       retailerStatusRegistry.markInitialCheckDone(visitRetailerId);
       retailerStatusRegistry.clearRefreshFlag(visitRetailerId);
     }
-  }, [visit.id, visit.retailerId, selectedDate, userId, viewingUserId]); // FIX: Removed state variables that are set within this callback to prevent re-render loops
+  }, [visit.id, visit.retailerId, selectedDate, userId, viewingUserId]); // FIX: Removed state variables that are set within this callback to prevent re-render loopsps
 
   // Run initial status check and register for targeted refresh
   useEffect(() => {
