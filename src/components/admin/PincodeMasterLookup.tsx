@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, MapPin } from 'lucide-react';
 import { karnatakaDistrictHDI } from '@/data/karnatakaHDI';
 import { getGDIData } from '@/data/gdiIndexData';
-import { getGDIData } from '@/data/gdiIndexData';
  
  interface PincodeData {
    pincode: string;
