@@ -173,18 +173,24 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* App Header */}
+      <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-primary/80">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <img 
+          src="/icons/app-icon.png" 
+          alt="QuickApp" 
+          className="w-8 h-8 rounded-lg"
+        />
+        <div className="flex-1">
+          <h1 className="text-lg font-bold">Help Center</h1>
+        </div>
+      </div>
+
+      {/* Search Section */}
       <div className="bg-primary/5 border-b">
-        <div className="max-w-2xl mx-auto px-4 pt-4 pb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-muted">
-              <ArrowLeft className="w-5 h-5 text-foreground" />
-            </button>
-            <div className="flex items-center gap-2">
-              <Book className="w-5 h-5 text-primary" />
-              <h1 className="text-lg font-bold text-foreground">Help Center</h1>
-            </div>
-          </div>
+        <div className="max-w-2xl mx-auto px-4 py-4">
           <p className="text-sm text-muted-foreground mb-3">
             Learn how to use every feature with step-by-step guides
           </p>
