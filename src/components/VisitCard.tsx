@@ -1120,7 +1120,7 @@ export const VisitCard = ({
       retailerStatusRegistry.markInitialCheckDone(visitRetailerId);
       retailerStatusRegistry.clearRefreshFlag(visitRetailerId);
     }
-  }, [visit.id, visit.retailerId, selectedDate, userId, currentStatus, currentVisitId, statusLoadedFromDB, actualOrderValue, noOrderReason, phase, pendingAmount]);
+  }, [visit.id, visit.retailerId, selectedDate, userId, viewingUserId]); // FIX: Removed state variables that are set within this callback to prevent re-render loops
 
   // Run initial status check and register for targeted refresh
   useEffect(() => {
