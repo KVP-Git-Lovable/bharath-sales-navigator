@@ -133,6 +133,7 @@ export const VisitCard = ({
   // This prevents lower-priority sources from overwriting higher-priority ones
   type OrderValueSource = 'db' | 'snapshot' | 'cache' | 'props' | null;
   const [orderValueSource, setOrderValueSource] = useState<OrderValueSource>(null);
+  const orderValueSourceRef = useRef<OrderValueSource>(null);
   
   const getSourcePriority = (source: OrderValueSource): number => {
     switch (source) {
