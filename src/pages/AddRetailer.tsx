@@ -1502,71 +1502,76 @@ export const AddRetailer = () => {
                   <p className="text-xs text-destructive mt-1">{validationErrors.location}</p>
                 )}
                 
-                {/* Latitude and Longitude Display */}
-                {(retailerData.latitude || retailerData.longitude) && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 hidden">
-                        <Label>Latitude</Label>
-                        <Input
-                          value={retailerData.latitude}
-                          readOnly
-                          className="bg-muted cursor-not-allowed"
-                          placeholder="GPS Latitude"
-                        />
-                      </div>
-                      <div className="space-y-2 hidden">
-                        <Label>Longitude</Label>
-                        <Input
-                          value={retailerData.longitude}
-                          readOnly
-                          className="bg-muted cursor-not-allowed"
-                          placeholder="GPS Longitude"
-                        />
-                      </div>
+                {/* Latitude and Longitude - Manual Entry */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        type="number"
+                        step="any"
+                        value={retailerData.latitude}
+                        onChange={(e) => handleInputChange("latitude", e.target.value)}
+                        className="bg-background"
+                        placeholder="e.g. 12.9716"
+                      />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        type="number"
+                        step="any"
+                        value={retailerData.longitude}
+                        onChange={(e) => handleInputChange("longitude", e.target.value)}
+                        className="bg-background"
+                        placeholder="e.g. 77.5946"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Enter manually or use the GPS button above to auto-fill</p>
                     
-                    {/* Google Maps Style Coordinate Display */}
-                    {retailerData.latitude && retailerData.longitude && (
-                      <div className="p-3 bg-muted/50 rounded-lg border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label className="text-sm font-medium">GPS Coordinates</Label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const googleMapsUrl = `https://www.google.com/maps?q=${retailerData.latitude},${retailerData.longitude}`;
-                                window.open(googleMapsUrl, '_blank');
-                                toast({ title: "Opening Google Maps", description: "Redirecting to Google Maps..." });
-                              }}
-                              className="text-primary hover:text-primary/80 transition-colors text-sm font-mono mt-1 block"
-                              title="Click to open in Google Maps"
-                            >
-                              {retailerData.latitude}, {retailerData.longitude}
-                            </button>
-                          </div>
-                          <Button
+                  {/* Google Maps Style Coordinate Display */}
+                  {retailerData.latitude && retailerData.longitude && (
+                    <div className="p-3 bg-muted/50 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm font-medium">GPS Coordinates</Label>
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => {
                               const googleMapsUrl = `https://www.google.com/maps?q=${retailerData.latitude},${retailerData.longitude}`;
                               window.open(googleMapsUrl, '_blank');
                               toast({ title: "Opening Google Maps", description: "Redirecting to Google Maps..." });
                             }}
-                            className="text-xs"
+                            className="text-primary hover:text-primary/80 transition-colors text-sm font-mono mt-1 block"
+                            title="Click to open in Google Maps"
                           >
-                            <MapPin size={14} className="mr-1" />
-                            Open in Maps
-                          </Button>
+                            {retailerData.latitude}, {retailerData.longitude}
+                          </button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Click coordinates or button to view location in Google Maps
-                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const googleMapsUrl = `https://www.google.com/maps?q=${retailerData.latitude},${retailerData.longitude}`;
+                            window.open(googleMapsUrl, '_blank');
+                            toast({ title: "Opening Google Maps", description: "Redirecting to Google Maps..." });
+                          }}
+                          className="text-xs"
+                        >
+                          <MapPin size={14} className="mr-1" />
+                          Open in Maps
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Click coordinates or button to view location in Google Maps
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
 
@@ -1588,7 +1593,6 @@ export const AddRetailer = () => {
                   <p className="text-xs text-muted-foreground">Manual credit score out of 10</p>
                 </div>
               )}
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Retail Type *</Label>
