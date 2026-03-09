@@ -201,7 +201,7 @@ import { getGDIData } from '@/data/gdiIndexData';
                   </div>
                 </div>
                 <p className="text-[9px] text-muted-foreground text-center mt-2 italic">
-                  Source: GDI Index Data (Health, Education, Standard of Living &amp; HDI)
+                  Source: NITI Aayog SDG India Index 2024-25 &amp; UNDP Subnational HDI Database
                 </p>
               </>
             );
