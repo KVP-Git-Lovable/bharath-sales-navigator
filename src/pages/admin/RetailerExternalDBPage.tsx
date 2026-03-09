@@ -89,34 +89,6 @@ const RetailerExternalDBPage: React.FC = () => {
             subtitle="Browse external grocery retailer data by state and city"
           />
           
-          {/* Geocode All Section */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <Button
-              onClick={handleGeocodeAll}
-              disabled={starting || isJobRunning}
-              variant="default"
-            >
-              {starting || isJobRunning ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Globe className="h-4 w-4 mr-2" />
-              )}
-              {isJobRunning ? 'Geocoding in progress...' : 'Geocode All'}
-            </Button>
-            {isJobRunning && (
-              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                <Progress value={progressPercent} className="flex-1" />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">
-                  {jobStatus.processed_records}/{jobStatus.total_records} ({progressPercent}%)
-                </span>
-              </div>
-            )}
-            {jobStatus?.status === 'completed' && (
-              <span className="text-sm text-primary">
-                ✓ Done — {jobStatus.geocoded_count} geocoded, {jobStatus.failed_count} failed
-              </span>
-            )}
-          </div>
 
           <RetailerExternalDBLookup />
         </div>

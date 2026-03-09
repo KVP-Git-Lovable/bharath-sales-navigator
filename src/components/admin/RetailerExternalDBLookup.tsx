@@ -137,7 +137,6 @@ export const RetailerExternalDBLookup: React.FC = () => {
               <div className="flex items-center gap-2">
                 {retailers.length > 0 && (
                   <>
-                    <GeocodeButton state={selectedState} city={selectedCity} />
                     <div className="w-64">
                       <SearchInput
                         placeholder="Filter results..."
