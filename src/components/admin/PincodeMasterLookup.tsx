@@ -177,7 +177,7 @@ import { getGDIData } from '@/data/gdiIndexData';
           {/* Maharashtra HDI Info Boxes - now uses GDI data */}
 
           {/* GDI Info Boxes for other states */}
-          {selectedState && selectedDistrict && selectedState !== 'KARNATAKA' && selectedState !== 'MAHARASHTRA' && (() => {
+          {selectedState && selectedDistrict && selectedState !== 'KARNATAKA' && (() => {
             const gdiData = getGDIData(selectedState, selectedDistrict);
             if (!gdiData) return null;
             return (
