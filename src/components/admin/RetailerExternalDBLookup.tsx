@@ -164,11 +164,11 @@ export const RetailerExternalDBLookup: React.FC = () => {
                     <TableRow>
                       <TableHead className="min-w-[200px]">Retailer Name</TableHead>
                       <TableHead className="min-w-[250px]">Address</TableHead>
+                      <TableHead>GPS Coordinate</TableHead>
                       <TableHead>Mobile</TableHead>
-                      <TableHead>Email</TableHead>
                       <TableHead>PIN Code</TableHead>
                       <TableHead>Category</TableHead>
-                      <TableHead>GPS Coordinate</TableHead>
+                      <TableHead>Email</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -182,18 +182,18 @@ export const RetailerExternalDBLookup: React.FC = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {r.mobile ? (
+                          {r.latitude && r.longitude ? (
                             <div className="flex items-center gap-1.5 text-sm">
-                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>{r.mobile}</span>
+                              <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-xs">{Number(r.latitude).toFixed(4)}, {Number(r.longitude).toFixed(4)}</span>
                             </div>
                           ) : '—'}
                         </TableCell>
                         <TableCell>
-                          {r.email ? (
+                          {r.mobile ? (
                             <div className="flex items-center gap-1.5 text-sm">
-                              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="break-all">{r.email}</span>
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>{r.mobile}</span>
                             </div>
                           ) : '—'}
                         </TableCell>
@@ -211,10 +211,10 @@ export const RetailerExternalDBLookup: React.FC = () => {
                           ) : '—'}
                         </TableCell>
                         <TableCell>
-                          {r.latitude && r.longitude ? (
-                            <div className="flex items-center gap-1.5 text-sm">
-                              <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-xs">{Number(r.latitude).toFixed(4)}, {Number(r.longitude).toFixed(4)}</span>
+                          {r.email ? (
+                            <div className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+                              <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span>{r.email}</span>
                             </div>
                           ) : '—'}
                         </TableCell>
