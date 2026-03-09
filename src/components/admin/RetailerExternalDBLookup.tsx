@@ -236,13 +236,17 @@ const GeocodeButton: React.FC<{ state: string; city: string }> = ({ state, city 
   const geocodeMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('geocode-retailer-ext', {
-        body: { state, city, batch_size: 50 },
+        body: { state, city, batch_size: 10 },
       });
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Geocoded ${data.geocoded} retailers (${data.failed} failed)`);
+      if (data.geocoded > 0 || data.failed > 0) {
+        toast.success(`Geocoded ${data.geocoded} retailers. ${data.remaining > 0 ? `${data.remaining} remaining — click again.` : 'All done!'}`);
+      } else {
+        toast.info('All retailers in this city are already geocoded.');
+      }
       queryClient.invalidateQueries({ queryKey: ['retailer-ext-data', state, city] });
     },
     onError: (err: any) => {
