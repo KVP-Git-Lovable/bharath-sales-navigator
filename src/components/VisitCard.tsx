@@ -133,6 +133,7 @@ export const VisitCard = ({
   // This prevents lower-priority sources from overwriting higher-priority ones
   type OrderValueSource = 'db' | 'snapshot' | 'cache' | 'props' | null;
   const [orderValueSource, setOrderValueSource] = useState<OrderValueSource>(null);
+  const orderValueSourceRef = useRef<OrderValueSource>(null);
   
   const getSourcePriority = (source: OrderValueSource): number => {
     switch (source) {
@@ -176,23 +177,22 @@ export const VisitCard = ({
   });
 
   // Consolidated order value update function with source priority
+  // Use ref for orderValueSource to keep callback stable and prevent re-render cascades
   const updateOrderValue = useCallback((value: number, source: OrderValueSource) => {
     const roundedValue = Math.round(value); // Ensure consistent rounding
-    const currentPriority = getSourcePriority(orderValueSource);
+    const currentPriority = getSourcePriority(orderValueSourceRef.current);
     const newPriority = getSourcePriority(source);
     
     // Only update if new source has equal or higher priority
     if (newPriority >= currentPriority) {
-      console.log(`💰 [VisitCard] Updating order value: ${roundedValue} from ${source} (priority ${newPriority} >= ${currentPriority})`);
       setActualOrderValue(roundedValue);
       setOrderValueSource(source);
+      orderValueSourceRef.current = source;
       if (roundedValue > 0) {
         setHasOrderToday(true);
       }
-    } else {
-      console.log(`⏭️ [VisitCard] Skipping order value update: ${roundedValue} from ${source} (priority ${newPriority} < ${currentPriority})`);
     }
-  }, [orderValueSource]);
+  }, []); // Stable callback - uses ref instead of state
   const [distributorName, setDistributorName] = useState<string>('');
   const [hasStockRecords, setHasStockRecords] = useState(false);
   const [stockRecordCount, setStockRecordCount] = useState(0);
@@ -392,34 +392,40 @@ export const VisitCard = ({
 
   // CRITICAL: Sync currentStatus when parent prop changes (e.g., after orders are loaded)
   // BUT: Do NOT override if we've already set a truly final status locally (productive)
+  // FIX: Use refs to avoid including currentStatus/statusLoadedFromDB in deps (they are set within this effect)
+  const currentStatusRef = useRef(currentStatus);
+  currentStatusRef.current = currentStatus;
+  const statusLoadedFromDBRef = useRef(statusLoadedFromDB);
+  statusLoadedFromDBRef.current = statusLoadedFromDB;
+
   useEffect(() => {
     const propStatus = visit.status;
     const propIsAuthoritative = propStatus === 'productive' || propStatus === 'unproductive';
-    const currentIsTrulyFinal = currentStatus === 'productive';
+    const currentIsTrulyFinal = currentStatusRef.current === 'productive';
 
     // If we already have productive locally, never downgrade from prop
-    if (currentIsTrulyFinal && statusLoadedFromDB) {
-      console.log('⏸️ [VisitCard] Keeping local final status:', currentStatus, '(prop was:', propStatus, ')');
+    if (currentIsTrulyFinal && statusLoadedFromDBRef.current) {
       return;
     }
 
     // If parent has authoritative status, sync it in (unproductive is allowed, but not treated as final)
-    if (propIsAuthoritative && currentStatus !== propStatus) {
-      console.log('⚡ [VisitCard] Syncing status from prop:', propStatus, '(was:', currentStatus, ')');
+    if (propIsAuthoritative && currentStatusRef.current !== propStatus) {
       setCurrentStatus(propStatus);
       setStatusLoadedFromDB(propStatus === 'productive');
     }
-  }, [visit.status, currentStatus, statusLoadedFromDB]);
+  }, [visit.status]); // Only re-run when prop status changes
 
   // CRITICAL: Sync order data from props when parent updates (e.g., when orders load)
   // This ensures Order button turns green and shows value when parent has fresh order data
+  // FIX: Use refs to avoid circular dependency on actualOrderValue/hasOrderToday
+  const hasOrderTodayRef = useRef(hasOrderToday);
+  hasOrderTodayRef.current = hasOrderToday;
+  const actualOrderValueRef = useRef(actualOrderValue);
+  actualOrderValueRef.current = actualOrderValue;
+
   useEffect(() => {
     // Only sync if prop has order data and local state doesn't
-    if (visit.hasOrder && !hasOrderToday) {
-      console.log('💰 [VisitCard] Syncing order data from prop:', {
-        hasOrder: visit.hasOrder,
-        orderValue: visit.orderValue
-      });
+    if (visit.hasOrder && !hasOrderTodayRef.current) {
       setHasOrderToday(true);
       updateOrderValue(visit.orderValue || 0, 'props');
       setCurrentStatus('productive');
@@ -427,11 +433,10 @@ export const VisitCard = ({
       setPhase('completed');
     }
     // Also sync if order value increased (new order added) - only from props
-    if (visit.hasOrder && visit.orderValue && visit.orderValue > actualOrderValue && orderValueSource === 'props') {
-      console.log('💰 [VisitCard] Order value increased from prop, updating:', visit.orderValue);
+    if (visit.hasOrder && visit.orderValue && visit.orderValue > actualOrderValueRef.current && orderValueSourceRef.current === 'props') {
       updateOrderValue(visit.orderValue, 'props');
     }
-  }, [visit.hasOrder, visit.orderValue, hasOrderToday, actualOrderValue, updateOrderValue, orderValueSource]);
+  }, [visit.hasOrder, visit.orderValue, updateOrderValue]); // Stable deps only
 
   // Check if the selected date is today's date (use local timezone for accurate comparison)
   const today = new Date();
@@ -590,7 +595,7 @@ export const VisitCard = ({
     };
     
     loadOfflineOrdersOnMount();
-  }, [userId, visit.retailerId, visit.id, selectedDate]); // Run on mount and when key props change
+  }, [userId, visit.retailerId, visit.id, selectedDate, updateOrderValue]); // Stable deps only
 
   // Memoized retailer ID for this card
   const myRetailerId = visit.retailerId || visit.id;
@@ -1115,7 +1120,7 @@ export const VisitCard = ({
       retailerStatusRegistry.markInitialCheckDone(visitRetailerId);
       retailerStatusRegistry.clearRefreshFlag(visitRetailerId);
     }
-  }, [visit.id, visit.retailerId, selectedDate, userId, currentStatus, currentVisitId, statusLoadedFromDB, actualOrderValue, noOrderReason, phase, pendingAmount]);
+  }, [visit.id, visit.retailerId, selectedDate, userId, viewingUserId]); // FIX: Removed state variables that are set within this callback to prevent re-render loopsps
 
   // Run initial status check and register for targeted refresh
   useEffect(() => {
