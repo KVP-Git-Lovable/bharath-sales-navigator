@@ -10831,6 +10831,8 @@ export type Database = {
           company_name: string
           email: string | null
           id: number
+          latitude: number | null
+          longitude: number | null
           mobile: string | null
           pincode: string | null
           state: string
@@ -10843,6 +10845,8 @@ export type Database = {
           company_name: string
           email?: string | null
           id?: never
+          latitude?: number | null
+          longitude?: number | null
           mobile?: string | null
           pincode?: string | null
           state: string
@@ -10855,6 +10859,8 @@ export type Database = {
           company_name?: string
           email?: string | null
           id?: never
+          latitude?: number | null
+          longitude?: number | null
           mobile?: string | null
           pincode?: string | null
           state?: string
