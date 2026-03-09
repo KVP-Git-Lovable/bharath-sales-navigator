@@ -177,23 +177,22 @@ export const VisitCard = ({
   });
 
   // Consolidated order value update function with source priority
+  // Use ref for orderValueSource to keep callback stable and prevent re-render cascades
   const updateOrderValue = useCallback((value: number, source: OrderValueSource) => {
     const roundedValue = Math.round(value); // Ensure consistent rounding
-    const currentPriority = getSourcePriority(orderValueSource);
+    const currentPriority = getSourcePriority(orderValueSourceRef.current);
     const newPriority = getSourcePriority(source);
     
     // Only update if new source has equal or higher priority
     if (newPriority >= currentPriority) {
-      console.log(`💰 [VisitCard] Updating order value: ${roundedValue} from ${source} (priority ${newPriority} >= ${currentPriority})`);
       setActualOrderValue(roundedValue);
       setOrderValueSource(source);
+      orderValueSourceRef.current = source;
       if (roundedValue > 0) {
         setHasOrderToday(true);
       }
-    } else {
-      console.log(`⏭️ [VisitCard] Skipping order value update: ${roundedValue} from ${source} (priority ${newPriority} < ${currentPriority})`);
     }
-  }, [orderValueSource]);
+  }, []); // Stable callback - uses ref instead of state
   const [distributorName, setDistributorName] = useState<string>('');
   const [hasStockRecords, setHasStockRecords] = useState(false);
   const [stockRecordCount, setStockRecordCount] = useState(0);
