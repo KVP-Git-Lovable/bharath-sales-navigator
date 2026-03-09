@@ -1532,47 +1532,46 @@ export const AddRetailer = () => {
                   </div>
                   <p className="text-xs text-muted-foreground">Enter manually or use the GPS button above to auto-fill</p>
                     
-                    {/* Google Maps Style Coordinate Display */}
-                    {retailerData.latitude && retailerData.longitude && (
-                      <div className="p-3 bg-muted/50 rounded-lg border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label className="text-sm font-medium">GPS Coordinates</Label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const googleMapsUrl = `https://www.google.com/maps?q=${retailerData.latitude},${retailerData.longitude}`;
-                                window.open(googleMapsUrl, '_blank');
-                                toast({ title: "Opening Google Maps", description: "Redirecting to Google Maps..." });
-                              }}
-                              className="text-primary hover:text-primary/80 transition-colors text-sm font-mono mt-1 block"
-                              title="Click to open in Google Maps"
-                            >
-                              {retailerData.latitude}, {retailerData.longitude}
-                            </button>
-                          </div>
-                          <Button
+                  {/* Google Maps Style Coordinate Display */}
+                  {retailerData.latitude && retailerData.longitude && (
+                    <div className="p-3 bg-muted/50 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm font-medium">GPS Coordinates</Label>
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => {
                               const googleMapsUrl = `https://www.google.com/maps?q=${retailerData.latitude},${retailerData.longitude}`;
                               window.open(googleMapsUrl, '_blank');
                               toast({ title: "Opening Google Maps", description: "Redirecting to Google Maps..." });
                             }}
-                            className="text-xs"
+                            className="text-primary hover:text-primary/80 transition-colors text-sm font-mono mt-1 block"
+                            title="Click to open in Google Maps"
                           >
-                            <MapPin size={14} className="mr-1" />
-                            Open in Maps
-                          </Button>
+                            {retailerData.latitude}, {retailerData.longitude}
+                          </button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Click coordinates or button to view location in Google Maps
-                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const googleMapsUrl = `https://www.google.com/maps?q=${retailerData.latitude},${retailerData.longitude}`;
+                            window.open(googleMapsUrl, '_blank');
+                            toast({ title: "Opening Google Maps", description: "Redirecting to Google Maps..." });
+                          }}
+                          className="text-xs"
+                        >
+                          <MapPin size={14} className="mr-1" />
+                          Open in Maps
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Click coordinates or button to view location in Google Maps
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
 
