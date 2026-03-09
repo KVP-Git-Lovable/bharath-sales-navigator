@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 interface HelpCategory {
   id: string;
