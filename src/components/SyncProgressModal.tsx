@@ -215,6 +215,9 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
             ...item,
             retryCount: 0,
             syncState: 'QUEUED',
+            // Clear previous error so the item can be retried after a fix (e.g., schema change)
+            errorType: undefined,
+            lastError: undefined,
             lastRetryAt: undefined,
           });
         }

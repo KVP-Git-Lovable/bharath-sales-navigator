@@ -142,9 +142,11 @@ export function useOfflineSync() {
           continue;
         }
 
-        // Skip VALIDATION errors — they won't fix themselves
-        if (item.errorType === 'VALIDATION') {
-          console.log(`⏭️ Skipping ${item.action} — VALIDATION error (not retryable)`);
+        // Skip VALIDATION errors only when the item is marked as failed.
+        // If the user manually resets an item to QUEUED (e.g., after a schema/config fix),
+        // we should allow retrying it.
+        if (item.errorType === 'VALIDATION' && item.syncState === 'FAILED_SYNC') {
+          console.log(`⏭️ Skipping ${item.action} — VALIDATION error (needs data fix or manual reset)`);
           continue;
         }
 
