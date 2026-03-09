@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 interface HelpCategory {
   id: string;
@@ -173,18 +174,18 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* App Header */}
-      <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-primary/80">
-          <ArrowLeft className="w-5 h-5" />
+      {/* QuickApp Header */}
+      <div className="bg-[#1a1a2e] px-4 py-3 flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-white/10">
+          <ArrowLeft className="w-5 h-5 text-white" />
         </button>
         <img 
-          src="/icons/app-icon.png" 
+          src={quickappLogo} 
           alt="QuickApp" 
-          className="w-8 h-8 rounded-lg"
+          className="h-8"
         />
         <div className="flex-1">
-          <h1 className="text-lg font-bold">Help Center</h1>
+          <span className="text-white/80 text-sm font-medium">Help Center</span>
         </div>
       </div>
 
