@@ -147,6 +147,7 @@ const helpCategories: HelpCategory[] = [
 ];
 
 export default function HelpCenter() {
+  const connectivityStatus = useConnectivity();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
