@@ -19,7 +19,7 @@ export const RetailerExternalDBLookup: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc('get_retailer_ext_states');
       if (error) throw error;
-      return (data || []).map((r: any) => r.state as string);
+      return (data || []).map((r: any) => r.state as string).filter((s: string) => s && s.trim() !== '');
     },
     staleTime: 60 * 60 * 1000,
   });
