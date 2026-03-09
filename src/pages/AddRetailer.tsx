@@ -1502,29 +1502,35 @@ export const AddRetailer = () => {
                   <p className="text-xs text-destructive mt-1">{validationErrors.location}</p>
                 )}
                 
-                {/* Latitude and Longitude Display */}
-                {(retailerData.latitude || retailerData.longitude) && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 hidden">
-                        <Label>Latitude</Label>
-                        <Input
-                          value={retailerData.latitude}
-                          readOnly
-                          className="bg-muted cursor-not-allowed"
-                          placeholder="GPS Latitude"
-                        />
-                      </div>
-                      <div className="space-y-2 hidden">
-                        <Label>Longitude</Label>
-                        <Input
-                          value={retailerData.longitude}
-                          readOnly
-                          className="bg-muted cursor-not-allowed"
-                          placeholder="GPS Longitude"
-                        />
-                      </div>
+                {/* Latitude and Longitude - Manual Entry */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        type="number"
+                        step="any"
+                        value={retailerData.latitude}
+                        onChange={(e) => handleInputChange("latitude", e.target.value)}
+                        className="bg-background"
+                        placeholder="e.g. 12.9716"
+                      />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        type="number"
+                        step="any"
+                        value={retailerData.longitude}
+                        onChange={(e) => handleInputChange("longitude", e.target.value)}
+                        className="bg-background"
+                        placeholder="e.g. 77.5946"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Enter manually or use the GPS button above to auto-fill</p>
                     
                     {/* Google Maps Style Coordinate Display */}
                     {retailerData.latitude && retailerData.longitude && (
