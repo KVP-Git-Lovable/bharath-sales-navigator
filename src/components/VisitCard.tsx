@@ -392,24 +392,28 @@ export const VisitCard = ({
 
   // CRITICAL: Sync currentStatus when parent prop changes (e.g., after orders are loaded)
   // BUT: Do NOT override if we've already set a truly final status locally (productive)
+  // FIX: Use refs to avoid including currentStatus/statusLoadedFromDB in deps (they are set within this effect)
+  const currentStatusRef = useRef(currentStatus);
+  currentStatusRef.current = currentStatus;
+  const statusLoadedFromDBRef = useRef(statusLoadedFromDB);
+  statusLoadedFromDBRef.current = statusLoadedFromDB;
+
   useEffect(() => {
     const propStatus = visit.status;
     const propIsAuthoritative = propStatus === 'productive' || propStatus === 'unproductive';
-    const currentIsTrulyFinal = currentStatus === 'productive';
+    const currentIsTrulyFinal = currentStatusRef.current === 'productive';
 
     // If we already have productive locally, never downgrade from prop
-    if (currentIsTrulyFinal && statusLoadedFromDB) {
-      console.log('⏸️ [VisitCard] Keeping local final status:', currentStatus, '(prop was:', propStatus, ')');
+    if (currentIsTrulyFinal && statusLoadedFromDBRef.current) {
       return;
     }
 
     // If parent has authoritative status, sync it in (unproductive is allowed, but not treated as final)
-    if (propIsAuthoritative && currentStatus !== propStatus) {
-      console.log('⚡ [VisitCard] Syncing status from prop:', propStatus, '(was:', currentStatus, ')');
+    if (propIsAuthoritative && currentStatusRef.current !== propStatus) {
       setCurrentStatus(propStatus);
       setStatusLoadedFromDB(propStatus === 'productive');
     }
-  }, [visit.status, currentStatus, statusLoadedFromDB]);
+  }, [visit.status]); // Only re-run when prop status changes
 
   // CRITICAL: Sync order data from props when parent updates (e.g., when orders load)
   // This ensures Order button turns green and shows value when parent has fresh order data
