@@ -19,7 +19,7 @@ export const RetailerExternalDBLookup: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc('get_retailer_ext_states');
       if (error) throw error;
-      return (data || []).map((r: any) => r.state as string);
+      return (data || []).map((r: any) => r.state as string).filter((s: string) => s && s.trim() !== '');
     },
     staleTime: 60 * 60 * 1000,
   });
@@ -32,7 +32,7 @@ export const RetailerExternalDBLookup: React.FC = () => {
         selected_state: selectedState,
       });
       if (error) throw error;
-      return (data || []).map((r: any) => r.city as string);
+      return (data || []).map((r: any) => r.city as string).filter((c: string) => c && c.trim() !== '');
     },
     enabled: !!selectedState,
     staleTime: 30 * 60 * 1000,
