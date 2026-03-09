@@ -3,8 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, MapPin } from 'lucide-react';
-import { karnatakaDistrictHDI } from '@/data/karnatakaHDI';
-import { maharashtraDistrictHDI } from '@/data/maharashtraHDI';
+import { getGDIData } from '@/data/gdiIndexData';
  
  interface PincodeData {
    pincode: string;
@@ -142,55 +141,32 @@ import { maharashtraDistrictHDI } from '@/data/maharashtraHDI';
            </Select>
          </div>
  
-          {/* Karnataka HDI Info Boxes */}
-          {selectedState === 'KARNATAKA' && selectedDistrict && (() => {
-            const hdiData = karnatakaDistrictHDI[selectedDistrict.toLowerCase()];
-            if (!hdiData) return null;
+          {/* GDI / HDI Info Boxes */}
+          {selectedState && selectedDistrict && (() => {
+            const gdiData = getGDIData(selectedState, selectedDistrict);
+            if (!gdiData) return null;
             return (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-3 text-center">
                     <p className="text-[10px] text-green-600 dark:text-green-400 font-medium uppercase tracking-wider">Health Index</p>
-                    <p className="text-lg font-bold text-green-700 dark:text-green-300">{hdiData.healthIndex}</p>
+                    <p className="text-lg font-bold text-green-700 dark:text-green-300">{gdiData.healthIndex}</p>
                   </div>
                   <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-center">
                     <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wider">Education Index</p>
-                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{hdiData.educationIndex}</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{gdiData.educationIndex}</p>
                   </div>
                   <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-center">
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wider">Standard of Living</p>
-                    <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{hdiData.standardOfLivingIndex}</p>
+                    <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{gdiData.standardOfLivingIndex}</p>
                   </div>
                   <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 p-3 text-center">
                     <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium uppercase tracking-wider">HDI</p>
-                    <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{hdiData.hdi}</p>
+                    <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{gdiData.hdi}</p>
                   </div>
                 </div>
                 <p className="text-[9px] text-muted-foreground text-center mt-2 italic">
-                  Source: Directorate of Economics and Statistics, Govt. of Karnataka (2023-24)
-                </p>
-              </>
-            );
-          })()}
-
-          {/* Maharashtra HDI Info Boxes */}
-          {selectedState === 'MAHARASHTRA' && selectedDistrict && (() => {
-            const hdiData = maharashtraDistrictHDI[selectedDistrict.toLowerCase()];
-            if (!hdiData) return null;
-            return (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 p-3 text-center">
-                    <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium uppercase tracking-wider">HDI</p>
-                    <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{hdiData.hdi}</p>
-                  </div>
-                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-center">
-                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wider">Literacy Rate (%)</p>
-                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{hdiData.literacyRate}%</p>
-                  </div>
-                </div>
-                <p className="text-[9px] text-muted-foreground text-center mt-2 italic">
-                  Source: Census of India & UNDP HDI Reports
+                  Source: GDI Index Data (Health, Education, Standard of Living &amp; HDI)
                 </p>
               </>
             );
