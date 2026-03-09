@@ -137,25 +137,50 @@ export function useUserTargetProgress(
           planData = cached.data.planData;
           monthData = cached.data.monthData;
         } else {
-          // Fetch plan and month data in parallel
-          const [planResult, monthResult] = await Promise.all([
-            supabase
-              .from('user_business_plans')
-              .select('id, quantity_target, quantity_unit, revenue_target')
-              .eq('user_id', userId)
-              .eq('year', fyYear)
-              .single(),
-            supabase
-              .from('user_business_plan_months')
-              .select('month_number, quantity_target, revenue_target, business_plan_id')
-              .order('month_number')
-          ]);
+          // Fetch plan for current FY first
+          const planResult = await supabase
+            .from('user_business_plans')
+            .select('id, quantity_target, quantity_unit, revenue_target, year')
+            .eq('user_id', userId)
+            .eq('year', fyYear)
+            .single();
 
           planData = planResult.data;
-          // Filter month data for this plan
-          monthData = planData 
-            ? monthResult.data?.filter(m => m.business_plan_id === planData.id) || []
-            : [];
+
+          // If no plan for current FY, try the next FY (user may have set target for upcoming year)
+          if (!planData) {
+            const nextFYResult = await supabase
+              .from('user_business_plans')
+              .select('id, quantity_target, quantity_unit, revenue_target, year')
+              .eq('user_id', userId)
+              .eq('year', fyYear + 1)
+              .single();
+            planData = nextFYResult.data;
+          }
+
+          // If still no plan, try fetching the most recent plan
+          if (!planData) {
+            const latestResult = await supabase
+              .from('user_business_plans')
+              .select('id, quantity_target, quantity_unit, revenue_target, year')
+              .eq('user_id', userId)
+              .order('year', { ascending: false })
+              .limit(1)
+              .single();
+            planData = latestResult.data;
+          }
+
+          // Fetch month data for the found plan
+          if (planData) {
+            const monthResult = await supabase
+              .from('user_business_plan_months')
+              .select('month_number, quantity_target, revenue_target, business_plan_id')
+              .eq('business_plan_id', planData.id)
+              .order('month_number');
+            monthData = monthResult.data || [];
+          } else {
+            monthData = [];
+          }
 
           // Cache the result
           planCache.set(cacheKey, {
