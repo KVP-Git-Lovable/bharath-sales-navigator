@@ -5155,6 +5155,42 @@ export type Database = {
         }
         Relationships: []
       }
+      geocoding_jobs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          failed_count: number
+          geocoded_count: number
+          id: string
+          processed_records: number
+          status: string
+          total_records: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          failed_count?: number
+          geocoded_count?: number
+          id?: string
+          processed_records?: number
+          status?: string
+          total_records?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          failed_count?: number
+          geocoded_count?: number
+          id?: string
+          processed_records?: number
+          status?: string
+          total_records?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       global_leave_policy: {
         Row: {
           allow_backdated_leave: boolean
