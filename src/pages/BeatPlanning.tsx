@@ -665,18 +665,19 @@ export const BeatPlanning = () => {
         {/* Header */}
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
           <CardHeader className="pb-2 sm:pb-3">
-          <div className="flex items-center justify-between w-full">
-              <ModuleHelpButton categoryId="my-visit" articleId="my-visit-beat-planning" variant="onDark" className="ml-auto" />
+          <div className="flex items-start justify-between w-full">
               <div className="flex items-start gap-2 sm:gap-3">
                 <div>
-                  <CardTitle className="text-lg sm:text-xl font-bold">
-                    {(() => {
-                      const dateKey = selectedDate.toLocaleDateString('en-US', { weekday: 'short' });
-                      return plannedBeats[dateKey]?.length > 0 
-                        ? `Journey: ${plannedBeats[dateKey].slice(0, 2).map(beatId => beats.find(b => b.id === beatId)?.name || beatId).join(', ')}${plannedBeats[dateKey].length > 2 ? '...' : ''}`
-                        : 'Plan My Journey';
-                    })()}
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg sm:text-xl font-bold">
+                      {(() => {
+                        return plannedBeats[selectedDay]?.length > 0 
+                          ? `Journey: ${plannedBeats[selectedDay].slice(0, 2).map(beatId => beats.find(b => b.id === beatId)?.name || beatId).join(', ')}${plannedBeats[selectedDay].length > 2 ? '...' : ''}`
+                          : 'Plan My Journey';
+                      })()}
+                    </CardTitle>
+                    <ModuleHelpButton categoryId="my-visit" articleId="my-visit-beat-planning" variant="onDark" />
+                  </div>
                   {/* User Selector for managers - below title */}
                   <UserSelector
                     selectedUserId={selectedUserId}
@@ -687,9 +688,8 @@ export const BeatPlanning = () => {
                   />
                   <p className="text-xs sm:text-sm text-primary-foreground/80 mt-1">
                     {(() => {
-                      const dateKey = selectedDate.toLocaleDateString('en-US', { weekday: 'short' });
-                      return plannedBeats[dateKey]?.length > 0 
-                        ? `${plannedBeats[dateKey].length} beat${plannedBeats[dateKey].length > 1 ? 's' : ''} selected`
+                      return plannedBeats[selectedDay]?.length > 0 
+                        ? `${plannedBeats[selectedDay].length} beat${plannedBeats[selectedDay].length > 1 ? 's' : ''} selected`
                         : 'Select beats for your visit schedule';
                     })()}
                   </p>
