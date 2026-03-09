@@ -178,20 +178,48 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* QuickApp Header */}
-      <div className="bg-[#1a1a2e] px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-white/10">
-          <ArrowLeft className="w-5 h-5 text-white" />
-        </button>
-        <img 
-          src={quickappLogo} 
-          alt="QuickApp" 
-          className="h-8"
-        />
-        <div className="flex-1">
-          <span className="text-white/80 text-sm font-medium">Help Center</span>
+      {/* QuickApp Header - Same as main app */}
+      <nav className="sticky top-0 z-50 bg-gradient-primary text-primary-foreground" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
+                <img 
+                  src={quickappLogo} 
+                  alt="QuickApp" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1">
+                  <h1 className="text-base font-semibold text-white">QuickApp.ai</h1>
+                  <SyncStatusIndicator />
+                </div>
+                <div className="flex items-center gap-0.5 text-white">
+                  {connectivityStatus === 'online' ? (
+                    <Wifi className="h-2.5 w-2.5 opacity-80" />
+                  ) : connectivityStatus === 'offline' ? (
+                    <>
+                      <WifiOff className="h-2.5 w-2.5 opacity-80" />
+                      <p className="text-[10px] opacity-80">No Connection</p>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white"
+              >
+                <Menu size={20} />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </nav>
 
       {/* Search Section */}
       <div className="bg-primary/5 border-b">
