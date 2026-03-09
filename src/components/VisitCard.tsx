@@ -417,13 +417,15 @@ export const VisitCard = ({
 
   // CRITICAL: Sync order data from props when parent updates (e.g., when orders load)
   // This ensures Order button turns green and shows value when parent has fresh order data
+  // FIX: Use refs to avoid circular dependency on actualOrderValue/hasOrderToday
+  const hasOrderTodayRef = useRef(hasOrderToday);
+  hasOrderTodayRef.current = hasOrderToday;
+  const actualOrderValueRef = useRef(actualOrderValue);
+  actualOrderValueRef.current = actualOrderValue;
+
   useEffect(() => {
     // Only sync if prop has order data and local state doesn't
-    if (visit.hasOrder && !hasOrderToday) {
-      console.log('💰 [VisitCard] Syncing order data from prop:', {
-        hasOrder: visit.hasOrder,
-        orderValue: visit.orderValue
-      });
+    if (visit.hasOrder && !hasOrderTodayRef.current) {
       setHasOrderToday(true);
       updateOrderValue(visit.orderValue || 0, 'props');
       setCurrentStatus('productive');
@@ -431,11 +433,10 @@ export const VisitCard = ({
       setPhase('completed');
     }
     // Also sync if order value increased (new order added) - only from props
-    if (visit.hasOrder && visit.orderValue && visit.orderValue > actualOrderValue && orderValueSource === 'props') {
-      console.log('💰 [VisitCard] Order value increased from prop, updating:', visit.orderValue);
+    if (visit.hasOrder && visit.orderValue && visit.orderValue > actualOrderValueRef.current && orderValueSourceRef.current === 'props') {
       updateOrderValue(visit.orderValue, 'props');
     }
-  }, [visit.hasOrder, visit.orderValue, hasOrderToday, actualOrderValue, updateOrderValue, orderValueSource]);
+  }, [visit.hasOrder, visit.orderValue, updateOrderValue]); // Stable deps only
 
   // Check if the selected date is today's date (use local timezone for accurate comparison)
   const today = new Date();
