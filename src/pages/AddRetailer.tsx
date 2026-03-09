@@ -1591,7 +1591,8 @@ export const AddRetailer = () => {
                     className="bg-background"
                   />
                   <p className="text-xs text-muted-foreground">Manual credit score out of 10</p>
-                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Retail Type *</Label>
