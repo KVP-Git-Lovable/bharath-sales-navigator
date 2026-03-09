@@ -134,15 +134,20 @@ export const RetailerExternalDBLookup: React.FC = () => {
                 Retailers in {selectedCity}, {selectedState}
                 <Badge variant="secondary" className="ml-2">{filteredRetailers.length}</Badge>
               </CardTitle>
-              {retailers.length > 0 && (
-                <div className="w-64">
-                  <SearchInput
-                    placeholder="Filter results..."
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                  />
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {retailers.length > 0 && (
+                  <>
+                    <GeocodeButton state={selectedState} city={selectedCity} />
+                    <div className="w-64">
+                      <SearchInput
+                        placeholder="Filter results..."
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -163,6 +168,7 @@ export const RetailerExternalDBLookup: React.FC = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>PIN Code</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>GPS Coordinate</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -204,6 +210,14 @@ export const RetailerExternalDBLookup: React.FC = () => {
                             <Badge variant="outline" className="text-xs">{r.category}</Badge>
                           ) : '—'}
                         </TableCell>
+                        <TableCell>
+                          {r.latitude && r.longitude ? (
+                            <div className="flex items-center gap-1.5 text-sm">
+                              <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-xs">{Number(r.latitude).toFixed(4)}, {Number(r.longitude).toFixed(4)}</span>
+                            </div>
+                          ) : '—'}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -214,5 +228,41 @@ export const RetailerExternalDBLookup: React.FC = () => {
         </Card>
       )}
     </div>
+  );
+};
+
+const GeocodeButton: React.FC<{ state: string; city: string }> = ({ state, city }) => {
+  const queryClient = useQueryClient();
+  const geocodeMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('geocode-retailer-ext', {
+        body: { state, city, batch_size: 50 },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Geocoded ${data.geocoded} retailers (${data.failed} failed)`);
+      queryClient.invalidateQueries({ queryKey: ['retailer-ext-data', state, city] });
+    },
+    onError: (err: any) => {
+      toast.error(`Geocoding failed: ${err.message}`);
+    },
+  });
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => geocodeMutation.mutate()}
+      disabled={geocodeMutation.isPending}
+    >
+      {geocodeMutation.isPending ? (
+        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+      ) : (
+        <Navigation className="h-4 w-4 mr-1.5" />
+      )}
+      Geocode
+    </Button>
   );
 };
