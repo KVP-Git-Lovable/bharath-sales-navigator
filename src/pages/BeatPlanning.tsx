@@ -590,8 +590,8 @@ export const BeatPlanning = () => {
   };
 
   const isBeatSelected = (beatId: string) => {
-    const dateKey = selectedDate.toLocaleDateString('en-US', { weekday: 'short' });
-    return (plannedBeats[dateKey] || []).includes(beatId);
+    // Use selectedDay directly for consistency with handleSelectBeat/handleRemoveBeat
+    return (plannedBeats[selectedDay] || []).includes(beatId);
   };
 
   const handleProceedToRetailers = () => {
