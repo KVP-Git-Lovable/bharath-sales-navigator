@@ -112,7 +112,7 @@ const RetailerExternalDBPage: React.FC = () => {
               </div>
             )}
             {jobStatus?.status === 'completed' && (
-              <span className="text-sm text-green-600">
+              <span className="text-sm text-primary">
                 ✓ Done — {jobStatus.geocoded_count} geocoded, {jobStatus.failed_count} failed
               </span>
             )}
