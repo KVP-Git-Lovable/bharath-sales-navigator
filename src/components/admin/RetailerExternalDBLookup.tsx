@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/SearchInput';
-import { Database, MapPin, Phone, Mail, Hash } from 'lucide-react';
+import { Database, MapPin, Phone, Mail, Hash, Navigation, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const RetailerExternalDBLookup: React.FC = () => {
   const [selectedState, setSelectedState] = useState<string>('');
