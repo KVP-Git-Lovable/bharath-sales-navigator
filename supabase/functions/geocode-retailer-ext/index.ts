@@ -8,7 +8,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -20,7 +20,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { state, city, batch_size = 50 } = body;
+    const { state, city, batch_size = 10 } = body;
 
     if (!state || !city) {
       return new Response(JSON.stringify({ error: "state and city are required" }), {
@@ -28,7 +28,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch records without coordinates that have an address
+    // Fetch only a small batch to avoid timeout
     const { data: records, error: fetchErr } = await supabase
       .from("retailer_external_db")
       .select("id, address, city, state, pincode")
@@ -37,12 +37,12 @@ serve(async (req) => {
       .is("latitude", null)
       .not("address", "is", null)
       .neq("address", "")
-      .limit(batch_size);
+      .limit(Math.min(batch_size, 15));
 
     if (fetchErr) throw fetchErr;
 
     if (!records || records.length === 0) {
-      return new Response(JSON.stringify({ message: "No records to geocode", geocoded: 0 }), {
+      return new Response(JSON.stringify({ message: "All records geocoded", geocoded: 0, remaining: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -53,49 +53,48 @@ serve(async (req) => {
 
     for (const record of records) {
       try {
-        const addressParts = [record.address, record.city, record.state, record.pincode, "India"]
-          .filter(Boolean);
+        const addressParts = [record.address, record.city, record.state, record.pincode, "India"].filter(Boolean);
         const fullAddress = addressParts.join(", ");
 
         const geoResp = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${GOOGLE_API_KEY}`
         );
 
-        if (!geoResp.ok) {
-          console.error(`API error for ${record.id}:`, geoResp.status);
-          failed++;
-          continue;
-        }
+        if (!geoResp.ok) { failed++; continue; }
 
         const geoData = await geoResp.json();
 
         if (geoData.status === "OK" && geoData.results?.length > 0) {
-          const location = geoData.results[0].geometry.location;
+          const loc = geoData.results[0].geometry.location;
           const { error: updateErr } = await supabase
             .from("retailer_external_db")
-            .update({ latitude: location.lat, longitude: location.lng })
+            .update({ latitude: loc.lat, longitude: loc.lng })
             .eq("id", record.id);
-
-          if (updateErr) {
-            console.error(`Update error for ${record.id}:`, updateErr);
-            failed++;
-          } else {
-            geocoded++;
-          }
+          if (updateErr) { failed++; } else { geocoded++; }
         } else {
-          console.log(`No result for ${record.id}: ${geoData.status}`);
+          // Mark with 0,0 so we don't retry forever
+          await supabase.from("retailer_external_db")
+            .update({ latitude: 0, longitude: 0 })
+            .eq("id", record.id);
           failed++;
         }
-
-        // Rate limit
-        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (err) {
-        console.error(`Error geocoding ${record.id}:`, err);
+        console.error(`Error for ${record.id}:`, err);
         failed++;
       }
     }
 
-    return new Response(JSON.stringify({ geocoded, failed, total: records.length }), {
+    // Count remaining
+    const { count } = await supabase
+      .from("retailer_external_db")
+      .select("id", { count: "exact", head: true })
+      .eq("state", state)
+      .eq("city", city)
+      .is("latitude", null)
+      .not("address", "is", null)
+      .neq("address", "");
+
+    return new Response(JSON.stringify({ geocoded, failed, remaining: count || 0 }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
