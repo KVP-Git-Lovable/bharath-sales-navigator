@@ -32,7 +32,7 @@ export const RetailerExternalDBLookup: React.FC = () => {
         selected_state: selectedState,
       });
       if (error) throw error;
-      return (data || []).map((r: any) => r.city as string);
+      return (data || []).map((r: any) => r.city as string).filter((c: string) => c && c.trim() !== '');
     },
     enabled: !!selectedState,
     staleTime: 30 * 60 * 1000,
