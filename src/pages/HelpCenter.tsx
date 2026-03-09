@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Book, MapPin, ShoppingCart, Users, Calendar, BarChart3, Award, Briefcase, Settings, ChevronRight, Star, ChevronsUpDown } from "lucide-react";
+import { Search, Book, MapPin, ShoppingCart, Users, Calendar, BarChart3, Award, Briefcase, Settings, ChevronRight, Star, ChevronsUpDown, Wifi, WifiOff, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
+import { useConnectivity } from "@/hooks/useConnectivity";
+import { NotificationBell } from "@/components/NotificationBell";
+import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 
 interface HelpCategory {
   id: string;
