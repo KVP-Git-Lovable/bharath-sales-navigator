@@ -174,28 +174,7 @@ import { getGDIData } from '@/data/gdiIndexData';
             );
           })()}
 
-          {/* Maharashtra HDI Info Boxes */}
-          {selectedState === 'MAHARASHTRA' && selectedDistrict && (() => {
-            const hdiData = maharashtraDistrictHDI[selectedDistrict.toLowerCase()];
-            if (!hdiData) return null;
-            return (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 p-3 text-center">
-                    <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium uppercase tracking-wider">HDI</p>
-                    <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{hdiData.hdi}</p>
-                  </div>
-                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-center">
-                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wider">Literacy Rate (%)</p>
-                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{hdiData.literacyRate}%</p>
-                  </div>
-                </div>
-                <p className="text-[9px] text-muted-foreground text-center mt-2 italic">
-                  Source: Census of India &amp; UNDP HDI Reports
-                </p>
-              </>
-            );
-          })()}
+          {/* Maharashtra HDI Info Boxes - now uses GDI data */}
 
           {/* GDI Info Boxes for other states */}
           {selectedState && selectedDistrict && selectedState !== 'KARNATAKA' && selectedState !== 'MAHARASHTRA' && (() => {
