@@ -1491,135 +1491,304 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   const handleDownloadPDF = async () => {
     setDownloadingPDF(true);
     try {
-      const doc = new jsPDF('p', 'pt', 'a4');
+      // --- Color Palette ---
+      const COLORS = {
+        primary: [31, 78, 121] as [number, number, number],
+        secondary: [46, 134, 193] as [number, number, number],
+        accent: [39, 174, 96] as [number, number, number],
+        warning: [243, 156, 18] as [number, number, number],
+        danger: [231, 76, 60] as [number, number, number],
+        lightBg: [241, 245, 249] as [number, number, number],
+        white: [255, 255, 255] as [number, number, number],
+        darkText: [30, 41, 59] as [number, number, number],
+        mutedText: [100, 116, 139] as [number, number, number],
+        cardBorder: [226, 232, 240] as [number, number, number],
+      };
+
+      const CHART_COLORS: [number, number, number][] = [
+        [31, 78, 121], [46, 134, 193], [39, 174, 96], [243, 156, 18],
+        [231, 76, 60], [142, 68, 173], [41, 128, 185], [22, 160, 133],
+        [211, 84, 0], [44, 62, 80],
+      ];
+
+      const doc = new jsPDF('l', 'pt', 'a4');
       const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 20;
-      let y = margin;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 30;
+      const contentWidth = pageWidth - margin * 2;
+      let y = 0;
 
       const fmtCurrency = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
       const fmtKG = (grams: number) => (grams / 1000).toFixed(1) + ' KG';
 
-      // --- Header ---
-      doc.setFontSize(18);
+      const checkPageBreak = (needed: number) => {
+        if (y + needed > pageHeight - 40) {
+          doc.addPage();
+          y = margin;
+        }
+      };
+
+      const drawSectionTitle = (title: string) => {
+        checkPageBreak(40);
+        doc.setFillColor(...COLORS.primary);
+        doc.rect(margin, y, 4, 16, 'F');
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...COLORS.primary);
+        doc.text(title, margin + 12, y + 12);
+        doc.setTextColor(...COLORS.darkText);
+        y += 24;
+      };
+
+      // ==================== HEADER BANNER ====================
+      doc.setFillColor(...COLORS.primary);
+      doc.rect(0, 0, pageWidth, 70, 'F');
+      // Subtle secondary stripe
+      doc.setFillColor(...COLORS.secondary);
+      doc.rect(0, 64, pageWidth, 6, 'F');
+
+      doc.setTextColor(...COLORS.white);
+      doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text('Analytics Report', margin, y + 18);
-      y += 28;
+      doc.text('Sales Analytics Report', margin, 32);
+
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Period: ${format(dateRange.from, 'dd MMM yyyy')} – ${format(dateRange.to, 'dd MMM yyyy')}`, margin, y);
-      y += 12;
+      const periodText = `${format(dateRange.from, 'dd MMM yyyy')} – ${format(dateRange.to, 'dd MMM yyyy')}`;
       const filterLabel = selectedUsers.length === 0 ? 'All Users' : selectedUsers.length <= 3 ? selectedUsers.join(', ') : `${selectedUsers.length} users selected`;
-      doc.text(`Filter: ${filterLabel}`, margin, y);
-      y += 20;
+      doc.text(`Period: ${periodText}   |   Filter: ${filterLabel}`, margin, 52);
+      doc.setTextColor(...COLORS.darkText);
+      y = 90;
 
-      // --- Section 1: Business Summary ---
-      doc.setFontSize(13);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Business Summary', margin, y);
-      y += 14;
-
-      const summaryMetrics = [
-        ['Total Order Value', fmtCurrency(businessSummary.totalRevenue)],
-        ['Total Quantity', businessSummary.totalKg.toFixed(1) + ' KG'],
-        ['Total Orders', String(businessSummary.totalOrders)],
-        ['Total Retailers', String(businessSummary.totalRetailers)],
-        ['Total Beats', String(businessSummary.totalBeats)],
-        ['Pending Payments', fmtCurrency(businessSummary.pendingPayments)],
+      // ==================== KPI CARDS ====================
+      const kpiData = [
+        { label: 'Total Revenue', value: fmtCurrency(businessSummary.totalRevenue), color: COLORS.primary },
+        { label: 'Total Quantity', value: businessSummary.totalKg.toFixed(1) + ' KG', color: COLORS.secondary },
+        { label: 'Orders', value: String(businessSummary.totalOrders), color: COLORS.accent },
+        { label: 'Retailers', value: String(businessSummary.totalRetailers), color: COLORS.warning },
+        { label: 'Pending Payments', value: fmtCurrency(businessSummary.pendingPayments), color: COLORS.danger },
       ];
 
-      autoTable(doc, {
-        startY: y,
-        head: [['Metric', 'Value']],
-        body: summaryMetrics,
-        theme: 'grid',
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [139, 92, 246] },
-        alternateRowStyles: { fillColor: [245, 243, 255] },
+      const cardWidth = (contentWidth - 4 * 12) / 5;
+      const cardHeight = 58;
+      kpiData.forEach((kpi, i) => {
+        const cx = margin + i * (cardWidth + 12);
+        // Card background
+        doc.setFillColor(...COLORS.white);
+        doc.setDrawColor(...COLORS.cardBorder);
+        doc.roundedRect(cx, y, cardWidth, cardHeight, 4, 4, 'FD');
+        // Color top accent
+        doc.setFillColor(...(kpi.color as [number, number, number]));
+        doc.rect(cx, y, cardWidth, 3, 'F');
+        // Label
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.mutedText);
+        doc.text(kpi.label, cx + 10, y + 20);
+        // Value
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...COLORS.darkText);
+        doc.text(kpi.value, cx + 10, y + 42);
       });
-      y = (doc as any).lastAutoTable.finalY + 16;
+      doc.setTextColor(...COLORS.darkText);
+      y += cardHeight + 24;
 
-      // --- Section 2: Order Summary by User ---
-      doc.setFontSize(13);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Order Summary by User', margin, y);
-      y += 14;
+      // ==================== SALES LEADERBOARD ====================
+      drawSectionTitle('Sales Leaderboard');
 
+      const totalRevenue = summaryData.reduce((s, u) => s + u.total_order_value, 0);
       if (summaryData.length > 0) {
-        const orderRows = summaryData.map((u, i) => [
+        const medalColors: Record<number, [number, number, number]> = {
+          0: [255, 215, 0],   // Gold
+          1: [192, 192, 192], // Silver
+          2: [205, 127, 50],  // Bronze
+        };
+
+        const leaderRows = summaryData.map((u, i) => [
           String(i + 1),
           u.full_name,
           fmtKG(u.total_kg),
           fmtCurrency(u.total_order_value),
+          totalRevenue > 0 ? (u.total_order_value / totalRevenue * 100).toFixed(1) + '%' : '0%',
         ]);
 
         autoTable(doc, {
           startY: y,
-          head: [['#', 'User', 'Total KG', 'Order Value']],
-          body: orderRows,
-          theme: 'striped',
+          head: [['Rank', 'User', 'Total KG', 'Revenue', 'Share %']],
+          body: leaderRows,
+          theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [59, 130, 246] },
+          styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { fillColor: COLORS.primary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          willDrawCell: (data: any) => {
+            if (data.section === 'body' && data.row.index < 3) {
+              const rowColor = data.row.index === 0 ? [255, 251, 235] : data.row.index === 1 ? [248, 250, 252] : [255, 247, 237];
+              doc.setFillColor(...(rowColor as [number, number, number]));
+            }
+          },
+          didDrawCell: (data: any) => {
+            if (data.section === 'body' && data.column.index === 0 && data.row.index < 3) {
+              const color = medalColors[data.row.index];
+              if (color) {
+                doc.setFillColor(...color);
+                doc.circle(data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, 5, 'F');
+                doc.setFontSize(7);
+                doc.setTextColor(50, 50, 50);
+                doc.text(String(data.row.index + 1), data.cell.x + data.cell.width / 2 - 2, data.cell.y + data.cell.height / 2 + 2.5);
+                doc.setTextColor(...COLORS.darkText);
+              }
+            }
+          },
         });
         y = (doc as any).lastAutoTable.finalY + 16;
       }
 
-      // --- Section 3: Revenue by SKU ---
-      if (skuDataForSummary.length > 0) {
-        doc.setFontSize(13);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Revenue by SKU', margin, y);
-        y += 14;
+      // ==================== REVENUE DISTRIBUTION CHART ====================
+      if (summaryData.length > 0 && totalRevenue > 0) {
+        checkPageBreak(100);
+        drawSectionTitle('Revenue Distribution by User');
 
-        const skuRows = skuDataForSummary.map(s => [
+        const barY = y;
+        const barHeight = 22;
+        const barWidth = contentWidth - 160;
+        const legendX = margin + barWidth + 16;
+        let barX = margin;
+
+        // Draw stacked horizontal bar
+        const topUsers = summaryData.slice(0, 10);
+        topUsers.forEach((u, i) => {
+          const share = u.total_order_value / totalRevenue;
+          const segW = share * barWidth;
+          if (segW > 1) {
+            const color = CHART_COLORS[i % CHART_COLORS.length];
+            doc.setFillColor(...color);
+            doc.rect(barX, barY, segW, barHeight, 'F');
+            barX += segW;
+          }
+        });
+
+        // Legend
+        let ly = barY;
+        topUsers.forEach((u, i) => {
+          if (ly > barY + 80) return;
+          const color = CHART_COLORS[i % CHART_COLORS.length];
+          doc.setFillColor(...color);
+          doc.rect(legendX, ly + 1, 8, 8, 'F');
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(...COLORS.darkText);
+          const nameShort = u.full_name.length > 16 ? u.full_name.substring(0, 14) + '…' : u.full_name;
+          doc.text(`${nameShort} (${(u.total_order_value / totalRevenue * 100).toFixed(1)}%)`, legendX + 12, ly + 8);
+          ly += 12;
+        });
+
+        y = Math.max(barY + barHeight, ly) + 20;
+      }
+
+      // ==================== REVENUE BY SKU ====================
+      if (skuDataForSummary.length > 0) {
+        checkPageBreak(60);
+        drawSectionTitle('Revenue by SKU');
+
+        const sortedSkus = [...skuDataForSummary].sort((a, b) => b.revenue - a.revenue);
+        const totalSkuRevenue = sortedSkus.reduce((s, sk) => s + sk.revenue, 0);
+
+        const skuRows = sortedSkus.map(s => [
           s.product_name,
           s.unit || '-',
           s.unit?.toLowerCase().includes('gm') || s.unit?.toLowerCase().includes('gram')
-            ? fmtKG(s.quantity_sold)
-            : String(s.quantity_sold),
+            ? fmtKG(s.quantity_sold) : String(s.quantity_sold),
           fmtCurrency(s.revenue),
+          totalSkuRevenue > 0 ? (s.revenue / totalSkuRevenue * 100).toFixed(1) + '%' : '0%',
         ]);
 
         autoTable(doc, {
           startY: y,
-          head: [['Product', 'Unit', 'Qty Sold', 'Revenue']],
+          head: [['Product', 'Unit', 'Qty Sold', 'Revenue', '% Contribution']],
           body: skuRows,
-          theme: 'striped',
+          theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [16, 185, 129] },
+          styles: { fontSize: 8, cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { fillColor: COLORS.accent, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
         });
         y = (doc as any).lastAutoTable.finalY + 16;
+
+        // --- Top 10 SKU Bar Chart ---
+        const top10 = sortedSkus.slice(0, 10);
+        if (top10.length > 0) {
+          checkPageBreak(top10.length * 18 + 40);
+          drawSectionTitle('Top SKU Revenue');
+
+          const maxRev = top10[0].revenue;
+          const chartBarMaxW = contentWidth * 0.5;
+          const labelW = 180;
+
+          top10.forEach((sku, i) => {
+            const bw = maxRev > 0 ? (sku.revenue / maxRev) * chartBarMaxW : 0;
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...COLORS.darkText);
+            const skuLabel = sku.product_name.length > 30 ? sku.product_name.substring(0, 28) + '…' : sku.product_name;
+            doc.text(skuLabel, margin, y + 10);
+            doc.setFillColor(...COLORS.secondary);
+            doc.rect(margin + labelW, y + 2, bw, 12, 'F');
+            doc.setFontSize(7);
+            doc.setTextColor(...COLORS.mutedText);
+            doc.text(fmtCurrency(sku.revenue), margin + labelW + bw + 6, y + 11);
+            doc.setTextColor(...COLORS.darkText);
+            y += 18;
+          });
+          y += 12;
+        }
       }
 
-      // --- Section 4: Productivity Summary ---
+      // ==================== PRODUCTIVITY SUMMARY ====================
       if (productivityDataForSummary.length > 0) {
-        doc.setFontSize(13);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Productivity Summary', margin, y);
-        y += 14;
+        checkPageBreak(60);
+        drawSectionTitle('Productivity Summary');
 
         const prodRows = productivityDataForSummary.map(p => [
           p.full_name,
           String(p.productive_visits),
           String(p.total_visits),
           p.productivity_percentage.toFixed(1) + '%',
+          '', // placeholder for visual bar
         ]);
 
         autoTable(doc, {
           startY: y,
-          head: [['User', 'Productive', 'Total Visits', 'Productivity %']],
+          head: [['User', 'Productive', 'Total', '%', 'Performance']],
           body: prodRows,
-          theme: 'striped',
+          theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [245, 158, 11] },
+          styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { fillColor: COLORS.warning, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          columnStyles: { 4: { cellWidth: 100 } },
+          didDrawCell: (data: any) => {
+            if (data.section === 'body' && data.column.index === 4) {
+              const pct = productivityDataForSummary[data.row.index]?.productivity_percentage || 0;
+              const barMaxW = 80;
+              const barW = (pct / 100) * barMaxW;
+              const bx = data.cell.x + 6;
+              const by = data.cell.y + data.cell.height / 2 - 4;
+              // Background bar
+              doc.setFillColor(226, 232, 240);
+              doc.roundedRect(bx, by, barMaxW, 8, 2, 2, 'F');
+              // Fill bar
+              const barColor = pct >= 80 ? COLORS.accent : pct >= 50 ? COLORS.warning : COLORS.danger;
+              doc.setFillColor(...barColor);
+              doc.roundedRect(bx, by, Math.max(barW, 2), 8, 2, 2, 'F');
+            }
+          },
         });
         y = (doc as any).lastAutoTable.finalY + 16;
       }
 
-      // --- Section 5: Attendance & Market Hours (fresh fetch) ---
+      // ==================== ATTENDANCE & WORKING HOURS ====================
       try {
         const fromDate = format(dateRange.from, 'yyyy-MM-dd');
         const toDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -1634,7 +1803,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           .in('status', ['present', 'half_day_leave']);
 
         if (attendanceData && attendanceData.length > 0) {
-          // Group by user
           const userAttendance: Record<string, { totalHours: number; days: number }> = {};
           attendanceData.forEach(a => {
             if (!userAttendance[a.user_id]) userAttendance[a.user_id] = { totalHours: 0, days: 0 };
@@ -1646,22 +1814,21 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
             const userName = users.find(u => u.id === uid)?.full_name || 'Unknown';
             const avgHours = data.days > 0 ? (data.totalHours / data.days).toFixed(1) : '0';
             return [userName, avgHours, String(data.days)];
-          }).sort((a, b) => b[2].localeCompare(a[2]));
+          }).sort((a, b) => Number(b[2]) - Number(a[2]));
 
           if (attendanceRows.length > 0) {
-            doc.setFontSize(13);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Attendance & Working Hours', margin, y);
-            y += 14;
+            checkPageBreak(60);
+            drawSectionTitle('Attendance & Working Hours');
 
             autoTable(doc, {
               startY: y,
               head: [['User', 'Avg Working Hours', 'Days Present']],
               body: attendanceRows,
-              theme: 'striped',
+              theme: 'plain',
               margin: { left: margin, right: margin },
-              styles: { fontSize: 8 },
-              headStyles: { fillColor: [99, 102, 241] },
+              styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+              headStyles: { fillColor: COLORS.secondary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+              alternateRowStyles: { fillColor: [248, 250, 252] },
             });
             y = (doc as any).lastAutoTable.finalY + 16;
           }
@@ -1670,43 +1837,79 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         console.error('Attendance fetch for PDF failed:', err);
       }
 
-      // --- Section 6: AI Insights ---
+      // ==================== AI INSIGHTS ====================
       if (aiInsights.length > 0) {
-        doc.setFontSize(13);
-        doc.setFont('helvetica', 'bold');
-        doc.text('AI Insights', margin, y);
-        y += 14;
+        checkPageBreak(60);
+        drawSectionTitle('AI Insights & Recommendations');
 
-        const insightRows = aiInsights.map(i => [
-          i.type.toUpperCase(),
-          i.title,
-          i.description,
-        ]);
+        const typeColors: Record<string, [number, number, number]> = {
+          opportunity: COLORS.accent,
+          success: COLORS.accent,
+          info: COLORS.secondary,
+          warning: COLORS.warning,
+          alert: COLORS.danger,
+          critical: COLORS.danger,
+        };
 
-        autoTable(doc, {
-          startY: y,
-          head: [['Type', 'Title', 'Description']],
-          body: insightRows,
-          theme: 'grid',
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [139, 92, 246] },
-          columnStyles: { 2: { cellWidth: 'auto' } },
+        aiInsights.forEach(insight => {
+          const boxHeight = 40;
+          checkPageBreak(boxHeight + 8);
+
+          const borderColor = typeColors[insight.type] || COLORS.secondary;
+
+          // Card background
+          doc.setFillColor(248, 250, 252);
+          doc.setDrawColor(...COLORS.cardBorder);
+          doc.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, 'FD');
+
+          // Left color accent bar
+          doc.setFillColor(...borderColor);
+          doc.rect(margin, y, 4, boxHeight, 'F');
+
+          // Type badge
+          doc.setFillColor(...borderColor);
+          doc.roundedRect(margin + 14, y + 6, 50, 12, 2, 2, 'F');
+          doc.setFontSize(6);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...COLORS.white);
+          doc.text(insight.type.toUpperCase(), margin + 18, y + 14);
+
+          // Title
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...COLORS.darkText);
+          doc.text(insight.title, margin + 70, y + 16);
+
+          // Description
+          doc.setFontSize(7.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(...COLORS.mutedText);
+          const descText = insight.description.length > 120 ? insight.description.substring(0, 118) + '…' : insight.description;
+          doc.text(descText, margin + 14, y + 32);
+
+          doc.setTextColor(...COLORS.darkText);
+          y += boxHeight + 6;
         });
+        y += 8;
       }
 
-      // --- Footer: page numbers ---
+      // ==================== FOOTER ON ALL PAGES ====================
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
+        const footerY = pageHeight - 20;
+        doc.setDrawColor(...COLORS.cardBorder);
+        doc.line(margin, footerY - 6, pageWidth - margin, footerY - 6);
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 50, doc.internal.pageSize.getHeight() - 10);
+        doc.setTextColor(...COLORS.mutedText);
+        doc.text(`Generated on ${format(new Date(), 'dd MMM yyyy, hh:mm a')}`, margin, footerY);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 50, footerY);
       }
 
       const pdfBlob = doc.output('blob');
-      await downloadPDF(pdfBlob, `Analytics_Report_${format(dateRange.from, 'yyyy-MM-dd')}_to_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`);
-      toast.success('Report PDF downloaded');
+      await downloadPDF(pdfBlob, `Sales_Report_${format(dateRange.from, 'yyyy-MM-dd')}_to_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`);
+      toast.success('Executive report downloaded');
     } catch (err) {
       console.error('PDF generation failed:', err);
       toast.error('Failed to generate PDF');
