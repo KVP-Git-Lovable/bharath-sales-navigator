@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 
 const RetailerExternalDBPage: React.FC = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
+  const navigate = useNavigate();
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<any>(null);
   const [starting, setStarting] = useState(false);
