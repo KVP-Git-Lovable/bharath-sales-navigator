@@ -268,9 +268,7 @@ export const PincodeMasterLookup: React.FC = () => {
                     </div>
                     <div className="text-sm text-muted-foreground text-right">
                       {item.territories.length > 0
-                        ? item.territories.map((t, i) => (
-                            <span key={i} className="block">{t}</span>
-                          ))
+                        ? item.territories.join(', ')
                         : '-'}
                     </div>
                   </div>
