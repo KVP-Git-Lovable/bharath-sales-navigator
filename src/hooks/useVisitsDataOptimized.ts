@@ -253,11 +253,31 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const userIdRef = useRef(effectiveUserId);
   const selectedDateRef = useRef(selectedDate);
   
+  // FIX: Sync state to module-level cache so it survives unmount/remount
+  useEffect(() => {
+    if (!effectiveUserId || !hasLoadedOnce) return;
+    const key = getModuleCacheKey(effectiveUserId, selectedDate);
+    moduleCache.set(key, {
+      beatPlans,
+      visits,
+      retailers,
+      orders,
+      points: { total: pointsData.total, byRetailer: Array.from(pointsData.byRetailer.entries()) },
+      timestamp: Date.now(),
+    });
+    // Prune module cache to prevent unbounded growth
+    if (moduleCache.size > 14) {
+      const firstKey = moduleCache.keys().next().value;
+      if (firstKey) moduleCache.delete(firstKey);
+    }
+  }, [effectiveUserId, selectedDate, beatPlans, visits, retailers, orders, pointsData, hasLoadedOnce]);
+  
   // Helper to clear all in-memory state and caches
   const clearAllCachesAndState = useCallback(() => {
     console.log('[useVisitsDataOptimized] CLEARING ALL CACHES AND STATE');
     cacheRef.current.clear();
     lastSyncTimeRef.current.clear();
+    moduleCache.clear(); // Also clear module cache
     setBeatPlans([]);
     setVisits([]);
     setRetailers([]);
