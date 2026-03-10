@@ -20,6 +20,8 @@ export interface ExternalRetailer {
   city: string;
   mobile: string | null;
   category: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export const PincodeMasterLookup: React.FC = () => {
