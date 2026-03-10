@@ -20,6 +20,8 @@ export interface ExternalRetailer {
   city: string;
   mobile: string | null;
   category: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export const PincodeMasterLookup: React.FC = () => {
@@ -115,7 +117,7 @@ export const PincodeMasterLookup: React.FC = () => {
     setLoadingRetailers(true);
     const { data, error } = await supabase
       .from('retailer_external_db')
-      .select('id, company_name, address, city, mobile, category')
+      .select('id, company_name, address, city, mobile, category, latitude, longitude')
       .eq('pincode', pincode)
       .order('company_name');
     if (!error && data) {
