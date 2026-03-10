@@ -51,39 +51,50 @@ export const RetailerUnsortedLookup: React.FC = () => {
     staleTime: 30 * 60 * 1000,
   });
 
-  const { data: retailers = [], isLoading: retailersLoading } = useQuery({
+  const {
+    data: retailers = [],
+    isLoading: retailersLoading,
+    error: retailersError,
+  } = useQuery({
     queryKey: ['retailer-unsorted-data', selectedState, selectedDistrict, selectedCity],
     queryFn: async () => {
+      const normalizedState = selectedState.trim();
+      const normalizedDistrict = selectedDistrict.trim();
+      const normalizedCity = selectedCity.trim();
+
       const { data, error } = await supabase
         .from('retailer_external_unsorted' as any)
         .select('*')
-        .eq('State', selectedState)
-        .eq('District', selectedDistrict)
-        .eq('City', selectedCity)
-        .order('Retailer\'s Name')
+        .eq('State', normalizedState)
+        .eq('District', normalizedDistrict)
+        .eq('City', normalizedCity)
         .limit(500);
+
       if (error) throw error;
-      return data || [];
+
+      return (data || []).sort((a: any, b: any) =>
+        (a["Retailer's Name"] || '').localeCompare(b["Retailer's Name"] || '')
+      );
     },
     enabled: !!selectedState && !!selectedDistrict && !!selectedCity,
     staleTime: 10 * 60 * 1000,
   });
 
   const handleStateChange = (value: string) => {
-    setSelectedState(value);
+    setSelectedState(value.trim());
     setSelectedDistrict('');
     setSelectedCity('');
     setSearchQuery('');
   };
 
   const handleDistrictChange = (value: string) => {
-    setSelectedDistrict(value);
+    setSelectedDistrict(value.trim());
     setSelectedCity('');
     setSearchQuery('');
   };
 
   const handleCityChange = (value: string) => {
-    setSelectedCity(value);
+    setSelectedCity(value.trim());
     setSearchQuery('');
   };
 
