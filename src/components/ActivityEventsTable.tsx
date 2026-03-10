@@ -136,15 +136,10 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  if (isLoading && activities.length === 0) {
-    return (
-      <Card className="shadow-card border-amber-200/50 dark:border-amber-800/30">
-        <CardContent className="p-4 text-center">
-          <Loader2 className="h-5 w-5 animate-spin mx-auto text-amber-500" />
-          <p className="text-xs text-muted-foreground mt-2">Loading activities...</p>
-        </CardContent>
-      </Card>
-    );
+  // FIX: Don't show loading spinner - it causes visual flickering
+  // The parent already waits for hasLoadedOnce before rendering this component
+  if (!hasLoadedOnce || (isLoading && activities.length === 0)) {
+    return null;
   }
 
   if (activities.length === 0) return null;
