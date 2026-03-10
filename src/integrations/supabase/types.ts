@@ -15766,6 +15766,24 @@ export type Database = {
           state: string
         }[]
       }
+      get_retailer_unsorted_cities: {
+        Args: { selected_district: string; selected_state: string }
+        Returns: {
+          city: string
+        }[]
+      }
+      get_retailer_unsorted_districts: {
+        Args: { selected_state: string }
+        Returns: {
+          district: string
+        }[]
+      }
+      get_retailer_unsorted_states: {
+        Args: never
+        Returns: {
+          state: string
+        }[]
+      }
       get_subordinate_users: {
         Args: { user_id_param: string }
         Returns: {

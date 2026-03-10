@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { RetailerExternalDBLookup } from '@/components/admin/RetailerExternalDBLookup';
 import { Button } from '@/components/ui/button';
-import { Globe, Loader2 } from 'lucide-react';
+import { Globe, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 
 const RetailerExternalDBPage: React.FC = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
+  const navigate = useNavigate();
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<any>(null);
   const [starting, setStarting] = useState(false);
@@ -84,11 +85,20 @@ const RetailerExternalDBPage: React.FC = () => {
     <Layout>
       <div className="min-h-screen bg-gradient-subtle p-4">
         <div className="max-w-6xl mx-auto space-y-6">
-          <AdminPageHeader
-            title="Retailer External Database"
-            subtitle="Browse external grocery retailer data by state and city"
-          />
-          
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <AdminPageHeader
+              title="Retailer External Database"
+              subtitle="Browse external grocery retailer data by state and city (with Address and category)"
+            />
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/retailer-unsorted')}
+              className="flex items-center gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Check uncategorized retailers
+            </Button>
+          </div>
 
           <RetailerExternalDBLookup />
         </div>
