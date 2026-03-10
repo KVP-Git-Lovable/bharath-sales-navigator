@@ -224,7 +224,14 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
 
   const lastDateRef = useRef<string>('');
   const lastUserRef = useRef<string>(''); // Track user changes for cache invalidation
-  const cacheRef = useRef<Map<string, any>>(new Map());
+  // FIX: Seed cacheRef from module cache so loadData finds data immediately
+  const cacheRef = useRef<Map<string, any>>(() => {
+    const map = new Map();
+    if (initialModuleCache) {
+      map.set(selectedDate, { ...initialModuleCache, points: initialModuleCache.points ? { total: initialModuleCache.points.total, byRetailer: initialModuleCache.points.byRetailer } : undefined });
+    }
+    return map;
+  });
   const isFetchingRef = useRef(false);
   const mountedRef = useRef(true);
   const lastSyncTimeRef = useRef<Map<string, number>>(new Map());
