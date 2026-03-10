@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, CheckCircle, Database } from 'lucide-react';
+import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, Database } from 'lucide-react';
 import { monitoring } from '@/services/MonitoringService';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 import { ActivityLoggingSection } from '@/components/status/ActivityLoggingSection';
