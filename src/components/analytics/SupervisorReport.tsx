@@ -1672,16 +1672,21 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         // Legend
         let ly = barY;
         topUsers.forEach((u, i) => {
-          if (ly > barY + 80) return;
+          if (ly > barY + 120) return;
           const color = CHART_COLORS[i % CHART_COLORS.length];
           doc.setFillColor(...color);
           doc.rect(legendX, ly + 1, 8, 8, 'F');
           doc.setFontSize(7);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(...COLORS.darkText);
-          const nameShort = u.full_name.length > 16 ? u.full_name.substring(0, 14) + '…' : u.full_name;
+          const nameShort = u.full_name.length > 14 ? u.full_name.substring(0, 12) + '…' : u.full_name;
           doc.text(`${nameShort} (${(u.total_order_value / totalRevenue * 100).toFixed(1)}%)`, legendX + 12, ly + 8);
-          ly += 12;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(...COLORS.mutedText);
+          const kgVal = u.total_kg >= 1 ? u.total_kg.toFixed(1) + ' KG' : (u.total_kg * 1000).toFixed(0) + ' gm';
+          doc.text(`${kgVal} | ${fmtCurrency(u.total_order_value)}`, legendX + 12, ly + 16);
+          ly += 22;
         });
 
         y = Math.max(barY + barHeight, ly) + 20;
