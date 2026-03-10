@@ -64,7 +64,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   const prevFetchKeyRef = useRef<string>('');
   const isFetchingRef = useRef(false);
   const prevScopeReadyRef = useRef(isScopeReady);
-  const reportContentRef = useRef<HTMLDivElement>(null);
+  
   const [downloadingPDF, setDownloadingPDF] = useState(false);
    
    // Hindi to English translation for retailer/beat names in Productivity section
