@@ -104,13 +104,6 @@ const StatusDashboard = () => {
           description: 'Blocks read from disk',
           health: m.cache_hit_ratio >= 99 ? 'good' : m.cache_hit_ratio >= 95 ? 'average' : 'bad',
         },
-        {
-          label: 'Commits',
-          value: formatNumber(m.commits),
-          icon: <CheckCircle className="h-6 w-6" />,
-          description: 'Successful transactions',
-          health: m.rollbacks === 0 ? 'good' : m.rollbacks / (m.commits + m.rollbacks) < 0.01 ? 'good' : m.rollbacks / (m.commits + m.rollbacks) < 0.05 ? 'average' : 'bad',
-        },
       ]);
       setLastRefreshed(new Date());
       await fetchMemoryUsage();
