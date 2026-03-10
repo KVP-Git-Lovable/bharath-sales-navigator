@@ -1,111 +1,65 @@
 
 
-# Event-Based Notification Engine
+# Plan: Data-Driven PDF Export for Analytics & Insights
 
-## Current State
-- Existing `notifications` table stores simple notifications (user_id, title, message, type, is_read)
-- `notification_preferences` table exists but only for push content template types
-- Notifications are currently hardcoded in only one place (`RetailManagement.tsx` for retailer verification)
-- No event system, no notification rules, no configurable engine exists
+## Problem
+The current "Download PDF" in the Analytics module uses `html2canvas` to screenshot the UI. This means:
+- Only visible/scrolled content is captured
+- Data is limited to what's rendered on screen (e.g. Top 5 filter, scroll-limited tables)
+- Requires UI interaction (clicking users/beats) to see detail data
+- Quality degrades with large content
 
-## Architecture
+## Solution
+Replace the screenshot-based approach with a **jsPDF + jspdf-autotable** data-driven PDF that fetches and includes the full dataset from backend APIs, respecting applied filters.
 
-```text
-Module Action (order created, leave approved, etc.)
-       ↓
-  DB Trigger on target table
-       ↓
-  calls process_notification_event() PG function
-       ↓
-  Looks up notification_rules for matching event_type + module
-       ↓
-  Resolves receiver (employee, manager, admin, role, specific user)
-       ↓
-  Renders message template with placeholders
-       ↓
-  Inserts into notifications table
-       ↓
-  Real-time subscription in NotificationBell picks it up
-```
+## Technical Changes
 
-## Database Changes (3 new tables + 1 function)
+### File: `src/components/analytics/SupervisorReport.tsx`
 
-### 1. `notification_event_types` (reference table)
-- `id` uuid PK
-- `event_code` text UNIQUE (RECORD_CREATED, RECORD_APPROVED, etc.)
-- `label` text (human-readable)
-- `description` text
-- `is_active` boolean default true
+**1. Replace `handleDownloadPDF` function (lines 1489-1583)**
 
-Seed with 10 system events: RECORD_CREATED, RECORD_UPDATED, RECORD_DELETED, RECORD_APPROVED, RECORD_REJECTED, TASK_ASSIGNED, ACTIVITY_COMPLETED, TARGET_ACHIEVED, COMMENT_ADDED, FILE_UPLOADED
+Remove all `html2canvas` logic. Replace with a new function that:
 
-### 2. `notification_rules` (admin-configurable)
-- `id` uuid PK
-- `name` text (rule name)
-- `event_code` text (FK to event_types)
-- `source_table` text (which table triggers this, e.g. 'orders', 'leave_applications')
-- `receiver_type` text ('employee', 'manager', 'admin', 'role', 'specific_user')
-- `receiver_role` text nullable (if receiver_type = 'role')
-- `receiver_user_id` uuid nullable (if receiver_type = 'specific_user')
-- `notification_channel` text default 'in_app' ('in_app', 'email', 'push')
-- `message_template` text (with {placeholders})
-- `title_template` text
-- `is_active` boolean default true
-- `created_by` uuid
-- `created_at`, `updated_at` timestamps
+- Uses `jsPDF` + `autoTable` (already installed as dependencies)
+- Removes the `reportContentRef` and `html2canvas` import (no longer needed)
+- Fetches full data from backend APIs using the same queries the components use, but without UI limits
 
-### 3. `notification_event_log` (audit trail)
-- `id` uuid PK
-- `event_code` text
-- `source_table` text
-- `record_id` uuid
-- `actor_user_id` uuid
-- `metadata` jsonb (snapshot of relevant data for placeholder resolution)
-- `processed` boolean default false
-- `created_at` timestamp
+**2. New PDF generation logic:**
 
-### 4. DB Function: `emit_notification_event()`
-A SECURITY DEFINER function that:
-1. Inserts into `notification_event_log`
-2. Queries matching `notification_rules` by event_code + source_table
-3. Resolves receiver (looks up manager via employees table, or admin users, etc.)
-4. Renders templates by replacing placeholders from metadata jsonb
-5. Inserts into `notifications` table
-6. Marks event as processed
+The new `handleDownloadPDF` will:
 
-### 5. DB Triggers on key tables
-Create AFTER INSERT/UPDATE triggers on: `orders`, `leave_applications`, `regularization_requests`, `approval_requests`, `visits`, `activity_events`, `pm_tasks` — each calling `emit_notification_event()` with appropriate event_code and metadata.
+a. **Header**: Report title, date range, selected user filter info
 
-## Frontend Changes
+b. **Section 1 — Business Summary**: Total Order Value, Total Quantity (KG), Total Beats, Retailers, Orders, Revenue, Pending Payments (from `businessSummary` state — already loaded)
 
-### Admin UI: Notification Rules Manager
-- New page `/admin/notification-rules` (replace or extend current `/push-content-setup`)
-- Add to AdminControls module list
-- Features:
-  - List all rules with toggle active/inactive
-  - Create/edit rule dialog: select event, source table, receiver type, channels, message template with placeholder helper
-  - Preview rendered message
-  - Test rule button
+c. **Section 2 — Order Summary by User** (full table, all users): Uses `summaryData` state (already contains all users, not just top/bottom 5). Table columns: Rank, User Name, Total KG, Total Order Value
 
-### Components
-- `src/pages/admin/NotificationRulesAdmin.tsx` — main admin page
-- `src/components/admin/NotificationRuleForm.tsx` — create/edit form with placeholder picker
+d. **Section 3 — Revenue by SKU**: Fetch full SKU data using same RPC `get_product_revenue_performance` for all selected users. Table columns: Product, Unit, Qty Sold, Revenue
 
-### Permission Integration
-Already has permission entries: `action_admin_notification_create`, `action_admin_notification_edit`, etc. — will reuse these.
+e. **Section 4 — Attendance & Market Hours**: Fetch attendance data for all selected users in date range. Table columns: User, Avg Working Hours, Avg Retailer Hours, Days
 
-## Implementation Steps
-1. Create DB migration: 3 tables + seed event types + `emit_notification_event()` function
-2. Create DB triggers on key tables (orders, leave_applications, etc.)
-3. Build NotificationRulesAdmin page with CRUD for rules
-4. Add route and update AdminControls entry
-5. Existing `NotificationBell` + `useNotifications` hook already handle real-time display — no changes needed
+f. **Section 5 — Productivity Summary**: Fetch visits data for all selected users. Table columns: User, Planned, Productive, Unproductive, Pending, Productivity %
 
-## Placeholder Resolution
-The `metadata` jsonb passed to `emit_notification_event()` will contain all available context. The function will do simple `REPLACE()` on template strings:
-- `{user_name}` — actor's full_name from profiles
-- `{module_name}` — derived from source_table
-- `{record_name}` — from metadata
-- `{date}` — current date or from metadata
-- `{points}` — from metadata if applicable
+g. **Section 6 — AI Insights**: Use `aiInsights` memo (already computed). Simple text rows.
+
+**3. Data fetching approach:**
+
+- Sections b, c, g: Use already-loaded state (`businessSummary`, `summaryData`, `aiInsights`)
+- Sections d, e, f: Fetch fresh data within the PDF handler using the same Supabase queries the child components use (copy the query logic). This ensures full dataset regardless of what's visible on screen.
+- All queries respect `selectedUserIds` and `dateRange` filters
+
+**4. Clean up:**
+- Remove `reportContentRef` usage
+- Remove `html2canvas` dynamic import
+- Keep `downloadingPDF` state for loading indicator
+
+### No other files changed
+The child components (`RevenueBySKUSection`, `AttendanceMarketHoursSection`, `ProductivitySummarySection`) remain unchanged — they still render the interactive UI. The PDF generation is self-contained in the parent.
+
+## PDF Layout
+- A4 portrait, margins 20pt
+- Each section starts with a bold heading
+- Tables use `autoTable` with alternating row colors
+- Summary metrics displayed as a key-value grid at the top
+- Page numbers in footer
 
