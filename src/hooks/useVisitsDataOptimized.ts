@@ -184,25 +184,42 @@ const fetchPointsForDate = async (uid: string, date: string): Promise<PointsData
   return { total, byRetailer };
 };
 
+// MODULE-LEVEL CACHE: Survives component unmount/remount to prevent flicker on navigation
+// This is the key fix for flickering when switching modules and returning
+const moduleCache = new Map<string, {
+  beatPlans: any[];
+  visits: any[];
+  retailers: any[];
+  orders: any[];
+  points?: { total: number; byRetailer: [string, any][] };
+  timestamp: number;
+}>();
+
+const getModuleCacheKey = (userId: string, date: string) => `${userId}:${date}`;
+
 export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: UseVisitsDataOptimizedProps) => {
   // The effective user ID to fetch data for:
   // - If viewUserId is provided and not 'self', use that (manager viewing subordinate)
   // - Otherwise use the authenticated user's ID
   const effectiveUserId = viewUserId && viewUserId !== 'self' ? viewUserId : userId;
   
-  const [beatPlans, setBeatPlans] = useState<any[]>([]);
-  const [visits, setVisits] = useState<any[]>([]);
-  const [retailers, setRetailers] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [pointsData, setPointsData] = useState<PointsData>({ total: 0, byRetailer: new Map() });
-  // FIX: Initialize loading state based on whether we might have cached data
-  // This prevents a 1-frame flicker where isLoading=true before the loadData effect runs
-  const [isLoading, setIsLoading] = useState(() => {
-    // If we've loaded before in this hook instance, don't show loading
-    // cacheRef isn't populated yet at init, so check if we had data before
-    return true; // Will be immediately overridden by loadData if cache exists
+  // FIX: Initialize state from module-level cache to prevent flicker on remount
+  const moduleCacheKey = effectiveUserId ? getModuleCacheKey(effectiveUserId, selectedDate) : '';
+  const initialModuleCache = moduleCacheKey ? moduleCache.get(moduleCacheKey) : undefined;
+  
+  const [beatPlans, setBeatPlans] = useState<any[]>(() => initialModuleCache?.beatPlans || []);
+  const [visits, setVisits] = useState<any[]>(() => initialModuleCache?.visits || []);
+  const [retailers, setRetailers] = useState<any[]>(() => initialModuleCache?.retailers || []);
+  const [orders, setOrders] = useState<any[]>(() => initialModuleCache?.orders || []);
+  const [pointsData, setPointsData] = useState<PointsData>(() => {
+    if (initialModuleCache?.points) {
+      return { total: initialModuleCache.points.total, byRetailer: new Map(initialModuleCache.points.byRetailer) };
+    }
+    return { total: 0, byRetailer: new Map() };
   });
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // FIX: If module cache has data, start with loading=false to prevent flicker
+  const [isLoading, setIsLoading] = useState(() => !initialModuleCache);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(() => !!initialModuleCache);
   const [error, setError] = useState<any>(null);
 
   const lastDateRef = useRef<string>('');
