@@ -2851,7 +2851,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </DialogContent>
       </Dialog>
 
-      </div>{/* end reportContentRef */}
+      </div>
 
       {/* Report Summary Dialog */}
       <ReportSummaryDialog
