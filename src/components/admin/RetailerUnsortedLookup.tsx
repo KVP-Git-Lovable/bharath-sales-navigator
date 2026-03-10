@@ -188,6 +188,10 @@ export const RetailerUnsortedLookup: React.FC = () => {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               </div>
+            ) : retailersError ? (
+              <p className="text-center text-destructive py-8">
+                Failed to load retailers: {(retailersError as Error).message}
+              </p>
             ) : filteredRetailers.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No retailers found</p>
             ) : (
