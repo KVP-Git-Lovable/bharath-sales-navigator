@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Store, ShoppingCart, MapPin, Loader2 } from 'lucide-react';
+import { Store, ShoppingCart, MapPin, Loader2, Users } from 'lucide-react';
 
 type Period = 'this_month' | 'last_month';
 
@@ -20,19 +20,26 @@ function getDateRange(period: Period): { start: string; end: string } {
 export const LicenseDetailsSection = () => {
   const [period, setPeriod] = useState<Period>('this_month');
   const [loading, setLoading] = useState(true);
-  const [counts, setCounts] = useState({ retailers: 0, orders: 0, visits: 0 });
+  const [counts, setCounts] = useState({ users: 0, retailers: 0, orders: 0, visits: 0 });
 
   const fetchCounts = useCallback(async () => {
     setLoading(true);
     const { start, end } = getDateRange(period);
 
-    const [retailers, orders, visits] = await Promise.all([
+    const [retailers, orders, visits, sessions] = await Promise.all([
       supabase.from('retailers').select('id', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
       supabase.from('orders').select('id', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
       supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
+      supabase.from('user_sessions').select('user_id', { count: 'exact' }).gte('login_at', start).lte('login_at', end),
     ]);
 
+    // Count distinct users from sessions
+    const distinctUsers = sessions.data
+      ? new Set(sessions.data.map((s: any) => s.user_id)).size
+      : 0;
+
     setCounts({
+      users: distinctUsers,
       retailers: retailers.count ?? 0,
       orders: orders.count ?? 0,
       visits: visits.count ?? 0,
@@ -43,6 +50,7 @@ export const LicenseDetailsSection = () => {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   const stats = [
+    { label: 'Users', value: counts.users, icon: <Users className="h-5 w-5" /> },
     { label: 'Retailers', value: counts.retailers, icon: <Store className="h-5 w-5" /> },
     { label: 'Orders', value: counts.orders, icon: <ShoppingCart className="h-5 w-5" /> },
     { label: 'Visits', value: counts.visits, icon: <MapPin className="h-5 w-5" /> },
@@ -52,7 +60,7 @@ export const LicenseDetailsSection = () => {
     <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="text-lg font-semibold text-foreground">License Details</CardTitle>
+          <CardTitle className="text-lg font-semibold text-foreground">Activity Details</CardTitle>
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end gap-0.5">
               <span className="text-sm text-muted-foreground whitespace-nowrap">Current license plan:</span>
