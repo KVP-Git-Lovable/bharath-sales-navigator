@@ -1,28 +1,111 @@
 
 
-# Plan: Hide the Projects Module
+# Event-Based Notification Engine
 
-## Summary
+## Current State
+- Existing `notifications` table stores simple notifications (user_id, title, message, type, is_read)
+- `notification_preferences` table exists but only for push content template types
+- Notifications are currently hardcoded in only one place (`RetailManagement.tsx` for retailer verification)
+- No event system, no notification rules, no configurable engine exists
 
-The Projects module is self-contained and only referenced from two integration points outside its own files. Hiding it requires changes in just **2 files** with no impact on other modules.
+## Architecture
 
-## Changes Required
+```text
+Module Action (order created, leave approved, etc.)
+       ↓
+  DB Trigger on target table
+       ↓
+  calls process_notification_event() PG function
+       ↓
+  Looks up notification_rules for matching event_type + module
+       ↓
+  Resolves receiver (employee, manager, admin, role, specific user)
+       ↓
+  Renders message template with placeholders
+       ↓
+  Inserts into notifications table
+       ↓
+  Real-time subscription in NotificationBell picks it up
+```
 
-### 1. Remove Projects nav item from Navbar (`src/components/Navbar.tsx`)
-- Remove or comment out the line that pushes the `projects` nav item (line ~131):
-  ```
-  { id: 'projects', icon: FolderKanban, label: 'Projects', href: "/projects", ... }
-  ```
-- Remove the `FolderKanban` import if no longer used.
+## Database Changes (3 new tables + 1 function)
 
-### 2. Comment out Project Management routes in `src/App.tsx`
-- Comment out the 5 route definitions (lines ~519-523): `/projects`, `/projects/:id`, `/projects/:id/resources/:resourceId`, `/templates`, `/templates/:id`
-- Comment out the corresponding lazy imports (~lines 193-197) for `ProjectsPage`, `ProjectDetailPage`, `ResourceDetailPage`, `TemplatesPage`, `TemplateBuilderPage`
+### 1. `notification_event_types` (reference table)
+- `id` uuid PK
+- `event_code` text UNIQUE (RECORD_CREATED, RECORD_APPROVED, etc.)
+- `label` text (human-readable)
+- `description` text
+- `is_active` boolean default true
 
-## Impact Analysis
+Seed with 10 system events: RECORD_CREATED, RECORD_UPDATED, RECORD_DELETED, RECORD_APPROVED, RECORD_REJECTED, TASK_ASSIGNED, ACTIVITY_COMPLETED, TARGET_ACHIEVED, COMMENT_ADDED, FILE_UPLOADED
 
-- **No other modules depend on the Projects module.** All PM-related code (`src/pages/pm/*`, `src/components/pm/*`, `src/hooks/useProjects.ts`, `src/hooks/usePMAI.ts`) is entirely self-contained.
-- The dashboard (`Index.tsx`) has no references to projects.
-- The feature flags system has no `projects` entry, so no DB changes needed.
-- All PM files remain in the codebase (archived in place) and can be re-enabled by uncommenting the routes and nav item.
+### 2. `notification_rules` (admin-configurable)
+- `id` uuid PK
+- `name` text (rule name)
+- `event_code` text (FK to event_types)
+- `source_table` text (which table triggers this, e.g. 'orders', 'leave_applications')
+- `receiver_type` text ('employee', 'manager', 'admin', 'role', 'specific_user')
+- `receiver_role` text nullable (if receiver_type = 'role')
+- `receiver_user_id` uuid nullable (if receiver_type = 'specific_user')
+- `notification_channel` text default 'in_app' ('in_app', 'email', 'push')
+- `message_template` text (with {placeholders})
+- `title_template` text
+- `is_active` boolean default true
+- `created_by` uuid
+- `created_at`, `updated_at` timestamps
+
+### 3. `notification_event_log` (audit trail)
+- `id` uuid PK
+- `event_code` text
+- `source_table` text
+- `record_id` uuid
+- `actor_user_id` uuid
+- `metadata` jsonb (snapshot of relevant data for placeholder resolution)
+- `processed` boolean default false
+- `created_at` timestamp
+
+### 4. DB Function: `emit_notification_event()`
+A SECURITY DEFINER function that:
+1. Inserts into `notification_event_log`
+2. Queries matching `notification_rules` by event_code + source_table
+3. Resolves receiver (looks up manager via employees table, or admin users, etc.)
+4. Renders templates by replacing placeholders from metadata jsonb
+5. Inserts into `notifications` table
+6. Marks event as processed
+
+### 5. DB Triggers on key tables
+Create AFTER INSERT/UPDATE triggers on: `orders`, `leave_applications`, `regularization_requests`, `approval_requests`, `visits`, `activity_events`, `pm_tasks` — each calling `emit_notification_event()` with appropriate event_code and metadata.
+
+## Frontend Changes
+
+### Admin UI: Notification Rules Manager
+- New page `/admin/notification-rules` (replace or extend current `/push-content-setup`)
+- Add to AdminControls module list
+- Features:
+  - List all rules with toggle active/inactive
+  - Create/edit rule dialog: select event, source table, receiver type, channels, message template with placeholder helper
+  - Preview rendered message
+  - Test rule button
+
+### Components
+- `src/pages/admin/NotificationRulesAdmin.tsx` — main admin page
+- `src/components/admin/NotificationRuleForm.tsx` — create/edit form with placeholder picker
+
+### Permission Integration
+Already has permission entries: `action_admin_notification_create`, `action_admin_notification_edit`, etc. — will reuse these.
+
+## Implementation Steps
+1. Create DB migration: 3 tables + seed event types + `emit_notification_event()` function
+2. Create DB triggers on key tables (orders, leave_applications, etc.)
+3. Build NotificationRulesAdmin page with CRUD for rules
+4. Add route and update AdminControls entry
+5. Existing `NotificationBell` + `useNotifications` hook already handle real-time display — no changes needed
+
+## Placeholder Resolution
+The `metadata` jsonb passed to `emit_notification_event()` will contain all available context. The function will do simple `REPLACE()` on template strings:
+- `{user_name}` — actor's full_name from profiles
+- `{module_name}` — derived from source_table
+- `{record_name}` — from metadata
+- `{date}` — current date or from metadata
+- `{points}` — from metadata if applicable
 
