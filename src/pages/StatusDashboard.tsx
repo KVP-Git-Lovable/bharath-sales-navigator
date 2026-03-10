@@ -270,30 +270,45 @@ const StatusDashboard = () => {
 
         {/* Metrics grid */}
         <div className="px-4 md:px-8 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {metrics.map((metric, idx) => (
-              <Card key={idx} className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                  <div className="p-2 rounded-full bg-primary/10 text-primary">{metric.icon}</div>
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">{metric.value}</p>
-                  <p className="text-sm font-medium text-foreground">{metric.label}</p>
-                  {metric.description && <p className="text-xs text-muted-foreground">{metric.description}</p>}
-                  <span className={`h-2.5 w-2.5 rounded-full ${HEALTH_DOT[metric.health]}`} title={metric.health} />
-                </CardContent>
-              </Card>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {metrics.map((metric, idx) => {
+              const healthColor = HEALTH_DOT[metric.health];
+              const healthLabel = metric.health === 'good' ? 'Healthy' : metric.health === 'average' ? 'Warning' : 'Critical';
+              return (
+                <Card key={idx} className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="p-1.5 rounded-full bg-primary/10 text-primary">{metric.icon}</div>
+                    <p className="text-lg md:text-xl font-bold text-foreground">{metric.value}</p>
+                    <p className="text-xs font-medium text-foreground">{metric.label}</p>
+                    {metric.description && <p className="text-[10px] text-muted-foreground">{metric.description}</p>}
+                    <div className="flex flex-col items-center gap-0.5 mt-1">
+                      <span className="text-[10px] font-medium" style={{ color: metric.health === 'good' ? '#22c55e' : metric.health === 'average' ? '#f59e0b' : '#ef4444' }}>{healthLabel}</span>
+                      <span className={`w-10 h-1 rounded-full ${healthColor}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
             {/* Memory card */}
-            {memoryPercent !== null && (
-              <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                  <div className="p-2 rounded-full bg-primary/10 text-primary"><Activity className="h-6 w-6" /></div>
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">{Number(memoryPercent).toFixed(1)}%</p>
-                  <p className="text-sm font-medium text-foreground">Memory</p>
-                  <p className="text-xs text-muted-foreground">Estimated memory usage</p>
-                  <span className={`h-2.5 w-2.5 rounded-full ${memoryPercent < 60 ? HEALTH_DOT.good : memoryPercent < 85 ? HEALTH_DOT.average : HEALTH_DOT.bad}`} />
-                </CardContent>
-              </Card>
-            )}
+            {memoryPercent !== null && (() => {
+              const memHealth = memoryPercent < 60 ? 'good' : memoryPercent < 85 ? 'average' : 'bad';
+              const memColor = HEALTH_DOT[memHealth];
+              const memLabel = memHealth === 'good' ? 'Healthy' : memHealth === 'average' ? 'Warning' : 'Critical';
+              return (
+                <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="p-1.5 rounded-full bg-primary/10 text-primary"><Activity className="h-5 w-5" /></div>
+                    <p className="text-lg md:text-xl font-bold text-foreground">{Number(memoryPercent).toFixed(1)}%</p>
+                    <p className="text-xs font-medium text-foreground">Memory</p>
+                    <p className="text-[10px] text-muted-foreground">Estimated memory usage</p>
+                    <div className="flex flex-col items-center gap-0.5 mt-1">
+                      <span className="text-[10px] font-medium" style={{ color: memHealth === 'good' ? '#22c55e' : memHealth === 'average' ? '#f59e0b' : '#ef4444' }}>{memLabel}</span>
+                      <span className={`w-10 h-1 rounded-full ${memColor}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
           <p className="text-xs text-white/40 text-center mt-6">Auto-refreshes every 15 minutes</p>
 
