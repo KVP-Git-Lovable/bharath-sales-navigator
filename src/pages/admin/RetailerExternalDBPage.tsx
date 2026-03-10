@@ -85,11 +85,20 @@ const RetailerExternalDBPage: React.FC = () => {
     <Layout>
       <div className="min-h-screen bg-gradient-subtle p-4">
         <div className="max-w-6xl mx-auto space-y-6">
-          <AdminPageHeader
-            title="Retailer External Database"
-            subtitle="Browse external grocery retailer data by state and city"
-          />
-          
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <AdminPageHeader
+              title="Retailer External Database"
+              subtitle="Browse external grocery retailer data by state and city (with Address and category)"
+            />
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/retailer-unsorted')}
+              className="flex items-center gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Check uncategorized retailers
+            </Button>
+          </div>
 
           <RetailerExternalDBLookup />
         </div>
