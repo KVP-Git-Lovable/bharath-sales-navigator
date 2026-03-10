@@ -202,8 +202,7 @@ export const RetailerUnsortedLookup: React.FC = () => {
                       <TableHead className="min-w-[200px]">Retailer's Name</TableHead>
                       <TableHead>Retailer's Number</TableHead>
                       <TableHead>Village Visited</TableHead>
-                      <TableHead>Lat</TableHead>
-                      <TableHead>Long</TableHead>
+                      <TableHead>GPS Coordinate</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -227,16 +226,16 @@ export const RetailerUnsortedLookup: React.FC = () => {
                           ) : '—'}
                         </TableCell>
                         <TableCell>
-                          {r["Lat"] ? (
-                            <div className="flex items-center gap-1.5 text-sm">
-                              <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-xs">{r["Lat"]}</span>
-                            </div>
-                          ) : '—'}
-                        </TableCell>
-                        <TableCell>
-                          {r["Long"] ? (
-                            <span className="text-xs">{r["Long"]}</span>
+                          {r["Lat"] && r["Long"] ? (
+                            <a
+                              href={`https://www.google.com/maps?q=${r["Lat"]},${r["Long"]}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                            >
+                              <Navigation className="h-3.5 w-3.5" />
+                              {r["Lat"]}, {r["Long"]}
+                            </a>
                           ) : '—'}
                         </TableCell>
                       </TableRow>
