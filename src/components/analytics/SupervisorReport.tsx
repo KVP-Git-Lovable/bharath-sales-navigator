@@ -1520,7 +1520,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
       const summaryMetrics = [
         ['Total Order Value', fmtCurrency(businessSummary.totalRevenue)],
-        ['Total Quantity', fmtKG(businessSummary.totalQuantity)],
+        ['Total Quantity', businessSummary.totalKg.toFixed(1) + ' KG'],
         ['Total Orders', String(businessSummary.totalOrders)],
         ['Total Retailers', String(businessSummary.totalRetailers)],
         ['Total Beats', String(businessSummary.totalBeats)],
