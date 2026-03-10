@@ -1172,14 +1172,13 @@ export const VisitCard = ({
   }, [myRetailerId, skipInitialCheck]); // Removed checkStatus and visit.status from deps to prevent re-running
 
   // Fetch pending amount for retailer - ONLY when online
+  // FIX: Defer to avoid initial render cascade that causes flickering
   useEffect(() => {
-    const fetchPendingAmount = async () => {
-      // OFFLINE GUARD: Skip network calls when offline - use existing cached state
-      if (!navigator.onLine) {
-        console.log('📵 [VisitCard] OFFLINE - skipping pending amount fetch');
-        return;
-      }
-      
+    // OFFLINE GUARD: Skip network calls when offline - use existing cached state
+    if (!navigator.onLine) return;
+    
+    // Defer to avoid blocking initial paint
+    const timer = setTimeout(async () => {
       const visitRetailerId = visit.retailerId || visit.id;
       
       try {
@@ -1211,29 +1210,23 @@ export const VisitCard = ({
             }
           }
         } else if (!pendingError && !retailerPendingData?.pending_amount) {
-          // Only reset if we got a successful response with no pending
-          // Don't reset on error to preserve cached data
           setPendingAmount(0);
           setPendingSinceDate(null);
         }
       } catch (err) {
-        // Network error - keep existing state, don't reset
         console.log('📵 [VisitCard] Network error fetching pending - keeping cached state');
       }
-    };
+    }, 500); // Delay 500ms to avoid blocking initial paint
     
-    fetchPendingAmount();
+    return () => clearTimeout(timer);
   }, [myRetailerId]); // Only depend on retailerId, run once per retailer
 
   // Check for existing feedback data to show tick marks - ONLY when online
+  // FIX: Defer to avoid initial render cascade that causes flickering
   useEffect(() => {
-    const checkFeedbackExists = async () => {
-      // OFFLINE GUARD: Skip network calls when offline - use existing state
-      if (!navigator.onLine) {
-        console.log('📵 [VisitCard] OFFLINE - skipping feedback check');
-        return;
-      }
-      
+    if (!navigator.onLine) return;
+    
+    const timer = setTimeout(async () => {
       const visitRetailerId = visit.retailerId || visit.id;
       const targetDate = selectedDate || getLocalTodayDate();
       
@@ -1241,54 +1234,25 @@ export const VisitCard = ({
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
         
-        // Check for retailer feedback
-        const { data: retailerFeedback } = await supabase
-          .from('retailer_feedback')
-          .select('id')
-          .eq('retailer_id', visitRetailerId)
-          .eq('feedback_date', targetDate)
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        setHasRetailerFeedback(!!retailerFeedback);
+        // Batch all feedback checks in parallel to minimize render cycles
+        const [retailerFeedback, brandingRequest, competitionData, jointFeedback] = await Promise.all([
+          supabase.from('retailer_feedback').select('id').eq('retailer_id', visitRetailerId).eq('feedback_date', targetDate).eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('branding_requests').select('id').eq('retailer_id', visitRetailerId).gte('created_at', `${targetDate}T00:00:00.000Z`).lte('created_at', `${targetDate}T23:59:59.999Z`).eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('competition_data').select('id').eq('retailer_id', visitRetailerId).gte('created_at', `${targetDate}T00:00:00.000Z`).lte('created_at', `${targetDate}T23:59:59.999Z`).eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('joint_sales_feedback').select('id').eq('retailer_id', visitRetailerId).eq('feedback_date', targetDate).eq('fse_user_id', session.user.id).maybeSingle(),
+        ]);
         
-        // Check for branding requests
-        const { data: brandingRequest } = await supabase
-          .from('branding_requests')
-          .select('id')
-          .eq('retailer_id', visitRetailerId)
-          .gte('created_at', `${targetDate}T00:00:00.000Z`)
-          .lte('created_at', `${targetDate}T23:59:59.999Z`)
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        setHasBrandingRequest(!!brandingRequest);
-        
-        // Check for competition data
-        const { data: competitionData } = await supabase
-          .from('competition_data')
-          .select('id')
-          .eq('retailer_id', visitRetailerId)
-          .gte('created_at', `${targetDate}T00:00:00.000Z`)
-          .lte('created_at', `${targetDate}T23:59:59.999Z`)
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        setHasCompetitionData(!!competitionData);
-        
-        // Check for joint sales feedback
-        const { data: jointFeedback } = await supabase
-          .from('joint_sales_feedback')
-          .select('id')
-          .eq('retailer_id', visitRetailerId)
-          .eq('feedback_date', targetDate)
-          .eq('fse_user_id', session.user.id)
-          .maybeSingle();
-        setHasJointSalesFeedback(!!jointFeedback);
+        // Batch all state updates together
+        setHasRetailerFeedback(!!retailerFeedback.data);
+        setHasBrandingRequest(!!brandingRequest.data);
+        setHasCompetitionData(!!competitionData.data);
+        setHasJointSalesFeedback(!!jointFeedback.data);
       } catch (err) {
-        // Network error - keep existing state
         console.log('📵 [VisitCard] Network error checking feedback - keeping cached state');
       }
-    };
+    }, 800); // Delay 800ms - feedback ticks are non-critical UI
     
-    checkFeedbackExists();
+    return () => clearTimeout(timer);
   }, [myRetailerId, selectedDate]);
 
   // Listen for custom events to refresh status - trigger full data reload

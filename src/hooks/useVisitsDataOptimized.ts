@@ -184,24 +184,52 @@ const fetchPointsForDate = async (uid: string, date: string): Promise<PointsData
   return { total, byRetailer };
 };
 
+// MODULE-LEVEL CACHE: Survives component unmount/remount to prevent flicker on navigation
+// This is the key fix for flickering when switching modules and returning
+const moduleCache = new Map<string, {
+  beatPlans: any[];
+  visits: any[];
+  retailers: any[];
+  orders: any[];
+  points?: { total: number; byRetailer: [string, any][] };
+  timestamp: number;
+}>();
+
+const getModuleCacheKey = (userId: string, date: string) => `${userId}:${date}`;
+
 export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: UseVisitsDataOptimizedProps) => {
   // The effective user ID to fetch data for:
   // - If viewUserId is provided and not 'self', use that (manager viewing subordinate)
   // - Otherwise use the authenticated user's ID
   const effectiveUserId = viewUserId && viewUserId !== 'self' ? viewUserId : userId;
   
-  const [beatPlans, setBeatPlans] = useState<any[]>([]);
-  const [visits, setVisits] = useState<any[]>([]);
-  const [retailers, setRetailers] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [pointsData, setPointsData] = useState<PointsData>({ total: 0, byRetailer: new Map() });
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // FIX: Initialize state from module-level cache to prevent flicker on remount
+  const moduleCacheKey = effectiveUserId ? getModuleCacheKey(effectiveUserId, selectedDate) : '';
+  const initialModuleCache = moduleCacheKey ? moduleCache.get(moduleCacheKey) : undefined;
+  
+  const [beatPlans, setBeatPlans] = useState<any[]>(() => initialModuleCache?.beatPlans || []);
+  const [visits, setVisits] = useState<any[]>(() => initialModuleCache?.visits || []);
+  const [retailers, setRetailers] = useState<any[]>(() => initialModuleCache?.retailers || []);
+  const [orders, setOrders] = useState<any[]>(() => initialModuleCache?.orders || []);
+  const [pointsData, setPointsData] = useState<PointsData>(() => {
+    if (initialModuleCache?.points) {
+      return { total: initialModuleCache.points.total, byRetailer: new Map(initialModuleCache.points.byRetailer) };
+    }
+    return { total: 0, byRetailer: new Map() };
+  });
+  // FIX: If module cache has data, start with loading=false to prevent flicker
+  const [isLoading, setIsLoading] = useState(() => !initialModuleCache);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(() => !!initialModuleCache);
   const [error, setError] = useState<any>(null);
 
   const lastDateRef = useRef<string>('');
   const lastUserRef = useRef<string>(''); // Track user changes for cache invalidation
-  const cacheRef = useRef<Map<string, any>>(new Map());
+  // FIX: Seed cacheRef from module cache so loadData finds data immediately
+  const cacheRef = useRef<Map<string, any>>(
+    initialModuleCache
+      ? new Map([[selectedDate, { ...initialModuleCache, points: initialModuleCache.points ? { total: initialModuleCache.points.total, byRetailer: initialModuleCache.points.byRetailer } : undefined }]])
+      : new Map()
+  );
   const isFetchingRef = useRef(false);
   const mountedRef = useRef(true);
   const lastSyncTimeRef = useRef<Map<string, number>>(new Map());
@@ -230,11 +258,31 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const userIdRef = useRef(effectiveUserId);
   const selectedDateRef = useRef(selectedDate);
   
+  // FIX: Sync state to module-level cache so it survives unmount/remount
+  useEffect(() => {
+    if (!effectiveUserId || !hasLoadedOnce) return;
+    const key = getModuleCacheKey(effectiveUserId, selectedDate);
+    moduleCache.set(key, {
+      beatPlans,
+      visits,
+      retailers,
+      orders,
+      points: { total: pointsData.total, byRetailer: Array.from(pointsData.byRetailer.entries()) },
+      timestamp: Date.now(),
+    });
+    // Prune module cache to prevent unbounded growth
+    if (moduleCache.size > 14) {
+      const firstKey = moduleCache.keys().next().value;
+      if (firstKey) moduleCache.delete(firstKey);
+    }
+  }, [effectiveUserId, selectedDate, beatPlans, visits, retailers, orders, pointsData, hasLoadedOnce]);
+  
   // Helper to clear all in-memory state and caches
   const clearAllCachesAndState = useCallback(() => {
     console.log('[useVisitsDataOptimized] CLEARING ALL CACHES AND STATE');
     cacheRef.current.clear();
     lastSyncTimeRef.current.clear();
+    moduleCache.clear(); // Also clear module cache
     setBeatPlans([]);
     setVisits([]);
     setRetailers([]);
