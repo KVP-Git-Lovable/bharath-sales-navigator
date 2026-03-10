@@ -34,19 +34,25 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
   const [visitStatuses, setVisitStatuses] = useState<Record<string, VisitStatus>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // FIX: Track whether we've completed at least one load to prevent showing spinner on mount
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const isToday = selectedDate === getLocalTodayDate();
+  
+  // FIX: Stabilize onActivitiesLoaded callback ref to prevent re-render cascades
+  const onActivitiesLoadedRef = useRef(onActivitiesLoaded);
+  onActivitiesLoadedRef.current = onActivitiesLoaded;
 
   const loadActivities = useCallback(async () => {
     if (!userId || !selectedDate) return;
-    // FIX: Only show loading spinner if no activities are cached yet (prevents flicker on re-entry)
-    if (activities.length === 0) {
+    // Only show loading if we haven't loaded anything yet
+    if (!hasLoadedOnce && activities.length === 0) {
       setIsLoading(true);
     }
     try {
       const data = await fetchActivitiesForDate(userId, selectedDate);
       setActivities(data);
-      onActivitiesLoaded?.(data.length);
+      onActivitiesLoadedRef.current?.(data.length);
 
       // Fetch visit statuses for all activities with visit_ids
       const visitIds = data.map(a => a.visit_id).filter(Boolean);
@@ -72,12 +78,13 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
       console.error('[ActivityEventsTable] Failed to load activities:', err);
     } finally {
       setIsLoading(false);
+      setHasLoadedOnce(true);
     }
-  }, [userId, selectedDate, fetchActivitiesForDate, onActivitiesLoaded]);
+  }, [userId, selectedDate, fetchActivitiesForDate, hasLoadedOnce, activities.length]);
 
   useEffect(() => {
     loadActivities();
-  }, [loadActivities]);
+  }, [userId, selectedDate]); // Only reload when userId or date changes, NOT when loadActivities changes
 
   useEffect(() => {
     const handler = () => loadActivities();
