@@ -516,12 +516,13 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/institutional-sales/price-books" element={<ProtectedRoute><PriceBooks /></ProtectedRoute>} />
         <Route path="/institutional-sales/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
 
-        {/* Project Management */}
+        {/* ARCHIVED: Projects module hidden
         <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
         <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
         <Route path="/projects/:id/resources/:resourceId" element={<ProtectedRoute><ResourceDetailPage /></ProtectedRoute>} />
         <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
         <Route path="/templates/:id" element={<ProtectedRoute><TemplateBuilderPage /></ProtectedRoute>} />
+        */}
 
         <Route path="*" element={<NotFound />} />
       </Routes>
