@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { RetailerExternalDBLookup } from '@/components/admin/RetailerExternalDBLookup';
 import { Button } from '@/components/ui/button';
-import { Globe, Loader2 } from 'lucide-react';
+import { Globe, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
