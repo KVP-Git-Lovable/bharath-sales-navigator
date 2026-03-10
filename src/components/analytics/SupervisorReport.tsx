@@ -62,7 +62,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   const prevFetchKeyRef = useRef<string>('');
   const isFetchingRef = useRef(false);
   const prevScopeReadyRef = useRef(isScopeReady);
-  const reportContentRef = useRef<HTMLDivElement>(null);
+  const reportContentRef = useRef<HTMLDivElement>(null); // kept for potential future use
   const [downloadingPDF, setDownloadingPDF] = useState(false);
    
    // Hindi to English translation for retailer/beat names in Productivity section
@@ -1487,90 +1487,345 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   };
 
   const handleDownloadPDF = async () => {
-    if (!reportContentRef.current) return;
     setDownloadingPDF(true);
     try {
-      const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
-      
-      const element = reportContentRef.current;
+      const autoTable = (await import('jspdf-autotable')).default;
 
-      // Temporarily expand all scrollable/overflow-hidden containers so ALL rows render
-      const overflowEls = element.querySelectorAll<HTMLElement>('[class*="max-h-"], [class*="overflow-y"], [class*="overflow-hidden"], [class*="overflow-x"]');
-      const savedStyles: { el: HTMLElement; overflow: string; maxHeight: string; height: string }[] = [];
-      overflowEls.forEach(el => {
-        savedStyles.push({
-          el,
-          overflow: el.style.overflow,
-          maxHeight: el.style.maxHeight,
-          height: el.style.height,
-        });
-        el.style.overflow = 'visible';
-        el.style.maxHeight = 'none';
-        el.style.height = 'auto';
-      });
-
-      // Wait for layout to settle
-      await new Promise(r => setTimeout(r, 300));
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-        windowHeight: element.scrollHeight,
-        height: element.scrollHeight,
-      });
-
-      // Restore original styles
-      savedStyles.forEach(({ el, overflow, maxHeight, height }) => {
-        el.style.overflow = overflow;
-        el.style.maxHeight = maxHeight;
-        el.style.height = height;
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      // A4 dimensions in points
-      const pdfWidth = 595.28;
-      const pdfHeight = 841.89;
-      const margin = 20;
-      const contentWidth = pdfWidth - margin * 2;
-      const scaledHeight = (imgHeight * contentWidth) / imgWidth;
-      
       const pdf = new jsPDF('p', 'pt', 'a4');
-      
-      if (scaledHeight <= pdfHeight - margin * 2) {
-        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
-      } else {
-        // Multi-page: slice the canvas
-        const pageContentHeight = pdfHeight - margin * 2;
-        const sourceSliceHeight = (pageContentHeight / contentWidth) * imgWidth;
-        let yOffset = 0;
-        let page = 0;
-        
-        while (yOffset < imgHeight) {
-          if (page > 0) pdf.addPage();
-          
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = imgWidth;
-          const remainingHeight = Math.min(sourceSliceHeight, imgHeight - yOffset);
-          sliceCanvas.height = remainingHeight;
-          const ctx = sliceCanvas.getContext('2d')!;
-          ctx.drawImage(canvas, 0, -yOffset);
-          
-          const sliceData = sliceCanvas.toDataURL('image/png');
-          const sliceScaledHeight = (remainingHeight * contentWidth) / imgWidth;
-          pdf.addImage(sliceData, 'PNG', margin, margin, contentWidth, sliceScaledHeight);
-          
-          yOffset += sourceSliceHeight;
-          page++;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const addSectionHeader = (text: string) => {
+        if (y > pdf.internal.pageSize.getHeight() - 60) {
+          pdf.addPage();
+          y = margin;
         }
+        y += 10;
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(text, margin, y);
+        y += 6;
+        pdf.setDrawColor(100, 100, 100);
+        pdf.line(margin, y, pageWidth - margin, y);
+        y += 12;
+      };
+
+      const addKeyValue = (key: string, value: string) => {
+        if (y > pdf.internal.pageSize.getHeight() - 30) {
+          pdf.addPage();
+          y = margin;
+        }
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(60, 60, 60);
+        pdf.text(key + ':', margin, y);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(value, margin + 140, y);
+        y += 16;
+      };
+
+      // --- Header ---
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(30, 30, 30);
+      pdf.text('Analytics & Insights Report', margin, y + 4);
+      y += 22;
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Period: ${format(dateRange.from, 'MMM dd, yyyy')} – ${format(dateRange.to, 'MMM dd, yyyy')}`, margin, y);
+      y += 14;
+      const userFilterText = selectedUserIds.length === 0
+        ? 'All Users'
+        : selectedUsers.length <= 5
+          ? selectedUsers.join(', ')
+          : `${selectedUsers.length} users selected`;
+      pdf.text(`Users: ${userFilterText}`, margin, y);
+      y += 20;
+
+      // --- Section 1: Business Summary ---
+      addSectionHeader('Business Summary');
+      addKeyValue('Total Order Value', `₹${businessSummary.totalRevenue.toLocaleString()}`);
+      addKeyValue('Total Quantity (KG)', `${businessSummary.totalKg.toLocaleString()} KG`);
+      addKeyValue('Total Pieces', businessSummary.totalPieces.toLocaleString());
+      addKeyValue('Total Orders', businessSummary.totalOrders.toLocaleString());
+      addKeyValue('Total Beats', businessSummary.totalBeats.toLocaleString());
+      addKeyValue('Total Retailers', businessSummary.totalRetailers.toLocaleString());
+      addKeyValue('Pending Payments', `₹${businessSummary.pendingPayments.toLocaleString()}`);
+
+      // --- Section 2: Order Summary by User ---
+      addSectionHeader('Order Summary by User');
+      if (summaryData.length > 0) {
+        const orderTableData = summaryData.map((u, i) => [
+          (i + 1).toString(),
+          u.full_name,
+          u.total_kg.toLocaleString(),
+          `₹${u.total_order_value.toLocaleString()}`
+        ]);
+
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [['#', 'User Name', 'Total KG', 'Total Order Value']],
+          body: orderTableData,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 255] },
+        });
+        y = (pdf as any).lastAutoTable.finalY + 16;
+      } else {
+        pdf.setFontSize(10);
+        pdf.text('No order data available for the selected period.', margin, y);
+        y += 16;
       }
+
+      // --- Section 3: Revenue by SKU ---
+      addSectionHeader('Revenue by SKU');
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
+      // Fetch SKU data for all selected users
+      const skuAllData: { product_name: string; unit: string; quantity_sold: number; revenue: number }[] = [];
+      const userNamesForSku = selectedUsers.length > 0 ? selectedUsers : summaryData.map(u => u.full_name);
+
+      // Batch RPC calls
+      const skuPromises = userNamesForSku.map(name =>
+        (supabase as any).rpc('get_product_revenue_performance', {
+          user_full_name: name,
+          start_date: fromDate,
+          end_date: toDate
+        })
+      );
+      const skuResults = await Promise.all(skuPromises);
       
+      // Aggregate SKU data across users
+      const skuMap = new Map<string, { unit: string; quantity_sold: number; revenue: number }>();
+      skuResults.forEach(({ data }: any) => {
+        if (data) {
+          (data as any[]).forEach((row: any) => {
+            const key = `${row.product_name}||${row.unit}`;
+            const existing = skuMap.get(key);
+            if (existing) {
+              existing.quantity_sold += Number(row.quantity_sold || 0);
+              existing.revenue += Number(row.revenue || 0);
+            } else {
+              skuMap.set(key, {
+                unit: row.unit || '',
+                quantity_sold: Number(row.quantity_sold || 0),
+                revenue: Number(row.revenue || 0)
+              });
+            }
+          });
+        }
+      });
+
+      const skuTableData = Array.from(skuMap.entries())
+        .sort((a, b) => b[1].revenue - a[1].revenue)
+        .map(([key, v]) => [
+          key.split('||')[0],
+          v.unit,
+          v.quantity_sold.toLocaleString(),
+          `₹${v.revenue.toLocaleString()}`
+        ]);
+
+      if (skuTableData.length > 0) {
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [['Product', 'Unit', 'Qty Sold', 'Revenue']],
+          body: skuTableData,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [240, 253, 244] },
+        });
+        y = (pdf as any).lastAutoTable.finalY + 16;
+      } else {
+        pdf.setFontSize(10);
+        pdf.text('No SKU data available.', margin, y);
+        y += 16;
+      }
+
+      // --- Section 4: Attendance & Market Hours ---
+      addSectionHeader('Attendance & Market Hours');
+      
+      // Fetch attendance data for all users in date range
+      let attendanceQuery = supabase
+        .from('attendance')
+        .select('user_id, total_hours, date')
+        .gte('date', fromDate)
+        .lte('date', toDate)
+        .in('status', ['present', 'regularized']);
+
+      if (selectedUserIds.length > 0) {
+        attendanceQuery = attendanceQuery.in('user_id', selectedUserIds);
+      }
+
+      const { data: attendanceData } = await attendanceQuery;
+
+      // Fetch market hours from visits
+      let visitsHoursQuery = supabase
+        .from('visits')
+        .select('user_id, check_in_time, check_out_time, planned_date')
+        .gte('planned_date', fromDate)
+        .lte('planned_date', toDate)
+        .in('status', ['productive', 'unproductive']);
+
+      if (selectedUserIds.length > 0) {
+        visitsHoursQuery = visitsHoursQuery.in('user_id', selectedUserIds);
+      }
+
+      const { data: visitsHoursData } = await visitsHoursQuery;
+
+      // Build user name lookup
+      const allUserIds = new Set<string>();
+      attendanceData?.forEach(a => allUserIds.add(a.user_id));
+      visitsHoursData?.forEach(v => allUserIds.add(v.user_id));
+
+      const userNameLookup: Record<string, string> = {};
+      users.forEach(u => { if (u.full_name) userNameLookup[u.id] = u.full_name; });
+
+      // Aggregate attendance per user
+      const attMap = new Map<string, { totalHours: number; days: number }>();
+      attendanceData?.forEach(a => {
+        const name = userNameLookup[a.user_id] || 'Unknown';
+        const existing = attMap.get(name) || { totalHours: 0, days: 0 };
+        existing.totalHours += Number(a.total_hours || 0);
+        existing.days += 1;
+        attMap.set(name, existing);
+      });
+
+      // Aggregate market hours per user from visits
+      const marketMap = new Map<string, { totalMinutes: number; days: Set<string> }>();
+      visitsHoursData?.forEach(v => {
+        if (v.check_in_time && v.check_out_time) {
+          const name = userNameLookup[v.user_id] || 'Unknown';
+          const existing = marketMap.get(name) || { totalMinutes: 0, days: new Set<string>() };
+          const inTime = new Date(v.check_in_time).getTime();
+          const outTime = new Date(v.check_out_time).getTime();
+          existing.totalMinutes += (outTime - inTime) / 60000;
+          existing.days.add(v.planned_date);
+          marketMap.set(name, existing);
+        }
+      });
+
+      const attendanceTableData: string[][] = [];
+      const allAttNames = new Set([...attMap.keys(), ...marketMap.keys()]);
+      allAttNames.forEach(name => {
+        const att = attMap.get(name);
+        const market = marketMap.get(name);
+        const avgWorkHrs = att && att.days > 0 ? (att.totalHours / att.days).toFixed(1) : '-';
+        const avgMarketHrs = market && market.days.size > 0 ? (market.totalMinutes / market.days.size / 60).toFixed(1) : '-';
+        const days = att?.days || 0;
+        attendanceTableData.push([name, `${avgWorkHrs} hrs`, `${avgMarketHrs} hrs`, days.toString()]);
+      });
+
+      if (attendanceTableData.length > 0) {
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [['User', 'Avg Working Hours', 'Avg Retailer Hours', 'Days']],
+          body: attendanceTableData,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [239, 246, 255] },
+        });
+        y = (pdf as any).lastAutoTable.finalY + 16;
+      } else {
+        pdf.setFontSize(10);
+        pdf.text('No attendance data available.', margin, y);
+        y += 16;
+      }
+
+      // --- Section 5: Productivity Summary ---
+      addSectionHeader('Productivity Summary');
+
+      let prodQuery = supabase
+        .from('visits')
+        .select('user_id, status, planned_date')
+        .gte('planned_date', fromDate)
+        .lte('planned_date', toDate);
+
+      if (selectedUserIds.length > 0) {
+        prodQuery = prodQuery.in('user_id', selectedUserIds);
+      }
+
+      const { data: prodData } = await prodQuery;
+
+      // Aggregate per user
+      const prodMap = new Map<string, { planned: number; productive: number; unproductive: number; pending: number }>();
+      prodData?.forEach(v => {
+        const name = userNameLookup[v.user_id] || 'Unknown';
+        const existing = prodMap.get(name) || { planned: 0, productive: 0, unproductive: 0, pending: 0 };
+        existing.planned += 1;
+        if (v.status === 'productive') existing.productive += 1;
+        else if (v.status === 'unproductive') existing.unproductive += 1;
+        else existing.pending += 1;
+        prodMap.set(name, existing);
+      });
+
+      const prodTableData = Array.from(prodMap.entries())
+        .sort((a, b) => {
+          const pctA = a[1].planned > 0 ? (a[1].productive / a[1].planned) * 100 : 0;
+          const pctB = b[1].planned > 0 ? (b[1].productive / b[1].planned) * 100 : 0;
+          return pctB - pctA;
+        })
+        .map(([name, d]) => {
+          const pct = d.planned > 0 ? ((d.productive / d.planned) * 100).toFixed(1) + '%' : '-';
+          return [name, d.planned.toString(), d.productive.toString(), d.unproductive.toString(), d.pending.toString(), pct];
+        });
+
+      if (prodTableData.length > 0) {
+        autoTable(pdf, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [['User', 'Planned', 'Productive', 'Unproductive', 'Pending', 'Productivity %']],
+          body: prodTableData,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [255, 251, 235] },
+        });
+        y = (pdf as any).lastAutoTable.finalY + 16;
+      } else {
+        pdf.setFontSize(10);
+        pdf.text('No productivity data available.', margin, y);
+        y += 16;
+      }
+
+      // --- Section 6: AI Insights ---
+      if (aiInsights.length > 0) {
+        addSectionHeader('AI Insights');
+        pdf.setFontSize(10);
+        aiInsights.forEach(insight => {
+          if (y > pdf.internal.pageSize.getHeight() - 40) {
+            pdf.addPage();
+            y = margin;
+          }
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(60, 60, 60);
+          pdf.text(`• ${insight.title}`, margin, y);
+          y += 14;
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(80, 80, 80);
+          const lines = pdf.splitTextToSize(insight.description, contentWidth - 10);
+          pdf.text(lines, margin + 10, y);
+          y += lines.length * 12 + 6;
+        });
+      }
+
+      // --- Footer: page numbers ---
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 60, pdf.internal.pageSize.getHeight() - 10);
+      }
+
       const pdfBlob = pdf.output('blob');
       await downloadPDF(pdfBlob, `Analytics_Report_${format(dateRange.from, 'yyyy-MM-dd')}_to_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`);
       toast.success('Report PDF downloaded');
