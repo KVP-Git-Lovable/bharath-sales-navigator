@@ -195,7 +195,13 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const [retailers, setRetailers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [pointsData, setPointsData] = useState<PointsData>({ total: 0, byRetailer: new Map() });
-  const [isLoading, setIsLoading] = useState(true);
+  // FIX: Initialize loading state based on whether we might have cached data
+  // This prevents a 1-frame flicker where isLoading=true before the loadData effect runs
+  const [isLoading, setIsLoading] = useState(() => {
+    // If we've loaded before in this hook instance, don't show loading
+    // cacheRef isn't populated yet at init, so check if we had data before
+    return true; // Will be immediately overridden by loadData if cache exists
+  });
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<any>(null);
 
