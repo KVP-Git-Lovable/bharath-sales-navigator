@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,7 +64,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   const prevFetchKeyRef = useRef<string>('');
   const isFetchingRef = useRef(false);
   const prevScopeReadyRef = useRef(isScopeReady);
-  const reportContentRef = useRef<HTMLDivElement>(null);
+  
   const [downloadingPDF, setDownloadingPDF] = useState(false);
    
    // Hindi to English translation for retailer/beat names in Productivity section
@@ -1487,91 +1489,222 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
   };
 
   const handleDownloadPDF = async () => {
-    if (!reportContentRef.current) return;
     setDownloadingPDF(true);
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-      
-      const element = reportContentRef.current;
-
-      // Temporarily expand all scrollable/overflow-hidden containers so ALL rows render
-      const overflowEls = element.querySelectorAll<HTMLElement>('[class*="max-h-"], [class*="overflow-y"], [class*="overflow-hidden"], [class*="overflow-x"]');
-      const savedStyles: { el: HTMLElement; overflow: string; maxHeight: string; height: string }[] = [];
-      overflowEls.forEach(el => {
-        savedStyles.push({
-          el,
-          overflow: el.style.overflow,
-          maxHeight: el.style.maxHeight,
-          height: el.style.height,
-        });
-        el.style.overflow = 'visible';
-        el.style.maxHeight = 'none';
-        el.style.height = 'auto';
-      });
-
-      // Wait for layout to settle
-      await new Promise(r => setTimeout(r, 300));
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-        windowHeight: element.scrollHeight,
-        height: element.scrollHeight,
-      });
-
-      // Restore original styles
-      savedStyles.forEach(({ el, overflow, maxHeight, height }) => {
-        el.style.overflow = overflow;
-        el.style.maxHeight = maxHeight;
-        el.style.height = height;
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      // A4 dimensions in points
-      const pdfWidth = 595.28;
-      const pdfHeight = 841.89;
+      const doc = new jsPDF('p', 'pt', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
-      const contentWidth = pdfWidth - margin * 2;
-      const scaledHeight = (imgHeight * contentWidth) / imgWidth;
-      
-      const pdf = new jsPDF('p', 'pt', 'a4');
-      
-      if (scaledHeight <= pdfHeight - margin * 2) {
-        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
-      } else {
-        // Multi-page: slice the canvas
-        const pageContentHeight = pdfHeight - margin * 2;
-        const sourceSliceHeight = (pageContentHeight / contentWidth) * imgWidth;
-        let yOffset = 0;
-        let page = 0;
-        
-        while (yOffset < imgHeight) {
-          if (page > 0) pdf.addPage();
-          
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = imgWidth;
-          const remainingHeight = Math.min(sourceSliceHeight, imgHeight - yOffset);
-          sliceCanvas.height = remainingHeight;
-          const ctx = sliceCanvas.getContext('2d')!;
-          ctx.drawImage(canvas, 0, -yOffset);
-          
-          const sliceData = sliceCanvas.toDataURL('image/png');
-          const sliceScaledHeight = (remainingHeight * contentWidth) / imgWidth;
-          pdf.addImage(sliceData, 'PNG', margin, margin, contentWidth, sliceScaledHeight);
-          
-          yOffset += sourceSliceHeight;
-          page++;
-        }
+      let y = margin;
+
+      const fmtCurrency = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+      const fmtKG = (grams: number) => (grams / 1000).toFixed(1) + ' KG';
+
+      // --- Header ---
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Analytics Report', margin, y + 18);
+      y += 28;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Period: ${format(dateRange.from, 'dd MMM yyyy')} – ${format(dateRange.to, 'dd MMM yyyy')}`, margin, y);
+      y += 12;
+      const filterLabel = selectedUsers.length === 0 ? 'All Users' : selectedUsers.length <= 3 ? selectedUsers.join(', ') : `${selectedUsers.length} users selected`;
+      doc.text(`Filter: ${filterLabel}`, margin, y);
+      y += 20;
+
+      // --- Section 1: Business Summary ---
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Business Summary', margin, y);
+      y += 14;
+
+      const summaryMetrics = [
+        ['Total Order Value', fmtCurrency(businessSummary.totalRevenue)],
+        ['Total Quantity', businessSummary.totalKg.toFixed(1) + ' KG'],
+        ['Total Orders', String(businessSummary.totalOrders)],
+        ['Total Retailers', String(businessSummary.totalRetailers)],
+        ['Total Beats', String(businessSummary.totalBeats)],
+        ['Pending Payments', fmtCurrency(businessSummary.pendingPayments)],
+      ];
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Metric', 'Value']],
+        body: summaryMetrics,
+        theme: 'grid',
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [139, 92, 246] },
+        alternateRowStyles: { fillColor: [245, 243, 255] },
+      });
+      y = (doc as any).lastAutoTable.finalY + 16;
+
+      // --- Section 2: Order Summary by User ---
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Order Summary by User', margin, y);
+      y += 14;
+
+      if (summaryData.length > 0) {
+        const orderRows = summaryData.map((u, i) => [
+          String(i + 1),
+          u.full_name,
+          fmtKG(u.total_kg),
+          fmtCurrency(u.total_order_value),
+        ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['#', 'User', 'Total KG', 'Order Value']],
+          body: orderRows,
+          theme: 'striped',
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [59, 130, 246] },
+        });
+        y = (doc as any).lastAutoTable.finalY + 16;
       }
-      
-      const pdfBlob = pdf.output('blob');
+
+      // --- Section 3: Revenue by SKU ---
+      if (skuDataForSummary.length > 0) {
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Revenue by SKU', margin, y);
+        y += 14;
+
+        const skuRows = skuDataForSummary.map(s => [
+          s.product_name,
+          s.unit || '-',
+          s.unit?.toLowerCase().includes('gm') || s.unit?.toLowerCase().includes('gram')
+            ? fmtKG(s.quantity_sold)
+            : String(s.quantity_sold),
+          fmtCurrency(s.revenue),
+        ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Product', 'Unit', 'Qty Sold', 'Revenue']],
+          body: skuRows,
+          theme: 'striped',
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [16, 185, 129] },
+        });
+        y = (doc as any).lastAutoTable.finalY + 16;
+      }
+
+      // --- Section 4: Productivity Summary ---
+      if (productivityDataForSummary.length > 0) {
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Productivity Summary', margin, y);
+        y += 14;
+
+        const prodRows = productivityDataForSummary.map(p => [
+          p.full_name,
+          String(p.productive_visits),
+          String(p.total_visits),
+          p.productivity_percentage.toFixed(1) + '%',
+        ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['User', 'Productive', 'Total Visits', 'Productivity %']],
+          body: prodRows,
+          theme: 'striped',
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [245, 158, 11] },
+        });
+        y = (doc as any).lastAutoTable.finalY + 16;
+      }
+
+      // --- Section 5: Attendance & Market Hours (fresh fetch) ---
+      try {
+        const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+        const toDate = format(dateRange.to, 'yyyy-MM-dd');
+        const userIds = selectedUserIds.length > 0 ? selectedUserIds : users.map(u => u.id);
+
+        const { data: attendanceData } = await supabase
+          .from('attendance')
+          .select('user_id, total_hours, date')
+          .in('user_id', userIds)
+          .gte('date', fromDate)
+          .lte('date', toDate)
+          .in('status', ['present', 'half_day_leave']);
+
+        if (attendanceData && attendanceData.length > 0) {
+          // Group by user
+          const userAttendance: Record<string, { totalHours: number; days: number }> = {};
+          attendanceData.forEach(a => {
+            if (!userAttendance[a.user_id]) userAttendance[a.user_id] = { totalHours: 0, days: 0 };
+            userAttendance[a.user_id].totalHours += (a.total_hours || 0);
+            userAttendance[a.user_id].days += 1;
+          });
+
+          const attendanceRows = Object.entries(userAttendance).map(([uid, data]) => {
+            const userName = users.find(u => u.id === uid)?.full_name || 'Unknown';
+            const avgHours = data.days > 0 ? (data.totalHours / data.days).toFixed(1) : '0';
+            return [userName, avgHours, String(data.days)];
+          }).sort((a, b) => b[2].localeCompare(a[2]));
+
+          if (attendanceRows.length > 0) {
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Attendance & Working Hours', margin, y);
+            y += 14;
+
+            autoTable(doc, {
+              startY: y,
+              head: [['User', 'Avg Working Hours', 'Days Present']],
+              body: attendanceRows,
+              theme: 'striped',
+              margin: { left: margin, right: margin },
+              styles: { fontSize: 8 },
+              headStyles: { fillColor: [99, 102, 241] },
+            });
+            y = (doc as any).lastAutoTable.finalY + 16;
+          }
+        }
+      } catch (err) {
+        console.error('Attendance fetch for PDF failed:', err);
+      }
+
+      // --- Section 6: AI Insights ---
+      if (aiInsights.length > 0) {
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text('AI Insights', margin, y);
+        y += 14;
+
+        const insightRows = aiInsights.map(i => [
+          i.type.toUpperCase(),
+          i.title,
+          i.description,
+        ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Type', 'Title', 'Description']],
+          body: insightRows,
+          theme: 'grid',
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [139, 92, 246] },
+          columnStyles: { 2: { cellWidth: 'auto' } },
+        });
+      }
+
+      // --- Footer: page numbers ---
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 50, doc.internal.pageSize.getHeight() - 10);
+      }
+
+      const pdfBlob = doc.output('blob');
       await downloadPDF(pdfBlob, `Analytics_Report_${format(dateRange.from, 'yyyy-MM-dd')}_to_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`);
       toast.success('Report PDF downloaded');
     } catch (err) {
@@ -1619,7 +1752,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </Button>
       </div>
 
-      <div ref={reportContentRef} className="space-y-4">
+      <div className="space-y-4">
       {/* Total Order Value Banner - Dashboard visualization */}
        <div className="grid grid-cols-2 gap-2 md:gap-4">
          {/* Total Order Value Banner */}
@@ -2718,7 +2851,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </DialogContent>
       </Dialog>
 
-      </div>{/* end reportContentRef */}
+      </div>
 
       {/* Report Summary Dialog */}
       <ReportSummaryDialog
