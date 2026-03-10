@@ -10250,6 +10250,39 @@ export type Database = {
         }
         Relationships: []
       }
+      retailer_external_unsorted: {
+        Row: {
+          City: string | null
+          District: string | null
+          Lat: string | null
+          Long: string | null
+          "Retailer's Name": string | null
+          "Retailer's Number": string
+          State: string | null
+          "Village Visited": string | null
+        }
+        Insert: {
+          City?: string | null
+          District?: string | null
+          Lat?: string | null
+          Long?: string | null
+          "Retailer's Name"?: string | null
+          "Retailer's Number": string
+          State?: string | null
+          "Village Visited"?: string | null
+        }
+        Update: {
+          City?: string | null
+          District?: string | null
+          Lat?: string | null
+          Long?: string | null
+          "Retailer's Name"?: string | null
+          "Retailer's Number"?: string
+          State?: string | null
+          "Village Visited"?: string | null
+        }
+        Relationships: []
+      }
       retailer_feedback: {
         Row: {
           comments: string | null
