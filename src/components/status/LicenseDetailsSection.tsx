@@ -84,7 +84,7 @@ export const LicenseDetailsSection = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-muted/30 p-4">
                 <div className="text-primary">{s.icon}</div>
