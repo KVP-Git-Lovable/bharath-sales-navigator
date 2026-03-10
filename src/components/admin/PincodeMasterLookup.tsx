@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,18 @@ export const PincodeMasterLookup: React.FC = () => {
   const [expandedPincode, setExpandedPincode] = useState<string | null>(null);
   const [retailers, setRetailers] = useState<ExternalRetailer[]>([]);
   const [loadingRetailers, setLoadingRetailers] = useState(false);
+
+  const groupedPincodes = useMemo(() => {
+    const map = new Map<string, string[]>();
+    pincodes.forEach(item => {
+      const territories = map.get(item.pincode) || [];
+      if (item.territory_po && !territories.includes(item.territory_po)) {
+        territories.push(item.territory_po);
+      }
+      map.set(item.pincode, territories);
+    });
+    return Array.from(map.entries()).map(([pincode, territories]) => ({ pincode, territories }));
+  }, [pincodes]);
 
   useEffect(() => {
     const fetchStates = async () => {
@@ -237,8 +249,8 @@ export const PincodeMasterLookup: React.FC = () => {
               <span className="text-right">Territory Name</span>
             </div>
             <div className="max-h-80 overflow-y-auto space-y-1">
-              {pincodes.map((item, index) => (
-                <React.Fragment key={`${item.pincode}-${index}`}>
+              {groupedPincodes.map((item) => (
+                <React.Fragment key={item.pincode}>
                   <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center py-2 px-3 rounded-md bg-muted/50 hover:bg-muted transition-colors">
                     <span className="font-mono text-sm font-medium">{item.pincode}</span>
                     <div className="flex justify-center">
@@ -252,7 +264,13 @@ export const PincodeMasterLookup: React.FC = () => {
                         View Retailers
                       </Button>
                     </div>
-                    <span className="text-sm text-muted-foreground text-right">{item.territory_po || '-'}</span>
+                    <div className="text-sm text-muted-foreground text-right">
+                      {item.territories.length > 0
+                        ? item.territories.map((t, i) => (
+                            <span key={i} className="block">{t}</span>
+                          ))
+                        : '-'}
+                    </div>
                   </div>
                   {expandedPincode === item.pincode && (
                     <PincodeRetailersList
@@ -265,7 +283,7 @@ export const PincodeMasterLookup: React.FC = () => {
               ))}
             </div>
             <p className="text-xs text-muted-foreground text-center pt-2">
-              Showing {pincodes.length} result{pincodes.length !== 1 ? 's' : ''}
+              Showing {groupedPincodes.length} result{groupedPincodes.length !== 1 ? 's' : ''}
             </p>
           </div>
         )}
