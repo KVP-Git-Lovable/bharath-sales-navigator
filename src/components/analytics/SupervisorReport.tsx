@@ -1683,7 +1683,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           doc.text(`${nameShort} (${(u.total_order_value / totalRevenue * 100).toFixed(1)}%)`, legendX + 12, ly + 8);
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6);
-          doc.setTextColor(...COLORS.lightText);
+          doc.setTextColor(...COLORS.mutedText);
           const kgVal = u.total_kg >= 1 ? u.total_kg.toFixed(1) + ' KG' : (u.total_kg * 1000).toFixed(0) + ' gm';
           doc.text(`${kgVal} | ${fmtCurrency(u.total_order_value)}`, legendX + 12, ly + 16);
           ly += 22;
