@@ -150,6 +150,14 @@ export const ActivityLoggingSection = () => {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
+          {/* Current Active Users Box */}
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2.5">
+            <Users className="h-4 w-4 text-primary" />
+            <span className="text-sm text-muted-foreground">Current active users:</span>
+            <span className="text-sm font-bold text-foreground">
+              {todayActiveCount !== null ? todayActiveCount : '–'}
+            </span>
+          </div>
           {rows.length === 0 && !loading ? (
             <p className="text-sm text-muted-foreground text-center py-6">No activity data for this period.</p>
           ) : (
