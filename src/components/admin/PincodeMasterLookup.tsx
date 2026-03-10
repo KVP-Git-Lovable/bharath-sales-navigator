@@ -237,8 +237,8 @@ export const PincodeMasterLookup: React.FC = () => {
               <span className="text-right">Territory Name</span>
             </div>
             <div className="max-h-80 overflow-y-auto space-y-1">
-              {pincodes.map((item, index) => (
-                <React.Fragment key={`${item.pincode}-${index}`}>
+              {groupedPincodes.map((item) => (
+                <React.Fragment key={item.pincode}>
                   <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center py-2 px-3 rounded-md bg-muted/50 hover:bg-muted transition-colors">
                     <span className="font-mono text-sm font-medium">{item.pincode}</span>
                     <div className="flex justify-center">
@@ -252,7 +252,13 @@ export const PincodeMasterLookup: React.FC = () => {
                         View Retailers
                       </Button>
                     </div>
-                    <span className="text-sm text-muted-foreground text-right">{item.territory_po || '-'}</span>
+                    <div className="text-sm text-muted-foreground text-right">
+                      {item.territories.length > 0
+                        ? item.territories.map((t, i) => (
+                            <span key={i} className="block">{t}</span>
+                          ))
+                        : '-'}
+                    </div>
                   </div>
                   {expandedPincode === item.pincode && (
                     <PincodeRetailersList
@@ -265,7 +271,7 @@ export const PincodeMasterLookup: React.FC = () => {
               ))}
             </div>
             <p className="text-xs text-muted-foreground text-center pt-2">
-              Showing {pincodes.length} result{pincodes.length !== 1 ? 's' : ''}
+              Showing {groupedPincodes.length} result{groupedPincodes.length !== 1 ? 's' : ''}
             </p>
           </div>
         )}
