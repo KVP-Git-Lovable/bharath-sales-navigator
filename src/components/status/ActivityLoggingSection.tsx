@@ -77,6 +77,17 @@ export const ActivityLoggingSection = () => {
   const [selectedProfile, setSelectedProfile] = useState<UserProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [todayActiveCount, setTodayActiveCount] = useState<number | null>(null);
+
+  const fetchTodayActiveUsers = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const { count, error } = await supabase
+      .from('attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('date', today)
+      .not('check_in_time', 'is', null);
+    if (!error) setTodayActiveCount(count ?? 0);
+  }, []);
 
   const fetchActivity = useCallback(async () => {
     setLoading(true);
@@ -93,7 +104,8 @@ export const ActivityLoggingSection = () => {
 
   useEffect(() => {
     fetchActivity();
-  }, [fetchActivity]);
+    fetchTodayActiveUsers();
+  }, [fetchActivity, fetchTodayActiveUsers]);
 
   const handleViewProfile = async (userId: string) => {
     setProfileOpen(true);
@@ -138,6 +150,14 @@ export const ActivityLoggingSection = () => {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
+          {/* Current Active Users Box */}
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2.5">
+            <Users className="h-4 w-4 text-primary" />
+            <span className="text-sm text-muted-foreground">Current active users:</span>
+            <span className="text-sm font-bold text-foreground">
+              {todayActiveCount !== null ? todayActiveCount : '–'}
+            </span>
+          </div>
           {rows.length === 0 && !loading ? (
             <p className="text-sm text-muted-foreground text-center py-6">No activity data for this period.</p>
           ) : (
