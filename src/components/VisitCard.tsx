@@ -1172,14 +1172,13 @@ export const VisitCard = ({
   }, [myRetailerId, skipInitialCheck]); // Removed checkStatus and visit.status from deps to prevent re-running
 
   // Fetch pending amount for retailer - ONLY when online
+  // FIX: Defer to avoid initial render cascade that causes flickering
   useEffect(() => {
-    const fetchPendingAmount = async () => {
-      // OFFLINE GUARD: Skip network calls when offline - use existing cached state
-      if (!navigator.onLine) {
-        console.log('📵 [VisitCard] OFFLINE - skipping pending amount fetch');
-        return;
-      }
-      
+    // OFFLINE GUARD: Skip network calls when offline - use existing cached state
+    if (!navigator.onLine) return;
+    
+    // Defer to avoid blocking initial paint
+    const timer = setTimeout(async () => {
       const visitRetailerId = visit.retailerId || visit.id;
       
       try {
@@ -1211,18 +1210,15 @@ export const VisitCard = ({
             }
           }
         } else if (!pendingError && !retailerPendingData?.pending_amount) {
-          // Only reset if we got a successful response with no pending
-          // Don't reset on error to preserve cached data
           setPendingAmount(0);
           setPendingSinceDate(null);
         }
       } catch (err) {
-        // Network error - keep existing state, don't reset
         console.log('📵 [VisitCard] Network error fetching pending - keeping cached state');
       }
-    };
+    }, 500); // Delay 500ms to avoid blocking initial paint
     
-    fetchPendingAmount();
+    return () => clearTimeout(timer);
   }, [myRetailerId]); // Only depend on retailerId, run once per retailer
 
   // Check for existing feedback data to show tick marks - ONLY when online
