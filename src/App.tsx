@@ -190,11 +190,12 @@ import QuoteDetail from "./pages/institutional/QuoteDetail";
 import InstitutionalProducts from "./pages/institutional/InstitutionalProducts";
 import OrderCommitments from "./pages/institutional/OrderCommitments";
 import InstitutionalInvoices from "./pages/institutional/InstitutionalInvoices";
-import ProjectsPage from "./pages/pm/ProjectsPage";
-import ProjectDetailPage from "./pages/pm/ProjectDetailPage";
-import ResourceDetailPage from "./pages/pm/ResourceDetailPage";
-import TemplatesPage from "./pages/pm/TemplatesPage";
-import TemplateBuilderPage from "./pages/pm/TemplateBuilderPage";
+// ARCHIVED: Projects module hidden
+// import ProjectsPage from "./pages/pm/ProjectsPage";
+// import ProjectDetailPage from "./pages/pm/ProjectDetailPage";
+// import ResourceDetailPage from "./pages/pm/ResourceDetailPage";
+// import TemplatesPage from "./pages/pm/TemplatesPage";
+// import TemplateBuilderPage from "./pages/pm/TemplateBuilderPage";
 import PriceBooks from "./pages/institutional/PriceBooks";
 import Collections from "./pages/institutional/Collections";
 
