@@ -77,6 +77,17 @@ export const ActivityLoggingSection = () => {
   const [selectedProfile, setSelectedProfile] = useState<UserProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [todayActiveCount, setTodayActiveCount] = useState<number | null>(null);
+
+  const fetchTodayActiveUsers = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const { count, error } = await supabase
+      .from('attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('date', today)
+      .not('check_in_time', 'is', null);
+    if (!error) setTodayActiveCount(count ?? 0);
+  }, []);
 
   const fetchActivity = useCallback(async () => {
     setLoading(true);
@@ -93,7 +104,8 @@ export const ActivityLoggingSection = () => {
 
   useEffect(() => {
     fetchActivity();
-  }, [fetchActivity]);
+    fetchTodayActiveUsers();
+  }, [fetchActivity, fetchTodayActiveUsers]);
 
   const handleViewProfile = async (userId: string) => {
     setProfileOpen(true);
