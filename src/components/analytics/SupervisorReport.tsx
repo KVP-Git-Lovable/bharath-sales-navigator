@@ -1752,7 +1752,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         </Button>
       </div>
 
-      <div ref={reportContentRef} className="space-y-4">
+      <div className="space-y-4">
       {/* Total Order Value Banner - Dashboard visualization */}
        <div className="grid grid-cols-2 gap-2 md:gap-4">
          {/* Total Order Value Banner */}
