@@ -301,8 +301,9 @@ export const MyVisits = () => {
     if (optimizedBeatPlans.length > 0) {
       return optimizedBeatPlans.map(plan => plan.beat_name).join(', ');
     }
-    return "No beats planned";
-  }, [optimizedBeatPlans]);
+    // FIX: Don't show "No beats planned" until data has actually loaded to prevent flicker
+    return hasLoadedOnce ? "No beats planned" : "";
+  }, [optimizedBeatPlans, hasLoadedOnce]);
   
   // Process retailers from optimized data - single source of truth
   const retailers = useMemo(() => {
@@ -1496,12 +1497,12 @@ export const MyVisits = () => {
             </Card>
           )}
           
-          {/* Activity Events Table - shown above visit list */}
-          {(isViewingSelf ? user?.id : selectedUserIds[0]) && (
+          {/* Activity Events Table - shown above visit list, ONLY after parent data loads to prevent flicker */}
+          {hasLoadedOnce && (isViewingSelf ? user?.id : selectedUserIds[0]) && (
             <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} onActivitiesLoaded={(count) => setHasActivities(count > 0)} />
           )}
 
-          {/* No visits message - ONLY after loading completes */}
+          {/* No visits message - ONLY after loading completes AND a brief settling period */}
           {!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && !hasActivities && (plannedBeats.length === 0 || searchTerm !== '') ? <Card className="shadow-card">
               <CardContent className="p-4 sm:p-8 text-center">
                 <CalendarIcon size={32} className="sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
