@@ -38,6 +38,18 @@ export const PincodeMasterLookup: React.FC = () => {
   const [retailers, setRetailers] = useState<ExternalRetailer[]>([]);
   const [loadingRetailers, setLoadingRetailers] = useState(false);
 
+  const groupedPincodes = useMemo(() => {
+    const map = new Map<string, string[]>();
+    pincodes.forEach(item => {
+      const territories = map.get(item.pincode) || [];
+      if (item.territory_po && !territories.includes(item.territory_po)) {
+        territories.push(item.territory_po);
+      }
+      map.set(item.pincode, territories);
+    });
+    return Array.from(map.entries()).map(([pincode, territories]) => ({ pincode, territories }));
+  }, [pincodes]);
+
   useEffect(() => {
     const fetchStates = async () => {
       setLoadingStates(true);
