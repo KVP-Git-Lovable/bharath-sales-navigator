@@ -444,6 +444,147 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_audit_log: {
+        Row: {
+          action: string
+          approval_request_id: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          level: number | null
+          metadata: Json | null
+          performed_by: string
+          timestamp: string
+        }
+        Insert: {
+          action: string
+          approval_request_id?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          level?: number | null
+          metadata?: Json | null
+          performed_by: string
+          timestamp?: string
+        }
+        Update: {
+          action?: string
+          approval_request_id?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          level?: number | null
+          metadata?: Json | null
+          performed_by?: string
+          timestamp?: string
+        }
+        Relationships: []
+      }
+      approval_config: {
+        Row: {
+          created_at: string
+          entity_type: string
+          final_approval_role: string | null
+          id: string
+          max_levels: number
+          skip_levels: boolean
+          updated_at: string
+          use_full_hierarchy: boolean
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          final_approval_role?: string | null
+          id?: string
+          max_levels?: number
+          skip_levels?: boolean
+          updated_at?: string
+          use_full_hierarchy?: boolean
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          final_approval_role?: string | null
+          id?: string
+          max_levels?: number
+          skip_levels?: boolean
+          updated_at?: string
+          use_full_hierarchy?: boolean
+        }
+        Relationships: []
+      }
+      approval_requests: {
+        Row: {
+          created_at: string
+          current_level: number
+          entity_id: string
+          entity_type: string
+          final_approved_by: string | null
+          id: string
+          requester_id: string
+          status: string
+          total_levels: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_level?: number
+          entity_id: string
+          entity_type: string
+          final_approved_by?: string | null
+          id?: string
+          requester_id: string
+          status?: string
+          total_levels?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_level?: number
+          entity_id?: string
+          entity_type?: string
+          final_approved_by?: string | null
+          id?: string
+          requester_id?: string
+          status?: string
+          total_levels?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      approval_steps: {
+        Row: {
+          action_taken_at: string | null
+          approval_request_id: string
+          approver_id: string
+          created_at: string
+          id: string
+          level: number
+          rejection_reason: string | null
+          status: string
+        }
+        Insert: {
+          action_taken_at?: string | null
+          approval_request_id: string
+          approver_id: string
+          created_at?: string
+          id?: string
+          level: number
+          rejection_reason?: string | null
+          status?: string
+        }
+        Update: {
+          action_taken_at?: string | null
+          approval_request_id?: string
+          approver_id?: string
+          created_at?: string
+          id?: string
+          level?: number
+          rejection_reason?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       approvers: {
         Row: {
           approver_level: number
@@ -599,6 +740,84 @@ export type Database = {
           },
         ]
       }
+      attendance_daily_admin_summary: {
+        Row: {
+          avg_hours: number | null
+          created_at: string
+          date: string
+          id: string
+          total_absent: number
+          total_employees: number
+          total_half_day: number
+          total_hours_sum: number | null
+          total_on_leave: number
+          total_present: number
+          updated_at: string
+        }
+        Insert: {
+          avg_hours?: number | null
+          created_at?: string
+          date: string
+          id?: string
+          total_absent?: number
+          total_employees?: number
+          total_half_day?: number
+          total_hours_sum?: number | null
+          total_on_leave?: number
+          total_present?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_hours?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          total_absent?: number
+          total_employees?: number
+          total_half_day?: number
+          total_hours_sum?: number | null
+          total_on_leave?: number
+          total_present?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      attendance_user_monthly_summary: {
+        Row: {
+          absent_days: number
+          half_day_leave_days: number
+          id: string
+          leave_days: number
+          month: number
+          present_days: number
+          regularized_days: number
+          user_id: string
+          year: number
+        }
+        Insert: {
+          absent_days?: number
+          half_day_leave_days?: number
+          id?: string
+          leave_days?: number
+          month: number
+          present_days?: number
+          regularized_days?: number
+          user_id: string
+          year: number
+        }
+        Update: {
+          absent_days?: number
+          half_day_leave_days?: number
+          id?: string
+          leave_days?: number
+          month?: number
+          present_days?: number
+          regularized_days?: number
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       badges: {
         Row: {
           badge_color: string | null
@@ -668,6 +887,33 @@ export type Database = {
           travel_allowance?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      beat_audit_log: {
+        Row: {
+          action: string
+          beat_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          performed_by: string | null
+        }
+        Insert: {
+          action: string
+          beat_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          performed_by?: string | null
+        }
+        Update: {
+          action?: string
+          beat_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          performed_by?: string | null
         }
         Relationships: []
       }
@@ -2314,6 +2560,30 @@ export type Database = {
           name?: string
           state?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      device_battery_logs: {
+        Row: {
+          battery_level: number | null
+          created_at: string | null
+          id: string
+          is_charging: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          battery_level?: number | null
+          created_at?: string | null
+          id?: string
+          is_charging?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          battery_level?: number | null
+          created_at?: string | null
+          id?: string
+          is_charging?: boolean | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -4822,6 +5092,60 @@ export type Database = {
         }
         Relationships: []
       }
+      geocoding_jobs: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      global_leave_policy: {
+        Row: {
+          carry_forward: boolean | null
+          created_at: string | null
+          id: string
+          leave_type: string
+          max_days: number | null
+        }
+        Insert: {
+          carry_forward?: boolean | null
+          created_at?: string | null
+          id?: string
+          leave_type: string
+          max_days?: number | null
+        }
+        Update: {
+          carry_forward?: boolean | null
+          created_at?: string | null
+          id?: string
+          leave_type?: string
+          max_days?: number | null
+        }
+        Relationships: []
+      }
       gps_tracking: {
         Row: {
           accuracy: number | null
@@ -6832,6 +7156,30 @@ export type Database = {
           },
         ]
       }
+      leave_type_policy_override: {
+        Row: {
+          created_at: string | null
+          id: string
+          leave_type: string | null
+          max_days: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          leave_type?: string | null
+          max_days?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          leave_type?: string | null
+          max_days?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       leave_types: {
         Row: {
           allow_half_day: boolean | null
@@ -6907,6 +7255,48 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_event_log: {
+        Row: {
+          created_at: string | null
+          event_type: string | null
+          id: string
+          payload: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+        }
+        Relationships: []
+      }
+      notification_event_types: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string | null
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -6931,6 +7321,30 @@ export type Database = {
           template_type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      notification_rules: {
+        Row: {
+          created_at: string | null
+          event_type_id: string | null
+          id: string
+          is_active: boolean | null
+          target_role: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          target_role?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          target_role?: string | null
         }
         Relationships: []
       }
@@ -7554,6 +7968,63 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_set_group_permissions: {
+        Row: {
+          group_id: string | null
+          id: string
+          permission_key: string | null
+        }
+        Insert: {
+          group_id?: string | null
+          id?: string
+          permission_key?: string | null
+        }
+        Update: {
+          group_id?: string | null
+          id?: string
+          permission_key?: string | null
+        }
+        Relationships: []
+      }
+      permission_set_group_users: {
+        Row: {
+          group_id: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          group_id?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          group_id?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      permission_set_groups: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string | null
+        }
+        Relationships: []
+      }
       pincode_master: {
         Row: {
           created_at: string | null
@@ -7590,6 +8061,72 @@ export type Database = {
           statename?: string | null
           territory_po?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      pm_ai_insights: {
+        Row: {
+          created_at: string | null
+          id: string
+          insight_text: string | null
+          project_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          insight_text?: string | null
+          project_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          insight_text?: string | null
+          project_id?: string | null
+        }
+        Relationships: []
+      }
+      pm_ideas: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          title: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          title?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          title?: string | null
+        }
+        Relationships: []
+      }
+      pm_knowledge_documents: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          title: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          title?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          title?: string | null
         }
         Relationships: []
       }
@@ -7678,6 +8215,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pm_project_resources: {
+        Row: {
+          created_at: string | null
+          id: string
+          project_id: string | null
+          resource_name: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          project_id?: string | null
+          resource_name?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          project_id?: string | null
+          resource_name?: string | null
+          url?: string | null
+        }
+        Relationships: []
       }
       pm_projects: {
         Row: {
@@ -7811,6 +8372,27 @@ export type Database = {
           },
         ]
       }
+      pm_sections: {
+        Row: {
+          id: string
+          name: string | null
+          position: number | null
+          project_id: string | null
+        }
+        Insert: {
+          id?: string
+          name?: string | null
+          position?: number | null
+          project_id?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          position?: number | null
+          project_id?: string | null
+        }
+        Relationships: []
+      }
       pm_sprints: {
         Row: {
           created_at: string
@@ -7857,6 +8439,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pm_support_requests: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          status: string | null
+          title: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          status?: string | null
+          title?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          status?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+      pm_task_attachments: {
+        Row: {
+          created_at: string | null
+          file_url: string | null
+          id: string
+          task_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_url?: string | null
+          id?: string
+          task_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_url?: string | null
+          id?: string
+          task_id?: string | null
+        }
+        Relationships: []
+      }
+      pm_task_collaborators: {
+        Row: {
+          id: string
+          task_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       pm_task_comments: {
         Row: {
@@ -8126,6 +8771,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pm_template_attachments: {
+        Row: {
+          file_url: string | null
+          id: string
+          template_task_id: string | null
+        }
+        Insert: {
+          file_url?: string | null
+          id?: string
+          template_task_id?: string | null
+        }
+        Update: {
+          file_url?: string | null
+          id?: string
+          template_task_id?: string | null
+        }
+        Relationships: []
+      }
+      pm_template_dependencies: {
+        Row: {
+          depends_on_task_id: string | null
+          id: string
+          task_id: string | null
+        }
+        Insert: {
+          depends_on_task_id?: string | null
+          id?: string
+          task_id?: string | null
+        }
+        Update: {
+          depends_on_task_id?: string | null
+          id?: string
+          task_id?: string | null
+        }
+        Relationships: []
+      }
+      pm_template_sections: {
+        Row: {
+          id: string
+          name: string | null
+          template_id: string | null
+        }
+        Insert: {
+          id?: string
+          name?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          template_id?: string | null
+        }
+        Relationships: []
+      }
+      pm_template_tasks: {
+        Row: {
+          id: string
+          position: number | null
+          template_section_id: string | null
+          title: string | null
+        }
+        Insert: {
+          id?: string
+          position?: number | null
+          template_section_id?: string | null
+          title?: string | null
+        }
+        Update: {
+          id?: string
+          position?: number | null
+          template_section_id?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+      pm_templates: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string | null
+        }
+        Relationships: []
       }
       pm_time_logs: {
         Row: {
@@ -9333,6 +10074,24 @@ export type Database = {
         }
         Relationships: []
       }
+      regularization_policy: {
+        Row: {
+          created_at: string | null
+          id: string
+          max_days: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          max_days?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          max_days?: number | null
+        }
+        Relationships: []
+      }
       regularization_requests: {
         Row: {
           approved_at: string | null
@@ -9445,6 +10204,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      retailer_external_db: {
+        Row: {
+          address: string | null
+          category: string | null
+          city: string
+          company_name: string
+          email: string | null
+          id: number
+          latitude: number | null
+          longitude: number | null
+          mobile: string | null
+          pincode: string | null
+          state: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          category?: string | null
+          city: string
+          company_name: string
+          email?: string | null
+          id?: never
+          latitude?: number | null
+          longitude?: number | null
+          mobile?: string | null
+          pincode?: string | null
+          state: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          category?: string | null
+          city?: string
+          company_name?: string
+          email?: string | null
+          id?: never
+          latitude?: number | null
+          longitude?: number | null
+          mobile?: string | null
+          pincode?: string | null
+          state?: string
+          website?: string | null
+        }
+        Relationships: []
       }
       retailer_feedback: {
         Row: {
@@ -12229,6 +13033,27 @@ export type Database = {
           },
         ]
       }
+      user_data_usage: {
+        Row: {
+          created_at: string | null
+          data_used_mb: number | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_used_mb?: number | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_used_mb?: number | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_invitations: {
         Row: {
           completed_at: string | null
@@ -12461,6 +13286,27 @@ export type Database = {
           },
         ]
       }
+      user_page_views: {
+        Row: {
+          created_at: string | null
+          id: string
+          page: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          page?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          page?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_performance_scores: {
         Row: {
           calculated_at: string | null
@@ -12685,6 +13531,30 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          session_token: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          session_token?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          session_token?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
