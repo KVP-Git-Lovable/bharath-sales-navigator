@@ -301,8 +301,9 @@ export const MyVisits = () => {
     if (optimizedBeatPlans.length > 0) {
       return optimizedBeatPlans.map(plan => plan.beat_name).join(', ');
     }
-    return "No beats planned";
-  }, [optimizedBeatPlans]);
+    // FIX: Don't show "No beats planned" until data has actually loaded to prevent flicker
+    return hasLoadedOnce ? "No beats planned" : "";
+  }, [optimizedBeatPlans, hasLoadedOnce]);
   
   // Process retailers from optimized data - single source of truth
   const retailers = useMemo(() => {
