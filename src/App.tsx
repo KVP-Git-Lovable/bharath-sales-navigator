@@ -123,6 +123,7 @@ import PincodeMasterPage from "./pages/admin/PincodeMasterPage";
 import HierarchyTargets from "./pages/admin/HierarchyTargets";
 import TaxMaster from "./pages/admin/TaxMaster";
 import RetailerExternalDBPage from "./pages/admin/RetailerExternalDBPage";
+import RetailerUnsortedPage from "./pages/admin/RetailerUnsortedPage";
 import NotificationRulesAdmin from "./pages/admin/NotificationRulesAdmin";
 import MyTargets from "./pages/MyTargets";
 import MyTarget from "./pages/MyTarget";
