@@ -95,8 +95,7 @@ const RetailerExternalDBPage: React.FC = () => {
               onClick={() => navigate('/admin/retailer-unsorted')}
               className="flex items-center gap-2"
             >
-              <AlertTriangle className="h-4 w-4" />
-              Check uncategorized retailers
+              View other retailers
             </Button>
           </div>
 
