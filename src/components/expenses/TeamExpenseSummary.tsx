@@ -368,6 +368,7 @@ const TeamOverview: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
         loading={loading}
         onTotalClick={() => {}}
         isExpanded={false}
+        orderValue={aggregated.orderValue}
       />
 
       <div className="space-y-2">
