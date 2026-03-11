@@ -45,11 +45,13 @@ interface DARecord {
 }
 
 interface AdditionalExpenseData {
+  id: string;
   date: string;
   expense_type: string;
   details: string;
   value: number;
   bill_attached: boolean;
+  bill_url: string | null;
   status: string;
 }
 
