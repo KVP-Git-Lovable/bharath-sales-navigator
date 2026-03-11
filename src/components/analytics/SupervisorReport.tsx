@@ -1734,8 +1734,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           body: skuRows,
           theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8, cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
-          headStyles: { fillColor: COLORS.accent, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          styles: { font: 'NotoSans', fontSize: 8, cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { font: 'NotoSans', fillColor: COLORS.accent, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
           alternateRowStyles: { fillColor: [248, 250, 252] },
         });
         y = (doc as any).lastAutoTable.finalY + 16;
