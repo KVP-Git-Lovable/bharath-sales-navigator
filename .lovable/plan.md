@@ -1,33 +1,40 @@
 
-# Expense Approval Workflow for Additional Expenses
+# Expense Approval Workflow — Integrated with Approval Engine
 
-## Status: ✅ Implemented
+## Status: ✅ Implemented (v2 — Scalable Approval Engine)
 
 ## Summary
-Added an approval lifecycle to Additional Expenses only. TA and DA remain auto-calculated with no approval. Additional expenses get a draft → submitted → manager_approved → rejected → paid status flow.
+Migrated additional expense approvals from a bespoke direct-update flow to the existing scalable `approval_requests` / `approval_steps` engine (same as leave and regularization). Added configurable approval policy in the Expense Master admin page.
 
 ## What Was Done
 
-### Phase 1: Database ✅
-- Added `status`, `submitted_at`, `approved_by`, `approved_at`, `rejection_reason` columns to `additional_expenses`
-- RLS policies: users can only edit/delete draft expenses; managers can approve/reject subordinates' submitted expenses; admins have full access
+### Phase 1: Database Migration ✅
+- Added `approval_mode` column to `approval_config` (`auto` | `manager` | `multi_level`)
+- Inserted `expense` row in `approval_config` (default: `manager`, `max_levels = 1`)
+- Created `trigger_create_expense_approval_request()` — fires on INSERT/UPDATE of `additional_expenses` when status becomes `submitted`; if `approval_mode = 'auto'`, auto-approves immediately
+- Updated `trigger_sync_entity_status()` to handle `entity_type = 'expense'` — syncs approved/rejected status back to `additional_expenses`
 
-### Phase 2: User-Facing ✅
-- `AdditionalExpenses.tsx`: Status badges on saved expenses, delete restricted to draft only
-- `BeatAllowanceManagement.tsx`: Submit Expenses button (bulk submits all draft in date range), Status column in additional expenses tab
+### Phase 2: Admin UI — Approval Policy Card ✅
+- Added "Expense Approval Policy" card in `ExpensePolicyConfig.tsx`
+- Configurable: Auto-Approve / Manager Approval / Multi-Level Approval
+- Max approval levels (1-5) visible in multi-level mode
+- Reads/writes `approval_config` where `entity_type = 'expense'`
 
-### Phase 3: Manager Approval Page ✅
-- `ExpenseApprovals.tsx` at `/expenses/approvals`: Filters by status/date/employee, approve/reject with reason dialog, employee summary cards
+### Phase 3: Expense Approvals Page ✅
+- Refactored `ExpenseApprovals.tsx` to use `useMyPendingSteps()` + `useProcessApprovalStep()` from the approval engine
+- No longer queries all subordinates — only shows expenses assigned to current user's approval step
+- Fixes the Abhishek-sees-Vikyath bug (scoped to correct hierarchy level)
 
-### Phase 4: Summary Updates ✅
-- `ExpenseSummaryBoxes.tsx`: Only counts `manager_approved` or `paid` additional expenses in totals
+### Phase 4: Team Summary Approvals Tab ✅
+- Refactored `TeamApprovalsList` in `TeamExpenseSummary.tsx` to use approval engine hooks
+- Pending expenses sourced from `useMyPendingSteps()` filtered to `entityType = 'expense'`
+- Completed approvals fetched from `approval_audit_log`
 
-### Phase 5: Navigation ✅
-- Route added in `App.tsx`
-- "Expense Approvals" link added in Navbar
+### Phase 5: Approval Engine Type Update ✅
+- Extended `PendingStep.entityType` to include `'expense'` alongside `'leave'` and `'regularization'`
 
 ## What Was NOT Changed
 - TA calculation logic (auto from beat or fixed)
 - DA calculation logic (auto from attendance)
-- `expense_master_config` admin settings
-- Existing `approval_requests` / `approval_steps` engine
+- `AdditionalExpenses.tsx` submission logic (already sets `status = 'submitted'`; DB trigger handles approval request creation)
+- Existing draft/submitted expenses without approval_requests continue working (backward compatible)
