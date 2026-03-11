@@ -436,7 +436,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {EXPENSE_CATEGORIES.map((category) => (
+                          {expenseCategories.map((category) => (
                             <SelectItem key={category} value={category} className="text-xs">
                               {category}
                             </SelectItem>
