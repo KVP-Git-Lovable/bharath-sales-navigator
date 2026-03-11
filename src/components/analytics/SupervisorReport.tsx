@@ -1569,7 +1569,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
       doc.setTextColor(...COLORS.white);
       doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.text('Sales Analytics Report', margin, 32);
 
       doc.setFontSize(10);
