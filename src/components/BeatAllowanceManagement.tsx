@@ -74,6 +74,7 @@ const BeatAllowanceManagement = () => {
   const [additionalExpenseData, setAdditionalExpenseData] = useState<AdditionalExpenseData[]>([]);
   const [activeTab, setActiveTab] = useState<'expenses' | 'da' | 'additional'>('expenses');
   const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set());
+  const [submittingExpenses, setSubmittingExpenses] = useState(false);
   const { toast } = useToast();
   
   // Track current fetch version to ignore stale responses
