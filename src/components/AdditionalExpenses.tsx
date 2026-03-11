@@ -182,7 +182,9 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   };
 
   const uploadFile = async (file: File, userId: string): Promise<string | null> => {
-    const fileName = `${userId}/${Date.now()}_${file.name}`;
+    // Sanitize filename: replace spaces and special chars with underscores
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = `${userId}/${Date.now()}_${sanitizedName}`;
     
     const { error } = await supabase.storage
       .from('expense-bills')
