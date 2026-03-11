@@ -43,7 +43,7 @@ const EXPENSE_CATEGORIES = [
 
 const STATUS_BADGE_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
-  submitted: { label: 'Submitted', variant: 'outline' },
+  submitted: { label: 'Pending', variant: 'outline' },
   manager_approved: { label: 'Approved', variant: 'default' },
   rejected: { label: 'Rejected', variant: 'destructive' },
   paid: { label: 'Paid', variant: 'default' },
