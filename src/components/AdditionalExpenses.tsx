@@ -349,7 +349,20 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
       </CardHeader>
 
       <CardContent className="p-3 sm:p-6 pt-0">
+        {isEditLoading && (
+          <div className="space-y-3 mb-4 p-3">
+            <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+            <div className="h-9 w-full bg-muted animate-pulse rounded" />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="h-9 bg-muted animate-pulse rounded" />
+              <div className="h-9 bg-muted animate-pulse rounded" />
+            </div>
+            <div className="h-16 w-full bg-muted animate-pulse rounded" />
+          </div>
+        )}
+
         {isFormOpen && !isEditLoading && (
+          <div className="space-y-3 mb-4">
             <div className="p-2.5 bg-muted/50 rounded-lg space-y-1">
               <Label className="text-xs font-medium">User: {userProfile?.full_name || 'Loading...'}</Label>
               {beatName && (
