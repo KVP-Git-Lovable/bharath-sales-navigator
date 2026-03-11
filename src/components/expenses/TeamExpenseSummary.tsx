@@ -452,7 +452,7 @@ const TeamExpenseSummary: React.FC<TeamExpenseSummaryProps> = ({ yearMonth: pare
             Approvals
           </TabsTrigger>
           <TabsTrigger value="overview" className="text-xs gap-1.5">
-            <User className="h-3.5 w-3.5" />
+            <Users className="h-3.5 w-3.5" />
             Overview
           </TabsTrigger>
         </TabsList>
