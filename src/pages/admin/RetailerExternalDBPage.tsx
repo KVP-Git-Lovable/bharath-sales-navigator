@@ -5,7 +5,7 @@ import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { RetailerExternalDBLookup } from '@/components/admin/RetailerExternalDBLookup';
 import { Button } from '@/components/ui/button';
-import { Globe, Loader2, AlertTriangle } from 'lucide-react';
+import { Globe, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
@@ -95,8 +95,7 @@ const RetailerExternalDBPage: React.FC = () => {
               onClick={() => navigate('/admin/retailer-unsorted')}
               className="flex items-center gap-2"
             >
-              <AlertTriangle className="h-4 w-4" />
-              Check uncategorized retailers
+              View other retailers
             </Button>
           </div>
 
