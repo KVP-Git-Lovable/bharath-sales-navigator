@@ -1,40 +1,42 @@
 
-# Expense Approval Workflow — Integrated with Approval Engine
+# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented (v2 — Scalable Approval Engine)
+## Status: ✅ Implemented
 
 ## Summary
-Migrated additional expense approvals from a bespoke direct-update flow to the existing scalable `approval_requests` / `approval_steps` engine (same as leave and regularization). Added configurable approval policy in the Expense Master admin page.
+Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
 
 ## What Was Done
 
-### Phase 1: Database Migration ✅
-- Added `approval_mode` column to `approval_config` (`auto` | `manager` | `multi_level`)
-- Inserted `expense` row in `approval_config` (default: `manager`, `max_levels = 1`)
-- Created `trigger_create_expense_approval_request()` — fires on INSERT/UPDATE of `additional_expenses` when status becomes `submitted`; if `approval_mode = 'auto'`, auto-approves immediately
-- Updated `trigger_sync_entity_status()` to handle `entity_type = 'expense'` — syncs approved/rejected status back to `additional_expenses`
+### Phase 1: Database Schema ✅
+- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
+- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
+- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
+- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
+- All tables have RLS: read by authenticated, write by admin only
+- Seeded default categories and a "Manager Approval" default workflow
 
-### Phase 2: Admin UI — Approval Policy Card ✅
-- Added "Expense Approval Policy" card in `ExpensePolicyConfig.tsx`
-- Configurable: Auto-Approve / Manager Approval / Multi-Level Approval
-- Max approval levels (1-5) visible in multi-level mode
-- Reads/writes `approval_config` where `entity_type = 'expense'`
+### Phase 2: Updated Trigger ✅
+- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
+  1. Checks amount-based rules first
+  2. Then category-based rules
+  3. Then 'always' rules
+  4. Falls back to default workflow
+  5. Ultimate fallback to old `approval_config` behavior
+- Creates `approval_steps` from `workflow_steps` using reporting chain
 
-### Phase 3: Expense Approvals Page ✅
-- Refactored `ExpenseApprovals.tsx` to use `useMyPendingSteps()` + `useProcessApprovalStep()` from the approval engine
-- No longer queries all subordinates — only shows expenses assigned to current user's approval step
-- Fixes the Abhishek-sees-Vikyath bug (scoped to correct hierarchy level)
+### Phase 3: Admin UI ✅
+- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
+- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
+- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
 
-### Phase 4: Team Summary Approvals Tab ✅
-- Refactored `TeamApprovalsList` in `TeamExpenseSummary.tsx` to use approval engine hooks
-- Pending expenses sourced from `useMyPendingSteps()` filtered to `entityType = 'expense'`
-- Completed approvals fetched from `approval_audit_log`
+### Phase 4: Submission UI ✅
+- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
+- Falls back to hardcoded list if DB categories unavailable
 
-### Phase 5: Approval Engine Type Update ✅
-- Extended `PendingStep.entityType` to include `'expense'` alongside `'leave'` and `'regularization'`
-
-## What Was NOT Changed
-- TA calculation logic (auto from beat or fixed)
-- DA calculation logic (auto from attendance)
-- `AdditionalExpenses.tsx` submission logic (already sets `status = 'submitted'`; DB trigger handles approval request creation)
-- Existing draft/submitted expenses without approval_requests continue working (backward compatible)
+## What Stays Unchanged
+- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
+- `process_approval_step()` — works as-is
+- `trigger_sync_entity_status()` — works as-is
+- TA/DA calculation logic — untouched
+- ExpenseApprovals page — works as-is (reads from approval engine)
