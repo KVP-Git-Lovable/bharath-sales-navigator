@@ -1512,6 +1512,26 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       ];
 
       const doc = new jsPDF('l', 'pt', 'a4');
+
+      // Fetch and register Noto Sans font for ₹ symbol support
+      const fontBaseUrl = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf';
+      const [regularRes, boldRes] = await Promise.all([
+        fetch('https://fonts.gstatic.com/s/notosans/v36/o-0IIpQlx3QUlC5A4PNb4j5Ba_2c7A.ttf'),
+        fetch('https://fonts.gstatic.com/s/notosans/v36/o-0NIIpQlx3QUlC5A4PNjXhFlY9aQWnf.ttf'),
+      ]);
+      const [regularBuf, boldBuf] = await Promise.all([regularRes.arrayBuffer(), boldRes.arrayBuffer()]);
+      const toBase64 = (buf: ArrayBuffer) => {
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+      };
+      doc.addFileToVFS('NotoSans-Regular.ttf', toBase64(regularBuf));
+      doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
+      doc.addFileToVFS('NotoSans-Bold.ttf', toBase64(boldBuf));
+      doc.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold');
+      doc.setFont('NotoSans', 'normal');
+
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 30;
@@ -1533,7 +1553,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         doc.setFillColor(...COLORS.primary);
         doc.rect(margin, y, 4, 16, 'F');
         doc.setFontSize(13);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setTextColor(...COLORS.primary);
         doc.text(title, margin + 12, y + 12);
         doc.setTextColor(...COLORS.darkText);
@@ -1549,11 +1569,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
       doc.setTextColor(...COLORS.white);
       doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.text('Sales Analytics Report', margin, 32);
 
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSans', 'normal');
       const periodText = `${format(dateRange.from, 'dd MMM yyyy')} – ${format(dateRange.to, 'dd MMM yyyy')}`;
       const filterLabel = selectedUsers.length === 0 ? 'All Users' : selectedUsers.length <= 3 ? selectedUsers.join(', ') : `${selectedUsers.length} users selected`;
       doc.text(`Period: ${periodText}   |   Filter: ${filterLabel}`, margin, 52);
@@ -1582,12 +1602,12 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         doc.rect(cx, y, cardWidth, 3, 'F');
         // Label
         doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('NotoSans', 'normal');
         doc.setTextColor(...COLORS.mutedText);
         doc.text(kpi.label, cx + 10, y + 20);
         // Value
         doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setTextColor(...COLORS.darkText);
         doc.text(kpi.value, cx + 10, y + 42);
       });
@@ -1677,11 +1697,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           doc.setFillColor(...color);
           doc.rect(legendX, ly + 1, 8, 8, 'F');
           doc.setFontSize(7);
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSans', 'bold');
           doc.setTextColor(...COLORS.darkText);
           const nameShort = u.full_name.length > 14 ? u.full_name.substring(0, 12) + '…' : u.full_name;
           doc.text(`${nameShort} (${(u.total_order_value / totalRevenue * 100).toFixed(1)}%)`, legendX + 12, ly + 8);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSans', 'normal');
           doc.setFontSize(6);
           doc.setTextColor(...COLORS.mutedText);
           const kgVal = u.total_kg >= 1 ? u.total_kg.toFixed(1) + ' KG' : (u.total_kg * 1000).toFixed(0) + ' gm';
@@ -1734,7 +1754,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           top10.forEach((sku, i) => {
             const bw = maxRev > 0 ? (sku.revenue / maxRev) * chartBarMaxW : 0;
             doc.setFontSize(7);
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('NotoSans', 'normal');
             doc.setTextColor(...COLORS.darkText);
             const skuLabel = sku.product_name.length > 30 ? sku.product_name.substring(0, 28) + '…' : sku.product_name;
             doc.text(skuLabel, margin, y + 10);
@@ -1875,19 +1895,19 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           doc.setFillColor(...borderColor);
           doc.roundedRect(margin + 14, y + 6, 50, 12, 2, 2, 'F');
           doc.setFontSize(6);
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSans', 'bold');
           doc.setTextColor(...COLORS.white);
           doc.text(insight.type.toUpperCase(), margin + 18, y + 14);
 
           // Title
           doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSans', 'bold');
           doc.setTextColor(...COLORS.darkText);
           doc.text(insight.title, margin + 70, y + 16);
 
           // Description
           doc.setFontSize(7.5);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSans', 'normal');
           doc.setTextColor(...COLORS.mutedText);
           const descText = insight.description.length > 120 ? insight.description.substring(0, 118) + '…' : insight.description;
           doc.text(descText, margin + 14, y + 32);
@@ -1906,7 +1926,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         doc.setDrawColor(...COLORS.cardBorder);
         doc.line(margin, footerY - 6, pageWidth - margin, footerY - 6);
         doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('NotoSans', 'normal');
         doc.setTextColor(...COLORS.mutedText);
         doc.text(`Generated on ${format(new Date(), 'dd MMM yyyy, hh:mm a')}`, margin, footerY);
         doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 50, footerY);
