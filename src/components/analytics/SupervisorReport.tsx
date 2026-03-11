@@ -1907,7 +1907,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
           // Description
           doc.setFontSize(7.5);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSans', 'normal');
           doc.setTextColor(...COLORS.mutedText);
           const descText = insight.description.length > 120 ? insight.description.substring(0, 118) + '…' : insight.description;
           doc.text(descText, margin + 14, y + 32);
