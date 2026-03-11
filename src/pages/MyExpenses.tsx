@@ -139,13 +139,6 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
       )}
 
-      {/* Action Buttons */}
-      <div className="flex gap-2">
-        <Button size="sm" onClick={onAddExpense} className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" />
-          Additional Expense
-        </Button>
-      </div>
 
       {/* Detailed Daily View (old Expense Details) */}
       <BeatAllowanceManagement />
