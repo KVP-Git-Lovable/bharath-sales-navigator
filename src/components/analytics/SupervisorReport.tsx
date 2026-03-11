@@ -1512,6 +1512,26 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       ];
 
       const doc = new jsPDF('l', 'pt', 'a4');
+
+      // Fetch and register Noto Sans font for ₹ symbol support
+      const fontBaseUrl = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf';
+      const [regularRes, boldRes] = await Promise.all([
+        fetch('https://fonts.gstatic.com/s/notosans/v36/o-0IIpQlx3QUlC5A4PNb4j5Ba_2c7A.ttf'),
+        fetch('https://fonts.gstatic.com/s/notosans/v36/o-0NIIpQlx3QUlC5A4PNjXhFlY9aQWnf.ttf'),
+      ]);
+      const [regularBuf, boldBuf] = await Promise.all([regularRes.arrayBuffer(), boldRes.arrayBuffer()]);
+      const toBase64 = (buf: ArrayBuffer) => {
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+      };
+      doc.addFileToVFS('NotoSans-Regular.ttf', toBase64(regularBuf));
+      doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
+      doc.addFileToVFS('NotoSans-Bold.ttf', toBase64(boldBuf));
+      doc.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold');
+      doc.setFont('NotoSans', 'normal');
+
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 30;
