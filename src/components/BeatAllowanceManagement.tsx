@@ -45,11 +45,13 @@ interface DARecord {
 }
 
 interface AdditionalExpenseData {
+  id: string;
   date: string;
   expense_type: string;
   details: string;
   value: number;
   bill_attached: boolean;
+  bill_url: string | null;
   status: string;
 }
 
@@ -172,9 +174,30 @@ const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ record
   );
 };
 
+// ─── Bill Link (tiny clickable link to view bill) ────────────────────────────
+
+const BillLink: React.FC<{ billUrl: string }> = ({ billUrl }) => {
+  const handleView = async () => {
+    const { data } = await supabase.storage.from('expense-bills').createSignedUrl(billUrl, 300);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    }
+  };
+  return (
+    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-primary" onClick={handleView}>
+      <ExternalLink className="h-2.5 w-2.5" />
+    </Button>
+  );
+};
+
 // ─── Additional Expenses Table ───────────────────────────────────────────────
 
-const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditional: number }> = ({ items, totalAdditional }) => {
+const AdditionalCardList: React.FC<{ 
+  items: AdditionalExpenseData[]; 
+  totalAdditional: number;
+  onDelete?: (id: string) => void;
+  onEdit?: (item: AdditionalExpenseData) => void;
+}> = ({ items, totalAdditional, onDelete, onEdit }) => {
   const [showMore, setShowMore] = useState(false);
 
   const statusLabel = (s: string) => s === 'manager_approved' ? 'Approved' : s === 'draft' ? 'Draft' : s === 'submitted' ? 'Submitted' : s === 'rejected' ? 'Rejected' : s === 'paid' ? 'Paid' : s;
@@ -202,8 +225,8 @@ const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditi
               <TableHead className="text-right text-[11px] px-2 w-[62px]">Amt</TableHead>
               <TableHead className="text-center text-[11px] px-1 w-[58px]">Status</TableHead>
               {showMore && <TableHead className="text-[11px] px-2">Details</TableHead>}
-              {showMore && <TableHead className="text-center text-[11px] px-1 w-[30px]">Bill</TableHead>}
-              {showMore && <TableHead className="text-center text-[11px] px-1 w-[56px]"></TableHead>}
+              <TableHead className="text-center text-[11px] px-1 w-[30px]">Bill</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[56px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -218,21 +241,47 @@ const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditi
                   <Badge variant={statusVariant(item.status)} className="text-[8px] px-1 py-0">{statusLabel(item.status)}</Badge>
                 </TableCell>
                 {showMore && <TableCell className="text-[11px] py-1.5 px-2 truncate">{item.details || '-'}</TableCell>}
-                {showMore && (
-                  <TableCell className="text-center py-1.5 px-1">
-                    {item.bill_attached ? <span className="text-green-600 text-[11px]">✓</span> : <span className="text-destructive text-[11px]">✗</span>}
-                  </TableCell>
-                )}
-                {showMore && (
-                  <TableCell className="text-center py-1.5 px-1">
-                    {(item.status === 'draft' || item.status === 'submitted') && (
-                      <div className="flex items-center justify-center gap-0">
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0"><Pencil className="h-2.5 w-2.5" /></Button>
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive"><Trash2 className="h-2.5 w-2.5" /></Button>
-                      </div>
-                    )}
-                  </TableCell>
-                )}
+                <TableCell className="text-center py-1.5 px-1">
+                  {item.bill_attached ? (
+                    item.bill_url ? (
+                      <BillLink billUrl={item.bill_url} />
+                    ) : (
+                      <span className="text-green-600 text-[11px]">✓</span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground text-[11px]">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-center py-1.5 px-1">
+                  {(item.status === 'draft' || item.status === 'submitted') && (
+                    <div className="flex items-center justify-center gap-0">
+                      <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit?.(item)}>
+                        <Pencil className="h-2.5 w-2.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive">
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this {item.expense_type} expense of ₹{item.value}?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDelete?.(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
             <TableRow className="border-t-2 bg-muted/30">
@@ -241,8 +290,8 @@ const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditi
               <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalAdditional.toLocaleString()}</TableCell>
               <TableCell></TableCell>
               {showMore && <TableCell></TableCell>}
-              {showMore && <TableCell></TableCell>}
-              {showMore && <TableCell></TableCell>}
+              <TableCell></TableCell>
+              <TableCell></TableCell>
             </TableRow>
           </TableBody>
         </Table>
@@ -581,18 +630,20 @@ const BeatAllowanceManagement = () => {
 
       const { data: expensesData, error } = await (supabase as any)
         .from('additional_expenses')
-        .select('expense_date, category, custom_category, description, amount, bill_url, status')
+        .select('id, expense_date, category, custom_category, description, amount, bill_url, status')
         .in('user_id', effectiveUserIds)
         .order('expense_date', { ascending: true });
 
       if (error) throw error;
 
       const additionalExpenses: AdditionalExpenseData[] = expensesData?.map((item: any) => ({
+        id: item.id,
         date: item.expense_date,
         expense_type: item.category === 'Other' ? item.custom_category : item.category,
         details: item.description || '',
         value: item.amount,
         bill_attached: !!item.bill_url,
+        bill_url: item.bill_url,
         status: item.status || 'draft'
       })) || [];
 
@@ -668,6 +719,26 @@ const BeatAllowanceManagement = () => {
       });
       return;
     }
+    setIsAdditionalExpensesOpen(true);
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('additional_expenses')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      toast({ title: "Deleted", description: "Expense deleted successfully" });
+      fetchAdditionalExpenseData();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast({ title: "Error", description: "Failed to delete expense", variant: "destructive" });
+    }
+  };
+
+  const handleEditExpense = (item: AdditionalExpenseData) => {
+    // Open the additional expenses dialog - the AdditionalExpenses component loads existing expenses for the date
     setIsAdditionalExpensesOpen(true);
   };
 
@@ -864,7 +935,12 @@ const BeatAllowanceManagement = () => {
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-2 mt-3">
-                <AdditionalCardList items={filteredAdditionalExpenses} totalAdditional={totalAdditionalExpenses} />
+                <AdditionalCardList 
+                  items={filteredAdditionalExpenses} 
+                  totalAdditional={totalAdditionalExpenses}
+                  onDelete={handleDeleteExpense}
+                  onEdit={handleEditExpense}
+                />
               </TabsContent>
             </Tabs>
           </div>

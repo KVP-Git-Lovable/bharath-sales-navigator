@@ -161,21 +161,6 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         orderValue={summary?.orderValue || 0}
       />
 
-      {/* Pending / Rejected info */}
-      {summary && (summary.additionalPending > 0 || summary.additionalRejected > 0) && (
-        <div className="flex items-center gap-2 flex-wrap text-xs px-1">
-          {summary.additionalPending > 0 && (
-            <span className="text-yellow-600 dark:text-yellow-400">
-              ⏳ Pending: ₹{summary.additionalPending.toLocaleString('en-IN')}
-            </span>
-          )}
-          {summary.additionalRejected > 0 && (
-            <span className="text-destructive">
-              ✕ Rejected: ₹{summary.additionalRejected.toLocaleString('en-IN')}
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Detailed Daily View (old Expense Details) */}
       <BeatAllowanceManagement />
