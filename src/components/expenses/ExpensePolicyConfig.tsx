@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Loader2, Car, Utensils, Receipt, Shield } from 'lucide-react';
+import { Save, Loader2, Car, Utensils, Receipt, Shield, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,11 +28,15 @@ const DEFAULT_CATEGORIES = ['food', 'travel', 'accommodation', 'communication', 
 const ExpensePolicyConfig = () => {
   const { toast } = useToast();
   const [config, setConfig] = useState<ExpenseConfig | null>(null);
+  const [approvalMode, setApprovalMode] = useState<'auto' | 'manager' | 'multi_level'>('manager');
+  const [maxLevels, setMaxLevels] = useState(1);
+  const [approvalConfigId, setApprovalConfigId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchConfig();
+    fetchApprovalConfig();
   }, []);
 
   const fetchConfig = async () => {
@@ -65,6 +69,25 @@ const ExpensePolicyConfig = () => {
     }
   };
 
+  const fetchApprovalConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('approval_config')
+        .select('*')
+        .eq('entity_type', 'expense')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setApprovalConfigId(data.id);
+        setApprovalMode(((data as any).approval_mode as 'auto' | 'manager' | 'multi_level') || 'manager');
+        setMaxLevels(data.max_levels || 1);
+      }
+    } catch (error) {
+      console.error('Error fetching approval config:', error);
+    }
+  };
+
   const handleSave = async () => {
     if (!config) return;
     try {
@@ -86,6 +109,19 @@ const ExpensePolicyConfig = () => {
         .eq('id', config.id);
 
       if (error) throw error;
+
+      // Save approval config
+      if (approvalConfigId) {
+        const { error: acError } = await supabase
+          .from('approval_config')
+          .update({
+            approval_mode: approvalMode,
+            max_levels: approvalMode === 'multi_level' ? maxLevels : 1,
+          } as any)
+          .eq('id', approvalConfigId);
+        if (acError) throw acError;
+      }
+
       toast({ title: "Success", description: "Expense policy saved successfully" });
     } catch (error) {
       console.error('Error saving config:', error);
@@ -293,6 +329,57 @@ const ExpensePolicyConfig = () => {
             rows={3}
             className="text-sm"
           />
+        </CardContent>
+      </Card>
+
+      {/* Approval Policy */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-indigo-600" />
+            Expense Approval Policy
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Approval Mode</Label>
+              <Select
+                value={approvalMode}
+                onValueChange={(value: 'auto' | 'manager' | 'multi_level') => setApprovalMode(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-Approve</SelectItem>
+                  <SelectItem value="manager">Manager Approval</SelectItem>
+                  <SelectItem value="multi_level">Multi-Level Approval</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {approvalMode === 'auto' && 'Expenses are auto-approved on submission — no manager action needed'}
+                {approvalMode === 'manager' && 'Direct manager must approve each expense submission'}
+                {approvalMode === 'multi_level' && 'Expenses go through multiple approval levels in the reporting chain'}
+              </p>
+            </div>
+
+            {approvalMode === 'multi_level' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Max Approval Levels</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={maxLevels}
+                  onChange={(e) => setMaxLevels(Math.min(5, Math.max(1, Number(e.target.value))))}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Number of managers in the chain who must approve (1-5)
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

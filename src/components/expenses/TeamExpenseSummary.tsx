@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
 import { useAuth } from '@/hooks/useAuth';
+import { useMyPendingSteps, useProcessApprovalStep } from '@/hooks/useApprovalEngine';
 import WeeklyBreakdown from './WeeklyBreakdown';
 import DailyBreakdown from './DailyBreakdown';
 import MonthNavigator from './MonthNavigator';
@@ -140,12 +141,16 @@ const ExpenseDetailDialog: React.FC<{
 
 const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
   const { user } = useAuth();
-  const { subordinateIds, subordinates } = useSubordinates();
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const { subordinates } = useSubordinates();
+  const { data: pendingSteps, isLoading: stepsLoading } = useMyPendingSteps();
+  const { processStep } = useProcessApprovalStep();
+  const [pendingExpenses, setPendingExpenses] = useState<ExpenseRecord[]>([]);
+  const [completedExpenses, setCompletedExpenses] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
+  const [selectedApprovalRequestId, setSelectedApprovalRequestId] = useState<string | null>(null);
   const [detailExpense, setDetailExpense] = useState<ExpenseRecord | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -155,38 +160,78 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
   const startStr = format(start, 'yyyy-MM-dd');
   const endStr = format(end, 'yyyy-MM-dd');
 
+  // Filter expense pending steps
+  const expensePendingSteps = useMemo(
+    () => (pendingSteps || []).filter(s => s.entityType === 'expense'),
+    [pendingSteps]
+  );
+
   const fetchExpenses = async () => {
-    if (!user?.id || subordinateIds.length === 0) { setLoading(false); return; }
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from('additional_expenses')
-        .select('*')
-        .in('user_id', subordinateIds)
-        .gte('expense_date', startStr)
-        .lte('expense_date', endStr)
-        .in('status', ['submitted', 'manager_approved', 'rejected'])
-        .order('expense_date', { ascending: false });
+      // Fetch pending expenses from approval engine
+      let pendingData: any[] = [];
+      if (expensePendingSteps.length > 0) {
+        const entityIds = expensePendingSteps.map(s => s.entityId);
+        const { data } = await (supabase as any)
+          .from('additional_expenses')
+          .select('*')
+          .in('id', entityIds)
+          .gte('expense_date', startStr)
+          .lte('expense_date', endStr)
+          .order('expense_date', { ascending: false });
+        pendingData = data || [];
+      }
 
-      if (error) throw error;
+      // Fetch completed expenses (where I was approver, from audit log)
+      const { data: auditData } = await supabase
+        .from('approval_audit_log')
+        .select('entity_id')
+        .eq('entity_type', 'expense')
+        .eq('performed_by', user.id)
+        .in('action', ['approved', 'rejected']);
 
-      // Fetch approver names for processed expenses
-      const approverIds = [...new Set((data || []).filter((e: any) => e.approved_by).map((e: any) => e.approved_by))];
+      const completedEntityIds = [...new Set((auditData || []).map((a: any) => a.entity_id))];
+      let completedData: any[] = [];
+      if (completedEntityIds.length > 0) {
+        const { data } = await (supabase as any)
+          .from('additional_expenses')
+          .select('*')
+          .in('id', completedEntityIds)
+          .gte('expense_date', startStr)
+          .lte('expense_date', endStr)
+          .in('status', ['manager_approved', 'rejected'])
+          .order('expense_date', { ascending: false });
+        completedData = data || [];
+      }
+
+      // Fetch approver names for completed
+      const approverIds = [...new Set(completedData.filter((e: any) => e.approved_by).map((e: any) => e.approved_by))];
       let approverMap = new Map<string, string>();
       if (approverIds.length > 0) {
         const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', approverIds);
         profiles?.forEach((p: any) => approverMap.set(p.id, p.full_name));
       }
 
-      const mapped = (data || []).map((exp: any) => {
-        const sub = subordinates.find(s => s.subordinate_user_id === exp.user_id);
-        return {
-          ...exp,
-          employee_name: sub?.full_name || 'Unknown',
-          approver_name: exp.approved_by ? approverMap.get(exp.approved_by) || 'Unknown' : null,
-        };
-      });
-      setExpenses(mapped);
+      // Fetch employee names
+      const allUserIds = [...new Set([...pendingData, ...completedData].map((e: any) => e.user_id))];
+      let nameMap = new Map<string, string>();
+      if (allUserIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', allUserIds);
+        profiles?.forEach((p: any) => nameMap.set(p.id, p.full_name));
+      }
+
+      setPendingExpenses(pendingData.map((exp: any) => ({
+        ...exp,
+        employee_name: nameMap.get(exp.user_id) || 'Unknown',
+      })));
+
+      setCompletedExpenses(completedData.map((exp: any) => ({
+        ...exp,
+        employee_name: nameMap.get(exp.user_id) || 'Unknown',
+        approver_name: exp.approved_by ? approverMap.get(exp.approved_by) || 'Unknown' : null,
+      })));
     } catch (error) {
       console.error('Error fetching expenses:', error);
       toast.error('Failed to fetch expenses');
@@ -196,42 +241,35 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
   };
 
   useEffect(() => {
-    if (subordinateIds.length > 0) fetchExpenses();
-  }, [subordinateIds, yearMonth]);
+    if (!stepsLoading) fetchExpenses();
+  }, [stepsLoading, expensePendingSteps.length, yearMonth]);
 
   const handleApprove = async (expenseId: string) => {
-    if (!user?.id) return;
+    const step = expensePendingSteps.find(s => s.entityId === expenseId);
+    if (!step) { toast.error('No approval step found'); return; }
     setActionLoading(expenseId);
     try {
-      const { error } = await (supabase as any)
-        .from('additional_expenses')
-        .update({ status: 'manager_approved', approved_by: user.id, approved_at: new Date().toISOString() })
-        .eq('id', expenseId).eq('status', 'submitted');
-      if (error) throw error;
-      toast.success('Expense approved');
+      await processStep(step.approvalRequestId, 'approved');
       setDetailOpen(false);
       fetchExpenses();
-    } catch { toast.error('Failed to approve'); }
+    } catch (err: any) { toast.error(err.message || 'Failed to approve'); }
     finally { setActionLoading(null); }
   };
 
   const handleReject = async (reason: string) => {
-    if (!user?.id || !selectedExpenseId) return;
+    if (!selectedExpenseId) return;
+    const step = expensePendingSteps.find(s => s.entityId === selectedExpenseId);
+    if (!step) { toast.error('No approval step found'); return; }
     try {
-      const { error } = await (supabase as any)
-        .from('additional_expenses')
-        .update({ status: 'rejected', approved_by: user.id, approved_at: new Date().toISOString(), rejection_reason: reason })
-        .eq('id', selectedExpenseId).eq('status', 'submitted');
-      if (error) throw error;
-      toast.success('Expense rejected');
+      await processStep(step.approvalRequestId, 'rejected', reason);
       setSelectedExpenseId(null);
       setDetailOpen(false);
       fetchExpenses();
-    } catch { toast.error('Failed to reject'); }
+    } catch (err: any) { toast.error(err.message || 'Failed to reject'); }
   };
 
-  const pending = expenses.filter(e => e.status === 'submitted');
-  const processed = expenses.filter(e => e.status !== 'submitted');
+  const pending = pendingExpenses;
+  const processed = completedExpenses;
 
   if (loading) {
     return (
@@ -241,7 +279,7 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
     );
   }
 
-  if (expenses.length === 0) {
+  if (pendingExpenses.length === 0 && completedExpenses.length === 0) {
     return <p className="text-sm text-muted-foreground text-center py-6">No expenses found for this month</p>;
   }
 
