@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, CalendarIcon, ExternalLink, Download, Car, Utensils, Receipt, BarChart3 } from 'lucide-react';
+import { Plus, CalendarIcon, ExternalLink, Download, Car, Utensils, Receipt, BarChart3, Send } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subWeeks, subMonths, subQuarters, subDays } from 'date-fns';
@@ -48,6 +50,7 @@ interface AdditionalExpenseData {
   details: string;
   value: number;
   bill_attached: boolean;
+  status: string;
 }
 
 type FilterType = 'today' | 'yesterday' | 'current_week' | 'last_week' | 'current_month' | 'last_month' | 'current_quarter' | 'previous_quarter' | 'custom';
@@ -71,6 +74,7 @@ const BeatAllowanceManagement = () => {
   const [additionalExpenseData, setAdditionalExpenseData] = useState<AdditionalExpenseData[]>([]);
   const [activeTab, setActiveTab] = useState<'expenses' | 'da' | 'additional'>('expenses');
   const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set());
+  const [submittingExpenses, setSubmittingExpenses] = useState(false);
   const { toast } = useToast();
   
   // Track current fetch version to ignore stale responses
@@ -378,9 +382,9 @@ const BeatAllowanceManagement = () => {
     try {
       if (!user?.id || effectiveUserIds.length === 0) return;
 
-      const { data: expensesData, error } = await supabase
+      const { data: expensesData, error } = await (supabase as any)
         .from('additional_expenses')
-        .select('expense_date, category, custom_category, description, amount, bill_url')
+        .select('expense_date, category, custom_category, description, amount, bill_url, status')
         .in('user_id', effectiveUserIds)
         .order('expense_date', { ascending: true });
 
@@ -391,7 +395,8 @@ const BeatAllowanceManagement = () => {
         expense_type: item.category === 'Other' ? item.custom_category : item.category,
         details: item.description || '',
         value: item.amount,
-        bill_attached: !!item.bill_url
+        bill_attached: !!item.bill_url,
+        status: item.status || 'draft'
       })) || [];
 
       if (isMountedRef.current) {
@@ -467,6 +472,30 @@ const BeatAllowanceManagement = () => {
       return;
     }
     setIsAdditionalExpensesOpen(true);
+  };
+
+  const handleSubmitExpenses = async () => {
+    if (!user?.id) return;
+    setSubmittingExpenses(true);
+    try {
+      const { start, end } = getDateRange();
+      const { error } = await (supabase as any)
+        .from('additional_expenses')
+        .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('status', 'draft')
+        .gte('expense_date', format(start, 'yyyy-MM-dd'))
+        .lte('expense_date', format(end, 'yyyy-MM-dd'));
+
+      if (error) throw error;
+      toast({ title: "Submitted", description: "Expenses submitted for approval" });
+      fetchAdditionalExpenseData();
+    } catch (error) {
+      console.error('Error submitting expenses:', error);
+      toast({ title: "Error", description: "Failed to submit expenses", variant: "destructive" });
+    } finally {
+      setSubmittingExpenses(false);
+    }
   };
 
   const filterByDate = (dateString: string) => {
@@ -895,6 +924,31 @@ const BeatAllowanceManagement = () => {
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-4">
+                {/* Submit Button */}
+                {filteredAdditionalExpenses.some(e => e.status === 'draft') && (
+                  <div className="flex justify-end">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" className="flex items-center gap-1.5 text-xs" disabled={submittingExpenses}>
+                          <Send className="h-3.5 w-3.5" />
+                          Submit Expenses
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Submit Expenses for Approval?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            All draft expenses in the selected date range will be submitted. You won't be able to edit them after submission.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleSubmitExpenses}>Submit</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -904,12 +958,13 @@ const BeatAllowanceManagement = () => {
                         <TableHead className="text-xs sm:text-sm">Details</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Add on expense</TableHead>
                         <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Bill</TableHead>
+                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredAdditionalExpenses.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
+                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
                             No additional expenses found for the selected criteria
                           </TableCell>
                         </TableRow>
@@ -930,6 +985,22 @@ const BeatAllowanceManagement = () => {
                                   <span className="text-red-600 text-sm">✗</span>
                                 )}
                               </TableCell>
+                              <TableCell className="text-center">
+                                <Badge 
+                                  variant={
+                                    item.status === 'manager_approved' ? 'default' : 
+                                    item.status === 'rejected' ? 'destructive' : 
+                                    item.status === 'submitted' ? 'outline' : 'secondary'
+                                  }
+                                  className="text-[10px] px-1.5 py-0"
+                                >
+                                  {item.status === 'manager_approved' ? 'Approved' : 
+                                   item.status === 'draft' ? 'Draft' :
+                                   item.status === 'submitted' ? 'Submitted' :
+                                   item.status === 'rejected' ? 'Rejected' :
+                                   item.status === 'paid' ? 'Paid' : item.status}
+                                </Badge>
+                              </TableCell>
                             </TableRow>
                           ))}
                           {/* Total Row */}
@@ -940,6 +1011,7 @@ const BeatAllowanceManagement = () => {
                             <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
                               ₹{totalAdditionalExpenses.toLocaleString()}
                             </TableCell>
+                            <TableCell></TableCell>
                             <TableCell></TableCell>
                           </TableRow>
                         </>

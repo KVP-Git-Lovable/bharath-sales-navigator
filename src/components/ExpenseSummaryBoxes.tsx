@@ -95,11 +95,12 @@ const ExpenseSummaryBoxes = () => {
         .select('*')
         .eq('user_id', user.data.user.id);
 
-      // Fetch additional expenses
-      const { data: expensesData } = await supabase
+      // Fetch additional expenses - only approved ones
+      const { data: expensesData } = await (supabase as any)
         .from('additional_expenses')
         .select('amount, expense_date')
         .eq('user_id', user.data.user.id)
+        .in('status', ['manager_approved', 'paid'])
         .gte('expense_date', format(startDate, 'yyyy-MM-dd'))
         .lte('expense_date', format(endDate, 'yyyy-MM-dd'));
 

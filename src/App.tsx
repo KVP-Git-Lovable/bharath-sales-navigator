@@ -101,6 +101,7 @@ import RetailManagement from "./pages/RetailManagement";
 import VanSalesManagement from "./pages/VanSalesManagement";
 import AdminExpenseManagement from "./pages/AdminExpenseManagement";
 import MyExpenses from "./pages/MyExpenses";
+import ExpenseApprovals from "./pages/ExpenseApprovals";
 import UserProfile from "./pages/UserProfile";
 import CompleteProfile from "./pages/CompleteProfile";
 import GamificationAdmin from "./pages/GamificationAdmin";
@@ -409,6 +410,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/add-records" element={<ProtectedRoute><AddRecords /></ProtectedRoute>} />
         <Route path="/add-beat" element={<ProtectedRoute><AddBeat /></ProtectedRoute>} />
         <Route path="/expenses" element={<ProtectedRoute><MyExpenses /></ProtectedRoute>} />
+        <Route path="/expenses/approvals" element={<ProtectedRoute><ExpenseApprovals /></ProtectedRoute>} />
         <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="/game-policy" element={<ProtectedRoute><GamePolicy /></ProtectedRoute>} />
         <Route path="/activities-info" element={<ProtectedRoute><ActivitiesInfo /></ProtectedRoute>} />
