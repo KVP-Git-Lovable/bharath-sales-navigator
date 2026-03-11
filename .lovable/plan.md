@@ -1,25 +1,39 @@
 
 
-## Pricing Page Updates
+# Fix: KG Display and ₹ Symbol in PDF Report
 
-**File:** `src/pages/website/PricingPage.tsx` (lines 33-88)
+## Two Bugs Found
 
-### Starter Plan (lines 33-43)
-- Remove: `"500 retailers/month"` and `"10,000 visits/month"`
-- Add: `"Storage space — 5 GB"`
-- Rename: `"AI-powered insights — 2,500 AI requests/month"` to `"AI-powered insights — 2,500 AI credits/month"`
+### Bug 1: KG Showing as 0.0
+The `fmtKG` function (line 1541) divides by 1000, treating the input as grams. But `total_kg` is already in kilograms (calculated at line 448). So 8.5 KG / 1000 = 0.0 KG.
 
-### Professional Plan (lines 52-64)
-- Change: `"15,000 orders/month"` to `"10,000 orders/month"`
-- Remove: `"1,500 retailers/month"` and `"30,000 visits/month"`
-- Add: `"Storage space — 10 GB"`
-- Rename: `"AI-powered insights — 5,000 AI requests/month"` to `"AI-powered insights — 5,000 AI credits/month"`
+**Fix**: Change `fmtKG` to not divide by 1000, or replace usages with direct formatting: `u.total_kg.toFixed(1) + ' KG'`
 
-### Enterprise Plan (lines 74-86)
-- Change: `"40,000 orders/month"` to `"20,000 orders/month"`
-- Remove: `"4,000 retailers/month"` and `"80,000 visits/month"`
-- Add: `"Storage space — 15 GB"`
-- Rename: `"AI-powered insights — 10,000 AI requests/month"` to `"AI-powered insights — 10,000 AI credits/month"`
+### Bug 2: ₹ Symbol Not Rendering in Tables
+`jspdf-autotable` does not automatically inherit the document font. Each `autoTable` call needs `font: 'NotoSans'` in its `styles` config. Currently none of the 4+ `autoTable` calls specify the font, so they fall back to Helvetica which lacks ₹.
 
-All changes are in a single file, updating the `plans` array data only.
+Additionally, the GitHub raw URL (`raw.githubusercontent.com/google/fonts/main/ofl/notosans/static/...`) may not exist — Google Fonts repo restructured and static TTFs may be at a different path. We should bundle the fonts locally in `public/fonts/` for reliability, or use a verified CDN URL.
+
+**Recommended approach**: Use `fontsource` CDN which hosts verified static TTFs:
+```
+Regular: https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/latin-400-normal.ttf  
+Bold: https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/latin-700-normal.ttf
+```
+
+## Changes — `src/components/analytics/SupervisorReport.tsx` only
+
+1. **Line 1541** — Fix `fmtKG`: change from `(grams / 1000).toFixed(1) + ' KG'` to `grams.toFixed(1) + ' KG'` (since input is already KG)
+
+2. **Lines 1518-1519** — Update font URLs to verified CDN:
+   ```
+   https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/latin-400-normal.ttf
+   https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/latin-700-normal.ttf
+   ```
+
+3. **All `autoTable` calls** (~4 occurrences) — Add `font: 'NotoSans'` to the `styles` object so tables use the registered font:
+   ```ts
+   styles: { font: 'NotoSans', fontSize: 8, ... }
+   ```
+
+No other files or modules are touched.
 
