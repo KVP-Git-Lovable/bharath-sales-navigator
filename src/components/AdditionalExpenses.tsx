@@ -17,6 +17,7 @@ interface AdditionalExpensesProps {
   beatId?: string;
   beatName?: string;
   expenseDate?: string;
+  editExpenseId?: string;
   onExpensesUpdated?: () => void;
 }
 
@@ -52,6 +53,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   beatId,
   beatName,
   expenseDate,
+  editExpenseId,
   onExpensesUpdated
 }) => {
   const { user, userProfile } = useAuth();
@@ -77,13 +79,44 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
-    fetchSavedExpenses();
-  }, [user]);
+    if (editExpenseId && user) {
+      loadExpenseForEditing(editExpenseId);
+    } else {
+      fetchSavedExpenses();
+    }
+  }, [user, editExpenseId]);
 
   useEffect(() => {
     const total = [...expenses, ...savedExpenses].reduce((sum, expense) => sum + expense.amount, 0);
     setTotalAmount(total);
   }, [expenses, savedExpenses]);
+
+  const loadExpenseForEditing = async (id: string) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('additional_expenses')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      if (data) {
+        setExpenses([{
+          id: data.id,
+          category: data.category,
+          custom_category: data.custom_category || '',
+          amount: data.amount,
+          description: data.description || '',
+          bill_url: data.bill_url || undefined,
+          expense_date: data.expense_date,
+          status: data.status,
+        }]);
+        setSavedExpenses([]);
+      }
+    } catch (error) {
+      console.error('Error loading expense for edit:', error);
+      toast.error('Failed to load expense');
+    }
+  };
 
   const fetchSavedExpenses = async () => {
     if (!user) return;
@@ -203,19 +236,19 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
           }
         }
       } else {
-        const expensesToSave = [];
-
         for (const expense of validExpenses) {
-          let billUrl = null;
+          let billUrl = expense.bill_url || null;
           
           if (expense.bill_file) {
-            billUrl = await uploadFile(expense.bill_file, user.id);
-            if (!billUrl) {
+            const uploaded = await uploadFile(expense.bill_file, user.id);
+            if (uploaded) {
+              billUrl = uploaded;
+            } else {
               toast.error('Failed to upload bill attachment, expense will be saved without it');
             }
           }
 
-          expensesToSave.push({
+          const expenseData = {
             user_id: user.id,
             category: expense.category,
             custom_category: expense.category === 'Other' ? expense.custom_category : null,
@@ -225,14 +258,23 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
             expense_date: expense.expense_date,
             status: 'submitted',
             submitted_at: new Date().toISOString()
-          });
+          };
+
+          if (expense.id) {
+            // Update existing expense
+            const { error } = await (supabase as any)
+              .from('additional_expenses')
+              .update(expenseData)
+              .eq('id', expense.id);
+            if (error) throw error;
+          } else {
+            // Insert new expense
+            const { error } = await (supabase as any)
+              .from('additional_expenses')
+              .insert(expenseData);
+            if (error) throw error;
+          }
         }
-
-        const { error } = await (supabase as any)
-          .from('additional_expenses')
-          .insert(expensesToSave);
-
-        if (error) throw error;
       }
 
       toast.success('Expenses saved & submitted for approval!');
@@ -484,7 +526,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                   Total: ₹{expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}
                 </div>
                 <Button onClick={saveExpenses} disabled={loading} size="sm" className="h-8 text-xs">
-                  {loading ? 'Saving...' : 'Save & Submit'}
+                  {loading ? 'Saving...' : editExpenseId ? 'Update Expense' : 'Save & Submit'}
                 </Button>
               </div>
             )}

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, CalendarIcon, ExternalLink, Download, Car, Utensils, Receipt, BarChart3, Send, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
+import { Plus, CalendarIcon, ExternalLink, Download, Car, Utensils, Receipt, BarChart3, Send, ChevronDown, ChevronUp, Pencil, Trash2, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -198,11 +198,21 @@ const AdditionalCardList: React.FC<{
   onDelete?: (id: string) => void;
   onEdit?: (item: AdditionalExpenseData) => void;
 }> = ({ items, totalAdditional, onDelete, onEdit }) => {
-  const [showMore, setShowMore] = useState(false);
+  const [viewItem, setViewItem] = useState<AdditionalExpenseData | null>(null);
+  const [signedBillUrl, setSignedBillUrl] = useState<string | null>(null);
 
-  const statusLabel = (s: string) => s === 'manager_approved' ? 'Approved' : s === 'draft' ? 'Draft' : s === 'submitted' ? 'Submitted' : s === 'rejected' ? 'Rejected' : s === 'paid' ? 'Paid' : s;
+  const statusLabel = (s: string) => s === 'manager_approved' ? 'Approved' : s === 'draft' ? 'Draft' : s === 'submitted' ? 'Pending' : s === 'rejected' ? 'Rejected' : s === 'paid' ? 'Paid' : s;
   const statusVariant = (s: string): 'default' | 'destructive' | 'outline' | 'secondary' =>
     s === 'manager_approved' ? 'default' : s === 'rejected' ? 'destructive' : s === 'submitted' ? 'outline' : 'secondary';
+
+  const handleViewDetail = async (item: AdditionalExpenseData) => {
+    setViewItem(item);
+    setSignedBillUrl(null);
+    if (item.bill_url) {
+      const { data } = await supabase.storage.from('expense-bills').createSignedUrl(item.bill_url, 300);
+      if (data?.signedUrl) setSignedBillUrl(data.signedUrl);
+    }
+  };
 
   if (items.length === 0) {
     return <p className="text-xs text-muted-foreground text-center py-6">No additional expenses found</p>;
@@ -210,12 +220,6 @@ const AdditionalCardList: React.FC<{
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-end">
-        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowMore(v => !v)}>
-          {showMore ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          {showMore ? 'Less' : 'More'}
-        </Button>
-      </div>
       <div className="rounded-md border overflow-hidden">
         <Table className="table-fixed w-full">
           <TableHeader>
@@ -224,9 +228,7 @@ const AdditionalCardList: React.FC<{
               <TableHead className="text-[11px] px-2">Type</TableHead>
               <TableHead className="text-right text-[11px] px-2 w-[62px]">Amt</TableHead>
               <TableHead className="text-center text-[11px] px-1 w-[58px]">Status</TableHead>
-              {showMore && <TableHead className="text-[11px] px-2">Details</TableHead>}
-              <TableHead className="text-center text-[11px] px-1 w-[30px]">Bill</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[56px]"></TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[72px]">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -240,47 +242,40 @@ const AdditionalCardList: React.FC<{
                 <TableCell className="text-center py-1.5 px-1">
                   <Badge variant={statusVariant(item.status)} className="text-[8px] px-1 py-0">{statusLabel(item.status)}</Badge>
                 </TableCell>
-                {showMore && <TableCell className="text-[11px] py-1.5 px-2 truncate">{item.details || '-'}</TableCell>}
                 <TableCell className="text-center py-1.5 px-1">
-                  {item.bill_attached ? (
-                    item.bill_url ? (
-                      <BillLink billUrl={item.bill_url} />
-                    ) : (
-                      <span className="text-green-600 text-[11px]">✓</span>
-                    )
-                  ) : (
-                    <span className="text-muted-foreground text-[11px]">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center py-1.5 px-1">
-                  {(item.status === 'draft' || item.status === 'submitted') && (
-                    <div className="flex items-center justify-center gap-0">
-                      <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit?.(item)}>
-                        <Pencil className="h-2.5 w-2.5" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive">
-                            <Trash2 className="h-2.5 w-2.5" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this {item.expense_type} expense of ₹{item.value}?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onDelete?.(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-center gap-0">
+                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleViewDetail(item)} title="View details">
+                      <Eye className="h-2.5 w-2.5" />
+                    </Button>
+                    {(item.status === 'draft' || item.status === 'submitted') && (
+                      <>
+                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit?.(item)} title="Edit">
+                          <Pencil className="h-2.5 w-2.5" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" title="Delete">
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this {item.expense_type} expense of ₹{item.value}?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onDelete?.(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -289,13 +284,53 @@ const AdditionalCardList: React.FC<{
               <TableCell></TableCell>
               <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalAdditional.toLocaleString()}</TableCell>
               <TableCell></TableCell>
-              {showMore && <TableCell></TableCell>}
-              <TableCell></TableCell>
               <TableCell></TableCell>
             </TableRow>
           </TableBody>
         </Table>
       </div>
+
+      {/* View Detail Dialog */}
+      <Dialog open={!!viewItem} onOpenChange={(open) => { if (!open) setViewItem(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Expense Details</DialogTitle>
+          </DialogHeader>
+          {viewItem && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div><span className="text-muted-foreground text-xs">Date</span><p className="font-medium">{new Date(viewItem.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p></div>
+                <div><span className="text-muted-foreground text-xs">Type</span><p className="font-medium">{viewItem.expense_type}</p></div>
+                <div><span className="text-muted-foreground text-xs">Amount</span><p className="font-medium">₹{viewItem.value.toLocaleString()}</p></div>
+                <div><span className="text-muted-foreground text-xs">Status</span><p><Badge variant={statusVariant(viewItem.status)} className="text-[9px] px-1.5 py-0">{statusLabel(viewItem.status)}</Badge></p></div>
+              </div>
+              {viewItem.details && (
+                <div><span className="text-muted-foreground text-xs">Details</span><p className="text-xs">{viewItem.details}</p></div>
+              )}
+              {viewItem.bill_url && (
+                <div>
+                  <span className="text-muted-foreground text-xs">Attachment</span>
+                  {signedBillUrl ? (
+                    <div className="mt-1 rounded-md border overflow-hidden">
+                      <img src={signedBillUrl} alt="Bill" className="w-full max-h-64 object-contain bg-muted" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <div className="p-2 border-t">
+                        <Button variant="outline" size="sm" className="w-full text-xs h-7" onClick={() => window.open(signedBillUrl, '_blank')}>
+                          <ExternalLink className="h-3 w-3 mr-1" /> Open Full Size
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Loading...</p>
+                  )}
+                </div>
+              )}
+              {!viewItem.bill_url && (
+                <div><span className="text-muted-foreground text-xs">Attachment</span><p className="text-xs text-muted-foreground">No bill attached</p></div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -315,6 +350,7 @@ const BeatAllowanceManagement = () => {
   const [filterType, setFilterType] = useState<FilterType>('current_week');
   const [loading, setLoading] = useState(true);
   const [isAdditionalExpensesOpen, setIsAdditionalExpensesOpen] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | undefined>();
   const [isProductivityReportOpen, setIsProductivityReportOpen] = useState(false);
   const [daRecords, setDARecords] = useState<DARecord[]>([]);
   const [additionalExpenseData, setAdditionalExpenseData] = useState<AdditionalExpenseData[]>([]);
@@ -738,7 +774,7 @@ const BeatAllowanceManagement = () => {
   };
 
   const handleEditExpense = (item: AdditionalExpenseData) => {
-    // Open the additional expenses dialog - the AdditionalExpenses component loads existing expenses for the date
+    setEditingExpenseId(item.id);
     setIsAdditionalExpensesOpen(true);
   };
 
@@ -948,16 +984,18 @@ const BeatAllowanceManagement = () => {
       </Card>
 
       {/* Additional Expenses Dialog */}
-      <Dialog open={isAdditionalExpensesOpen} onOpenChange={setIsAdditionalExpensesOpen}>
+      <Dialog open={isAdditionalExpensesOpen} onOpenChange={(open) => { setIsAdditionalExpensesOpen(open); if (!open) setEditingExpenseId(undefined); }}>
         <DialogContent className="max-w-[100vw] sm:max-w-[90vw] h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-0 sm:p-6 rounded-none sm:rounded-lg">
           <DialogHeader className="p-3 sm:p-0 pb-0">
-            <DialogTitle className="text-sm sm:text-lg">Additional Expenses</DialogTitle>
+            <DialogTitle className="text-sm sm:text-lg">{editingExpenseId ? 'Edit Expense' : 'Additional Expenses'}</DialogTitle>
           </DialogHeader>
           <AdditionalExpenses
+            editExpenseId={editingExpenseId}
             onExpensesUpdated={() => {
               fetchExpenseData();
               fetchAdditionalExpenseData();
               setIsAdditionalExpensesOpen(false);
+              setEditingExpenseId(undefined);
             }}
           />
         </DialogContent>
