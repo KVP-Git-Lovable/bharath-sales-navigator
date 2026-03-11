@@ -924,31 +924,7 @@ const BeatAllowanceManagement = () => {
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-4">
-                {/* Submit Button */}
-                {filteredAdditionalExpenses.some(e => e.status === 'draft') && (
-                  <div className="flex justify-end">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" className="flex items-center gap-1.5 text-xs" disabled={submittingExpenses}>
-                          <Send className="h-3.5 w-3.5" />
-                          Submit Expenses
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Submit Expenses for Approval?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            All draft expenses in the selected date range will be submitted. You won't be able to edit them after submission.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleSubmitExpenses}>Submit</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                )}
+      {/* Auto-submitted: no separate submit button needed */}
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
