@@ -28,7 +28,7 @@ export const SyncStatusIndicator = memo(() => {
   const [lastSyncStatus, setLastSyncStatus] = useState<'success' | 'error' | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const mountedRef = useRef(true);
-  const syncingDisplayRef = useRef<NodeJS.Timeout | null>(null);
+  const syncingDisplayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cache warming state
   const {
