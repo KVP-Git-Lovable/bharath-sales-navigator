@@ -526,7 +526,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                   Total: ₹{expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}
                 </div>
                 <Button onClick={saveExpenses} disabled={loading} size="sm" className="h-8 text-xs">
-                  {loading ? 'Saving...' : 'Save & Submit'}
+                  {loading ? 'Saving...' : editExpenseId ? 'Update Expense' : 'Save & Submit'}
                 </Button>
               </div>
             )}
