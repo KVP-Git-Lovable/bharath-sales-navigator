@@ -1,25 +1,24 @@
 
 
-## Pricing Page Updates
+# Fix: Use Full Static Noto Sans TTFs from GitHub
 
-**File:** `src/pages/website/PricingPage.tsx` (lines 33-88)
+## Why it's still broken
+The `fonts.gstatic.com` URLs serve **web-optimized subsets** of Noto Sans — these fonts may:
+1. Not include the ₹ (U+20B9) glyph at all (subset exclusion)
+2. Have simplified/malformed font tables (causing the "bad /BBox" error in Adobe)
 
-### Starter Plan (lines 33-43)
-- Remove: `"500 retailers/month"` and `"10,000 visits/month"`
-- Add: `"Storage space — 5 GB"`
-- Rename: `"AI-powered insights — 2,500 AI requests/month"` to `"AI-powered insights — 2,500 AI credits/month"`
+These URLs are designed for CSS `@font-face` use in browsers, not for embedding in PDFs via jsPDF.
 
-### Professional Plan (lines 52-64)
-- Change: `"15,000 orders/month"` to `"10,000 orders/month"`
-- Remove: `"1,500 retailers/month"` and `"30,000 visits/month"`
-- Add: `"Storage space — 10 GB"`
-- Rename: `"AI-powered insights — 5,000 AI requests/month"` to `"AI-powered insights — 5,000 AI credits/month"`
+## Fix
+Switch to the **full static TTF files** from Google's official fonts GitHub repository (`/static/` subdirectory), which contain all glyphs and proper font tables:
 
-### Enterprise Plan (lines 74-86)
-- Change: `"40,000 orders/month"` to `"20,000 orders/month"`
-- Remove: `"4,000 retailers/month"` and `"80,000 visits/month"`
-- Add: `"Storage space — 15 GB"`
-- Rename: `"AI-powered insights — 10,000 AI requests/month"` to `"AI-powered insights — 10,000 AI credits/month"`
+**File:** `src/components/analytics/SupervisorReport.tsx` — lines 1518-1519 only.
 
-All changes are in a single file, updating the `plans` array data only.
+Replace URLs with:
+```
+Regular: https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/static/NotoSans-Regular.ttf
+Bold:    https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/static/NotoSans-Bold.ttf
+```
+
+No other changes needed. Everything else (font registration, setFont calls, fmtCurrency) stays the same.
 
