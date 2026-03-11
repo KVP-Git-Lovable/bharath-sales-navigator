@@ -720,18 +720,6 @@ const BeatAllowanceManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Compact Inline Summary */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Badge variant="outline" className="gap-1 text-xs py-1 px-2 border-blue-300 text-blue-700 dark:text-blue-400">
-          <Car className="h-3 w-3" /> TA: ₹{totalTA.toLocaleString()}
-        </Badge>
-        <Badge variant="outline" className="gap-1 text-xs py-1 px-2 border-green-300 text-green-700 dark:text-green-400">
-          <Utensils className="h-3 w-3" /> DA: ₹{totalDA.toLocaleString()}
-        </Badge>
-        <Badge variant="outline" className="gap-1 text-xs py-1 px-2 border-purple-300 text-purple-700 dark:text-purple-400">
-          <Receipt className="h-3 w-3" /> Additional: ₹{totalAdditionalExpenses.toLocaleString()}
-        </Badge>
-      </div>
 
       {/* Main Content */}
       <Card>
