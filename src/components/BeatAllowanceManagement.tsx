@@ -228,7 +228,8 @@ const AdditionalCardList: React.FC<{
               <TableHead className="text-[11px] px-2">Type</TableHead>
               <TableHead className="text-right text-[11px] px-2 w-[62px]">Amt</TableHead>
               <TableHead className="text-center text-[11px] px-1 w-[58px]">Status</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[72px]">Action</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[40px]">Details</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[56px]">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
