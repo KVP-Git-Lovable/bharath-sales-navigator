@@ -611,69 +611,12 @@ const BeatAllowanceManagement = () => {
 
   return (
     <div className="space-y-3">
-      {/* Compact Filter Bar - Mobile Optimized */}
+      {/* Main Content */}
       <Card>
-        <CardContent className="py-2.5 px-3">
-          {/* Row 1: User selector + Date filter */}
-          <div className="flex items-center gap-2 flex-wrap">
-
-            {/* Custom Date Pickers - Inline */}
-            {filterType === 'custom' && (
-              <>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "h-8 w-[90px] justify-start text-left font-normal text-xs px-2",
-                        !dateRangeStart && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-1 h-3 w-3" />
-                      {dateRangeStart ? format(dateRangeStart, "MMM dd") : "Start"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-background" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateRangeStart}
-                      onSelect={setDateRangeStart}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "h-8 w-[90px] justify-start text-left font-normal text-xs px-2",
-                        !dateRangeEnd && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-1 h-3 w-3" />
-                      {dateRangeEnd ? format(dateRangeEnd, "MMM dd") : "End"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-background" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateRangeEnd}
-                      onSelect={setDateRangeEnd}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </>
-            )}
-
-            {/* Action Buttons - Right aligned */}
-            <div className="flex items-center gap-1.5 ml-auto">
+        <CardHeader className="pb-3 sm:pb-6 px-3 sm:px-6">
+          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 xs:gap-3">
+            <CardTitle className="text-lg sm:text-xl">Expense Details</CardTitle>
+            <div className="flex items-center gap-1.5">
               <Button 
                 onClick={() => setIsProductivityReportOpen(true)} 
                 variant="outline" 
@@ -692,26 +635,16 @@ const BeatAllowanceManagement = () => {
                 <Download className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">XLS</span>
               </Button>
+              <Button
+                onClick={handleAdditionalExpensesClick}
+                variant="default"
+                size="sm"
+                className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 h-auto"
+              >
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Additional </span>Expenses
+              </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-
-      {/* Main Content */}
-      <Card>
-        <CardHeader className="pb-3 sm:pb-6 px-3 sm:px-6">
-          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 xs:gap-3">
-            <CardTitle className="text-lg sm:text-xl">Expense Details</CardTitle>
-            <Button
-              onClick={handleAdditionalExpensesClick}
-              variant="default"
-              size="sm"
-              className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 h-auto"
-            >
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Additional </span>Expenses
-            </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">{getFilterLabel()}</p>
         </CardHeader>
