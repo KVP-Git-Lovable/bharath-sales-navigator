@@ -236,19 +236,19 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
           }
         }
       } else {
-        const expensesToSave = [];
-
         for (const expense of validExpenses) {
-          let billUrl = null;
+          let billUrl = expense.bill_url || null;
           
           if (expense.bill_file) {
-            billUrl = await uploadFile(expense.bill_file, user.id);
-            if (!billUrl) {
+            const uploaded = await uploadFile(expense.bill_file, user.id);
+            if (uploaded) {
+              billUrl = uploaded;
+            } else {
               toast.error('Failed to upload bill attachment, expense will be saved without it');
             }
           }
 
-          expensesToSave.push({
+          const expenseData = {
             user_id: user.id,
             category: expense.category,
             custom_category: expense.category === 'Other' ? expense.custom_category : null,
@@ -258,14 +258,23 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
             expense_date: expense.expense_date,
             status: 'submitted',
             submitted_at: new Date().toISOString()
-          });
+          };
+
+          if (expense.id) {
+            // Update existing expense
+            const { error } = await (supabase as any)
+              .from('additional_expenses')
+              .update(expenseData)
+              .eq('id', expense.id);
+            if (error) throw error;
+          } else {
+            // Insert new expense
+            const { error } = await (supabase as any)
+              .from('additional_expenses')
+              .insert(expenseData);
+            if (error) throw error;
+          }
         }
-
-        const { error } = await (supabase as any)
-          .from('additional_expenses')
-          .insert(expensesToSave);
-
-        if (error) throw error;
       }
 
       toast.success('Expenses saved & submitted for approval!');
