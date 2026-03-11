@@ -231,12 +231,14 @@ const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string 
                 {isLoading ? (
                   <p className="text-xs text-muted-foreground">Loading...</p>
                 ) : summary ? (
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
                     <span className="text-blue-600">TA: {fmt(summary.ta)}</span>
                     <span>·</span>
                     <span className="text-green-600">DA: {fmt(summary.da)}</span>
                     <span>·</span>
                     <span className="text-purple-600">Add: {fmt(summary.additionalApproved)}</span>
+                    <span>·</span>
+                    <span className="text-orange-600">Orders: {fmt(summary.orderValue)}</span>
                   </div>
                 ) : null}
               </div>
@@ -270,7 +272,7 @@ const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string 
 
 // Helper component to collect a single subordinate's summary into aggregation
 const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) => {
-  const [aggregated, setAggregated] = useState({ ta: 0, da: 0, additional: 0, total: 0, presentDays: 0 });
+  const [aggregated, setAggregated] = useState({ ta: 0, da: 0, additional: 0, total: 0, presentDays: 0, orderValue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -286,7 +288,7 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
 
       try {
         // Fetch attendance, config, beat_plans, beats, and additional for all subordinates at once
-        const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes] = await Promise.all([
+        const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
           supabase.from('attendance').select('user_id, date, status')
             .in('user_id', subordinateIds).gte('date', startStr).lte('date', endStr),
           supabase.from('expense_master_config').select('*').single(),
@@ -295,6 +297,9 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
           supabase.from('beats').select('beat_id, travel_allowance'),
           (supabase as any).from('additional_expenses').select('user_id, amount, status, expense_date')
             .in('user_id', subordinateIds).gte('expense_date', startStr).lte('expense_date', endStr),
+          supabase.from('orders').select('user_id, total_amount')
+            .in('user_id', subordinateIds).gte('order_date', startStr).lte('order_date', endStr)
+            .eq('status', 'confirmed'),
         ]);
 
         const config = configRes.data;
@@ -328,9 +333,12 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
           totalAdditional += userAdditional.reduce((s: number, e: any) => s + (e.amount || 0), 0);
         });
 
+        const totalOrderValue = (ordersRes.data || []).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+
         setAggregated({
           ta: totalTA, da: totalDA, additional: totalAdditional,
           total: totalTA + totalDA + totalAdditional, presentDays: totalPresent,
+          orderValue: totalOrderValue,
         });
       } catch (err) {
         console.error('Error aggregating team expenses:', err);
@@ -360,6 +368,7 @@ const TeamOverview: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
         loading={loading}
         onTotalClick={() => {}}
         isExpanded={false}
+        orderValue={aggregated.orderValue}
       />
 
       <div className="space-y-2">

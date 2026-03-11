@@ -158,6 +158,7 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         loading={isLoading}
         onTotalClick={onTotalClick}
         isExpanded={false}
+        orderValue={summary?.orderValue || 0}
       />
 
       {/* Pending / Rejected info */}
