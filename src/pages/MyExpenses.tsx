@@ -3,7 +3,7 @@ import { Layout } from '@/components/Layout';
 import { ModuleHelpButton } from '@/components/help/ModuleHelpButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, Users, User as UserIcon } from 'lucide-react';
+import { Users, User as UserIcon, CalendarDays, CalendarRange } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,15 +12,19 @@ import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
 import MonthNavigator from '@/components/expenses/MonthNavigator';
 import ExpenseSummaryCards from '@/components/expenses/ExpenseSummaryCards';
 import WeeklyBreakdown from '@/components/expenses/WeeklyBreakdown';
+import DailyBreakdown from '@/components/expenses/DailyBreakdown';
 import TeamExpenseSummary from '@/components/expenses/TeamExpenseSummary';
 import AdditionalExpenses from '@/components/AdditionalExpenses';
 import BeatAllowanceManagement from '@/components/BeatAllowanceManagement';
+
+type BreakdownView = 'weekly' | 'daily';
 
 const MyExpenses = () => {
   const { user } = useAuth();
   const { isManager } = useSubordinates();
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [breakdownView, setBreakdownView] = useState<BreakdownView>('weekly');
   const [isAdditionalOpen, setIsAdditionalOpen] = useState(false);
 
   const yearMonth = format(selectedMonth, 'yyyy-MM');
@@ -60,7 +64,9 @@ const MyExpenses = () => {
                   summary={summary}
                   isLoading={isLoading}
                   showBreakdown={showBreakdown}
+                  breakdownView={breakdownView}
                   onToggleBreakdown={() => setShowBreakdown(!showBreakdown)}
+                  onBreakdownViewChange={setBreakdownView}
                   onAddExpense={() => setIsAdditionalOpen(true)}
                 />
               </TabsContent>
@@ -75,7 +81,9 @@ const MyExpenses = () => {
                 summary={summary}
                 isLoading={isLoading}
                 showBreakdown={showBreakdown}
+                breakdownView={breakdownView}
                 onToggleBreakdown={() => setShowBreakdown(!showBreakdown)}
+                onBreakdownViewChange={setBreakdownView}
                 onAddExpense={() => setIsAdditionalOpen(true)}
               />
             </div>
@@ -97,12 +105,14 @@ interface MyExpenseContentProps {
   summary: ReturnType<typeof useMonthlyExpenseSummary>['data'];
   isLoading: boolean;
   showBreakdown: boolean;
+  breakdownView: BreakdownView;
   onToggleBreakdown: () => void;
+  onBreakdownViewChange: (view: BreakdownView) => void;
   onAddExpense: () => void;
 }
 
 const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
-  summary, isLoading, showBreakdown, onToggleBreakdown, onAddExpense
+  summary, isLoading, showBreakdown, breakdownView, onToggleBreakdown, onBreakdownViewChange, onAddExpense
 }) => {
   return (
     <>
@@ -134,11 +144,38 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         </div>
       )}
 
-      {/* Weekly Breakdown (expandable) */}
+      {/* Breakdown (expandable) with view toggle */}
       {showBreakdown && summary && (
-        <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
-      )}
+        <div className="space-y-2">
+          {/* View Toggle */}
+          <div className="flex items-center gap-1.5 px-1">
+            <Button
+              variant={breakdownView === 'weekly' ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 text-[11px] gap-1 px-2.5"
+              onClick={() => onBreakdownViewChange('weekly')}
+            >
+              <CalendarRange className="h-3 w-3" />
+              Weekly
+            </Button>
+            <Button
+              variant={breakdownView === 'daily' ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 text-[11px] gap-1 px-2.5"
+              onClick={() => onBreakdownViewChange('daily')}
+            >
+              <CalendarDays className="h-3 w-3" />
+              Daily
+            </Button>
+          </div>
 
+          {breakdownView === 'weekly' ? (
+            <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
+          ) : (
+            <DailyBreakdown days={summary.dailyBreakdown} />
+          )}
+        </div>
+      )}
 
       {/* Detailed Daily View (old Expense Details) */}
       <BeatAllowanceManagement />
