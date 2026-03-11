@@ -147,8 +147,6 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         </Button>
       </div>
 
-      {/* Detailed Daily View (old Expense Details) */}
-      <BeatAllowanceManagement />
     </>
   );
 };
