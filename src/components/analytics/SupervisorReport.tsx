@@ -1697,7 +1697,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           doc.setFillColor(...color);
           doc.rect(legendX, ly + 1, 8, 8, 'F');
           doc.setFontSize(7);
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSans', 'bold');
           doc.setTextColor(...COLORS.darkText);
           const nameShort = u.full_name.length > 14 ? u.full_name.substring(0, 12) + '…' : u.full_name;
           doc.text(`${nameShort} (${(u.total_order_value / totalRevenue * 100).toFixed(1)}%)`, legendX + 12, ly + 8);
