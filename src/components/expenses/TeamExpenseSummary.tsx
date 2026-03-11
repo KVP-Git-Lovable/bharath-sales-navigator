@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
 import { useAuth } from '@/hooks/useAuth';
+import { useMyPendingSteps, useProcessApprovalStep } from '@/hooks/useApprovalEngine';
 import WeeklyBreakdown from './WeeklyBreakdown';
 import DailyBreakdown from './DailyBreakdown';
 import MonthNavigator from './MonthNavigator';
