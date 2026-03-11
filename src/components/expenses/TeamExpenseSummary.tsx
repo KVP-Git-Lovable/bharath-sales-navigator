@@ -333,9 +333,12 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
           totalAdditional += userAdditional.reduce((s: number, e: any) => s + (e.amount || 0), 0);
         });
 
+        const totalOrderValue = (ordersRes.data || []).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+
         setAggregated({
           ta: totalTA, da: totalDA, additional: totalAdditional,
           total: totalTA + totalDA + totalAdditional, presentDays: totalPresent,
+          orderValue: totalOrderValue,
         });
       } catch (err) {
         console.error('Error aggregating team expenses:', err);
