@@ -244,10 +244,11 @@ const AdditionalCardList: React.FC<{
                   <Badge variant={statusVariant(item.status)} className="text-[8px] px-1 py-0">{statusLabel(item.status)}</Badge>
                 </TableCell>
                 <TableCell className="text-center py-1.5 px-1">
-                  <div className="flex items-center justify-center gap-0">
-                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleViewDetail(item)} title="View details">
-                      <Eye className="h-2.5 w-2.5" />
-                    </Button>
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleViewDetail(item)} title="View details">
+                    <Eye className="h-2.5 w-2.5" />
+                  </Button>
+                </TableCell>
+                <TableCell className="text-center py-1.5 px-1">
                     {(item.status === 'draft' || item.status === 'submitted') && (
                       <>
                         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit?.(item)} title="Edit">
