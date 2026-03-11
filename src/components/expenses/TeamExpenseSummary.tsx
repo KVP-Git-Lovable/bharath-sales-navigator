@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, CheckCircle, XCircle, Eye, CalendarRange, CalendarDays, Users } from 'lucide-react';
+import { ChevronRight, CheckCircle, XCircle, Eye, CalendarRange, CalendarDays, Users, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
@@ -11,12 +11,14 @@ import WeeklyBreakdown from './WeeklyBreakdown';
 import DailyBreakdown from './DailyBreakdown';
 import MonthNavigator from './MonthNavigator';
 import ExpenseSummaryCards from './ExpenseSummaryCards';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
+import { SignedImage } from '@/components/ui/signed-image';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface TeamExpenseSummaryProps {
   yearMonth: string;
@@ -37,12 +39,103 @@ interface ExpenseRecord {
   expense_date: string;
   status: string;
   employee_name?: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
+  approver_name?: string;
 }
 
 const STATUS_BADGE_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   submitted: { label: 'Pending', variant: 'outline' },
   manager_approved: { label: 'Approved', variant: 'default' },
   rejected: { label: 'Rejected', variant: 'destructive' },
+};
+
+// ─── Expense Detail Dialog ───────────────────────────────────────────────────
+
+const BillPreview: React.FC<{ billUrl: string }> = ({ billUrl }) => {
+  const signedUrl = useSignedUrl(billUrl, 'expense-bills');
+  if (!signedUrl) return <p className="text-xs text-muted-foreground">Loading bill...</p>;
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(billUrl);
+  return isImage ? (
+    <a href={signedUrl} target="_blank" rel="noopener noreferrer">
+      <img src={signedUrl} alt="Bill" className="rounded-lg border max-h-48 w-full object-contain bg-muted" />
+    </a>
+  ) : (
+    <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary underline">
+      <FileText className="h-3.5 w-3.5" /> View Bill Attachment
+    </a>
+  );
+};
+
+const ExpenseDetailDialog: React.FC<{
+  expense: ExpenseRecord | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  actionLoading: string | null;
+}> = ({ expense, open, onOpenChange, onApprove, onReject, actionLoading }) => {
+  if (!expense) return null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">Expense Details</DialogTitle>
+          <DialogDescription className="text-xs">
+            {expense.employee_name} · {new Date(expense.expense_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">{expense.category === 'Other' ? expense.custom_category : expense.category}</span>
+            <span className="text-lg font-bold text-primary">₹{expense.amount.toLocaleString()}</span>
+          </div>
+          <Badge variant={STATUS_BADGE_MAP[expense.status]?.variant || 'secondary'} className="text-xs">
+            {STATUS_BADGE_MAP[expense.status]?.label || expense.status}
+          </Badge>
+          {expense.description && (
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Description</p>
+              <p className="text-sm">{expense.description}</p>
+            </div>
+          )}
+          {expense.bill_url && (
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground mb-1">Bill Attachment</p>
+              <BillPreview billUrl={expense.bill_url} />
+            </div>
+          )}
+          {expense.approver_name && expense.approved_at && (
+            <div className="rounded-md bg-muted/50 p-2 text-xs space-y-0.5">
+              <p>
+                <span className="font-medium">{expense.status === 'rejected' ? 'Rejected' : 'Approved'} by:</span>{' '}
+                {expense.approver_name}
+              </p>
+              <p className="text-muted-foreground">
+                {new Date(expense.approved_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+              {expense.status === 'rejected' && expense.rejection_reason && (
+                <p className="text-destructive">Reason: {expense.rejection_reason}</p>
+              )}
+            </div>
+          )}
+          {expense.status === 'submitted' && (
+            <div className="flex items-center gap-2 pt-2">
+              <Button className="flex-1 h-9 text-xs gap-1.5" variant="default"
+                onClick={() => onApprove(expense.id)} disabled={actionLoading === expense.id}>
+                <CheckCircle className="h-3.5 w-3.5" /> Approve
+              </Button>
+              <Button className="flex-1 h-9 text-xs gap-1.5" variant="destructive"
+                onClick={() => onReject(expense.id)} disabled={actionLoading === expense.id}>
+                <XCircle className="h-3.5 w-3.5" /> Reject
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
@@ -53,6 +146,8 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
+  const [detailExpense, setDetailExpense] = useState<ExpenseRecord | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const [year, month] = yearMonth.split('-').map(Number);
   const start = startOfMonth(new Date(year, month - 1));
@@ -74,9 +169,22 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
         .order('expense_date', { ascending: false });
 
       if (error) throw error;
+
+      // Fetch approver names for processed expenses
+      const approverIds = [...new Set((data || []).filter((e: any) => e.approved_by).map((e: any) => e.approved_by))];
+      let approverMap = new Map<string, string>();
+      if (approverIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', approverIds);
+        profiles?.forEach((p: any) => approverMap.set(p.id, p.full_name));
+      }
+
       const mapped = (data || []).map((exp: any) => {
         const sub = subordinates.find(s => s.subordinate_user_id === exp.user_id);
-        return { ...exp, employee_name: sub?.full_name || 'Unknown' };
+        return {
+          ...exp,
+          employee_name: sub?.full_name || 'Unknown',
+          approver_name: exp.approved_by ? approverMap.get(exp.approved_by) || 'Unknown' : null,
+        };
       });
       setExpenses(mapped);
     } catch (error) {
@@ -101,6 +209,7 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
         .eq('id', expenseId).eq('status', 'submitted');
       if (error) throw error;
       toast.success('Expense approved');
+      setDetailOpen(false);
       fetchExpenses();
     } catch { toast.error('Failed to approve'); }
     finally { setActionLoading(null); }
@@ -116,15 +225,9 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
       if (error) throw error;
       toast.success('Expense rejected');
       setSelectedExpenseId(null);
+      setDetailOpen(false);
       fetchExpenses();
     } catch { toast.error('Failed to reject'); }
-  };
-
-  const openBill = async (billUrl: string) => {
-    try {
-      const { data } = await supabase.storage.from('expense-bills').createSignedUrl(billUrl, 300);
-      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-    } catch { toast.error('Failed to open bill'); }
   };
 
   const pending = expenses.filter(e => e.status === 'submitted');
@@ -143,7 +246,7 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
   }
 
   const ExpenseCard: React.FC<{ exp: ExpenseRecord; showActions: boolean }> = ({ exp, showActions }) => (
-    <Card className="border">
+    <Card className="border cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => { setDetailExpense(exp); setDetailOpen(true); }}>
       <CardContent className="p-3 space-y-1.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium truncate">{exp.employee_name}</p>
@@ -160,28 +263,25 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
           <span className="text-sm font-bold text-primary">₹{exp.amount.toLocaleString()}</span>
         </div>
         {exp.description && <p className="text-[11px] text-muted-foreground truncate">{exp.description}</p>}
-        <div className="flex items-center justify-between pt-1">
-          <div>
-            {exp.bill_url && (
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => openBill(exp.bill_url!)}>
-                <Eye className="h-3 w-3" /> Bill
-              </Button>
-            )}
+        {!showActions && exp.approver_name && (
+          <p className="text-[10px] text-muted-foreground">
+            {exp.status === 'rejected' ? 'Rejected' : 'Approved'} by {exp.approver_name}
+            {exp.approved_at && ` · ${new Date(exp.approved_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`}
+          </p>
+        )}
+        {showActions && (
+          <div className="flex items-center justify-end gap-1 pt-1">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+              onClick={(e) => { e.stopPropagation(); handleApprove(exp.id); }} disabled={actionLoading === exp.id}>
+              <CheckCircle className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:bg-destructive/10"
+              onClick={(e) => { e.stopPropagation(); setSelectedExpenseId(exp.id); setRejectionDialogOpen(true); }}
+              disabled={actionLoading === exp.id}>
+              <XCircle className="h-4 w-4" />
+            </Button>
           </div>
-          {showActions && (
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
-                onClick={() => handleApprove(exp.id)} disabled={actionLoading === exp.id}>
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:bg-destructive/10"
-                onClick={() => { setSelectedExpenseId(exp.id); setRejectionDialogOpen(true); }}
-                disabled={actionLoading === exp.id}>
-                <XCircle className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -196,10 +296,18 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
       )}
       {processed.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground">Processed ({processed.length})</p>
+          <p className="text-xs font-semibold text-muted-foreground">Completed Approvals ({processed.length})</p>
           {processed.map(exp => <ExpenseCard key={exp.id} exp={exp} showActions={false} />)}
         </div>
       )}
+      <ExpenseDetailDialog
+        expense={detailExpense}
+        open={detailOpen}
+        onOpenChange={(v) => { setDetailOpen(v); if (!v) setDetailExpense(null); }}
+        onApprove={handleApprove}
+        onReject={(id) => { setSelectedExpenseId(id); setRejectionDialogOpen(true); }}
+        actionLoading={actionLoading}
+      />
       <RejectionReasonDialog
         isOpen={rejectionDialogOpen}
         onClose={() => { setRejectionDialogOpen(false); setSelectedExpenseId(null); }}
