@@ -66,7 +66,7 @@ export const useGPSTrackingOptimized = (userId: string | undefined, date: Date) 
   const [localPositions, setLocalPositions] = useState<GPSPosition[]>([]);
   const [error, setError] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoCheckIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
   
   const dateStr = useMemo(() => date.toISOString().split('T')[0], [date]);

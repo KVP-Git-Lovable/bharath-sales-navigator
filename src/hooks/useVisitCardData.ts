@@ -35,7 +35,7 @@ const batchDataCache = new Map<string, {
 
 // Batch fetch queue
 let batchQueue: string[] = [];
-let batchTimeout: NodeJS.Timeout | null = null;
+let batchTimeout: ReturnType<typeof setTimeout> | null = null;
 let batchPromiseResolvers: Map<string, (data: any) => void> = new Map();
 
 const BATCH_DELAY = 50; // Wait 50ms to collect retailer IDs before batch fetch

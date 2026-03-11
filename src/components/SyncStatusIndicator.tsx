@@ -28,7 +28,7 @@ export const SyncStatusIndicator = memo(() => {
   const [lastSyncStatus, setLastSyncStatus] = useState<'success' | 'error' | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const mountedRef = useRef(true);
-  const syncingDisplayRef = useRef<NodeJS.Timeout | null>(null);
+  const syncingDisplayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cache warming state
   const {
@@ -117,7 +117,7 @@ export const SyncStatusIndicator = memo(() => {
 
   // Track last sync time to avoid rapid re-sync loops
   const lastSyncTimeRef = useRef<number>(0);
-  const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Monitor syncing status when coming online
   useEffect(() => {

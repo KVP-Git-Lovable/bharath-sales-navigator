@@ -15,7 +15,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
    const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const lastResponseTime = useRef<number>(0);
-  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
  
    const conversation = useConversation({
      textOnly: true,
