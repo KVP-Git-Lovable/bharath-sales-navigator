@@ -272,7 +272,7 @@ const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string 
 
 // Helper component to collect a single subordinate's summary into aggregation
 const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) => {
-  const [aggregated, setAggregated] = useState({ ta: 0, da: 0, additional: 0, total: 0, presentDays: 0 });
+  const [aggregated, setAggregated] = useState({ ta: 0, da: 0, additional: 0, total: 0, presentDays: 0, orderValue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
