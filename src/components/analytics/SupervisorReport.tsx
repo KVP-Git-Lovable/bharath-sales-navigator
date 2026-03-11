@@ -1602,7 +1602,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         doc.rect(cx, y, cardWidth, 3, 'F');
         // Label
         doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('NotoSans', 'normal');
         doc.setTextColor(...COLORS.mutedText);
         doc.text(kpi.label, cx + 10, y + 20);
         // Value
