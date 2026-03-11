@@ -774,7 +774,7 @@ const BeatAllowanceManagement = () => {
   };
 
   const handleEditExpense = (item: AdditionalExpenseData) => {
-    // Open the additional expenses dialog - the AdditionalExpenses component loads existing expenses for the date
+    setEditingExpenseId(item.id);
     setIsAdditionalExpensesOpen(true);
   };
 
