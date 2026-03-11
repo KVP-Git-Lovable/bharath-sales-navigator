@@ -71,6 +71,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const [expenses, setExpenses] = useState<AdditionalExpense[]>([{ ...initialExpense }]);
   const [savedExpenses, setSavedExpenses] = useState<AdditionalExpense[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
   const [applyToAllBeats, setApplyToAllBeats] = useState(false);
 
