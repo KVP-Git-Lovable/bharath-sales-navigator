@@ -228,7 +228,8 @@ const AdditionalCardList: React.FC<{
               <TableHead className="text-[11px] px-2">Type</TableHead>
               <TableHead className="text-right text-[11px] px-2 w-[62px]">Amt</TableHead>
               <TableHead className="text-center text-[11px] px-1 w-[58px]">Status</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[72px]">Action</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[40px]">Details</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[56px]">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -243,39 +244,39 @@ const AdditionalCardList: React.FC<{
                   <Badge variant={statusVariant(item.status)} className="text-[8px] px-1 py-0">{statusLabel(item.status)}</Badge>
                 </TableCell>
                 <TableCell className="text-center py-1.5 px-1">
-                  <div className="flex items-center justify-center gap-0">
-                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleViewDetail(item)} title="View details">
-                      <Eye className="h-2.5 w-2.5" />
-                    </Button>
-                    {(item.status === 'draft' || item.status === 'submitted') && (
-                      <>
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit?.(item)} title="Edit">
-                          <Pencil className="h-2.5 w-2.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" title="Delete">
-                              <Trash2 className="h-2.5 w-2.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Expense</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this {item.expense_type} expense of ₹{item.value}?
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => onDelete?.(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
-                    )}
-                  </div>
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleViewDetail(item)} title="View details">
+                    <Eye className="h-2.5 w-2.5" />
+                  </Button>
+                </TableCell>
+                <TableCell className="text-center py-1.5 px-1">
+                  {(item.status === 'draft' || item.status === 'submitted') ? (
+                    <div className="flex items-center justify-center gap-0">
+                      <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit?.(item)} title="Edit">
+                        <Pencil className="h-2.5 w-2.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" title="Delete">
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this {item.expense_type} expense of ₹{item.value}?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDelete?.(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  ) : null}
                 </TableCell>
               </TableRow>
             ))}
@@ -283,6 +284,7 @@ const AdditionalCardList: React.FC<{
               <TableCell className="font-bold text-[11px] py-1.5 px-2">Total</TableCell>
               <TableCell></TableCell>
               <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalAdditional.toLocaleString()}</TableCell>
+              <TableCell></TableCell>
               <TableCell></TableCell>
               <TableCell></TableCell>
             </TableRow>
