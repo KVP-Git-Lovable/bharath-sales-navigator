@@ -1,111 +1,135 @@
 
 
-# Event-Based Notification Engine
+# Expense Approval Workflow for Additional Expenses
 
-## Current State
-- Existing `notifications` table stores simple notifications (user_id, title, message, type, is_read)
-- `notification_preferences` table exists but only for push content template types
-- Notifications are currently hardcoded in only one place (`RetailManagement.tsx` for retailer verification)
-- No event system, no notification rules, no configurable engine exists
+## Summary
 
-## Architecture
+Add an approval lifecycle to Additional Expenses only. TA and DA remain auto-calculated with no approval. Additional expenses get a draft → submitted → manager_approved → rejected → paid status flow.
 
-```text
-Module Action (order created, leave approved, etc.)
-       ↓
-  DB Trigger on target table
-       ↓
-  calls process_notification_event() PG function
-       ↓
-  Looks up notification_rules for matching event_type + module
-       ↓
-  Resolves receiver (employee, manager, admin, role, specific user)
-       ↓
-  Renders message template with placeholders
-       ↓
-  Inserts into notifications table
-       ↓
-  Real-time subscription in NotificationBell picks it up
-```
+---
 
-## Database Changes (3 new tables + 1 function)
+## Phase 1: Database Changes
 
-### 1. `notification_event_types` (reference table)
-- `id` uuid PK
-- `event_code` text UNIQUE (RECORD_CREATED, RECORD_APPROVED, etc.)
-- `label` text (human-readable)
-- `description` text
-- `is_active` boolean default true
+### 1a. Alter `additional_expenses` table — add new columns:
 
-Seed with 10 system events: RECORD_CREATED, RECORD_UPDATED, RECORD_DELETED, RECORD_APPROVED, RECORD_REJECTED, TASK_ASSIGNED, ACTIVITY_COMPLETED, TARGET_ACHIEVED, COMMENT_ADDED, FILE_UPLOADED
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `status` | text | `'draft'` | draft / submitted / manager_approved / rejected / paid |
+| `submitted_at` | timestamptz | null | When user submitted for approval |
+| `approved_by` | uuid | null | Manager who approved/rejected |
+| `approved_at` | timestamptz | null | Timestamp of approval action |
+| `rejection_reason` | text | null | Reason if rejected |
 
-### 2. `notification_rules` (admin-configurable)
-- `id` uuid PK
-- `name` text (rule name)
-- `event_code` text (FK to event_types)
-- `source_table` text (which table triggers this, e.g. 'orders', 'leave_applications')
-- `receiver_type` text ('employee', 'manager', 'admin', 'role', 'specific_user')
-- `receiver_role` text nullable (if receiver_type = 'role')
-- `receiver_user_id` uuid nullable (if receiver_type = 'specific_user')
-- `notification_channel` text default 'in_app' ('in_app', 'email', 'push')
-- `message_template` text (with {placeholders})
-- `title_template` text
-- `is_active` boolean default true
-- `created_by` uuid
-- `created_at`, `updated_at` timestamps
+### 1b. Update RLS policies on `additional_expenses`
 
-### 3. `notification_event_log` (audit trail)
-- `id` uuid PK
-- `event_code` text
-- `source_table` text
-- `record_id` uuid
-- `actor_user_id` uuid
-- `metadata` jsonb (snapshot of relevant data for placeholder resolution)
-- `processed` boolean default false
-- `created_at` timestamp
+- Keep existing user CRUD policies but restrict UPDATE/DELETE to `status = 'draft'` only (users cannot edit submitted expenses).
+- Add SELECT policy for managers: allow managers to read subordinates' expenses (using `get_all_subordinates` function).
+- Add UPDATE policy for managers: allow managers to update `status`, `approved_by`, `approved_at`, `rejection_reason` on subordinates' expenses where `status = 'submitted'`.
 
-### 4. DB Function: `emit_notification_event()`
-A SECURITY DEFINER function that:
-1. Inserts into `notification_event_log`
-2. Queries matching `notification_rules` by event_code + source_table
-3. Resolves receiver (looks up manager via employees table, or admin users, etc.)
-4. Renders templates by replacing placeholders from metadata jsonb
-5. Inserts into `notifications` table
-6. Marks event as processed
+### 1c. Add approval config (optional)
 
-### 5. DB Triggers on key tables
-Create AFTER INSERT/UPDATE triggers on: `orders`, `leave_applications`, `regularization_requests`, `approval_requests`, `visits`, `activity_events`, `pm_tasks` — each calling `emit_notification_event()` with appropriate event_code and metadata.
+Register `'expense'` entity type in `approval_config` if using the existing approval engine. However, per the user's design, this is a simpler direct-manager approval (not multi-level), so we'll implement a lightweight approval directly on the table rather than using the `approval_requests` engine.
 
-## Frontend Changes
+---
 
-### Admin UI: Notification Rules Manager
-- New page `/admin/notification-rules` (replace or extend current `/push-content-setup`)
-- Add to AdminControls module list
-- Features:
-  - List all rules with toggle active/inactive
-  - Create/edit rule dialog: select event, source table, receiver type, channels, message template with placeholder helper
-  - Preview rendered message
-  - Test rule button
+## Phase 2: User-Facing Changes (AdditionalExpenses.tsx + BeatAllowanceManagement.tsx)
 
-### Components
-- `src/pages/admin/NotificationRulesAdmin.tsx` — main admin page
-- `src/components/admin/NotificationRuleForm.tsx` — create/edit form with placeholder picker
+### 2a. Update `AdditionalExpenses.tsx`
 
-### Permission Integration
-Already has permission entries: `action_admin_notification_create`, `action_admin_notification_edit`, etc. — will reuse these.
+- New expenses save with `status: 'draft'` (already the DB default).
+- Show status badge (Draft / Submitted / Approved / Rejected) on each saved expense.
+- Only allow edit/delete when `status = 'draft'`.
+- Hide delete button for non-draft expenses.
 
-## Implementation Steps
-1. Create DB migration: 3 tables + seed event types + `emit_notification_event()` function
-2. Create DB triggers on key tables (orders, leave_applications, etc.)
-3. Build NotificationRulesAdmin page with CRUD for rules
-4. Add route and update AdminControls entry
-5. Existing `NotificationBell` + `useNotifications` hook already handle real-time display — no changes needed
+### 2b. Add "Submit Expenses" button in `BeatAllowanceManagement.tsx`
 
-## Placeholder Resolution
-The `metadata` jsonb passed to `emit_notification_event()` will contain all available context. The function will do simple `REPLACE()` on template strings:
-- `{user_name}` — actor's full_name from profiles
-- `{module_name}` — derived from source_table
-- `{record_name}` — from metadata
-- `{date}` — current date or from metadata
-- `{points}` — from metadata if applicable
+- In the Additional Expenses tab, add a **"Submit Expenses"** button.
+- On click: bulk-update all `draft` expenses in the selected date range to `status = 'submitted'`, `submitted_at = now()`.
+- Show confirmation dialog before submitting.
+- After submission, expenses become read-only.
+
+### 2c. Update Additional Expenses tab display
+
+- Add a **Status** column to the additional expenses table.
+- Color-coded badges: Draft (gray), Submitted (blue), Approved (green), Rejected (red), Paid (purple).
+- Filter by status (All / Draft / Submitted / Approved / Rejected).
+
+---
+
+## Phase 3: Manager Expense Approval Page
+
+### 3a. New route: `/expenses/approvals`
+
+Create `src/pages/ExpenseApprovals.tsx`:
+
+- Uses `useSubordinates()` to get team member IDs.
+- Fetches `additional_expenses` where `user_id IN (subordinate_ids)` and `status = 'submitted'`.
+- Joins with `profiles` to show employee name.
+
+### 3b. UI Layout
+
+- **Filters**: Employee selector, date range, status (Submitted / Approved / Rejected / All).
+- **Table columns**: Employee, Date, Category, Amount, Description, Bill (view link), Status, Actions.
+- **Actions**: Approve button, Reject button (with reason dialog).
+- Approve → updates `status = 'manager_approved'`, `approved_by`, `approved_at`.
+- Reject → updates `status = 'rejected'`, `approved_by`, `approved_at`, `rejection_reason`.
+
+### 3c. Team Expense Summary Cards
+
+At the top of the approval page, show per-employee summary:
+- Employee Name | TA (auto) | DA (auto) | Additional (submitted) | Total
+
+### 3d. Navigation
+
+- Add link to `/expenses/approvals` from the sidebar/navigation for managers.
+- Add route in `App.tsx`.
+
+---
+
+## Phase 4: Summary & Reports Integration
+
+### 4a. Update `ExpenseSummaryBoxes.tsx`
+
+- The "Additional Expenses" summary box should show **only approved** expenses (`status = 'manager_approved'` or `'paid'`).
+- Add a separate indicator for pending/submitted expenses.
+
+### 4b. Update `ProductivityTracking.tsx`
+
+- Total Expense calculation: `TA + DA + Approved Additional Expenses` only.
+
+### 4c. Admin Monthly Report
+
+- In `AdminExpenseManagement.tsx`, the productivity/expense view should only count `manager_approved` additional expenses in totals.
+
+---
+
+## Phase 5: Notifications (Optional Enhancement)
+
+- When user submits expenses → notify manager (using existing `emit_notification_event` pattern).
+- When manager approves/rejects → notify user.
+- This can be added as a trigger on `additional_expenses` status changes.
+
+---
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| New migration SQL | ALTER TABLE + RLS policies |
+| `src/components/AdditionalExpenses.tsx` | Add status display, restrict edit/delete to draft |
+| `src/components/BeatAllowanceManagement.tsx` | Add Submit button, status column in additional tab |
+| `src/pages/ExpenseApprovals.tsx` | **New** — Manager approval page |
+| `src/App.tsx` | Add route for `/expenses/approvals` |
+| `src/components/ExpenseSummaryBoxes.tsx` | Filter by approved status |
+| `src/components/ProductivityTracking.tsx` | Use approved expenses only in totals |
+| Navigation component | Add link for managers |
+
+---
+
+## What Will NOT Change
+
+- TA calculation logic (auto from beat or fixed) — untouched
+- DA calculation logic (auto from attendance) — untouched
+- `expense_master_config` admin settings — untouched
+- The existing `approval_requests` / `approval_steps` engine — not used for expenses (keeping it simple with direct status updates)
 
