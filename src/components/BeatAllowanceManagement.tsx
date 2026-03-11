@@ -924,31 +924,7 @@ const BeatAllowanceManagement = () => {
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-4">
-                {/* Submit Button */}
-                {filteredAdditionalExpenses.some(e => e.status === 'draft') && (
-                  <div className="flex justify-end">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" className="flex items-center gap-1.5 text-xs" disabled={submittingExpenses}>
-                          <Send className="h-3.5 w-3.5" />
-                          Submit Expenses
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Submit Expenses for Approval?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            All draft expenses in the selected date range will be submitted. You won't be able to edit them after submission.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleSubmitExpenses}>Submit</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                )}
+      {/* Auto-submitted: no separate submit button needed */}
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -1027,9 +1003,9 @@ const BeatAllowanceManagement = () => {
 
       {/* Additional Expenses Dialog */}
       <Dialog open={isAdditionalExpensesOpen} onOpenChange={setIsAdditionalExpensesOpen}>
-        <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Additional Expenses</DialogTitle>
+        <DialogContent className="max-w-[100vw] sm:max-w-[90vw] h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-0 sm:p-6 rounded-none sm:rounded-lg">
+          <DialogHeader className="p-3 sm:p-0 pb-0">
+            <DialogTitle className="text-sm sm:text-lg">Additional Expenses</DialogTitle>
           </DialogHeader>
           <AdditionalExpenses
             onExpensesUpdated={() => {

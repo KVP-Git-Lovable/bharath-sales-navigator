@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Upload, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Upload, FileText, Camera } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { compressImageFile } from '@/utils/imageCompression';
 
 interface AdditionalExpensesProps {
   beatId?: string;
@@ -55,12 +56,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 }) => {
   const { user, userProfile } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(true);
-  const [expenses, setExpenses] = useState<AdditionalExpense[]>([]);
-  const [savedExpenses, setSavedExpenses] = useState<AdditionalExpense[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [applyToAllBeats, setApplyToAllBeats] = useState(false);
-
   const defaultDate = expenseDate || new Date().toISOString().split('T')[0];
   
   const initialExpense: AdditionalExpense = {
@@ -69,6 +64,17 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     description: '',
     expense_date: defaultDate
   };
+
+  // Pre-load with one empty expense row for direct entry
+  const [expenses, setExpenses] = useState<AdditionalExpense[]>([{ ...initialExpense }]);
+  const [savedExpenses, setSavedExpenses] = useState<AdditionalExpense[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [applyToAllBeats, setApplyToAllBeats] = useState(false);
+
+  // Refs for hidden file inputs
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
     fetchSavedExpenses();
@@ -117,9 +123,21 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     setExpenses(newExpenses);
   };
 
-  const handleFileChange = (index: number, file: File | null) => {
+  const handleFileSelected = async (index: number, file: File | null) => {
     if (file) {
-      updateExpense(index, 'bill_file', file);
+      // Compress image files before setting
+      if (file.type.startsWith('image/')) {
+        try {
+          const compressed = await compressImageFile(file, 0.4, 1024);
+          const compressedFile = new File([compressed], file.name, { type: 'image/jpeg' });
+          updateExpense(index, 'bill_file', compressedFile);
+          toast.success(`Compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
+        } catch {
+          updateExpense(index, 'bill_file', file);
+        }
+      } else {
+        updateExpense(index, 'bill_file', file);
+      }
     }
   };
 
@@ -128,7 +146,9 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     
     const { error } = await supabase.storage
       .from('expense-bills')
-      .upload(fileName, file);
+      .upload(fileName, file, {
+        contentType: file.type || 'image/jpeg'
+      });
 
     if (error) {
       console.error('Error uploading file:', error);
@@ -140,6 +160,13 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 
   const saveExpenses = async () => {
     if (!user || expenses.length === 0) return;
+
+    // Filter out empty rows
+    const validExpenses = expenses.filter(e => e.category && e.amount > 0);
+    if (validExpenses.length === 0) {
+      toast.error('Please fill in at least one expense with category and amount');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -153,7 +180,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
         if (beatError) throw beatError;
 
         for (const beatAllowance of beatAllowances || []) {
-          for (const expense of expenses) {
+          for (const expense of validExpenses) {
             let billUrl = null;
             
             if (expense.bill_file) {
@@ -170,14 +197,15 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                 description: `${expense.description} (Applied to ${beatAllowance.beat_name})`,
                 bill_url: billUrl,
                 expense_date: expense.expense_date,
-                status: 'draft'
+                status: 'submitted',
+                submitted_at: new Date().toISOString()
               });
           }
         }
       } else {
         const expensesToSave = [];
 
-        for (const expense of expenses) {
+        for (const expense of validExpenses) {
           let billUrl = null;
           
           if (expense.bill_file) {
@@ -196,7 +224,8 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
             description: beatName ? `${expense.description} (${beatName})` : expense.description,
             bill_url: billUrl,
             expense_date: expense.expense_date,
-            status: 'draft'
+            status: 'submitted',
+            submitted_at: new Date().toISOString()
           });
         }
 
@@ -207,8 +236,8 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
         if (error) throw error;
       }
 
-      toast.success('Expenses saved successfully!');
-      setExpenses([]);
+      toast.success('Expenses saved & submitted for approval!');
+      setExpenses([{ ...initialExpense }]);
       setIsFormOpen(false);
       fetchSavedExpenses();
       
@@ -225,11 +254,12 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 
   const deleteSavedExpense = async (expenseId: string) => {
     try {
+      // Allow deleting both draft and submitted (user's own)
       const { error } = await (supabase as any)
         .from('additional_expenses')
         .delete()
         .eq('id', expenseId)
-        .eq('status', 'draft');
+        .in('status', ['draft', 'submitted']);
 
       if (error) throw error;
 
@@ -237,7 +267,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
       fetchSavedExpenses();
     } catch (error) {
       console.error('Error deleting expense:', error);
-      toast.error('Failed to delete expense. Only draft expenses can be deleted.');
+      toast.error('Failed to delete expense. Only draft/submitted expenses can be deleted.');
     }
   };
 
@@ -251,39 +281,40 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <FileText size={20} />
+    <Card className="w-full border-0 shadow-none sm:border sm:shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6">
+        <CardTitle className="flex items-center gap-1.5 text-sm sm:text-lg">
+          <FileText size={16} className="sm:w-5 sm:h-5" />
           Additional Expenses
           {totalAmount > 0 && (
-            <span className="text-lg font-bold text-primary ml-2">₹{totalAmount.toFixed(2)}</span>
+            <span className="text-sm sm:text-lg font-bold text-primary ml-1">₹{totalAmount.toFixed(2)}</span>
           )}
         </CardTitle>
         <Button
           onClick={() => setIsFormOpen(!isFormOpen)}
           variant={isFormOpen ? "outline" : "default"}
           size="sm"
+          className="h-7 text-xs px-2"
         >
           {isFormOpen ? 'Cancel' : 'Edit'}
         </Button>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-3 sm:p-6 pt-0">
         {isFormOpen && (
-          <div className="space-y-6 mb-6">
-            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-              <Label className="text-sm font-medium">User: {userProfile?.full_name || 'Loading...'}</Label>
+          <div className="space-y-3 mb-4">
+            <div className="p-2.5 bg-muted/50 rounded-lg space-y-1">
+              <Label className="text-xs font-medium">User: {userProfile?.full_name || 'Loading...'}</Label>
               {beatName && (
-                <Label className="text-sm font-medium text-primary">Beat: {beatName}</Label>
+                <Label className="text-xs font-medium text-primary block">Beat: {beatName}</Label>
               )}
               {expenseDate && (
-                <Label className="text-sm font-medium text-muted-foreground">Date: {new Date(expenseDate).toLocaleDateString()}</Label>
+                <Label className="text-xs font-medium text-muted-foreground block">Date: {new Date(expenseDate).toLocaleDateString()}</Label>
               )}
             </div>
 
             {beatId && expenseDate && (
-              <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-2 p-2.5 bg-blue-50 rounded-lg border border-blue-200">
                 <Checkbox
                   id="apply-all-beats"
                   checked={applyToAllBeats}
@@ -291,41 +322,43 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                 />
                 <Label
                   htmlFor="apply-all-beats"
-                  className="text-sm font-medium cursor-pointer"
+                  className="text-xs font-medium cursor-pointer"
                 >
                   Apply these expenses to all beats for this date
                 </Label>
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {expenses.map((expense, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-4">
+                <div key={index} className="p-3 border rounded-lg space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="font-medium">Expense {index + 1}</Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeExpenseRow(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
+                    <Label className="font-medium text-xs">Expense {index + 1}</Label>
+                    {expenses.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeExpenseRow(index)}
+                        className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2.5">
                     <div>
-                      <Label htmlFor={`category-${index}`}>Category</Label>
+                      <Label htmlFor={`category-${index}`} className="text-xs">Category</Label>
                       <Select 
                         onValueChange={(value) => updateExpense(index, 'category', value)}
                         value={expense.category}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
                           {EXPENSE_CATEGORIES.map((category) => (
-                            <SelectItem key={category} value={category}>
+                            <SelectItem key={category} value={category} className="text-xs">
                               {category}
                             </SelectItem>
                           ))}
@@ -335,68 +368,102 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 
                     {expense.category === 'Other' && (
                       <div>
-                        <Label htmlFor={`custom-category-${index}`}>Custom Category</Label>
+                        <Label htmlFor={`custom-category-${index}`} className="text-xs">Custom Category</Label>
                         <Input
                           id={`custom-category-${index}`}
                           value={expense.custom_category || ''}
                           onChange={(e) => updateExpense(index, 'custom_category', e.target.value)}
                           placeholder="Enter custom category"
+                          className="h-9 text-xs"
                         />
                       </div>
                     )}
 
-                    <div>
-                      <Label htmlFor={`amount-${index}`}>Amount (₹)</Label>
-                      <Input
-                        id={`amount-${index}`}
-                        type="number"
-                        value={expense.amount}
-                        onChange={(e) => updateExpense(index, 'amount', parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor={`amount-${index}`} className="text-xs">Amount (₹)</Label>
+                        <Input
+                          id={`amount-${index}`}
+                          type="number"
+                          value={expense.amount || ''}
+                          onChange={(e) => updateExpense(index, 'amount', parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          min="0"
+                          step="0.01"
+                          className="h-9 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor={`date-${index}`} className="text-xs">Date</Label>
+                        <Input
+                          id={`date-${index}`}
+                          type="date"
+                          value={expense.expense_date}
+                          onChange={(e) => updateExpense(index, 'expense_date', e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <Label htmlFor={`date-${index}`}>Date</Label>
-                      <Input
-                        id={`date-${index}`}
-                        type="date"
-                        value={expense.expense_date}
-                        onChange={(e) => updateExpense(index, 'expense_date', e.target.value)}
+                      <Label htmlFor={`description-${index}`} className="text-xs">Description</Label>
+                      <Textarea
+                        id={`description-${index}`}
+                        value={expense.description || ''}
+                        onChange={(e) => updateExpense(index, 'description', e.target.value)}
+                        placeholder="Enter expense description"
+                        rows={2}
+                        className="text-xs min-h-[60px]"
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <Label htmlFor={`description-${index}`}>Description</Label>
-                    <Textarea
-                      id={`description-${index}`}
-                      value={expense.description || ''}
-                      onChange={(e) => updateExpense(index, 'description', e.target.value)}
-                      placeholder="Enter expense description"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor={`bill-${index}`}>Attach Bill</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input
-                        id={`bill-${index}`}
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => handleFileChange(index, e.target.files?.[0] || null)}
-                        className="flex-1"
-                      />
-                      <Upload size={16} className="text-muted-foreground" />
+                    <div>
+                      <Label className="text-xs">Attach Bill</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        {/* Hidden file inputs */}
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          ref={(el) => { fileInputRefs.current[index] = el; }}
+                          onChange={(e) => handleFileSelected(index, e.target.files?.[0] || null)}
+                          className="hidden"
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          ref={(el) => { cameraInputRefs.current[index] = el; }}
+                          onChange={(e) => handleFileSelected(index, e.target.files?.[0] || null)}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs flex-1"
+                          onClick={() => fileInputRefs.current[index]?.click()}
+                        >
+                          <Upload size={12} className="mr-1" />
+                          Upload
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs flex-1"
+                          onClick={() => cameraInputRefs.current[index]?.click()}
+                        >
+                          <Camera size={12} className="mr-1" />
+                          Camera
+                        </Button>
+                      </div>
+                      {expense.bill_file && (
+                        <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                          ✓ {expense.bill_file.name} ({(expense.bill_file.size / 1024).toFixed(0)}KB)
+                        </p>
+                      )}
                     </div>
-                    {expense.bill_file && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Selected: {expense.bill_file.name}
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}
@@ -404,20 +471,21 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               <Button
                 onClick={addExpenseRow}
                 variant="outline"
-                className="w-full border-dashed"
+                size="sm"
+                className="w-full border-dashed h-8 text-xs"
               >
-                <Plus size={16} className="mr-2" />
+                <Plus size={14} className="mr-1" />
                 Add More Expense
               </Button>
             </div>
 
-            {expenses.length > 0 && (
-              <div className="flex justify-between items-center pt-4">
-                <div className="text-lg font-semibold">
+            {expenses.some(e => e.category && e.amount > 0) && (
+              <div className="flex justify-between items-center pt-3 border-t">
+                <div className="text-sm font-semibold">
                   Total: ₹{expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}
                 </div>
-                <Button onClick={saveExpenses} disabled={loading}>
-                  {loading ? 'Saving...' : 'Save Expenses'}
+                <Button onClick={saveExpenses} disabled={loading} size="sm" className="h-8 text-xs">
+                  {loading ? 'Saving...' : 'Save & Submit'}
                 </Button>
               </div>
             )}
@@ -426,34 +494,34 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 
         {/* Saved Expenses List */}
         {savedExpenses.length > 0 && (
-          <div className="space-y-3">
-            <Label className="font-medium">Saved Expenses:</Label>
+          <div className="space-y-2">
+            <Label className="font-medium text-xs">Saved Expenses:</Label>
             {savedExpenses.map((expense) => (
-              <div key={expense.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">
+              <div key={expense.id} className="flex items-center justify-between p-2.5 bg-muted/30 rounded-lg gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium text-xs truncate">
                       {expense.category === 'Other' ? expense.custom_category : expense.category}
                     </span>
-                    <span className="text-sm text-muted-foreground">
-                      • {new Date(expense.expense_date).toLocaleDateString()}
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(expense.expense_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                     </span>
                     {getStatusBadge(expense.status || 'draft')}
                   </div>
                   {expense.description && (
-                    <p className="text-sm text-muted-foreground">{expense.description}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{expense.description}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">₹{expense.amount}</span>
-                  {(!expense.status || expense.status === 'draft') && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-bold text-xs">₹{expense.amount}</span>
+                  {(!expense.status || expense.status === 'draft' || expense.status === 'submitted') && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteSavedExpense(expense.id!)}
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive h-6 w-6 p-0"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={12} />
                     </Button>
                   )}
                 </div>
@@ -461,15 +529,15 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
             ))}
             
             <div className="flex justify-end pt-2 border-t">
-              <div className="text-lg font-bold">
-                Total Expenses: ₹{totalAmount.toFixed(2)}
+              <div className="text-sm font-bold">
+                Total: ₹{totalAmount.toFixed(2)}
               </div>
             </div>
           </div>
         )}
 
         {savedExpenses.length === 0 && !isFormOpen && (
-          <p className="text-muted-foreground text-center py-4">
+          <p className="text-muted-foreground text-center py-3 text-xs">
             No additional expenses recorded. Click "Edit" to add expenses.
           </p>
         )}
