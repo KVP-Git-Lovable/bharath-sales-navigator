@@ -630,18 +630,20 @@ const BeatAllowanceManagement = () => {
 
       const { data: expensesData, error } = await (supabase as any)
         .from('additional_expenses')
-        .select('expense_date, category, custom_category, description, amount, bill_url, status')
+        .select('id, expense_date, category, custom_category, description, amount, bill_url, status')
         .in('user_id', effectiveUserIds)
         .order('expense_date', { ascending: true });
 
       if (error) throw error;
 
       const additionalExpenses: AdditionalExpenseData[] = expensesData?.map((item: any) => ({
+        id: item.id,
         date: item.expense_date,
         expense_type: item.category === 'Other' ? item.custom_category : item.category,
         details: item.description || '',
         value: item.amount,
         bill_attached: !!item.bill_url,
+        bill_url: item.bill_url,
         status: item.status || 'draft'
       })) || [];
 
