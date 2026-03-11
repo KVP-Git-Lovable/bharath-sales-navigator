@@ -417,6 +417,15 @@ const ExpensePolicyConfig = () => {
         </CardContent>
       </Card>
 
+      {/* Expense Categories */}
+      <ExpenseCategoriesConfig />
+
+      {/* Approval Workflows */}
+      <ApprovalWorkflowsConfig />
+
+      {/* Approval Rules */}
+      <ApprovalRulesConfig />
+
       {/* Save Button */}
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
