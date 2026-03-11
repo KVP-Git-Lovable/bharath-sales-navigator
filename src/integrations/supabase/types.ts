@@ -4673,26 +4673,47 @@ export type Database = {
       }
       expense_master_config: {
         Row: {
+          allowed_categories: string[] | null
           created_at: string
           da_amount: number | null
+          da_calculation_basis: string | null
+          expense_policy_notes: string | null
           fixed_ta_amount: number | null
           id: string
+          max_additional_expense_per_day: number | null
+          max_additional_expense_per_month: number | null
+          require_bill_above_amount: number | null
+          ta_per_km_rate: number | null
           ta_type: string
           updated_at: string
         }
         Insert: {
+          allowed_categories?: string[] | null
           created_at?: string
           da_amount?: number | null
+          da_calculation_basis?: string | null
+          expense_policy_notes?: string | null
           fixed_ta_amount?: number | null
           id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          require_bill_above_amount?: number | null
+          ta_per_km_rate?: number | null
           ta_type?: string
           updated_at?: string
         }
         Update: {
+          allowed_categories?: string[] | null
           created_at?: string
           da_amount?: number | null
+          da_calculation_basis?: string | null
+          expense_policy_notes?: string | null
           fixed_ta_amount?: number | null
           id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          require_bill_above_amount?: number | null
+          ta_per_km_rate?: number | null
           ta_type?: string
           updated_at?: string
         }
