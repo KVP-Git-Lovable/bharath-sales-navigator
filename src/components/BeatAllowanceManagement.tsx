@@ -653,7 +653,7 @@ const BeatAllowanceManagement = () => {
             {/* Main Tabs */}
             <Tabs value={activeTab} onValueChange={(value: 'expenses' | 'da' | 'additional') => setActiveTab(value)} className="w-full">
               <TabsList className="grid w-full grid-cols-3 h-8 sm:h-10">
-                <TabsTrigger value="expenses" className="text-xs sm:text-sm">My Expenses</TabsTrigger>
+                <TabsTrigger value="expenses" className="text-xs sm:text-sm">TA</TabsTrigger>
                 <TabsTrigger value="da" className="text-xs sm:text-sm">DA</TabsTrigger>
                 <TabsTrigger value="additional" className="text-xs sm:text-sm">Additional Expenses</TabsTrigger>
               </TabsList>
