@@ -1538,7 +1538,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       let y = 0;
 
       const fmtCurrency = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
-      const fmtKG = (grams: number) => (grams / 1000).toFixed(1) + ' KG';
+      const fmtKG = (kg: number) => kg.toFixed(1) + ' KG';
 
       const checkPageBreak = (needed: number) => {
         if (y + needed > pageHeight - 40) {
