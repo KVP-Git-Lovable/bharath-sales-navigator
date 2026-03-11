@@ -231,12 +231,14 @@ const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string 
                 {isLoading ? (
                   <p className="text-xs text-muted-foreground">Loading...</p>
                 ) : summary ? (
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
                     <span className="text-blue-600">TA: {fmt(summary.ta)}</span>
                     <span>·</span>
                     <span className="text-green-600">DA: {fmt(summary.da)}</span>
                     <span>·</span>
                     <span className="text-purple-600">Add: {fmt(summary.additionalApproved)}</span>
+                    <span>·</span>
+                    <span className="text-orange-600">Orders: {fmt(summary.orderValue)}</span>
                   </div>
                 ) : null}
               </div>
