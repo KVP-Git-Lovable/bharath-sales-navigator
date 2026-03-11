@@ -523,6 +523,14 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                           ✓ {expense.bill_file.name} ({(expense.bill_file.size / 1024).toFixed(0)}KB)
                         </p>
                       )}
+                      {!expense.bill_file && expense.bill_url && (
+                        <p className="text-[10px] text-primary mt-1 truncate">
+                          ✓ Existing bill attached · <span className="underline cursor-pointer" onClick={async () => {
+                            const { data } = await supabase.storage.from('expense-bills').createSignedUrl(expense.bill_url!, 300);
+                            if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                          }}>View</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
