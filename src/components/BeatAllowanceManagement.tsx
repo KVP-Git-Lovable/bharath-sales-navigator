@@ -658,77 +658,8 @@ const BeatAllowanceManagement = () => {
                 <TabsTrigger value="additional" className="text-xs sm:text-sm">Additional Expenses</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="expenses" className="space-y-4">
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Beat</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">TA Amount</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Productive Visits</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Order Value</TableHead>
-                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredExpenseRows.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
-                            No expense records found for the selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {filteredExpenseRows.map((row) => (
-                            <TableRow key={row.id} className={row.isOnLeave ? 'bg-muted/50' : ''}>
-                              <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
-                                {new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                                {row.isOnLeave && <span className="ml-1 text-xs text-orange-500">(Leave)</span>}
-                              </TableCell>
-                              <TableCell className="font-medium text-xs sm:text-sm">{row.beat_name}</TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                ₹{row.ta.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                {row.productive_visits}
-                              </TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                ₹{row.order_value.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs h-7 px-2"
-                                  onClick={() => navigate(`/today-summary?date=${row.date}`)}
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  More details
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Total Row */}
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-xs sm:text-sm">Total</TableCell>
-                            <TableCell></TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{totalTA.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              {filteredExpenseRows.reduce((sum, row) => sum + row.productive_visits, 0)}
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{filteredExpenseRows.reduce((sum, row) => sum + row.order_value, 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="expenses" className="space-y-2 mt-3">
+                <TACardList rows={filteredExpenseRows} totalTA={totalTA} navigate={navigate} />
               </TabsContent>
 
               <TabsContent value="da" className="space-y-4">
