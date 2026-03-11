@@ -311,7 +311,7 @@ export const MyRetailers = () => {
   }, [selectedUserIds]);
 
   // Debounce the loadRetailers call to prevent rapid firing
-  const loadRetailersTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadRetailersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Track previous user IDs to detect user changes
   const prevUserIdsRef = useRef<string>('');

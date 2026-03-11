@@ -16,7 +16,7 @@ export const useGPSTracking = (userId: string | undefined, date: Date) => {
   const [positions, setPositions] = useState<GPSPosition[]>([]);
   const [error, setError] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoCheckIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if current time is within working hours (9 AM - 7 PM IST)
   const isWithinWorkingHours = useCallback(() => {
