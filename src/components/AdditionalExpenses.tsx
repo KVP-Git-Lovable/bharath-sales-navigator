@@ -33,7 +33,7 @@ interface AdditionalExpense {
   status?: string;
 }
 
-const EXPENSE_CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   'Telephone Expense',
   'Outlocation travel',
   'Food Expenses',
@@ -74,10 +74,27 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const [isEditLoading, setIsEditLoading] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
   const [applyToAllBeats, setApplyToAllBeats] = useState(false);
+  const [dbCategories, setDbCategories] = useState<string[]>([]);
 
   // Refs for hidden file inputs
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  const expenseCategories = dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES;
+
+  useEffect(() => {
+    // Fetch categories from DB
+    (supabase as any)
+      .from('expense_categories')
+      .select('name')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }: any) => {
+        if (data && data.length > 0) {
+          setDbCategories(data.map((c: any) => c.name));
+        }
+      });
+  }, []);
 
   useEffect(() => {
     if (editExpenseId && user) {
@@ -419,7 +436,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {EXPENSE_CATEGORIES.map((category) => (
+                          {expenseCategories.map((category) => (
                             <SelectItem key={category} value={category} className="text-xs">
                               {category}
                             </SelectItem>

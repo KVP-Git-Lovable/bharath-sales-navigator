@@ -8,6 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Save, Loader2, Car, Utensils, Receipt, Shield, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import ExpenseCategoriesConfig from './ExpenseCategoriesConfig';
+import ApprovalWorkflowsConfig from './ApprovalWorkflowsConfig';
+import ApprovalRulesConfig from './ApprovalRulesConfig';
 
 interface ExpenseConfig {
   id: string;
@@ -413,6 +416,15 @@ const ExpensePolicyConfig = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Expense Categories */}
+      <ExpenseCategoriesConfig />
+
+      {/* Approval Workflows */}
+      <ApprovalWorkflowsConfig />
+
+      {/* Approval Rules */}
+      <ApprovalRulesConfig />
 
       {/* Save Button */}
       <div className="flex justify-end">
