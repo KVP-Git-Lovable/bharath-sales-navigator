@@ -14,6 +14,7 @@ import ExpenseSummaryCards from '@/components/expenses/ExpenseSummaryCards';
 import WeeklyBreakdown from '@/components/expenses/WeeklyBreakdown';
 import TeamExpenseSummary from '@/components/expenses/TeamExpenseSummary';
 import AdditionalExpenses from '@/components/AdditionalExpenses';
+import BeatAllowanceManagement from '@/components/BeatAllowanceManagement';
 
 const MyExpenses = () => {
   const { user } = useAuth();
@@ -145,6 +146,9 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
           Additional Expense
         </Button>
       </div>
+
+      {/* Detailed Daily View (old Expense Details) */}
+      <BeatAllowanceManagement />
     </>
   );
 };

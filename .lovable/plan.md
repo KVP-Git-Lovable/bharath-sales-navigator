@@ -1,35 +1,33 @@
 
+# Expense Approval Workflow for Additional Expenses
 
-# Restore Old Expense Details View
+## Status: ✅ Implemented
 
-## Problem
-The recent redesign removed the `BeatAllowanceManagement` component (the "Expense Details" card with tabs: My Expenses, DA, Additional Expenses — showing daily breakdown tables). The user wants this view restored below the new summary cards.
+## Summary
+Added an approval lifecycle to Additional Expenses only. TA and DA remain auto-calculated with no approval. Additional expenses get a draft → submitted → manager_approved → rejected → paid status flow.
 
-## Plan
+## What Was Done
 
-### Modify `src/pages/MyExpenses.tsx`
-- Import `BeatAllowanceManagement` component
-- Add it below the summary cards and action buttons inside `MyExpenseContent`
-- It will sit below the weekly breakdown section, providing the full daily detail view the user had before (Date, Beat, TA Amount, Productive Visits, Order Value, Actions)
+### Phase 1: Database ✅
+- Added `status`, `submitted_at`, `approved_by`, `approved_at`, `rejection_reason` columns to `additional_expenses`
+- RLS policies: users can only edit/delete draft expenses; managers can approve/reject subordinates' submitted expenses; admins have full access
 
-### No changes to `BeatAllowanceManagement.tsx`
-The component is kept as-is — it already has its own date filters, tabs (My Expenses / DA / Additional Expenses), and the "+ Additional Expenses" button.
+### Phase 2: User-Facing ✅
+- `AdditionalExpenses.tsx`: Status badges on saved expenses, delete restricted to draft only
+- `BeatAllowanceManagement.tsx`: Submit Expenses button (bulk submits all draft in date range), Status column in additional expenses tab
 
-### Layout after change:
-```text
-Expenses [help]
-< Month Navigator >
-[TA] [DA] [Additional] [Total]  ← summary cards
-(pending/rejected badges)
-(weekly breakdown if expanded)
-[+ Additional Expense] button
-─────────────────────────────
-BeatAllowanceManagement       ← restored old view
-  (Expense Details card)
-  (My Expenses | DA | Additional Expenses tabs)
-  (Date/Beat/TA table)
-```
+### Phase 3: Manager Approval Page ✅
+- `ExpenseApprovals.tsx` at `/expenses/approvals`: Filters by status/date/employee, approve/reject with reason dialog, employee summary cards
 
-### Files to modify:
-- **`src/pages/MyExpenses.tsx`** — Add `BeatAllowanceManagement` import and render it inside `MyExpenseContent`
+### Phase 4: Summary Updates ✅
+- `ExpenseSummaryBoxes.tsx`: Only counts `manager_approved` or `paid` additional expenses in totals
 
+### Phase 5: Navigation ✅
+- Route added in `App.tsx`
+- "Expense Approvals" link added in Navbar
+
+## What Was NOT Changed
+- TA calculation logic (auto from beat or fixed)
+- DA calculation logic (auto from attendance)
+- `expense_master_config` admin settings
+- Existing `approval_requests` / `approval_steps` engine
