@@ -722,7 +722,26 @@ const BeatAllowanceManagement = () => {
     setIsAdditionalExpensesOpen(true);
   };
 
-  const handleSubmitExpenses = async () => {
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('additional_expenses')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      toast({ title: "Deleted", description: "Expense deleted successfully" });
+      fetchAdditionalExpenseData();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast({ title: "Error", description: "Failed to delete expense", variant: "destructive" });
+    }
+  };
+
+  const handleEditExpense = (item: AdditionalExpenseData) => {
+    // Open the additional expenses dialog - the AdditionalExpenses component loads existing expenses for the date
+    setIsAdditionalExpensesOpen(true);
+  };
+
     if (!user?.id) return;
     setSubmittingExpenses(true);
     try {
