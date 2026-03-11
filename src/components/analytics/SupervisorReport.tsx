@@ -1515,8 +1515,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
       // Fetch and register static Noto Sans font for ₹ symbol support
       const [regularRes, boldRes] = await Promise.all([
-        fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/static/NotoSans-Regular.ttf'),
-        fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/static/NotoSans-Bold.ttf'),
+        fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/latin-400-normal.ttf'),
+        fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/latin-700-normal.ttf'),
       ]);
       const [regularBuf, boldBuf] = await Promise.all([regularRes.arrayBuffer(), boldRes.arrayBuffer()]);
       const toBase64 = (buf: ArrayBuffer) => {
@@ -1538,7 +1538,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       let y = 0;
 
       const fmtCurrency = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
-      const fmtKG = (grams: number) => (grams / 1000).toFixed(1) + ' KG';
+      const fmtKG = (kg: number) => kg.toFixed(1) + ' KG';
 
       const checkPageBreak = (needed: number) => {
         if (y + needed > pageHeight - 40) {
@@ -1638,8 +1638,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           body: leaderRows,
           theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
-          headStyles: { fillColor: COLORS.primary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          styles: { font: 'NotoSans', fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { font: 'NotoSans', fillColor: COLORS.primary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
           alternateRowStyles: { fillColor: [248, 250, 252] },
           willDrawCell: (data: any) => {
             if (data.section === 'body' && data.row.index < 3) {
@@ -1734,8 +1734,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           body: skuRows,
           theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8, cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
-          headStyles: { fillColor: COLORS.accent, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          styles: { font: 'NotoSans', fontSize: 8, cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { font: 'NotoSans', fillColor: COLORS.accent, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
           alternateRowStyles: { fillColor: [248, 250, 252] },
         });
         y = (doc as any).lastAutoTable.finalY + 16;
@@ -1788,8 +1788,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           body: prodRows,
           theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
-          headStyles: { fillColor: COLORS.warning, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          styles: { font: 'NotoSans', fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { font: 'NotoSans', fillColor: COLORS.warning, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
           alternateRowStyles: { fillColor: [248, 250, 252] },
           columnStyles: { 4: { cellWidth: 100 } },
           didDrawCell: (data: any) => {
@@ -1850,8 +1850,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
               body: attendanceRows,
               theme: 'plain',
               margin: { left: margin, right: margin },
-              styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
-              headStyles: { fillColor: COLORS.secondary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+              styles: { font: 'NotoSans', fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+              headStyles: { font: 'NotoSans', fillColor: COLORS.secondary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
               alternateRowStyles: { fillColor: [248, 250, 252] },
             });
             y = (doc as any).lastAutoTable.finalY + 16;
