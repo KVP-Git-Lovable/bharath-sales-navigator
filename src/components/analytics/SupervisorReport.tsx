@@ -1895,7 +1895,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           doc.setFillColor(...borderColor);
           doc.roundedRect(margin + 14, y + 6, 50, 12, 2, 2, 'F');
           doc.setFontSize(6);
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSans', 'bold');
           doc.setTextColor(...COLORS.white);
           doc.text(insight.type.toUpperCase(), margin + 18, y + 14);
 
