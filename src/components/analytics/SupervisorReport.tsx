@@ -1638,8 +1638,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           body: leaderRows,
           theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
-          headStyles: { fillColor: COLORS.primary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
+          styles: { font: 'NotoSans', fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
+          headStyles: { font: 'NotoSans', fillColor: COLORS.primary, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
           alternateRowStyles: { fillColor: [248, 250, 252] },
           willDrawCell: (data: any) => {
             if (data.section === 'body' && data.row.index < 3) {
