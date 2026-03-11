@@ -33,7 +33,7 @@ interface AdditionalExpense {
   status?: string;
 }
 
-const EXPENSE_CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   'Telephone Expense',
   'Outlocation travel',
   'Food Expenses',
