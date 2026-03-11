@@ -30,6 +30,7 @@ export interface MonthlyExpenseSummary {
   additionalRejected: number;
   additionalTotal: number;
   total: number;
+  orderValue: number;
   presentDays: number;
   weeklyBreakdown: WeeklyBreakdown[];
   dailyBreakdown: DailyBreakdown[];
