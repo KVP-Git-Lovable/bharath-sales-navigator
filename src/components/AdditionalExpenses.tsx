@@ -17,6 +17,7 @@ interface AdditionalExpensesProps {
   beatId?: string;
   beatName?: string;
   expenseDate?: string;
+  editExpenseId?: string;
   onExpensesUpdated?: () => void;
 }
 
