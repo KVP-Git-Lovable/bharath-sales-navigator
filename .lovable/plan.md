@@ -1,33 +1,46 @@
 
-# Expense Approval Workflow for Additional Expenses
 
-## Status: ✅ Implemented
+# Additional Expenses Module Improvements
 
-## Summary
-Added an approval lifecycle to Additional Expenses only. TA and DA remain auto-calculated with no approval. Additional expenses get a draft → submitted → manager_approved → rejected → paid status flow.
+## Changes Overview
 
-## What Was Done
+### 1. Auto-submit on save (no separate submit step)
+When user saves expenses, status goes directly to `submitted` instead of `draft`. This sends it to the manager automatically. User can still edit (we'll allow editing `submitted` expenses by the owner).
 
-### Phase 1: Database ✅
-- Added `status`, `submitted_at`, `approved_by`, `approved_at`, `rejection_reason` columns to `additional_expenses`
-- RLS policies: users can only edit/delete draft expenses; managers can approve/reject subordinates' submitted expenses; admins have full access
+### 2. Direct expense creation (remove extra click)
+Currently clicking "Additional Expenses" opens a dialog, which then shows the form. Instead, start with one empty expense row pre-loaded so the user can fill immediately without clicking "Add More Expense".
 
-### Phase 2: User-Facing ✅
-- `AdditionalExpenses.tsx`: Status badges on saved expenses, delete restricted to draft only
-- `BeatAllowanceManagement.tsx`: Submit Expenses button (bulk submits all draft in date range), Status column in additional expenses tab
+### 3. Mobile UI optimization
+- Reduce font sizes in the AdditionalExpenses form
+- Make the dialog full-screen on mobile (`max-w-full h-full` on small screens)
+- Stack Category/Amount vertically on mobile
+- Smaller padding and spacing throughout
 
-### Phase 3: Manager Approval Page ✅
-- `ExpenseApprovals.tsx` at `/expenses/approvals`: Filters by status/date/employee, approve/reject with reason dialog, employee summary cards
+### 4. Camera + File upload for bills
+Replace the plain file input with two buttons: "Upload File" and "Take Photo" (using `capture="environment"` on a hidden input for camera). Both feed into the same bill attachment flow.
 
-### Phase 4: Summary Updates ✅
-- `ExpenseSummaryBoxes.tsx`: Only counts `manager_approved` or `paid` additional expenses in totals
+### 5. Image compression before upload
+Use the existing `compressImageFile` utility to compress image bills before uploading to Supabase storage. Target max 1024px dimension and 40% quality to keep files in KB range.
 
-### Phase 5: Navigation ✅
-- Route added in `App.tsx`
-- "Expense Approvals" link added in Navbar
+---
 
-## What Was NOT Changed
-- TA calculation logic (auto from beat or fixed)
-- DA calculation logic (auto from attendance)
-- `expense_master_config` admin settings
-- Existing `approval_requests` / `approval_steps` engine
+## Technical Details
+
+### Files to modify:
+
+**`src/components/AdditionalExpenses.tsx`**
+- Initialize `expenses` state with one empty row (removes need for extra "Add" click)
+- On save: set `status: 'submitted'` and `submitted_at` instead of `'draft'`
+- Allow edit/delete for both `draft` and `submitted` status (user's own expenses)
+- Replace file input with two buttons: "Upload" (file picker) and "Camera" (file input with `capture="environment"`)
+- Compress image files using `compressImageFile` before upload (skip compression for PDFs)
+- Reduce all font sizes: title to `text-base`, labels to `text-xs`, inputs smaller
+- Tighter padding (`p-3` instead of `p-4`, `gap-3` instead of `gap-4`)
+
+**`src/components/BeatAllowanceManagement.tsx`**
+- Update dialog to be mobile-friendly: `max-w-full sm:max-w-[90vw]` and full height on mobile
+- Remove the separate "Submit Expenses" button/flow since expenses auto-submit on save
+- Update RLS consideration: manager approval page already queries `status = 'submitted'`
+
+**Database**: No migration needed. The existing columns support this flow. We just change the default status on insert from `'draft'` to `'submitted'`.
+
