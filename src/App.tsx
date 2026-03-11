@@ -410,6 +410,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/add-records" element={<ProtectedRoute><AddRecords /></ProtectedRoute>} />
         <Route path="/add-beat" element={<ProtectedRoute><AddBeat /></ProtectedRoute>} />
         <Route path="/expenses" element={<ProtectedRoute><MyExpenses /></ProtectedRoute>} />
+        <Route path="/expenses/approvals" element={<ProtectedRoute><ExpenseApprovals /></ProtectedRoute>} />
         <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="/game-policy" element={<ProtectedRoute><GamePolicy /></ProtectedRoute>} />
         <Route path="/activities-info" element={<ProtectedRoute><ActivitiesInfo /></ProtectedRoute>} />
