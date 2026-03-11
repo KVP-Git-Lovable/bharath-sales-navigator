@@ -53,6 +53,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   beatId,
   beatName,
   expenseDate,
+  editExpenseId,
   onExpensesUpdated
 }) => {
   const { user, userProfile } = useAuth();
