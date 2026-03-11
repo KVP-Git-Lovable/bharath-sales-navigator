@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -27,6 +28,7 @@ interface AdditionalExpense {
   bill_url?: string;
   bill_file?: File;
   expense_date: string;
+  status?: string;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -37,6 +39,14 @@ const EXPENSE_CATEGORIES = [
   'Other'
 ];
 
+const STATUS_BADGE_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  draft: { label: 'Draft', variant: 'secondary' },
+  submitted: { label: 'Submitted', variant: 'outline' },
+  manager_approved: { label: 'Approved', variant: 'default' },
+  rejected: { label: 'Rejected', variant: 'destructive' },
+  paid: { label: 'Paid', variant: 'default' },
+};
+
 const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   beatId,
   beatName,
@@ -44,14 +54,12 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   onExpensesUpdated
 }) => {
   const { user, userProfile } = useAuth();
-  const [isFormOpen, setIsFormOpen] = useState(true); // Auto-open for beat-specific form
+  const [isFormOpen, setIsFormOpen] = useState(true);
   const [expenses, setExpenses] = useState<AdditionalExpense[]>([]);
   const [savedExpenses, setSavedExpenses] = useState<AdditionalExpense[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
   const [applyToAllBeats, setApplyToAllBeats] = useState(false);
-
-  console.log('AdditionalExpenses component rendering', { user, userProfile, beatId, beatName, expenseDate });
 
   const defaultDate = expenseDate || new Date().toISOString().split('T')[0];
   
@@ -75,12 +83,11 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     if (!user) return;
 
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('additional_expenses')
         .select('*')
         .eq('user_id', user.id);
 
-      // If beatId and expenseDate are provided, filter for specific beat and date
       if (beatId && expenseDate) {
         query = query.eq('expense_date', expenseDate);
       }
@@ -137,8 +144,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     setLoading(true);
     try {
       if (applyToAllBeats && expenseDate) {
-        // Get all beats for this user on this date
-        const { data: beatAllowances, error: beatError } = await supabase
+        const { data: beatAllowances, error: beatError } = await (supabase as any)
           .from('beat_allowances')
           .select('beat_id, beat_name')
           .eq('user_id', user.id)
@@ -146,7 +152,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 
         if (beatError) throw beatError;
 
-        // Apply expenses to all beats
         for (const beatAllowance of beatAllowances || []) {
           for (const expense of expenses) {
             let billUrl = null;
@@ -155,7 +160,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               billUrl = await uploadFile(expense.bill_file, user.id);
             }
 
-            await supabase
+            await (supabase as any)
               .from('additional_expenses')
               .insert({
                 user_id: user.id,
@@ -164,12 +169,12 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                 amount: expense.amount,
                 description: `${expense.description} (Applied to ${beatAllowance.beat_name})`,
                 bill_url: billUrl,
-                expense_date: expense.expense_date
+                expense_date: expense.expense_date,
+                status: 'draft'
               });
           }
         }
       } else {
-        // Apply expenses to current beat only
         const expensesToSave = [];
 
         for (const expense of expenses) {
@@ -190,11 +195,12 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
             amount: expense.amount,
             description: beatName ? `${expense.description} (${beatName})` : expense.description,
             bill_url: billUrl,
-            expense_date: expense.expense_date
+            expense_date: expense.expense_date,
+            status: 'draft'
           });
         }
 
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('additional_expenses')
           .insert(expensesToSave);
 
@@ -206,7 +212,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
       setIsFormOpen(false);
       fetchSavedExpenses();
       
-      // Call parent callback to refresh data
       if (onExpensesUpdated) {
         onExpensesUpdated();
       }
@@ -220,10 +225,11 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
 
   const deleteSavedExpense = async (expenseId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('additional_expenses')
         .delete()
-        .eq('id', expenseId);
+        .eq('id', expenseId)
+        .eq('status', 'draft');
 
       if (error) throw error;
 
@@ -231,8 +237,17 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
       fetchSavedExpenses();
     } catch (error) {
       console.error('Error deleting expense:', error);
-      toast.error('Failed to delete expense');
+      toast.error('Failed to delete expense. Only draft expenses can be deleted.');
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const config = STATUS_BADGE_MAP[status] || { label: status, variant: 'secondary' as const };
+    return (
+      <Badge variant={config.variant} className="text-[10px] px-1.5 py-0">
+        {config.label}
+      </Badge>
+    );
   };
 
   return (
@@ -257,7 +272,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
       <CardContent>
         {isFormOpen && (
           <div className="space-y-6 mb-6">
-            {/* User Info and Beat Info */}
             <div className="p-4 bg-muted/50 rounded-lg space-y-2">
               <Label className="text-sm font-medium">User: {userProfile?.full_name || 'Loading...'}</Label>
               {beatName && (
@@ -268,7 +282,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               )}
             </div>
 
-            {/* Apply to all beats option */}
             {beatId && expenseDate && (
               <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <Checkbox
@@ -285,7 +298,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               </div>
             )}
 
-            {/* Expense Rows */}
             <div className="space-y-4">
               {expenses.map((expense, index) => (
                 <div key={index} className="p-4 border rounded-lg space-y-4">
@@ -389,7 +401,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                 </div>
               ))}
 
-              {/* Add More Button */}
               <Button
                 onClick={addExpenseRow}
                 variant="outline"
@@ -400,7 +411,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               </Button>
             </div>
 
-            {/* Save Button */}
             {expenses.length > 0 && (
               <div className="flex justify-between items-center pt-4">
                 <div className="text-lg font-semibold">
@@ -428,6 +438,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                     <span className="text-sm text-muted-foreground">
                       • {new Date(expense.expense_date).toLocaleDateString()}
                     </span>
+                    {getStatusBadge(expense.status || 'draft')}
                   </div>
                   {expense.description && (
                     <p className="text-sm text-muted-foreground">{expense.description}</p>
@@ -435,14 +446,16 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold">₹{expense.amount}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteSavedExpense(expense.id!)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                  {(!expense.status || expense.status === 'draft') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteSavedExpense(expense.id!)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
