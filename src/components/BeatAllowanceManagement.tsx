@@ -616,29 +616,6 @@ const BeatAllowanceManagement = () => {
         <CardContent className="py-2.5 px-3">
           {/* Row 1: User selector + Date filter */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Compact User Selector */}
-            <CompactMultiUserSelector
-              selectedUserIds={selectedUserIds}
-              onSelectionChange={setSelectedUserIds}
-            />
-            
-            {/* Date Range Filter */}
-            <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
-              <SelectTrigger className="h-8 w-[130px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-background">
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="current_week">This Week</SelectItem>
-                <SelectItem value="last_week">Last Week</SelectItem>
-                <SelectItem value="current_month">This Month</SelectItem>
-                <SelectItem value="last_month">Last Month</SelectItem>
-                <SelectItem value="current_quarter">This Quarter</SelectItem>
-                <SelectItem value="previous_quarter">Last Quarter</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
 
             {/* Custom Date Pickers - Inline */}
             {filterType === 'custom' && (
