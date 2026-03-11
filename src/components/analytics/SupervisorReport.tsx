@@ -1573,7 +1573,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       doc.text('Sales Analytics Report', margin, 32);
 
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSans', 'normal');
       const periodText = `${format(dateRange.from, 'dd MMM yyyy')} – ${format(dateRange.to, 'dd MMM yyyy')}`;
       const filterLabel = selectedUsers.length === 0 ? 'All Users' : selectedUsers.length <= 3 ? selectedUsers.join(', ') : `${selectedUsers.length} users selected`;
       doc.text(`Period: ${periodText}   |   Filter: ${filterLabel}`, margin, 52);
