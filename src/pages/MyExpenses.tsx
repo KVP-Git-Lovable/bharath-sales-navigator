@@ -3,8 +3,8 @@ import { Layout } from '@/components/Layout';
 import { ModuleHelpButton } from '@/components/help/ModuleHelpButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Users, User as UserIcon, CalendarDays, CalendarRange } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Users, User as UserIcon, CalendarDays, CalendarRange, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
@@ -61,10 +61,7 @@ const MyExpenses = () => {
                 <MyExpenseContent
                   summary={summary}
                   isLoading={isLoading}
-                  showBreakdown={showBreakdown}
-                  breakdownView={breakdownView}
-                  onToggleBreakdown={() => setShowBreakdown(!showBreakdown)}
-                  onBreakdownViewChange={setBreakdownView}
+                  onTotalClick={() => setShowBreakdown(true)}
                   onAddExpense={() => setIsAdditionalOpen(true)}
                 />
               </TabsContent>
@@ -79,16 +76,55 @@ const MyExpenses = () => {
               <MyExpenseContent
                 summary={summary}
                 isLoading={isLoading}
-                showBreakdown={showBreakdown}
-                breakdownView={breakdownView}
-                onToggleBreakdown={() => setShowBreakdown(!showBreakdown)}
-                onBreakdownViewChange={setBreakdownView}
+                onTotalClick={() => setShowBreakdown(true)}
                 onAddExpense={() => setIsAdditionalOpen(true)}
               />
             </div>
           )}
         </div>
       </div>
+
+      {/* Breakdown Dialog */}
+      <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg">
+              Expense Breakdown · {format(selectedMonth, 'MMM yyyy')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* View Toggle */}
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant={breakdownView === 'weekly' ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 text-xs gap-1.5 px-3"
+                onClick={() => setBreakdownView('weekly')}
+              >
+                <CalendarRange className="h-3.5 w-3.5" />
+                Weekly
+              </Button>
+              <Button
+                variant={breakdownView === 'daily' ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 text-xs gap-1.5 px-3"
+                onClick={() => setBreakdownView('daily')}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Daily
+              </Button>
+            </div>
+
+            {summary && (
+              breakdownView === 'weekly' ? (
+                <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
+              ) : (
+                <DailyBreakdown days={summary.dailyBreakdown} />
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Additional Expenses Dialog */}
       <Dialog open={isAdditionalOpen} onOpenChange={setIsAdditionalOpen}>
@@ -103,15 +139,12 @@ const MyExpenses = () => {
 interface MyExpenseContentProps {
   summary: ReturnType<typeof useMonthlyExpenseSummary>['data'];
   isLoading: boolean;
-  showBreakdown: boolean;
-  breakdownView: BreakdownView;
-  onToggleBreakdown: () => void;
-  onBreakdownViewChange: (view: BreakdownView) => void;
+  onTotalClick: () => void;
   onAddExpense: () => void;
 }
 
 const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
-  summary, isLoading, showBreakdown, breakdownView, onToggleBreakdown, onBreakdownViewChange, onAddExpense
+  summary, isLoading, onTotalClick, onAddExpense
 }) => {
   return (
     <>
@@ -123,8 +156,8 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         total={summary?.total || 0}
         presentDays={summary?.presentDays || 0}
         loading={isLoading}
-        onTotalClick={onToggleBreakdown}
-        isExpanded={showBreakdown}
+        onTotalClick={onTotalClick}
+        isExpanded={false}
       />
 
       {/* Pending / Rejected info */}
@@ -139,39 +172,6 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
             <span className="text-destructive">
               ✕ Rejected: ₹{summary.additionalRejected.toLocaleString('en-IN')}
             </span>
-          )}
-        </div>
-      )}
-
-      {/* Breakdown (expandable) with view toggle */}
-      {showBreakdown && summary && (
-        <div className="space-y-2">
-          {/* View Toggle */}
-          <div className="flex items-center gap-1.5 px-1">
-            <Button
-              variant={breakdownView === 'weekly' ? 'default' : 'outline'}
-              size="sm"
-              className="h-7 text-[11px] gap-1 px-2.5"
-              onClick={() => onBreakdownViewChange('weekly')}
-            >
-              <CalendarRange className="h-3 w-3" />
-              Weekly
-            </Button>
-            <Button
-              variant={breakdownView === 'daily' ? 'default' : 'outline'}
-              size="sm"
-              className="h-7 text-[11px] gap-1 px-2.5"
-              onClick={() => onBreakdownViewChange('daily')}
-            >
-              <CalendarDays className="h-3 w-3" />
-              Daily
-            </Button>
-          </div>
-
-          {breakdownView === 'weekly' ? (
-            <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
-          ) : (
-            <DailyBreakdown days={summary.dailyBreakdown} />
           )}
         </div>
       )}
