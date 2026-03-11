@@ -1754,7 +1754,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           top10.forEach((sku, i) => {
             const bw = maxRev > 0 ? (sku.revenue / maxRev) * chartBarMaxW : 0;
             doc.setFontSize(7);
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('NotoSans', 'normal');
             doc.setTextColor(...COLORS.darkText);
             const skuLabel = sku.product_name.length > 30 ? sku.product_name.substring(0, 28) + '…' : sku.product_name;
             doc.text(skuLabel, margin, y + 10);
