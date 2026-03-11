@@ -182,10 +182,15 @@ export const RetailerExternalDBLookup: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           {r.latitude && r.longitude ? (
-                            <div className="flex items-center gap-1.5 text-sm">
-                              <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
+                            <a
+                              href={`https://www.google.com/maps?q=${r.latitude},${r.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                            >
+                              <Navigation className="h-3.5 w-3.5" />
                               <span className="text-xs">{Number(r.latitude).toFixed(4)}, {Number(r.longitude).toFixed(4)}</span>
-                            </div>
+                            </a>
                           ) : '—'}
                         </TableCell>
                         <TableCell>
