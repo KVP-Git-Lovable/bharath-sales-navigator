@@ -1,25 +1,21 @@
 
 
-## Pricing Page Updates
+# Fix: Switch to Static Noto Sans Font Files
 
-**File:** `src/pages/website/PricingPage.tsx` (lines 33-88)
+## Problem
+The current font URLs point to variable-weight Noto Sans fonts (`v36` with axis parameters), which jsPDF cannot parse correctly — causing a `/BBox` error in Adobe and broken `₹` rendering.
 
-### Starter Plan (lines 33-43)
-- Remove: `"500 retailers/month"` and `"10,000 visits/month"`
-- Add: `"Storage space — 5 GB"`
-- Rename: `"AI-powered insights — 2,500 AI requests/month"` to `"AI-powered insights — 2,500 AI credits/month"`
+## Change
+**File:** `src/components/analytics/SupervisorReport.tsx` — lines 1517-1520 only.
 
-### Professional Plan (lines 52-64)
-- Change: `"15,000 orders/month"` to `"10,000 orders/month"`
-- Remove: `"1,500 retailers/month"` and `"30,000 visits/month"`
-- Add: `"Storage space — 10 GB"`
-- Rename: `"AI-powered insights — 5,000 AI requests/month"` to `"AI-powered insights — 5,000 AI credits/month"`
+Replace the font URLs with static `v27` variants:
 
-### Enterprise Plan (lines 74-86)
-- Change: `"40,000 orders/month"` to `"20,000 orders/month"`
-- Remove: `"4,000 retailers/month"` and `"80,000 visits/month"`
-- Add: `"Storage space — 15 GB"`
-- Rename: `"AI-powered insights — 10,000 AI requests/month"` to `"AI-powered insights — 10,000 AI credits/month"`
+```
+Regular: https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNr6TRAsA.ttf
+Bold:    https://fonts.gstatic.com/s/notosans/v27/o-0NIIpQlx3QUlC5A4PNjXhFVNyB.ttf
+```
 
-All changes are in a single file, updating the `plans` array data only.
+Also remove the unused `fontBaseUrl` variable on line 1517.
+
+No other files or sections are touched.
 
