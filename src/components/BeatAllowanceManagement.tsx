@@ -1012,6 +1012,7 @@ const BeatAllowanceManagement = () => {
                               ₹{totalAdditionalExpenses.toLocaleString()}
                             </TableCell>
                             <TableCell></TableCell>
+                            <TableCell></TableCell>
                           </TableRow>
                         </>
                       )}
