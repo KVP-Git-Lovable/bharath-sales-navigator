@@ -350,6 +350,7 @@ const BeatAllowanceManagement = () => {
   const [filterType, setFilterType] = useState<FilterType>('current_week');
   const [loading, setLoading] = useState(true);
   const [isAdditionalExpensesOpen, setIsAdditionalExpensesOpen] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | undefined>();
   const [isProductivityReportOpen, setIsProductivityReportOpen] = useState(false);
   const [daRecords, setDARecords] = useState<DARecord[]>([]);
   const [additionalExpenseData, setAdditionalExpenseData] = useState<AdditionalExpenseData[]>([]);
