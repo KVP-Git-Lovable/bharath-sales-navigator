@@ -742,6 +742,7 @@ const BeatAllowanceManagement = () => {
     setIsAdditionalExpensesOpen(true);
   };
 
+  const handleSubmitExpenses = async () => {
     if (!user?.id) return;
     setSubmittingExpenses(true);
     try {
