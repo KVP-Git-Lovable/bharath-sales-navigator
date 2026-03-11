@@ -13,6 +13,15 @@ export interface WeeklyBreakdown {
   endDate: string;
 }
 
+export interface DailyBreakdown {
+  date: string;
+  ta: number;
+  da: number;
+  additional: number;
+  total: number;
+  isPresent: boolean;
+}
+
 export interface MonthlyExpenseSummary {
   ta: number;
   da: number;
@@ -23,6 +32,7 @@ export interface MonthlyExpenseSummary {
   total: number;
   presentDays: number;
   weeklyBreakdown: WeeklyBreakdown[];
+  dailyBreakdown: DailyBreakdown[];
 }
 
 export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: string) => {
