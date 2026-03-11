@@ -720,49 +720,17 @@ const BeatAllowanceManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Highlight Panel */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Car className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total TA</p>
-                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">₹{totalTA.toLocaleString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/10 rounded-lg">
-                <Utensils className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total DA</p>
-                <p className="text-lg font-bold text-green-600 dark:text-green-400">₹{totalDA.toLocaleString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Receipt className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Additional</p>
-                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">₹{totalAdditionalExpenses.toLocaleString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Compact Inline Summary */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant="outline" className="gap-1 text-xs py-1 px-2 border-blue-300 text-blue-700 dark:text-blue-400">
+          <Car className="h-3 w-3" /> TA: ₹{totalTA.toLocaleString()}
+        </Badge>
+        <Badge variant="outline" className="gap-1 text-xs py-1 px-2 border-green-300 text-green-700 dark:text-green-400">
+          <Utensils className="h-3 w-3" /> DA: ₹{totalDA.toLocaleString()}
+        </Badge>
+        <Badge variant="outline" className="gap-1 text-xs py-1 px-2 border-purple-300 text-purple-700 dark:text-purple-400">
+          <Receipt className="h-3 w-3" /> Additional: ₹{totalAdditionalExpenses.toLocaleString()}
+        </Badge>
       </div>
 
       {/* Main Content */}
