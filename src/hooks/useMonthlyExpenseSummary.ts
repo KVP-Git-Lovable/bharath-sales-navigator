@@ -48,7 +48,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
 
-      const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes] = await Promise.all([
+      const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
         supabase.from('attendance').select('date, status')
           .eq('user_id', userId).gte('date', startStr).lte('date', endStr),
         supabase.from('expense_master_config').select('*').single(),
@@ -57,6 +57,9 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         supabase.from('beats').select('beat_id, travel_allowance'),
         (supabase as any).from('additional_expenses').select('amount, status, expense_date')
           .eq('user_id', userId).gte('expense_date', startStr).lte('expense_date', endStr),
+        supabase.from('orders').select('total_amount')
+          .eq('user_id', userId).gte('order_date', startStr).lte('order_date', endStr)
+          .eq('status', 'confirmed'),
       ]);
 
       const config = configRes.data;
