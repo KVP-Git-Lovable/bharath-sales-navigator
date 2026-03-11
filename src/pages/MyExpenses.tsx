@@ -42,9 +42,6 @@ const MyExpenses = () => {
             </div>
           </div>
 
-          {/* Month Navigator */}
-          <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
-
           {/* Manager tabs or direct content */}
           {isManager ? (
             <Tabs defaultValue="my" className="w-full">
@@ -60,6 +57,7 @@ const MyExpenses = () => {
               </TabsList>
 
               <TabsContent value="my" className="space-y-4 mt-3">
+                <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
                 <MyExpenseContent
                   summary={summary}
                   isLoading={isLoading}
@@ -77,6 +75,7 @@ const MyExpenses = () => {
             </Tabs>
           ) : (
             <div className="space-y-4">
+              <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
               <MyExpenseContent
                 summary={summary}
                 isLoading={isLoading}
