@@ -288,7 +288,7 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
 
       try {
         // Fetch attendance, config, beat_plans, beats, and additional for all subordinates at once
-        const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes] = await Promise.all([
+        const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
           supabase.from('attendance').select('user_id, date, status')
             .in('user_id', subordinateIds).gte('date', startStr).lte('date', endStr),
           supabase.from('expense_master_config').select('*').single(),
@@ -297,6 +297,9 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
           supabase.from('beats').select('beat_id, travel_allowance'),
           (supabase as any).from('additional_expenses').select('user_id, amount, status, expense_date')
             .in('user_id', subordinateIds).gte('expense_date', startStr).lte('expense_date', endStr),
+          supabase.from('orders').select('user_id, total_amount')
+            .in('user_id', subordinateIds).gte('order_date', startStr).lte('order_date', endStr)
+            .eq('status', 'confirmed'),
         ]);
 
         const config = configRes.data;
