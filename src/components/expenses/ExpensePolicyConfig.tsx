@@ -46,8 +46,37 @@ const ExpensePolicyConfig = () => {
         .select('*')
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data) {
+      if (error && error.code === 'PGRST116') {
+        // No config exists — create a default one
+        const { data: newData, error: insertError } = await supabase
+          .from('expense_master_config')
+          .insert({
+            ta_type: 'from_beat',
+            fixed_ta_amount: 0,
+            da_amount: 0,
+          } as any)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        if (newData) {
+          setConfig({
+            id: newData.id,
+            ta_type: (newData.ta_type as 'fixed' | 'from_beat') || 'from_beat',
+            fixed_ta_amount: newData.fixed_ta_amount || 0,
+            da_amount: newData.da_amount || 0,
+            ta_per_km_rate: (newData as any).ta_per_km_rate || 0,
+            da_calculation_basis: ((newData as any).da_calculation_basis as 'per_day' | 'per_half_day') || 'per_day',
+            max_additional_expense_per_day: (newData as any).max_additional_expense_per_day || 0,
+            max_additional_expense_per_month: (newData as any).max_additional_expense_per_month || 0,
+            require_bill_above_amount: (newData as any).require_bill_above_amount || 500,
+            allowed_categories: (newData as any).allowed_categories || DEFAULT_CATEGORIES,
+            expense_policy_notes: (newData as any).expense_policy_notes || '',
+          });
+        }
+      } else if (error) {
+        throw error;
+      } else if (data) {
         setConfig({
           id: data.id,
           ta_type: (data.ta_type as 'fixed' | 'from_beat') || 'from_beat',
