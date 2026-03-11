@@ -1926,7 +1926,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         doc.setDrawColor(...COLORS.cardBorder);
         doc.line(margin, footerY - 6, pageWidth - margin, footerY - 6);
         doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('NotoSans', 'normal');
         doc.setTextColor(...COLORS.mutedText);
         doc.text(`Generated on ${format(new Date(), 'dd MMM yyyy, hh:mm a')}`, margin, footerY);
         doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 50, footerY);
