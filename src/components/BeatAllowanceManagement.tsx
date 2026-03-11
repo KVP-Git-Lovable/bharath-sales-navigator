@@ -666,78 +666,8 @@ const BeatAllowanceManagement = () => {
                 <DACardList records={filteredDARecords} totalDA={totalDA} />
               </TabsContent>
 
-              <TabsContent value="additional" className="space-y-4">
-      {/* Auto-submitted: no separate submit button needed */}
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Type</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Details</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Add on expense</TableHead>
-                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Bill</TableHead>
-                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAdditionalExpenses.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
-                            No additional expenses found for the selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {filteredAdditionalExpenses.map((item, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {new Date(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm">{item.expense_type}</TableCell>
-                              <TableCell className="text-xs sm:text-sm max-w-[100px] truncate">{item.details}</TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">₹{item.value}</TableCell>
-                              <TableCell className="text-center">
-                                {item.bill_attached ? (
-                                  <span className="text-green-600 text-sm">✓</span>
-                                ) : (
-                                  <span className="text-red-600 text-sm">✗</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Badge 
-                                  variant={
-                                    item.status === 'manager_approved' ? 'default' : 
-                                    item.status === 'rejected' ? 'destructive' : 
-                                    item.status === 'submitted' ? 'outline' : 'secondary'
-                                  }
-                                  className="text-[10px] px-1.5 py-0"
-                                >
-                                  {item.status === 'manager_approved' ? 'Approved' : 
-                                   item.status === 'draft' ? 'Draft' :
-                                   item.status === 'submitted' ? 'Submitted' :
-                                   item.status === 'rejected' ? 'Rejected' :
-                                   item.status === 'paid' ? 'Paid' : item.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Total Row */}
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-xs sm:text-sm">Total</TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{totalAdditionalExpenses.toLocaleString()}
-                            </TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="additional" className="space-y-2 mt-3">
+                <AdditionalCardList items={filteredAdditionalExpenses} totalAdditional={totalAdditionalExpenses} />
               </TabsContent>
             </Tabs>
           </div>
