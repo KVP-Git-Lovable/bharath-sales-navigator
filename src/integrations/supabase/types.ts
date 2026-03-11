@@ -99,6 +99,8 @@ export type Database = {
       additional_expenses: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           bill_url: string | null
           category: string
           created_at: string
@@ -106,11 +108,16 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          rejection_reason: string | null
+          status: string
+          submitted_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           bill_url?: string | null
           category: string
           created_at?: string
@@ -118,11 +125,16 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          rejection_reason?: string | null
+          status?: string
+          submitted_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           bill_url?: string | null
           category?: string
           created_at?: string
@@ -130,6 +142,9 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          rejection_reason?: string | null
+          status?: string
+          submitted_at?: string | null
           updated_at?: string
           user_id?: string
         }
