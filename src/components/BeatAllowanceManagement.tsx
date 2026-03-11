@@ -984,16 +984,18 @@ const BeatAllowanceManagement = () => {
       </Card>
 
       {/* Additional Expenses Dialog */}
-      <Dialog open={isAdditionalExpensesOpen} onOpenChange={setIsAdditionalExpensesOpen}>
+      <Dialog open={isAdditionalExpensesOpen} onOpenChange={(open) => { setIsAdditionalExpensesOpen(open); if (!open) setEditingExpenseId(undefined); }}>
         <DialogContent className="max-w-[100vw] sm:max-w-[90vw] h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-0 sm:p-6 rounded-none sm:rounded-lg">
           <DialogHeader className="p-3 sm:p-0 pb-0">
-            <DialogTitle className="text-sm sm:text-lg">Additional Expenses</DialogTitle>
+            <DialogTitle className="text-sm sm:text-lg">{editingExpenseId ? 'Edit Expense' : 'Additional Expenses'}</DialogTitle>
           </DialogHeader>
           <AdditionalExpenses
+            editExpenseId={editingExpenseId}
             onExpensesUpdated={() => {
               fetchExpenseData();
               fetchAdditionalExpenseData();
               setIsAdditionalExpensesOpen(false);
+              setEditingExpenseId(undefined);
             }}
           />
         </DialogContent>
