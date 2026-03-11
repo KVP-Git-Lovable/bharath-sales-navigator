@@ -222,38 +222,43 @@ const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string 
       <Card>
         <CollapsibleTrigger asChild>
           <CardContent className="p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{name}</p>
-                {isLoading ? (
-                  <p className="text-xs text-muted-foreground">Loading...</p>
-                ) : summary ? (
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-                    <span className="text-blue-600">TA: {fmt(summary.ta)}</span>
-                    <span>·</span>
-                    <span className="text-green-600">DA: {fmt(summary.da)}</span>
-                    <span>·</span>
-                    <span className="text-purple-600">Add: {fmt(summary.additionalApproved)}</span>
-                    <span>·</span>
-                    <span className="text-orange-600">Orders: {fmt(summary.orderValue)}</span>
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <p className="text-sm font-medium truncate min-w-0">{name}</p>
+              <div className="flex items-center gap-1.5 shrink-0">
                 {summary && summary.additionalPending > 0 && (
-                  <Badge variant="outline" className="text-[10px] border-yellow-300 text-yellow-700">
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 border-yellow-300 text-yellow-700">
                     Pending {fmt(summary.additionalPending)}
                   </Badge>
                 )}
-                <span className="text-sm font-bold text-primary">
-                  {isLoading ? '...' : summary ? fmt(summary.total) : '₹0'}
-                </span>
-                {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
               </div>
             </div>
+            {isLoading ? (
+              <div className="h-8 rounded bg-muted animate-pulse" />
+            ) : summary ? (
+              <div className="grid grid-cols-5 gap-1 text-center">
+                <div>
+                  <p className="text-[9px] text-muted-foreground">TA</p>
+                  <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{fmt(summary.ta)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-muted-foreground">DA</p>
+                  <p className="text-[11px] font-semibold text-green-600 dark:text-green-400">{fmt(summary.da)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-muted-foreground">Add</p>
+                  <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">{fmt(summary.additionalApproved)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-muted-foreground">Total</p>
+                  <p className="text-[11px] font-bold text-primary">{fmt(summary.total)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-muted-foreground">Orders</p>
+                  <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">{fmt(summary.orderValue)}</p>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </CollapsibleTrigger>
         <CollapsibleContent>
