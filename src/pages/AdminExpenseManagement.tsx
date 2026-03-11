@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Settings, BarChart3, Receipt } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Layout } from '@/components/Layout';
 import ExpensePolicyConfig from '@/components/expenses/ExpensePolicyConfig';
 import ProductivityTracking from '@/components/ProductivityTracking';
 
@@ -24,8 +25,8 @@ const AdminExpenseManagement = () => {
   }
 
   return (
+    <Layout>
     <div className="min-h-screen bg-gradient-subtle">
-      {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3 sm:gap-4">
@@ -78,6 +79,7 @@ const AdminExpenseManagement = () => {
         </Tabs>
       </div>
     </div>
+    </Layout>
   );
 };
 
