@@ -662,62 +662,8 @@ const BeatAllowanceManagement = () => {
                 <TACardList rows={filteredExpenseRows} totalTA={totalTA} navigate={navigate} />
               </TabsContent>
 
-              <TabsContent value="da" className="space-y-4">
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">DA Amount</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Day Start Time</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Day End Time</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Market Hours</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredDARecords.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
-                            No DA records found for the selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {filteredDARecords.map((record, index) => (
-                            <TableRow key={index} className={record.isOnLeave ? 'bg-muted/50' : ''}>
-                              <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
-                                {new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                                {record.isOnLeave && <span className="ml-1 text-xs text-orange-500">(Leave)</span>}
-                              </TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                ₹{record.da_amount.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {record.day_start_time}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {record.day_end_time}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {record.market_hours}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Total Row */}
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-xs sm:text-sm">Total</TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{totalDA.toLocaleString()}
-                            </TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="da" className="space-y-2 mt-3">
+                <DACardList records={filteredDARecords} totalDA={totalDA} />
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-4">
