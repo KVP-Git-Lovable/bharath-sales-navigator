@@ -55,6 +55,207 @@ interface AdditionalExpenseData {
 
 type FilterType = 'today' | 'yesterday' | 'current_week' | 'last_week' | 'current_month' | 'last_month' | 'current_quarter' | 'previous_quarter' | 'custom';
 
+const fmtCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+// ─── TA Card List ────────────────────────────────────────────────────────────
+
+const TACardList: React.FC<{ rows: ExpenseRow[]; totalTA: number; navigate: any }> = ({ rows, totalTA, navigate }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  if (rows.length === 0) {
+    return <p className="text-xs text-muted-foreground text-center py-6">No TA records found</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Total strip */}
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">Total TA</span>
+        <span className="text-sm font-bold text-primary">{fmtCurrency(totalTA)}</span>
+      </div>
+
+      {rows.map((row) => {
+        const isOpen = expandedIds.has(row.id);
+        return (
+          <div key={row.id} className={`rounded-lg border p-3 space-y-2 ${row.isOnLeave ? 'bg-muted/40' : 'bg-card'}`}>
+            {/* Default row: Date | Beat | TA | Action */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{fmtDate(row.date)}</span>
+                  {row.isOnLeave && <Badge variant="outline" className="text-[9px] px-1 py-0 border-orange-300 text-orange-600">Leave</Badge>}
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate">{row.beat_name}</p>
+              </div>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400 shrink-0">{fmtCurrency(row.ta)}</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => navigate(`/today-summary?date=${row.date}`)}>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => toggle(row.id)}>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {/* Expanded: extra columns */}
+            {isOpen && (
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t text-[11px]">
+                <div>
+                  <span className="text-muted-foreground">Productive Visits</span>
+                  <p className="font-medium">{row.productive_visits}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Order Value</span>
+                  <p className="font-medium">{fmtCurrency(row.order_value)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── DA Card List ────────────────────────────────────────────────────────────
+
+const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ records, totalDA }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const toggle = (idx: number) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(idx) ? next.delete(idx) : next.add(idx);
+    return next;
+  });
+
+  if (records.length === 0) {
+    return <p className="text-xs text-muted-foreground text-center py-6">No DA records found</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">Total DA</span>
+        <span className="text-sm font-bold text-primary">{fmtCurrency(totalDA)}</span>
+      </div>
+
+      {records.map((record, idx) => {
+        const isOpen = expandedIds.has(idx);
+        return (
+          <div key={idx} className={`rounded-lg border p-3 space-y-2 ${record.isOnLeave ? 'bg-muted/40' : 'bg-card'}`}>
+            {/* Default: Date | DA Amount | Market Hours */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{fmtDate(record.date)}</span>
+                  {record.isOnLeave && <Badge variant="outline" className="text-[9px] px-1 py-0 border-orange-300 text-orange-600">Leave</Badge>}
+                </div>
+                <p className="text-[11px] text-muted-foreground">{record.market_hours}</p>
+              </div>
+              <span className="text-sm font-bold text-green-600 dark:text-green-400 shrink-0">{fmtCurrency(record.da_amount)}</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => toggle(idx)}>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {/* Expanded */}
+            {isOpen && (
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t text-[11px]">
+                <div>
+                  <span className="text-muted-foreground">Day Start</span>
+                  <p className="font-medium">{record.day_start_time}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Day End</span>
+                  <p className="font-medium">{record.day_end_time}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── Additional Expenses Card List ───────────────────────────────────────────
+
+const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditional: number }> = ({ items, totalAdditional }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const toggle = (idx: number) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(idx) ? next.delete(idx) : next.add(idx);
+    return next;
+  });
+
+  const statusLabel = (s: string) => s === 'manager_approved' ? 'Approved' : s === 'draft' ? 'Draft' : s === 'submitted' ? 'Submitted' : s === 'rejected' ? 'Rejected' : s === 'paid' ? 'Paid' : s;
+  const statusVariant = (s: string): 'default' | 'destructive' | 'outline' | 'secondary' =>
+    s === 'manager_approved' ? 'default' : s === 'rejected' ? 'destructive' : s === 'submitted' ? 'outline' : 'secondary';
+
+  if (items.length === 0) {
+    return <p className="text-xs text-muted-foreground text-center py-6">No additional expenses found</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">Total Additional</span>
+        <span className="text-sm font-bold text-primary">{fmtCurrency(totalAdditional)}</span>
+      </div>
+
+      {items.map((item, idx) => {
+        const isOpen = expandedIds.has(idx);
+        return (
+          <div key={idx} className="rounded-lg border p-3 space-y-2 bg-card">
+            {/* Default: Date | Type | Amount | Status */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{fmtDate(item.date)}</span>
+                  <Badge variant={statusVariant(item.status)} className="text-[9px] px-1.5 py-0">{statusLabel(item.status)}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate">{item.expense_type}</p>
+              </div>
+              <span className="text-sm font-bold text-purple-600 dark:text-purple-400 shrink-0">{fmtCurrency(item.value)}</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => toggle(idx)}>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {/* Expanded */}
+            {isOpen && (
+              <div className="space-y-2 pt-1 border-t text-[11px]">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-muted-foreground">Details</span>
+                    <p className="font-medium">{item.details || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Bill</span>
+                    <p className="font-medium">{item.bill_attached ? '✓ Attached' : '✗ None'}</p>
+                  </div>
+                </div>
+                {(item.status === 'draft' || item.status === 'submitted') && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 px-2">
+                      <Pencil className="h-3 w-3" /> Edit
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 px-2 text-destructive hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3" /> Delete
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+
 const BeatAllowanceManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
