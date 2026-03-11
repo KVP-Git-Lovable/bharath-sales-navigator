@@ -279,7 +279,7 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
     );
   }
 
-  if (expenses.length === 0) {
+  if (pendingExpenses.length === 0 && completedExpenses.length === 0) {
     return <p className="text-sm text-muted-foreground text-center py-6">No expenses found for this month</p>;
   }
 
