@@ -934,7 +934,12 @@ const BeatAllowanceManagement = () => {
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-2 mt-3">
-                <AdditionalCardList items={filteredAdditionalExpenses} totalAdditional={totalAdditionalExpenses} />
+                <AdditionalCardList 
+                  items={filteredAdditionalExpenses} 
+                  totalAdditional={totalAdditionalExpenses}
+                  onDelete={handleDeleteExpense}
+                  onEdit={handleEditExpense}
+                />
               </TabsContent>
             </Tabs>
           </div>
