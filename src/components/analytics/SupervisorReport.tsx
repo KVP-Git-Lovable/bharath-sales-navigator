@@ -1607,7 +1607,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         doc.text(kpi.label, cx + 10, y + 20);
         // Value
         doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setTextColor(...COLORS.darkText);
         doc.text(kpi.value, cx + 10, y + 42);
       });
