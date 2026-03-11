@@ -174,6 +174,22 @@ const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ record
   );
 };
 
+// ─── Bill Link (tiny clickable link to view bill) ────────────────────────────
+
+const BillLink: React.FC<{ billUrl: string }> = ({ billUrl }) => {
+  const handleView = async () => {
+    const { data } = await supabase.storage.from('expense-bills').createSignedUrl(billUrl, 300);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    }
+  };
+  return (
+    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-primary" onClick={handleView}>
+      <ExternalLink className="h-2.5 w-2.5" />
+    </Button>
+  );
+};
+
 // ─── Additional Expenses Table ───────────────────────────────────────────────
 
 const AdditionalCardList: React.FC<{ 
