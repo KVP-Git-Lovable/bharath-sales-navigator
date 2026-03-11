@@ -1003,9 +1003,9 @@ const BeatAllowanceManagement = () => {
 
       {/* Additional Expenses Dialog */}
       <Dialog open={isAdditionalExpensesOpen} onOpenChange={setIsAdditionalExpensesOpen}>
-        <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Additional Expenses</DialogTitle>
+        <DialogContent className="max-w-[100vw] sm:max-w-[90vw] h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-0 sm:p-6 rounded-none sm:rounded-lg">
+          <DialogHeader className="p-3 sm:p-0 pb-0">
+            <DialogTitle className="text-sm sm:text-lg">Additional Expenses</DialogTitle>
           </DialogHeader>
           <AdditionalExpenses
             onExpensesUpdated={() => {
