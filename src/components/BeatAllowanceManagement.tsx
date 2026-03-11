@@ -924,6 +924,31 @@ const BeatAllowanceManagement = () => {
               </TabsContent>
 
               <TabsContent value="additional" className="space-y-4">
+                {/* Submit Button */}
+                {filteredAdditionalExpenses.some(e => e.status === 'draft') && (
+                  <div className="flex justify-end">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" className="flex items-center gap-1.5 text-xs" disabled={submittingExpenses}>
+                          <Send className="h-3.5 w-3.5" />
+                          Submit Expenses
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Submit Expenses for Approval?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            All draft expenses in the selected date range will be submitted. You won't be able to edit them after submission.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleSubmitExpenses}>Submit</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -933,12 +958,13 @@ const BeatAllowanceManagement = () => {
                         <TableHead className="text-xs sm:text-sm">Details</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Add on expense</TableHead>
                         <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Bill</TableHead>
+                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredAdditionalExpenses.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
+                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
                             No additional expenses found for the selected criteria
                           </TableCell>
                         </TableRow>
@@ -958,6 +984,22 @@ const BeatAllowanceManagement = () => {
                                 ) : (
                                   <span className="text-red-600 text-sm">✗</span>
                                 )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge 
+                                  variant={
+                                    item.status === 'manager_approved' ? 'default' : 
+                                    item.status === 'rejected' ? 'destructive' : 
+                                    item.status === 'submitted' ? 'outline' : 'secondary'
+                                  }
+                                  className="text-[10px] px-1.5 py-0"
+                                >
+                                  {item.status === 'manager_approved' ? 'Approved' : 
+                                   item.status === 'draft' ? 'Draft' :
+                                   item.status === 'submitted' ? 'Submitted' :
+                                   item.status === 'rejected' ? 'Rejected' :
+                                   item.status === 'paid' ? 'Paid' : item.status}
+                                </Badge>
                               </TableCell>
                             </TableRow>
                           ))}
