@@ -107,6 +107,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
 
       // Weekly breakdown (week 1 = days 1-7, week 2 = 8-14, etc.)
       const weeklyMap = new Map<number, WeeklyBreakdown>();
+      const dailyBreakdown: DailyBreakdown[] = [];
       const daysInMonth = end.getDate();
       
       for (let day = 1; day <= daysInMonth; day++) {
@@ -127,19 +128,25 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
 
         const week = weeklyMap.get(weekNum)!;
         
-        // TA for this day
-        week.ta += dailyTA.get(dateStr) || 0;
-        
-        // DA for this day
-        if (presentDates.has(dateStr)) {
-          week.da += daAmount;
-        }
-        
-        // Additional expenses for this day (approved only)
+        const dayTA = dailyTA.get(dateStr) || 0;
+        const isPresent = presentDates.has(dateStr);
+        const dayDA = isPresent ? daAmount : 0;
         const dayAdditional = additional
           .filter((e: any) => e.expense_date === dateStr && ['manager_approved', 'paid'].includes(e.status))
           .reduce((s: number, e: any) => s + (e.amount || 0), 0);
+
+        week.ta += dayTA;
+        week.da += dayDA;
         week.additional += dayAdditional;
+
+        dailyBreakdown.push({
+          date: dateStr,
+          ta: dayTA,
+          da: dayDA,
+          additional: dayAdditional,
+          total: dayTA + dayDA + dayAdditional,
+          isPresent,
+        });
       }
 
       // Calculate weekly totals
@@ -155,6 +162,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         total: ta + da + additionalApproved,
         presentDays,
         weeklyBreakdown: Array.from(weeklyMap.values()),
+        dailyBreakdown,
       };
     },
     enabled: !!userId && !!yearMonth,
