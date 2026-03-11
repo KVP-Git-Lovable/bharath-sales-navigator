@@ -109,6 +109,19 @@ const ExpensePolicyConfig = () => {
         .eq('id', config.id);
 
       if (error) throw error;
+
+      // Save approval config
+      if (approvalConfigId) {
+        const { error: acError } = await supabase
+          .from('approval_config')
+          .update({
+            approval_mode: approvalMode,
+            max_levels: approvalMode === 'multi_level' ? maxLevels : 1,
+          } as any)
+          .eq('id', approvalConfigId);
+        if (acError) throw acError;
+      }
+
       toast({ title: "Success", description: "Expense policy saved successfully" });
     } catch (error) {
       console.error('Error saving config:', error);
