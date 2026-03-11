@@ -43,7 +43,7 @@ const EXPENSE_CATEGORIES = [
 
 const STATUS_BADGE_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
-  submitted: { label: 'Submitted', variant: 'outline' },
+  submitted: { label: 'Pending', variant: 'outline' },
   manager_approved: { label: 'Approved', variant: 'default' },
   rejected: { label: 'Rejected', variant: 'destructive' },
   paid: { label: 'Paid', variant: 'default' },
@@ -71,6 +71,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const [expenses, setExpenses] = useState<AdditionalExpense[]>([{ ...initialExpense }]);
   const [savedExpenses, setSavedExpenses] = useState<AdditionalExpense[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
   const [applyToAllBeats, setApplyToAllBeats] = useState(false);
 
@@ -92,29 +93,35 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   }, [expenses, savedExpenses]);
 
   const loadExpenseForEditing = async (id: string) => {
+    setIsEditLoading(true);
     try {
       const { data, error } = await (supabase as any)
         .from('additional_expenses')
         .select('*')
         .eq('id', id)
+        .eq('user_id', user?.id)
         .single();
       if (error) throw error;
-      if (data) {
-        setExpenses([{
-          id: data.id,
-          category: data.category,
-          custom_category: data.custom_category || '',
-          amount: data.amount,
-          description: data.description || '',
-          bill_url: data.bill_url || undefined,
-          expense_date: data.expense_date,
-          status: data.status,
-        }]);
-        setSavedExpenses([]);
+      if (!data) {
+        toast.error('Expense not found');
+        return;
       }
+      setExpenses([{
+        id: data.id,
+        category: data.category,
+        custom_category: data.custom_category || '',
+        amount: data.amount,
+        description: data.description || '',
+        bill_url: data.bill_url || undefined,
+        expense_date: data.expense_date,
+        status: data.status,
+      }]);
+      setSavedExpenses([]);
     } catch (error) {
       console.error('Error loading expense for edit:', error);
       toast.error('Failed to load expense');
+    } finally {
+      setIsEditLoading(false);
     }
   };
 
@@ -342,7 +349,19 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
       </CardHeader>
 
       <CardContent className="p-3 sm:p-6 pt-0">
-        {isFormOpen && (
+        {isEditLoading && (
+          <div className="space-y-3 mb-4 p-3">
+            <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+            <div className="h-9 w-full bg-muted animate-pulse rounded" />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="h-9 bg-muted animate-pulse rounded" />
+              <div className="h-9 bg-muted animate-pulse rounded" />
+            </div>
+            <div className="h-16 w-full bg-muted animate-pulse rounded" />
+          </div>
+        )}
+
+        {isFormOpen && !isEditLoading && (
           <div className="space-y-3 mb-4">
             <div className="p-2.5 bg-muted/50 rounded-lg space-y-1">
               <Label className="text-xs font-medium">User: {userProfile?.full_name || 'Loading...'}</Label>
@@ -502,6 +521,14 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                       {expense.bill_file && (
                         <p className="text-[10px] text-muted-foreground mt-1 truncate">
                           ✓ {expense.bill_file.name} ({(expense.bill_file.size / 1024).toFixed(0)}KB)
+                        </p>
+                      )}
+                      {!expense.bill_file && expense.bill_url && (
+                        <p className="text-[10px] text-primary mt-1 truncate">
+                          ✓ Existing bill attached · <span className="underline cursor-pointer" onClick={async () => {
+                            const { data } = await supabase.storage.from('expense-bills').createSignedUrl(expense.bill_url!, 300);
+                            if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                          }}>View</span>
                         </p>
                       )}
                     </div>
