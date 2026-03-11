@@ -134,33 +134,33 @@ const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ record
           {showMore ? 'Less' : 'More'}
         </Button>
       </div>
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-hidden">
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs w-[70px]">Date</TableHead>
-              <TableHead className="text-right text-xs w-[80px]">DA Amt</TableHead>
-              <TableHead className="text-xs">Mkt Hours</TableHead>
-              {showMore && <TableHead className="text-xs w-[70px]">Start</TableHead>}
-              {showMore && <TableHead className="text-xs w-[70px]">End</TableHead>}
+              <TableHead className="text-[11px] px-2 w-[60px]">Date</TableHead>
+              <TableHead className="text-right text-[11px] px-2 w-[62px]">DA Amt</TableHead>
+              <TableHead className="text-[11px] px-2">Mkt Hours</TableHead>
+              {showMore && <TableHead className="text-[11px] px-2 w-[55px]">Start</TableHead>}
+              {showMore && <TableHead className="text-[11px] px-2 w-[55px]">End</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {records.map((record, idx) => (
               <TableRow key={idx} className={record.isOnLeave ? 'bg-muted/50' : ''}>
-                <TableCell className="text-xs py-2 whitespace-nowrap">
+                <TableCell className="text-[11px] py-1.5 px-2 whitespace-nowrap">
                   {new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                  {record.isOnLeave && <span className="ml-0.5 text-[9px] text-orange-500">(L)</span>}
+                  {record.isOnLeave && <span className="ml-0.5 text-[9px] text-orange-500">L</span>}
                 </TableCell>
-                <TableCell className="text-right text-xs py-2 font-medium">₹{record.da_amount.toLocaleString()}</TableCell>
-                <TableCell className="text-xs py-2">{record.market_hours}</TableCell>
-                {showMore && <TableCell className="text-xs py-2">{record.day_start_time}</TableCell>}
-                {showMore && <TableCell className="text-xs py-2">{record.day_end_time}</TableCell>}
+                <TableCell className="text-right text-[11px] py-1.5 px-2 font-medium">₹{record.da_amount.toLocaleString()}</TableCell>
+                <TableCell className="text-[11px] py-1.5 px-2">{record.market_hours}</TableCell>
+                {showMore && <TableCell className="text-[11px] py-1.5 px-2">{record.day_start_time}</TableCell>}
+                {showMore && <TableCell className="text-[11px] py-1.5 px-2">{record.day_end_time}</TableCell>}
               </TableRow>
             ))}
             <TableRow className="border-t-2 bg-muted/30">
-              <TableCell className="font-bold text-xs py-2">Total</TableCell>
-              <TableCell className="text-right font-bold text-xs py-2">₹{totalDA.toLocaleString()}</TableCell>
+              <TableCell className="font-bold text-[11px] py-1.5 px-2">Total</TableCell>
+              <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalDA.toLocaleString()}</TableCell>
               <TableCell></TableCell>
               {showMore && <TableCell></TableCell>}
               {showMore && <TableCell></TableCell>}
