@@ -193,42 +193,42 @@ const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditi
           {showMore ? 'Less' : 'More'}
         </Button>
       </div>
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-hidden">
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs w-[70px]">Date</TableHead>
-              <TableHead className="text-xs">Type</TableHead>
-              <TableHead className="text-right text-xs w-[80px]">Amount</TableHead>
-              <TableHead className="text-center text-xs w-[70px]">Status</TableHead>
-              {showMore && <TableHead className="text-xs">Details</TableHead>}
-              {showMore && <TableHead className="text-center text-xs w-[40px]">Bill</TableHead>}
-              {showMore && <TableHead className="text-center text-xs w-[80px]">Actions</TableHead>}
+              <TableHead className="text-[11px] px-2 w-[60px]">Date</TableHead>
+              <TableHead className="text-[11px] px-2">Type</TableHead>
+              <TableHead className="text-right text-[11px] px-2 w-[62px]">Amt</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[58px]">Status</TableHead>
+              {showMore && <TableHead className="text-[11px] px-2">Details</TableHead>}
+              {showMore && <TableHead className="text-center text-[11px] px-1 w-[30px]">Bill</TableHead>}
+              {showMore && <TableHead className="text-center text-[11px] px-1 w-[56px]"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((item, idx) => (
               <TableRow key={idx}>
-                <TableCell className="text-xs py-2 whitespace-nowrap">
+                <TableCell className="text-[11px] py-1.5 px-2 whitespace-nowrap">
                   {new Date(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                 </TableCell>
-                <TableCell className="text-xs py-2 max-w-[80px] truncate">{item.expense_type}</TableCell>
-                <TableCell className="text-right text-xs py-2 font-medium">₹{item.value.toLocaleString()}</TableCell>
-                <TableCell className="text-center py-2">
-                  <Badge variant={statusVariant(item.status)} className="text-[9px] px-1.5 py-0">{statusLabel(item.status)}</Badge>
+                <TableCell className="text-[11px] py-1.5 px-2 truncate">{item.expense_type}</TableCell>
+                <TableCell className="text-right text-[11px] py-1.5 px-2 font-medium">₹{item.value.toLocaleString()}</TableCell>
+                <TableCell className="text-center py-1.5 px-1">
+                  <Badge variant={statusVariant(item.status)} className="text-[8px] px-1 py-0">{statusLabel(item.status)}</Badge>
                 </TableCell>
-                {showMore && <TableCell className="text-xs py-2 max-w-[80px] truncate">{item.details || '-'}</TableCell>}
+                {showMore && <TableCell className="text-[11px] py-1.5 px-2 truncate">{item.details || '-'}</TableCell>}
                 {showMore && (
-                  <TableCell className="text-center py-2">
-                    {item.bill_attached ? <span className="text-green-600 text-xs">✓</span> : <span className="text-destructive text-xs">✗</span>}
+                  <TableCell className="text-center py-1.5 px-1">
+                    {item.bill_attached ? <span className="text-green-600 text-[11px]">✓</span> : <span className="text-destructive text-[11px]">✗</span>}
                   </TableCell>
                 )}
                 {showMore && (
-                  <TableCell className="text-center py-2">
+                  <TableCell className="text-center py-1.5 px-1">
                     {(item.status === 'draft' || item.status === 'submitted') && (
-                      <div className="flex items-center justify-center gap-0.5">
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Pencil className="h-3 w-3" /></Button>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                      <div className="flex items-center justify-center gap-0">
+                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0"><Pencil className="h-2.5 w-2.5" /></Button>
+                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive"><Trash2 className="h-2.5 w-2.5" /></Button>
                       </div>
                     )}
                   </TableCell>
@@ -236,9 +236,9 @@ const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditi
               </TableRow>
             ))}
             <TableRow className="border-t-2 bg-muted/30">
-              <TableCell className="font-bold text-xs py-2">Total</TableCell>
+              <TableCell className="font-bold text-[11px] py-1.5 px-2">Total</TableCell>
               <TableCell></TableCell>
-              <TableCell className="text-right font-bold text-xs py-2">₹{totalAdditional.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalAdditional.toLocaleString()}</TableCell>
               <TableCell></TableCell>
               {showMore && <TableCell></TableCell>}
               {showMore && <TableCell></TableCell>}
