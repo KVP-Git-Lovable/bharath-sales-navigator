@@ -211,8 +211,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
           if (expense.bill_file) {
             billUrl = await uploadFile(expense.bill_file, user.id);
             if (!billUrl) {
-              toast.error('Failed to upload file for one of the expenses');
-              continue;
+              toast.error('Failed to upload bill attachment, expense will be saved without it');
             }
           }
 
