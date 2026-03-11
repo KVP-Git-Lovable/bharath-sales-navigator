@@ -79,13 +79,44 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
-    fetchSavedExpenses();
-  }, [user]);
+    if (editExpenseId && user) {
+      loadExpenseForEditing(editExpenseId);
+    } else {
+      fetchSavedExpenses();
+    }
+  }, [user, editExpenseId]);
 
   useEffect(() => {
     const total = [...expenses, ...savedExpenses].reduce((sum, expense) => sum + expense.amount, 0);
     setTotalAmount(total);
   }, [expenses, savedExpenses]);
+
+  const loadExpenseForEditing = async (id: string) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('additional_expenses')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      if (data) {
+        setExpenses([{
+          id: data.id,
+          category: data.category,
+          custom_category: data.custom_category || '',
+          amount: data.amount,
+          description: data.description || '',
+          bill_url: data.bill_url || undefined,
+          expense_date: data.expense_date,
+          status: data.status,
+        }]);
+        setSavedExpenses([]);
+      }
+    } catch (error) {
+      console.error('Error loading expense for edit:', error);
+      toast.error('Failed to load expense');
+    }
+  };
 
   const fetchSavedExpenses = async () => {
     if (!user) return;
