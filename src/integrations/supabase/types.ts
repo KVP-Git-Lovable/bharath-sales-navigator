@@ -619,6 +619,39 @@ export type Database = {
           },
         ]
       }
+      approval_workflows: {
+        Row: {
+          approval_mode: string
+          created_at: string
+          entity_type: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          updated_at: string
+          workflow_name: string
+        }
+        Insert: {
+          approval_mode?: string
+          created_at?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          updated_at?: string
+          workflow_name: string
+        }
+        Update: {
+          approval_mode?: string
+          created_at?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          updated_at?: string
+          workflow_name?: string
+        }
+        Relationships: []
+      }
       approvers: {
         Row: {
           approver_level: number
@@ -4673,6 +4706,83 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      expense_approval_rules: {
+        Row: {
+          condition_type: string
+          condition_value: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number
+          rule_name: string
+          updated_at: string
+          workflow_id: string
+        }
+        Insert: {
+          condition_type: string
+          condition_value?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          rule_name: string
+          updated_at?: string
+          workflow_id: string
+        }
+        Update: {
+          condition_type?: string
+          condition_value?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          rule_name?: string
+          updated_at?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_approval_rules_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          limit_amount: number | null
+          name: string
+          receipt_required: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          limit_amount?: number | null
+          name: string
+          receipt_required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          limit_amount?: number | null
+          name?: string
+          receipt_required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       expense_master_config: {
         Row: {
@@ -15468,6 +15578,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      workflow_steps: {
+        Row: {
+          approver_role: string | null
+          approver_type: string
+          created_at: string
+          hierarchy_level: number | null
+          id: string
+          specific_user_id: string | null
+          step_number: number
+          workflow_id: string
+        }
+        Insert: {
+          approver_role?: string | null
+          approver_type?: string
+          created_at?: string
+          hierarchy_level?: number | null
+          id?: string
+          specific_user_id?: string | null
+          step_number?: number
+          workflow_id: string
+        }
+        Update: {
+          approver_role?: string | null
+          approver_type?: string
+          created_at?: string
+          hierarchy_level?: number | null
+          id?: string
+          specific_user_id?: string | null
+          step_number?: number
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_steps_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       working_days_config: {
         Row: {
