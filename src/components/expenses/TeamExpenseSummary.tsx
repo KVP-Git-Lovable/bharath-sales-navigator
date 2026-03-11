@@ -216,62 +216,92 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
 const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string }> = ({
   userId, name, yearMonth
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [breakdownView, setBreakdownView] = useState<'weekly' | 'daily'>('weekly');
   const { data: summary, isLoading } = useMonthlyExpenseSummary(userId, yearMonth);
 
   return (
-    <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <Card>
-        <CollapsibleTrigger asChild>
-          <CardContent className="p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <p className="text-sm font-medium truncate min-w-0">{name}</p>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {summary && summary.additionalPending > 0 && (
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 border-yellow-300 text-yellow-700">
-                    Pending {fmt(summary.additionalPending)}
-                  </Badge>
-                )}
-                {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+    <>
+      <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setDialogOpen(true)}>
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <p className="text-sm font-medium truncate min-w-0">{name}</p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {summary && summary.additionalPending > 0 && (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 border-yellow-300 text-yellow-700">
+                  Pending {fmt(summary.additionalPending)}
+                </Badge>
+              )}
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="h-8 rounded bg-muted animate-pulse" />
+          ) : summary ? (
+            <div className="grid grid-cols-5 gap-1 text-center">
+              <div>
+                <p className="text-[9px] text-muted-foreground">TA</p>
+                <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{fmt(summary.ta)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground">DA</p>
+                <p className="text-[11px] font-semibold text-green-600 dark:text-green-400">{fmt(summary.da)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground">Add</p>
+                <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">{fmt(summary.additionalApproved)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground">Total</p>
+                <p className="text-[11px] font-bold text-primary">{fmt(summary.total)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground">Orders</p>
+                <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">{fmt(summary.orderValue)}</p>
               </div>
             </div>
-            {isLoading ? (
-              <div className="h-8 rounded bg-muted animate-pulse" />
-            ) : summary ? (
-              <div className="grid grid-cols-5 gap-1 text-center">
-                <div>
-                  <p className="text-[9px] text-muted-foreground">TA</p>
-                  <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{fmt(summary.ta)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-muted-foreground">DA</p>
-                  <p className="text-[11px] font-semibold text-green-600 dark:text-green-400">{fmt(summary.da)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-muted-foreground">Add</p>
-                  <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">{fmt(summary.additionalApproved)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-muted-foreground">Total</p>
-                  <p className="text-[11px] font-bold text-primary">{fmt(summary.total)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-muted-foreground">Orders</p>
-                  <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">{fmt(summary.orderValue)}</p>
-                </div>
-              </div>
-            ) : null}
-          </CardContent>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          {summary && (
-            <div className="px-3 pb-3">
-              <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
-            </div>
-          )}
-        </CollapsibleContent>
+          ) : null}
+        </CardContent>
       </Card>
-    </Collapsible>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg">{name} · Breakdown</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant={breakdownView === 'weekly' ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 text-xs gap-1.5 px-3"
+                onClick={() => setBreakdownView('weekly')}
+              >
+                <CalendarRange className="h-3.5 w-3.5" />
+                Weekly
+              </Button>
+              <Button
+                variant={breakdownView === 'daily' ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 text-xs gap-1.5 px-3"
+                onClick={() => setBreakdownView('daily')}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Daily
+              </Button>
+            </div>
+
+            {summary && (
+              breakdownView === 'weekly' ? (
+                <WeeklyBreakdown weeks={summary.weeklyBreakdown} />
+              ) : (
+                <DailyBreakdown days={summary.dailyBreakdown} />
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
