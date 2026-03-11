@@ -7,9 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, CheckCircle, XCircle, Eye, FileText } from 'lucide-react';
+import { CalendarIcon, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useSubordinates } from '@/hooks/useSubordinates';
+import { useMyPendingSteps, useProcessApprovalStep } from '@/hooks/useApprovalEngine';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
@@ -28,9 +28,12 @@ interface ExpenseRecord {
   status: string;
   submitted_at: string | null;
   employee_name?: string;
+  // approval engine fields
+  approvalRequestId?: string;
+  stepId?: string;
 }
 
-type FilterStatus = 'submitted' | 'manager_approved' | 'rejected' | 'all';
+type FilterStatus = 'pending' | 'manager_approved' | 'rejected' | 'all';
 type DateFilter = 'this_week' | 'this_month' | 'last_month' | 'custom';
 
 const STATUS_BADGE_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -43,17 +46,24 @@ const STATUS_BADGE_MAP: Record<string, { label: string; variant: 'default' | 'se
 
 const ExpenseApprovals = () => {
   const { user } = useAuth();
-  const { subordinateIds, subordinates, isManager, isLoading: subsLoading } = useSubordinates();
+  const { data: pendingSteps, isLoading: stepsLoading } = useMyPendingSteps();
+  const { processStep } = useProcessApprovalStep();
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [completedExpenses, setCompletedExpenses] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>('submitted');
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>('pending');
   const [dateFilter, setDateFilter] = useState<DateFilter>('this_month');
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [dateRangeStart, setDateRangeStart] = useState<Date>();
   const [dateRangeEnd, setDateRangeEnd] = useState<Date>();
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
-  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
+  const [selectedExpense, setSelectedExpense] = useState<ExpenseRecord | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Get expense-related pending steps
+  const expensePendingSteps = useMemo(
+    () => (pendingSteps || []).filter(s => s.entityType === 'expense'),
+    [pendingSteps]
+  );
 
   const getDateRange = () => {
     const today = new Date();
@@ -62,9 +72,10 @@ const ExpenseApprovals = () => {
         return { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) };
       case 'this_month':
         return { start: startOfMonth(today), end: endOfMonth(today) };
-      case 'last_month':
+      case 'last_month': {
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+      }
       case 'custom':
         if (dateRangeStart && dateRangeEnd) return { start: dateRangeStart, end: dateRangeEnd };
         return { start: startOfMonth(today), end: endOfMonth(today) };
@@ -73,41 +84,45 @@ const ExpenseApprovals = () => {
     }
   };
 
-  const fetchExpenses = async () => {
-    if (!user?.id || subordinateIds.length === 0) {
+  // Fetch pending expenses using approval engine entity IDs
+  const fetchPendingExpenses = async () => {
+    if (expensePendingSteps.length === 0) {
+      setExpenses([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
+      const entityIds = expensePendingSteps.map(s => s.entityId);
       const { start, end } = getDateRange();
-      
-      let query = (supabase as any)
+
+      const { data, error } = await (supabase as any)
         .from('additional_expenses')
         .select('*')
-        .in('user_id', subordinateIds)
+        .in('id', entityIds)
         .gte('expense_date', format(start, 'yyyy-MM-dd'))
         .lte('expense_date', format(end, 'yyyy-MM-dd'))
         .order('expense_date', { ascending: false });
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      } else {
-        query = query.in('status', ['submitted', 'manager_approved', 'rejected']);
-      }
-
-      if (selectedEmployee !== 'all') {
-        query = query.eq('user_id', selectedEmployee);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
 
-      // Map employee names
+      // Fetch employee names
+      const userIds = [...new Set((data || []).map((e: any) => e.user_id))];
+      let nameMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds);
+        profiles?.forEach((p: any) => nameMap.set(p.id, p.full_name));
+      }
+
       const mapped = (data || []).map((exp: any) => {
-        const sub = subordinates.find(s => s.subordinate_user_id === exp.user_id);
-        return { ...exp, employee_name: sub?.full_name || 'Unknown' };
+        const step = expensePendingSteps.find(s => s.entityId === exp.id);
+        return {
+          ...exp,
+          employee_name: nameMap.get(exp.user_id) || 'Unknown',
+          approvalRequestId: step?.approvalRequestId,
+          stepId: step?.stepId,
+        };
       });
 
       setExpenses(mapped);
@@ -119,58 +134,97 @@ const ExpenseApprovals = () => {
     }
   };
 
-  useEffect(() => {
-    if (!subsLoading && subordinateIds.length > 0) {
-      fetchExpenses();
-    }
-  }, [subordinateIds, subsLoading, statusFilter, dateFilter, selectedEmployee, dateRangeStart, dateRangeEnd]);
-
-  const handleApprove = async (expenseId: string) => {
+  // Fetch completed (approved/rejected) expenses for history view
+  const fetchCompletedExpenses = async () => {
     if (!user?.id) return;
-    setActionLoading(expenseId);
+    setLoading(true);
     try {
-      const { error } = await (supabase as any)
-        .from('additional_expenses')
-        .update({
-          status: 'manager_approved',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', expenseId)
-        .eq('status', 'submitted');
+      const { start, end } = getDateRange();
 
+      // Get expense IDs where I was an approver (from audit log)
+      const { data: auditData } = await supabase
+        .from('approval_audit_log')
+        .select('entity_id')
+        .eq('entity_type', 'expense')
+        .eq('performed_by', user.id)
+        .in('action', ['approved', 'rejected']);
+
+      const entityIds = [...new Set((auditData || []).map((a: any) => a.entity_id))];
+      if (entityIds.length === 0) { setCompletedExpenses([]); setLoading(false); return; }
+
+      const statusToFetch = statusFilter === 'manager_approved' ? 'manager_approved' :
+                             statusFilter === 'rejected' ? 'rejected' :
+                             undefined;
+
+      let query = (supabase as any)
+        .from('additional_expenses')
+        .select('*')
+        .in('id', entityIds)
+        .gte('expense_date', format(start, 'yyyy-MM-dd'))
+        .lte('expense_date', format(end, 'yyyy-MM-dd'))
+        .order('expense_date', { ascending: false });
+
+      if (statusToFetch) {
+        query = query.eq('status', statusToFetch);
+      } else {
+        query = query.in('status', ['manager_approved', 'rejected']);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      toast.success('Expense approved');
-      fetchExpenses();
+
+      const userIds = [...new Set((data || []).map((e: any) => e.user_id))];
+      let nameMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds);
+        profiles?.forEach((p: any) => nameMap.set(p.id, p.full_name));
+      }
+
+      setCompletedExpenses((data || []).map((exp: any) => ({
+        ...exp,
+        employee_name: nameMap.get(exp.user_id) || 'Unknown',
+      })));
     } catch (error) {
-      console.error('Error approving expense:', error);
-      toast.error('Failed to approve expense');
+      console.error('Error fetching completed expenses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!stepsLoading) {
+      if (statusFilter === 'pending') {
+        fetchPendingExpenses();
+      } else {
+        fetchCompletedExpenses();
+      }
+    }
+  }, [stepsLoading, expensePendingSteps.length, statusFilter, dateFilter, dateRangeStart, dateRangeEnd]);
+
+  const handleApprove = async (expense: ExpenseRecord) => {
+    if (!expense.approvalRequestId) {
+      toast.error('No approval request found for this expense');
+      return;
+    }
+    setActionLoading(expense.id);
+    try {
+      await processStep(expense.approvalRequestId, 'approved');
+      if (statusFilter === 'pending') fetchPendingExpenses();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve expense');
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleReject = async (reason: string) => {
-    if (!user?.id || !selectedExpenseId) return;
+    if (!selectedExpense?.approvalRequestId) return;
     try {
-      const { error } = await (supabase as any)
-        .from('additional_expenses')
-        .update({
-          status: 'rejected',
-          approved_by: user.id,
-          approved_at: new Date().toISOString(),
-          rejection_reason: reason
-        })
-        .eq('id', selectedExpenseId)
-        .eq('status', 'submitted');
-
-      if (error) throw error;
-      toast.success('Expense rejected');
-      setSelectedExpenseId(null);
-      fetchExpenses();
-    } catch (error) {
-      console.error('Error rejecting expense:', error);
-      toast.error('Failed to reject expense');
+      await processStep(selectedExpense.approvalRequestId, 'rejected', reason);
+      setSelectedExpense(null);
+      if (statusFilter === 'pending') fetchPendingExpenses();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reject expense');
     }
   };
 
@@ -179,31 +233,30 @@ const ExpenseApprovals = () => {
       const { data } = await supabase.storage
         .from('expense-bills')
         .createSignedUrl(billUrl, 300);
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
-      }
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
     } catch {
       toast.error('Failed to open bill');
     }
   };
 
-  // Summary by employee
+  const displayExpenses = statusFilter === 'pending' ? expenses : completedExpenses;
+
   const employeeSummary = useMemo(() => {
     const map = new Map<string, { name: string; total: number; count: number }>();
-    expenses.forEach(exp => {
+    displayExpenses.forEach(exp => {
       const existing = map.get(exp.user_id) || { name: exp.employee_name || 'Unknown', total: 0, count: 0 };
       existing.total += exp.amount;
       existing.count += 1;
       map.set(exp.user_id, existing);
     });
     return Array.from(map.entries()).map(([id, data]) => ({ id, ...data }));
-  }, [expenses]);
+  }, [displayExpenses]);
 
-  if (!isManager && !subsLoading) {
+  if (stepsLoading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
-          <p className="text-muted-foreground">You don't have team members to manage expenses for.</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       </Layout>
     );
@@ -224,10 +277,10 @@ const ExpenseApprovals = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="submitted">Pending</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="manager_approved">Approved</SelectItem>
                     <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="all">All Completed</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -240,20 +293,6 @@ const ExpenseApprovals = () => {
                     <SelectItem value="this_month">This Month</SelectItem>
                     <SelectItem value="last_month">Last Month</SelectItem>
                     <SelectItem value="custom">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger className="w-[160px] h-9 text-sm">
-                    <SelectValue placeholder="All Employees" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Employees</SelectItem>
-                    {subordinates.map(sub => (
-                      <SelectItem key={sub.subordinate_user_id} value={sub.subordinate_user_id}>
-                        {sub.full_name}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
 
@@ -305,7 +344,7 @@ const ExpenseApprovals = () => {
           {/* Expenses Table */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Expenses ({expenses.length})</CardTitle>
+              <CardTitle className="text-lg">Expenses ({displayExpenses.length})</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -328,14 +367,14 @@ const ExpenseApprovals = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {expenses.length === 0 ? (
+                      {displayExpenses.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                             No expenses found for the selected filters
                           </TableCell>
                         </TableRow>
                       ) : (
-                        expenses.map(exp => (
+                        displayExpenses.map(exp => (
                           <TableRow key={exp.id}>
                             <TableCell className="text-xs font-medium">{exp.employee_name}</TableCell>
                             <TableCell className="text-xs whitespace-nowrap">
@@ -361,13 +400,13 @@ const ExpenseApprovals = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center">
-                              {exp.status === 'submitted' && (
+                              {exp.status === 'submitted' && exp.approvalRequestId && (
                                 <div className="flex items-center justify-center gap-1">
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    onClick={() => handleApprove(exp.id)}
+                                    onClick={() => handleApprove(exp)}
                                     disabled={actionLoading === exp.id}
                                   >
                                     <CheckCircle className="h-4 w-4" />
@@ -376,7 +415,7 @@ const ExpenseApprovals = () => {
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 px-2 text-destructive hover:bg-destructive/10"
-                                    onClick={() => { setSelectedExpenseId(exp.id); setRejectionDialogOpen(true); }}
+                                    onClick={() => { setSelectedExpense(exp); setRejectionDialogOpen(true); }}
                                     disabled={actionLoading === exp.id}
                                   >
                                     <XCircle className="h-4 w-4" />
@@ -398,7 +437,7 @@ const ExpenseApprovals = () => {
 
       <RejectionReasonDialog
         isOpen={rejectionDialogOpen}
-        onClose={() => { setRejectionDialogOpen(false); setSelectedExpenseId(null); }}
+        onClose={() => { setRejectionDialogOpen(false); setSelectedExpense(null); }}
         onConfirm={handleReject}
         title="Reject Expense"
         description="Please provide a reason for rejecting this expense."

@@ -268,8 +268,8 @@ const TeamApprovalsList: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
     } catch (err: any) { toast.error(err.message || 'Failed to reject'); }
   };
 
-  const pending = expenses.filter(e => e.status === 'submitted');
-  const processed = expenses.filter(e => e.status !== 'submitted');
+  const pending = pendingExpenses;
+  const processed = completedExpenses;
 
   if (loading) {
     return (
