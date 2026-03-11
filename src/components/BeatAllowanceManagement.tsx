@@ -48,6 +48,7 @@ interface AdditionalExpenseData {
   details: string;
   value: number;
   bill_attached: boolean;
+  status: string;
 }
 
 type FilterType = 'today' | 'yesterday' | 'current_week' | 'last_week' | 'current_month' | 'last_month' | 'current_quarter' | 'previous_quarter' | 'custom';
