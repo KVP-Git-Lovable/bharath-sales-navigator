@@ -615,18 +615,7 @@ const BeatAllowanceManagement = () => {
       <Card>
         <CardHeader className="pb-3 sm:pb-6 px-3 sm:px-6">
           <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 xs:gap-3">
-            <div className="flex items-center gap-1.5">
-              <CardTitle className="text-lg sm:text-xl">Expense Details</CardTitle>
-              <Button
-                onClick={handleAdditionalExpensesClick}
-                variant="default"
-                size="sm"
-                className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 h-auto"
-              >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden xs:inline">Add </span>Expense
-              </Button>
-            </div>
+            <CardTitle className="text-lg sm:text-xl">Expense Details</CardTitle>
             <div className="flex items-center gap-1.5">
               <Button 
                 onClick={() => setIsProductivityReportOpen(true)} 
@@ -645,6 +634,15 @@ const BeatAllowanceManagement = () => {
               >
                 <Download className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">XLS</span>
+              </Button>
+              <Button
+                onClick={handleAdditionalExpensesClick}
+                variant="default"
+                size="sm"
+                className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 h-auto"
+              >
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Add </span>Expense
               </Button>
             </div>
           </div>
