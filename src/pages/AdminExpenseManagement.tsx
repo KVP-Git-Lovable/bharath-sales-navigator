@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Settings, BarChart3, Receipt } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Layout } from '@/components/Layout';
 import ExpensePolicyConfig from '@/components/expenses/ExpensePolicyConfig';
 import ProductivityTracking from '@/components/ProductivityTracking';
 
