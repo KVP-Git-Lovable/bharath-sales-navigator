@@ -69,6 +69,25 @@ const ExpensePolicyConfig = () => {
     }
   };
 
+  const fetchApprovalConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('approval_config')
+        .select('*')
+        .eq('entity_type', 'expense')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setApprovalConfigId(data.id);
+        setApprovalMode(((data as any).approval_mode as 'auto' | 'manager' | 'multi_level') || 'manager');
+        setMaxLevels(data.max_levels || 1);
+      }
+    } catch (error) {
+      console.error('Error fetching approval config:', error);
+    }
+  };
+
   const handleSave = async () => {
     if (!config) return;
     try {
