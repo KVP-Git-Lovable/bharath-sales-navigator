@@ -505,6 +505,7 @@ export type Database = {
       }
       approval_config: {
         Row: {
+          approval_mode: string
           created_at: string
           entity_type: string
           final_approval_role: string | null
@@ -515,6 +516,7 @@ export type Database = {
           use_full_hierarchy: boolean
         }
         Insert: {
+          approval_mode?: string
           created_at?: string
           entity_type: string
           final_approval_role?: string | null
@@ -525,6 +527,7 @@ export type Database = {
           use_full_hierarchy?: boolean
         }
         Update: {
+          approval_mode?: string
           created_at?: string
           entity_type?: string
           final_approval_role?: string | null
