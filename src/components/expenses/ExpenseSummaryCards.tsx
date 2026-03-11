@@ -90,12 +90,6 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
 
   return (
     <div className="space-y-1.5">
-      {/* Toggle */}
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setCompact(v => !v)}>
-          {compact ? <LayoutGrid className="h-3.5 w-3.5" /> : <List className="h-3.5 w-3.5" />}
-        </Button>
-      </div>
 
       {compact ? (
         /* Compact single-line strip */
