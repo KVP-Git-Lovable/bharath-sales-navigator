@@ -79,6 +79,7 @@ const AdminExpenseManagement = () => {
         </Tabs>
       </div>
     </div>
+    </Layout>
   );
 };
 
