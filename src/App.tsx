@@ -101,6 +101,7 @@ import RetailManagement from "./pages/RetailManagement";
 import VanSalesManagement from "./pages/VanSalesManagement";
 import AdminExpenseManagement from "./pages/AdminExpenseManagement";
 import MyExpenses from "./pages/MyExpenses";
+import ExpenseApprovals from "./pages/ExpenseApprovals";
 import UserProfile from "./pages/UserProfile";
 import CompleteProfile from "./pages/CompleteProfile";
 import GamificationAdmin from "./pages/GamificationAdmin";

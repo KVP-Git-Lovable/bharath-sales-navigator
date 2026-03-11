@@ -381,9 +381,9 @@ const BeatAllowanceManagement = () => {
     try {
       if (!user?.id || effectiveUserIds.length === 0) return;
 
-      const { data: expensesData, error } = await supabase
+      const { data: expensesData, error } = await (supabase as any)
         .from('additional_expenses')
-        .select('expense_date, category, custom_category, description, amount, bill_url')
+        .select('expense_date, category, custom_category, description, amount, bill_url, status')
         .in('user_id', effectiveUserIds)
         .order('expense_date', { ascending: true });
 
@@ -394,7 +394,8 @@ const BeatAllowanceManagement = () => {
         expense_type: item.category === 'Other' ? item.custom_category : item.category,
         details: item.description || '',
         value: item.amount,
-        bill_attached: !!item.bill_url
+        bill_attached: !!item.bill_url,
+        status: item.status || 'draft'
       })) || [];
 
       if (isMountedRef.current) {
