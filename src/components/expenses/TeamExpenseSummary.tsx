@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, User, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { ChevronRight, CheckCircle, XCircle, Eye, CalendarRange, CalendarDays } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
