@@ -156,6 +156,8 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       // Calculate weekly totals
       weeklyMap.forEach(w => w.total = w.ta + w.da + w.additional);
 
+      const orderValue = (ordersRes.data || []).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+
       return {
         ta,
         da,
@@ -164,6 +166,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         additionalRejected,
         additionalTotal,
         total: ta + da + additionalApproved,
+        orderValue,
         presentDays,
         weeklyBreakdown: Array.from(weeklyMap.values()),
         dailyBreakdown,
