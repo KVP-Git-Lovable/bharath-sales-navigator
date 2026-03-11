@@ -474,6 +474,30 @@ const BeatAllowanceManagement = () => {
     setIsAdditionalExpensesOpen(true);
   };
 
+  const handleSubmitExpenses = async () => {
+    if (!user?.id) return;
+    setSubmittingExpenses(true);
+    try {
+      const { start, end } = getDateRange();
+      const { error } = await (supabase as any)
+        .from('additional_expenses')
+        .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('status', 'draft')
+        .gte('expense_date', format(start, 'yyyy-MM-dd'))
+        .lte('expense_date', format(end, 'yyyy-MM-dd'));
+
+      if (error) throw error;
+      toast({ title: "Submitted", description: "Expenses submitted for approval" });
+      fetchAdditionalExpenseData();
+    } catch (error) {
+      console.error('Error submitting expenses:', error);
+      toast({ title: "Error", description: "Failed to submit expenses", variant: "destructive" });
+    } finally {
+      setSubmittingExpenses(false);
+    }
+  };
+
   const filterByDate = (dateString: string) => {
     const rowDate = new Date(dateString);
     rowDate.setHours(0, 0, 0, 0);
