@@ -28,11 +28,15 @@ const DEFAULT_CATEGORIES = ['food', 'travel', 'accommodation', 'communication', 
 const ExpensePolicyConfig = () => {
   const { toast } = useToast();
   const [config, setConfig] = useState<ExpenseConfig | null>(null);
+  const [approvalMode, setApprovalMode] = useState<'auto' | 'manager' | 'multi_level'>('manager');
+  const [maxLevels, setMaxLevels] = useState(1);
+  const [approvalConfigId, setApprovalConfigId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchConfig();
+    fetchApprovalConfig();
   }, []);
 
   const fetchConfig = async () => {
