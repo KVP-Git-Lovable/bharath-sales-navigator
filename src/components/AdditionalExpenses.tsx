@@ -93,29 +93,35 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   }, [expenses, savedExpenses]);
 
   const loadExpenseForEditing = async (id: string) => {
+    setIsEditLoading(true);
     try {
       const { data, error } = await (supabase as any)
         .from('additional_expenses')
         .select('*')
         .eq('id', id)
+        .eq('user_id', user?.id)
         .single();
       if (error) throw error;
-      if (data) {
-        setExpenses([{
-          id: data.id,
-          category: data.category,
-          custom_category: data.custom_category || '',
-          amount: data.amount,
-          description: data.description || '',
-          bill_url: data.bill_url || undefined,
-          expense_date: data.expense_date,
-          status: data.status,
-        }]);
-        setSavedExpenses([]);
+      if (!data) {
+        toast.error('Expense not found');
+        return;
       }
+      setExpenses([{
+        id: data.id,
+        category: data.category,
+        custom_category: data.custom_category || '',
+        amount: data.amount,
+        description: data.description || '',
+        bill_url: data.bill_url || undefined,
+        expense_date: data.expense_date,
+        status: data.status,
+      }]);
+      setSavedExpenses([]);
     } catch (error) {
       console.error('Error loading expense for edit:', error);
       toast.error('Failed to load expense');
+    } finally {
+      setIsEditLoading(false);
     }
   };
 
