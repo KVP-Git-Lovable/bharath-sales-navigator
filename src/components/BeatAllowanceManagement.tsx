@@ -72,43 +72,43 @@ const TACardList: React.FC<{ rows: ExpenseRow[]; totalTA: number; navigate: any 
           {showMore ? 'Less' : 'More'}
         </Button>
       </div>
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-hidden">
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs w-[70px]">Date</TableHead>
-              <TableHead className="text-xs">Beat</TableHead>
-              <TableHead className="text-right text-xs w-[80px]">TA Amt</TableHead>
-              <TableHead className="text-center text-xs w-[60px]">Action</TableHead>
-              {showMore && <TableHead className="text-right text-xs w-[50px]">Visits</TableHead>}
-              {showMore && <TableHead className="text-right text-xs w-[80px]">Order Val</TableHead>}
+              <TableHead className="text-[11px] px-2 w-[60px]">Date</TableHead>
+              <TableHead className="text-[11px] px-2">Beat</TableHead>
+              <TableHead className="text-right text-[11px] px-2 w-[62px]">TA Amt</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[38px]"></TableHead>
+              {showMore && <TableHead className="text-right text-[11px] px-2 w-[40px]">Visits</TableHead>}
+              {showMore && <TableHead className="text-right text-[11px] px-2 w-[68px]">Orders</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id} className={row.isOnLeave ? 'bg-muted/50' : ''}>
-                <TableCell className="text-xs py-2 whitespace-nowrap">
+                <TableCell className="text-[11px] py-1.5 px-2 whitespace-nowrap">
                   {new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                  {row.isOnLeave && <span className="ml-0.5 text-[9px] text-orange-500">(L)</span>}
+                  {row.isOnLeave && <span className="ml-0.5 text-[9px] text-orange-500">L</span>}
                 </TableCell>
-                <TableCell className="text-xs py-2 max-w-[120px] truncate">{row.beat_name}</TableCell>
-                <TableCell className="text-right text-xs py-2 font-medium">₹{row.ta.toLocaleString()}</TableCell>
-                <TableCell className="text-center py-2">
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigate(`/today-summary?date=${row.date}`)}>
+                <TableCell className="text-[11px] py-1.5 px-2 truncate">{row.beat_name}</TableCell>
+                <TableCell className="text-right text-[11px] py-1.5 px-2 font-medium">₹{row.ta.toLocaleString()}</TableCell>
+                <TableCell className="text-center py-1.5 px-1">
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => navigate(`/today-summary?date=${row.date}`)}>
                     <ExternalLink className="h-3 w-3" />
                   </Button>
                 </TableCell>
-                {showMore && <TableCell className="text-right text-xs py-2">{row.productive_visits}</TableCell>}
-                {showMore && <TableCell className="text-right text-xs py-2">₹{row.order_value.toLocaleString()}</TableCell>}
+                {showMore && <TableCell className="text-right text-[11px] py-1.5 px-2">{row.productive_visits}</TableCell>}
+                {showMore && <TableCell className="text-right text-[11px] py-1.5 px-2">₹{row.order_value.toLocaleString()}</TableCell>}
               </TableRow>
             ))}
             <TableRow className="border-t-2 bg-muted/30">
-              <TableCell className="font-bold text-xs py-2">Total</TableCell>
+              <TableCell className="font-bold text-[11px] py-1.5 px-2">Total</TableCell>
               <TableCell></TableCell>
-              <TableCell className="text-right font-bold text-xs py-2">₹{totalTA.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalTA.toLocaleString()}</TableCell>
               <TableCell></TableCell>
-              {showMore && <TableCell className="text-right font-bold text-xs py-2">{rows.reduce((s, r) => s + r.productive_visits, 0)}</TableCell>}
-              {showMore && <TableCell className="text-right font-bold text-xs py-2">₹{rows.reduce((s, r) => s + r.order_value, 0).toLocaleString()}</TableCell>}
+              {showMore && <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">{rows.reduce((s, r) => s + r.productive_visits, 0)}</TableCell>}
+              {showMore && <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{rows.reduce((s, r) => s + r.order_value, 0).toLocaleString()}</TableCell>}
             </TableRow>
           </TableBody>
         </Table>
