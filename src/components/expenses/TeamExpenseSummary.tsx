@@ -268,47 +268,100 @@ const TeamMemberRow: React.FC<{ userId: string; name: string; yearMonth: string 
 
 // ─── Overview Tab with Aggregated Summary Cards ──────────────────────────────
 
-const TeamOverview: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
-  const { subordinates } = useSubordinates();
+// Helper component to collect a single subordinate's summary into aggregation
+const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) => {
+  const [aggregated, setAggregated] = useState({ ta: 0, da: 0, additional: 0, total: 0, presentDays: 0 });
+  const [loading, setLoading] = useState(true);
 
-  // Fetch summaries for all subordinates
-  const summaryHooks = subordinates.map(sub => ({
-    sub,
-    result: useMonthlyExpenseSummary(sub.subordinate_user_id, yearMonth),
-  }));
+  useEffect(() => {
+    if (subordinateIds.length === 0) { setLoading(false); return; }
 
-  const isLoading = summaryHooks.some(h => h.result.isLoading);
+    const fetchAll = async () => {
+      setLoading(true);
+      const [yr, mo] = yearMonth.split('-').map(Number);
+      const start = startOfMonth(new Date(yr, mo - 1));
+      const end = endOfMonth(start);
+      const startStr = format(start, 'yyyy-MM-dd');
+      const endStr = format(end, 'yyyy-MM-dd');
 
-  const aggregated = useMemo(() => {
-    let ta = 0, da = 0, additional = 0, total = 0, presentDays = 0;
-    summaryHooks.forEach(h => {
-      const s = h.result.data;
-      if (s) {
-        ta += s.ta;
-        da += s.da;
-        additional += s.additionalApproved;
-        total += s.total;
-        presentDays += s.presentDays;
+      try {
+        // Fetch attendance, config, beat_plans, beats, and additional for all subordinates at once
+        const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes] = await Promise.all([
+          supabase.from('attendance').select('user_id, date, status')
+            .in('user_id', subordinateIds).gte('date', startStr).lte('date', endStr),
+          supabase.from('expense_master_config').select('*').single(),
+          supabase.from('beat_plans').select('user_id, plan_date, beat_id')
+            .in('user_id', subordinateIds).gte('plan_date', startStr).lte('plan_date', endStr),
+          supabase.from('beats').select('beat_id, travel_allowance'),
+          (supabase as any).from('additional_expenses').select('user_id, amount, status, expense_date')
+            .in('user_id', subordinateIds).gte('expense_date', startStr).lte('expense_date', endStr),
+        ]);
+
+        const config = configRes.data;
+        const daAmount = config?.da_amount || 0;
+        const taType = config?.ta_type || 'from_beat';
+        const fixedTa = config?.fixed_ta_amount || 0;
+
+        const beatTAMap = new Map<string, number>();
+        beatsRes.data?.forEach((b: any) => beatTAMap.set(b.beat_id, b.travel_allowance || 0));
+
+        let totalTA = 0, totalDA = 0, totalAdditional = 0, totalPresent = 0;
+
+        subordinateIds.forEach(uid => {
+          const presentDates = new Set(
+            attendanceRes.data?.filter((a: any) => a.user_id === uid && ['present', 'regularized'].includes(a.status)).map((a: any) => a.date) || []
+          );
+          totalPresent += presentDates.size;
+          totalDA += presentDates.size * daAmount;
+
+          // TA
+          if (taType === 'fixed') {
+            totalTA += presentDates.size * fixedTa;
+          } else {
+            beatPlansRes.data?.filter((p: any) => p.user_id === uid && presentDates.has(p.plan_date)).forEach((plan: any) => {
+              totalTA += beatTAMap.get(plan.beat_id) || 0;
+            });
+          }
+
+          // Additional approved
+          const userAdditional = additionalRes.data?.filter((e: any) => e.user_id === uid && ['manager_approved', 'paid'].includes(e.status)) || [];
+          totalAdditional += userAdditional.reduce((s: number, e: any) => s + (e.amount || 0), 0);
+        });
+
+        setAggregated({
+          ta: totalTA, da: totalDA, additional: totalAdditional,
+          total: totalTA + totalDA + totalAdditional, presentDays: totalPresent,
+        });
+      } catch (err) {
+        console.error('Error aggregating team expenses:', err);
+      } finally {
+        setLoading(false);
       }
-    });
-    return { ta, da, additional, total, presentDays };
-  }, [summaryHooks.map(h => h.result.data)]);
+    };
+
+    fetchAll();
+  }, [subordinateIds.join(','), yearMonth]);
+
+  return { aggregated, loading };
+};
+
+const TeamOverview: React.FC<{ yearMonth: string }> = ({ yearMonth }) => {
+  const { subordinates, subordinateIds } = useSubordinates();
+  const { aggregated, loading } = useTeamAggregatedExpenses(subordinateIds, yearMonth);
 
   return (
     <div className="space-y-3">
-      {/* Aggregated Summary Cards */}
       <ExpenseSummaryCards
         ta={aggregated.ta}
         da={aggregated.da}
         additional={aggregated.additional}
         total={aggregated.total}
         presentDays={aggregated.presentDays}
-        loading={isLoading}
+        loading={loading}
         onTotalClick={() => {}}
         isExpanded={false}
       />
 
-      {/* Individual member rows */}
       <div className="space-y-2">
         {subordinates.map((sub) => (
           <TeamMemberRow
