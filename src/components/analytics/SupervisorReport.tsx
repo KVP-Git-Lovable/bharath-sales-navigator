@@ -1513,11 +1513,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
       const doc = new jsPDF('l', 'pt', 'a4');
 
-      // Fetch and register Noto Sans font for ₹ symbol support
-      const fontBaseUrl = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf';
+      // Fetch and register static Noto Sans font for ₹ symbol support
       const [regularRes, boldRes] = await Promise.all([
-        fetch('https://fonts.gstatic.com/s/notosans/v36/o-0IIpQlx3QUlC5A4PNb4j5Ba_2c7A.ttf'),
-        fetch('https://fonts.gstatic.com/s/notosans/v36/o-0NIIpQlx3QUlC5A4PNjXhFlY9aQWnf.ttf'),
+        fetch('https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNr6TRAsA.ttf'),
+        fetch('https://fonts.gstatic.com/s/notosans/v27/o-0NIIpQlx3QUlC5A4PNjXhFVNyB.ttf'),
       ]);
       const [regularBuf, boldBuf] = await Promise.all([regularRes.arrayBuffer(), boldRes.arrayBuffer()]);
       const toBase64 = (buf: ArrayBuffer) => {
