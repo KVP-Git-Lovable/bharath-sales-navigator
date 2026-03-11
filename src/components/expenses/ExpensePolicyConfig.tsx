@@ -170,11 +170,13 @@ const ExpensePolicyConfig = () => {
 
   if (!config) {
     return (
-      <Card>
-        <CardContent className="p-6 text-center text-muted-foreground">
-          No expense configuration found. Please create one first.
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            Loading expense configuration...
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
