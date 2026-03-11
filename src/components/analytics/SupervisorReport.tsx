@@ -1701,7 +1701,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           doc.setTextColor(...COLORS.darkText);
           const nameShort = u.full_name.length > 14 ? u.full_name.substring(0, 12) + '…' : u.full_name;
           doc.text(`${nameShort} (${(u.total_order_value / totalRevenue * 100).toFixed(1)}%)`, legendX + 12, ly + 8);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSans', 'normal');
           doc.setFontSize(6);
           doc.setTextColor(...COLORS.mutedText);
           const kgVal = u.total_kg >= 1 ? u.total_kg.toFixed(1) + ' KG' : (u.total_kg * 1000).toFixed(0) + ' gm';
