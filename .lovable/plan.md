@@ -1,33 +1,48 @@
 
-# Expense Approval Workflow for Additional Expenses
 
-## Status: ✅ Implemented
+## Plan: Compact Expense + Order Value Summary Row
 
-## Summary
-Added an approval lifecycle to Additional Expenses only. TA and DA remain auto-calculated with no approval. Additional expenses get a draft → submitted → manager_approved → rejected → paid status flow.
+### What the user wants
+1. **Compact single-line summary** showing TA, DA, Additional Expense, Total Expense, and **Order Value** (total orders for the month) -- replacing or supplementing the current 2x2 grid cards.
+2. This should appear in both **My Expenses** and **Team Summary > Overview**.
+3. For Team Summary, it aggregates all subordinates' expenses AND their total order values.
 
-## What Was Done
+### Design
 
-### Phase 1: Database ✅
-- Added `status`, `submitted_at`, `approved_by`, `approved_at`, `rejection_reason` columns to `additional_expenses`
-- RLS policies: users can only edit/delete draft expenses; managers can approve/reject subordinates' submitted expenses; admins have full access
+**New compact summary strip** — a single horizontal row (or a small card) showing:
+`TA: ₹X | DA: ₹X | Add: ₹X | Total: ₹X | Orders: ₹X`
 
-### Phase 2: User-Facing ✅
-- `AdditionalExpenses.tsx`: Status badges on saved expenses, delete restricted to draft only
-- `BeatAllowanceManagement.tsx`: Submit Expenses button (bulk submits all draft in date range), Status column in additional expenses tab
+This will be rendered as a compact row above or instead of the current 4-card grid, with each metric as a small labeled value in a single flex row.
 
-### Phase 3: Manager Approval Page ✅
-- `ExpenseApprovals.tsx` at `/expenses/approvals`: Filters by status/date/employee, approve/reject with reason dialog, employee summary cards
+### Changes
 
-### Phase 4: Summary Updates ✅
-- `ExpenseSummaryBoxes.tsx`: Only counts `manager_approved` or `paid` additional expenses in totals
+#### 1. `src/components/expenses/ExpenseSummaryCards.tsx`
+- Add optional `orderValue` prop (number) and `showCompact` prop (boolean).
+- When `showCompact` is true, render a single-line compact strip with all 5 values (TA, DA, Additional, Total Expense, Order Value) in a horizontal scrollable flex row.
+- Keep the existing 2x2 grid as the default view.
+- Add a toggle button (e.g., grid/list icon) to switch between compact and expanded views.
 
-### Phase 5: Navigation ✅
-- Route added in `App.tsx`
-- "Expense Approvals" link added in Navbar
+#### 2. `src/hooks/useMonthlyExpenseSummary.ts`
+- Add `orderValue` to the `MonthlyExpenseSummary` interface.
+- Fetch from `orders` table: `SUM(total_amount)` where `user_id = userId`, `created_at` within month range, and `status = 'confirmed'`.
+- Return it alongside existing expense data.
 
-## What Was NOT Changed
-- TA calculation logic (auto from beat or fixed)
-- DA calculation logic (auto from attendance)
-- `expense_master_config` admin settings
-- Existing `approval_requests` / `approval_steps` engine
+#### 3. `src/pages/MyExpenses.tsx`
+- Pass `summary.orderValue` to `ExpenseSummaryCards`.
+
+#### 4. `src/components/expenses/TeamExpenseSummary.tsx`
+- In `useTeamAggregatedExpenses`, also fetch orders for all subordinate IDs and sum `total_amount`.
+- Pass aggregated `orderValue` to `ExpenseSummaryCards` in `TeamOverview`.
+- In `TeamMemberRow`, show individual order value alongside expense totals.
+
+### Data Query (orders)
+```sql
+SELECT COALESCE(SUM(total_amount), 0) 
+FROM orders 
+WHERE user_id = ? 
+  AND created_at >= ? AND created_at < ?
+  AND status = 'confirmed'
+```
+
+No database migrations needed -- just reading existing `orders` table data.
+
