@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, CalendarIcon, ExternalLink, Download, Car, Utensils, Receipt, BarChart3, Send } from 'lucide-react';
+import { Plus, CalendarIcon, ExternalLink, Download, Car, Utensils, Receipt, BarChart3, Send, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +54,207 @@ interface AdditionalExpenseData {
 }
 
 type FilterType = 'today' | 'yesterday' | 'current_week' | 'last_week' | 'current_month' | 'last_month' | 'current_quarter' | 'previous_quarter' | 'custom';
+
+const fmtCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+// ─── TA Card List ────────────────────────────────────────────────────────────
+
+const TACardList: React.FC<{ rows: ExpenseRow[]; totalTA: number; navigate: any }> = ({ rows, totalTA, navigate }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  if (rows.length === 0) {
+    return <p className="text-xs text-muted-foreground text-center py-6">No TA records found</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Total strip */}
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">Total TA</span>
+        <span className="text-sm font-bold text-primary">{fmtCurrency(totalTA)}</span>
+      </div>
+
+      {rows.map((row) => {
+        const isOpen = expandedIds.has(row.id);
+        return (
+          <div key={row.id} className={`rounded-lg border p-3 space-y-2 ${row.isOnLeave ? 'bg-muted/40' : 'bg-card'}`}>
+            {/* Default row: Date | Beat | TA | Action */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{fmtDate(row.date)}</span>
+                  {row.isOnLeave && <Badge variant="outline" className="text-[9px] px-1 py-0 border-orange-300 text-orange-600">Leave</Badge>}
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate">{row.beat_name}</p>
+              </div>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400 shrink-0">{fmtCurrency(row.ta)}</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => navigate(`/today-summary?date=${row.date}`)}>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => toggle(row.id)}>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {/* Expanded: extra columns */}
+            {isOpen && (
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t text-[11px]">
+                <div>
+                  <span className="text-muted-foreground">Productive Visits</span>
+                  <p className="font-medium">{row.productive_visits}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Order Value</span>
+                  <p className="font-medium">{fmtCurrency(row.order_value)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── DA Card List ────────────────────────────────────────────────────────────
+
+const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ records, totalDA }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const toggle = (idx: number) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(idx) ? next.delete(idx) : next.add(idx);
+    return next;
+  });
+
+  if (records.length === 0) {
+    return <p className="text-xs text-muted-foreground text-center py-6">No DA records found</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">Total DA</span>
+        <span className="text-sm font-bold text-primary">{fmtCurrency(totalDA)}</span>
+      </div>
+
+      {records.map((record, idx) => {
+        const isOpen = expandedIds.has(idx);
+        return (
+          <div key={idx} className={`rounded-lg border p-3 space-y-2 ${record.isOnLeave ? 'bg-muted/40' : 'bg-card'}`}>
+            {/* Default: Date | DA Amount | Market Hours */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{fmtDate(record.date)}</span>
+                  {record.isOnLeave && <Badge variant="outline" className="text-[9px] px-1 py-0 border-orange-300 text-orange-600">Leave</Badge>}
+                </div>
+                <p className="text-[11px] text-muted-foreground">{record.market_hours}</p>
+              </div>
+              <span className="text-sm font-bold text-green-600 dark:text-green-400 shrink-0">{fmtCurrency(record.da_amount)}</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => toggle(idx)}>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {/* Expanded */}
+            {isOpen && (
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t text-[11px]">
+                <div>
+                  <span className="text-muted-foreground">Day Start</span>
+                  <p className="font-medium">{record.day_start_time}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Day End</span>
+                  <p className="font-medium">{record.day_end_time}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── Additional Expenses Card List ───────────────────────────────────────────
+
+const AdditionalCardList: React.FC<{ items: AdditionalExpenseData[]; totalAdditional: number }> = ({ items, totalAdditional }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const toggle = (idx: number) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(idx) ? next.delete(idx) : next.add(idx);
+    return next;
+  });
+
+  const statusLabel = (s: string) => s === 'manager_approved' ? 'Approved' : s === 'draft' ? 'Draft' : s === 'submitted' ? 'Submitted' : s === 'rejected' ? 'Rejected' : s === 'paid' ? 'Paid' : s;
+  const statusVariant = (s: string): 'default' | 'destructive' | 'outline' | 'secondary' =>
+    s === 'manager_approved' ? 'default' : s === 'rejected' ? 'destructive' : s === 'submitted' ? 'outline' : 'secondary';
+
+  if (items.length === 0) {
+    return <p className="text-xs text-muted-foreground text-center py-6">No additional expenses found</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">Total Additional</span>
+        <span className="text-sm font-bold text-primary">{fmtCurrency(totalAdditional)}</span>
+      </div>
+
+      {items.map((item, idx) => {
+        const isOpen = expandedIds.has(idx);
+        return (
+          <div key={idx} className="rounded-lg border p-3 space-y-2 bg-card">
+            {/* Default: Date | Type | Amount | Status */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{fmtDate(item.date)}</span>
+                  <Badge variant={statusVariant(item.status)} className="text-[9px] px-1.5 py-0">{statusLabel(item.status)}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate">{item.expense_type}</p>
+              </div>
+              <span className="text-sm font-bold text-purple-600 dark:text-purple-400 shrink-0">{fmtCurrency(item.value)}</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => toggle(idx)}>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {/* Expanded */}
+            {isOpen && (
+              <div className="space-y-2 pt-1 border-t text-[11px]">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-muted-foreground">Details</span>
+                    <p className="font-medium">{item.details || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Bill</span>
+                    <p className="font-medium">{item.bill_attached ? '✓ Attached' : '✗ None'}</p>
+                  </div>
+                </div>
+                {(item.status === 'draft' || item.status === 'submitted') && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 px-2">
+                      <Pencil className="h-3 w-3" /> Edit
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 px-2 text-destructive hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3" /> Delete
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 
 const BeatAllowanceManagement = () => {
   const navigate = useNavigate();
@@ -658,209 +859,16 @@ const BeatAllowanceManagement = () => {
                 <TabsTrigger value="additional" className="text-xs sm:text-sm">Additional Expenses</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="expenses" className="space-y-4">
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Beat</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">TA Amount</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Productive Visits</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Order Value</TableHead>
-                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredExpenseRows.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
-                            No expense records found for the selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {filteredExpenseRows.map((row) => (
-                            <TableRow key={row.id} className={row.isOnLeave ? 'bg-muted/50' : ''}>
-                              <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
-                                {new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                                {row.isOnLeave && <span className="ml-1 text-xs text-orange-500">(Leave)</span>}
-                              </TableCell>
-                              <TableCell className="font-medium text-xs sm:text-sm">{row.beat_name}</TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                ₹{row.ta.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                {row.productive_visits}
-                              </TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                ₹{row.order_value.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs h-7 px-2"
-                                  onClick={() => navigate(`/today-summary?date=${row.date}`)}
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  More details
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Total Row */}
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-xs sm:text-sm">Total</TableCell>
-                            <TableCell></TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{totalTA.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              {filteredExpenseRows.reduce((sum, row) => sum + row.productive_visits, 0)}
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{filteredExpenseRows.reduce((sum, row) => sum + row.order_value, 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="expenses" className="space-y-2 mt-3">
+                <TACardList rows={filteredExpenseRows} totalTA={totalTA} navigate={navigate} />
               </TabsContent>
 
-              <TabsContent value="da" className="space-y-4">
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">DA Amount</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Day Start Time</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Day End Time</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Market Hours</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredDARecords.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
-                            No DA records found for the selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {filteredDARecords.map((record, index) => (
-                            <TableRow key={index} className={record.isOnLeave ? 'bg-muted/50' : ''}>
-                              <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
-                                {new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                                {record.isOnLeave && <span className="ml-1 text-xs text-orange-500">(Leave)</span>}
-                              </TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
-                                ₹{record.da_amount.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {record.day_start_time}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {record.day_end_time}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {record.market_hours}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Total Row */}
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-xs sm:text-sm">Total</TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{totalDA.toLocaleString()}
-                            </TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="da" className="space-y-2 mt-3">
+                <DACardList records={filteredDARecords} totalDA={totalDA} />
               </TabsContent>
 
-              <TabsContent value="additional" className="space-y-4">
-      {/* Auto-submitted: no separate submit button needed */}
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-xs sm:text-sm whitespace-nowrap">Type</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Details</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Add on expense</TableHead>
-                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Bill</TableHead>
-                        <TableHead className="text-center text-xs sm:text-sm whitespace-nowrap">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAdditionalExpenses.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-xs sm:text-sm">
-                            No additional expenses found for the selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {filteredAdditionalExpenses.map((item, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                {new Date(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                              </TableCell>
-                              <TableCell className="text-xs sm:text-sm">{item.expense_type}</TableCell>
-                              <TableCell className="text-xs sm:text-sm max-w-[100px] truncate">{item.details}</TableCell>
-                              <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">₹{item.value}</TableCell>
-                              <TableCell className="text-center">
-                                {item.bill_attached ? (
-                                  <span className="text-green-600 text-sm">✓</span>
-                                ) : (
-                                  <span className="text-red-600 text-sm">✗</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Badge 
-                                  variant={
-                                    item.status === 'manager_approved' ? 'default' : 
-                                    item.status === 'rejected' ? 'destructive' : 
-                                    item.status === 'submitted' ? 'outline' : 'secondary'
-                                  }
-                                  className="text-[10px] px-1.5 py-0"
-                                >
-                                  {item.status === 'manager_approved' ? 'Approved' : 
-                                   item.status === 'draft' ? 'Draft' :
-                                   item.status === 'submitted' ? 'Submitted' :
-                                   item.status === 'rejected' ? 'Rejected' :
-                                   item.status === 'paid' ? 'Paid' : item.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Total Row */}
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-xs sm:text-sm">Total</TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                            <TableCell className="text-right font-bold text-xs sm:text-sm whitespace-nowrap">
-                              ₹{totalAdditionalExpenses.toLocaleString()}
-                            </TableCell>
-                            <TableCell></TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="additional" className="space-y-2 mt-3">
+                <AdditionalCardList items={filteredAdditionalExpenses} totalAdditional={totalAdditionalExpenses} />
               </TabsContent>
             </Tabs>
           </div>
