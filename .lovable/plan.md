@@ -1,71 +1,42 @@
 
+# Scalable Expense Approval Policy — Enterprise Upgrade
 
-# Scalable Expense Policy Management with Groups
+## Status: ✅ Implemented
 
-## Problem
-Currently, assigning custom TA/DA overrides requires adding users or teams one at a time. With 500+ users, this is unmanageable. You need:
-1. **Multi-user selection** — select multiple users at once to assign the same override
-2. **Expense Groups** — create named groups (e.g., "North Region Sales", "Senior Reps") and assign policies to them
-3. A resolution hierarchy that remains: **User Override > Group Override > Team (Manager) Override > Global Default**
+## Summary
+Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, conditional rules, and **Expense Groups** for scalable multi-user policy management.
 
-## Design
+## What Was Done
 
-### New DB Table: `expense_groups`
-Stores named groups with their TA/DA policy values.
+### Phase 1: Database Schema ✅
+- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
+- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
+- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
+- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
+- All tables have RLS: read by authenticated, write by admin only
+- Seeded default categories and a "Manager Approval" default workflow
 
-```
-expense_groups:
-  id (uuid PK)
-  name (text, unique)
-  description (text, nullable)
-  ta_type (text: 'fixed' | 'from_beat')
-  fixed_ta_amount (numeric, default 0)
-  da_amount (numeric, default 0)
-  ta_per_km_rate (numeric, default 0)
-  created_at, updated_at
-```
+### Phase 2: Updated Trigger ✅
+- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution
 
-### New DB Table: `expense_group_members`
-Maps users to groups (many-to-many).
+### Phase 3: Admin UI ✅
+- **Expense Categories Card** — CRUD table in ExpensePolicyConfig
+- **Approval Workflows Card** — Create workflows with steps, set default
+- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
 
-```
-expense_group_members:
-  id (uuid PK)
-  group_id (uuid FK -> expense_groups)
-  user_id (uuid, references auth.users)
-  created_at
-  UNIQUE(group_id, user_id)
-```
+### Phase 4: Submission UI ✅
+- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
 
-### Updated Resolution Priority
-**User Override > Group Override > Team (Manager) Override > Global Default**
+### Phase 5: Expense Groups ✅ (NEW)
+- **`expense_groups` table** — Named groups with TA/DA policy values (ta_type, fixed_ta_amount, da_amount, ta_per_km_rate)
+- **`expense_group_members` table** — Many-to-many junction mapping users to groups
+- **Resolution hierarchy updated**: User Override > **Group Override** > Team (Manager) Override > Global Default
+- **ExpenseGroupsConfig UI** — Full CRUD for groups + multi-user member management dialog
+- **All callers updated** — EditBeatModal, MyBeats, ProductivityTracking, TeamExpenseSummary, BeatAllowanceManagement, ExpenseMonthlySummary, useMonthlyExpenseSummary
 
-Update `useResolvedExpenseConfig.ts` to also fetch `expense_groups` + `expense_group_members` and check group membership during resolution.
-
-### UI Changes in `ExpensePolicyConfig.tsx`
-
-#### 1. Multi-User Selection for Direct Overrides
-Replace the single-user `ProfileSelector` with the existing `CompactMultiUserSelector` (or a full multi-select variant). When the admin selects multiple users and sets an amount, create `user_expense_config` rows for all selected users in one batch.
-
-#### 2. New "Expense Groups" Management Section
-Add a new card/section in the Configuration tab:
-- **Create Group**: Name + description + TA/DA values
-- **Manage Members**: Use multi-user selector to add/remove users from a group
-- **List Groups**: Show all groups with member count, edit/delete
-- **Assign Policy**: Set TA type, fixed TA amount, DA amount per group
-
-#### 3. Override Table Enhancement
-Show which group a user belongs to (if any) in the override table, so admins can see the full picture.
-
-### Files to Edit
-1. **Migration SQL** — create `expense_groups` and `expense_group_members` tables with RLS
-2. **`src/hooks/useResolvedExpenseConfig.ts`** — add group-level resolution between user and team levels
-3. **`src/components/expenses/ExpensePolicyConfig.tsx`** — add multi-user bulk assignment + expense groups CRUD UI
-4. **`src/components/EditBeatModal.tsx`** and **`src/pages/MyBeats.tsx`** — no changes needed (they already call `resolveExpenseConfig` which will pick up group overrides automatically)
-
-### How It Scales
-- **1-10 custom users**: Use multi-select to bulk-assign direct overrides
-- **10-100 users with same policy**: Create a group, assign policy once, add users to group
-- **500+ users**: Most users fall under Global Default or a few groups; only exceptions get individual overrides
-- Groups can mirror regions, roles, seniority levels, or any custom segmentation
-
+## What Stays Unchanged
+- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
+- `process_approval_step()` — works as-is
+- `trigger_sync_entity_status()` — works as-is
+- TA/DA calculation logic — untouched
+- ExpenseApprovals page — works as-is

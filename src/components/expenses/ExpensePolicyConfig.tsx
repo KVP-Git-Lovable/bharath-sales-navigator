@@ -12,6 +12,7 @@ import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, Use
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ExpenseCategoriesConfig from './ExpenseCategoriesConfig';
+import ExpenseGroupsConfig from './ExpenseGroupsConfig';
 import ApprovalWorkflowsConfig from './ApprovalWorkflowsConfig';
 import ApprovalRulesConfig from './ApprovalRulesConfig';
 
@@ -751,6 +752,9 @@ const ExpensePolicyConfig = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Expense Groups */}
+      <ExpenseGroupsConfig />
 
       {/* Expense Categories */}
       <ExpenseCategoriesConfig />

@@ -49,7 +49,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
 
-      const [{ globalConfig, userConfigMap, teamConfigMap }, managerId, attendanceRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
+      const [{ globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap }, managerId, attendanceRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
         fetchExpenseConfigs(),
         fetchUserManagerId(userId),
         supabase.from('attendance').select('date, status')
@@ -64,8 +64,8 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           .eq('status', 'confirmed'),
       ]);
 
-      // Resolve config with hierarchy: User > Manager > Global
-      const config = resolveExpenseConfig(userId, managerId, globalConfig, userConfigMap, teamConfigMap);
+      // Resolve config with hierarchy: User > Group > Manager > Global
+      const config = resolveExpenseConfig(userId, managerId, globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
       const daAmount = config.da_amount;
       const taType = config.ta_type;
       const fixedTa = config.fixed_ta_amount;

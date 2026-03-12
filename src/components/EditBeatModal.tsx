@@ -107,9 +107,9 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
       // Fetch expense config
       (async () => {
         try {
-          const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+          const { globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap } = await fetchExpenseConfigs();
           const managerId = user?.id ? await fetchUserManagerId(user.id) : null;
-          const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
+          const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
           setTaType(resolved.ta_type);
           setFixedTaAmount(resolved.fixed_ta_amount);
           setTaPerKmRate(resolved.ta_per_km_rate);

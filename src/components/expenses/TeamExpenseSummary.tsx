@@ -472,7 +472,7 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
       try {
         // Fetch all data + expense config hierarchy
         const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
-        const [{ globalConfig, userConfigMap, teamConfigMap }, managerMap, attendanceRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
+        const [{ globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap }, managerMap, attendanceRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
           fetchExpenseConfigs(),
           fetchUserManagerIds(subordinateIds),
           supabase.from('attendance').select('user_id, date, status')
@@ -494,7 +494,7 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
 
         subordinateIds.forEach(uid => {
           // Resolve per-user config
-          const userConfig = resolveExpenseConfig(uid, managerMap.get(uid), globalConfig, userConfigMap, teamConfigMap);
+          const userConfig = resolveExpenseConfig(uid, managerMap.get(uid), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
           
           const presentDates = new Set(
             attendanceRes.data?.filter((a: any) => a.user_id === uid && ['present', 'regularized'].includes(a.status)).map((a: any) => a.date) || []

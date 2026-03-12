@@ -445,14 +445,14 @@ const BeatAllowanceManagement = () => {
 
       // Fetch expense configs with hierarchy
       const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
-      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const { globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap } = await fetchExpenseConfigs();
       
       // Get manager IDs for effective users
       const managerMap = await fetchUserManagerIds(effectiveUserIds);
       
       // Resolve config for first effective user (primary user context)
       const primaryUserId = effectiveUserIds[0];
-      const primaryConfig = resolveExpenseConfig(primaryUserId, managerMap.get(primaryUserId), globalConfig, userConfigMap, teamConfigMap);
+      const primaryConfig = resolveExpenseConfig(primaryUserId, managerMap.get(primaryUserId), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
       const taType = primaryConfig.ta_type;
       const fixedTaAmount = primaryConfig.fixed_ta_amount;
 
@@ -602,9 +602,9 @@ const BeatAllowanceManagement = () => {
 
       // Fetch DA amount using config hierarchy
       const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } = await import('@/hooks/useResolvedExpenseConfig');
-      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const { globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap } = await fetchExpenseConfigs();
       const managerId = await fetchUserManagerId(user.id);
-      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap);
+      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
 
       const daPerDay = config.da_amount;
 

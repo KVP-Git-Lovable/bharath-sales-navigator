@@ -45,7 +45,7 @@ const ExpenseMonthlySummary = () => {
       const endStr = format(end, 'yyyy-MM-dd');
 
       // Fetch all configs + manager + data in parallel
-      const [{ globalConfig, userConfigMap, teamConfigMap }, managerId, attendanceRes, beatPlansRes, allowancesRes, additionalRes] = await Promise.all([
+      const [{ globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap }, managerId, attendanceRes, beatPlansRes, allowancesRes, additionalRes] = await Promise.all([
         fetchExpenseConfigs(),
         fetchUserManagerId(user.id),
         supabase.from('attendance').select('date, status')
@@ -59,7 +59,7 @@ const ExpenseMonthlySummary = () => {
       ]);
 
       // Resolve config with hierarchy
-      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap);
+      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
       const daAmount = config.da_amount;
       const taType = config.ta_type;
       const fixedTa = config.fixed_ta_amount;
