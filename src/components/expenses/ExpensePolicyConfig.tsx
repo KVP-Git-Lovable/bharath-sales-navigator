@@ -45,17 +45,41 @@ const ProfileSelector: React.FC<{
   excludeIds: string[];
   onSelect: (userId: string, name: string) => void;
   label: string;
-}> = ({ excludeIds, onSelect, label }) => {
+  managersOnly?: boolean;
+}> = ({ excludeIds, onSelect, label, managersOnly = false }) => {
   const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase.rpc('get_profiles_for_selector');
-      setProfiles((data || []).filter((p: any) => !excludeIds.includes(p.id)));
+    const fetchProfiles = async () => {
+      if (managersOnly) {
+        // Fetch only users who are managers (appear as manager_id in employees table)
+        const { data: managerIds } = await supabase
+          .from('employees')
+          .select('manager_id')
+          .not('manager_id', 'is', null);
+
+        const uniqueManagerIds = [...new Set((managerIds || []).map((e: any) => e.manager_id))];
+
+        if (uniqueManagerIds.length === 0) {
+          setProfiles([]);
+          return;
+        }
+
+        const { data: managerProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', uniqueManagerIds)
+          .order('full_name');
+
+        setProfiles((managerProfiles || []).filter((p: any) => !excludeIds.includes(p.id)));
+      } else {
+        const { data } = await supabase.rpc('get_profiles_for_selector');
+        setProfiles((data || []).filter((p: any) => !excludeIds.includes(p.id)));
+      }
     };
-    if (open) fetch();
-  }, [open, excludeIds]);
+    if (open) fetchProfiles();
+  }, [open, excludeIds, managersOnly]);
 
   return (
     <Select
