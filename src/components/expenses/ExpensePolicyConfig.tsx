@@ -619,7 +619,7 @@ const ExpensePolicyConfig = () => {
               </div>
 
               {taDistribution === 'custom' && (
-                <OverrideTable field="ta" overrides={taOverrides} defaultAmount={config.fixed_ta_amount} />
+                <OverrideTable field="ta" overrides={taOverrides} defaultAmount={config.fixed_ta_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
               )}
             </>
           )}
