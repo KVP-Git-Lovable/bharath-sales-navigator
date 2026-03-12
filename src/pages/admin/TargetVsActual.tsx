@@ -42,6 +42,7 @@ const TargetVsActual = () => {
   
   const [activeTab, setActiveTab] = useState<'targets' | 'hierarchy' | 'dashboard'>('targets');
   const [fyYear, setFYYear] = useState(getCurrentFY());
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(undefined);
   
   // Dashboard tab state - default to 'all' for admins
   const [userScope, setUserScope] = useState<UserScope>(hasAdminAccess ? 'all' : 'team');
