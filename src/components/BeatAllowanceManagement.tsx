@@ -573,9 +573,9 @@ const BeatAllowanceManagement = () => {
         const orderValue = orderValueByDateMap.get(plan.plan_date) || 0;
         const isOnLeave = leaveDates.has(plan.plan_date);
         
-        // Get TA based on expense master config - Fixed TA or from Beat
-        // If on leave, TA is 0
-        const ta = isOnLeave ? 0 : (taType === 'fixed' ? fixedTaAmount : (beatTAMap.get(plan.beat_id) || 0));
+        // Get TA based on expense master config - Fixed TA, from Beat, or from GPS
+        // If on leave, TA is 0; GPS-based TA is handled separately below
+        const ta = isOnLeave ? 0 : (taType === 'fixed' ? fixedTaAmount : (taType === 'from_gps' ? 0 : (beatTAMap.get(plan.beat_id) || 0)));
         const productiveVisits = productiveVisitsMap.get(plan.plan_date) || 0;
         
         rows.push({
