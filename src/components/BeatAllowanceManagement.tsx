@@ -445,7 +445,7 @@ const BeatAllowanceManagement = () => {
 
       // Fetch expense configs with hierarchy
       const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
-      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const { globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap } = await fetchExpenseConfigs();
       
       // Get manager IDs for effective users
       const managerMap = await fetchUserManagerIds(effectiveUserIds);
