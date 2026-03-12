@@ -37,10 +37,21 @@ interface ExpenseConfig {
 
 interface OverrideEntry {
   id: string;
-  ref_id: string; // user_id or manager_id
+  ref_id: string;
   type: 'user' | 'team';
   amount: number;
   name: string;
+}
+
+interface ExpenseGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  ta_type: string;
+  fixed_ta_amount: number;
+  da_amount: number;
+  ta_per_km_rate: number;
+  member_count?: number;
 }
 
 const DEFAULT_CATEGORIES = ['food', 'travel', 'accommodation', 'communication', 'other'];
