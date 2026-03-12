@@ -5053,6 +5053,7 @@ export type Database = {
           fy_year: number
           id: string
           is_locked: boolean | null
+          plan_status: string
           quantity_unit: string | null
           setup_completed: boolean | null
           target_end_month: number
@@ -5074,6 +5075,7 @@ export type Database = {
           fy_year: number
           id?: string
           is_locked?: boolean | null
+          plan_status?: string
           quantity_unit?: string | null
           setup_completed?: boolean | null
           target_end_month?: number
@@ -5095,6 +5097,7 @@ export type Database = {
           fy_year?: number
           id?: string
           is_locked?: boolean | null
+          plan_status?: string
           quantity_unit?: string | null
           setup_completed?: boolean | null
           target_end_month?: number
@@ -13053,6 +13056,59 @@ export type Database = {
             columns: ["kpi_id"]
             isOneToOne: false
             referencedRelation: "target_kpi_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      target_breakdowns: {
+        Row: {
+          created_at: string | null
+          fy_config_id: string
+          id: string
+          month_number: number | null
+          parameter_id: string
+          parameter_name: string
+          parameter_type: string
+          quantity_target: number | null
+          revenue_target: number | null
+          updated_at: string | null
+          user_id: string
+          visits_target: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          fy_config_id: string
+          id?: string
+          month_number?: number | null
+          parameter_id: string
+          parameter_name: string
+          parameter_type: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          user_id: string
+          visits_target?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          fy_config_id?: string
+          id?: string
+          month_number?: number | null
+          parameter_id?: string
+          parameter_name?: string
+          parameter_type?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          user_id?: string
+          visits_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_breakdowns_fy_config_id_fkey"
+            columns: ["fy_config_id"]
+            isOneToOne: false
+            referencedRelation: "fy_target_config"
             referencedColumns: ["id"]
           },
         ]
