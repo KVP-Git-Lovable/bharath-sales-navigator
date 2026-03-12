@@ -189,6 +189,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
         target_period_type: periodType,
         target_start_month: (existingConfig as any).target_start_month ?? 1,
         target_end_month: (existingConfig as any).target_end_month ?? 12,
+        plan_status: ((existingConfig as any).plan_status as PlanStatus) ?? 'draft',
       });
     } else {
       setConfig({
