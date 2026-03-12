@@ -455,6 +455,7 @@ const BeatAllowanceManagement = () => {
       const primaryConfig = resolveExpenseConfig(primaryUserId, managerMap.get(primaryUserId), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
       const taType = primaryConfig.ta_type;
       const fixedTaAmount = primaryConfig.fixed_ta_amount;
+      const taPerKmRate = primaryConfig.ta_per_km_rate;
 
       // Fetch beat plans (journey plans) to get dates and beats
       const { data: beatPlans, error: beatPlansError } = await supabase
@@ -465,17 +466,21 @@ const BeatAllowanceManagement = () => {
 
       if (beatPlansError) throw beatPlansError;
 
-      // Fetch beats to get travel_allowance from My Beat
+      // Fetch beats to get travel_allowance and average_km from My Beat
       const { data: beatsData, error: beatsError } = await supabase
         .from('beats')
-        .select('beat_id, beat_name, travel_allowance');
+        .select('beat_id, beat_name, travel_allowance, average_km');
 
       if (beatsError) throw beatsError;
 
-      // Create beat travel allowance map
+      // Create beat travel allowance map - uses per-km rate if configured, else fixed TA from beat
       const beatTAMap = new Map();
       beatsData?.forEach((beat: any) => {
-        beatTAMap.set(beat.beat_id, beat.travel_allowance || 0);
+        const km = beat.average_km || 0;
+        const beatFixedTA = beat.travel_allowance || 0;
+        // If per-km rate is set and > 0, calculate TA from km; otherwise use beat's fixed TA
+        const ta = (taPerKmRate > 0 && km > 0) ? (km * taPerKmRate) : beatFixedTA;
+        beatTAMap.set(beat.beat_id, ta);
       });
 
       // Fetch additional expenses
