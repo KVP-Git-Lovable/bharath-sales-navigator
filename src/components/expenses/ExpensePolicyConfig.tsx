@@ -23,7 +23,7 @@ import ApprovalRulesConfig from './ApprovalRulesConfig';
 
 interface ExpenseConfig {
   id: string;
-  ta_type: 'fixed' | 'from_beat';
+  ta_type: 'fixed' | 'from_beat' | 'from_gps';
   fixed_ta_amount: number;
   da_amount: number;
   ta_per_km_rate: number;
