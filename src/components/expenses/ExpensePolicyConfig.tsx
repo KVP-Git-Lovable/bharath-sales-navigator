@@ -8,11 +8,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, User, Info } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, User, Info, Search, Edit2, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import ExpenseCategoriesConfig from './ExpenseCategoriesConfig';
-import ExpenseGroupsConfig from './ExpenseGroupsConfig';
 import ApprovalWorkflowsConfig from './ApprovalWorkflowsConfig';
 import ApprovalRulesConfig from './ApprovalRulesConfig';
 
