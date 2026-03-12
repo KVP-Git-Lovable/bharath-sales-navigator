@@ -21,6 +21,7 @@ export interface WeeklyBreakdown {
 export interface DailyBreakdown {
   date: string;
   ta: number;
+  taKm: number;
   da: number;
   additional: number;
   total: number;
