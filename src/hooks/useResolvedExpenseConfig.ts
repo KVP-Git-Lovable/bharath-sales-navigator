@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ResolvedExpenseConfig {
-  ta_type: 'fixed' | 'from_beat';
+  ta_type: 'fixed' | 'from_beat' | 'from_gps';
   fixed_ta_amount: number;
   da_amount: number;
   ta_per_km_rate: number;
