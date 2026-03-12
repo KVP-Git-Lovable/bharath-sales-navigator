@@ -404,12 +404,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     setConfig(newConfig);
   };
 
-  const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits;
+  const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits || config.enable_retailer_activation;
   const hasAtLeastOneParameter = Object.values(config.enabled_parameters).some(v => v);
   const hasValidTargets = 
     (!config.enable_quantity || config.total_quantity_target > 0) &&
     (!config.enable_revenue || config.total_revenue_target > 0) &&
-    (!config.enable_visits || config.total_visits_target > 0);
+    (!config.enable_visits || config.total_visits_target > 0) &&
+    (!config.enable_retailer_activation || config.total_retailer_activation_target > 0);
   const canActivate = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
   const isReadOnly = config.plan_status === 'closed';
 
