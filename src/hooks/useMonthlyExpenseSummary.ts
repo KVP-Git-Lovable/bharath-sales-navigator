@@ -161,9 +161,15 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           .filter((e: any) => e.expense_date === dateStr && ['manager_approved', 'paid'].includes(e.status))
           .reduce((s: number, e: any) => s + (e.amount || 0), 0);
 
+        const dayOrders = (ordersRes.data || []).filter((o: any) => o.order_date === dateStr);
+        const dayOrderValue = dayOrders.reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+        const dayOrderCount = dayOrders.length;
+
         week.ta += dayTA;
         week.da += dayDA;
         week.additional += dayAdditional;
+        week.orderValue += dayOrderValue;
+        week.orderCount += dayOrderCount;
 
         dailyBreakdown.push({
           date: dateStr,
@@ -171,6 +177,8 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           da: dayDA,
           additional: dayAdditional,
           total: dayTA + dayDA + dayAdditional,
+          orderValue: dayOrderValue,
+          orderCount: dayOrderCount,
           isPresent,
         });
       }
