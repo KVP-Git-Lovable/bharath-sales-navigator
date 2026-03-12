@@ -40,7 +40,7 @@ const DailyBreakdown: React.FC<DailyBreakdownProps> = ({ days }) => {
               {format(parseISO(day.date), 'dd MMM')}
               {!day.isPresent && <span className="text-muted-foreground ml-1">·</span>}
             </span>
-            <span className="text-right text-blue-600">{day.ta > 0 ? fmt(day.ta) : '–'}</span>
+            <span className="text-right text-blue-600">{day.ta > 0 ? (day.taKm > 0 ? `${fmt(day.ta)} (${Math.round(day.taKm)} km)` : fmt(day.ta)) : '–'}</span>
             <span className="text-right text-green-600">{day.da > 0 ? fmt(day.da) : '–'}</span>
             <span className="text-right text-purple-600">{day.additional > 0 ? fmt(day.additional) : '–'}</span>
             <span className="text-right text-orange-600">{day.orderValue > 0 ? fmt(day.orderValue) : '–'}</span>

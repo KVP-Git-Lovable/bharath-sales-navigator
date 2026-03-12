@@ -12,12 +12,13 @@ interface ExpenseSummaryCardsProps {
   onTotalClick: () => void;
   isExpanded: boolean;
   orderValue?: number;
+  totalKm?: number;
 }
 
 const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
 const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
-  ta, da, additional, total, presentDays, loading, onTotalClick, isExpanded, orderValue = 0
+  ta, da, additional, total, presentDays, loading, onTotalClick, isExpanded, orderValue = 0, totalKm = 0
 }) => {
   const [compact, setCompact] = useState(false);
 
@@ -32,7 +33,7 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
   }
 
   const compactItems = [
-    { label: 'TA', value: fmt(ta), color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'TA', value: totalKm > 0 ? `${fmt(ta)} · ${Math.round(totalKm)} km` : fmt(ta), color: 'text-blue-600 dark:text-blue-400' },
     { label: 'DA', value: fmt(da), color: 'text-green-600 dark:text-green-400' },
     { label: 'Add', value: fmt(additional), color: 'text-purple-600 dark:text-purple-400' },
     { label: 'Total', value: fmt(total), color: 'text-primary font-bold', clickable: true },
@@ -41,7 +42,7 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
 
   const cards = [
     {
-      label: 'Travel (TA)',
+      label: totalKm > 0 ? `Travel (TA) · ${Math.round(totalKm)} km` : 'Travel (TA)',
       value: fmt(ta),
       icon: Car,
       bg: 'bg-blue-50 dark:bg-blue-950/30',

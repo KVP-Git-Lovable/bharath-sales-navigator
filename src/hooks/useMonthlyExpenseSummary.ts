@@ -8,6 +8,7 @@ export interface WeeklyBreakdown {
   weekLabel: string;
   weekNumber: number;
   ta: number;
+  taKm: number;
   da: number;
   additional: number;
   total: number;
@@ -20,6 +21,7 @@ export interface WeeklyBreakdown {
 export interface DailyBreakdown {
   date: string;
   ta: number;
+  taKm: number;
   da: number;
   additional: number;
   total: number;
@@ -30,6 +32,8 @@ export interface DailyBreakdown {
 
 export interface MonthlyExpenseSummary {
   ta: number;
+  totalKm: number;
+  taType: string;
   da: number;
   additionalApproved: number;
   additionalPending: number;
@@ -94,8 +98,9 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       // DA total
       const da = presentDays * daAmount;
 
-      // TA calculation per day
+      // TA calculation per day + GPS km tracking
       const dailyTA = new Map<string, number>();
+      const dailyKm = new Map<string, number>();
       if (taType === 'fixed') {
         presentDates.forEach(d => dailyTA.set(d, fixedTa));
       } else if (taType === 'from_gps') {
@@ -103,6 +108,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         const gpsDistances = await fetchMonthlyGPSDistances(userId, startStr, endStr);
         presentDates.forEach(d => {
           const km = gpsDistances.get(d) || 0;
+          dailyKm.set(d, km);
           dailyTA.set(d, Math.round(km * taPerKmRate * 100) / 100);
         });
       } else {
@@ -146,7 +152,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           weeklyMap.set(weekNum, {
             weekLabel: `Week ${weekNum}`,
             weekNumber: weekNum,
-            ta: 0, da: 0, additional: 0, total: 0, orderValue: 0, orderCount: 0,
+            ta: 0, taKm: 0, da: 0, additional: 0, total: 0, orderValue: 0, orderCount: 0,
             startDate: `${yearMonth}-${String(weekStart).padStart(2, '0')}`,
             endDate: `${yearMonth}-${String(weekEnd).padStart(2, '0')}`,
           });
@@ -155,6 +161,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         const week = weeklyMap.get(weekNum)!;
         
         const dayTA = dailyTA.get(dateStr) || 0;
+        const dayTAKm = dailyKm.get(dateStr) || 0;
         const isPresent = presentDates.has(dateStr);
         const dayDA = isPresent ? daAmount : 0;
         const dayAdditional = additional
@@ -166,6 +173,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         const dayOrderCount = dayOrders.length;
 
         week.ta += dayTA;
+        week.taKm += dayTAKm;
         week.da += dayDA;
         week.additional += dayAdditional;
         week.orderValue += dayOrderValue;
@@ -174,6 +182,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         dailyBreakdown.push({
           date: dateStr,
           ta: dayTA,
+          taKm: dayTAKm,
           da: dayDA,
           additional: dayAdditional,
           total: dayTA + dayDA + dayAdditional,
@@ -188,8 +197,13 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
 
       const orderValue = (ordersRes.data || []).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
 
+      let totalKm = 0;
+      dailyKm.forEach(v => totalKm += v);
+
       return {
         ta,
+        totalKm,
+        taType,
         da,
         additionalApproved,
         additionalPending,

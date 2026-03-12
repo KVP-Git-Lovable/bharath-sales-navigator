@@ -26,7 +26,7 @@ const WeeklyBreakdown: React.FC<WeeklyBreakdownProps> = ({ weeks }) => {
               </span>
             </div>
             <div className="flex items-center gap-3 text-[11px] flex-wrap">
-              <span className="text-blue-600">TA: {fmt(week.ta)}</span>
+              <span className="text-blue-600">TA: {fmt(week.ta)}{week.taKm > 0 ? ` (${Math.round(week.taKm)} km)` : ''}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-green-600">DA: {fmt(week.da)}</span>
               <span className="text-muted-foreground">·</span>
