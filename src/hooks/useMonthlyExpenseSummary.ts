@@ -23,6 +23,8 @@ export interface DailyBreakdown {
   da: number;
   additional: number;
   total: number;
+  orderValue: number;
+  orderCount: number;
   isPresent: boolean;
 }
 
