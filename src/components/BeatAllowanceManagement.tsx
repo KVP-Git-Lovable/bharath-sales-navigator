@@ -592,6 +592,29 @@ const BeatAllowanceManagement = () => {
         });
       });
 
+      // If GPS-based TA, fetch GPS distances and update rows
+      if (taType === 'from_gps') {
+        const { fetchMonthlyGPSDistances } = await import('@/hooks/useGPSDistance');
+        const { start, end } = getDateRange();
+        const startStr = format(start, 'yyyy-MM-dd');
+        const endStr = format(end, 'yyyy-MM-dd');
+        
+        // Fetch GPS distances for all effective users
+        for (const uid of effectiveUserIds) {
+          const gpsDistances = await fetchMonthlyGPSDistances(uid, startStr, endStr);
+          rows.forEach(row => {
+            if (!row.isOnLeave) {
+              const km = gpsDistances.get(row.date) || 0;
+              row.ta = Math.round(km * taPerKmRate * 100) / 100;
+              // Store km in beat_name for display when GPS mode
+              if (km > 0) {
+                row.beat_name = `${row.beat_name} (${km.toFixed(1)} km)`;
+              }
+            }
+          });
+        }
+      }
+
       if (isMountedRef.current) {
         setExpenseRows(rows);
       }
