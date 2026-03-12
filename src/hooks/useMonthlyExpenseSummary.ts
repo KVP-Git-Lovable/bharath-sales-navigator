@@ -11,6 +11,8 @@ export interface WeeklyBreakdown {
   da: number;
   additional: number;
   total: number;
+  orderValue: number;
+  orderCount: number;
   startDate: string;
   endDate: string;
 }
@@ -21,6 +23,8 @@ export interface DailyBreakdown {
   da: number;
   additional: number;
   total: number;
+  orderValue: number;
+  orderCount: number;
   isPresent: boolean;
 }
 
@@ -60,7 +64,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         supabase.from('beats').select('beat_id, travel_allowance, average_km'),
         (supabase as any).from('additional_expenses').select('amount, status, expense_date')
           .eq('user_id', userId).gte('expense_date', startStr).lte('expense_date', endStr),
-        supabase.from('orders').select('total_amount')
+        supabase.from('orders').select('total_amount, order_date')
           .eq('user_id', userId).gte('order_date', startStr).lte('order_date', endStr)
           .eq('status', 'confirmed'),
       ]);
@@ -142,7 +146,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           weeklyMap.set(weekNum, {
             weekLabel: `Week ${weekNum}`,
             weekNumber: weekNum,
-            ta: 0, da: 0, additional: 0, total: 0,
+            ta: 0, da: 0, additional: 0, total: 0, orderValue: 0, orderCount: 0,
             startDate: `${yearMonth}-${String(weekStart).padStart(2, '0')}`,
             endDate: `${yearMonth}-${String(weekEnd).padStart(2, '0')}`,
           });
@@ -157,9 +161,15 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           .filter((e: any) => e.expense_date === dateStr && ['manager_approved', 'paid'].includes(e.status))
           .reduce((s: number, e: any) => s + (e.amount || 0), 0);
 
+        const dayOrders = (ordersRes.data || []).filter((o: any) => o.order_date === dateStr);
+        const dayOrderValue = dayOrders.reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+        const dayOrderCount = dayOrders.length;
+
         week.ta += dayTA;
         week.da += dayDA;
         week.additional += dayAdditional;
+        week.orderValue += dayOrderValue;
+        week.orderCount += dayOrderCount;
 
         dailyBreakdown.push({
           date: dateStr,
@@ -167,6 +177,8 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           da: dayDA,
           additional: dayAdditional,
           total: dayTA + dayDA + dayAdditional,
+          orderValue: dayOrderValue,
+          orderCount: dayOrderCount,
           isPresent,
         });
       }
