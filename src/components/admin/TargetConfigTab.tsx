@@ -371,17 +371,27 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     toast.success('Configuration saved');
   };
 
-  const handleLockAndAssign = async () => {
-    const lockedConfig = { ...config, is_locked: true, setup_completed: true };
-    await saveMutation.mutateAsync(lockedConfig);
-    toast.success('Configuration locked! Proceed to assign targets.');
-    onLockedAndAssign?.();
+  const handleStatusChange = async (newStatus: PlanStatus) => {
+    const updatedConfig = { ...config, plan_status: newStatus, setup_completed: newStatus !== 'draft' };
+    await saveMutation.mutateAsync(updatedConfig);
+    const statusLabels: Record<PlanStatus, string> = {
+      draft: 'Plan moved to Draft',
+      active: 'Plan activated! You can now allocate targets.',
+      closed: 'Plan closed.',
+    };
+    toast.success(statusLabels[newStatus]);
+    if (newStatus === 'active') {
+      onLockedAndAssign?.();
+    }
   };
 
-  const handleUnlock = async () => {
-    const unlockedConfig = { ...config, is_locked: false };
-    await saveMutation.mutateAsync(unlockedConfig);
-    toast.success('Configuration unlocked for editing');
+  const handleCreateNewPlan = async () => {
+    const newConfig: TargetConfig = {
+      fy_year: fyYear,
+      ...DEFAULT_CONFIG,
+      target_plan_name: `Plan ${plans.length + 1}`,
+    };
+    setConfig(newConfig);
   };
 
   const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits;
@@ -390,7 +400,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     (!config.enable_quantity || config.total_quantity_target > 0) &&
     (!config.enable_revenue || config.total_revenue_target > 0) &&
     (!config.enable_visits || config.total_visits_target > 0);
-  const canLock = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
+  const canActivate = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
+  const isReadOnly = config.plan_status === 'closed';
 
   if (isLoading) {
     return (
