@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Loader2, Car, Utensils, Receipt, Shield, ShieldCheck } from 'lucide-react';
+import { Save, Loader2, Car, Utensils, Receipt, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ExpenseCategoriesConfig from './ExpenseCategoriesConfig';
@@ -345,6 +345,15 @@ const ExpensePolicyConfig = () => {
         </CardContent>
       </Card>
 
+      {/* Expense Categories */}
+      <ExpenseCategoriesConfig />
+
+      {/* Approval Workflows */}
+      <ApprovalWorkflowsConfig />
+
+      {/* Approval Rules */}
+      <ApprovalRulesConfig />
+
       {/* Policy Notes */}
       <Card>
         <CardHeader className="pb-3">
@@ -365,66 +374,6 @@ const ExpensePolicyConfig = () => {
           />
         </CardContent>
       </Card>
-
-      {/* Approval Policy */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-indigo-600" />
-            Expense Approval Policy
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Approval Mode</Label>
-              <Select
-                value={approvalMode}
-                onValueChange={(value: 'auto' | 'manager' | 'multi_level') => setApprovalMode(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto-Approve</SelectItem>
-                  <SelectItem value="manager">Manager Approval</SelectItem>
-                  <SelectItem value="multi_level">Multi-Level Approval</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {approvalMode === 'auto' && 'Expenses are auto-approved on submission — no manager action needed'}
-                {approvalMode === 'manager' && 'Direct manager must approve each expense submission'}
-                {approvalMode === 'multi_level' && 'Expenses go through multiple approval levels in the reporting chain'}
-              </p>
-            </div>
-
-            {approvalMode === 'multi_level' && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Max Approval Levels</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="5"
-                  value={maxLevels}
-                  onChange={(e) => setMaxLevels(Math.min(5, Math.max(1, Number(e.target.value))))}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Number of managers in the chain who must approve (1-5)
-                </p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Expense Categories */}
-      <ExpenseCategoriesConfig />
-
-      {/* Approval Workflows */}
-      <ApprovalWorkflowsConfig />
-
-      {/* Approval Rules */}
-      <ApprovalRulesConfig />
 
       {/* Save Button */}
       <div className="flex justify-end">
