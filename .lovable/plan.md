@@ -1,42 +1,49 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
+# Scalable Target Management — Plan
 
 ## Status: ✅ Implemented
 
 ## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, conditional rules, and **Expense Groups** for scalable multi-user policy management.
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
 ## What Was Done
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig
-- **Approval Workflows Card** — Create workflows with steps, set default
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-### Phase 5: Expense Groups ✅ (NEW)
-- **`expense_groups` table** — Named groups with TA/DA policy values (ta_type, fixed_ta_amount, da_amount, ta_per_km_rate)
-- **`expense_group_members` table** — Many-to-many junction mapping users to groups
-- **Resolution hierarchy updated**: User Override > **Group Override** > Team (Manager) Override > Global Default
-- **ExpenseGroupsConfig UI** — Full CRUD for groups + multi-user member management dialog
-- **All callers updated** — EditBeatModal, MyBeats, ProductivityTracking, TeamExpenseSummary, BeatAllowanceManagement, ExpenseMonthlySummary, useMonthlyExpenseSummary
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
+
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
