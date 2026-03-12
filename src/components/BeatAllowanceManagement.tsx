@@ -68,22 +68,22 @@ const TACardList: React.FC<{ rows: ExpenseRow[]; totalTA: number; navigate: any 
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end sm:hidden">
         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowMore(v => !v)}>
           {showMore ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           {showMore ? 'Less' : 'More'}
         </Button>
       </div>
       <div className="rounded-md border overflow-hidden">
-        <Table className="table-fixed w-full">
+        <Table className="table-fixed sm:table-auto w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-[11px] px-2 w-[60px]">Date</TableHead>
+              <TableHead className="text-[11px] px-2 w-[60px] sm:w-auto">Date</TableHead>
               <TableHead className="text-[11px] px-2">Beat</TableHead>
-              <TableHead className="text-right text-[11px] px-2 w-[62px]">TA Amt</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[38px]"></TableHead>
-              {showMore && <TableHead className="text-right text-[11px] px-2 w-[40px]">Visits</TableHead>}
-              {showMore && <TableHead className="text-right text-[11px] px-2 w-[68px]">Orders</TableHead>}
+              <TableHead className="text-right text-[11px] px-2 w-[62px] sm:w-auto">TA Amt</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[38px] sm:w-auto"></TableHead>
+              <TableHead className={`text-right text-[11px] px-2 w-[40px] sm:w-auto ${showMore ? '' : 'hidden sm:table-cell'}`}>Visits</TableHead>
+              <TableHead className={`text-right text-[11px] px-2 w-[68px] sm:w-auto ${showMore ? '' : 'hidden sm:table-cell'}`}>Orders</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -100,8 +100,8 @@ const TACardList: React.FC<{ rows: ExpenseRow[]; totalTA: number; navigate: any 
                     <ExternalLink className="h-3 w-3" />
                   </Button>
                 </TableCell>
-                {showMore && <TableCell className="text-right text-[11px] py-1.5 px-2">{row.productive_visits}</TableCell>}
-                {showMore && <TableCell className="text-right text-[11px] py-1.5 px-2">₹{row.order_value.toLocaleString()}</TableCell>}
+                <TableCell className={`text-right text-[11px] py-1.5 px-2 ${showMore ? '' : 'hidden sm:table-cell'}`}>{row.productive_visits}</TableCell>
+                <TableCell className={`text-right text-[11px] py-1.5 px-2 ${showMore ? '' : 'hidden sm:table-cell'}`}>₹{row.order_value.toLocaleString()}</TableCell>
               </TableRow>
             ))}
             <TableRow className="border-t-2 bg-muted/30">
@@ -109,8 +109,8 @@ const TACardList: React.FC<{ rows: ExpenseRow[]; totalTA: number; navigate: any 
               <TableCell></TableCell>
               <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalTA.toLocaleString()}</TableCell>
               <TableCell></TableCell>
-              {showMore && <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">{rows.reduce((s, r) => s + r.productive_visits, 0)}</TableCell>}
-              {showMore && <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{rows.reduce((s, r) => s + r.order_value, 0).toLocaleString()}</TableCell>}
+              <TableCell className={`text-right font-bold text-[11px] py-1.5 px-2 ${showMore ? '' : 'hidden sm:table-cell'}`}>{rows.reduce((s, r) => s + r.productive_visits, 0)}</TableCell>
+              <TableCell className={`text-right font-bold text-[11px] py-1.5 px-2 ${showMore ? '' : 'hidden sm:table-cell'}`}>₹{rows.reduce((s, r) => s + r.order_value, 0).toLocaleString()}</TableCell>
             </TableRow>
           </TableBody>
         </Table>
