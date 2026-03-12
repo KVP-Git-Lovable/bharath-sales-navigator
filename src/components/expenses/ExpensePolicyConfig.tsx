@@ -492,15 +492,17 @@ const ExpensePolicyConfig = () => {
     }
   };
 
-  const openCreateGroupDialog = () => {
+  const openCreateGroupDialog = (context: 'ta' | 'da' = 'ta') => {
     setEditingGroup(null);
+    setGroupDialogContext(context);
     setGroupForm({ name: '', description: '', ta_type: 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
     setGroupDialogOpen(true);
   };
 
-  const openEditGroupDialog = (group: ExpenseGroup) => {
+  const openEditGroupDialog = (group: ExpenseGroup, context: 'ta' | 'da' = 'ta') => {
     setEditingGroup(group);
-    setGroupForm({ name: group.name, description: group.description || '', ta_type: group.ta_type as 'fixed' | 'from_beat', fixed_ta_amount: group.fixed_ta_amount, da_amount: group.da_amount, ta_per_km_rate: group.ta_per_km_rate });
+    setGroupDialogContext(context);
+    setGroupForm({ name: group.name, description: group.description || '', ta_type: group.ta_type as 'fixed' | 'from_beat' | 'from_gps', fixed_ta_amount: group.fixed_ta_amount, da_amount: group.da_amount, ta_per_km_rate: group.ta_per_km_rate });
     setGroupDialogOpen(true);
   };
 
