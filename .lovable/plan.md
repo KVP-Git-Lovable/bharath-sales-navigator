@@ -1,42 +1,87 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# 3-Level TA/DA Configuration Hierarchy
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
+## Answer to Your Question
 
-## What Was Done
+**Admin Expense Master > Configuration**: Yes, UI changes needed -- add User-level and Manager-level config sections.
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+**User Expense Tab**: No UI changes needed. The expense tab displays calculated TA/DA values. Once the calculation engine uses the new hierarchy, the correct amounts will flow through automatically. No UX or linking changes required on the user side.
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
-  1. Checks amount-based rules first
-  2. Then category-based rules
-  3. Then 'always' rules
-  4. Falls back to default workflow
-  5. Ultimate fallback to old `approval_config` behavior
-- Creates `approval_steps` from `workflow_steps` using reporting chain
+## What Changes Where
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
-- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+### 1. Database: Two New Tables (Migrations)
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
-- Falls back to hardcoded list if DB categories unavailable
+**`user_expense_config`** -- per-user overrides:
+| Column | Type |
+|--------|------|
+| id | uuid PK |
+| user_id | uuid FK → auth.users (unique) |
+| ta_type | text ('fixed' / 'from_beat') |
+| fixed_ta_amount | numeric |
+| da_amount | numeric |
+| created_at / updated_at | timestamptz |
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is (reads from approval engine)
+**`team_expense_config`** -- per-manager/team overrides:
+| Column | Type |
+|--------|------|
+| id | uuid PK |
+| manager_id | uuid FK → auth.users (unique) |
+| ta_type | text ('fixed' / 'from_beat') |
+| fixed_ta_amount | numeric |
+| da_amount | numeric |
+| created_at / updated_at | timestamptz |
+
+RLS: Admin-only write, authenticated read (own config or subordinate configs).
+
+### 2. Admin UI: Expense Master > Configuration
+
+Update `ExpensePolicyConfig.tsx` to add two new config sections after the existing TA/DA cards:
+
+**Manager-Level Config Card** -- Table listing managers with their TA/DA overrides. Admin can add/edit/remove rows. Uses a user selector filtered to users who have subordinates.
+
+**User-Level Config Card** -- Table listing individual users with their TA/DA overrides. Admin can add/edit/remove rows. Uses a profile selector.
+
+Both cards show a badge indicating "Overrides Global Default" and display the current global value for reference.
+
+### 3. Calculation Engine: 6 Files Updated
+
+Every file that currently reads only `expense_master_config` needs to also fetch `user_expense_config` and `team_expense_config`, then apply the priority: **User > Manager > Global**.
+
+Files affected:
+| File | Change |
+|------|--------|
+| `src/hooks/useMonthlyExpenseSummary.ts` | Add user/team config queries, COALESCE logic |
+| `src/components/BeatAllowanceManagement.tsx` | Same -- TA and DA calculation sections |
+| `src/components/expenses/ExpenseMonthlySummary.tsx` | Same |
+| `src/components/expenses/TeamExpenseSummary.tsx` | Per-member lookup (each subordinate may have different config) |
+| `src/components/ProductivityTracking.tsx` | Same |
+
+The logic in each:
+```
+// Fetch all three configs
+const [globalConfig, userConfig, teamConfig] = await Promise.all([...]);
+
+// For a given userId, find their manager
+const managerId = employees.find(e => e.user_id === userId)?.manager_id;
+
+// Resolve with priority
+const daAmount = userConfig?.da_amount ?? teamConfig?.da_amount ?? globalConfig?.da_amount ?? 0;
+const taType = userConfig?.ta_type ?? teamConfig?.ta_type ?? globalConfig?.ta_type ?? 'from_beat';
+const fixedTa = userConfig?.fixed_ta_amount ?? teamConfig?.fixed_ta_amount ?? globalConfig?.fixed_ta_amount ?? 0;
+```
+
+### 4. Shared Helper Hook (New)
+
+Create `src/hooks/useResolvedExpenseConfig.ts` -- a reusable hook that takes a `userId` and returns the resolved TA/DA config after applying the 3-level hierarchy. This avoids duplicating the COALESCE logic across 5 files.
+
+### Summary
+
+| Area | UI Change? | Logic Change? |
+|------|-----------|---------------|
+| Admin Expense Master > Config | Yes -- 2 new cards | Yes -- CRUD for new tables |
+| User Expense Tab (TA/DA/Additional) | No | Yes -- config resolution |
+| Team Summary (Manager view) | No | Yes -- per-member config |
+
+Total: 2 new DB tables, 1 new hook, 1 admin component update, 5 calculation files updated.
+
