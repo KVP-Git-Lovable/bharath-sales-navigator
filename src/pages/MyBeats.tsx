@@ -543,6 +543,7 @@ export const MyBeats = () => {
       const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
       setTaType(resolved.ta_type);
       setFixedTaAmount(resolved.fixed_ta_amount);
+      setTaPerKmRate(resolved.ta_per_km_rate);
       if (resolved.ta_type === 'fixed') {
         setTravelAllowance(resolved.fixed_ta_amount.toString());
       } else {
