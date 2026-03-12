@@ -934,10 +934,19 @@ const ExpensePolicyConfig = () => {
       {/* ─── DA Policy Card ───────────────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Utensils className="h-4 w-4 text-primary" />
-            Daily Allowance (DA) Policy
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Utensils className="h-4 w-4 text-primary" />
+              Daily Allowance (DA) Policy
+            </CardTitle>
+            <button
+              onClick={() => setShowDAHelp(true)}
+              className="inline-flex items-center justify-center rounded-full w-7 h-7 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              aria-label="How DA policy works"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Distribution */}
