@@ -66,6 +66,7 @@ interface TargetConfig {
   total_quantity_target: number;
   total_revenue_target: number;
   total_visits_target: number;
+  total_retailer_activation_target: number;
   is_locked: boolean;
   setup_completed: boolean;
   target_period_type: PeriodType;
