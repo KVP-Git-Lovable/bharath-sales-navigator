@@ -75,10 +75,13 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const [totalAmount, setTotalAmount] = useState(0);
   const [applyToAllBeats, setApplyToAllBeats] = useState(false);
   const [dbCategories, setDbCategories] = useState<string[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
 
   // Refs for hidden file inputs
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const scanFileRef = useRef<HTMLInputElement | null>(null);
+  const scanCameraRef = useRef<HTMLInputElement | null>(null);
 
   const expenseCategories = dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES;
 
