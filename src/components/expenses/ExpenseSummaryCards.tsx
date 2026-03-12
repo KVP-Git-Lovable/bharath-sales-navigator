@@ -127,7 +127,6 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
               </div>
             </button>
           ))}
-          </div>
         </div>
       )}
     </div>
