@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Upload, FileText, Camera } from 'lucide-react';
+import { Plus, Trash2, Upload, FileText, Camera, ScanLine, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,10 +75,13 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
   const [totalAmount, setTotalAmount] = useState(0);
   const [applyToAllBeats, setApplyToAllBeats] = useState(false);
   const [dbCategories, setDbCategories] = useState<string[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
 
   // Refs for hidden file inputs
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const scanFileRef = useRef<HTMLInputElement | null>(null);
+  const scanCameraRef = useRef<HTMLInputElement | null>(null);
 
   const expenseCategories = dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES;
 
@@ -178,6 +181,64 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     const newExpenses = [...expenses];
     newExpenses[index] = { ...newExpenses[index], [field]: value };
     setExpenses(newExpenses);
+  };
+
+  const handleScanBill = async (file: File | null) => {
+    if (!file) return;
+    setIsScanning(true);
+    try {
+      // Compress image
+      const compressed = await compressImageFile(file, 0.5, 1024);
+      const compressedFile = new File([compressed], file.name.replace(/[^a-zA-Z0-9._-]/g, '_'), { type: 'image/jpeg' });
+
+      // Convert to base64
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(compressed);
+      });
+
+      // Call scan-bill edge function
+      const { data, error } = await supabase.functions.invoke('scan-bill', {
+        body: { imageBase64: base64, categories: expenseCategories }
+      });
+
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      // Auto-fill first expense row
+      const updated = [...expenses];
+      const target = updated[0];
+      if (data.category && expenseCategories.includes(data.category)) {
+        target.category = data.category;
+      }
+      if (data.amount && data.amount > 0) {
+        target.amount = data.amount;
+      }
+      if (data.description) {
+        target.description = data.description;
+      }
+      if (data.date) {
+        target.expense_date = data.date;
+      }
+      target.bill_file = compressedFile;
+      updated[0] = target;
+      setExpenses(updated);
+
+      toast.success('Bill scanned! Review the auto-filled details below.');
+    } catch (err) {
+      console.error('Scan bill error:', err);
+      toast.error('Failed to scan bill. Please fill in manually.');
+    } finally {
+      setIsScanning(false);
+      // Reset file inputs
+      if (scanFileRef.current) scanFileRef.current.value = '';
+      if (scanCameraRef.current) scanCameraRef.current.value = '';
+    }
   };
 
   const handleFileSelected = async (index: number, file: File | null) => {
@@ -392,8 +453,64 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               )}
             </div>
 
+            {/* AI Scan Bill Section */}
+            <div className="p-3 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <ScanLine size={16} className="text-primary" />
+                <Label className="text-xs font-semibold text-primary">Scan Bill with AI</Label>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Upload or photograph a bill to auto-fill category, amount & description
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                ref={scanFileRef}
+                onChange={(e) => handleScanBill(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={scanCameraRef}
+                onChange={(e) => handleScanBill(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs flex-1 border-primary/30"
+                  onClick={() => scanFileRef.current?.click()}
+                  disabled={isScanning}
+                >
+                  <Upload size={12} className="mr-1" />
+                  Upload Bill
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs flex-1 border-primary/30"
+                  onClick={() => scanCameraRef.current?.click()}
+                  disabled={isScanning}
+                >
+                  <Camera size={12} className="mr-1" />
+                  Take Photo
+                </Button>
+              </div>
+              {isScanning && (
+                <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-md">
+                  <Loader2 size={14} className="animate-spin text-primary" />
+                  <span className="text-xs text-primary font-medium">Scanning bill... AI is reading your receipt</span>
+                </div>
+              )}
+            </div>
+
             {beatId && expenseDate && (
-              <div className="flex items-center space-x-2 p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-2 p-2.5 bg-primary/5 rounded-lg border border-primary/20">
                 <Checkbox
                   id="apply-all-beats"
                   checked={applyToAllBeats}
