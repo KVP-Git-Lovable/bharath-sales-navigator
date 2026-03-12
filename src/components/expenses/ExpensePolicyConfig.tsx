@@ -268,66 +268,81 @@ OverrideTable.displayName = 'OverrideTable';
 const InlineGroupSection = React.memo<{
   groups: ExpenseGroup[];
   field: 'ta' | 'da';
-  onCreate: () => void;
-  onEdit: (g: ExpenseGroup) => void;
+  onCreate: (context: 'ta' | 'da') => void;
+  onEdit: (g: ExpenseGroup, context: 'ta' | 'da') => void;
   onMembers: (g: ExpenseGroup) => void;
   onDelete: (g: ExpenseGroup) => void;
-}>(({ groups, field, onCreate, onEdit, onMembers, onDelete }) => (
-  <div className="mt-4 pt-4 border-t space-y-2">
-    <div className="flex items-center justify-between">
-      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-        <Users className="h-3.5 w-3.5" />
-        Group Overrides
-      </p>
-      <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={onCreate}>
-        <Plus className="h-3 w-3" />
-        Create Group
-      </Button>
-    </div>
-    {groups.length === 0 ? (
-      <p className="text-xs text-muted-foreground text-center py-2">No expense groups yet.</p>
-    ) : (
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-[11px] px-2">Group</TableHead>
-              <TableHead className="text-[11px] px-2">{field === 'ta' ? 'TA (₹)' : 'DA (₹)'}</TableHead>
-              <TableHead className="text-[11px] px-2">Members</TableHead>
-              <TableHead className="text-[11px] px-1 w-[80px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {groups.map(g => (
-              <TableRow key={g.id}>
-                <TableCell className="py-1.5 px-2">
-                  <p className="text-xs font-medium">{g.name}</p>
-                  {g.description && <p className="text-[10px] text-muted-foreground">{g.description}</p>}
-                </TableCell>
-                <TableCell className="py-1.5 px-2 text-xs">
-                  ₹{field === 'ta' ? g.fixed_ta_amount : g.da_amount}
-                </TableCell>
-                <TableCell className="py-1.5 px-2">
-                  <Badge variant="secondary" className="text-[10px] cursor-pointer" onClick={() => onMembers(g)}>
-                    <Users className="h-3 w-3 mr-0.5" />{g.member_count || 0}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-1.5 px-1">
-                  <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onMembers(g)}><UserPlus className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(g)}><Edit2 className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => onDelete(g)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+}>(({ groups, field, onCreate, onEdit, onMembers, onDelete }) => {
+  // Filter groups: TA section shows groups with TA config, DA section shows groups with DA config
+  const filteredGroups = groups.filter(g => {
+    if (field === 'ta') {
+      return g.fixed_ta_amount > 0 || g.ta_per_km_rate > 0 || g.ta_type === 'fixed' || g.ta_type === 'from_gps';
+    } else {
+      return g.da_amount > 0;
+    }
+  });
+
+  return (
+    <div className="mt-4 pt-4 border-t space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5" />
+          {field === 'ta' ? 'TA' : 'DA'} Group Overrides
+        </p>
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onCreate(field)}>
+          <Plus className="h-3 w-3" />
+          Create {field === 'ta' ? 'TA' : 'DA'} Group
+        </Button>
       </div>
-    )}
-    <p className="text-[10px] text-muted-foreground">Priority: User Override → Group → Team → Global Default</p>
-  </div>
-));
+      {filteredGroups.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-2">No {field === 'ta' ? 'TA' : 'DA'} groups yet.</p>
+      ) : (
+        <div className="rounded-md border overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-[11px] px-2">Group</TableHead>
+                <TableHead className="text-[11px] px-2">{field === 'ta' ? 'TA (₹)' : 'DA (₹)'}</TableHead>
+                <TableHead className="text-[11px] px-2">Members</TableHead>
+                <TableHead className="text-[11px] px-1 w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredGroups.map(g => (
+                <TableRow key={g.id}>
+                  <TableCell className="py-1.5 px-2">
+                    <p className="text-xs font-medium">{g.name}</p>
+                    {g.description && <p className="text-[10px] text-muted-foreground">{g.description}</p>}
+                  </TableCell>
+                  <TableCell className="py-1.5 px-2 text-xs">
+                    {field === 'ta' ? (
+                      g.ta_type === 'from_gps' ? `GPS × ₹${g.ta_per_km_rate}/km` : `₹${g.fixed_ta_amount}`
+                    ) : (
+                      `₹${g.da_amount}`
+                    )}
+                  </TableCell>
+                  <TableCell className="py-1.5 px-2">
+                    <Badge variant="secondary" className="text-[10px] cursor-pointer" onClick={() => onMembers(g)}>
+                      <Users className="h-3 w-3 mr-0.5" />{g.member_count || 0}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-1.5 px-1">
+                    <div className="flex items-center gap-0.5">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onMembers(g)}><UserPlus className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(g, field)}><Edit2 className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => onDelete(g)}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <p className="text-[10px] text-muted-foreground">Priority: User Override → Group → Team → Global Default</p>
+    </div>
+  );
+}));
 
 InlineGroupSection.displayName = 'InlineGroupSection';
 
