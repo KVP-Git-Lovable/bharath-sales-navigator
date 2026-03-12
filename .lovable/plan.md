@@ -1,42 +1,36 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# AI Bill Scanner for Additional Expenses
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, conditional rules, and **Expense Groups** for scalable multi-user policy management.
+## What We're Building
+A "Scan Bill" feature at the top of the Additional Expenses form that lets users upload or photograph a bill, sends it to AI for OCR, and auto-fills the expense category, amount, and description.
 
-## What Was Done
+## Changes
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+### 1. New Edge Function: `scan-bill`
+Based on the existing `scan-board` pattern. Uses Lovable AI (Gemini 2.5 Flash) with vision to extract:
+- **category** — matched against the configured expense categories
+- **amount** — total/final amount from the bill
+- **description** — vendor name, items summary
+- **date** — bill date if visible
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution
+The prompt will include the list of available expense categories so AI picks the best match.
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig
-- **Approval Workflows Card** — Create workflows with steps, set default
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+### 2. Update `supabase/config.toml`
+Add `[functions.scan-bill]` with `verify_jwt = false`.
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
+### 3. Update `AdditionalExpenses.tsx`
+- Add a prominent "Scan Bill" section at the **top** of the form (before expense rows), with Upload and Camera buttons
+- On image capture/upload:
+  1. Compress the image (reuse existing `compressImageFile`)
+  2. Convert to base64 and send to `scan-bill` edge function
+  3. Auto-fill the first expense row's category, amount, description, and date
+  4. Attach the compressed image as `bill_file` on that row
+- Show a loading state ("Scanning bill...") during AI processing
+- Show extracted results with option to edit before saving
 
-### Phase 5: Expense Groups ✅ (NEW)
-- **`expense_groups` table** — Named groups with TA/DA policy values (ta_type, fixed_ta_amount, da_amount, ta_per_km_rate)
-- **`expense_group_members` table** — Many-to-many junction mapping users to groups
-- **Resolution hierarchy updated**: User Override > **Group Override** > Team (Manager) Override > Global Default
-- **ExpenseGroupsConfig UI** — Full CRUD for groups + multi-user member management dialog
-- **All callers updated** — EditBeatModal, MyBeats, ProductivityTracking, TeamExpenseSummary, BeatAllowanceManagement, ExpenseMonthlySummary, useMonthlyExpenseSummary
+### Files
+1. **Create** `supabase/functions/scan-bill/index.ts` — AI vision OCR for bills
+2. **Edit** `supabase/config.toml` — add function entry
+3. **Edit** `src/components/AdditionalExpenses.tsx` — add scan UI at top + auto-fill logic
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is
