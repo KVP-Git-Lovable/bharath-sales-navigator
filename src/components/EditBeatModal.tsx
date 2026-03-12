@@ -492,7 +492,13 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                         step="0.1"
                         placeholder="0.0"
                         value={averageKm}
-                        onChange={(e) => setAverageKm(e.target.value)}
+                        onChange={(e) => {
+                          setAverageKm(e.target.value);
+                          if (taType === 'from_beat' && taPerKmRate > 0) {
+                            const km = parseFloat(e.target.value) || 0;
+                            setTravelAllowance((km * taPerKmRate).toFixed(2));
+                          }
+                        }}
                       />
                     </div>
                     
