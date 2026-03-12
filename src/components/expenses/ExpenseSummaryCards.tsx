@@ -12,6 +12,7 @@ interface ExpenseSummaryCardsProps {
   onTotalClick: () => void;
   isExpanded: boolean;
   orderValue?: number;
+  totalKm?: number;
 }
 
 const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
