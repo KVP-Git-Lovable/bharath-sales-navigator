@@ -1,42 +1,37 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# Fix Expense Details Tables for Desktop + Mobile Responsiveness
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
+## Problem
+The TA, DA, and Additional Expenses tables inside `BeatAllowanceManagement.tsx` were optimized for mobile with tiny fixed column widths (60px, 62px, 38px). On desktop (1021px+), this creates huge empty gaps — especially visible in the TA table where "Beat" stretches across most of the screen while "TA Amt" is crammed to the right.
 
-## What Was Done
+The header buttons (Report, XLS, Add Expense) also use `hidden sm:inline` which hides text on some breakpoints unnecessarily.
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+## Changes
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
-  1. Checks amount-based rules first
-  2. Then category-based rules
-  3. Then 'always' rules
-  4. Falls back to default workflow
-  5. Ultimate fallback to old `approval_config` behavior
-- Creates `approval_steps` from `workflow_steps` using reporting chain
+### `src/components/BeatAllowanceManagement.tsx`
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
-- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+**TA Table (TACardList):**
+- Use responsive column widths: `w-[60px] sm:w-[100px]` for Date, `sm:w-[80px]` for TA Amt, remove `table-fixed` on desktop or use `max-w-4xl mx-auto` to constrain table width on large screens
+- On desktop, show the "More" columns (Visits, Orders) by default since there's room
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
-- Falls back to hardcoded list if DB categories unavailable
+**DA Table (DACardList):**
+- Same responsive width treatment for Date and DA Amt columns
+- Show Start/End columns by default on desktop
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is (reads from approval engine)
+**Additional Expenses Table (AdditionalCardList):**
+- Widen Status and Action columns on desktop
+
+**Card container:**
+- Add `max-w-4xl` to the Card to prevent the table from stretching across ultra-wide screens, keeping a readable density
+
+### `src/components/expenses/ExpenseSummaryCards.tsx`
+- On desktop (sm+), use a 5-column grid instead of 3+2 split so summary cards sit in one row and use space better
+
+### `src/pages/MyExpenses.tsx`
+- Add `max-w-4xl mx-auto` wrapper for desktop content centering (the page already has `max-w-7xl` but the expense content should be narrower for readability)
+
+## Scope
+- 3 files modified
+- Pure CSS/layout changes — no logic or data changes
+
