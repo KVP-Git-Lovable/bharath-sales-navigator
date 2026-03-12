@@ -50,6 +50,7 @@ const ApprovalWorkflowsConfig = () => {
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [newName, setNewName] = useState('');
   const [newMode, setNewMode] = useState<'sequential' | 'parallel_any' | 'parallel_all'>('sequential');
   const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
