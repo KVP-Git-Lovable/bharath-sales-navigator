@@ -1,42 +1,59 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# Integrate Expense Groups into TA/DA Cards + Multi-Select for Add User/Team
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, conditional rules, and **Expense Groups** for scalable multi-user policy management.
+## Current State
+- **Expense Groups** exists as a **separate card** below TA/DA policy cards (line 757)
+- **"+ Add User"** and **"+ Add Team (Manager)"** use a single-select `<Select>` dropdown (`ProfileSelector`) — only one user/team can be added at a time
+- The TA and DA cards already have "Custom per user/team" mode with an `OverrideTable`
 
-## What Was Done
+## Changes
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+### 1. Move Expense Groups inside TA & DA Policy Cards
+- Remove the standalone `<ExpenseGroupsConfig />` from line 757
+- Inside each policy card (TA and DA), when "Custom per user/team" is selected, add a sub-section below the override table showing:
+  - A "Groups" section listing existing expense groups with their relevant policy value (TA amount for TA card, DA amount for DA card)
+  - A button to create/edit groups inline (reuse the dialog from `ExpenseGroupsConfig`)
+  - Clicking a group opens the member management dialog
+- This way admins see user overrides, team overrides, AND group overrides all in context within each policy card
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution
+### 2. Replace Single-Select ProfileSelector with Multi-Select
+- Replace the `<Select>` component in `ProfileSelector` with a `Popover` + checkbox list (similar pattern to `ExpenseGroupsConfig`'s member management)
+- Allow selecting multiple users/teams at once
+- On confirm/close, call `addOverride` for each selected user/team in batch
+- Show a search input and scrollable checkbox list inside the popover
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig
-- **Approval Workflows Card** — Create workflows with steps, set default
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+### Files to Edit
+1. **`src/components/expenses/ExpensePolicyConfig.tsx`**:
+   - Replace `ProfileSelector` with a new `MultiProfileSelector` component using Popover + checkboxes
+   - Update `OverrideTable` to use the new multi-select component
+   - Integrate expense groups section inside both TA and DA custom sections
+   - Remove standalone `<ExpenseGroupsConfig />` render
+   - Add group CRUD dialogs (reuse logic from `ExpenseGroupsConfig`)
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
+2. **`src/components/expenses/ExpenseGroupsConfig.tsx`**: Keep as-is for reusable logic, or inline key parts into the policy config
 
-### Phase 5: Expense Groups ✅ (NEW)
-- **`expense_groups` table** — Named groups with TA/DA policy values (ta_type, fixed_ta_amount, da_amount, ta_per_km_rate)
-- **`expense_group_members` table** — Many-to-many junction mapping users to groups
-- **Resolution hierarchy updated**: User Override > **Group Override** > Team (Manager) Override > Global Default
-- **ExpenseGroupsConfig UI** — Full CRUD for groups + multi-user member management dialog
-- **All callers updated** — EditBeatModal, MyBeats, ProductivityTracking, TeamExpenseSummary, BeatAllowanceManagement, ExpenseMonthlySummary, useMonthlyExpenseSummary
+### UI Layout (inside each policy card, custom mode)
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is
+```text
+┌─ TA Policy Card ──────────────────────────┐
+│  TA Calculation Method: [Fixed / From Beat]│
+│  Distribution: ○ Same for all ● Custom    │
+│  Default TA: ₹___                         │
+│                                           │
+│  ── User/Team Overrides ──────────────── │
+│  [Override Table rows...]                 │
+│  [+ Add Users] [+ Add Teams]  ← multi    │
+│                                           │
+│  ── Group Overrides ─────────────────── │
+│  Group Name | TA(₹) | Members | Actions   │
+│  [+ Create Group]                         │
+└───────────────────────────────────────────┘
+```
+
+### Multi-Select Component Design
+- Trigger button: "+ Add Users" / "+ Add Teams (Managers)"
+- Popover content: search input + scrollable checkbox list + "Add Selected" button
+- On "Add Selected", batch-create override rows for all checked users/teams
+- Existing overrides are excluded from the list
+
