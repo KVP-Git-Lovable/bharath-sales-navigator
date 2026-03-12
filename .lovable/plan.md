@@ -1,42 +1,38 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# Auto-populate Beat TA Based on Admin Expense Config
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
+## Problem
+When creating or editing a beat, the Travel Allowance field is always a free-form input. It should be context-aware based on the admin's expense policy configuration:
+- If TA is **"fixed"** → auto-populate the fixed amount and make it read-only (since it's the same for all beats)
+- If TA is **"from_beat"** → show the input field so users can enter the per-beat TA value (or per-KM rate info)
 
-## What Was Done
+DA is already working correctly — it's a flat daily amount applied per present day, independent of beats. The approval flow for additional expenses also works via the existing rule-based engine and doesn't need changes.
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+## What Changes
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
-  1. Checks amount-based rules first
-  2. Then category-based rules
-  3. Then 'always' rules
-  4. Falls back to default workflow
-  5. Ultimate fallback to old `approval_config` behavior
-- Creates `approval_steps` from `workflow_steps` using reporting chain
+### 1. `src/pages/MyBeats.tsx` — Create Beat Dialog
+- On dialog open, fetch `expense_master_config` to get `ta_type` and `fixed_ta_amount`
+- If `ta_type === 'fixed'`: auto-populate `travelAllowance` with `fixed_ta_amount`, make the input **read-only**, and show a helper text: "Fixed TA set by admin policy"
+- If `ta_type === 'from_beat'`: show the input as-is with helper text: "Enter travel allowance for this beat"
+- Also check for user-level override from `user_expense_config` — if a custom fixed TA is set for this user, use that value instead
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
-- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+### 2. `src/components/EditBeatModal.tsx` — Edit Beat Dialog
+- Same logic: fetch `expense_master_config` on open
+- If `ta_type === 'fixed'`: show the fixed amount (read-only) with info text
+- If `ta_type === 'from_beat'`: allow editing the beat-specific TA value as before
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
-- Falls back to hardcoded list if DB categories unavailable
+### 3. Beat save logic adjustment
+- When `ta_type === 'fixed'`: always save the fixed TA amount from config (not user input), ensuring consistency
+- When `ta_type === 'from_beat'`: save user-entered value as before
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is (reads from approval engine)
+## Files to Edit
+- `src/pages/MyBeats.tsx` — fetch config on create dialog open, conditionally render TA field
+- `src/components/EditBeatModal.tsx` — same conditional TA field logic
+
+## What Already Works (No Changes Needed)
+- **DA calculation**: Uses `resolveExpenseConfig()` to get DA per present day — works correctly
+- **TA calculation in expenses**: `useMonthlyExpenseSummary.ts` already handles both `fixed` (uses `fixedTa` per day) and `from_beat` (sums beat TAs from plans) — works correctly
+- **Approval flow**: Rule-based routing trigger handles additional expenses — works correctly
+- **Productivity tracking**: Already reads beat TA and resolved config — works correctly
+
