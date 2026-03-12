@@ -211,6 +211,9 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async (configData: TargetConfig) => {
+      // Derive is_locked from plan_status for backward compatibility
+      const isLocked = configData.plan_status === 'active' || configData.plan_status === 'closed';
+      
       if (configData.id) {
         const { error } = await supabase
           .from('fy_target_config')
@@ -224,11 +227,12 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
             total_quantity_target: configData.total_quantity_target,
             total_revenue_target: configData.total_revenue_target,
             total_visits_target: configData.total_visits_target,
-            is_locked: configData.is_locked,
+            is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
             target_start_month: configData.target_start_month,
             target_end_month: configData.target_end_month,
+            plan_status: configData.plan_status,
           })
           .eq('id', configData.id);
         if (error) throw error;
@@ -255,18 +259,20 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
             total_quantity_target: configData.total_quantity_target,
             total_revenue_target: configData.total_revenue_target,
             total_visits_target: configData.total_visits_target,
-            is_locked: configData.is_locked,
+            is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
             target_start_month: configData.target_start_month,
             target_end_month: configData.target_end_month,
             created_by: user?.id,
+            plan_status: configData.plan_status,
           })
           .select()
           .single();
         if (error) throw error;
         if (data) {
           setConfig(prev => ({ ...prev, id: data.id }));
+          onPlanChange?.(data.id);
           
           // Save period targets if not annual
           if (configData.target_period_type !== 'annual' && periodTargets.length > 0) {
@@ -281,6 +287,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fy-target-config'] });
+      queryClient.invalidateQueries({ queryKey: ['fy-target-plans'] });
       queryClient.invalidateQueries({ queryKey: ['fy-period-targets'] });
     },
     onError: (error: Error) => {
