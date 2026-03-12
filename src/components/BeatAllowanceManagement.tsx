@@ -130,21 +130,21 @@ const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ record
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end sm:hidden">
         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowMore(v => !v)}>
           {showMore ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           {showMore ? 'Less' : 'More'}
         </Button>
       </div>
       <div className="rounded-md border overflow-hidden">
-        <Table className="table-fixed w-full">
+        <Table className="table-fixed sm:table-auto w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-[11px] px-2 w-[60px]">Date</TableHead>
-              <TableHead className="text-right text-[11px] px-2 w-[62px]">DA Amt</TableHead>
+              <TableHead className="text-[11px] px-2 w-[60px] sm:w-auto">Date</TableHead>
+              <TableHead className="text-right text-[11px] px-2 w-[62px] sm:w-auto">DA Amt</TableHead>
               <TableHead className="text-[11px] px-2">Mkt Hours</TableHead>
-              {showMore && <TableHead className="text-[11px] px-2 w-[55px]">Start</TableHead>}
-              {showMore && <TableHead className="text-[11px] px-2 w-[55px]">End</TableHead>}
+              <TableHead className={`text-[11px] px-2 w-[55px] sm:w-auto ${showMore ? '' : 'hidden sm:table-cell'}`}>Start</TableHead>
+              <TableHead className={`text-[11px] px-2 w-[55px] sm:w-auto ${showMore ? '' : 'hidden sm:table-cell'}`}>End</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,16 +156,16 @@ const DACardList: React.FC<{ records: DARecord[]; totalDA: number }> = ({ record
                 </TableCell>
                 <TableCell className="text-right text-[11px] py-1.5 px-2 font-medium">₹{record.da_amount.toLocaleString()}</TableCell>
                 <TableCell className="text-[11px] py-1.5 px-2">{record.market_hours}</TableCell>
-                {showMore && <TableCell className="text-[11px] py-1.5 px-2">{record.day_start_time}</TableCell>}
-                {showMore && <TableCell className="text-[11px] py-1.5 px-2">{record.day_end_time}</TableCell>}
+                <TableCell className={`text-[11px] py-1.5 px-2 ${showMore ? '' : 'hidden sm:table-cell'}`}>{record.day_start_time}</TableCell>
+                <TableCell className={`text-[11px] py-1.5 px-2 ${showMore ? '' : 'hidden sm:table-cell'}`}>{record.day_end_time}</TableCell>
               </TableRow>
             ))}
             <TableRow className="border-t-2 bg-muted/30">
               <TableCell className="font-bold text-[11px] py-1.5 px-2">Total</TableCell>
               <TableCell className="text-right font-bold text-[11px] py-1.5 px-2">₹{totalDA.toLocaleString()}</TableCell>
               <TableCell></TableCell>
-              {showMore && <TableCell></TableCell>}
-              {showMore && <TableCell></TableCell>}
+              <TableCell className={`${showMore ? '' : 'hidden sm:table-cell'}`}></TableCell>
+              <TableCell className={`${showMore ? '' : 'hidden sm:table-cell'}`}></TableCell>
             </TableRow>
           </TableBody>
         </Table>
