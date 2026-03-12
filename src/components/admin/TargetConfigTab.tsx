@@ -865,10 +865,10 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {config.enable_quantity && (
-                <div className="rounded-xl border bg-muted/30 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-foreground whitespace-nowrap">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900/40 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
                     Qty Target ({config.quantity_unit})
                   </Label>
                   <Input
@@ -881,8 +881,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 </div>
               )}
               {config.enable_revenue && (
-                <div className="rounded-xl border bg-success/10 border-success/20 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-success whitespace-nowrap">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900/40 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                     Revenue Target (₹)
                   </Label>
                   <Input
@@ -895,8 +895,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 </div>
               )}
               {config.enable_visits && (
-                <div className="rounded-xl border bg-primary/5 border-primary/20 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-primary whitespace-nowrap">
+                <div className="rounded-xl border border-violet-200 bg-violet-50 dark:bg-violet-950/20 dark:border-violet-900/40 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-violet-700 dark:text-violet-300 whitespace-nowrap">
                     Visits Target
                   </Label>
                   <Input
@@ -909,8 +909,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 </div>
               )}
               {config.enable_retailer_activation && (
-                <div className="rounded-xl border bg-accent/50 border-accent p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-foreground whitespace-nowrap">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap">
                     Retailer Activation
                   </Label>
                   <Input
