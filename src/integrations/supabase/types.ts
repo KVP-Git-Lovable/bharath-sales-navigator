@@ -13190,6 +13190,36 @@ export type Database = {
           },
         ]
       }
+      team_expense_config: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          fixed_ta_amount: number | null
+          id: string
+          manager_id: string
+          ta_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          manager_id: string
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          manager_id?: string
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       territories: {
         Row: {
           assigned_distributor_ids: Json | null
@@ -13903,6 +13933,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_expense_config: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          fixed_ta_amount: number | null
+          id: string
+          ta_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          ta_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          ta_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_invitations: {
         Row: {

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfMonth, endOfMonth, format, getWeek } from 'date-fns';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } from './useResolvedExpenseConfig';
 
 export interface WeeklyBreakdown {
   weekLabel: string;
@@ -48,10 +49,11 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
 
-      const [attendanceRes, configRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
+      const [{ globalConfig, userConfigMap, teamConfigMap }, managerId, attendanceRes, beatPlansRes, beatsRes, additionalRes, ordersRes] = await Promise.all([
+        fetchExpenseConfigs(),
+        fetchUserManagerId(userId),
         supabase.from('attendance').select('date, status')
           .eq('user_id', userId).gte('date', startStr).lte('date', endStr),
-        supabase.from('expense_master_config').select('*').single(),
         supabase.from('beat_plans').select('plan_date, beat_id')
           .eq('user_id', userId).gte('plan_date', startStr).lte('plan_date', endStr),
         supabase.from('beats').select('beat_id, travel_allowance'),
@@ -62,10 +64,11 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           .eq('status', 'confirmed'),
       ]);
 
-      const config = configRes.data;
-      const daAmount = config?.da_amount || 0;
-      const taType = config?.ta_type || 'from_beat';
-      const fixedTa = config?.fixed_ta_amount || 0;
+      // Resolve config with hierarchy: User > Manager > Global
+      const config = resolveExpenseConfig(userId, managerId, globalConfig, userConfigMap, teamConfigMap);
+      const daAmount = config.da_amount;
+      const taType = config.ta_type;
+      const fixedTa = config.fixed_ta_amount;
 
       // Build beat TA map
       const beatTAMap = new Map<string, number>();

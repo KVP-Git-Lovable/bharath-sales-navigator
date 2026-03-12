@@ -120,15 +120,14 @@ const ProductivityTracking = () => {
         travelAllowanceMap.set(b.beat_name, b.travel_allowance || 0);
       });
 
-      // Fetch expense master config for DA
-      const { data: configData } = await supabase
-        .from('expense_master_config')
-        .select('da_amount, ta_type, fixed_ta_amount')
-        .single();
+      // Fetch expense configs (global + user/team overrides)
+      const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
 
-      const daAmount = configData?.da_amount || 0;
-      const taType = configData?.ta_type || 'from_beat';
-      const fixedTaAmount = configData?.fixed_ta_amount || 0;
+      // We'll resolve per-user below after we know userIds
+      const globalDaAmount = globalConfig?.da_amount || 0;
+      const globalTaType = globalConfig?.ta_type || 'from_beat';
+      const globalFixedTa = globalConfig?.fixed_ta_amount || 0;
 
       // Fetch profiles for user names
       const userIds = Array.from(new Set((ordersData || []).map((o: any) => o.user_id)));
@@ -141,6 +140,9 @@ const ProductivityTracking = () => {
         nameMap = Object.fromEntries((profilesData as any[] | null)?.map((p: any) => [p.id, p.full_name]) || []);
       }
 
+      // Fetch manager IDs for all users to resolve per-user config
+      const managerMap = await fetchUserManagerIds(userIds as string[]);
+
       // Group data by user and date
       const groupedData = new Map<string, ProductivityData>();
 
@@ -150,11 +152,13 @@ const ProductivityTracking = () => {
         const key = `${userId}_${orderDate}`;
 
         if (!groupedData.has(key)) {
+          // Resolve per-user config
+          const userConfig = resolveExpenseConfig(userId, managerMap.get(userId), globalConfig, userConfigMap, teamConfigMap);
           const beatName = beatNameMap.get(key) || '-';
-          const travelAllowance = taType === 'fixed' 
-            ? fixedTaAmount 
+          const travelAllowance = userConfig.ta_type === 'fixed' 
+            ? userConfig.fixed_ta_amount 
             : (travelAllowanceMap.get(beatName) || 0);
-          const totalAllowance = daAmount + travelAllowance;
+          const totalAllowance = userConfig.da_amount + travelAllowance;
 
           groupedData.set(key, {
             user_id: userId,
@@ -163,7 +167,7 @@ const ProductivityTracking = () => {
             date: orderDate,
             orders_count: 0,
             total_order_value: 0,
-            daily_allowance: daAmount,
+            daily_allowance: userConfig.da_amount,
             travel_allowance: travelAllowance,
             total_allowance: totalAllowance,
             productivity_ratio: 0

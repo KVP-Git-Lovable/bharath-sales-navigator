@@ -443,14 +443,18 @@ const BeatAllowanceManagement = () => {
     try {
       if (!user?.id || effectiveUserIds.length === 0) return;
 
-      // Fetch expense master config for TA type
-      const { data: configData } = await supabase
-        .from('expense_master_config')
-        .select('ta_type, fixed_ta_amount')
-        .single();
-
-      const taType = configData?.ta_type || 'from_beat';
-      const fixedTaAmount = configData?.fixed_ta_amount || 0;
+      // Fetch expense configs with hierarchy
+      const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      
+      // Get manager IDs for effective users
+      const managerMap = await fetchUserManagerIds(effectiveUserIds);
+      
+      // Resolve config for first effective user (primary user context)
+      const primaryUserId = effectiveUserIds[0];
+      const primaryConfig = resolveExpenseConfig(primaryUserId, managerMap.get(primaryUserId), globalConfig, userConfigMap, teamConfigMap);
+      const taType = primaryConfig.ta_type;
+      const fixedTaAmount = primaryConfig.fixed_ta_amount;
 
       // Fetch beat plans (journey plans) to get dates and beats
       const { data: beatPlans, error: beatPlansError } = await supabase
@@ -596,13 +600,13 @@ const BeatAllowanceManagement = () => {
     try {
       if (!user?.id) return;
 
-      // Fetch DA amount from expense_master_config
-      const { data: configData } = await supabase
-        .from('expense_master_config')
-        .select('da_amount')
-        .single();
+      // Fetch DA amount using config hierarchy
+      const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } = await import('@/hooks/useResolvedExpenseConfig');
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const managerId = await fetchUserManagerId(user.id);
+      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap);
 
-      const daPerDay = configData?.da_amount || 0;
+      const daPerDay = config.da_amount;
 
       // Fetch attendance data with check-in/check-out times
       const { data: attendanceData, error: attendanceError } = await supabase
