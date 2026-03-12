@@ -1957,13 +1957,21 @@ export const MyBeats = () => {
                     type="number"
                     placeholder={taType === 'fixed' ? '' : "Enter travel allowance"}
                     value={travelAllowance}
-                    onChange={(e) => taType !== 'fixed' && setTravelAllowance(e.target.value)}
-                    readOnly={taType === 'fixed'}
-                    className={taType === 'fixed' ? 'bg-muted cursor-not-allowed' : ''}
+                    onChange={(e) => {
+                      if (taType !== 'fixed' && !(taType === 'from_beat' && taPerKmRate > 0)) {
+                        setTravelAllowance(e.target.value);
+                      }
+                    }}
+                    readOnly={taType === 'fixed' || (taType === 'from_beat' && taPerKmRate > 0)}
+                    className={(taType === 'fixed' || (taType === 'from_beat' && taPerKmRate > 0)) ? 'bg-muted cursor-not-allowed' : ''}
                   />
                   {taType === 'fixed' ? (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" /> Fixed TA set by admin policy (₹{fixedTaAmount})
+                    </p>
+                  ) : taPerKmRate > 0 ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Auto-calculated at ₹{taPerKmRate}/km
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">Enter the travel allowance for this beat</p>
@@ -1980,7 +1988,13 @@ export const MyBeats = () => {
                     step="0.1"
                     placeholder="Enter average distance"
                     value={averageKm}
-                    onChange={(e) => setAverageKm(e.target.value)}
+                    onChange={(e) => {
+                      setAverageKm(e.target.value);
+                      if (taType === 'from_beat' && taPerKmRate > 0) {
+                        const km = parseFloat(e.target.value) || 0;
+                        setTravelAllowance((km * taPerKmRate).toFixed(2));
+                      }
+                    }}
                   />
                 </div>
               </div>
