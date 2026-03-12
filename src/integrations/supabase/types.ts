@@ -5047,6 +5047,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           enable_quantity: boolean | null
+          enable_retailer_activation: boolean
           enable_revenue: boolean | null
           enable_visits: boolean | null
           enabled_parameters: Json | null
@@ -5061,6 +5062,7 @@ export type Database = {
           target_plan_name: string | null
           target_start_month: number
           total_quantity_target: number | null
+          total_retailer_activation_target: number | null
           total_revenue_target: number | null
           total_visits_target: number | null
           updated_at: string | null
@@ -5069,6 +5071,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           enable_quantity?: boolean | null
+          enable_retailer_activation?: boolean
           enable_revenue?: boolean | null
           enable_visits?: boolean | null
           enabled_parameters?: Json | null
@@ -5083,6 +5086,7 @@ export type Database = {
           target_plan_name?: string | null
           target_start_month?: number
           total_quantity_target?: number | null
+          total_retailer_activation_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
           updated_at?: string | null
@@ -5091,6 +5095,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           enable_quantity?: boolean | null
+          enable_retailer_activation?: boolean
           enable_revenue?: boolean | null
           enable_visits?: boolean | null
           enabled_parameters?: Json | null
@@ -5105,6 +5110,7 @@ export type Database = {
           target_plan_name?: string | null
           target_start_month?: number
           total_quantity_target?: number | null
+          total_retailer_activation_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
           updated_at?: string | null
