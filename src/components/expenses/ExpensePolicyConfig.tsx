@@ -692,7 +692,7 @@ const ExpensePolicyConfig = () => {
           </div>
 
           {daDistribution === 'custom' && (
-            <OverrideTable field="da" overrides={daOverrides} defaultAmount={config.da_amount} />
+            <OverrideTable field="da" overrides={daOverrides} defaultAmount={config.da_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
           )}
         </CardContent>
       </Card>
