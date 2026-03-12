@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Car, Utensils, Receipt, IndianRupee, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } from '@/hooks/useResolvedExpenseConfig';
 
 interface MonthlySummary {
   ta: number;
@@ -43,11 +44,12 @@ const ExpenseMonthlySummary = () => {
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
 
-      // Fetch attendance for DA calc
-      const [attendanceRes, configRes, beatPlansRes, allowancesRes, additionalRes] = await Promise.all([
+      // Fetch all configs + manager + data in parallel
+      const [{ globalConfig, userConfigMap, teamConfigMap }, managerId, attendanceRes, beatPlansRes, allowancesRes, additionalRes] = await Promise.all([
+        fetchExpenseConfigs(),
+        fetchUserManagerId(user.id),
         supabase.from('attendance').select('date, status')
           .eq('user_id', user.id).gte('date', startStr).lte('date', endStr),
-        supabase.from('expense_master_config').select('*').single(),
         supabase.from('beat_plans').select('plan_date, beat_id')
           .eq('user_id', user.id).gte('plan_date', startStr).lte('plan_date', endStr),
         supabase.from('beat_allowances').select('beat_id, travel_allowance')
@@ -56,10 +58,11 @@ const ExpenseMonthlySummary = () => {
           .eq('user_id', user.id).gte('expense_date', startStr).lte('expense_date', endStr),
       ]);
 
-      const config = configRes.data;
-      const daAmount = config?.da_amount || 0;
-      const taType = config?.ta_type || 'from_beat';
-      const fixedTa = config?.fixed_ta_amount || 0;
+      // Resolve config with hierarchy
+      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap);
+      const daAmount = config.da_amount;
+      const taType = config.ta_type;
+      const fixedTa = config.fixed_ta_amount;
 
       // Count present days
       const presentDays = attendanceRes.data?.filter(a => a.status === 'present').length || 0;

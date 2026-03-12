@@ -167,7 +167,7 @@ const ProductivityTracking = () => {
             date: orderDate,
             orders_count: 0,
             total_order_value: 0,
-            daily_allowance: daAmount,
+            daily_allowance: userConfig.da_amount,
             travel_allowance: travelAllowance,
             total_allowance: totalAllowance,
             productivity_ratio: 0
