@@ -4,6 +4,7 @@ export interface ResolvedExpenseConfig {
   ta_type: 'fixed' | 'from_beat';
   fixed_ta_amount: number;
   da_amount: number;
+  ta_per_km_rate: number;
 }
 
 /**
@@ -52,6 +53,7 @@ export const resolveExpenseConfig = (
     ta_type: (userConfig?.ta_type ?? teamConfig?.ta_type ?? globalConfig?.ta_type ?? 'from_beat') as 'fixed' | 'from_beat',
     fixed_ta_amount: userConfig?.fixed_ta_amount ?? teamConfig?.fixed_ta_amount ?? globalConfig?.fixed_ta_amount ?? 0,
     da_amount: userConfig?.da_amount ?? teamConfig?.da_amount ?? globalConfig?.da_amount ?? 0,
+    ta_per_km_rate: userConfig?.ta_per_km_rate ?? teamConfig?.ta_per_km_rate ?? globalConfig?.ta_per_km_rate ?? 0,
   };
 };
 

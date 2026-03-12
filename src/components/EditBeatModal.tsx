@@ -83,6 +83,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   // Expense config for TA
   const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
   const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
+  const [taPerKmRate, setTaPerKmRate] = useState<number>(0);
 
   const weekDays = [
     { label: "Mon", value: 1 },
@@ -111,8 +112,12 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
           const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
           setTaType(resolved.ta_type);
           setFixedTaAmount(resolved.fixed_ta_amount);
+          setTaPerKmRate(resolved.ta_per_km_rate);
           if (resolved.ta_type === 'fixed') {
             setTravelAllowance(resolved.fixed_ta_amount.toString());
+          } else if (resolved.ta_per_km_rate > 0 && beat.average_km) {
+            // Auto-calculate TA from KM * rate
+            setTravelAllowance((beat.average_km * resolved.ta_per_km_rate).toFixed(2));
           } else {
             setTravelAllowance(beat.travel_allowance?.toString() || '');
           }
@@ -453,13 +458,21 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                         type="number"
                         placeholder={taType === 'fixed' ? '' : "0"}
                         value={travelAllowance}
-                        onChange={(e) => taType !== 'fixed' && setTravelAllowance(e.target.value)}
-                        readOnly={taType === 'fixed'}
-                        className={taType === 'fixed' ? 'bg-muted cursor-not-allowed' : ''}
+                        onChange={(e) => {
+                          if (taType !== 'fixed' && !(taType === 'from_beat' && taPerKmRate > 0)) {
+                            setTravelAllowance(e.target.value);
+                          }
+                        }}
+                        readOnly={taType === 'fixed' || (taType === 'from_beat' && taPerKmRate > 0)}
+                        className={(taType === 'fixed' || (taType === 'from_beat' && taPerKmRate > 0)) ? 'bg-muted cursor-not-allowed' : ''}
                       />
                       {taType === 'fixed' ? (
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Info className="h-3 w-3" /> Fixed TA set by admin policy (₹{fixedTaAmount})
+                        </p>
+                      ) : taPerKmRate > 0 ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Info className="h-3 w-3" /> Auto-calculated at ₹{taPerKmRate}/km
                         </p>
                       ) : (
                         <p className="text-xs text-muted-foreground">Enter travel allowance for this beat</p>
@@ -479,7 +492,13 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                         step="0.1"
                         placeholder="0.0"
                         value={averageKm}
-                        onChange={(e) => setAverageKm(e.target.value)}
+                        onChange={(e) => {
+                          setAverageKm(e.target.value);
+                          if (taType === 'from_beat' && taPerKmRate > 0) {
+                            const km = parseFloat(e.target.value) || 0;
+                            setTravelAllowance((km * taPerKmRate).toFixed(2));
+                          }
+                        }}
                       />
                     </div>
                     
