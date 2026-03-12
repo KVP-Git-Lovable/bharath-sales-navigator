@@ -157,6 +157,7 @@ export const MyBeats = () => {
   // Expense config for TA auto-population
   const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
   const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
+  const [taPerKmRate, setTaPerKmRate] = useState<number>(0);
   
   // Monthly recurrence options
   const [monthlyType, setMonthlyType] = useState<"day" | "date">("day"); // "day" = First Monday, "date" = 15th

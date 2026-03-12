@@ -83,6 +83,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   // Expense config for TA
   const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
   const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
+  const [taPerKmRate, setTaPerKmRate] = useState<number>(0);
 
   const weekDays = [
     { label: "Mon", value: 1 },
