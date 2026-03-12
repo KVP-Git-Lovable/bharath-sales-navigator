@@ -215,7 +215,9 @@ const ExpensePolicyConfig = () => {
       const { data, error } = await supabase
         .from('expense_master_config')
         .select('*')
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (error && error.code === 'PGRST116') {
         const { data: newData, error: insertError } = await supabase
