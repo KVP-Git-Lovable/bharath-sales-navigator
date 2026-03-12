@@ -33,7 +33,7 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
   }
 
   const compactItems = [
-    { label: 'TA', value: fmt(ta), color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'TA', value: totalKm > 0 ? `${fmt(ta)} · ${Math.round(totalKm)} km` : fmt(ta), color: 'text-blue-600 dark:text-blue-400' },
     { label: 'DA', value: fmt(da), color: 'text-green-600 dark:text-green-400' },
     { label: 'Add', value: fmt(additional), color: 'text-purple-600 dark:text-purple-400' },
     { label: 'Total', value: fmt(total), color: 'text-primary font-bold', clickable: true },
