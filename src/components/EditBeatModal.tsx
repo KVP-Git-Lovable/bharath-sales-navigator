@@ -269,7 +269,9 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
       const { error: beatUpdateError } = await supabase
         .from('beats')
         .update({
+          beat_name: beatName.trim(),
           travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
+          average_km: parseFloat(averageKm) || 0,
           average_time_minutes: parseInt(averageTimeMinutes) || 0,
           territory_id: selectedTerritoryId || null,
           updated_at: new Date().toISOString()
