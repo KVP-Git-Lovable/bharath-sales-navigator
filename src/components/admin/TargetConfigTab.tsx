@@ -78,6 +78,8 @@ const FY_MONTH_OPTIONS = FY_MONTHS.map((name, i) => ({ value: i + 1, label: name
 interface TargetConfigTabProps {
   fyYear: number;
   onLockedAndAssign?: () => void;
+  selectedPlanId?: string;
+  onPlanChange?: (planId: string) => void;
 }
 
 const QUANTITY_UNITS = ['Kg', 'Units', 'Liters', 'Pcs', 'Boxes', 'Tonnes', 'Cartons'];
