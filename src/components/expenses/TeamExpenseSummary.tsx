@@ -479,7 +479,7 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
             .in('user_id', subordinateIds).gte('date', startStr).lte('date', endStr),
           supabase.from('beat_plans').select('user_id, plan_date, beat_id')
             .in('user_id', subordinateIds).gte('plan_date', startStr).lte('plan_date', endStr),
-          supabase.from('beats').select('beat_id, travel_allowance'),
+          supabase.from('beats').select('beat_id, travel_allowance, average_km'),
           (supabase as any).from('additional_expenses').select('user_id, amount, status, expense_date')
             .in('user_id', subordinateIds).gte('expense_date', startStr).lte('expense_date', endStr),
           supabase.from('orders').select('user_id, total_amount')
@@ -487,8 +487,8 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
             .eq('status', 'confirmed'),
         ]);
 
+        // Build beat TA map with per-km rate support
         const beatTAMap = new Map<string, number>();
-        beatsRes.data?.forEach((b: any) => beatTAMap.set(b.beat_id, b.travel_allowance || 0));
 
         let totalTA = 0, totalDA = 0, totalAdditional = 0, totalPresent = 0;
 
