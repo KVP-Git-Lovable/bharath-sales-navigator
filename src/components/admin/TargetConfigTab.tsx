@@ -669,6 +669,35 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 </div>
               )}
             </div>
+
+            {/* Retailer Activation */}
+            <div
+              onClick={() => handleBasisChange('enable_retailer_activation', !config.enable_retailer_activation)}
+              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                config.enable_retailer_activation
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                  config.enable_retailer_activation ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Store className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">Retailer Activation</p>
+                  <p className="text-xs text-muted-foreground">Track new retailers</p>
+                </div>
+              </div>
+              {config.enable_retailer_activation && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Inline unit selectors below metrics */}
