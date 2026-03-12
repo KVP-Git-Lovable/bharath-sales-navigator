@@ -1953,10 +1953,19 @@ export const MyBeats = () => {
                   <Input
                     id="travelAllowance"
                     type="number"
-                    placeholder="Enter travel allowance"
+                    placeholder={taType === 'fixed' ? '' : "Enter travel allowance"}
                     value={travelAllowance}
-                    onChange={(e) => setTravelAllowance(e.target.value)}
+                    onChange={(e) => taType !== 'fixed' && setTravelAllowance(e.target.value)}
+                    readOnly={taType === 'fixed'}
+                    className={taType === 'fixed' ? 'bg-muted cursor-not-allowed' : ''}
                   />
+                  {taType === 'fixed' ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Fixed TA set by admin policy (₹{fixedTaAmount})
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Enter the travel allowance for this beat</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="averageKm" className="flex items-center gap-2">
