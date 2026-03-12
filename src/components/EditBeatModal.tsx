@@ -97,12 +97,30 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   useEffect(() => {
     if (beat && isOpen) {
       setBeatName(beat.name || '');
-      setTravelAllowance(beat.travel_allowance?.toString() || '');
       setAverageKm(beat.average_km?.toString() || '');
       setAverageTimeMinutes(beat.average_time_minutes?.toString() || '');
       loadRetailers();
       loadTerritories();
       loadBeatTerritory();
+      
+      // Fetch expense config
+      (async () => {
+        try {
+          const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+          const managerId = user?.id ? await fetchUserManagerId(user.id) : null;
+          const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
+          setTaType(resolved.ta_type);
+          setFixedTaAmount(resolved.fixed_ta_amount);
+          if (resolved.ta_type === 'fixed') {
+            setTravelAllowance(resolved.fixed_ta_amount.toString());
+          } else {
+            setTravelAllowance(beat.travel_allowance?.toString() || '');
+          }
+        } catch {
+          setTaType('from_beat');
+          setTravelAllowance(beat.travel_allowance?.toString() || '');
+        }
+      })();
     }
   }, [beat, isOpen]);
   
