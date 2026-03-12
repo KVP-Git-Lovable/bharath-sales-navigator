@@ -107,6 +107,13 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   target_period_type: 'annual',
   target_start_month: 1,
   target_end_month: 12,
+  plan_status: 'draft',
+};
+
+const STATUS_CONFIG: Record<PlanStatus, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
+  draft: { label: 'Draft', icon: FileText, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  active: { label: 'Active', icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  closed: { label: 'Closed', icon: Archive, color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
 };
 
 export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabProps) {
