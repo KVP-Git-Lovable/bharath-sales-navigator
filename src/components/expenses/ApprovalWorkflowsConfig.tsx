@@ -192,10 +192,19 @@ const ApprovalWorkflowsConfig = () => {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <GitBranch className="h-4 w-4 text-cyan-600" />
-            Approval Workflows
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-cyan-600" />
+              Approval Workflows
+            </CardTitle>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="inline-flex items-center justify-center rounded-full w-7 h-7 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              aria-label="How approval workflows work"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+          </div>
           <Button size="sm" variant="outline" onClick={() => setShowAdd(!showAdd)}>
             <Plus className="h-3.5 w-3.5 mr-1" />
             Add
