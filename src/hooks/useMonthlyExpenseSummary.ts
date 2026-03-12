@@ -32,6 +32,8 @@ export interface DailyBreakdown {
 
 export interface MonthlyExpenseSummary {
   ta: number;
+  totalKm: number;
+  taType: string;
   da: number;
   additionalApproved: number;
   additionalPending: number;
