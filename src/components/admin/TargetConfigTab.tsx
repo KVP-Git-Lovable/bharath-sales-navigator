@@ -413,8 +413,10 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     );
   }
 
-  // Locked view - show read-only summary
-  if (config.is_locked) {
+  // Closed view - show read-only summary with reopen option
+  if (isReadOnly) {
+    const statusInfo = STATUS_CONFIG[config.plan_status];
+    const StatusIcon = statusInfo.icon;
     return (
       <Card>
         <CardHeader>
@@ -429,13 +431,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="gap-1">
-                <Lock className="h-3 w-3" />
-                Locked
+              <Badge variant="outline" className={`gap-1 ${statusInfo.color}`}>
+                <StatusIcon className="h-3 w-3" />
+                {statusInfo.label}
               </Badge>
-              <Button variant="outline" size="sm" onClick={handleUnlock} disabled={saveMutation.isPending}>
+              <Button variant="outline" size="sm" onClick={() => handleStatusChange('draft')} disabled={saveMutation.isPending}>
                 <Unlock className="h-4 w-4 mr-1" />
-                Unlock to Edit
+                Reopen as Draft
               </Button>
             </div>
           </div>
