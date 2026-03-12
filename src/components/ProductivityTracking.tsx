@@ -122,7 +122,7 @@ const ProductivityTracking = () => {
 
       // Fetch expense configs (global + user/team overrides)
       const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
-      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const { globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap } = await fetchExpenseConfigs();
 
       // We'll resolve per-user below after we know userIds
       const globalDaAmount = globalConfig?.da_amount || 0;
