@@ -348,8 +348,9 @@ const ExpensePolicyConfig = () => {
   // Expense Groups (inline)
   const [expenseGroups, setExpenseGroups] = useState<ExpenseGroup[]>([]);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupDialogContext, setGroupDialogContext] = useState<'ta' | 'da'>('ta');
   const [editingGroup, setEditingGroup] = useState<ExpenseGroup | null>(null);
-  const [groupForm, setGroupForm] = useState({ name: '', description: '', ta_type: 'from_beat' as 'fixed' | 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', ta_type: 'from_beat' as 'fixed' | 'from_beat' | 'from_gps', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
   const [savingGroup, setSavingGroup] = useState(false);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [membersGroup, setMembersGroup] = useState<ExpenseGroup | null>(null);
