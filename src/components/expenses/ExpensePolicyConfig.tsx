@@ -410,6 +410,93 @@ const ExpensePolicyConfig = () => {
     }
   };
 
+  // ─── Expense Groups helpers ────────────────────────────────────────────────
+
+  const fetchGroups = async () => {
+    try {
+      const { data: groupsData } = await (supabase as any).from('expense_groups').select('*').order('name');
+      const { data: membersData } = await (supabase as any).from('expense_group_members').select('group_id');
+      const countMap = new Map<string, number>();
+      (membersData || []).forEach((m: any) => countMap.set(m.group_id, (countMap.get(m.group_id) || 0) + 1));
+      setExpenseGroups((groupsData || []).map((g: any) => ({ ...g, member_count: countMap.get(g.id) || 0 })));
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
+  };
+
+  const openCreateGroupDialog = () => {
+    setEditingGroup(null);
+    setGroupForm({ name: '', description: '', ta_type: 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
+    setGroupDialogOpen(true);
+  };
+
+  const openEditGroupDialog = (group: ExpenseGroup) => {
+    setEditingGroup(group);
+    setGroupForm({ name: group.name, description: group.description || '', ta_type: group.ta_type as 'fixed' | 'from_beat', fixed_ta_amount: group.fixed_ta_amount, da_amount: group.da_amount, ta_per_km_rate: group.ta_per_km_rate });
+    setGroupDialogOpen(true);
+  };
+
+  const handleSaveGroup = async () => {
+    if (!groupForm.name.trim()) { toast({ title: 'Error', description: 'Group name is required', variant: 'destructive' }); return; }
+    try {
+      setSavingGroup(true);
+      const payload = { name: groupForm.name.trim(), description: groupForm.description.trim() || null, ta_type: groupForm.ta_type, fixed_ta_amount: groupForm.fixed_ta_amount, da_amount: groupForm.da_amount, ta_per_km_rate: groupForm.ta_per_km_rate, updated_at: new Date().toISOString() };
+      if (editingGroup) {
+        await (supabase as any).from('expense_groups').update(payload).eq('id', editingGroup.id);
+        toast({ title: 'Updated', description: `Group "${groupForm.name}" updated` });
+      } else {
+        await (supabase as any).from('expense_groups').insert(payload);
+        toast({ title: 'Created', description: `Group "${groupForm.name}" created` });
+      }
+      setGroupDialogOpen(false);
+      fetchGroups();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally { setSavingGroup(false); }
+  };
+
+  const handleDeleteGroup = async (group: ExpenseGroup) => {
+    if (!confirm(`Delete group "${group.name}"?`)) return;
+    try {
+      await (supabase as any).from('expense_groups').delete().eq('id', group.id);
+      toast({ title: 'Deleted', description: `Group "${group.name}" deleted` });
+      fetchGroups();
+    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+  };
+
+  const openMembersDialog = async (group: ExpenseGroup) => {
+    setMembersGroup(group);
+    setMemberSearch('');
+    setMembersDialogOpen(true);
+    const { data: memberRows } = await (supabase as any).from('expense_group_members').select('user_id').eq('group_id', group.id);
+    setSelectedMemberIds(new Set((memberRows || []).map((m: any) => m.user_id)));
+    const { data: allProfiles } = await supabase.rpc('get_profiles_for_selector');
+    setAllUsers((allProfiles || []).map((p: any) => ({ id: p.id, full_name: p.full_name || 'Unknown' })));
+  };
+
+  const handleSaveMembers = async () => {
+    if (!membersGroup) return;
+    try {
+      setSavingMembers(true);
+      await (supabase as any).from('expense_group_members').delete().eq('group_id', membersGroup.id);
+      if (selectedMemberIds.size > 0) {
+        const rows = Array.from(selectedMemberIds).map(uid => ({ group_id: membersGroup.id, user_id: uid }));
+        const { error } = await (supabase as any).from('expense_group_members').insert(rows);
+        if (error) throw error;
+      }
+      toast({ title: 'Saved', description: `${selectedMemberIds.size} members assigned to "${membersGroup.name}"` });
+      setMembersDialogOpen(false);
+      fetchGroups();
+    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+    finally { setSavingMembers(false); }
+  };
+
+  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const filteredMemberUsers = memberSearch.trim()
+    ? allUsers.filter(u => u.full_name.toLowerCase().includes(memberSearch.toLowerCase()))
+    : allUsers;
+
   // ─── Override CRUD helpers ──────────────────────────────────────────────────
 
   const addOverride = async (
