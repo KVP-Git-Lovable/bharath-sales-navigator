@@ -69,10 +69,16 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       const daAmount = config.da_amount;
       const taType = config.ta_type;
       const fixedTa = config.fixed_ta_amount;
+      const taPerKmRate = config.ta_per_km_rate;
 
-      // Build beat TA map
+      // Build beat TA map - uses per-km rate if configured
       const beatTAMap = new Map<string, number>();
-      beatsRes.data?.forEach((b: any) => beatTAMap.set(b.beat_id, b.travel_allowance || 0));
+      beatsRes.data?.forEach((b: any) => {
+        const km = b.average_km || 0;
+        const beatFixedTA = b.travel_allowance || 0;
+        const ta = (taPerKmRate > 0 && km > 0) ? (km * taPerKmRate) : beatFixedTA;
+        beatTAMap.set(b.beat_id, ta);
+      });
 
       // Present dates
       const presentDates = new Set(
@@ -83,7 +89,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       // DA total
       const da = presentDays * daAmount;
 
-      // TA calculation per day (for weekly grouping)
+      // TA calculation per day - sums all beats planned for each day
       const dailyTA = new Map<string, number>();
       if (taType === 'fixed') {
         presentDates.forEach(d => dailyTA.set(d, fixedTa));
