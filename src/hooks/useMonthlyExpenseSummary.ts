@@ -64,7 +64,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         supabase.from('beats').select('beat_id, travel_allowance, average_km'),
         (supabase as any).from('additional_expenses').select('amount, status, expense_date')
           .eq('user_id', userId).gte('expense_date', startStr).lte('expense_date', endStr),
-        supabase.from('orders').select('total_amount')
+        supabase.from('orders').select('total_amount, order_date')
           .eq('user_id', userId).gte('order_date', startStr).lte('order_date', endStr)
           .eq('status', 'confirmed'),
       ]);
