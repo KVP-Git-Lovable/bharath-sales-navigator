@@ -1,37 +1,42 @@
 
+# Scalable Expense Approval Policy — Enterprise Upgrade
 
-# Add In-App Help Guide for Approval Workflows
+## Status: ✅ Implemented
 
-## What We'll Build
+## Summary
+Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
 
-A help button (HelpCircle icon) next to the "Approval Workflows" title that opens a dialog/sheet with a clear, step-by-step explanation of how the feature works -- including what workflows are, how to configure them, how approval modes differ, and how rules connect workflows to expenses.
+## What Was Done
 
-## Implementation
+### Phase 1: Database Schema ✅
+- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
+- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
+- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
+- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
+- All tables have RLS: read by authenticated, write by admin only
+- Seeded default categories and a "Manager Approval" default workflow
 
-### 1. Add a Help Dialog to `ApprovalWorkflowsConfig.tsx`
+### Phase 2: Updated Trigger ✅
+- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
+  1. Checks amount-based rules first
+  2. Then category-based rules
+  3. Then 'always' rules
+  4. Falls back to default workflow
+  5. Ultimate fallback to old `approval_config` behavior
+- Creates `approval_steps` from `workflow_steps` using reporting chain
 
-- Import `HelpCircle` from lucide-react and `Dialog`/`DialogContent`/`DialogHeader` from the UI library
-- Add a `HelpCircle` button next to the card title ("Approval Workflows")
-- On click, open a `Dialog` containing structured help content:
+### Phase 3: Admin UI ✅
+- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
+- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
+- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
 
-**Help Content Sections:**
-1. **What are Approval Workflows?** -- Named approval chains that define who approves expenses and in what order
-2. **How to Create a Workflow** -- Click Add, name it, choose mode, then expand to add steps
-3. **Approval Modes Explained:**
-   - Sequential: Step 1 must approve before Step 2 sees it
-   - Parallel (Any One): All approvers see it simultaneously; one approval is enough
-   - Parallel (All Required): All approvers must approve
-4. **Step Types:**
-   - Manager: The submitter's direct manager at that hierarchy level
-   - Specific User: A named person (e.g., Finance Head)
-   - Hierarchy Level: Manager at level N in the reporting chain
-5. **How Workflows Connect to Expenses** -- Via Approval Rules (amount/category conditions route to specific workflows). If no rule matches, the default workflow is used.
-6. **Example Setup** -- A practical example: "Manager + Finance" workflow with 2 sequential steps
+### Phase 4: Submission UI ✅
+- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
+- Falls back to hardcoded list if DB categories unavailable
 
-The content will use simple language, small icons, and visual hierarchy (headings, badges, a simple ASCII flow diagram) so non-technical admins can understand it.
-
-### Files Modified
-| File | Change |
-|------|--------|
-| `src/components/expenses/ApprovalWorkflowsConfig.tsx` | Add HelpCircle button + Dialog with help content |
-
+## What Stays Unchanged
+- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
+- `process_approval_step()` — works as-is
+- `trigger_sync_entity_status()` — works as-is
+- TA/DA calculation logic — untouched
+- ExpenseApprovals page — works as-is (reads from approval engine)
