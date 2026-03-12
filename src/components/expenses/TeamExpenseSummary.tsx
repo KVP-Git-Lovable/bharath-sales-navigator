@@ -493,15 +493,18 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
         let totalTA = 0, totalDA = 0, totalAdditional = 0, totalPresent = 0;
 
         subordinateIds.forEach(uid => {
+          // Resolve per-user config
+          const userConfig = resolveExpenseConfig(uid, managerMap.get(uid), globalConfig, userConfigMap, teamConfigMap);
+          
           const presentDates = new Set(
             attendanceRes.data?.filter((a: any) => a.user_id === uid && ['present', 'regularized'].includes(a.status)).map((a: any) => a.date) || []
           );
           totalPresent += presentDates.size;
-          totalDA += presentDates.size * daAmount;
+          totalDA += presentDates.size * userConfig.da_amount;
 
           // TA
-          if (taType === 'fixed') {
-            totalTA += presentDates.size * fixedTa;
+          if (userConfig.ta_type === 'fixed') {
+            totalTA += presentDates.size * userConfig.fixed_ta_amount;
           } else {
             beatPlansRes.data?.filter((p: any) => p.user_id === uid && presentDates.has(p.plan_date)).forEach((plan: any) => {
               totalTA += beatTAMap.get(plan.beat_id) || 0;
