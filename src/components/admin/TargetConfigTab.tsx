@@ -890,22 +890,35 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
         <div className="flex items-center justify-between pt-2">
           <Button variant="outline" onClick={handleSave} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Save Draft
+            {config.plan_status === 'draft' ? 'Save Draft' : 'Save Changes'}
           </Button>
           
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={handleLockAndAssign} 
-              disabled={!canLock || saveMutation.isPending}
-              className="gap-2"
-            >
-              {saveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Lock className="h-4 w-4" />
-              )}
-              Lock & Assign to Hierarchy
-            </Button>
+          <div className="flex items-center gap-2">
+            {config.plan_status === 'draft' && (
+              <Button 
+                onClick={() => handleStatusChange('active')} 
+                disabled={!canActivate || saveMutation.isPending}
+                className="gap-2"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Activate & Assign
+              </Button>
+            )}
+            {config.plan_status === 'active' && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => handleStatusChange('draft')} disabled={saveMutation.isPending}>
+                  Back to Draft
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => handleStatusChange('closed')} disabled={saveMutation.isPending} className="gap-1">
+                  <Archive className="h-4 w-4" />
+                  Close Plan
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardContent>
