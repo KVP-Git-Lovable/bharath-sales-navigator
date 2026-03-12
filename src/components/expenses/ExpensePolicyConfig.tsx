@@ -785,7 +785,7 @@ const ExpensePolicyConfig = () => {
             <Label className="text-xs font-medium">TA Calculation Method</Label>
             <Select
               value={config.ta_type}
-              onValueChange={(value: 'fixed' | 'from_beat') =>
+              onValueChange={(value: 'fixed' | 'from_beat' | 'from_gps') =>
                 setConfig(prev => prev ? { ...prev, ta_type: value } : null)
               }
             >
@@ -795,6 +795,7 @@ const ExpensePolicyConfig = () => {
               <SelectContent>
                 <SelectItem value="fixed">Fixed TA per Day</SelectItem>
                 <SelectItem value="from_beat">TA from Beat Distance</SelectItem>
+                <SelectItem value="from_gps">From GPS Tracking</SelectItem>
               </SelectContent>
             </Select>
           </div>
