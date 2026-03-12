@@ -110,14 +110,16 @@ const ProductivityTracking = () => {
       // Fetch beats for travel allowance
       const { data: beatsData, error: beatsError } = await supabase
         .from('beats')
-        .select('beat_name, travel_allowance');
+        .select('beat_name, travel_allowance, average_km');
 
       if (beatsError) throw beatsError;
 
-      // Create travel allowance map by beat name
+      // Create travel allowance map by beat name - uses per-km rate when available
       const travelAllowanceMap = new Map<string, number>();
+      const beatKmMap = new Map<string, number>();
       (beatsData || []).forEach((b: any) => {
         travelAllowanceMap.set(b.beat_name, b.travel_allowance || 0);
+        beatKmMap.set(b.beat_name, b.average_km || 0);
       });
 
       // Fetch expense configs (global + user/team overrides)
@@ -155,9 +157,12 @@ const ProductivityTracking = () => {
           // Resolve per-user config
           const userConfig = resolveExpenseConfig(userId, managerMap.get(userId), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
           const beatName = beatNameMap.get(key) || '-';
+          const km = beatKmMap.get(beatName) || 0;
+          const perKmRate = userConfig.ta_per_km_rate || 0;
+          const beatFixedTA = travelAllowanceMap.get(beatName) || 0;
           const travelAllowance = userConfig.ta_type === 'fixed' 
             ? userConfig.fixed_ta_amount 
-            : (travelAllowanceMap.get(beatName) || 0);
+            : ((perKmRate > 0 && km > 0) ? (km * perKmRate) : beatFixedTA);
           const totalAllowance = userConfig.da_amount + travelAllowance;
 
           groupedData.set(key, {
