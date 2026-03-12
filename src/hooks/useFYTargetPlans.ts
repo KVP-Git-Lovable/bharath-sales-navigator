@@ -11,10 +11,12 @@ export interface FYTargetPlan {
   enable_quantity: boolean;
   enable_revenue: boolean;
   enable_visits: boolean;
+  enable_retailer_activation: boolean;
   quantity_unit: string | null;
   total_quantity_target: number | null;
   total_revenue_target: number | null;
   total_visits_target: number | null;
+  total_retailer_activation_target: number | null;
   setup_completed: boolean;
   is_locked: boolean;
   created_at: string;

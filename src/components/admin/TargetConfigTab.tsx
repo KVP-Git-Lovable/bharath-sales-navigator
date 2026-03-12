@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useFYTargetPlans, type PlanStatus } from '@/hooks/useFYTargetPlans';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar, Plus, FileText, CheckCircle2, Archive } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar, Plus, FileText, CheckCircle2, Archive, Store } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,7 @@ interface TargetConfig {
   enable_quantity: boolean;
   enable_revenue: boolean;
   enable_visits: boolean;
+  enable_retailer_activation: boolean;
   quantity_unit: string;
   enabled_parameters: {
     product: boolean;
@@ -65,6 +66,7 @@ interface TargetConfig {
   total_quantity_target: number;
   total_revenue_target: number;
   total_visits_target: number;
+  total_retailer_activation_target: number;
   is_locked: boolean;
   setup_completed: boolean;
   target_period_type: PeriodType;
@@ -90,6 +92,7 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   enable_quantity: true,
   enable_revenue: true,
   enable_visits: false,
+  enable_retailer_activation: false,
   quantity_unit: 'Kg',
   enabled_parameters: {
     product: true,
@@ -102,6 +105,7 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   total_quantity_target: 0,
   total_revenue_target: 0,
   total_visits_target: 0,
+  total_retailer_activation_target: 0,
   is_locked: false,
   setup_completed: false,
   target_period_type: 'annual',
@@ -179,11 +183,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
         enable_quantity: existingConfig.enable_quantity ?? true,
         enable_revenue: existingConfig.enable_revenue ?? true,
         enable_visits: existingConfig.enable_visits ?? false,
+        enable_retailer_activation: (existingConfig as any).enable_retailer_activation ?? false,
         quantity_unit: existingConfig.quantity_unit ?? 'Kg',
         enabled_parameters: enabledParams,
         total_quantity_target: existingConfig.total_quantity_target ?? 0,
         total_revenue_target: existingConfig.total_revenue_target ?? 0,
         total_visits_target: existingConfig.total_visits_target ?? 0,
+        total_retailer_activation_target: (existingConfig as any).total_retailer_activation_target ?? 0,
         is_locked: existingConfig.is_locked ?? false,
         setup_completed: existingConfig.setup_completed ?? false,
         target_period_type: periodType,
@@ -222,11 +228,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
             enable_quantity: configData.enable_quantity,
             enable_revenue: configData.enable_revenue,
             enable_visits: configData.enable_visits,
+            enable_retailer_activation: configData.enable_retailer_activation,
             quantity_unit: configData.quantity_unit,
             enabled_parameters: configData.enabled_parameters,
             total_quantity_target: configData.total_quantity_target,
             total_revenue_target: configData.total_revenue_target,
             total_visits_target: configData.total_visits_target,
+            total_retailer_activation_target: configData.total_retailer_activation_target,
             is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
@@ -254,11 +262,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
             enable_quantity: configData.enable_quantity,
             enable_revenue: configData.enable_revenue,
             enable_visits: configData.enable_visits,
+            enable_retailer_activation: configData.enable_retailer_activation,
             quantity_unit: configData.quantity_unit,
             enabled_parameters: configData.enabled_parameters,
             total_quantity_target: configData.total_quantity_target,
             total_revenue_target: configData.total_revenue_target,
             total_visits_target: configData.total_visits_target,
+            total_retailer_activation_target: configData.total_retailer_activation_target,
             is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
@@ -295,7 +305,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     },
   });
 
-  const handleBasisChange = (field: 'enable_quantity' | 'enable_revenue' | 'enable_visits', checked: boolean) => {
+  const handleBasisChange = (field: 'enable_quantity' | 'enable_revenue' | 'enable_visits' | 'enable_retailer_activation', checked: boolean) => {
     setConfig(prev => ({ ...prev, [field]: checked }));
   };
 
@@ -394,12 +404,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     setConfig(newConfig);
   };
 
-  const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits;
+  const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits || config.enable_retailer_activation;
   const hasAtLeastOneParameter = Object.values(config.enabled_parameters).some(v => v);
   const hasValidTargets = 
     (!config.enable_quantity || config.total_quantity_target > 0) &&
     (!config.enable_revenue || config.total_revenue_target > 0) &&
-    (!config.enable_visits || config.total_visits_target > 0);
+    (!config.enable_visits || config.total_visits_target > 0) &&
+    (!config.enable_retailer_activation || config.total_retailer_activation_target > 0);
   const canActivate = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
   const isReadOnly = config.plan_status === 'closed';
 
@@ -461,6 +472,12 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
               <div className="p-4 bg-primary/5 rounded-lg border">
                 <p className="text-sm text-muted-foreground">Visits Target</p>
                 <p className="text-2xl font-bold">{formatNumber(config.total_visits_target)}</p>
+              </div>
+            )}
+            {config.enable_retailer_activation && (
+              <div className="p-4 bg-primary/5 rounded-lg border">
+                <p className="text-sm text-muted-foreground">Retailer Activation</p>
+                <p className="text-2xl font-bold">{formatNumber(config.total_retailer_activation_target)} retailers</p>
               </div>
             )}
           </div>
@@ -571,7 +588,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
             <Label className="text-sm font-semibold text-foreground">Target Metrics</Label>
             <p className="text-xs text-muted-foreground mt-1">Select which metrics to track</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Quantity */}
             <div
               onClick={() => handleBasisChange('enable_quantity', !config.enable_quantity)}
@@ -651,6 +668,35 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 </div>
               </div>
               {config.enable_visits && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Retailer Activation */}
+            <div
+              onClick={() => handleBasisChange('enable_retailer_activation', !config.enable_retailer_activation)}
+              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                config.enable_retailer_activation
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                  config.enable_retailer_activation ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Store className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">Retailer Activation</p>
+                  <p className="text-xs text-muted-foreground">Track new retailers</p>
+                </div>
+              </div>
+              {config.enable_retailer_activation && (
                 <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                   <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -857,6 +903,20 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                     type="text"
                     value={config.total_visits_target > 0 ? formatNumber(config.total_visits_target) : ''}
                     onChange={(e) => setConfig(prev => ({ ...prev, total_visits_target: Math.round(parseNumber(e.target.value)) }))}
+                    placeholder="0"
+                    className="w-32 text-right font-semibold bg-background"
+                  />
+                </div>
+              )}
+              {config.enable_retailer_activation && (
+                <div className="rounded-xl border bg-accent/50 border-accent p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-foreground whitespace-nowrap">
+                    Retailer Activation
+                  </Label>
+                  <Input
+                    type="text"
+                    value={config.total_retailer_activation_target > 0 ? formatNumber(config.total_retailer_activation_target) : ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, total_retailer_activation_target: Math.round(parseNumber(e.target.value)) }))}
                     placeholder="0"
                     className="w-32 text-right font-semibold bg-background"
                   />
