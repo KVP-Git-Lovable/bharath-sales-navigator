@@ -112,8 +112,12 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
           const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
           setTaType(resolved.ta_type);
           setFixedTaAmount(resolved.fixed_ta_amount);
+          setTaPerKmRate(resolved.ta_per_km_rate);
           if (resolved.ta_type === 'fixed') {
             setTravelAllowance(resolved.fixed_ta_amount.toString());
+          } else if (resolved.ta_per_km_rate > 0 && beat.average_km) {
+            // Auto-calculate TA from KM * rate
+            setTravelAllowance((beat.average_km * resolved.ta_per_km_rate).toFixed(2));
           } else {
             setTravelAllowance(beat.travel_allowance?.toString() || '');
           }
