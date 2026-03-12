@@ -191,11 +191,11 @@ const ExpenseCategoriesConfig = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs">Name</TableHead>
-              <TableHead className="text-xs">Receipt</TableHead>
-              <TableHead className="text-xs">Limit</TableHead>
-              <TableHead className="text-xs">Active</TableHead>
-              <TableHead className="text-xs w-[80px]">Actions</TableHead>
+              <TableHead className="text-xs w-[40%]">Name</TableHead>
+              <TableHead className="text-xs w-[15%]">Receipt</TableHead>
+              <TableHead className="text-xs w-[15%]">Limit</TableHead>
+              <TableHead className="text-xs w-[15%]">Active</TableHead>
+              <TableHead className="text-xs w-[15%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
