@@ -1094,7 +1094,7 @@ const ExpensePolicyConfig = () => {
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingGroup ? 'Edit Group' : 'Create Expense Group'}</DialogTitle>
+            <DialogTitle>{editingGroup ? 'Edit Group' : `Create ${groupDialogContext === 'ta' ? 'TA' : 'DA'} Group`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -1105,30 +1105,41 @@ const ExpensePolicyConfig = () => {
               <Label className="text-xs">Description</Label>
               <Input value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">TA Type</Label>
-              <Select value={groupForm.ta_type} onValueChange={(v: 'fixed' | 'from_beat') => setGroupForm(f => ({ ...f, ta_type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">Fixed TA</SelectItem>
-                  <SelectItem value="from_beat">From Beat Distance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
+
+            {/* TA-specific fields */}
+            {groupDialogContext === 'ta' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">TA Type</Label>
+                  <Select value={groupForm.ta_type} onValueChange={(v: 'fixed' | 'from_beat' | 'from_gps') => setGroupForm(f => ({ ...f, ta_type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixed TA</SelectItem>
+                      <SelectItem value="from_beat">From Beat Distance</SelectItem>
+                      <SelectItem value="from_gps">From GPS Tracking</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fixed TA (₹)</Label>
+                    <Input type="number" min="0" value={groupForm.fixed_ta_amount} onChange={e => setGroupForm(f => ({ ...f, fixed_ta_amount: Number(e.target.value) }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Per KM Rate (₹)</Label>
+                    <Input type="number" min="0" step="0.5" value={groupForm.ta_per_km_rate} onChange={e => setGroupForm(f => ({ ...f, ta_per_km_rate: Number(e.target.value) }))} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* DA-specific fields */}
+            {groupDialogContext === 'da' && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Fixed TA (₹)</Label>
-                <Input type="number" min="0" value={groupForm.fixed_ta_amount} onChange={e => setGroupForm(f => ({ ...f, fixed_ta_amount: Number(e.target.value) }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">DA (₹)</Label>
+                <Label className="text-xs">DA Amount (₹)</Label>
                 <Input type="number" min="0" value={groupForm.da_amount} onChange={e => setGroupForm(f => ({ ...f, da_amount: Number(e.target.value) }))} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Per KM (₹)</Label>
-                <Input type="number" min="0" step="0.5" value={groupForm.ta_per_km_rate} onChange={e => setGroupForm(f => ({ ...f, ta_per_km_rate: Number(e.target.value) }))} />
-              </div>
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Cancel</Button>
