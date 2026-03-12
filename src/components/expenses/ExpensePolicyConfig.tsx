@@ -229,15 +229,15 @@ const OverrideTable = React.memo<{
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        <ProfileSelector
+        <MultiProfileSelector
           excludeIds={excludeIds}
-          onSelect={(id, name) => onAdd(field, 'user', id, name)}
-          label="+ Add User"
+          onAdd={(selections) => selections.forEach(s => onAdd(field, 'user', s.id, s.name))}
+          label="Add Users"
         />
-        <ProfileSelector
+        <MultiProfileSelector
           excludeIds={excludeIds}
-          onSelect={(id, name) => onAdd(field, 'team', id, name)}
-          label="+ Add Team (Manager)"
+          onAdd={(selections) => selections.forEach(s => onAdd(field, 'team', s.id, s.name))}
+          label="Add Teams"
           managersOnly
         />
       </div>
