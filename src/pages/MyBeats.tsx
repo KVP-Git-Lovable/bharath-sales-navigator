@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power } from "lucide-react";
+import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power, Info } from "lucide-react";
+import { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } from "@/hooks/useResolvedExpenseConfig";
 import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
@@ -152,6 +153,10 @@ export const MyBeats = () => {
   const [repeatUntilMode, setRepeatUntilMode] = useState<"date" | "permanent">("date");
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string>("");
   const [territories, setTerritories] = useState<any[]>([]);
+  
+  // Expense config for TA auto-population
+  const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
+  const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
   
   // Monthly recurrence options
   const [monthlyType, setMonthlyType] = useState<"day" | "date">("day"); // "day" = First Monday, "date" = 15th
@@ -529,6 +534,24 @@ export const MyBeats = () => {
     setBeatName("");
     setAverageKm("");
     setAverageTimeMinutes("");
+    
+    // Fetch expense config to determine TA behavior
+    try {
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const managerId = user?.id ? await fetchUserManagerId(user.id) : null;
+      const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
+      setTaType(resolved.ta_type);
+      setFixedTaAmount(resolved.fixed_ta_amount);
+      if (resolved.ta_type === 'fixed') {
+        setTravelAllowance(resolved.fixed_ta_amount.toString());
+      } else {
+        setTravelAllowance("");
+      }
+    } catch (err) {
+      console.error('Error fetching expense config:', err);
+      setTaType('from_beat');
+      setTravelAllowance("");
+    }
   };
 
   const handleRetailerSelection = (retailerId: string) => {
@@ -589,7 +612,7 @@ export const MyBeats = () => {
         beat_id: beatId,
         beat_name: beatName.trim(),
         category: 'General',
-        travel_allowance: parseFloat(travelAllowance) || 0,
+        travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
         average_km: parseFloat(averageKm) || 0,
         average_time_minutes: parseInt(averageTimeMinutes) || 0,
         created_by: user.id,
@@ -1930,10 +1953,19 @@ export const MyBeats = () => {
                   <Input
                     id="travelAllowance"
                     type="number"
-                    placeholder="Enter travel allowance"
+                    placeholder={taType === 'fixed' ? '' : "Enter travel allowance"}
                     value={travelAllowance}
-                    onChange={(e) => setTravelAllowance(e.target.value)}
+                    onChange={(e) => taType !== 'fixed' && setTravelAllowance(e.target.value)}
+                    readOnly={taType === 'fixed'}
+                    className={taType === 'fixed' ? 'bg-muted cursor-not-allowed' : ''}
                   />
+                  {taType === 'fixed' ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Fixed TA set by admin policy (₹{fixedTaAmount})
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Enter the travel allowance for this beat</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="averageKm" className="flex items-center gap-2">

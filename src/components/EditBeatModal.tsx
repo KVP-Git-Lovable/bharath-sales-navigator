@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } from '@/hooks/useResolvedExpenseConfig';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SearchInput } from '@/components/SearchInput';
-import { Save, X, Users, MapPin, Clock, Truck, Repeat, CalendarDays, Navigation } from 'lucide-react';
+import { Save, X, Users, MapPin, Clock, Truck, Repeat, CalendarDays, Navigation, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -78,6 +79,10 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   // Territory
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null);
+  
+  // Expense config for TA
+  const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
+  const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
 
   const weekDays = [
     { label: "Mon", value: 1 },
@@ -92,12 +97,30 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   useEffect(() => {
     if (beat && isOpen) {
       setBeatName(beat.name || '');
-      setTravelAllowance(beat.travel_allowance?.toString() || '');
       setAverageKm(beat.average_km?.toString() || '');
       setAverageTimeMinutes(beat.average_time_minutes?.toString() || '');
       loadRetailers();
       loadTerritories();
       loadBeatTerritory();
+      
+      // Fetch expense config
+      (async () => {
+        try {
+          const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+          const managerId = user?.id ? await fetchUserManagerId(user.id) : null;
+          const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
+          setTaType(resolved.ta_type);
+          setFixedTaAmount(resolved.fixed_ta_amount);
+          if (resolved.ta_type === 'fixed') {
+            setTravelAllowance(resolved.fixed_ta_amount.toString());
+          } else {
+            setTravelAllowance(beat.travel_allowance?.toString() || '');
+          }
+        } catch {
+          setTaType('from_beat');
+          setTravelAllowance(beat.travel_allowance?.toString() || '');
+        }
+      })();
     }
   }, [beat, isOpen]);
   
@@ -247,7 +270,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
         .from('beats')
         .update({
           beat_name: beatName.trim(),
-          travel_allowance: parseFloat(travelAllowance) || 0,
+          travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
           average_km: parseFloat(averageKm) || 0,
           average_time_minutes: parseInt(averageTimeMinutes) || 0,
           territory_id: selectedTerritoryId || null,
@@ -264,7 +287,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
           user_id: user.id,
           beat_id: beat.id,
           beat_name: beatName.trim(),
-          travel_allowance: parseFloat(travelAllowance) || 0,
+          travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
           average_km: parseFloat(averageKm) || 0,
           average_time_minutes: parseInt(averageTimeMinutes) || 0,
           daily_allowance: 0
@@ -428,10 +451,19 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                       <Input
                         id="travelAllowance"
                         type="number"
-                        placeholder="0"
+                        placeholder={taType === 'fixed' ? '' : "0"}
                         value={travelAllowance}
-                        onChange={(e) => setTravelAllowance(e.target.value)}
+                        onChange={(e) => taType !== 'fixed' && setTravelAllowance(e.target.value)}
+                        readOnly={taType === 'fixed'}
+                        className={taType === 'fixed' ? 'bg-muted cursor-not-allowed' : ''}
                       />
+                      {taType === 'fixed' ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Info className="h-3 w-3" /> Fixed TA set by admin policy (₹{fixedTaAmount})
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Enter travel allowance for this beat</p>
+                      )}
                     </div>
                   </div>
 
