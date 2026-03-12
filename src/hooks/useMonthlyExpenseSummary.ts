@@ -8,6 +8,7 @@ export interface WeeklyBreakdown {
   weekLabel: string;
   weekNumber: number;
   ta: number;
+  taKm: number;
   da: number;
   additional: number;
   total: number;
