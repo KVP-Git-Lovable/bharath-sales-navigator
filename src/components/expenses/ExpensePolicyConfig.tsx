@@ -932,8 +932,7 @@ const ExpensePolicyConfig = () => {
         </CardContent>
       </Card>
 
-      {/* Expense Groups */}
-      <ExpenseGroupsConfig />
+      {/* Group Dialogs are rendered below */}
 
       {/* Expense Categories */}
       <ExpenseCategoriesConfig />
