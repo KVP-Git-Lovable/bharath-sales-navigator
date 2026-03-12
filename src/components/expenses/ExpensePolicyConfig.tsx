@@ -798,7 +798,10 @@ const ExpensePolicyConfig = () => {
               </div>
 
               {taDistribution === 'custom' && (
-                <OverrideTable field="ta" overrides={taOverrides} defaultAmount={config.fixed_ta_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+                <>
+                  <OverrideTable field="ta" overrides={taOverrides} defaultAmount={config.fixed_ta_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+                  <InlineGroupSection groups={expenseGroups} field="ta" onCreate={openCreateGroupDialog} onEdit={openEditGroupDialog} onMembers={openMembersDialog} onDelete={handleDeleteGroup} />
+                </>
               )}
             </>
           )}
