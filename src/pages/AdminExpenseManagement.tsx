@@ -30,14 +30,6 @@ const AdminExpenseManagement = () => {
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3 sm:gap-4">
-            <Button
-              onClick={() => navigate('/admin-controls')}
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="hidden sm:flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10 shrink-0">
                 <Receipt className="h-5 w-5 text-primary" />
