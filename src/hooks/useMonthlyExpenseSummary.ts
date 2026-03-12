@@ -11,6 +11,8 @@ export interface WeeklyBreakdown {
   da: number;
   additional: number;
   total: number;
+  orderValue: number;
+  orderCount: number;
   startDate: string;
   endDate: string;
 }
