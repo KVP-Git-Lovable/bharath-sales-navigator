@@ -92,6 +92,7 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   enable_quantity: true,
   enable_revenue: true,
   enable_visits: false,
+  enable_retailer_activation: false,
   quantity_unit: 'Kg',
   enabled_parameters: {
     product: true,
