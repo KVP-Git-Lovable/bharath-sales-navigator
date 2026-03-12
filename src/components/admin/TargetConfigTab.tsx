@@ -70,6 +70,7 @@ interface TargetConfig {
   target_period_type: PeriodType;
   target_start_month: number;
   target_end_month: number;
+  plan_status: PlanStatus;
 }
 
 const FY_MONTH_OPTIONS = FY_MONTHS.map((name, i) => ({ value: i + 1, label: name }));
