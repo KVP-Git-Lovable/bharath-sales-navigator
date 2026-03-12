@@ -146,7 +146,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
           weeklyMap.set(weekNum, {
             weekLabel: `Week ${weekNum}`,
             weekNumber: weekNum,
-            ta: 0, da: 0, additional: 0, total: 0,
+            ta: 0, da: 0, additional: 0, total: 0, orderValue: 0, orderCount: 0,
             startDate: `${yearMonth}-${String(weekStart).padStart(2, '0')}`,
             endDate: `${yearMonth}-${String(weekEnd).padStart(2, '0')}`,
           });
