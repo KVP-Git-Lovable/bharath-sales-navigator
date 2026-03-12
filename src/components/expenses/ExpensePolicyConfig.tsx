@@ -342,7 +342,7 @@ const InlineGroupSection = React.memo<{
       <p className="text-[10px] text-muted-foreground">Priority: User Override → Group → Team → Global Default</p>
     </div>
   );
-}));
+});
 
 InlineGroupSection.displayName = 'InlineGroupSection';
 
