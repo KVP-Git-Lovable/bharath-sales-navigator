@@ -241,7 +241,7 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     }
   };
 
-
+  const handleFileSelected = async (index: number, file: File | null) => {
     if (file) {
       // Compress image files before setting
       if (file.type.startsWith('image/')) {
