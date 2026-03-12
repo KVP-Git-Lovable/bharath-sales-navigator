@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SearchInput } from '@/components/SearchInput';
-import { Save, X, Users, MapPin, Clock, Truck, Repeat, CalendarDays, Navigation } from 'lucide-react';
+import { Save, X, Users, MapPin, Clock, Truck, Repeat, CalendarDays, Navigation, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
