@@ -219,7 +219,12 @@ const ExpensePolicyConfig = () => {
         .limit(1)
         .maybeSingle();
 
-      if (error && error.code === 'PGRST116') {
+      if (error) {
+        throw error;
+      }
+      
+      if (!data) {
+        // No config exists yet — create one
         const { data: newData, error: insertError } = await supabase
           .from('expense_master_config')
           .insert({
@@ -246,9 +251,7 @@ const ExpensePolicyConfig = () => {
             expense_policy_notes: (newData as any).expense_policy_notes || '',
           });
         }
-      } else if (error) {
-        throw error;
-      } else if (data) {
+      } else {
         setConfig({
           id: data.id,
           ta_type: (data.ta_type as 'fixed' | 'from_beat') || 'from_beat',
