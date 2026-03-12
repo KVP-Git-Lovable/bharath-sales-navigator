@@ -509,7 +509,8 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
               )}
             </div>
 
-              <div className="flex items-center space-x-2 p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+            {beatId && expenseDate && (
+              <div className="flex items-center space-x-2 p-2.5 bg-primary/5 rounded-lg border border-primary/20">
                 <Checkbox
                   id="apply-all-beats"
                   checked={applyToAllBeats}
