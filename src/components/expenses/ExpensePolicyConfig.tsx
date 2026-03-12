@@ -278,9 +278,23 @@ const ExpensePolicyConfig = () => {
   const [taOverrides, setTaOverrides] = useState<OverrideEntry[]>([]);
   const [daOverrides, setDaOverrides] = useState<OverrideEntry[]>([]);
 
+  // Expense Groups (inline)
+  const [expenseGroups, setExpenseGroups] = useState<ExpenseGroup[]>([]);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ExpenseGroup | null>(null);
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', ta_type: 'from_beat' as 'fixed' | 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [membersGroup, setMembersGroup] = useState<ExpenseGroup | null>(null);
+  const [allUsers, setAllUsers] = useState<{ id: string; full_name: string }[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [memberSearch, setMemberSearch] = useState('');
+  const [savingMembers, setSavingMembers] = useState(false);
+
   useEffect(() => {
     fetchConfig();
     fetchOverrides();
+    fetchGroups();
   }, []);
 
   const fetchConfig = async () => {
