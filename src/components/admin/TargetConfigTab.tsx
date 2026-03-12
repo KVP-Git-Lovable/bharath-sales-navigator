@@ -305,7 +305,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     },
   });
 
-  const handleBasisChange = (field: 'enable_quantity' | 'enable_revenue' | 'enable_visits', checked: boolean) => {
+  const handleBasisChange = (field: 'enable_quantity' | 'enable_revenue' | 'enable_visits' | 'enable_retailer_activation', checked: boolean) => {
     setConfig(prev => ({ ...prev, [field]: checked }));
   };
 
