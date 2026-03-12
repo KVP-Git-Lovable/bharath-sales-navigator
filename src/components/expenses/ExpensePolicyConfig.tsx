@@ -826,7 +826,35 @@ const ExpensePolicyConfig = () => {
             </div>
           )}
 
-          {/* Fixed TA — distribution options */}
+          {/* From GPS — info message + per-km rate */}
+          {config.ta_type === 'from_gps' && (
+            <div className="rounded-md bg-muted/50 border p-3 flex items-start gap-2">
+              <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  TA will be auto-calculated from the user's actual GPS kilometers traveled during the day. The system tracks GPS distance in real-time and calculates: <strong>TA = Total KM × Per KM Rate</strong>.
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  <Label className="text-xs">Per KM Rate (₹) <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className="max-w-[180px]"
+                    value={config.ta_per_km_rate}
+                    onChange={(e) =>
+                      setConfig(prev => prev ? { ...prev, ta_per_km_rate: Number(e.target.value) } : null)
+                    }
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Example: If rate is ₹8/km and user travels 45 km, TA = ₹360
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+
           {config.ta_type === 'fixed' && (
             <>
               <div className="space-y-2">
