@@ -1218,6 +1218,154 @@ const ExpensePolicyConfig = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* TA Help Dialog */}
+      <Dialog open={showTAHelp} onOpenChange={setShowTAHelp}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Car className="h-4 w-4 text-primary" />
+              How Travel Allowance (TA) Works
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">What is TA?</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Travel Allowance compensates employees for <strong className="text-foreground">travel expenses</strong> incurred during field work — fuel, transport, tolls, etc. TA is calculated daily based on the method you choose.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">3 Calculation Methods</h4>
+              <div className="grid gap-2">
+                <div className="p-2.5 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Banknote className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="font-medium text-xs text-foreground">Fixed TA per Day</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">A flat amount paid every working day, regardless of distance traveled. Simple and predictable.</p>
+                </div>
+                <div className="p-2.5 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin className="h-3.5 w-3.5 text-green-500" />
+                    <span className="font-medium text-xs text-foreground">From Beat Distance</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">TA is calculated from each beat's configured distance (average KM). Uses the <strong>per-KM rate</strong> × beat distance, or a beat-level fixed allowance.</p>
+                </div>
+                <div className="p-2.5 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Navigation className="h-3.5 w-3.5 text-orange-500" />
+                    <span className="font-medium text-xs text-foreground">From GPS Tracking</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">TA is <strong>auto-calculated</strong> from actual GPS kilometers traveled during the day. Uses <strong>per-KM rate</strong> × real distance. Updates in real-time.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">Distribution Options</h4>
+              <div className="space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Same for all</Badge>
+                  <span>One TA amount/method applies to the entire organization</span>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Custom</Badge>
+                  <span>Set different TA for specific users, teams (managers), or groups</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">Override Priority</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                When multiple configs exist, the system resolves in this order:
+              </p>
+              <ol className="text-[11px] text-muted-foreground space-y-0.5 list-decimal list-inside">
+                <li><strong className="text-foreground">User Override</strong> — highest priority</li>
+                <li><strong className="text-foreground">Group Override</strong> — assigned expense group</li>
+                <li><strong className="text-foreground">Team Override</strong> — set by manager</li>
+                <li><strong className="text-foreground">Global Default</strong> — fallback for everyone</li>
+              </ol>
+            </div>
+
+            <div className="p-3 rounded-md border border-dashed bg-muted/20 space-y-2">
+              <h4 className="font-semibold text-foreground text-xs">💡 Example</h4>
+              <div className="text-[11px] text-muted-foreground space-y-1">
+                <p><strong className="text-foreground">Method:</strong> From GPS Tracking, Rate: ₹8/km</p>
+                <p><strong className="text-foreground">Employee travels:</strong> 45 km in a day</p>
+                <p><strong className="text-foreground">TA calculated:</strong> 45 × ₹8 = <strong className="text-foreground">₹360</strong></p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DA Help Dialog */}
+      <Dialog open={showDAHelp} onOpenChange={setShowDAHelp}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Utensils className="h-4 w-4 text-primary" />
+              How Daily Allowance (DA) Works
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">What is DA?</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Daily Allowance covers <strong className="text-foreground">daily expenses</strong> like food, refreshments, and incidentals that employees incur while working in the field. It is a fixed amount paid per working day.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">How It's Calculated</h4>
+              <div className="p-2.5 rounded-md border bg-muted/30">
+                <p className="text-[11px] text-muted-foreground">
+                  DA is a <strong className="text-foreground">flat daily amount</strong> credited for each day the employee is marked as present (checked in). Unlike TA, there is no distance-based variation — every present day earns the same DA.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">Distribution Options</h4>
+              <div className="space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Same for all</Badge>
+                  <span>One DA amount applies to everyone in the organization</span>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Custom</Badge>
+                  <span>Set different DA for specific users, teams, or groups based on role, location, etc.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">Override Priority</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Same as TA — when multiple configs exist:
+              </p>
+              <ol className="text-[11px] text-muted-foreground space-y-0.5 list-decimal list-inside">
+                <li><strong className="text-foreground">User Override</strong> — highest priority</li>
+                <li><strong className="text-foreground">Group Override</strong> — assigned expense group</li>
+                <li><strong className="text-foreground">Team Override</strong> — set by manager</li>
+                <li><strong className="text-foreground">Global Default</strong> — fallback for everyone</li>
+              </ol>
+            </div>
+
+            <div className="p-3 rounded-md border border-dashed bg-muted/20 space-y-2">
+              <h4 className="font-semibold text-foreground text-xs">💡 Example</h4>
+              <div className="text-[11px] text-muted-foreground space-y-1">
+                <p><strong className="text-foreground">Global DA:</strong> ₹200/day</p>
+                <p><strong className="text-foreground">Group "Metro Cities":</strong> ₹300/day (override)</p>
+                <p><strong className="text-foreground">Employee in Metro group, present 22 days:</strong> 22 × ₹300 = <strong className="text-foreground">₹6,600</strong></p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
