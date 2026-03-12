@@ -221,15 +221,15 @@ const AdditionalCardList: React.FC<{
   return (
     <div className="space-y-2">
       <div className="rounded-md border overflow-hidden">
-        <Table className="table-fixed w-full">
+        <Table className="table-fixed sm:table-auto w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-[11px] px-2 w-[60px]">Date</TableHead>
+              <TableHead className="text-[11px] px-2 w-[60px] sm:w-auto">Date</TableHead>
               <TableHead className="text-[11px] px-2">Type</TableHead>
-              <TableHead className="text-right text-[11px] px-2 w-[62px]">Amt</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[58px]">Status</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[40px]">Details</TableHead>
-              <TableHead className="text-center text-[11px] px-1 w-[56px]">Action</TableHead>
+              <TableHead className="text-right text-[11px] px-2 w-[62px] sm:w-auto">Amt</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[58px] sm:w-auto">Status</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[40px] sm:w-auto">Details</TableHead>
+              <TableHead className="text-center text-[11px] px-1 w-[56px] sm:w-auto">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

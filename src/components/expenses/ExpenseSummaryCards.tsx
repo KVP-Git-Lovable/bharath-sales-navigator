@@ -107,36 +107,23 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
           ))}
         </div>
       ) : (
-        /* Grid view — 3 on top, 2 on bottom */
-        <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            {cards.slice(0, 3).map((card) => (
-              <div
-                key={card.label}
-                className={`flex items-center gap-2 p-2.5 rounded-xl border ${card.bg} ${card.border} text-left`}
-              >
-                <card.icon className={`h-4 w-4 ${card.iconColor} shrink-0`} />
-                <div className="min-w-0">
-                  <p className="text-[9px] text-muted-foreground leading-tight truncate">{card.label}</p>
-                  <p className={`text-xs font-bold ${card.valueColor}`}>{card.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {cards.slice(3).map((card) => (
+        /* Grid view — 3+2 on mobile, single row of 5 on desktop */
+        <div className="space-y-2 sm:space-y-0">
+          {/* Mobile: 3 on top, 2 on bottom | Desktop: all 5 in one row */}
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {cards.map((card) => (
               <button
                 key={card.label}
-                className={`flex items-center gap-2.5 p-3 rounded-xl border ${card.bg} ${card.border} text-left transition-all ${
+                className={`flex items-center gap-2 p-2.5 sm:p-3 rounded-xl border ${card.bg} ${card.border} text-left transition-all ${
                   card.clickable ? 'cursor-pointer hover:shadow-md active:scale-[0.98]' : 'cursor-default'
                 } ${card.clickable && isExpanded ? 'ring-2 ring-primary/30' : ''}`}
                 onClick={card.clickable ? onTotalClick : undefined}
                 type="button"
               >
-                <card.icon className={`h-5 w-5 ${card.iconColor} shrink-0`} />
+                <card.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${card.iconColor} shrink-0`} />
                 <div className="min-w-0">
-                  <p className="text-[10px] text-muted-foreground leading-tight">{card.label}</p>
-                  <p className={`text-sm font-bold ${card.valueColor}`}>{card.value}</p>
+                  <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight truncate">{card.label}</p>
+                  <p className={`text-xs sm:text-sm font-bold ${card.valueColor}`}>{card.value}</p>
                 </div>
               </button>
             ))}
