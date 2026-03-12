@@ -468,6 +468,7 @@ const ExpensePolicyConfig = () => {
             excludeIds={excludeIds}
             onSelect={(id, name) => addOverride(field, 'team', id, name)}
             label="+ Add Team (Manager)"
+            managersOnly
           />
         </div>
 
