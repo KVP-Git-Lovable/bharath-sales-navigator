@@ -41,7 +41,7 @@ const ExpenseGroupsConfig = () => {
   const [editingGroup, setEditingGroup] = useState<ExpenseGroup | null>(null);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formTaType, setFormTaType] = useState<'fixed' | 'from_beat'>('from_beat');
+  const [formTaType, setFormTaType] = useState<'fixed' | 'from_beat' | 'from_gps'>('from_beat');
   const [formFixedTa, setFormFixedTa] = useState(0);
   const [formDa, setFormDa] = useState(0);
   const [formTaPerKm, setFormTaPerKm] = useState(0);

@@ -81,7 +81,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null);
   
   // Expense config for TA
-  const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
+  const [taType, setTaType] = useState<'fixed' | 'from_beat' | 'from_gps'>('from_beat');
   const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
   const [taPerKmRate, setTaPerKmRate] = useState<number>(0);
 

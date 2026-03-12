@@ -155,7 +155,7 @@ export const MyBeats = () => {
   const [territories, setTerritories] = useState<any[]>([]);
   
   // Expense config for TA auto-population
-  const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
+  const [taType, setTaType] = useState<'fixed' | 'from_beat' | 'from_gps'>('from_beat');
   const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
   const [taPerKmRate, setTaPerKmRate] = useState<number>(0);
   
