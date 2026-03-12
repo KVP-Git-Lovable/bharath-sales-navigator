@@ -52,8 +52,7 @@ const ExpenseMonthlySummary = () => {
           .eq('user_id', user.id).gte('date', startStr).lte('date', endStr),
         supabase.from('beat_plans').select('plan_date, beat_id')
           .eq('user_id', user.id).gte('plan_date', startStr).lte('plan_date', endStr),
-        supabase.from('beat_allowances').select('beat_id, travel_allowance')
-          .eq('user_id', user.id),
+        supabase.from('beats').select('beat_id, travel_allowance, average_km'),
         (supabase as any).from('additional_expenses').select('amount, status')
           .eq('user_id', user.id).gte('expense_date', startStr).lte('expense_date', endStr),
       ]);
@@ -63,23 +62,30 @@ const ExpenseMonthlySummary = () => {
       const daAmount = config.da_amount;
       const taType = config.ta_type;
       const fixedTa = config.fixed_ta_amount;
+      const taPerKmRate = config.ta_per_km_rate;
 
-      // Count present days
-      const presentDays = attendanceRes.data?.filter(a => a.status === 'present').length || 0;
+      // Count present days (include regularized)
+      const presentDays = attendanceRes.data?.filter(a => ['present', 'regularized'].includes(a.status)).length || 0;
       const da = presentDays * daAmount;
 
-      // Calculate TA
+      // Calculate TA - uses per-km rate if configured, handles multiple beats per day
       let ta = 0;
       if (taType === 'fixed') {
         ta = presentDays * fixedTa;
       } else {
-        const allowanceMap = new Map<string, number>();
-        allowancesRes.data?.forEach((a: any) => allowanceMap.set(a.beat_id, a.travel_allowance || 0));
+        // Build beat TA map with per-km rate support
+        const beatTAMap = new Map<string, number>();
+        allowancesRes.data?.forEach((b: any) => {
+          const km = b.average_km || 0;
+          const beatFixedTA = b.travel_allowance || 0;
+          const beatTA = (taPerKmRate > 0 && km > 0) ? (km * taPerKmRate) : beatFixedTA;
+          beatTAMap.set(b.beat_id, beatTA);
+        });
         
-        const presentDates = new Set(attendanceRes.data?.filter(a => a.status === 'present').map(a => a.date));
+        const presentDates = new Set(attendanceRes.data?.filter(a => ['present', 'regularized'].includes(a.status)).map(a => a.date));
         ta = beatPlansRes.data?.reduce((sum: number, plan: any) => {
           if (presentDates.has(plan.plan_date)) {
-            return sum + (allowanceMap.get(plan.beat_id) || 0);
+            return sum + (beatTAMap.get(plan.beat_id) || 0);
           }
           return sum;
         }, 0) || 0;
