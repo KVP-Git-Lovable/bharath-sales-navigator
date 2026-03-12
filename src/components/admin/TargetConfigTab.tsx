@@ -116,7 +116,7 @@ const STATUS_CONFIG: Record<PlanStatus, { label: string; icon: React.ElementType
   closed: { label: 'Closed', icon: Archive, color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
 };
 
-export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabProps) {
+export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onPlanChange }: TargetConfigTabProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [config, setConfig] = useState<TargetConfig>({
@@ -132,16 +132,30 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
   const [breakdownData, setBreakdownData] = useState<Record<string, BreakdownItem[]>>({});
   const [equalDivide, setEqualDivide] = useState<Record<string, boolean>>({});
 
-  // Fetch existing config
+  // Fetch all plans for this FY year
+  const { data: plans = [], isLoading: plansLoading } = useFYTargetPlans(fyYear);
+
+  // Fetch existing config for the selected plan
   const { data: existingConfig, isLoading } = useQuery({
-    queryKey: ['fy-target-config', fyYear],
+    queryKey: ['fy-target-config', fyYear, selectedPlanId],
     queryFn: async () => {
+      if (selectedPlanId) {
+        const { data, error } = await supabase
+          .from('fy_target_config')
+          .select('*')
+          .eq('id', selectedPlanId)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      }
+      // Fallback: get first plan for this FY
       const { data, error } = await supabase
         .from('fy_target_config')
         .select('*')
         .eq('fy_year', fyYear)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
-
       if (error) throw error;
       return data;
     },
