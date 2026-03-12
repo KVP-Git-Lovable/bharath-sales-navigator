@@ -268,66 +268,81 @@ OverrideTable.displayName = 'OverrideTable';
 const InlineGroupSection = React.memo<{
   groups: ExpenseGroup[];
   field: 'ta' | 'da';
-  onCreate: () => void;
-  onEdit: (g: ExpenseGroup) => void;
+  onCreate: (context: 'ta' | 'da') => void;
+  onEdit: (g: ExpenseGroup, context: 'ta' | 'da') => void;
   onMembers: (g: ExpenseGroup) => void;
   onDelete: (g: ExpenseGroup) => void;
-}>(({ groups, field, onCreate, onEdit, onMembers, onDelete }) => (
-  <div className="mt-4 pt-4 border-t space-y-2">
-    <div className="flex items-center justify-between">
-      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-        <Users className="h-3.5 w-3.5" />
-        Group Overrides
-      </p>
-      <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={onCreate}>
-        <Plus className="h-3 w-3" />
-        Create Group
-      </Button>
-    </div>
-    {groups.length === 0 ? (
-      <p className="text-xs text-muted-foreground text-center py-2">No expense groups yet.</p>
-    ) : (
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-[11px] px-2">Group</TableHead>
-              <TableHead className="text-[11px] px-2">{field === 'ta' ? 'TA (₹)' : 'DA (₹)'}</TableHead>
-              <TableHead className="text-[11px] px-2">Members</TableHead>
-              <TableHead className="text-[11px] px-1 w-[80px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {groups.map(g => (
-              <TableRow key={g.id}>
-                <TableCell className="py-1.5 px-2">
-                  <p className="text-xs font-medium">{g.name}</p>
-                  {g.description && <p className="text-[10px] text-muted-foreground">{g.description}</p>}
-                </TableCell>
-                <TableCell className="py-1.5 px-2 text-xs">
-                  ₹{field === 'ta' ? g.fixed_ta_amount : g.da_amount}
-                </TableCell>
-                <TableCell className="py-1.5 px-2">
-                  <Badge variant="secondary" className="text-[10px] cursor-pointer" onClick={() => onMembers(g)}>
-                    <Users className="h-3 w-3 mr-0.5" />{g.member_count || 0}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-1.5 px-1">
-                  <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onMembers(g)}><UserPlus className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(g)}><Edit2 className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => onDelete(g)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+}>(({ groups, field, onCreate, onEdit, onMembers, onDelete }) => {
+  // Filter groups: TA section shows groups with TA config, DA section shows groups with DA config
+  const filteredGroups = groups.filter(g => {
+    if (field === 'ta') {
+      return g.fixed_ta_amount > 0 || g.ta_per_km_rate > 0 || g.ta_type === 'fixed' || g.ta_type === 'from_gps';
+    } else {
+      return g.da_amount > 0;
+    }
+  });
+
+  return (
+    <div className="mt-4 pt-4 border-t space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5" />
+          {field === 'ta' ? 'TA' : 'DA'} Group Overrides
+        </p>
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onCreate(field)}>
+          <Plus className="h-3 w-3" />
+          Create {field === 'ta' ? 'TA' : 'DA'} Group
+        </Button>
       </div>
-    )}
-    <p className="text-[10px] text-muted-foreground">Priority: User Override → Group → Team → Global Default</p>
-  </div>
-));
+      {filteredGroups.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-2">No {field === 'ta' ? 'TA' : 'DA'} groups yet.</p>
+      ) : (
+        <div className="rounded-md border overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-[11px] px-2">Group</TableHead>
+                <TableHead className="text-[11px] px-2">{field === 'ta' ? 'TA (₹)' : 'DA (₹)'}</TableHead>
+                <TableHead className="text-[11px] px-2">Members</TableHead>
+                <TableHead className="text-[11px] px-1 w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredGroups.map(g => (
+                <TableRow key={g.id}>
+                  <TableCell className="py-1.5 px-2">
+                    <p className="text-xs font-medium">{g.name}</p>
+                    {g.description && <p className="text-[10px] text-muted-foreground">{g.description}</p>}
+                  </TableCell>
+                  <TableCell className="py-1.5 px-2 text-xs">
+                    {field === 'ta' ? (
+                      g.ta_type === 'from_gps' ? `GPS × ₹${g.ta_per_km_rate}/km` : `₹${g.fixed_ta_amount}`
+                    ) : (
+                      `₹${g.da_amount}`
+                    )}
+                  </TableCell>
+                  <TableCell className="py-1.5 px-2">
+                    <Badge variant="secondary" className="text-[10px] cursor-pointer" onClick={() => onMembers(g)}>
+                      <Users className="h-3 w-3 mr-0.5" />{g.member_count || 0}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-1.5 px-1">
+                    <div className="flex items-center gap-0.5">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onMembers(g)}><UserPlus className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(g, field)}><Edit2 className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => onDelete(g)}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <p className="text-[10px] text-muted-foreground">Priority: User Override → Group → Team → Global Default</p>
+    </div>
+  );
+});
 
 InlineGroupSection.displayName = 'InlineGroupSection';
 
@@ -348,8 +363,9 @@ const ExpensePolicyConfig = () => {
   // Expense Groups (inline)
   const [expenseGroups, setExpenseGroups] = useState<ExpenseGroup[]>([]);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupDialogContext, setGroupDialogContext] = useState<'ta' | 'da'>('ta');
   const [editingGroup, setEditingGroup] = useState<ExpenseGroup | null>(null);
-  const [groupForm, setGroupForm] = useState({ name: '', description: '', ta_type: 'from_beat' as 'fixed' | 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', ta_type: 'from_beat' as 'fixed' | 'from_beat' | 'from_gps', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
   const [savingGroup, setSavingGroup] = useState(false);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [membersGroup, setMembersGroup] = useState<ExpenseGroup | null>(null);
@@ -491,15 +507,17 @@ const ExpensePolicyConfig = () => {
     }
   };
 
-  const openCreateGroupDialog = () => {
+  const openCreateGroupDialog = (context: 'ta' | 'da' = 'ta') => {
     setEditingGroup(null);
+    setGroupDialogContext(context);
     setGroupForm({ name: '', description: '', ta_type: 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
     setGroupDialogOpen(true);
   };
 
-  const openEditGroupDialog = (group: ExpenseGroup) => {
+  const openEditGroupDialog = (group: ExpenseGroup, context: 'ta' | 'da' = 'ta') => {
     setEditingGroup(group);
-    setGroupForm({ name: group.name, description: group.description || '', ta_type: group.ta_type as 'fixed' | 'from_beat', fixed_ta_amount: group.fixed_ta_amount, da_amount: group.da_amount, ta_per_km_rate: group.ta_per_km_rate });
+    setGroupDialogContext(context);
+    setGroupForm({ name: group.name, description: group.description || '', ta_type: group.ta_type as 'fixed' | 'from_beat' | 'from_gps', fixed_ta_amount: group.fixed_ta_amount, da_amount: group.da_amount, ta_per_km_rate: group.ta_per_km_rate });
     setGroupDialogOpen(true);
   };
 
@@ -1076,7 +1094,7 @@ const ExpensePolicyConfig = () => {
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingGroup ? 'Edit Group' : 'Create Expense Group'}</DialogTitle>
+            <DialogTitle>{editingGroup ? 'Edit Group' : `Create ${groupDialogContext === 'ta' ? 'TA' : 'DA'} Group`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -1087,30 +1105,41 @@ const ExpensePolicyConfig = () => {
               <Label className="text-xs">Description</Label>
               <Input value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">TA Type</Label>
-              <Select value={groupForm.ta_type} onValueChange={(v: 'fixed' | 'from_beat') => setGroupForm(f => ({ ...f, ta_type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">Fixed TA</SelectItem>
-                  <SelectItem value="from_beat">From Beat Distance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
+
+            {/* TA-specific fields */}
+            {groupDialogContext === 'ta' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">TA Type</Label>
+                  <Select value={groupForm.ta_type} onValueChange={(v: 'fixed' | 'from_beat' | 'from_gps') => setGroupForm(f => ({ ...f, ta_type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixed TA</SelectItem>
+                      <SelectItem value="from_beat">From Beat Distance</SelectItem>
+                      <SelectItem value="from_gps">From GPS Tracking</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fixed TA (₹)</Label>
+                    <Input type="number" min="0" value={groupForm.fixed_ta_amount} onChange={e => setGroupForm(f => ({ ...f, fixed_ta_amount: Number(e.target.value) }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Per KM Rate (₹)</Label>
+                    <Input type="number" min="0" step="0.5" value={groupForm.ta_per_km_rate} onChange={e => setGroupForm(f => ({ ...f, ta_per_km_rate: Number(e.target.value) }))} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* DA-specific fields */}
+            {groupDialogContext === 'da' && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Fixed TA (₹)</Label>
-                <Input type="number" min="0" value={groupForm.fixed_ta_amount} onChange={e => setGroupForm(f => ({ ...f, fixed_ta_amount: Number(e.target.value) }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">DA (₹)</Label>
+                <Label className="text-xs">DA Amount (₹)</Label>
                 <Input type="number" min="0" value={groupForm.da_amount} onChange={e => setGroupForm(f => ({ ...f, da_amount: Number(e.target.value) }))} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Per KM (₹)</Label>
-                <Input type="number" min="0" step="0.5" value={groupForm.ta_per_km_rate} onChange={e => setGroupForm(f => ({ ...f, ta_per_km_rate: Number(e.target.value) }))} />
-              </div>
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Cancel</Button>
