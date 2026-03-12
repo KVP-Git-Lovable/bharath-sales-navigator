@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.pm-ai-assistant]
 verify_jwt = false
+
+[functions.scan-bill]
+verify_jwt = false
