@@ -105,6 +105,7 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   total_quantity_target: 0,
   total_revenue_target: 0,
   total_visits_target: 0,
+  total_retailer_activation_target: 0,
   is_locked: false,
   setup_completed: false,
   target_period_type: 'annual',
