@@ -4,7 +4,7 @@
 ## Status: ✅ Implemented
 
 ## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
+Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, conditional rules, and **Expense Groups** for scalable multi-user policy management.
 
 ## What Was Done
 
@@ -17,26 +17,26 @@ Upgraded the expense approval system from a single global policy to an enterpris
 - Seeded default categories and a "Manager Approval" default workflow
 
 ### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
-  1. Checks amount-based rules first
-  2. Then category-based rules
-  3. Then 'always' rules
-  4. Falls back to default workflow
-  5. Ultimate fallback to old `approval_config` behavior
-- Creates `approval_steps` from `workflow_steps` using reporting chain
+- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution
 
 ### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
-- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
+- **Expense Categories Card** — CRUD table in ExpensePolicyConfig
+- **Approval Workflows Card** — Create workflows with steps, set default
 - **Approval Rules Card** — Priority-based rules mapping conditions to workflows
 
 ### Phase 4: Submission UI ✅
 - `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
-- Falls back to hardcoded list if DB categories unavailable
+
+### Phase 5: Expense Groups ✅ (NEW)
+- **`expense_groups` table** — Named groups with TA/DA policy values (ta_type, fixed_ta_amount, da_amount, ta_per_km_rate)
+- **`expense_group_members` table** — Many-to-many junction mapping users to groups
+- **Resolution hierarchy updated**: User Override > **Group Override** > Team (Manager) Override > Global Default
+- **ExpenseGroupsConfig UI** — Full CRUD for groups + multi-user member management dialog
+- **All callers updated** — EditBeatModal, MyBeats, ProductivityTracking, TeamExpenseSummary, BeatAllowanceManagement, ExpenseMonthlySummary, useMonthlyExpenseSummary
 
 ## What Stays Unchanged
 - `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
 - `process_approval_step()` — works as-is
 - `trigger_sync_entity_status()` — works as-is
 - TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is (reads from approval engine)
+- ExpenseApprovals page — works as-is
