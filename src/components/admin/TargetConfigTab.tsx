@@ -490,12 +490,64 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
   return (
     <Card className="border shadow-sm">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Settings className="h-5 w-5 text-primary" />
-          Create Target for FY {fyYear - 1}-{String(fyYear).slice(-2)}
-        </CardTitle>
+        {/* Plan Selector */}
+        {plans.length > 0 && (
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <span className="text-sm font-medium text-muted-foreground">Plan:</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {plans.map(plan => {
+                const isSelected = plan.id === config.id;
+                const planStatusInfo = STATUS_CONFIG[plan.plan_status as PlanStatus] || STATUS_CONFIG.draft;
+                const PlanStatusIcon = planStatusInfo.icon;
+                return (
+                  <Button
+                    key={plan.id}
+                    variant={isSelected ? 'default' : 'outline'}
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={() => onPlanChange?.(plan.id)}
+                  >
+                    <PlanStatusIcon className="h-3 w-3" />
+                    {plan.target_plan_name || 'Untitled Plan'}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={handleCreateNewPlan}>
+              <Plus className="h-3 w-3" />
+              New Plan
+            </Button>
+          </div>
+        )}
+
+        {/* Status Badge + Controls */}
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Settings className="h-5 w-5 text-primary" />
+            {config.id ? 'Edit' : 'Create'} Target for FY {fyYear - 1}-{String(fyYear).slice(-2)}
+          </CardTitle>
+          {config.id && (
+            <div className="flex items-center gap-2">
+              {(() => {
+                const statusInfo = STATUS_CONFIG[config.plan_status];
+                const StatusIcon = statusInfo.icon;
+                return (
+                  <Badge variant="outline" className={`gap-1 ${statusInfo.color} ${statusInfo.bgColor}`}>
+                    <StatusIcon className="h-3 w-3" />
+                    {statusInfo.label}
+                  </Badge>
+                );
+              })()}
+            </div>
+          )}
+        </div>
         <CardDescription>
           Define target metrics, parameters, and company-wide goals
+          {config.plan_status === 'active' && (
+            <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
+              ⚠ Changes will affect allocated targets
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
