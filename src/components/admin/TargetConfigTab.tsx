@@ -902,6 +902,20 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                   />
                 </div>
               )}
+              {config.enable_retailer_activation && (
+                <div className="rounded-xl border bg-accent/50 border-accent p-4 flex items-center justify-between gap-4">
+                  <Label className="text-sm font-medium text-foreground whitespace-nowrap">
+                    Retailer Activation
+                  </Label>
+                  <Input
+                    type="text"
+                    value={config.total_retailer_activation_target > 0 ? formatNumber(config.total_retailer_activation_target) : ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, total_retailer_activation_target: Math.round(parseNumber(e.target.value)) }))}
+                    placeholder="0"
+                    className="w-32 text-right font-semibold bg-background"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
