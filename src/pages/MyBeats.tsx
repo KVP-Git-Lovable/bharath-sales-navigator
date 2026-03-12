@@ -534,6 +534,24 @@ export const MyBeats = () => {
     setBeatName("");
     setAverageKm("");
     setAverageTimeMinutes("");
+    
+    // Fetch expense config to determine TA behavior
+    try {
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const managerId = user?.id ? await fetchUserManagerId(user.id) : null;
+      const resolved = resolveExpenseConfig(user?.id || '', managerId, globalConfig, userConfigMap, teamConfigMap);
+      setTaType(resolved.ta_type);
+      setFixedTaAmount(resolved.fixed_ta_amount);
+      if (resolved.ta_type === 'fixed') {
+        setTravelAllowance(resolved.fixed_ta_amount.toString());
+      } else {
+        setTravelAllowance("");
+      }
+    } catch (err) {
+      console.error('Error fetching expense config:', err);
+      setTaType('from_beat');
+      setTravelAllowance("");
+    }
   };
 
   const handleRetailerSelection = (retailerId: string) => {
