@@ -600,13 +600,13 @@ const BeatAllowanceManagement = () => {
     try {
       if (!user?.id) return;
 
-      // Fetch DA amount from expense_master_config
-      const { data: configData } = await supabase
-        .from('expense_master_config')
-        .select('da_amount')
-        .single();
+      // Fetch DA amount using config hierarchy
+      const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } = await import('@/hooks/useResolvedExpenseConfig');
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const managerId = await fetchUserManagerId(user.id);
+      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap);
 
-      const daPerDay = configData?.da_amount || 0;
+      const daPerDay = config.da_amount;
 
       // Fetch attendance data with check-in/check-out times
       const { data: attendanceData, error: attendanceError } = await supabase
