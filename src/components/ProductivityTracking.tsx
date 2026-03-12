@@ -157,9 +157,12 @@ const ProductivityTracking = () => {
           // Resolve per-user config
           const userConfig = resolveExpenseConfig(userId, managerMap.get(userId), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
           const beatName = beatNameMap.get(key) || '-';
+          const km = beatKmMap.get(beatName) || 0;
+          const perKmRate = userConfig.ta_per_km_rate || 0;
+          const beatFixedTA = travelAllowanceMap.get(beatName) || 0;
           const travelAllowance = userConfig.ta_type === 'fixed' 
             ? userConfig.fixed_ta_amount 
-            : (travelAllowanceMap.get(beatName) || 0);
+            : ((perKmRate > 0 && km > 0) ? (km * perKmRate) : beatFixedTA);
           const totalAllowance = userConfig.da_amount + travelAllowance;
 
           groupedData.set(key, {
