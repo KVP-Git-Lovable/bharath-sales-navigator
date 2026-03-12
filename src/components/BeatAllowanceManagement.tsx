@@ -602,9 +602,9 @@ const BeatAllowanceManagement = () => {
 
       // Fetch DA amount using config hierarchy
       const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } = await import('@/hooks/useResolvedExpenseConfig');
-      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
+      const { globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap } = await fetchExpenseConfigs();
       const managerId = await fetchUserManagerId(user.id);
-      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap);
+      const config = resolveExpenseConfig(user.id, managerId, globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
 
       const daPerDay = config.da_amount;
 
