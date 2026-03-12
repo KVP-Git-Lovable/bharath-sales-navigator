@@ -13,7 +13,7 @@ export interface ResolvedExpenseConfig {
  */
 export const fetchExpenseConfigs = async () => {
   const [globalRes, userRes, teamRes] = await Promise.all([
-    supabase.from('expense_master_config').select('*').single(),
+    supabase.from('expense_master_config').select('*').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
     (supabase as any).from('user_expense_config').select('*'),
     (supabase as any).from('team_expense_config').select('*'),
   ]);
