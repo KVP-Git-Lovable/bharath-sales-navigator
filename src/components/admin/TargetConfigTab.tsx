@@ -53,6 +53,7 @@ interface TargetConfig {
   enable_quantity: boolean;
   enable_revenue: boolean;
   enable_visits: boolean;
+  enable_retailer_activation: boolean;
   quantity_unit: string;
   enabled_parameters: {
     product: boolean;
