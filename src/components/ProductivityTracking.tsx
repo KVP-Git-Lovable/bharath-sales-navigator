@@ -140,6 +140,9 @@ const ProductivityTracking = () => {
         nameMap = Object.fromEntries((profilesData as any[] | null)?.map((p: any) => [p.id, p.full_name]) || []);
       }
 
+      // Fetch manager IDs for all users to resolve per-user config
+      const managerMap = await fetchUserManagerIds(userIds as string[]);
+
       // Group data by user and date
       const groupedData = new Map<string, ProductivityData>();
 
@@ -149,11 +152,13 @@ const ProductivityTracking = () => {
         const key = `${userId}_${orderDate}`;
 
         if (!groupedData.has(key)) {
+          // Resolve per-user config
+          const userConfig = resolveExpenseConfig(userId, managerMap.get(userId), globalConfig, userConfigMap, teamConfigMap);
           const beatName = beatNameMap.get(key) || '-';
-          const travelAllowance = taType === 'fixed' 
-            ? fixedTaAmount 
+          const travelAllowance = userConfig.ta_type === 'fixed' 
+            ? userConfig.fixed_ta_amount 
             : (travelAllowanceMap.get(beatName) || 0);
-          const totalAllowance = daAmount + travelAllowance;
+          const totalAllowance = userConfig.da_amount + travelAllowance;
 
           groupedData.set(key, {
             user_id: userId,
