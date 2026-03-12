@@ -373,6 +373,8 @@ const ExpensePolicyConfig = () => {
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [memberSearch, setMemberSearch] = useState('');
   const [savingMembers, setSavingMembers] = useState(false);
+  const [showTAHelp, setShowTAHelp] = useState(false);
+  const [showDAHelp, setShowDAHelp] = useState(false);
 
   useEffect(() => {
     fetchConfig();
