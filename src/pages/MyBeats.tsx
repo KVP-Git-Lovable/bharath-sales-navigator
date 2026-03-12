@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power } from "lucide-react";
+import { Plus, Users, MapPin, Calendar, BarChart, Edit2, Trash2, Clock, Truck, Sparkles, CalendarDays, Repeat, ChevronDown, TrendingUp, Package, Search, Store, Hash, Percent, AlertCircle, Power, Info } from "lucide-react";
+import { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } from "@/hooks/useResolvedExpenseConfig";
 import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
