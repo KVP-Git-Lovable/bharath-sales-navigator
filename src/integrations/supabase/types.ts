@@ -8541,6 +8541,48 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_enabled_metrics: {
+        Row: {
+          created_at: string | null
+          fy_config_id: string
+          id: string
+          metric_id: string
+          total_target: number | null
+          unit_override: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          fy_config_id: string
+          id?: string
+          metric_id: string
+          total_target?: number | null
+          unit_override?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          fy_config_id?: string
+          id?: string
+          metric_id?: string
+          total_target?: number | null
+          unit_override?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_enabled_metrics_fy_config_id_fkey"
+            columns: ["fy_config_id"]
+            isOneToOne: false
+            referencedRelation: "fy_target_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_enabled_metrics_metric_id_fkey"
+            columns: ["metric_id"]
+            isOneToOne: false
+            referencedRelation: "target_metric_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pm_ai_insights: {
         Row: {
           content: Json
@@ -13158,6 +13200,39 @@ export type Database = {
           kpi_name?: string
           unit?: string | null
           weightage?: number | null
+        }
+        Relationships: []
+      }
+      target_metric_definitions: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          unit: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          unit?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          unit?: string | null
         }
         Relationships: []
       }

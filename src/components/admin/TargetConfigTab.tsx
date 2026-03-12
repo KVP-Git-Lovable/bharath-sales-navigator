@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useFYTargetPlans, type PlanStatus } from '@/hooks/useFYTargetPlans';
+import { useMetricDefinitions, usePlanEnabledMetrics, useSavePlanMetrics, useCreateMetricDefinition, useDeleteMetricDefinition, type TargetMetricDefinition } from '@/hooks/useTargetMetrics';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar, Plus, FileText, CheckCircle2, Archive, Store } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar, Plus, FileText, CheckCircle2, Archive, Store, X, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -16,18 +17,43 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { type PeriodType } from './target-config/PeriodTypeSelector';
 import { generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
 import { useTargetPeriods } from '@/hooks/useTargetPeriods';
 import { generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
 
-// Types for breakdown data
+// Icon map for dynamic rendering
+const ICON_MAP: Record<string, React.ElementType> = {
+  'package': Package,
+  'indian-rupee': IndianRupee,
+  'footprints': Footprints,
+  'store': Store,
+  'target': Target,
+  'users': Users,
+  'calendar': Calendar,
+};
+
+// Color map for metric cards
+const COLOR_MAP: Record<string, { bg: string; border: string; text: string; darkBg: string; darkBorder: string; darkText: string }> = {
+  blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', darkBg: 'dark:bg-blue-950/20', darkBorder: 'dark:border-blue-900/40', darkText: 'dark:text-blue-300' },
+  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', darkBg: 'dark:bg-emerald-950/20', darkBorder: 'dark:border-emerald-900/40', darkText: 'dark:text-emerald-300' },
+  violet: { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', darkBg: 'dark:bg-violet-950/20', darkBorder: 'dark:border-violet-900/40', darkText: 'dark:text-violet-300' },
+  amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', darkBg: 'dark:bg-amber-950/20', darkBorder: 'dark:border-amber-900/40', darkText: 'dark:text-amber-300' },
+  rose: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', darkBg: 'dark:bg-rose-950/20', darkBorder: 'dark:border-rose-900/40', darkText: 'dark:text-rose-300' },
+  cyan: { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', darkBg: 'dark:bg-cyan-950/20', darkBorder: 'dark:border-cyan-900/40', darkText: 'dark:text-cyan-300' },
+  pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', darkBg: 'dark:bg-pink-950/20', darkBorder: 'dark:border-pink-900/40', darkText: 'dark:text-pink-300' },
+  indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', darkBg: 'dark:bg-indigo-950/20', darkBorder: 'dark:border-indigo-900/40', darkText: 'dark:text-indigo-300' },
+};
+
+const AVAILABLE_COLORS = Object.keys(COLOR_MAP);
+const AVAILABLE_ICONS = Object.keys(ICON_MAP);
+
+// Types for breakdown data - now dynamic
 interface BreakdownItem {
   id: string;
   name: string;
-  quantity: number;
-  revenue: number;
-  visits: number;
+  metrics: Record<string, number>; // keyed by metric_id
   categoryId?: string;
   categoryName?: string;
 }
@@ -131,10 +157,24 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
   const [annualMonthlyTargets, setAnnualMonthlyTargets] = useState(generateInitialMonthlyTargets());
   const [showAnnualMonthlyBreakdown, setShowAnnualMonthlyBreakdown] = useState(false);
 
+  // Dynamic metrics state
+  const [enabledMetricIds, setEnabledMetricIds] = useState<Set<string>>(new Set());
+  const [metricTargets, setMetricTargets] = useState<Record<string, number>>({});
+  const [showCreateMetricDialog, setShowCreateMetricDialog] = useState(false);
+
   // Breakdown state
   const [activeParamTab, setActiveParamTab] = useState<string>('');
   const [breakdownData, setBreakdownData] = useState<Record<string, BreakdownItem[]>>({});
   const [equalDivide, setEqualDivide] = useState<Record<string, boolean>>({});
+
+  // Fetch metric definitions
+  const { data: metricDefinitions = [], isLoading: metricsDefLoading } = useMetricDefinitions();
+
+  // Fetch plan-enabled metrics
+  const { data: planEnabledMetrics = [] } = usePlanEnabledMetrics(config.id);
+
+  // Save plan metrics mutation
+  const savePlanMetricsMutation = useSavePlanMetrics();
 
   // Fetch all plans for this FY year
   const { data: plans = [], isLoading: plansLoading } = useFYTargetPlans(fyYear);
@@ -152,7 +192,6 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
         if (error) throw error;
         return data;
       }
-      // Fallback: get first plan for this FY
       const { data, error } = await supabase
         .from('fy_target_config')
         .select('*')
@@ -205,6 +244,31 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     }
   }, [existingConfig, fyYear]);
 
+  // Sync plan-enabled metrics to local state
+  useEffect(() => {
+    if (planEnabledMetrics.length > 0) {
+      const ids = new Set(planEnabledMetrics.map(m => m.metric_id));
+      setEnabledMetricIds(ids);
+      const targets: Record<string, number> = {};
+      planEnabledMetrics.forEach(m => { targets[m.metric_id] = m.total_target; });
+      setMetricTargets(targets);
+    } else if (metricDefinitions.length > 0 && !config.id) {
+      // For new plans, auto-enable system metrics based on legacy config
+      const ids = new Set<string>();
+      const targets: Record<string, number> = {};
+      metricDefinitions.forEach(m => {
+        if (m.name === 'Quantity' && config.enable_quantity) { ids.add(m.id); targets[m.id] = config.total_quantity_target; }
+        if (m.name === 'Revenue' && config.enable_revenue) { ids.add(m.id); targets[m.id] = config.total_revenue_target; }
+        if (m.name === 'Productive Visits' && config.enable_visits) { ids.add(m.id); targets[m.id] = config.total_visits_target; }
+        if (m.name === 'Retailer Activation' && config.enable_retailer_activation) { ids.add(m.id); targets[m.id] = config.total_retailer_activation_target; }
+      });
+      if (ids.size > 0) {
+        setEnabledMetricIds(ids);
+        setMetricTargets(targets);
+      }
+    }
+  }, [planEnabledMetrics, metricDefinitions, config.id]);
+
   // Load saved periods when they're fetched
   useEffect(() => {
     if (savedPeriods.length > 0) {
@@ -214,27 +278,35 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     }
   }, [savedPeriods, config.target_period_type]);
 
+  // Active metric definitions (enabled ones)
+  const activeMetrics = useMemo(() =>
+    metricDefinitions.filter(m => enabledMetricIds.has(m.id)),
+    [metricDefinitions, enabledMetricIds]
+  );
+
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async (configData: TargetConfig) => {
-      // Derive is_locked from plan_status for backward compatibility
       const isLocked = configData.plan_status === 'active' || configData.plan_status === 'closed';
       
+      // Sync legacy fields from dynamic metrics
+      const legacyFields = syncLegacyFromMetrics(metricDefinitions, enabledMetricIds, metricTargets);
+
       if (configData.id) {
         const { error } = await supabase
           .from('fy_target_config')
           .update({
             target_plan_name: configData.target_plan_name,
-            enable_quantity: configData.enable_quantity,
-            enable_revenue: configData.enable_revenue,
-            enable_visits: configData.enable_visits,
-            enable_retailer_activation: configData.enable_retailer_activation,
+            enable_quantity: legacyFields.enable_quantity,
+            enable_revenue: legacyFields.enable_revenue,
+            enable_visits: legacyFields.enable_visits,
+            enable_retailer_activation: legacyFields.enable_retailer_activation,
             quantity_unit: configData.quantity_unit,
             enabled_parameters: configData.enabled_parameters,
-            total_quantity_target: configData.total_quantity_target,
-            total_revenue_target: configData.total_revenue_target,
-            total_visits_target: configData.total_visits_target,
-            total_retailer_activation_target: configData.total_retailer_activation_target,
+            total_quantity_target: legacyFields.total_quantity_target,
+            total_revenue_target: legacyFields.total_revenue_target,
+            total_visits_target: legacyFields.total_visits_target,
+            total_retailer_activation_target: legacyFields.total_retailer_activation_target,
             is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
@@ -244,7 +316,16 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
           })
           .eq('id', configData.id);
         if (error) throw error;
-        
+
+        // Save dynamic metrics
+        await savePlanMetricsMutation.mutateAsync({
+          fyConfigId: configData.id,
+          metrics: Array.from(enabledMetricIds).map(metricId => ({
+            metric_id: metricId,
+            total_target: metricTargets[metricId] ?? 0,
+          })),
+        });
+
         // Save period targets if not annual
         if (configData.target_period_type !== 'annual' && periodTargets.length > 0) {
           await savePeriods({
@@ -259,16 +340,16 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
           .insert({
             fy_year: configData.fy_year,
             target_plan_name: configData.target_plan_name,
-            enable_quantity: configData.enable_quantity,
-            enable_revenue: configData.enable_revenue,
-            enable_visits: configData.enable_visits,
-            enable_retailer_activation: configData.enable_retailer_activation,
+            enable_quantity: legacyFields.enable_quantity,
+            enable_revenue: legacyFields.enable_revenue,
+            enable_visits: legacyFields.enable_visits,
+            enable_retailer_activation: legacyFields.enable_retailer_activation,
             quantity_unit: configData.quantity_unit,
             enabled_parameters: configData.enabled_parameters,
-            total_quantity_target: configData.total_quantity_target,
-            total_revenue_target: configData.total_revenue_target,
-            total_visits_target: configData.total_visits_target,
-            total_retailer_activation_target: configData.total_retailer_activation_target,
+            total_quantity_target: legacyFields.total_quantity_target,
+            total_revenue_target: legacyFields.total_revenue_target,
+            total_visits_target: legacyFields.total_visits_target,
+            total_retailer_activation_target: legacyFields.total_retailer_activation_target,
             is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
@@ -283,8 +364,16 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
         if (data) {
           setConfig(prev => ({ ...prev, id: data.id }));
           onPlanChange?.(data.id);
-          
-          // Save period targets if not annual
+
+          // Save dynamic metrics
+          await savePlanMetricsMutation.mutateAsync({
+            fyConfigId: data.id,
+            metrics: Array.from(enabledMetricIds).map(metricId => ({
+              metric_id: metricId,
+              total_target: metricTargets[metricId] ?? 0,
+            })),
+          });
+
           if (configData.target_period_type !== 'annual' && periodTargets.length > 0) {
             await savePeriods({
               configId: data.id,
@@ -305,8 +394,39 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     },
   });
 
-  const handleBasisChange = (field: 'enable_quantity' | 'enable_revenue' | 'enable_visits' | 'enable_retailer_activation', checked: boolean) => {
-    setConfig(prev => ({ ...prev, [field]: checked }));
+  // Helper: sync legacy columns from dynamic metric state
+  function syncLegacyFromMetrics(
+    defs: TargetMetricDefinition[],
+    enabled: Set<string>,
+    targets: Record<string, number>
+  ) {
+    let enable_quantity = false, enable_revenue = false, enable_visits = false, enable_retailer_activation = false;
+    let total_quantity_target = 0, total_revenue_target = 0, total_visits_target = 0, total_retailer_activation_target = 0;
+    defs.forEach(m => {
+      if (!enabled.has(m.id)) return;
+      const t = targets[m.id] ?? 0;
+      if (m.name === 'Quantity') { enable_quantity = true; total_quantity_target = t; }
+      if (m.name === 'Revenue') { enable_revenue = true; total_revenue_target = t; }
+      if (m.name === 'Productive Visits') { enable_visits = true; total_visits_target = t; }
+      if (m.name === 'Retailer Activation') { enable_retailer_activation = true; total_retailer_activation_target = t; }
+    });
+    return { enable_quantity, enable_revenue, enable_visits, enable_retailer_activation, total_quantity_target, total_revenue_target, total_visits_target, total_retailer_activation_target };
+  }
+
+  const handleToggleMetric = (metricId: string) => {
+    setEnabledMetricIds(prev => {
+      const next = new Set(prev);
+      if (next.has(metricId)) {
+        next.delete(metricId);
+      } else {
+        next.add(metricId);
+      }
+      return next;
+    });
+  };
+
+  const handleMetricTargetChange = (metricId: string, value: number) => {
+    setMetricTargets(prev => ({ ...prev, [metricId]: value }));
   };
 
   const handleParameterChange = (param: keyof TargetConfig['enabled_parameters'], checked: boolean) => {
@@ -321,8 +441,6 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
 
   const handlePeriodTypeChange = (periodType: PeriodType) => {
     setConfig(prev => ({ ...prev, target_period_type: periodType }));
-    
-    // Generate initial periods for the new type
     if (periodType !== 'annual') {
       const newPeriods = generateInitialPeriods(periodType);
       setPeriodTargets(newPeriods);
@@ -339,8 +457,6 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
           : p
       )
     );
-    
-    // Update FY totals based on period totals when not in annual mode
     if (config.target_period_type !== 'annual') {
       const updatedPeriods = periodTargets.map(p =>
         p.periodNumber === periodNumber ? { ...p, [field]: value } : p
@@ -402,19 +518,18 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
       target_plan_name: `Plan ${plans.length + 1}`,
     };
     setConfig(newConfig);
+    // Reset dynamic metrics for new plan
+    setEnabledMetricIds(new Set());
+    setMetricTargets({});
   };
 
-  const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits || config.enable_retailer_activation;
+  const hasAtLeastOneBasis = enabledMetricIds.size > 0;
   const hasAtLeastOneParameter = Object.values(config.enabled_parameters).some(v => v);
-  const hasValidTargets = 
-    (!config.enable_quantity || config.total_quantity_target > 0) &&
-    (!config.enable_revenue || config.total_revenue_target > 0) &&
-    (!config.enable_visits || config.total_visits_target > 0) &&
-    (!config.enable_retailer_activation || config.total_retailer_activation_target > 0);
+  const hasValidTargets = Array.from(enabledMetricIds).every(id => (metricTargets[id] ?? 0) > 0);
   const canActivate = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
   const isReadOnly = config.plan_status === 'closed';
 
-  if (isLoading) {
+  if (isLoading || metricsDefLoading) {
     return (
       <Card>
         <CardContent className="py-12 flex items-center justify-center">
@@ -454,32 +569,20 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Target Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {config.enable_quantity && (
-              <div className="p-4 bg-primary/5 rounded-lg border">
-                <p className="text-sm text-muted-foreground">Quantity Target</p>
-                <p className="text-2xl font-bold">{formatNumber(config.total_quantity_target)} {config.quantity_unit}</p>
-              </div>
-            )}
-            {config.enable_revenue && (
-              <div className="p-4 bg-primary/5 rounded-lg border">
-                <p className="text-sm text-muted-foreground">Revenue Target</p>
-                <p className="text-2xl font-bold">₹{formatNumber(config.total_revenue_target)}</p>
-              </div>
-            )}
-            {config.enable_visits && (
-              <div className="p-4 bg-primary/5 rounded-lg border">
-                <p className="text-sm text-muted-foreground">Visits Target</p>
-                <p className="text-2xl font-bold">{formatNumber(config.total_visits_target)}</p>
-              </div>
-            )}
-            {config.enable_retailer_activation && (
-              <div className="p-4 bg-primary/5 rounded-lg border">
-                <p className="text-sm text-muted-foreground">Retailer Activation</p>
-                <p className="text-2xl font-bold">{formatNumber(config.total_retailer_activation_target)} retailers</p>
-              </div>
-            )}
+          {/* Target Summary - dynamic */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {activeMetrics.map(metric => {
+              const colors = COLOR_MAP[metric.color] || COLOR_MAP.blue;
+              return (
+                <div key={metric.id} className={`p-4 ${colors.bg} ${colors.darkBg} rounded-lg border ${colors.border} ${colors.darkBorder}`}>
+                  <p className="text-sm text-muted-foreground">{metric.name}</p>
+                  <p className="text-2xl font-bold">
+                    {metric.unit === '₹' ? '₹' : ''}{formatNumber(metricTargets[metric.id] ?? 0)}
+                    {metric.unit && metric.unit !== '₹' ? ` ${metric.unit}` : ''}
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
           {/* Enabled Parameters */}
@@ -582,152 +685,88 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
 
         <Separator />
 
-        {/* Step 2: Target Metrics */}
+        {/* Step 2: Target Metrics - Dynamic */}
         <div className="space-y-4">
-          <div>
-            <Label className="text-sm font-semibold text-foreground">Target Metrics</Label>
-            <p className="text-xs text-muted-foreground mt-1">Select which metrics to track</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Target Metrics</Label>
+              <p className="text-xs text-muted-foreground mt-1">Select which metrics to track</p>
+            </div>
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setShowCreateMetricDialog(true)}>
+              <Plus className="h-3 w-3" />
+              Custom Metric
+            </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Quantity */}
-            <div
-              onClick={() => handleBasisChange('enable_quantity', !config.enable_quantity)}
-              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                config.enable_quantity
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-muted-foreground/40'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                  config.enable_quantity ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Package className="h-5 w-5" />
+            {metricDefinitions.map(metric => {
+              const isEnabled = enabledMetricIds.has(metric.id);
+              const IconComp = ICON_MAP[metric.icon] || Target;
+              const colors = COLOR_MAP[metric.color] || COLOR_MAP.blue;
+              return (
+                <div
+                  key={metric.id}
+                  onClick={() => handleToggleMetric(metric.id)}
+                  className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    isEnabled
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                      isEnabled ? `${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}` : 'bg-muted text-muted-foreground'
+                    }`}>
+                      <IconComp className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-foreground truncate">{metric.name}</p>
+                      <p className="text-xs text-muted-foreground">{metric.unit || 'count'}</p>
+                    </div>
+                  </div>
+                  {isEnabled && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                  {!metric.is_system && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Will be handled by delete mutation
+                      }}
+                      className="absolute bottom-2 right-2 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Delete custom metric"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">Quantity</p>
-                  <p className="text-xs text-muted-foreground">Track volume targets</p>
-                </div>
-              </div>
-              {config.enable_quantity && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-            </div>
-
-            {/* Revenue */}
-            <div
-              onClick={() => handleBasisChange('enable_revenue', !config.enable_revenue)}
-              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                config.enable_revenue
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-muted-foreground/40'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                  config.enable_revenue ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <IndianRupee className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">Revenue</p>
-                  <p className="text-xs text-muted-foreground">Track revenue targets</p>
-                </div>
-              </div>
-              {config.enable_revenue && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-            </div>
-
-            {/* Visits */}
-            <div
-              onClick={() => handleBasisChange('enable_visits', !config.enable_visits)}
-              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                config.enable_visits
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-muted-foreground/40'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                  config.enable_visits ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Footprints className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">Productive Visits</p>
-                  <p className="text-xs text-muted-foreground">Track visit targets</p>
-                </div>
-              </div>
-              {config.enable_visits && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-            </div>
-
-            {/* Retailer Activation */}
-            <div
-              onClick={() => handleBasisChange('enable_retailer_activation', !config.enable_retailer_activation)}
-              className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                config.enable_retailer_activation
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-muted-foreground/40'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                  config.enable_retailer_activation ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Store className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">Retailer Activation</p>
-                  <p className="text-xs text-muted-foreground">Track new retailers</p>
-                </div>
-              </div>
-              {config.enable_retailer_activation && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Inline unit selectors below metrics */}
-          {(config.enable_quantity || config.enable_revenue) && (
+          {/* Quantity unit selector for Quantity metric */}
+          {activeMetrics.some(m => m.name === 'Quantity') && (
             <div className="flex flex-wrap gap-4 pt-2">
-              {config.enable_quantity && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Quantity Unit</Label>
-                  <Select 
-                    value={config.quantity_unit} 
-                    onValueChange={(v) => setConfig(prev => ({ ...prev, quantity_unit: v }))}
-                  >
-                    <SelectTrigger className="w-36 h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {QUANTITY_UNITS.map((unit) => (
-                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {config.enable_revenue && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Quantity Unit</Label>
+                <Select
+                  value={config.quantity_unit}
+                  onValueChange={(v) => setConfig(prev => ({ ...prev, quantity_unit: v }))}
+                >
+                  <SelectTrigger className="w-36 h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUANTITY_UNITS.map((unit) => (
+                      <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {activeMetrics.some(m => m.name === 'Revenue') && (
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Currency</Label>
                   <Select value="₹ (INR)" onValueChange={() => {}}>
@@ -840,90 +879,40 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 </SelectContent>
               </Select>
             </div>
-            <div className="self-end pb-0.5">
-              <Badge variant="outline" className="text-xs">
-                {config.target_end_month - config.target_start_month + 1} month{config.target_end_month - config.target_start_month + 1 !== 1 ? 's' : ''}
-              </Badge>
-            </div>
           </div>
         </div>
 
-        <Separator />
-
-        {/* Step 4: FY Total Targets */}
+        {/* Step 4: FY Overview - Dynamic */}
         {hasAtLeastOneBasis && (
-          <div className="rounded-xl border bg-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h3 className="font-semibold text-base text-foreground">
-                  FY {fyYear} Overview
-                </h3>
-                <Badge variant="outline" className="text-xs gap-1 text-primary border-primary/30 bg-primary/5">
-                  <Users className="h-3 w-3" />
-                  From Hierarchy
-                </Badge>
+          <>
+            <Separator />
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-semibold text-foreground">FY {fyYear - 1}-{String(fyYear).slice(-2)} Overview</Label>
+                <p className="text-xs text-muted-foreground mt-1">Set total targets for each enabled metric</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {activeMetrics.map(metric => {
+                  const colors = COLOR_MAP[metric.color] || COLOR_MAP.blue;
+                  const displayUnit = metric.name === 'Quantity' ? config.quantity_unit : metric.unit;
+                  return (
+                    <div key={metric.id} className={`rounded-xl border ${colors.border} ${colors.bg} ${colors.darkBg} ${colors.darkBorder} p-4 flex items-center justify-between gap-4`}>
+                      <Label className={`text-sm font-medium ${colors.text} ${colors.darkText} whitespace-nowrap`}>
+                        {metric.name}{displayUnit ? ` (${displayUnit})` : ''}
+                      </Label>
+                      <Input
+                        type="text"
+                        value={(metricTargets[metric.id] ?? 0) > 0 ? formatNumber(metricTargets[metric.id] ?? 0) : ''}
+                        onChange={(e) => handleMetricTargetChange(metric.id, Math.round(parseNumber(e.target.value)))}
+                        placeholder="0"
+                        className="w-32 text-right font-semibold bg-background"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {config.enable_quantity && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900/40 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                    Qty Target ({config.quantity_unit})
-                  </Label>
-                  <Input
-                    type="text"
-                    value={config.total_quantity_target > 0 ? formatNumber(config.total_quantity_target) : ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, total_quantity_target: parseNumber(e.target.value) }))}
-                    placeholder="0"
-                    className="w-32 text-right font-semibold bg-background"
-                  />
-                </div>
-              )}
-              {config.enable_revenue && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900/40 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                    Revenue Target (₹)
-                  </Label>
-                  <Input
-                    type="text"
-                    value={config.total_revenue_target > 0 ? formatNumber(config.total_revenue_target) : ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, total_revenue_target: parseNumber(e.target.value) }))}
-                    placeholder="0"
-                    className="w-32 text-right font-semibold bg-background"
-                  />
-                </div>
-              )}
-              {config.enable_visits && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50 dark:bg-violet-950/20 dark:border-violet-900/40 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-violet-700 dark:text-violet-300 whitespace-nowrap">
-                    Visits Target
-                  </Label>
-                  <Input
-                    type="text"
-                    value={config.total_visits_target > 0 ? formatNumber(config.total_visits_target) : ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, total_visits_target: Math.round(parseNumber(e.target.value)) }))}
-                    placeholder="0"
-                    className="w-32 text-right font-semibold bg-background"
-                  />
-                </div>
-              )}
-              {config.enable_retailer_activation && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 p-4 flex items-center justify-between gap-4">
-                  <Label className="text-sm font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                    Retailer Activation
-                  </Label>
-                  <Input
-                    type="text"
-                    value={config.total_retailer_activation_target > 0 ? formatNumber(config.total_retailer_activation_target) : ''}
-                    onChange={(e) => setConfig(prev => ({ ...prev, total_retailer_activation_target: Math.round(parseNumber(e.target.value)) }))}
-                    placeholder="0"
-                    className="w-32 text-right font-semibold bg-background"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+          </>
         )}
 
         {/* Step 5: Parameter Breakdown */}
@@ -932,6 +921,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
             <Separator />
             <ParameterBreakdownSection
               config={config}
+              activeMetrics={activeMetrics}
+              metricTargets={metricTargets}
               breakdownData={breakdownData}
               setBreakdownData={setBreakdownData}
               equalDivide={equalDivide}
@@ -940,6 +931,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
               setActiveParamTab={setActiveParamTab}
               formatNumber={formatNumber}
               parseNumber={parseNumber}
+              quantityUnit={config.quantity_unit}
             />
           </>
         )}
@@ -982,23 +974,120 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
           </div>
         </div>
       </CardContent>
+
+      {/* Create Custom Metric Dialog */}
+      <CreateMetricDialog
+        open={showCreateMetricDialog}
+        onOpenChange={setShowCreateMetricDialog}
+      />
     </Card>
   );
 }
 
-// === Product Category Groups Component ===
+// === Create Metric Dialog ===
+function CreateMetricDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [name, setName] = useState('');
+  const [unit, setUnit] = useState('');
+  const [color, setColor] = useState('blue');
+  const [icon, setIcon] = useState('target');
+  const createMutation = useCreateMetricDefinition();
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      toast.error('Metric name is required');
+      return;
+    }
+    await createMutation.mutateAsync({ name: name.trim(), unit: unit.trim(), icon, color });
+    toast.success(`Metric "${name}" created`);
+    setName('');
+    setUnit('');
+    setColor('blue');
+    setIcon('target');
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create Custom Metric</DialogTitle>
+          <DialogDescription>Define a new target metric for your plans</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="metric_name">Metric Name</Label>
+            <Input id="metric_name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Demo Calls" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="metric_unit">Unit (optional)</Label>
+            <Input id="metric_unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g., calls, SKUs, count" />
+          </div>
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_COLORS.map(c => {
+                const colors = COLOR_MAP[c];
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setColor(c)}
+                    className={`w-8 h-8 rounded-full ${colors.bg} border-2 transition-all ${
+                      color === c ? 'border-foreground scale-110' : `${colors.border} hover:scale-105`
+                    }`}
+                    title={c}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Icon</Label>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_ICONS.map(ic => {
+                const IconComp = ICON_MAP[ic];
+                return (
+                  <button
+                    key={ic}
+                    onClick={() => setIcon(ic)}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center border-2 transition-all ${
+                      icon === ic ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-muted-foreground/40 text-muted-foreground'
+                    }`}
+                    title={ic}
+                  >
+                    <IconComp className="h-4 w-4" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleCreate} disabled={createMutation.isPending || !name.trim()}>
+            {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Create Metric
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// === Product Category Groups Component - Dynamic ===
 function ProductCategoryGroups({
   items,
-  config,
+  activeMetrics,
   formatNumber,
   parseNumber,
   handleItemChange,
+  quantityUnit,
 }: {
   items: BreakdownItem[];
-  config: TargetConfig;
+  activeMetrics: TargetMetricDefinition[];
   formatNumber: (n: number) => string;
   parseNumber: (v: string) => number;
-  handleItemChange: (paramKey: string, itemId: string, field: 'quantity' | 'revenue' | 'visits', value: number) => void;
+  handleItemChange: (paramKey: string, itemId: string, metricId: string, value: number) => void;
+  quantityUnit: string;
 }) {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
@@ -1017,8 +1106,10 @@ function ProductCategoryGroups({
     setOpenCategories(prev => ({ ...prev, [catKey]: !prev[catKey] }));
   };
 
-  const getCategoryTotal = (catItems: BreakdownItem[], field: 'quantity' | 'revenue' | 'visits') =>
-    catItems.reduce((sum, item) => sum + item[field], 0);
+  const getCategoryTotal = (catItems: BreakdownItem[], metricId: string) =>
+    catItems.reduce((sum, item) => sum + (item.metrics[metricId] ?? 0), 0);
+
+  const gridCols = `1.5fr ${activeMetrics.map(() => '1fr').join(' ')}`;
 
   return (
     <div className="space-y-2">
@@ -1026,58 +1117,41 @@ function ProductCategoryGroups({
         const isOpen = openCategories[catKey] ?? false;
         return (
           <div key={catKey} className="border rounded-lg overflow-hidden">
-            {/* Category header - clickable */}
             <button
               onClick={() => toggleCategory(catKey)}
               className="w-full grid gap-2 items-center p-2.5 bg-muted/50 hover:bg-muted transition-colors"
-              style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+              style={{ gridTemplateColumns: gridCols }}
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground text-left">
                 {isOpen ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                 {catName}
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{catItems.length}</Badge>
               </span>
-              {config.enable_quantity && <span className="text-xs font-medium text-muted-foreground">{formatNumber(getCategoryTotal(catItems, 'quantity'))}</span>}
-              {config.enable_revenue && <span className="text-xs font-medium text-muted-foreground">₹{formatNumber(getCategoryTotal(catItems, 'revenue'))}</span>}
-              {config.enable_visits && <span className="text-xs font-medium text-muted-foreground">{formatNumber(getCategoryTotal(catItems, 'visits'))}</span>}
+              {activeMetrics.map(metric => (
+                <span key={metric.id} className="text-xs font-medium text-muted-foreground">
+                  {metric.unit === '₹' ? '₹' : ''}{formatNumber(getCategoryTotal(catItems, metric.id))}
+                </span>
+              ))}
             </button>
-            {/* Expanded products */}
             {isOpen && (
               <div className="divide-y">
                 {catItems.map(item => (
                   <div
                     key={item.id}
                     className="grid gap-2 items-center p-2 pl-8 bg-card hover:bg-accent/30 transition-colors"
-                    style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                    style={{ gridTemplateColumns: gridCols }}
                   >
                     <span className="text-sm text-foreground truncate">{item.name}</span>
-                    {config.enable_quantity && (
+                    {activeMetrics.map(metric => (
                       <Input
+                        key={metric.id}
                         type="text"
                         className="h-8 text-sm"
-                        value={item.quantity > 0 ? formatNumber(item.quantity) : ''}
-                        onChange={(e) => handleItemChange('product', item.id, 'quantity', parseNumber(e.target.value))}
+                        value={(item.metrics[metric.id] ?? 0) > 0 ? formatNumber(item.metrics[metric.id] ?? 0) : ''}
+                        onChange={(e) => handleItemChange('product', item.id, metric.id, parseNumber(e.target.value))}
                         placeholder="0"
                       />
-                    )}
-                    {config.enable_revenue && (
-                      <Input
-                        type="text"
-                        className="h-8 text-sm"
-                        value={item.revenue > 0 ? formatNumber(item.revenue) : ''}
-                        onChange={(e) => handleItemChange('product', item.id, 'revenue', parseNumber(e.target.value))}
-                        placeholder="0"
-                      />
-                    )}
-                    {config.enable_visits && (
-                      <Input
-                        type="text"
-                        className="h-8 text-sm"
-                        value={item.visits > 0 ? formatNumber(item.visits) : ''}
-                        onChange={(e) => handleItemChange('product', item.id, 'visits', parseNumber(e.target.value))}
-                        placeholder="0"
-                      />
-                    )}
+                    ))}
                   </div>
                 ))}
               </div>
@@ -1089,9 +1163,11 @@ function ProductCategoryGroups({
   );
 }
 
-// === Parameter Breakdown Section Component ===
+// === Parameter Breakdown Section Component - Dynamic ===
 interface ParameterBreakdownProps {
   config: TargetConfig;
+  activeMetrics: TargetMetricDefinition[];
+  metricTargets: Record<string, number>;
   breakdownData: Record<string, BreakdownItem[]>;
   setBreakdownData: React.Dispatch<React.SetStateAction<Record<string, BreakdownItem[]>>>;
   equalDivide: Record<string, boolean>;
@@ -1100,10 +1176,13 @@ interface ParameterBreakdownProps {
   setActiveParamTab: (tab: string) => void;
   formatNumber: (n: number) => string;
   parseNumber: (v: string) => number;
+  quantityUnit: string;
 }
 
 function ParameterBreakdownSection({
   config,
+  activeMetrics,
+  metricTargets,
   breakdownData,
   setBreakdownData,
   equalDivide,
@@ -1112,6 +1191,7 @@ function ParameterBreakdownSection({
   setActiveParamTab,
   formatNumber,
   parseNumber,
+  quantityUnit,
 }: ParameterBreakdownProps) {
   const enabledParams = useMemo(() => 
     Object.entries(config.enabled_parameters)
@@ -1120,7 +1200,6 @@ function ParameterBreakdownSection({
     [config.enabled_parameters]
   );
 
-  // Auto-select first enabled tab
   useEffect(() => {
     if (enabledParams.length > 0 && (!activeParamTab || !enabledParams.includes(activeParamTab))) {
       setActiveParamTab(enabledParams[0]);
@@ -1183,40 +1262,42 @@ function ParameterBreakdownSection({
   // Initialize breakdown data when source data loads
   useEffect(() => {
     const newData: Record<string, BreakdownItem[]> = { ...breakdownData };
+    const emptyMetrics: Record<string, number> = {};
+    activeMetrics.forEach(m => { emptyMetrics[m.id] = 0; });
 
     if (config.enabled_parameters.product && products && !newData.product) {
       newData.product = products.map(p => {
         const cat = p.product_categories as any;
-        return { id: p.id, name: p.name, quantity: 0, revenue: 0, visits: 0, categoryId: cat?.id, categoryName: cat?.name ?? 'Uncategorized' };
+        return { id: p.id, name: p.name, metrics: { ...emptyMetrics }, categoryId: cat?.id, categoryName: cat?.name ?? 'Uncategorized' };
       });
     }
     if (config.enabled_parameters.distributor && distributors && !newData.distributor) {
-      newData.distributor = distributors.map(d => ({ id: d.id, name: d.name, quantity: 0, revenue: 0, visits: 0 }));
+      newData.distributor = distributors.map(d => ({ id: d.id, name: d.name, metrics: { ...emptyMetrics } }));
     }
     if (config.enabled_parameters.territory && territories && !newData.territory) {
-      newData.territory = territories.map(t => ({ id: t.id, name: t.name, quantity: 0, revenue: 0, visits: 0 }));
+      newData.territory = territories.map(t => ({ id: t.id, name: t.name, metrics: { ...emptyMetrics } }));
     }
     if (config.enabled_parameters.beat && beats && !newData.beat) {
-      newData.beat = beats.map(b => ({ id: b.id, name: b.name, quantity: 0, revenue: 0, visits: 0 }));
+      newData.beat = beats.map(b => ({ id: b.id, name: b.name, metrics: { ...emptyMetrics } }));
     }
     if (config.enabled_parameters.monthly) {
       const activeMonths = FY_MONTHS
         .map((m, i) => ({ name: m, index: i }))
         .filter((_, i) => (i + 1) >= config.target_start_month && (i + 1) <= config.target_end_month);
-      newData.monthly = activeMonths.map(m => ({ id: `month-${m.index}`, name: m.name, quantity: 0, revenue: 0, visits: 0 }));
+      newData.monthly = activeMonths.map(m => ({ id: `month-${m.index}`, name: m.name, metrics: { ...emptyMetrics } }));
     }
     if (config.enabled_parameters.retailer && !newData.retailer) {
-      newData.retailer = []; // Retailers handled at user level
+      newData.retailer = [];
     }
 
     setBreakdownData(newData);
-  }, [products, distributors, territories, beats, config.enabled_parameters, config.target_start_month, config.target_end_month]);
+  }, [products, distributors, territories, beats, config.enabled_parameters, config.target_start_month, config.target_end_month, activeMetrics]);
 
-  const handleItemChange = (paramKey: string, itemId: string, field: 'quantity' | 'revenue' | 'visits', value: number) => {
+  const handleItemChange = (paramKey: string, itemId: string, metricId: string, value: number) => {
     setBreakdownData(prev => ({
       ...prev,
       [paramKey]: (prev[paramKey] ?? []).map(item =>
-        item.id === itemId ? { ...item, [field]: value } : item
+        item.id === itemId ? { ...item, metrics: { ...item.metrics, [metricId]: value } } : item
       ),
     }));
   };
@@ -1226,23 +1307,24 @@ function ParameterBreakdownSection({
     if (!items || items.length === 0) return;
 
     const count = items.length;
-    const newItems = items.map(item => ({
-      ...item,
-      quantity: config.enable_quantity ? Math.round(config.total_quantity_target / count) : 0,
-      revenue: config.enable_revenue ? Math.round(config.total_revenue_target / count) : 0,
-      visits: config.enable_visits ? Math.round(config.total_visits_target / count) : 0,
-    }));
+    const newItems = items.map(item => {
+      const newMetrics = { ...item.metrics };
+      activeMetrics.forEach(m => {
+        newMetrics[m.id] = Math.round((metricTargets[m.id] ?? 0) / count);
+      });
+      return { ...item, metrics: newMetrics };
+    });
 
     setBreakdownData(prev => ({ ...prev, [paramKey]: newItems }));
     setEqualDivide(prev => ({ ...prev, [paramKey]: true }));
     toast.success('Targets divided equally');
   };
 
-  const getTotal = (paramKey: string, field: 'quantity' | 'revenue' | 'visits') => {
-    return (breakdownData[paramKey] ?? []).reduce((sum, item) => sum + item[field], 0);
+  const getTotal = (paramKey: string, metricId: string) => {
+    return (breakdownData[paramKey] ?? []).reduce((sum, item) => sum + (item.metrics[metricId] ?? 0), 0);
   };
 
-  const isLoading = (paramKey: string) => {
+  const isLoadingParam = (paramKey: string) => {
     switch (paramKey) {
       case 'product': return productsLoading;
       case 'distributor': return distributorsLoading;
@@ -1253,6 +1335,8 @@ function ParameterBreakdownSection({
   };
 
   if (enabledParams.length === 0) return null;
+
+  const gridCols = `1.5fr ${activeMetrics.map(() => '1fr').join(' ')}`;
 
   return (
     <div className="space-y-4">
@@ -1286,7 +1370,7 @@ function ParameterBreakdownSection({
                 <div className="p-6 text-center text-sm text-muted-foreground border rounded-lg bg-muted/30">
                   Retailer-wise breakdown is managed at the individual user level during hierarchy allocation.
                 </div>
-              ) : isLoading(paramKey) ? (
+              ) : isLoadingParam(paramKey) ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
@@ -1313,11 +1397,16 @@ function ParameterBreakdownSection({
                   </div>
 
                   {/* Header */}
-                  <div className="grid gap-2" style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
                     <div className="text-xs font-medium text-muted-foreground px-2">{info.label}</div>
-                    {config.enable_quantity && <div className="text-xs font-medium text-muted-foreground px-2">Qty ({config.quantity_unit})</div>}
-                    {config.enable_revenue && <div className="text-xs font-medium text-muted-foreground px-2">Revenue (₹)</div>}
-                    {config.enable_visits && <div className="text-xs font-medium text-muted-foreground px-2">Visits</div>}
+                    {activeMetrics.map(metric => {
+                      const displayUnit = metric.name === 'Quantity' ? quantityUnit : metric.unit;
+                      return (
+                        <div key={metric.id} className="text-xs font-medium text-muted-foreground px-2">
+                          {metric.name}{displayUnit ? ` (${displayUnit})` : ''}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Items - grouped by category for products */}
@@ -1325,46 +1414,30 @@ function ParameterBreakdownSection({
                     {paramKey === 'product' ? (
                       <ProductCategoryGroups
                         items={items}
-                        config={config}
+                        activeMetrics={activeMetrics}
                         formatNumber={formatNumber}
                         parseNumber={parseNumber}
                         handleItemChange={handleItemChange}
+                        quantityUnit={quantityUnit}
                       />
                     ) : (
                       items.map(item => (
                         <div
                           key={item.id}
                           className="grid gap-2 items-center p-2 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
-                          style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                          style={{ gridTemplateColumns: gridCols }}
                         >
                           <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
-                          {config.enable_quantity && (
+                          {activeMetrics.map(metric => (
                             <Input
+                              key={metric.id}
                               type="text"
                               className="h-8 text-sm"
-                              value={item.quantity > 0 ? formatNumber(item.quantity) : ''}
-                              onChange={(e) => handleItemChange(paramKey, item.id, 'quantity', parseNumber(e.target.value))}
+                              value={(item.metrics[metric.id] ?? 0) > 0 ? formatNumber(item.metrics[metric.id] ?? 0) : ''}
+                              onChange={(e) => handleItemChange(paramKey, item.id, metric.id, parseNumber(e.target.value))}
                               placeholder="0"
                             />
-                          )}
-                          {config.enable_revenue && (
-                            <Input
-                              type="text"
-                              className="h-8 text-sm"
-                              value={item.revenue > 0 ? formatNumber(item.revenue) : ''}
-                              onChange={(e) => handleItemChange(paramKey, item.id, 'revenue', parseNumber(e.target.value))}
-                              placeholder="0"
-                            />
-                          )}
-                          {config.enable_visits && (
-                            <Input
-                              type="text"
-                              className="h-8 text-sm"
-                              value={item.visits > 0 ? formatNumber(item.visits) : ''}
-                              onChange={(e) => handleItemChange(paramKey, item.id, 'visits', parseNumber(e.target.value))}
-                              placeholder="0"
-                            />
-                          )}
+                          ))}
                         </div>
                       ))
                     )}
@@ -1373,12 +1446,14 @@ function ParameterBreakdownSection({
                   {/* Total footer */}
                   <div
                     className="grid gap-2 items-center p-2 rounded-lg bg-primary/5 border border-primary/20 font-semibold"
-                    style={{ gridTemplateColumns: `1.5fr ${config.enable_quantity ? '1fr' : ''} ${config.enable_revenue ? '1fr' : ''} ${config.enable_visits ? '1fr' : ''}` }}
+                    style={{ gridTemplateColumns: gridCols }}
                   >
                     <span className="text-sm text-foreground">Total</span>
-                    {config.enable_quantity && <span className="text-sm text-foreground">{formatNumber(getTotal(paramKey, 'quantity'))}</span>}
-                    {config.enable_revenue && <span className="text-sm text-foreground">₹{formatNumber(getTotal(paramKey, 'revenue'))}</span>}
-                    {config.enable_visits && <span className="text-sm text-foreground">{formatNumber(getTotal(paramKey, 'visits'))}</span>}
+                    {activeMetrics.map(metric => (
+                      <span key={metric.id} className="text-sm text-foreground">
+                        {metric.unit === '₹' ? '₹' : ''}{formatNumber(getTotal(paramKey, metric.id))}
+                      </span>
+                    ))}
                   </div>
                 </>
               )}
