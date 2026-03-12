@@ -474,6 +474,12 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
                 <p className="text-2xl font-bold">{formatNumber(config.total_visits_target)}</p>
               </div>
             )}
+            {config.enable_retailer_activation && (
+              <div className="p-4 bg-primary/5 rounded-lg border">
+                <p className="text-sm text-muted-foreground">Retailer Activation</p>
+                <p className="text-2xl font-bold">{formatNumber(config.total_retailer_activation_target)} retailers</p>
+              </div>
+            )}
           </div>
 
           {/* Enabled Parameters */}
