@@ -161,6 +161,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         const week = weeklyMap.get(weekNum)!;
         
         const dayTA = dailyTA.get(dateStr) || 0;
+        const dayTAKm = dailyKm.get(dateStr) || 0;
         const isPresent = presentDates.has(dateStr);
         const dayDA = isPresent ? daAmount : 0;
         const dayAdditional = additional
@@ -172,6 +173,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         const dayOrderCount = dayOrders.length;
 
         week.ta += dayTA;
+        week.taKm += dayTAKm;
         week.da += dayDA;
         week.additional += dayAdditional;
         week.orderValue += dayOrderValue;
@@ -180,6 +182,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         dailyBreakdown.push({
           date: dateStr,
           ta: dayTA,
+          taKm: dayTAKm,
           da: dayDA,
           additional: dayAdditional,
           total: dayTA + dayDA + dayAdditional,
