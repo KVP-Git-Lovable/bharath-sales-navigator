@@ -183,7 +183,65 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
     setExpenses(newExpenses);
   };
 
-  const handleFileSelected = async (index: number, file: File | null) => {
+  const handleScanBill = async (file: File | null) => {
+    if (!file) return;
+    setIsScanning(true);
+    try {
+      // Compress image
+      const compressed = await compressImageFile(file, 0.5, 1024);
+      const compressedFile = new File([compressed], file.name.replace(/[^a-zA-Z0-9._-]/g, '_'), { type: 'image/jpeg' });
+
+      // Convert to base64
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(compressed);
+      });
+
+      // Call scan-bill edge function
+      const { data, error } = await supabase.functions.invoke('scan-bill', {
+        body: { imageBase64: base64, categories: expenseCategories }
+      });
+
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      // Auto-fill first expense row
+      const updated = [...expenses];
+      const target = updated[0];
+      if (data.category && expenseCategories.includes(data.category)) {
+        target.category = data.category;
+      }
+      if (data.amount && data.amount > 0) {
+        target.amount = data.amount;
+      }
+      if (data.description) {
+        target.description = data.description;
+      }
+      if (data.date) {
+        target.expense_date = data.date;
+      }
+      target.bill_file = compressedFile;
+      updated[0] = target;
+      setExpenses(updated);
+
+      toast.success('Bill scanned! Review the auto-filled details below.');
+    } catch (err) {
+      console.error('Scan bill error:', err);
+      toast.error('Failed to scan bill. Please fill in manually.');
+    } finally {
+      setIsScanning(false);
+      // Reset file inputs
+      if (scanFileRef.current) scanFileRef.current.value = '';
+      if (scanCameraRef.current) scanCameraRef.current.value = '';
+    }
+  };
+
+
     if (file) {
       // Compress image files before setting
       if (file.type.startsWith('image/')) {
