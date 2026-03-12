@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink } from 'lucide-react';
+import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, isSameDay } from 'date-fns';
@@ -310,7 +310,8 @@ const ProductivityTracking = () => {
 
               {/* Date Filter */}
               <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-auto min-w-[140px] h-9 text-xs gap-1.5">
+                  <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -356,7 +357,8 @@ const ProductivityTracking = () => {
 
               {/* Sort By */}
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-auto min-w-[130px] h-9 text-xs gap-1.5">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
