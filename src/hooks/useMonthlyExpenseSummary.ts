@@ -98,8 +98,9 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       // DA total
       const da = presentDays * daAmount;
 
-      // TA calculation per day
+      // TA calculation per day + GPS km tracking
       const dailyTA = new Map<string, number>();
+      const dailyKm = new Map<string, number>();
       if (taType === 'fixed') {
         presentDates.forEach(d => dailyTA.set(d, fixedTa));
       } else if (taType === 'from_gps') {
@@ -107,6 +108,7 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
         const gpsDistances = await fetchMonthlyGPSDistances(userId, startStr, endStr);
         presentDates.forEach(d => {
           const km = gpsDistances.get(d) || 0;
+          dailyKm.set(d, km);
           dailyTA.set(d, Math.round(km * taPerKmRate * 100) / 100);
         });
       } else {
