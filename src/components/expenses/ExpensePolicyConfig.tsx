@@ -874,7 +874,10 @@ const ExpensePolicyConfig = () => {
           </div>
 
           {daDistribution === 'custom' && (
-            <OverrideTable field="da" overrides={daOverrides} defaultAmount={config.da_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+            <>
+              <OverrideTable field="da" overrides={daOverrides} defaultAmount={config.da_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+              <InlineGroupSection groups={expenseGroups} field="da" onCreate={openCreateGroupDialog} onEdit={openEditGroupDialog} onMembers={openMembersDialog} onDelete={handleDeleteGroup} />
+            </>
           )}
         </CardContent>
       </Card>
