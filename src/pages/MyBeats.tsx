@@ -154,6 +154,10 @@ export const MyBeats = () => {
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string>("");
   const [territories, setTerritories] = useState<any[]>([]);
   
+  // Expense config for TA auto-population
+  const [taType, setTaType] = useState<'fixed' | 'from_beat'>('from_beat');
+  const [fixedTaAmount, setFixedTaAmount] = useState<number>(0);
+  
   // Monthly recurrence options
   const [monthlyType, setMonthlyType] = useState<"day" | "date">("day"); // "day" = First Monday, "date" = 15th
   const [monthlyWeek, setMonthlyWeek] = useState<"first" | "second" | "third" | "fourth" | "last">("first");
