@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, User, Info, Search, Edit2, UserPlus } from 'lucide-react';
+import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, User, Info, Search, Edit2, UserPlus, HelpCircle, MapPin, Navigation, Banknote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
