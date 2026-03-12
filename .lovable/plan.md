@@ -1,42 +1,89 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# Simplify TA/DA Configuration — Inline Flexible Setup
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
+## Problem
+The current UI has 4 separate cards: TA Policy (global), DA Policy (global), Manager-Level Overrides, and User-Level Overrides. This is confusing — admins don't think in "overrides," they think "who gets what."
 
-## What Was Done
+## New Design
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+Merge everything into **2 cards** (TA Policy and DA Policy), each with a built-in distribution mode selector. No separate override cards.
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
-  1. Checks amount-based rules first
-  2. Then category-based rules
-  3. Then 'always' rules
-  4. Falls back to default workflow
-  5. Ultimate fallback to old `approval_config` behavior
-- Creates `approval_steps` from `workflow_steps` using reporting chain
+### TA Policy Card — Redesigned
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
-- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+```
+┌─────────────────────────────────────────────┐
+│ 🚗 Travel Allowance (TA) Policy             │
+│                                              │
+│ TA Calculation: [Fixed ▼] / [From Beat ▼]   │
+│                                              │
+│ If "From Beat" selected:                     │
+│   ℹ️ TA auto-calculated from beat values.    │
+│   Per KM Rate (optional): [___]              │
+│                                              │
+│ If "Fixed" selected:                         │
+│   Distribution: ○ Same for all  ○ Custom     │
+│                                              │
+│   If "Same for all":                         │
+│     Fixed TA Amount: [₹ 200]                 │
+│                                              │
+│   If "Custom":                               │
+│     Default TA: [₹ 200] (for users not       │
+│                          listed below)       │
+│     ┌──────────────────────────────────┐     │
+│     │ + Add User / + Add Group         │     │
+│     │                                  │     │
+│     │ User/Group    │ TA Amount │  ✕   │     │
+│     │ Ravi          │ ₹300      │  ✕   │     │
+│     │ South Team    │ ₹250      │  ✕   │     │
+│     └──────────────────────────────────┘     │
+└─────────────────────────────────────────────┘
+```
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
-- Falls back to hardcoded list if DB categories unavailable
+### DA Policy Card — Redesigned
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is (reads from approval engine)
+```
+┌─────────────────────────────────────────────┐
+│ 🍽 Daily Allowance (DA) Policy               │
+│                                              │
+│ Distribution: ○ Same for all  ○ Custom       │
+│                                              │
+│ If "Same for all":                           │
+│   DA Amount: [₹ 150]                         │
+│                                              │
+│ If "Custom":                                 │
+│   Default DA: [₹ 150]                        │
+│   ┌──────────────────────────────────┐       │
+│   │ + Add User / + Add Group (Mgr)   │       │
+│   │                                  │       │
+│   │ User/Group    │ DA Amount │  ✕   │       │
+│   │ Ravi          │ ₹200      │  ✕   │       │
+│   │ South Team    │ ₹180      │  ✕   │       │
+│   └──────────────────────────────────┘       │
+│                                              │
+│ Calculation Basis: [Full Day Only ▼]         │
+└─────────────────────────────────────────────┘
+```
+
+### Key UX Concepts
+
+1. **Radio toggle "Same for all" vs "Custom"** — simple binary choice
+2. **"Custom" reveals inline table** — add individual users or manager-groups (team) in one unified list with a type badge (User/Team)
+3. **"From Beat" TA hides amount fields entirely** — shows info text: "TA will be auto-calculated from each beat's travel allowance value"
+4. **Default amount always shown in Custom mode** — acts as fallback for unlisted users
+5. **Remove the 4 separate cards** — merge into 2
+
+## File Changes
+
+### `src/components/expenses/ExpensePolicyConfig.tsx`
+- Remove the "Manager-Level Overrides" card and "User-Level Overrides" card
+- Remove the "Save Overrides" button
+- Inside TA Policy card: add `distribution` radio (`same_for_all` | `custom`). When `custom`, show inline table combining user and team overrides with an "Add User" / "Add Team" selector and a type badge
+- When TA is `from_beat`, hide distribution options and show info text
+- Inside DA Policy card: same `distribution` radio + inline table pattern
+- Single "Save Expense Policy" button saves global config + all overrides together
+- Remove `OverrideRow` component, replace with simpler inline row that only shows the relevant field (TA amount OR DA amount, not both mixed)
+
+### No other files change
+The backend tables (`user_expense_config`, `team_expense_config`) and resolution hook (`useResolvedExpenseConfig.ts`) remain identical — only the admin UI simplifies.
+
