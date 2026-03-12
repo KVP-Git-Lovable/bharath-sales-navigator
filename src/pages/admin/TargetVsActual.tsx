@@ -150,12 +150,14 @@ const TargetVsActual = () => {
               <TargetConfigTab 
                 fyYear={fyYear} 
                 onLockedAndAssign={handleLockedAndAssign}
+                selectedPlanId={selectedPlanId}
+                onPlanChange={setSelectedPlanId}
               />
             </TabsContent>
 
             {/* Hierarchy Tab - Allocate to Users */}
             <TabsContent value="hierarchy" className="mt-6">
-              <HierarchyAllocationTab fyYear={fyYear} />
+              <HierarchyAllocationTab fyYear={fyYear} selectedPlanId={selectedPlanId} />
             </TabsContent>
 
             {/* Dashboard Tab - Target vs Actual */}
