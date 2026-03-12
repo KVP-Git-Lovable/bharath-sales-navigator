@@ -612,7 +612,7 @@ export const MyBeats = () => {
         beat_id: beatId,
         beat_name: beatName.trim(),
         category: 'General',
-        travel_allowance: parseFloat(travelAllowance) || 0,
+        travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
         average_km: parseFloat(averageKm) || 0,
         average_time_minutes: parseInt(averageTimeMinutes) || 0,
         created_by: user.id,
