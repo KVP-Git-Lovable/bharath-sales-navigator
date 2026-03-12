@@ -39,21 +39,20 @@ interface OverrideEntry {
 
 const DEFAULT_CATEGORIES = ['food', 'travel', 'accommodation', 'communication', 'other'];
 
-// ─── Profile Selector ─────────────────────────────────────────────────────────
+// ─── Profile Selector (extracted outside to prevent remount on parent re-render) ──
 
-const ProfileSelector: React.FC<{
+const ProfileSelector = React.memo<{
   excludeIds: string[];
   onSelect: (userId: string, name: string) => void;
   label: string;
   managersOnly?: boolean;
-}> = ({ excludeIds, onSelect, label, managersOnly = false }) => {
+}>(({ excludeIds, onSelect, label, managersOnly = false }) => {
   const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfiles = async () => {
       if (managersOnly) {
-        // Fetch only users who are managers (appear as manager_id in employees table)
         const { data: managerIds } = await supabase
           .from('employees')
           .select('manager_id')
@@ -102,7 +101,95 @@ const ProfileSelector: React.FC<{
       </SelectContent>
     </Select>
   );
-};
+});
+
+ProfileSelector.displayName = 'ProfileSelector';
+
+// ─── Override Table (extracted outside to prevent remount on parent re-render) ──
+
+const OverrideTable = React.memo<{
+  field: 'ta' | 'da';
+  overrides: OverrideEntry[];
+  defaultAmount: number;
+  onUpdateAmount: (field: 'ta' | 'da', id: string, amount: number) => void;
+  onDelete: (field: 'ta' | 'da', entry: OverrideEntry) => void;
+  onAdd: (field: 'ta' | 'da', type: 'user' | 'team', refId: string, name: string) => void;
+}>(({ field, overrides, defaultAmount, onUpdateAmount, onDelete, onAdd }) => {
+  const excludeIds = overrides.map(o => o.ref_id);
+
+  return (
+    <div className="space-y-3 mt-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Default: <span className="font-semibold text-foreground">₹{defaultAmount}</span> for users not listed below
+        </p>
+      </div>
+
+      {overrides.length > 0 && (
+        <div className="rounded-md border overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-[11px] px-2">User / Team</TableHead>
+                <TableHead className="text-[11px] px-2">Type</TableHead>
+                <TableHead className="text-[11px] px-2">{field === 'ta' ? 'TA' : 'DA'} Amount (₹)</TableHead>
+                <TableHead className="text-[11px] px-1 w-[40px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {overrides.map(o => (
+                <TableRow key={`${o.id}-${field}`}>
+                  <TableCell className="text-xs font-medium py-2 px-2">{o.name}</TableCell>
+                  <TableCell className="py-2 px-2">
+                    <Badge variant={o.type === 'user' ? 'default' : 'secondary'} className="text-[10px]">
+                      {o.type === 'user' ? <><User className="h-3 w-3 mr-1" />User</> : <><Users className="h-3 w-3 mr-1" />Team</>}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-2 px-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      className="h-8 text-xs w-[100px]"
+                      value={o.amount}
+                      onChange={(e) => onUpdateAmount(field, o.id, Number(e.target.value))}
+                    />
+                  </TableCell>
+                  <TableCell className="py-2 px-1">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => onDelete(field, o)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <ProfileSelector
+          excludeIds={excludeIds}
+          onSelect={(id, name) => onAdd(field, 'user', id, name)}
+          label="+ Add User"
+        />
+        <ProfileSelector
+          excludeIds={excludeIds}
+          onSelect={(id, name) => onAdd(field, 'team', id, name)}
+          label="+ Add Team (Manager)"
+          managersOnly
+        />
+      </div>
+
+      {overrides.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          No custom {field === 'ta' ? 'TA' : 'DA'} overrides yet. Add users or teams above.
+        </p>
+      )}
+    </div>
+  );
+});
+
+OverrideTable.displayName = 'OverrideTable';
 
 const ExpensePolicyConfig = () => {
   const { toast } = useToast();
