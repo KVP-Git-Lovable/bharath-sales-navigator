@@ -153,7 +153,7 @@ const ProductivityTracking = () => {
 
         if (!groupedData.has(key)) {
           // Resolve per-user config
-          const userConfig = resolveExpenseConfig(userId, managerMap.get(userId), globalConfig, userConfigMap, teamConfigMap);
+          const userConfig = resolveExpenseConfig(userId, managerMap.get(userId), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
           const beatName = beatNameMap.get(key) || '-';
           const travelAllowance = userConfig.ta_type === 'fixed' 
             ? userConfig.fixed_ta_amount 

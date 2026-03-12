@@ -452,7 +452,7 @@ const BeatAllowanceManagement = () => {
       
       // Resolve config for first effective user (primary user context)
       const primaryUserId = effectiveUserIds[0];
-      const primaryConfig = resolveExpenseConfig(primaryUserId, managerMap.get(primaryUserId), globalConfig, userConfigMap, teamConfigMap);
+      const primaryConfig = resolveExpenseConfig(primaryUserId, managerMap.get(primaryUserId), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
       const taType = primaryConfig.ta_type;
       const fixedTaAmount = primaryConfig.fixed_ta_amount;
 

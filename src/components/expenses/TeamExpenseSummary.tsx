@@ -494,7 +494,7 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
 
         subordinateIds.forEach(uid => {
           // Resolve per-user config
-          const userConfig = resolveExpenseConfig(uid, managerMap.get(uid), globalConfig, userConfigMap, teamConfigMap);
+          const userConfig = resolveExpenseConfig(uid, managerMap.get(uid), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
           
           const presentDates = new Set(
             attendanceRes.data?.filter((a: any) => a.user_id === uid && ['present', 'regularized'].includes(a.status)).map((a: any) => a.date) || []
