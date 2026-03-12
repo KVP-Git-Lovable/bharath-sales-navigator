@@ -573,9 +573,9 @@ const BeatAllowanceManagement = () => {
         const orderValue = orderValueByDateMap.get(plan.plan_date) || 0;
         const isOnLeave = leaveDates.has(plan.plan_date);
         
-        // Get TA based on expense master config - Fixed TA or from Beat
-        // If on leave, TA is 0
-        const ta = isOnLeave ? 0 : (taType === 'fixed' ? fixedTaAmount : (beatTAMap.get(plan.beat_id) || 0));
+        // Get TA based on expense master config - Fixed TA, from Beat, or from GPS
+        // If on leave, TA is 0; GPS-based TA is handled separately below
+        const ta = isOnLeave ? 0 : (taType === 'fixed' ? fixedTaAmount : (taType === 'from_gps' ? 0 : (beatTAMap.get(plan.beat_id) || 0)));
         const productiveVisits = productiveVisitsMap.get(plan.plan_date) || 0;
         
         rows.push({
@@ -591,6 +591,29 @@ const BeatAllowanceManagement = () => {
           isOnLeave
         });
       });
+
+      // If GPS-based TA, fetch GPS distances and update rows
+      if (taType === 'from_gps') {
+        const { fetchMonthlyGPSDistances } = await import('@/hooks/useGPSDistance');
+        const { start, end } = getDateRange();
+        const startStr = format(start, 'yyyy-MM-dd');
+        const endStr = format(end, 'yyyy-MM-dd');
+        
+        // Fetch GPS distances for all effective users
+        for (const uid of effectiveUserIds) {
+          const gpsDistances = await fetchMonthlyGPSDistances(uid, startStr, endStr);
+          rows.forEach(row => {
+            if (!row.isOnLeave) {
+              const km = gpsDistances.get(row.date) || 0;
+              row.ta = Math.round(km * taPerKmRate * 100) / 100;
+              // Store km in beat_name for display when GPS mode
+              if (km > 0) {
+                row.beat_name = `${row.beat_name} (${km.toFixed(1)} km)`;
+              }
+            }
+          });
+        }
+      }
 
       if (isMountedRef.current) {
         setExpenseRows(rows);

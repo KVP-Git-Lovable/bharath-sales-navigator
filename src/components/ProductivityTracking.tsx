@@ -162,7 +162,9 @@ const ProductivityTracking = () => {
           const beatFixedTA = travelAllowanceMap.get(beatName) || 0;
           const travelAllowance = userConfig.ta_type === 'fixed' 
             ? userConfig.fixed_ta_amount 
-            : ((perKmRate > 0 && km > 0) ? (km * perKmRate) : beatFixedTA);
+            : userConfig.ta_type === 'from_gps'
+              ? 0 // GPS-based TA will be calculated separately
+              : ((perKmRate > 0 && km > 0) ? (km * perKmRate) : beatFixedTA);
           const totalAllowance = userConfig.da_amount + travelAllowance;
 
           groupedData.set(key, {

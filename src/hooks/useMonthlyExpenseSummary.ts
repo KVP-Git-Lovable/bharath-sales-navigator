@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerId } from './useResolvedExpenseConfig';
+import { fetchMonthlyGPSDistances } from './useGPSDistance';
 
 export interface WeeklyBreakdown {
   weekLabel: string;
@@ -89,11 +90,19 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
       // DA total
       const da = presentDays * daAmount;
 
-      // TA calculation per day - sums all beats planned for each day
+      // TA calculation per day
       const dailyTA = new Map<string, number>();
       if (taType === 'fixed') {
         presentDates.forEach(d => dailyTA.set(d, fixedTa));
+      } else if (taType === 'from_gps') {
+        // Fetch GPS distances for the month
+        const gpsDistances = await fetchMonthlyGPSDistances(userId, startStr, endStr);
+        presentDates.forEach(d => {
+          const km = gpsDistances.get(d) || 0;
+          dailyTA.set(d, Math.round(km * taPerKmRate * 100) / 100);
+        });
       } else {
+        // from_beat
         beatPlansRes.data?.forEach((plan: any) => {
           if (presentDates.has(plan.plan_date)) {
             const current = dailyTA.get(plan.plan_date) || 0;

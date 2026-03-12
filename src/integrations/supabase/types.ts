@@ -2674,6 +2674,33 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_gps_distance: {
+        Row: {
+          date: string
+          id: string
+          point_count: number
+          total_km: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          date: string
+          id?: string
+          point_count?: number
+          total_km?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          date?: string
+          id?: string
+          point_count?: number
+          total_km?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       device_battery_logs: {
         Row: {
           battery_level: number
