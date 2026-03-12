@@ -1,42 +1,50 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# Show GPS Kilometers in Expense UI
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, conditional rules, and **Expense Groups** for scalable multi-user policy management.
+## Visual Design
 
-## What Was Done
+Here's how it would look across the three areas:
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+### 1. Summary Card (Travel TA)
+```text
+┌─────────────────────────┐
+│ 🚗  Travel (TA)         │
+│     ₹1,250  · 50 km     │
+└─────────────────────────┘
+```
+The km value appears as a subtle secondary text next to the amount, only when TA type is `from_gps`.
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution
+### 2. Weekly Breakdown
+```text
+┌─────────────────────────────────────────┐
+│ Week 1          01 Mar – 07 Mar         │
+│ TA: ₹500 (20 km) · DA: ₹350 · Add: ₹0 │
+│                              Total ₹850 │
+└─────────────────────────────────────────┘
+```
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig
-- **Approval Workflows Card** — Create workflows with steps, set default
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+### 3. Daily Breakdown
+```text
+│ Date     │ TA          │ DA   │ Add  │ Total │
+│ 01 Mar ✓ │ ₹100 (4 km) │ ₹50  │ ₹0   │ ₹150  │
+│ 02 Mar ✓ │ ₹150 (6 km) │ ₹50  │ ₹0   │ ₹200  │
+```
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
+## Implementation
 
-### Phase 5: Expense Groups ✅ (NEW)
-- **`expense_groups` table** — Named groups with TA/DA policy values (ta_type, fixed_ta_amount, da_amount, ta_per_km_rate)
-- **`expense_group_members` table** — Many-to-many junction mapping users to groups
-- **Resolution hierarchy updated**: User Override > **Group Override** > Team (Manager) Override > Global Default
-- **ExpenseGroupsConfig UI** — Full CRUD for groups + multi-user member management dialog
-- **All callers updated** — EditBeatModal, MyBeats, ProductivityTracking, TeamExpenseSummary, BeatAllowanceManagement, ExpenseMonthlySummary, useMonthlyExpenseSummary
+### Data Changes
+- **`useMonthlyExpenseSummary.ts`**: When `taType === 'from_gps'`, store `km` alongside `ta` in daily/weekly breakdowns. Add `taKm` field to `DailyBreakdown` and `WeeklyBreakdown` interfaces. Sum km per week.
+- **`ExpenseSummaryCards.tsx`**: Accept optional `totalKm` prop; display `· X km` next to TA value when present.
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is
+### UI Changes
+- **`WeeklyBreakdown.tsx`**: Show `(X km)` after TA amount when `taKm > 0`.
+- **`DailyBreakdown.tsx`**: Show `(X km)` after TA amount when `taKm > 0`.
+- **`ExpenseSummaryCards.tsx`**: Show `· X km` subtitle on TA card.
+
+### Files
+1. Edit `src/hooks/useMonthlyExpenseSummary.ts` — add `taKm` to interfaces and populate from GPS data
+2. Edit `src/components/expenses/ExpenseSummaryCards.tsx` — show km on TA card
+3. Edit `src/components/expenses/WeeklyBreakdown.tsx` — show km next to TA
+4. Edit `src/components/expenses/DailyBreakdown.tsx` — show km next to TA
+
