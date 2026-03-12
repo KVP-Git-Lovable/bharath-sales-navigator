@@ -42,7 +42,7 @@ const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
 
   const cards = [
     {
-      label: 'Travel (TA)',
+      label: totalKm > 0 ? `Travel (TA) · ${Math.round(totalKm)} km` : 'Travel (TA)',
       value: fmt(ta),
       icon: Car,
       bg: 'bg-blue-50 dark:bg-blue-950/30',

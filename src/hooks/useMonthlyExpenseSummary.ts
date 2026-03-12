@@ -197,8 +197,13 @@ export const useMonthlyExpenseSummary = (userId: string | undefined, yearMonth: 
 
       const orderValue = (ordersRes.data || []).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
 
+      let totalKm = 0;
+      dailyKm.forEach(v => totalKm += v);
+
       return {
         ta,
+        totalKm,
+        taType,
         da,
         additionalApproved,
         additionalPending,
