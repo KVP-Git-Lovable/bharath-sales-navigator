@@ -1,42 +1,28 @@
 
-# Scalable Expense Approval Policy — Enterprise Upgrade
 
-## Status: ✅ Implemented
+# Fix: "Add Team (Manager)" Selector Should Only Show Managers
 
-## Summary
-Upgraded the expense approval system from a single global policy to an enterprise-grade, configuration-driven model with categories, workflows, and conditional rules — all reusing the existing approval engine.
+## Problem
+Both `+ Add User` and `+ Add Team (Manager)` use the same `ProfileSelector` component, which fetches all profiles via `get_profiles_for_selector`. There is no filtering for managers — so both dropdowns show identical lists.
 
-## What Was Done
+## The Difference (Intent)
+- **Add User**: Sets a custom TA/DA for one specific person. Saved to `user_expense_config`.
+- **Add Team (Manager)**: Sets a custom TA/DA for an entire team by selecting their manager. All subordinates under that manager inherit the value. Saved to `team_expense_config`.
 
-### Phase 1: Database Schema ✅
-- Created `expense_categories` — admin-configurable categories with receipt requirements and limits
-- Created `approval_workflows` — named workflow definitions with sequential/parallel modes
-- Created `workflow_steps` — ordered steps per workflow (manager / specific user / hierarchy level)
-- Created `expense_approval_rules` — condition-based routing (amount range / category / always) to workflows
-- All tables have RLS: read by authenticated, write by admin only
-- Seeded default categories and a "Manager Approval" default workflow
+## Fix
 
-### Phase 2: Updated Trigger ✅
-- `trigger_create_expense_approval_request()` now performs rule-based workflow resolution:
-  1. Checks amount-based rules first
-  2. Then category-based rules
-  3. Then 'always' rules
-  4. Falls back to default workflow
-  5. Ultimate fallback to old `approval_config` behavior
-- Creates `approval_steps` from `workflow_steps` using reporting chain
+### 1. Create a new RPC or query to fetch only managers
+Query the `employees` table to find users who appear as `manager_id` for at least one other employee. This gives us the list of actual managers.
 
-### Phase 3: Admin UI ✅
-- **Expense Categories Card** — CRUD table in ExpensePolicyConfig (name, receipt required, limit, active toggle)
-- **Approval Workflows Card** — Create workflows with steps, set default, choose mode (sequential/parallel)
-- **Approval Rules Card** — Priority-based rules mapping conditions to workflows
+Option: Add a `ManagerSelector` variant of `ProfileSelector` that fetches profiles filtered to only those whose `id` exists in `employees.manager_id`.
 
-### Phase 4: Submission UI ✅
-- `AdditionalExpenses.tsx` now fetches categories from `expense_categories` table
-- Falls back to hardcoded list if DB categories unavailable
+### 2. Update `ProfileSelector` to accept a `managersOnly` prop
+- When `managersOnly` is true, fetch profiles joined/filtered against the `employees` table where the profile's `id` matches at least one `manager_id` entry.
+- Query: select profiles where `id IN (SELECT DISTINCT manager_id FROM employees WHERE manager_id IS NOT NULL)`.
 
-## What Stays Unchanged
-- `approval_requests`, `approval_steps`, `approval_audit_log` — untouched
-- `process_approval_step()` — works as-is
-- `trigger_sync_entity_status()` — works as-is
-- TA/DA calculation logic — untouched
-- ExpenseApprovals page — works as-is (reads from approval engine)
+### 3. Update the OverrideTable in `ExpensePolicyConfig.tsx`
+Pass `managersOnly={true}` to the second `ProfileSelector` (the "Add Team" one). The first one stays as-is.
+
+## Files Changed
+- `src/components/expenses/ExpensePolicyConfig.tsx` — add `managersOnly` prop to `ProfileSelector`, update the query logic, pass it for the Team selector.
+
