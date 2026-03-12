@@ -1042,6 +1042,104 @@ const ExpensePolicyConfig = () => {
           Save Expense Policy
         </Button>
       </div>
+
+      {/* Create/Edit Group Dialog */}
+      <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingGroup ? 'Edit Group' : 'Create Expense Group'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Group Name *</Label>
+              <Input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. North Region Sales" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Description</Label>
+              <Input value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">TA Type</Label>
+              <Select value={groupForm.ta_type} onValueChange={(v: 'fixed' | 'from_beat') => setGroupForm(f => ({ ...f, ta_type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed TA</SelectItem>
+                  <SelectItem value="from_beat">From Beat Distance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Fixed TA (₹)</Label>
+                <Input type="number" min="0" value={groupForm.fixed_ta_amount} onChange={e => setGroupForm(f => ({ ...f, fixed_ta_amount: Number(e.target.value) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">DA (₹)</Label>
+                <Input type="number" min="0" value={groupForm.da_amount} onChange={e => setGroupForm(f => ({ ...f, da_amount: Number(e.target.value) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Per KM (₹)</Label>
+                <Input type="number" min="0" step="0.5" value={groupForm.ta_per_km_rate} onChange={e => setGroupForm(f => ({ ...f, ta_per_km_rate: Number(e.target.value) }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveGroup} disabled={savingGroup}>
+              {savingGroup && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {editingGroup ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Members Management Dialog */}
+      <Dialog open={membersDialogOpen} onOpenChange={setMembersDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Manage Members — {membersGroup?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search users..." value={memberSearch} onChange={e => setMemberSearch(e.target.value)} className="pl-9" />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{selectedMemberIds.size} selected</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedMemberIds(new Set(allUsers.map(u => u.id)))}>Select All</Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedMemberIds(new Set())}>Clear</Button>
+              </div>
+            </div>
+            <ScrollArea className="h-[300px] border rounded-md">
+              <div className="p-2 space-y-1">
+                {filteredMemberUsers.map(u => (
+                  <div
+                    key={u.id}
+                    className={cn('flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors', selectedMemberIds.has(u.id) ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50')}
+                    onClick={() => { setSelectedMemberIds(prev => { const next = new Set(prev); if (next.has(u.id)) next.delete(u.id); else next.add(u.id); return next; }); }}
+                  >
+                    <Checkbox checked={selectedMemberIds.has(u.id)} onCheckedChange={() => { setSelectedMemberIds(prev => { const next = new Set(prev); if (next.has(u.id)) next.delete(u.id); else next.add(u.id); return next; }); }} />
+                    <Avatar className="h-6 w-6"><AvatarFallback className="text-xs">{getInitials(u.full_name)}</AvatarFallback></Avatar>
+                    <span className="text-sm">{u.full_name}</span>
+                  </div>
+                ))}
+                {filteredMemberUsers.length === 0 && <div className="text-center py-6 text-sm text-muted-foreground">No users found</div>}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMembersDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveMembers} disabled={savingMembers}>
+              {savingMembers && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Save Members ({selectedMemberIds.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
