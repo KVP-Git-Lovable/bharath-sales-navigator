@@ -42,6 +42,7 @@ const TargetVsActual = () => {
   
   const [activeTab, setActiveTab] = useState<'targets' | 'hierarchy' | 'dashboard'>('targets');
   const [fyYear, setFYYear] = useState(getCurrentFY());
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(undefined);
   
   // Dashboard tab state - default to 'all' for admins
   const [userScope, setUserScope] = useState<UserScope>(hasAdminAccess ? 'all' : 'team');
@@ -149,12 +150,14 @@ const TargetVsActual = () => {
               <TargetConfigTab 
                 fyYear={fyYear} 
                 onLockedAndAssign={handleLockedAndAssign}
+                selectedPlanId={selectedPlanId}
+                onPlanChange={setSelectedPlanId}
               />
             </TabsContent>
 
             {/* Hierarchy Tab - Allocate to Users */}
             <TabsContent value="hierarchy" className="mt-6">
-              <HierarchyAllocationTab fyYear={fyYear} />
+              <HierarchyAllocationTab fyYear={fyYear} selectedPlanId={selectedPlanId} />
             </TabsContent>
 
             {/* Dashboard Tab - Target vs Actual */}

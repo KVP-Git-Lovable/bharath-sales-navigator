@@ -2,13 +2,15 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Lock, Package, IndianRupee, Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Package, IndianRupee, Users, AlertTriangle, CheckCircle2, FileText, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { type PlanStatus } from '@/hooks/useFYTargetPlans';
 
 interface DistributionSummaryHeaderProps {
   targetPlanName: string;
   fyYear: number;
   isLocked?: boolean;
+  planStatus?: PlanStatus;
   enabledMetrics: {
     quantity: boolean;
     revenue: boolean;
@@ -32,10 +34,17 @@ const formatCurrency = (num: number) => {
   return `₹${formatNumber(num)}`;
 };
 
+const STATUS_BADGE: Record<string, { label: string; icon: React.ElementType; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+  draft: { label: 'Draft', icon: FileText, variant: 'secondary' },
+  active: { label: 'Active', icon: CheckCircle2, variant: 'default' },
+  closed: { label: 'Closed', icon: Archive, variant: 'outline' },
+};
+
 export function DistributionSummaryHeader({
   targetPlanName,
   fyYear,
   isLocked,
+  planStatus,
   enabledMetrics,
   quantityUnit,
   totalQuantity,
@@ -46,7 +55,6 @@ export function DistributionSummaryHeader({
   allocatedVisits,
   selectedUserName,
 }: DistributionSummaryHeaderProps) {
-  // Calculate primary distribution percentage (use the first enabled metric)
   const getDistributionPercent = () => {
     if (enabledMetrics.quantity && totalQuantity > 0) {
       return Math.min(100, Math.round((allocatedQuantity / totalQuantity) * 100));
@@ -77,6 +85,11 @@ export function DistributionSummaryHeader({
 
   const status = getStatusInfo(distributionPercent);
   const StatusIcon = status.icon;
+
+  // Determine which status badge to show
+  const effectiveStatus = planStatus || (isLocked ? 'active' : 'draft');
+  const statusBadge = STATUS_BADGE[effectiveStatus] || STATUS_BADGE.draft;
+  const BadgeIcon = statusBadge.icon;
 
   const metrics = [
     {
@@ -113,21 +126,17 @@ export function DistributionSummaryHeader({
 
   return (
     <Card className="border-primary/20 overflow-hidden">
-      {/* Top accent bar */}
       <div className={cn('h-1', getProgressColor(distributionPercent))} />
       <CardContent className="py-4 space-y-4">
-        {/* Header row */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-lg">
               {targetPlanName || 'FY Sales Plan'}
             </h3>
-            {isLocked && (
-              <Badge variant="default" className="gap-1">
-                <Lock className="h-3 w-3" />
-                Locked
-              </Badge>
-            )}
+            <Badge variant={statusBadge.variant} className="gap-1">
+              <BadgeIcon className="h-3 w-3" />
+              {statusBadge.label}
+            </Badge>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-sm font-medium">
@@ -136,7 +145,6 @@ export function DistributionSummaryHeader({
           </div>
         </div>
 
-        {/* Distribution progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -161,7 +169,6 @@ export function DistributionSummaryHeader({
           </p>
         )}
 
-        {/* Metrics grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {metrics.map(metric => {
             const MetricIcon = metric.icon;

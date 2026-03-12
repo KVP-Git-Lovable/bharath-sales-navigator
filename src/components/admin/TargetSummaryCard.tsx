@@ -1,7 +1,8 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Package, IndianRupee, Users } from 'lucide-react';
+import { Package, IndianRupee, Users, CheckCircle2, FileText, Archive } from 'lucide-react';
+import { type PlanStatus } from '@/hooks/useFYTargetPlans';
 
 interface TargetConfig {
   target_plan_name?: string;
@@ -13,6 +14,7 @@ interface TargetConfig {
   total_revenue_target: number;
   total_visits_target: number;
   is_locked?: boolean;
+  plan_status?: PlanStatus;
 }
 
 interface TargetSummaryCardProps {
@@ -23,6 +25,12 @@ interface TargetSummaryCardProps {
   allocatedRevenue?: number;
   allocatedVisits?: number;
 }
+
+const STATUS_BADGE: Record<string, { label: string; icon: React.ElementType; variant: 'default' | 'secondary' | 'outline' }> = {
+  draft: { label: 'Draft', icon: FileText, variant: 'secondary' },
+  active: { label: 'Active', icon: CheckCircle2, variant: 'default' },
+  closed: { label: 'Closed', icon: Archive, variant: 'outline' },
+};
 
 export function TargetSummaryCard({
   config,
@@ -45,42 +53,40 @@ export function TargetSummaryCard({
     return `₹${formatNumber(num)}`;
   };
 
+  const effectiveStatus = config.plan_status || (config.is_locked ? 'active' : 'draft');
+  const statusBadge = STATUS_BADGE[effectiveStatus] || STATUS_BADGE.draft;
+  const BadgeIcon = statusBadge.icon;
+
   return (
     <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
       <CardContent className="py-4">
-        {/* Header with Title and Badge */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-lg">
               Target: <span className="text-primary">{config.target_plan_name || 'FY Sales Plan'}</span>
             </h3>
-            {config.is_locked && (
-              <Badge variant="default" className="gap-1">
-                <Lock className="h-3 w-3" />
-                Locked
-              </Badge>
-            )}
+            <Badge variant={statusBadge.variant} className="gap-1">
+              <BadgeIcon className="h-3 w-3" />
+              {statusBadge.label}
+            </Badge>
           </div>
           <div className="text-sm font-medium text-muted-foreground bg-background/60 px-3 py-1 rounded-full">
             FY {fyYear - 1}-{String(fyYear).slice(-2)}
           </div>
         </div>
 
-        {/* Total Target Label */}
         <div className="mb-3">
           <span className="text-sm font-medium text-muted-foreground border-b-2 border-primary/30 pb-0.5">
             Total Target
           </span>
         </div>
 
-        {/* Selected user indicator */}
         {selectedUserName && (
           <p className="text-sm text-muted-foreground mb-3">
             Allocating for: <span className="font-medium text-foreground">{selectedUserName}</span>
           </p>
         )}
 
-        {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {config.enable_quantity && (
             <div className="flex items-center gap-3 bg-background/70 rounded-lg p-3 border border-border/50">

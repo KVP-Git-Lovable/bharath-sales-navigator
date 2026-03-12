@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useFYTargetPlans, type PlanStatus } from '@/hooks/useFYTargetPlans';
 import { toast } from 'sonner';
-import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar } from 'lucide-react';
+import { Loader2, Lock, Unlock, Target, Settings, Package, IndianRupee, Footprints, ChevronDown, ChevronUp, Divide, Users, Calendar, Plus, FileText, CheckCircle2, Archive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -69,6 +70,7 @@ interface TargetConfig {
   target_period_type: PeriodType;
   target_start_month: number;
   target_end_month: number;
+  plan_status: PlanStatus;
 }
 
 const FY_MONTH_OPTIONS = FY_MONTHS.map((name, i) => ({ value: i + 1, label: name }));
@@ -76,6 +78,8 @@ const FY_MONTH_OPTIONS = FY_MONTHS.map((name, i) => ({ value: i + 1, label: name
 interface TargetConfigTabProps {
   fyYear: number;
   onLockedAndAssign?: () => void;
+  selectedPlanId?: string;
+  onPlanChange?: (planId: string) => void;
 }
 
 const QUANTITY_UNITS = ['Kg', 'Units', 'Liters', 'Pcs', 'Boxes', 'Tonnes', 'Cartons'];
@@ -103,9 +107,16 @@ const DEFAULT_CONFIG: Omit<TargetConfig, 'fy_year'> = {
   target_period_type: 'annual',
   target_start_month: 1,
   target_end_month: 12,
+  plan_status: 'draft',
 };
 
-export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabProps) {
+const STATUS_CONFIG: Record<PlanStatus, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
+  draft: { label: 'Draft', icon: FileText, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  active: { label: 'Active', icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  closed: { label: 'Closed', icon: Archive, color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
+};
+
+export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onPlanChange }: TargetConfigTabProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [config, setConfig] = useState<TargetConfig>({
@@ -121,16 +132,30 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
   const [breakdownData, setBreakdownData] = useState<Record<string, BreakdownItem[]>>({});
   const [equalDivide, setEqualDivide] = useState<Record<string, boolean>>({});
 
-  // Fetch existing config
+  // Fetch all plans for this FY year
+  const { data: plans = [], isLoading: plansLoading } = useFYTargetPlans(fyYear);
+
+  // Fetch existing config for the selected plan
   const { data: existingConfig, isLoading } = useQuery({
-    queryKey: ['fy-target-config', fyYear],
+    queryKey: ['fy-target-config', fyYear, selectedPlanId],
     queryFn: async () => {
+      if (selectedPlanId) {
+        const { data, error } = await supabase
+          .from('fy_target_config')
+          .select('*')
+          .eq('id', selectedPlanId)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      }
+      // Fallback: get first plan for this FY
       const { data, error } = await supabase
         .from('fy_target_config')
         .select('*')
         .eq('fy_year', fyYear)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
-
       if (error) throw error;
       return data;
     },
@@ -164,6 +189,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         target_period_type: periodType,
         target_start_month: (existingConfig as any).target_start_month ?? 1,
         target_end_month: (existingConfig as any).target_end_month ?? 12,
+        plan_status: ((existingConfig as any).plan_status as PlanStatus) ?? 'draft',
       });
     } else {
       setConfig({
@@ -185,6 +211,9 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async (configData: TargetConfig) => {
+      // Derive is_locked from plan_status for backward compatibility
+      const isLocked = configData.plan_status === 'active' || configData.plan_status === 'closed';
+      
       if (configData.id) {
         const { error } = await supabase
           .from('fy_target_config')
@@ -198,11 +227,12 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
             total_quantity_target: configData.total_quantity_target,
             total_revenue_target: configData.total_revenue_target,
             total_visits_target: configData.total_visits_target,
-            is_locked: configData.is_locked,
+            is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
             target_start_month: configData.target_start_month,
             target_end_month: configData.target_end_month,
+            plan_status: configData.plan_status,
           })
           .eq('id', configData.id);
         if (error) throw error;
@@ -229,18 +259,20 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
             total_quantity_target: configData.total_quantity_target,
             total_revenue_target: configData.total_revenue_target,
             total_visits_target: configData.total_visits_target,
-            is_locked: configData.is_locked,
+            is_locked: isLocked,
             setup_completed: configData.setup_completed,
             target_period_type: configData.target_period_type,
             target_start_month: configData.target_start_month,
             target_end_month: configData.target_end_month,
             created_by: user?.id,
+            plan_status: configData.plan_status,
           })
           .select()
           .single();
         if (error) throw error;
         if (data) {
           setConfig(prev => ({ ...prev, id: data.id }));
+          onPlanChange?.(data.id);
           
           // Save period targets if not annual
           if (configData.target_period_type !== 'annual' && periodTargets.length > 0) {
@@ -255,6 +287,7 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fy-target-config'] });
+      queryClient.invalidateQueries({ queryKey: ['fy-target-plans'] });
       queryClient.invalidateQueries({ queryKey: ['fy-period-targets'] });
     },
     onError: (error: Error) => {
@@ -338,17 +371,27 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     toast.success('Configuration saved');
   };
 
-  const handleLockAndAssign = async () => {
-    const lockedConfig = { ...config, is_locked: true, setup_completed: true };
-    await saveMutation.mutateAsync(lockedConfig);
-    toast.success('Configuration locked! Proceed to assign targets.');
-    onLockedAndAssign?.();
+  const handleStatusChange = async (newStatus: PlanStatus) => {
+    const updatedConfig = { ...config, plan_status: newStatus, setup_completed: newStatus !== 'draft' };
+    await saveMutation.mutateAsync(updatedConfig);
+    const statusLabels: Record<PlanStatus, string> = {
+      draft: 'Plan moved to Draft',
+      active: 'Plan activated! You can now allocate targets.',
+      closed: 'Plan closed.',
+    };
+    toast.success(statusLabels[newStatus]);
+    if (newStatus === 'active') {
+      onLockedAndAssign?.();
+    }
   };
 
-  const handleUnlock = async () => {
-    const unlockedConfig = { ...config, is_locked: false };
-    await saveMutation.mutateAsync(unlockedConfig);
-    toast.success('Configuration unlocked for editing');
+  const handleCreateNewPlan = async () => {
+    const newConfig: TargetConfig = {
+      fy_year: fyYear,
+      ...DEFAULT_CONFIG,
+      target_plan_name: `Plan ${plans.length + 1}`,
+    };
+    setConfig(newConfig);
   };
 
   const hasAtLeastOneBasis = config.enable_quantity || config.enable_revenue || config.enable_visits;
@@ -357,7 +400,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     (!config.enable_quantity || config.total_quantity_target > 0) &&
     (!config.enable_revenue || config.total_revenue_target > 0) &&
     (!config.enable_visits || config.total_visits_target > 0);
-  const canLock = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
+  const canActivate = hasAtLeastOneBasis && hasAtLeastOneParameter && hasValidTargets;
+  const isReadOnly = config.plan_status === 'closed';
 
   if (isLoading) {
     return (
@@ -369,8 +413,10 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
     );
   }
 
-  // Locked view - show read-only summary
-  if (config.is_locked) {
+  // Closed view - show read-only summary with reopen option
+  if (isReadOnly) {
+    const statusInfo = STATUS_CONFIG[config.plan_status];
+    const StatusIcon = statusInfo.icon;
     return (
       <Card>
         <CardHeader>
@@ -385,13 +431,13 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="gap-1">
-                <Lock className="h-3 w-3" />
-                Locked
+              <Badge variant="outline" className={`gap-1 ${statusInfo.color}`}>
+                <StatusIcon className="h-3 w-3" />
+                {statusInfo.label}
               </Badge>
-              <Button variant="outline" size="sm" onClick={handleUnlock} disabled={saveMutation.isPending}>
+              <Button variant="outline" size="sm" onClick={() => handleStatusChange('draft')} disabled={saveMutation.isPending}>
                 <Unlock className="h-4 w-4 mr-1" />
-                Unlock to Edit
+                Reopen as Draft
               </Button>
             </div>
           </div>
@@ -444,12 +490,64 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
   return (
     <Card className="border shadow-sm">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Settings className="h-5 w-5 text-primary" />
-          Create Target for FY {fyYear - 1}-{String(fyYear).slice(-2)}
-        </CardTitle>
+        {/* Plan Selector */}
+        {plans.length > 0 && (
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <span className="text-sm font-medium text-muted-foreground">Plan:</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {plans.map(plan => {
+                const isSelected = plan.id === config.id;
+                const planStatusInfo = STATUS_CONFIG[plan.plan_status as PlanStatus] || STATUS_CONFIG.draft;
+                const PlanStatusIcon = planStatusInfo.icon;
+                return (
+                  <Button
+                    key={plan.id}
+                    variant={isSelected ? 'default' : 'outline'}
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={() => onPlanChange?.(plan.id)}
+                  >
+                    <PlanStatusIcon className="h-3 w-3" />
+                    {plan.target_plan_name || 'Untitled Plan'}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={handleCreateNewPlan}>
+              <Plus className="h-3 w-3" />
+              New Plan
+            </Button>
+          </div>
+        )}
+
+        {/* Status Badge + Controls */}
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Settings className="h-5 w-5 text-primary" />
+            {config.id ? 'Edit' : 'Create'} Target for FY {fyYear - 1}-{String(fyYear).slice(-2)}
+          </CardTitle>
+          {config.id && (
+            <div className="flex items-center gap-2">
+              {(() => {
+                const statusInfo = STATUS_CONFIG[config.plan_status];
+                const StatusIcon = statusInfo.icon;
+                return (
+                  <Badge variant="outline" className={`gap-1 ${statusInfo.color} ${statusInfo.bgColor}`}>
+                    <StatusIcon className="h-3 w-3" />
+                    {statusInfo.label}
+                  </Badge>
+                );
+              })()}
+            </div>
+          )}
+        </div>
         <CardDescription>
           Define target metrics, parameters, and company-wide goals
+          {config.plan_status === 'active' && (
+            <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
+              ⚠ Changes will affect allocated targets
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
@@ -792,22 +890,35 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign }: TargetConfigTabPr
         <div className="flex items-center justify-between pt-2">
           <Button variant="outline" onClick={handleSave} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Save Draft
+            {config.plan_status === 'draft' ? 'Save Draft' : 'Save Changes'}
           </Button>
           
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={handleLockAndAssign} 
-              disabled={!canLock || saveMutation.isPending}
-              className="gap-2"
-            >
-              {saveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Lock className="h-4 w-4" />
-              )}
-              Lock & Assign to Hierarchy
-            </Button>
+          <div className="flex items-center gap-2">
+            {config.plan_status === 'draft' && (
+              <Button 
+                onClick={() => handleStatusChange('active')} 
+                disabled={!canActivate || saveMutation.isPending}
+                className="gap-2"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Activate & Assign
+              </Button>
+            )}
+            {config.plan_status === 'active' && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => handleStatusChange('draft')} disabled={saveMutation.isPending}>
+                  Back to Draft
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => handleStatusChange('closed')} disabled={saveMutation.isPending} className="gap-1">
+                  <Archive className="h-4 w-4" />
+                  Close Plan
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardContent>

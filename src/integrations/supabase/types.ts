@@ -5053,6 +5053,7 @@ export type Database = {
           fy_year: number
           id: string
           is_locked: boolean | null
+          plan_status: string
           quantity_unit: string | null
           setup_completed: boolean | null
           target_end_month: number
@@ -5074,6 +5075,7 @@ export type Database = {
           fy_year: number
           id?: string
           is_locked?: boolean | null
+          plan_status?: string
           quantity_unit?: string | null
           setup_completed?: boolean | null
           target_end_month?: number
@@ -5095,6 +5097,7 @@ export type Database = {
           fy_year?: number
           id?: string
           is_locked?: boolean | null
+          plan_status?: string
           quantity_unit?: string | null
           setup_completed?: boolean | null
           target_end_month?: number
@@ -5701,6 +5704,7 @@ export type Database = {
           quantity_unit: string | null
           root_user_id: string
           status: string | null
+          target_plan_id: string | null
           total_quantity_target: number
           total_revenue_target: number
           updated_at: string | null
@@ -5714,6 +5718,7 @@ export type Database = {
           quantity_unit?: string | null
           root_user_id: string
           status?: string | null
+          target_plan_id?: string | null
           total_quantity_target?: number
           total_revenue_target?: number
           updated_at?: string | null
@@ -5727,6 +5732,7 @@ export type Database = {
           quantity_unit?: string | null
           root_user_id?: string
           status?: string | null
+          target_plan_id?: string | null
           total_quantity_target?: number
           total_revenue_target?: number
           updated_at?: string | null
@@ -5737,6 +5743,13 @@ export type Database = {
             columns: ["root_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hierarchy_targets_target_plan_id_fkey"
+            columns: ["target_plan_id"]
+            isOneToOne: false
+            referencedRelation: "target_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -13047,6 +13060,59 @@ export type Database = {
           },
         ]
       }
+      target_breakdowns: {
+        Row: {
+          created_at: string | null
+          fy_config_id: string
+          id: string
+          month_number: number | null
+          parameter_id: string
+          parameter_name: string
+          parameter_type: string
+          quantity_target: number | null
+          revenue_target: number | null
+          updated_at: string | null
+          user_id: string
+          visits_target: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          fy_config_id: string
+          id?: string
+          month_number?: number | null
+          parameter_id: string
+          parameter_name: string
+          parameter_type: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          user_id: string
+          visits_target?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          fy_config_id?: string
+          id?: string
+          month_number?: number | null
+          parameter_id?: string
+          parameter_name?: string
+          parameter_type?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          user_id?: string
+          visits_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_breakdowns_fy_config_id_fkey"
+            columns: ["fy_config_id"]
+            isOneToOne: false
+            referencedRelation: "fy_target_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       target_kpi_definitions: {
         Row: {
           calculation_method: string
@@ -13088,6 +13154,112 @@ export type Database = {
           weightage?: number | null
         }
         Relationships: []
+      }
+      target_plans: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          fy_year: number
+          id: string
+          is_locked: boolean | null
+          name: string
+          policy_id: string
+          status: string | null
+          target_end_month: number | null
+          target_start_month: number | null
+          total_secondary_value: number | null
+          total_target_value: number | null
+          total_visits_target: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          fy_year: number
+          id?: string
+          is_locked?: boolean | null
+          name: string
+          policy_id: string
+          status?: string | null
+          target_end_month?: number | null
+          target_start_month?: number | null
+          total_secondary_value?: number | null
+          total_target_value?: number | null
+          total_visits_target?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          fy_year?: number
+          id?: string
+          is_locked?: boolean | null
+          name?: string
+          policy_id?: string
+          status?: string | null
+          target_end_month?: number | null
+          target_start_month?: number | null
+          total_secondary_value?: number | null
+          total_target_value?: number | null
+          total_visits_target?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_plans_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "target_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      target_policies: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          enabled_parameters: Json | null
+          id: string
+          is_active: boolean | null
+          name: string
+          period_type: string | null
+          quantity_unit: string | null
+          target_type_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          enabled_parameters?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          period_type?: string | null
+          quantity_unit?: string | null
+          target_type_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          enabled_parameters?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          period_type?: string | null
+          quantity_unit?: string | null
+          target_type_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_policies_target_type_id_fkey"
+            columns: ["target_type_id"]
+            isOneToOne: false
+            referencedRelation: "target_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       target_setup_master: {
         Row: {
@@ -13142,6 +13314,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      target_types: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          metric: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          metric: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          metric?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       tax_components: {
         Row: {
