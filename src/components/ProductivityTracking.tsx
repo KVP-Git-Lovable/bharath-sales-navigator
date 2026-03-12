@@ -110,14 +110,16 @@ const ProductivityTracking = () => {
       // Fetch beats for travel allowance
       const { data: beatsData, error: beatsError } = await supabase
         .from('beats')
-        .select('beat_name, travel_allowance');
+        .select('beat_name, travel_allowance, average_km');
 
       if (beatsError) throw beatsError;
 
-      // Create travel allowance map by beat name
+      // Create travel allowance map by beat name - uses per-km rate when available
       const travelAllowanceMap = new Map<string, number>();
+      const beatKmMap = new Map<string, number>();
       (beatsData || []).forEach((b: any) => {
         travelAllowanceMap.set(b.beat_name, b.travel_allowance || 0);
+        beatKmMap.set(b.beat_name, b.average_km || 0);
       });
 
       // Fetch expense configs (global + user/team overrides)
