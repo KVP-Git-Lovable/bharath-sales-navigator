@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, FileText, AlertTriangle } from 'lucide-react';
 import { DistributionSummaryHeader } from './DistributionSummaryHeader';
 import { AllocationTable } from './AllocationTable';
+import { type PlanStatus } from '@/hooks/useFYTargetPlans';
 
 interface EnabledParameters {
   product: boolean;
@@ -28,13 +29,15 @@ interface TargetConfig {
   total_revenue_target: number;
   total_visits_target: number;
   is_locked?: boolean;
+  plan_status?: PlanStatus;
 }
 
 interface HierarchyAllocationTabProps {
   fyYear: number;
+  selectedPlanId?: string;
 }
 
-export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) {
+export function HierarchyAllocationTab({ fyYear, selectedPlanId }: HierarchyAllocationTabProps) {
   const { user } = useAuth();
   const [selectedNode, setSelectedNode] = useState<{
     userId: string;
@@ -44,14 +47,24 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
 
   // Fetch config for the FY
   const { data: config, isLoading } = useQuery({
-    queryKey: ['fy-target-config', fyYear],
+    queryKey: ['fy-target-config', fyYear, selectedPlanId],
     queryFn: async () => {
+      if (selectedPlanId) {
+        const { data, error } = await supabase
+          .from('fy_target_config')
+          .select('*')
+          .eq('id', selectedPlanId)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      }
       const { data, error } = await supabase
         .from('fy_target_config')
         .select('*')
         .eq('fy_year', fyYear)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
-
       if (error) throw error;
       return data;
     },
@@ -61,7 +74,6 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
   // Auto-select current user as root
   useEffect(() => {
     if (user?.id && !selectedNode) {
-      // Get user's name
       supabase
         .from('profiles')
         .select('full_name')
@@ -91,24 +103,26 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <Lock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Target Configuration</h3>
           <p className="text-muted-foreground">
-            Please create and lock a target configuration in the "Targets" tab first.
+            Please create a target configuration in the "Targets" tab first.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  if (!config.is_locked) {
+  const planStatus = ((config as any).plan_status as PlanStatus) || 'draft';
+
+  if (planStatus === 'draft') {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <Lock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Configuration Not Locked</h3>
+          <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Plan is in Draft</h3>
           <p className="text-muted-foreground">
-            Please lock the target configuration in the "Targets" tab before allocating to users.
+            Please activate the target plan in the "Targets" tab before allocating to users.
           </p>
         </CardContent>
       </Card>
@@ -140,7 +154,7 @@ export function HierarchyAllocationTab({ fyYear }: HierarchyAllocationTabProps) 
       <DistributionSummaryHeader
         targetPlanName={config.target_plan_name || 'FY Sales Plan'}
         fyYear={fyYear}
-        isLocked={config.is_locked}
+        planStatus={planStatus}
         enabledMetrics={{
           quantity: config.enable_quantity,
           revenue: config.enable_revenue,
