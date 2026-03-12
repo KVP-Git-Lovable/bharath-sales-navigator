@@ -8,11 +8,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, User, Info } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Save, Loader2, Car, Utensils, Receipt, Shield, Plus, Trash2, Users, User, Info, Search, Edit2, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import ExpenseCategoriesConfig from './ExpenseCategoriesConfig';
-import ExpenseGroupsConfig from './ExpenseGroupsConfig';
 import ApprovalWorkflowsConfig from './ApprovalWorkflowsConfig';
 import ApprovalRulesConfig from './ApprovalRulesConfig';
 
@@ -32,24 +37,37 @@ interface ExpenseConfig {
 
 interface OverrideEntry {
   id: string;
-  ref_id: string; // user_id or manager_id
+  ref_id: string;
   type: 'user' | 'team';
   amount: number;
   name: string;
 }
 
+interface ExpenseGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  ta_type: string;
+  fixed_ta_amount: number;
+  da_amount: number;
+  ta_per_km_rate: number;
+  member_count?: number;
+}
+
 const DEFAULT_CATEGORIES = ['food', 'travel', 'accommodation', 'communication', 'other'];
 
-// ─── Profile Selector (extracted outside to prevent remount on parent re-render) ──
+// ─── Multi-Profile Selector (Popover + Checkboxes for batch selection) ──
 
-const ProfileSelector = React.memo<{
+const MultiProfileSelector = React.memo<{
   excludeIds: string[];
-  onSelect: (userId: string, name: string) => void;
+  onAdd: (selections: { id: string; name: string }[]) => void;
   label: string;
   managersOnly?: boolean;
-}>(({ excludeIds, onSelect, label, managersOnly = false }) => {
+}>(({ excludeIds, onAdd, label, managersOnly = false }) => {
   const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -78,33 +96,87 @@ const ProfileSelector = React.memo<{
         setProfiles((data || []).filter((p: any) => !excludeIds.includes(p.id)));
       }
     };
-    if (open) fetchProfiles();
+    if (open) {
+      fetchProfiles();
+      setSelected(new Set());
+      setSearch('');
+    }
   }, [open, excludeIds, managersOnly]);
 
+  const filtered = search.trim()
+    ? profiles.filter(p => p.full_name.toLowerCase().includes(search.toLowerCase()))
+    : profiles;
+
+  const toggleUser = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    const selections = profiles
+      .filter(p => selected.has(p.id))
+      .map(p => ({ id: p.id, name: p.full_name }));
+    if (selections.length > 0) onAdd(selections);
+    setOpen(false);
+  };
+
   return (
-    <Select
-      onValueChange={(val) => {
-        const profile = profiles.find(p => p.id === val);
-        if (profile) onSelect(profile.id, profile.full_name);
-      }}
-      onOpenChange={setOpen}
-    >
-      <SelectTrigger className="h-8 text-xs w-[180px]">
-        <SelectValue placeholder={label} />
-      </SelectTrigger>
-      <SelectContent>
-        {profiles.map(p => (
-          <SelectItem key={p.id} value={p.id} className="text-xs">{p.full_name}</SelectItem>
-        ))}
-        {profiles.length === 0 && (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">No users available</div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="h-7 text-xs pl-7"
+            />
+          </div>
+        </div>
+        <ScrollArea className="h-[200px]">
+          <div className="p-1.5 space-y-0.5">
+            {filtered.map(p => (
+              <div
+                key={p.id}
+                className={cn(
+                  'flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs transition-colors',
+                  selected.has(p.id) ? 'bg-primary/10' : 'hover:bg-muted/50'
+                )}
+                onClick={() => toggleUser(p.id)}
+              >
+                <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleUser(p.id)} className="h-3.5 w-3.5" />
+                <span className="truncate">{p.full_name}</span>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="text-center py-4 text-xs text-muted-foreground">No users available</div>
+            )}
+          </div>
+        </ScrollArea>
+        {selected.size > 0 && (
+          <div className="p-2 border-t">
+            <Button size="sm" className="w-full h-7 text-xs" onClick={handleConfirm}>
+              Add {selected.size} Selected
+            </Button>
+          </div>
         )}
-      </SelectContent>
-    </Select>
+      </PopoverContent>
+    </Popover>
   );
 });
 
-ProfileSelector.displayName = 'ProfileSelector';
+MultiProfileSelector.displayName = 'MultiProfileSelector';
 
 // ─── Override Table (extracted outside to prevent remount on parent re-render) ──
 
@@ -168,15 +240,15 @@ const OverrideTable = React.memo<{
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        <ProfileSelector
+        <MultiProfileSelector
           excludeIds={excludeIds}
-          onSelect={(id, name) => onAdd(field, 'user', id, name)}
-          label="+ Add User"
+          onAdd={(selections) => selections.forEach(s => onAdd(field, 'user', s.id, s.name))}
+          label="Add Users"
         />
-        <ProfileSelector
+        <MultiProfileSelector
           excludeIds={excludeIds}
-          onSelect={(id, name) => onAdd(field, 'team', id, name)}
-          label="+ Add Team (Manager)"
+          onAdd={(selections) => selections.forEach(s => onAdd(field, 'team', s.id, s.name))}
+          label="Add Teams"
           managersOnly
         />
       </div>
@@ -191,6 +263,73 @@ const OverrideTable = React.memo<{
 });
 
 OverrideTable.displayName = 'OverrideTable';
+// ─── Inline Group Section (shown inside TA/DA custom sections) ──
+
+const InlineGroupSection = React.memo<{
+  groups: ExpenseGroup[];
+  field: 'ta' | 'da';
+  onCreate: () => void;
+  onEdit: (g: ExpenseGroup) => void;
+  onMembers: (g: ExpenseGroup) => void;
+  onDelete: (g: ExpenseGroup) => void;
+}>(({ groups, field, onCreate, onEdit, onMembers, onDelete }) => (
+  <div className="mt-4 pt-4 border-t space-y-2">
+    <div className="flex items-center justify-between">
+      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <Users className="h-3.5 w-3.5" />
+        Group Overrides
+      </p>
+      <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={onCreate}>
+        <Plus className="h-3 w-3" />
+        Create Group
+      </Button>
+    </div>
+    {groups.length === 0 ? (
+      <p className="text-xs text-muted-foreground text-center py-2">No expense groups yet.</p>
+    ) : (
+      <div className="rounded-md border overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[11px] px-2">Group</TableHead>
+              <TableHead className="text-[11px] px-2">{field === 'ta' ? 'TA (₹)' : 'DA (₹)'}</TableHead>
+              <TableHead className="text-[11px] px-2">Members</TableHead>
+              <TableHead className="text-[11px] px-1 w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {groups.map(g => (
+              <TableRow key={g.id}>
+                <TableCell className="py-1.5 px-2">
+                  <p className="text-xs font-medium">{g.name}</p>
+                  {g.description && <p className="text-[10px] text-muted-foreground">{g.description}</p>}
+                </TableCell>
+                <TableCell className="py-1.5 px-2 text-xs">
+                  ₹{field === 'ta' ? g.fixed_ta_amount : g.da_amount}
+                </TableCell>
+                <TableCell className="py-1.5 px-2">
+                  <Badge variant="secondary" className="text-[10px] cursor-pointer" onClick={() => onMembers(g)}>
+                    <Users className="h-3 w-3 mr-0.5" />{g.member_count || 0}
+                  </Badge>
+                </TableCell>
+                <TableCell className="py-1.5 px-1">
+                  <div className="flex items-center gap-0.5">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onMembers(g)}><UserPlus className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(g)}><Edit2 className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => onDelete(g)}><Trash2 className="h-3 w-3" /></Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    )}
+    <p className="text-[10px] text-muted-foreground">Priority: User Override → Group → Team → Global Default</p>
+  </div>
+));
+
+InlineGroupSection.displayName = 'InlineGroupSection';
 
 const ExpensePolicyConfig = () => {
   const { toast } = useToast();
@@ -206,9 +345,23 @@ const ExpensePolicyConfig = () => {
   const [taOverrides, setTaOverrides] = useState<OverrideEntry[]>([]);
   const [daOverrides, setDaOverrides] = useState<OverrideEntry[]>([]);
 
+  // Expense Groups (inline)
+  const [expenseGroups, setExpenseGroups] = useState<ExpenseGroup[]>([]);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ExpenseGroup | null>(null);
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', ta_type: 'from_beat' as 'fixed' | 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [membersGroup, setMembersGroup] = useState<ExpenseGroup | null>(null);
+  const [allUsers, setAllUsers] = useState<{ id: string; full_name: string }[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [memberSearch, setMemberSearch] = useState('');
+  const [savingMembers, setSavingMembers] = useState(false);
+
   useEffect(() => {
     fetchConfig();
     fetchOverrides();
+    fetchGroups();
   }, []);
 
   const fetchConfig = async () => {
@@ -323,6 +476,93 @@ const ExpensePolicyConfig = () => {
       console.error('Error fetching overrides:', error);
     }
   };
+
+  // ─── Expense Groups helpers ────────────────────────────────────────────────
+
+  const fetchGroups = async () => {
+    try {
+      const { data: groupsData } = await (supabase as any).from('expense_groups').select('*').order('name');
+      const { data: membersData } = await (supabase as any).from('expense_group_members').select('group_id');
+      const countMap = new Map<string, number>();
+      (membersData || []).forEach((m: any) => countMap.set(m.group_id, (countMap.get(m.group_id) || 0) + 1));
+      setExpenseGroups((groupsData || []).map((g: any) => ({ ...g, member_count: countMap.get(g.id) || 0 })));
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
+  };
+
+  const openCreateGroupDialog = () => {
+    setEditingGroup(null);
+    setGroupForm({ name: '', description: '', ta_type: 'from_beat', fixed_ta_amount: 0, da_amount: 0, ta_per_km_rate: 0 });
+    setGroupDialogOpen(true);
+  };
+
+  const openEditGroupDialog = (group: ExpenseGroup) => {
+    setEditingGroup(group);
+    setGroupForm({ name: group.name, description: group.description || '', ta_type: group.ta_type as 'fixed' | 'from_beat', fixed_ta_amount: group.fixed_ta_amount, da_amount: group.da_amount, ta_per_km_rate: group.ta_per_km_rate });
+    setGroupDialogOpen(true);
+  };
+
+  const handleSaveGroup = async () => {
+    if (!groupForm.name.trim()) { toast({ title: 'Error', description: 'Group name is required', variant: 'destructive' }); return; }
+    try {
+      setSavingGroup(true);
+      const payload = { name: groupForm.name.trim(), description: groupForm.description.trim() || null, ta_type: groupForm.ta_type, fixed_ta_amount: groupForm.fixed_ta_amount, da_amount: groupForm.da_amount, ta_per_km_rate: groupForm.ta_per_km_rate, updated_at: new Date().toISOString() };
+      if (editingGroup) {
+        await (supabase as any).from('expense_groups').update(payload).eq('id', editingGroup.id);
+        toast({ title: 'Updated', description: `Group "${groupForm.name}" updated` });
+      } else {
+        await (supabase as any).from('expense_groups').insert(payload);
+        toast({ title: 'Created', description: `Group "${groupForm.name}" created` });
+      }
+      setGroupDialogOpen(false);
+      fetchGroups();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally { setSavingGroup(false); }
+  };
+
+  const handleDeleteGroup = async (group: ExpenseGroup) => {
+    if (!confirm(`Delete group "${group.name}"?`)) return;
+    try {
+      await (supabase as any).from('expense_groups').delete().eq('id', group.id);
+      toast({ title: 'Deleted', description: `Group "${group.name}" deleted` });
+      fetchGroups();
+    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+  };
+
+  const openMembersDialog = async (group: ExpenseGroup) => {
+    setMembersGroup(group);
+    setMemberSearch('');
+    setMembersDialogOpen(true);
+    const { data: memberRows } = await (supabase as any).from('expense_group_members').select('user_id').eq('group_id', group.id);
+    setSelectedMemberIds(new Set((memberRows || []).map((m: any) => m.user_id)));
+    const { data: allProfiles } = await supabase.rpc('get_profiles_for_selector');
+    setAllUsers((allProfiles || []).map((p: any) => ({ id: p.id, full_name: p.full_name || 'Unknown' })));
+  };
+
+  const handleSaveMembers = async () => {
+    if (!membersGroup) return;
+    try {
+      setSavingMembers(true);
+      await (supabase as any).from('expense_group_members').delete().eq('group_id', membersGroup.id);
+      if (selectedMemberIds.size > 0) {
+        const rows = Array.from(selectedMemberIds).map(uid => ({ group_id: membersGroup.id, user_id: uid }));
+        const { error } = await (supabase as any).from('expense_group_members').insert(rows);
+        if (error) throw error;
+      }
+      toast({ title: 'Saved', description: `${selectedMemberIds.size} members assigned to "${membersGroup.name}"` });
+      setMembersDialogOpen(false);
+      fetchGroups();
+    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+    finally { setSavingMembers(false); }
+  };
+
+  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const filteredMemberUsers = memberSearch.trim()
+    ? allUsers.filter(u => u.full_name.toLowerCase().includes(memberSearch.toLowerCase()))
+    : allUsers;
 
   // ─── Override CRUD helpers ──────────────────────────────────────────────────
 
@@ -625,7 +865,10 @@ const ExpensePolicyConfig = () => {
               </div>
 
               {taDistribution === 'custom' && (
-                <OverrideTable field="ta" overrides={taOverrides} defaultAmount={config.fixed_ta_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+                <>
+                  <OverrideTable field="ta" overrides={taOverrides} defaultAmount={config.fixed_ta_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+                  <InlineGroupSection groups={expenseGroups} field="ta" onCreate={openCreateGroupDialog} onEdit={openEditGroupDialog} onMembers={openMembersDialog} onDelete={handleDeleteGroup} />
+                </>
               )}
             </>
           )}
@@ -698,7 +941,10 @@ const ExpensePolicyConfig = () => {
           </div>
 
           {daDistribution === 'custom' && (
-            <OverrideTable field="da" overrides={daOverrides} defaultAmount={config.da_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+            <>
+              <OverrideTable field="da" overrides={daOverrides} defaultAmount={config.da_amount} onUpdateAmount={handleUpdateOverrideAmount} onDelete={handleDeleteOverride} onAdd={handleAddOverride} />
+              <InlineGroupSection groups={expenseGroups} field="da" onCreate={openCreateGroupDialog} onEdit={openEditGroupDialog} onMembers={openMembersDialog} onDelete={handleDeleteGroup} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -753,8 +999,7 @@ const ExpensePolicyConfig = () => {
         </CardContent>
       </Card>
 
-      {/* Expense Groups */}
-      <ExpenseGroupsConfig />
+      {/* Group Dialogs are rendered below */}
 
       {/* Expense Categories */}
       <ExpenseCategoriesConfig />
@@ -797,6 +1042,104 @@ const ExpensePolicyConfig = () => {
           Save Expense Policy
         </Button>
       </div>
+
+      {/* Create/Edit Group Dialog */}
+      <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingGroup ? 'Edit Group' : 'Create Expense Group'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Group Name *</Label>
+              <Input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. North Region Sales" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Description</Label>
+              <Input value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">TA Type</Label>
+              <Select value={groupForm.ta_type} onValueChange={(v: 'fixed' | 'from_beat') => setGroupForm(f => ({ ...f, ta_type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed TA</SelectItem>
+                  <SelectItem value="from_beat">From Beat Distance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Fixed TA (₹)</Label>
+                <Input type="number" min="0" value={groupForm.fixed_ta_amount} onChange={e => setGroupForm(f => ({ ...f, fixed_ta_amount: Number(e.target.value) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">DA (₹)</Label>
+                <Input type="number" min="0" value={groupForm.da_amount} onChange={e => setGroupForm(f => ({ ...f, da_amount: Number(e.target.value) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Per KM (₹)</Label>
+                <Input type="number" min="0" step="0.5" value={groupForm.ta_per_km_rate} onChange={e => setGroupForm(f => ({ ...f, ta_per_km_rate: Number(e.target.value) }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveGroup} disabled={savingGroup}>
+              {savingGroup && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {editingGroup ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Members Management Dialog */}
+      <Dialog open={membersDialogOpen} onOpenChange={setMembersDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Manage Members — {membersGroup?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search users..." value={memberSearch} onChange={e => setMemberSearch(e.target.value)} className="pl-9" />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{selectedMemberIds.size} selected</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedMemberIds(new Set(allUsers.map(u => u.id)))}>Select All</Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedMemberIds(new Set())}>Clear</Button>
+              </div>
+            </div>
+            <ScrollArea className="h-[300px] border rounded-md">
+              <div className="p-2 space-y-1">
+                {filteredMemberUsers.map(u => (
+                  <div
+                    key={u.id}
+                    className={cn('flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors', selectedMemberIds.has(u.id) ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50')}
+                    onClick={() => { setSelectedMemberIds(prev => { const next = new Set(prev); if (next.has(u.id)) next.delete(u.id); else next.add(u.id); return next; }); }}
+                  >
+                    <Checkbox checked={selectedMemberIds.has(u.id)} onCheckedChange={() => { setSelectedMemberIds(prev => { const next = new Set(prev); if (next.has(u.id)) next.delete(u.id); else next.add(u.id); return next; }); }} />
+                    <Avatar className="h-6 w-6"><AvatarFallback className="text-xs">{getInitials(u.full_name)}</AvatarFallback></Avatar>
+                    <span className="text-sm">{u.full_name}</span>
+                  </div>
+                ))}
+                {filteredMemberUsers.length === 0 && <div className="text-center py-6 text-sm text-muted-foreground">No users found</div>}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMembersDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveMembers} disabled={savingMembers}>
+              {savingMembers && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Save Members ({selectedMemberIds.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
