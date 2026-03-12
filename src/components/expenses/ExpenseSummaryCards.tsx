@@ -18,7 +18,7 @@ interface ExpenseSummaryCardsProps {
 const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
 const ExpenseSummaryCards: React.FC<ExpenseSummaryCardsProps> = ({
-  ta, da, additional, total, presentDays, loading, onTotalClick, isExpanded, orderValue = 0
+  ta, da, additional, total, presentDays, loading, onTotalClick, isExpanded, orderValue = 0, totalKm = 0
 }) => {
   const [compact, setCompact] = useState(false);
 
