@@ -4784,6 +4784,71 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_group_members: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "expense_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_groups: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          description: string | null
+          fixed_ta_amount: number | null
+          id: string
+          name: string
+          ta_per_km_rate: number | null
+          ta_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          description?: string | null
+          fixed_ta_amount?: number | null
+          id?: string
+          name: string
+          ta_per_km_rate?: number | null
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          description?: string | null
+          fixed_ta_amount?: number | null
+          id?: string
+          name?: string
+          ta_per_km_rate?: number | null
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expense_master_config: {
         Row: {
           allowed_categories: string[] | null
