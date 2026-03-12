@@ -343,6 +343,126 @@ const ApprovalWorkflowsConfig = () => {
           ))}
         </div>
       </CardContent>
+
+      {/* Help Dialog */}
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <GitBranch className="h-4 w-4 text-cyan-600" />
+              How Approval Workflows Work
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Configure who approves expenses and in what order.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm">
+            {/* Section 1 */}
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">What are Approval Workflows?</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                A workflow is a named approval chain that defines <strong className="text-foreground">who</strong> needs to approve an expense and <strong className="text-foreground">in what order</strong>. For example, "Manager Approval" or "Manager + Finance Head".
+              </p>
+            </div>
+
+            {/* Section 2 */}
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground">How to Create a Workflow</h4>
+              <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
+                <li>Click <Badge variant="outline" className="text-[10px] px-1.5 py-0">+ Add</Badge> to create a new workflow</li>
+                <li>Give it a name (e.g., "Finance Review")</li>
+                <li>Choose an approval mode (see below)</li>
+                <li>Expand the workflow and add approval steps</li>
+                <li>Mark one workflow as <Badge className="text-[10px] px-1.5 py-0">Default</Badge> — it will be used when no specific rule matches</li>
+              </ol>
+            </div>
+
+            {/* Section 3 - Modes */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">Approval Modes</h4>
+              <div className="grid gap-2">
+                <div className="p-2.5 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ArrowDown className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="font-medium text-xs text-foreground">Sequential</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Step 1 must approve before Step 2 can see the request. Approval flows top-down in order.</p>
+                </div>
+                <div className="p-2.5 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserCheck className="h-3.5 w-3.5 text-green-500" />
+                    <span className="font-medium text-xs text-foreground">Parallel (Any One)</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">All approvers see the request simultaneously. <strong>Any one</strong> approval is enough to proceed.</p>
+                </div>
+                <div className="p-2.5 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="h-3.5 w-3.5 text-orange-500" />
+                    <span className="font-medium text-xs text-foreground">Parallel (All Required)</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">All approvers see the request simultaneously. <strong>Everyone</strong> must approve for it to pass.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4 - Step Types */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">Step Types</h4>
+              <div className="space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Manager</Badge>
+                  <span>The submitter's direct manager at the given hierarchy level</span>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Specific User</Badge>
+                  <span>A named person (e.g., Finance Head) — always the same person regardless of who submits</span>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Hierarchy Level</Badge>
+                  <span>Manager at level N in the reporting chain (e.g., level 2 = manager's manager)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 5 - Connection to Rules */}
+            <div className="space-y-1.5">
+              <h4 className="font-semibold text-foreground flex items-center gap-2">
+                <Layers className="h-3.5 w-3.5 text-purple-500" />
+                How Workflows Connect to Expenses
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Workflows are connected to expenses via <strong className="text-foreground">Approval Rules</strong> (configured below). Rules define conditions like:
+              </p>
+              <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc list-inside">
+                <li>Amount between ₹0–500 → use "Auto Approve" workflow</li>
+                <li>Amount above ₹2000 → use "Manager + Finance" workflow</li>
+                <li>Category = "Travel" → use "Travel Review" workflow</li>
+              </ul>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                If no rule matches, the <Badge className="text-[10px] px-1.5 py-0">Default</Badge> workflow is used automatically.
+              </p>
+            </div>
+
+            {/* Section 6 - Example */}
+            <div className="p-3 rounded-md border border-dashed bg-muted/20 space-y-2">
+              <h4 className="font-semibold text-foreground text-xs">💡 Example Setup</h4>
+              <div className="text-[11px] text-muted-foreground space-y-1.5">
+                <p><strong className="text-foreground">Workflow:</strong> "Manager + Finance" (Sequential)</p>
+                <div className="flex items-center gap-1.5 text-foreground">
+                  <Badge variant="outline" className="text-[10px]">Step 1</Badge>
+                  <span>Manager</span>
+                  <ArrowDown className="h-3 w-3 text-muted-foreground" />
+                  <Badge variant="outline" className="text-[10px]">Step 2</Badge>
+                  <span>Finance Head (Specific User)</span>
+                </div>
+                <p className="pt-1"><strong className="text-foreground">Rule:</strong> Amount above ₹2,000 → route to this workflow</p>
+                <p><strong className="text-foreground">Result:</strong> High-value expenses go to the manager first, then to the finance head for final approval.</p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
