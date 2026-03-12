@@ -287,7 +287,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
           user_id: user.id,
           beat_id: beat.id,
           beat_name: beatName.trim(),
-          travel_allowance: parseFloat(travelAllowance) || 0,
+          travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
           average_km: parseFloat(averageKm) || 0,
           average_time_minutes: parseInt(averageTimeMinutes) || 0,
           daily_allowance: 0
