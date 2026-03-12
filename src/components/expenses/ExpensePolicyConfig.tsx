@@ -752,6 +752,9 @@ const ExpensePolicyConfig = () => {
         </CardContent>
       </Card>
 
+      {/* Expense Groups */}
+      <ExpenseGroupsConfig />
+
       {/* Expense Categories */}
       <ExpenseCategoriesConfig />
 
