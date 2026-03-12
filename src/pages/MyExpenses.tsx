@@ -159,6 +159,7 @@ const MyExpenseContent: React.FC<MyExpenseContentProps> = ({
         onTotalClick={onTotalClick}
         isExpanded={false}
         orderValue={summary?.orderValue || 0}
+        totalKm={summary?.totalKm || 0}
       />
 
 
