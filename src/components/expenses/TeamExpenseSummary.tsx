@@ -488,13 +488,16 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
         ]);
 
         // Build beat TA map with per-km rate support
-        const beatTAMap = new Map<string, number>();
+        // Build base beat data map
+        const beatDataMap = new Map<string, { travel_allowance: number; average_km: number }>();
+        beatsRes.data?.forEach((b: any) => beatDataMap.set(b.beat_id, { travel_allowance: b.travel_allowance || 0, average_km: b.average_km || 0 }));
 
         let totalTA = 0, totalDA = 0, totalAdditional = 0, totalPresent = 0;
 
         subordinateIds.forEach(uid => {
           // Resolve per-user config
           const userConfig = resolveExpenseConfig(uid, managerMap.get(uid), globalConfig, userConfigMap, teamConfigMap, userGroupConfigMap);
+          const taPerKmRate = userConfig.ta_per_km_rate || 0;
           
           const presentDates = new Set(
             attendanceRes.data?.filter((a: any) => a.user_id === uid && ['present', 'regularized'].includes(a.status)).map((a: any) => a.date) || []
@@ -507,7 +510,11 @@ const useTeamAggregatedExpenses = (subordinateIds: string[], yearMonth: string) 
             totalTA += presentDates.size * userConfig.fixed_ta_amount;
           } else {
             beatPlansRes.data?.filter((p: any) => p.user_id === uid && presentDates.has(p.plan_date)).forEach((plan: any) => {
-              totalTA += beatTAMap.get(plan.beat_id) || 0;
+              const beatData = beatDataMap.get(plan.beat_id);
+              const km = beatData?.average_km || 0;
+              const beatFixedTA = beatData?.travel_allowance || 0;
+              const beatTA = (taPerKmRate > 0 && km > 0) ? (km * taPerKmRate) : beatFixedTA;
+              totalTA += beatTA;
             });
           }
 
