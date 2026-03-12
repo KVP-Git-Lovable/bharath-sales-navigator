@@ -120,15 +120,14 @@ const ProductivityTracking = () => {
         travelAllowanceMap.set(b.beat_name, b.travel_allowance || 0);
       });
 
-      // Fetch expense master config for DA
-      const { data: configData } = await supabase
-        .from('expense_master_config')
-        .select('da_amount, ta_type, fixed_ta_amount')
-        .single();
+      // Fetch expense configs (global + user/team overrides)
+      const { fetchExpenseConfigs, resolveExpenseConfig, fetchUserManagerIds } = await import('@/hooks/useResolvedExpenseConfig');
+      const { globalConfig, userConfigMap, teamConfigMap } = await fetchExpenseConfigs();
 
-      const daAmount = configData?.da_amount || 0;
-      const taType = configData?.ta_type || 'from_beat';
-      const fixedTaAmount = configData?.fixed_ta_amount || 0;
+      // We'll resolve per-user below after we know userIds
+      const globalDaAmount = globalConfig?.da_amount || 0;
+      const globalTaType = globalConfig?.ta_type || 'from_beat';
+      const globalFixedTa = globalConfig?.fixed_ta_amount || 0;
 
       // Fetch profiles for user names
       const userIds = Array.from(new Set((ordersData || []).map((o: any) => o.user_id)));
