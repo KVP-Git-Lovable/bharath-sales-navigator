@@ -1,49 +1,39 @@
 
-# Scalable Target Management — Plan
 
-## Status: ✅ Implemented
+# Fix Plan Status & Enable Multiple Target Plans
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Issue 1: "FY Sales Plan" Shows as Closed Instead of Active
 
-## What Was Done
+The database confirms the plan `FY Sales Plan` currently has `plan_status = 'closed'`. This is why the Targets tab shows it as a closed/read-only plan. We need to update it back to `'active'`.
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+**Fix**: Run a data migration to set the plan back to active status.
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+```sql
+UPDATE fy_target_config 
+SET plan_status = 'active', is_locked = true 
+WHERE id = '728d55ce-9692-4b77-833b-7ac912c62a0b';
+```
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+## Issue 2: Creating a New Target Plan
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+The current system **already supports multiple plans per FY year**. The "New Plan" button exists in the UI. However, there's no conflict — each plan is independent with its own metrics, parameters, and hierarchy allocations.
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+**What works today:**
+- Click "New Plan" button → fills in a blank form → Save → creates a second plan
+- Both plans can be "Active" simultaneously (no constraint preventing it)
+- Plan selector (pill buttons at top) lets you switch between plans
+- Hierarchy tab respects the selected plan via `selectedPlanId`
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+**Small improvements needed:**
+1. After clicking "New Plan", auto-save isn't triggered — the user must fill in details and click Save. This is fine, but we should make the flow clearer.
+2. The plan selector should show status indicators more prominently so it's obvious which plans are active vs draft.
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+## Changes
+
+| What | How |
+|------|-----|
+| Fix existing plan status | SQL migration: set `plan_status = 'active'` for the FY Sales Plan |
+| No code changes needed | Multiple plans already work — New Plan button, plan selector, and independent save all exist |
+
+This is a simple data fix. The system already supports what you need.
+
