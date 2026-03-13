@@ -687,7 +687,7 @@ export function AllocationTable({
               </Badge>
             )}
             {isManager && <StrategyBadge strategy={levelStrategy} />}
-            <div className="flex-1" />
+            {/* Re-read levelStrategy from allocation for potential per-user override */}
             {enabledMetrics.quantity && (
               <span className="text-sm font-mono font-medium">
                 {formatNumber(alloc?.quantityTarget || 0)} <span className="text-xs text-muted-foreground">{quantityUnit}</span>
