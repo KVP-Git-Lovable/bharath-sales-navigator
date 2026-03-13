@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { TargetStrategy, SplitMethod, LevelStrategyConfig, LevelInfo, StrategyBadge } from './TargetStrategySelector';
+import { TargetStrategy, SplitMethod, LevelStrategyConfig, LevelInfo, StrategyBadge, InlineStrategySelector } from './TargetStrategySelector';
 import { TargetSplitDialog } from './TargetSplitDialog';
 import {
   Tooltip,
@@ -516,11 +516,33 @@ export function AllocationTable({
     });
   };
 
-  // Handle level strategy change
+  // Handle level strategy change — also update all users at that level
   const handleLevelStrategyChange = useCallback((level: number, strategy: TargetStrategy) => {
     setLevelStrategies(prev => {
       const next = new Map(prev);
       next.set(level, strategy);
+      return next;
+    });
+    // Update all users at this level
+    setAllocations(prev => {
+      const next = new Map(prev);
+      next.forEach((alloc, userId) => {
+        if (alloc.level === level) {
+          next.set(userId, { ...alloc, targetStrategy: strategy });
+        }
+      });
+      return next;
+    });
+  }, []);
+
+  // Handle per-user strategy change
+  const handleUserStrategyChange = useCallback((userId: string, strategy: TargetStrategy) => {
+    setAllocations(prev => {
+      const next = new Map(prev);
+      const current = next.get(userId);
+      if (current) {
+        next.set(userId, { ...current, targetStrategy: strategy });
+      }
       return next;
     });
   }, []);
@@ -583,8 +605,7 @@ export function AllocationTable({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const upserts = Array.from(allocations.values()).map(alloc => {
-        const levelStrategy = levelStrategies.get(alloc.level) || 'roll_down';
-        const userStrategy = alloc.subordinateCount > 0 ? levelStrategy : 'roll_down';
+        const userStrategy = alloc.targetStrategy || levelStrategies.get(alloc.level) || 'roll_down';
 
         return {
           id: alloc.existingPlanId || undefined,
@@ -641,6 +662,7 @@ export function AllocationTable({
     const dist = managerDistribution.get(user.userId);
     const alloc = allocations.get(user.userId);
     const levelStrategy = levelStrategies.get(user.level) || 'roll_down';
+    const userStrategy = alloc?.targetStrategy || levelStrategy;
 
     // Compact mode
     if (displayDensity === 'compact') {
@@ -664,7 +686,12 @@ export function AllocationTable({
                 <Users className="h-2.5 w-2.5" />{user.subordinateCount}
               </Badge>
             )}
-            {isManager && <StrategyBadge strategy={levelStrategy} />}
+            {isManager && (
+              <InlineStrategySelector
+                value={userStrategy}
+                onChange={(s) => handleUserStrategyChange(user.userId, s)}
+              />
+            )}
             <div className="flex-1" />
             {enabledMetrics.quantity && (
               <span className="text-sm font-mono font-medium">
@@ -708,7 +735,12 @@ export function AllocationTable({
                   <Users className="h-3 w-3" />{user.subordinateCount}
                 </Badge>
               )}
-              {isManager && <StrategyBadge strategy={levelStrategy} />}
+              {isManager && (
+                <InlineStrategySelector
+                  value={userStrategy}
+                  onChange={(s) => handleUserStrategyChange(user.userId, s)}
+                />
+              )}
             </div>
 
             <div className="flex-1" />
