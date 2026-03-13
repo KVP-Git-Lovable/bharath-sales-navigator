@@ -48,6 +48,7 @@ interface StepPreviewProps {
   quantityUnit: string;
   enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean };
   allocations: Map<string, { quantityTarget: number; revenueTarget: number; visitsTarget: number; personalQuantityTarget?: number; personalRevenueTarget?: number; personalVisitsTarget?: number; targetStrategy: TargetStrategy }>;
+  onTargetChange?: (userId: string, field: string, value: number) => void;
 }
 
 export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }: StepPreviewProps) {
