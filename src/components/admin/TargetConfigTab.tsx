@@ -1327,7 +1327,7 @@ function ParameterBreakdownSection({
     if (config.enabled_parameters.beat && beats && !newData.beat) {
       newData.beat = beats.map(b => ({ id: b.id, name: b.name, metrics: { ...emptyMetrics } }));
     }
-    if (config.enabled_parameters.monthly) {
+    if (config.enabled_parameters.monthly && !newData.monthly) {
       const activeMonths = FY_MONTHS
         .map((m, i) => ({ name: m, index: i }))
         .filter((_, i) => (i + 1) >= config.target_start_month && (i + 1) <= config.target_end_month);
