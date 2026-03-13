@@ -419,9 +419,10 @@ export function AllocationTable({
     childIds.forEach((childId) => {
       const childAlloc = next.get(childId);
       if (!childAlloc) return;
-      quantityTotal += childAlloc.quantityTarget;
-      revenueTotal += childAlloc.revenueTarget;
-      visitsTotal += childAlloc.visitsTarget;
+
+      quantityTotal += getEffectiveQuantity(childAlloc);
+      revenueTotal += getEffectiveRevenue(childAlloc);
+      visitsTotal += getEffectiveVisits(childAlloc);
     });
 
     next.set(managerId, {
