@@ -40,6 +40,13 @@ interface SubordinateAllocation {
   targetStrategy: TargetStrategy;
 }
 
+interface TeamHierarchyNode {
+  userId: string;
+  fullName: string;
+  subordinateCount: number;
+  children: TeamHierarchyNode[];
+}
+
 interface AllocationTableProps {
   parentUserId: string;
   totalQuantity: number;
