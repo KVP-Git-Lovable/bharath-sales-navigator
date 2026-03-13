@@ -128,7 +128,55 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
           </div>
 
           <div className="flex items-center gap-3">
-            {isIndependent && isManager ? (
+            {onTargetChange && !isManager && (
+              <button
+                onClick={() => setEditingUser(isEditing ? null : node.userId)}
+                className="p-1 hover:bg-muted/50 rounded text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+            {isEditing && onTargetChange && !isManager ? (
+              <>
+                {enabledMetrics.quantity && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="text"
+                      value={qty > 0 ? formatNumber(qty) : ''}
+                      onChange={(e) => onTargetChange(node.userId, 'quantityTarget', parseNum(e.target.value))}
+                      placeholder="0"
+                      className="h-7 w-20 text-right text-sm"
+                      autoFocus
+                    />
+                    <span className="text-[10px] text-muted-foreground">{quantityUnit}</span>
+                  </div>
+                )}
+                {enabledMetrics.revenue && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">₹</span>
+                    <Input
+                      type="text"
+                      value={rev > 0 ? formatNumber(rev) : ''}
+                      onChange={(e) => onTargetChange(node.userId, 'revenueTarget', parseNum(e.target.value))}
+                      placeholder="0"
+                      className="h-7 w-24 text-right text-sm"
+                    />
+                  </div>
+                )}
+                {enabledMetrics.visits && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="text"
+                      value={vis > 0 ? formatNumber(vis) : ''}
+                      onChange={(e) => onTargetChange(node.userId, 'visitsTarget', Math.round(parseNum(e.target.value)))}
+                      placeholder="0"
+                      className="h-7 w-16 text-right text-sm"
+                    />
+                    <span className="text-[10px] text-muted-foreground">vis</span>
+                  </div>
+                )}
+              </>
+            ) : isIndependent && isManager ? (
               <>
                 {enabledMetrics.quantity && personalQty > 0 && (
                   <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400">
