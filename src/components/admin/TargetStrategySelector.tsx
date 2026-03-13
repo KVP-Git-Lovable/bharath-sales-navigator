@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowUpCircle, ArrowDownCircle, Minus, Users } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Minus, Users, AlertTriangle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -35,6 +35,7 @@ export interface LevelInfo {
   level: number;
   userCount: number;
   managerCount: number;
+  users?: Array<{ fullName: string; designation?: string }>;
 }
 
 interface LevelStrategyConfigProps {
@@ -226,52 +227,75 @@ export function LevelStrategyConfig({
       </div>
 
       {/* Level-wise strategy */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {levels.map((lvl) => {
           const strategy = levelStrategies.get(lvl.level) || 'roll_down';
           const Icon = strategyIcons[strategy];
           return (
-            <div key={lvl.level} className="flex items-center gap-3 py-1.5">
-              <Badge variant="outline" className="text-xs min-w-[40px] justify-center">
-                L{lvl.level}
-              </Badge>
-              <span className="text-sm text-muted-foreground min-w-[80px]">
-                {lvl.userCount} user{lvl.userCount !== 1 ? 's' : ''}
-                {lvl.managerCount > 0 && (
-                  <span className="text-[10px]"> ({lvl.managerCount} mgr{lvl.managerCount !== 1 ? 's' : ''})</span>
-                )}
-              </span>
-              <Select
-                value={strategy}
-                onValueChange={(v) => onLevelStrategyChange(lvl.level, v as TargetStrategy)}
-              >
-                <SelectTrigger className={cn(
-                  "h-8 w-[140px] text-xs gap-1.5",
-                  strategyColors[strategy]
-                )}>
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {strategies.map((s) => {
-                    const SIcon = s.icon;
-                    return (
-                      <SelectItem key={s.value} value={s.value} className="text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <SIcon className={cn('h-3.5 w-3.5', strategyColors[s.value])} />
-                          <span>{s.label}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                {strategies.find(s => s.value === strategy)?.description.slice(0, 60)}…
-              </span>
+            <div key={lvl.level} className="space-y-1.5">
+              <div className="flex items-center gap-3 py-1.5">
+                <Badge variant="outline" className="text-xs min-w-[40px] justify-center">
+                  L{lvl.level}
+                </Badge>
+                <span className="text-sm text-muted-foreground min-w-[80px]">
+                  {lvl.userCount} user{lvl.userCount !== 1 ? 's' : ''}
+                  {lvl.managerCount > 0 && (
+                    <span className="text-[10px]"> ({lvl.managerCount} mgr{lvl.managerCount !== 1 ? 's' : ''})</span>
+                  )}
+                </span>
+                <Select
+                  value={strategy}
+                  onValueChange={(v) => onLevelStrategyChange(lvl.level, v as TargetStrategy)}
+                >
+                  <SelectTrigger className={cn(
+                    "h-8 w-[140px] text-xs gap-1.5",
+                    strategyColors[strategy]
+                  )}>
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {strategies.map((s) => {
+                      const SIcon = s.icon;
+                      return (
+                        <SelectItem key={s.value} value={s.value} className="text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <SIcon className={cn('h-3.5 w-3.5', strategyColors[s.value])} />
+                            <span>{s.label}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* User names chips */}
+              {lvl.users && lvl.users.length > 0 && (
+                <div className="flex flex-wrap gap-1 ml-[52px]">
+                  {lvl.users.map((u, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground"
+                    >
+                      {u.fullName}
+                      {u.designation && (
+                        <span className="text-[9px] opacity-70">· {u.designation}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
+      </div>
+
+      {/* Root user info note */}
+      <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
+        <AlertTriangle className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+        <p className="text-[11px] text-blue-700 dark:text-blue-300 leading-snug">
+          The root user distributes targets but does not hold a personal target.
+        </p>
       </div>
 
       {/* Split method */}

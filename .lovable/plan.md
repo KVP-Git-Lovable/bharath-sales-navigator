@@ -1,45 +1,49 @@
 
+# Scalable Target Management — Plan
 
-# Show User Names & Designations in Level Config + Exclude Top User from Targets
+## Status: ✅ Implemented
 
-## Problem
-1. The "Configure Target Distribution" panel only shows "L1 (4 users)", "L2", "L3" — no user names or roles
-2. The top-level user (root) should not receive a target — their job is only to distribute to subordinates
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-## Changes
+## What Was Done
 
-### 1. LevelStrategyConfig — Show user details per level (`TargetStrategySelector.tsx`)
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-Update the `LevelInfo` interface and `LevelStrategyConfig` component:
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-- Add `users: Array<{ fullName: string; designation?: string }>` to `LevelInfo`
-- Display user names (and designations if available) under each level row as small chips/tags
-- Example: "L1 — 3 users: Rajesh (Regional Manager), Sunil (Regional Manager), Priya (Regional Manager)"
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-### 2. Fetch designation alongside profiles (`AllocationTable.tsx`)
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-In the hierarchy query (line 338), add `designation` to the profiles select:
-```
-profiles.select('id, full_name, profile_picture_url, designation')
-```
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-Pass designation data into `SubordinateAllocation` (add `designation?: string` field) and populate `LevelInfo.users` from the allocations map.
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-### 3. Exclude top user from target assignment (`AllocationTable.tsx`)
-
-- The root user (parentUserId / L0) should NOT appear in the allocation tree — they are the distributor, not a target holder
-- This is already the case since `subordinatesOnly` filters `level > 0` (line 329-331)
-- However, the save mutation (line 605-618) saves a plan for the root user with `quantity_target: totalQuantity` — change this to save with `quantity_target: 0` and mark the strategy as `roll_down` only (the root just distributes)
-- In the auto-calculate logic, the root's total is the source, not their own target
-
-### 4. Add a note in the config panel
-
-Add a small info line: "The root user distributes targets but does not hold a personal target."
-
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| `TargetStrategySelector.tsx` | Update `LevelInfo` interface, show user names/designations per level |
-| `AllocationTable.tsx` | Fetch designation, populate level user info, set root target to 0 on save |
-
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically

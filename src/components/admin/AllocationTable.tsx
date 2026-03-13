@@ -36,6 +36,7 @@ interface SubordinateAllocation {
   userId: string;
   fullName: string;
   profilePictureUrl: string | null;
+  designation?: string;
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
@@ -335,7 +336,7 @@ export function AllocationTable({
       const userIds = subordinatesOnly.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
 
       const [profilesRes, plansRes, employeesRes] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, profile_picture_url').in('id', userIds),
+        supabase.from('profiles').select('id, full_name, profile_picture_url, designation').in('id', userIds),
         supabase.from('user_business_plans').select('*').in('user_id', userIds).eq('year', fyYear),
         supabase.from('employees').select('manager_id, user_id'),
       ]);
@@ -367,6 +368,7 @@ export function AllocationTable({
           userId: sub.subordinate_user_id,
           fullName: profile?.full_name || 'Unknown',
           profilePictureUrl: profile?.profile_picture_url || null,
+          designation: profile?.designation || undefined,
           quantityTarget: existingPlan?.quantity_target || 0,
           revenueTarget: existingPlan?.revenue_target || 0,
           visitsTarget: 0,
@@ -434,16 +436,17 @@ export function AllocationTable({
 
   // Compute level info for the config panel
   const levelInfos = useMemo((): LevelInfo[] => {
-    const levelMap = new Map<number, { users: number; managers: number }>();
+    const levelMap = new Map<number, { users: number; managers: number; userDetails: Array<{ fullName: string; designation?: string }> }>();
     allocations.forEach(alloc => {
-      const existing = levelMap.get(alloc.level) || { users: 0, managers: 0 };
+      const existing = levelMap.get(alloc.level) || { users: 0, managers: 0, userDetails: [] };
       existing.users++;
       if (alloc.subordinateCount > 0) existing.managers++;
+      existing.userDetails.push({ fullName: alloc.fullName, designation: alloc.designation });
       levelMap.set(alloc.level, existing);
     });
     return Array.from(levelMap.entries())
       .sort(([a], [b]) => a - b)
-      .map(([level, info]) => ({ level, userCount: info.users, managerCount: info.managers }));
+      .map(([level, info]) => ({ level, userCount: info.users, managerCount: info.managers, users: info.userDetails }));
   }, [allocations]);
 
   // Compute per-manager distribution status
@@ -609,8 +612,8 @@ export function AllocationTable({
         year: fyYear,
         target_strategy: rootStrategy,
         quantity_unit: quantityUnit,
-        quantity_target: totalQuantity,
-        revenue_target: totalRevenue,
+        quantity_target: 0,
+        revenue_target: 0,
       };
 
       const { error: managerError } = await supabase
