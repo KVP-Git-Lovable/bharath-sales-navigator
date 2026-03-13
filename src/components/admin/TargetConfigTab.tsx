@@ -402,21 +402,37 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
   });
 
   // Helper: sync legacy columns from dynamic metric state
+  // Falls back to configData values if no dynamic metrics are enabled
   function syncLegacyFromMetrics(
     defs: TargetMetricDefinition[],
     enabled: Set<string>,
-    targets: Record<string, number>
+    targets: Record<string, number>,
+    configData?: TargetConfig
   ) {
     let enable_quantity = false, enable_revenue = false, enable_visits = false, enable_retailer_activation = false;
     let total_quantity_target = 0, total_revenue_target = 0, total_visits_target = 0, total_retailer_activation_target = 0;
+    let anyMatched = false;
     defs.forEach(m => {
       if (!enabled.has(m.id)) return;
       const t = targets[m.id] ?? 0;
-      if (m.name === 'Quantity') { enable_quantity = true; total_quantity_target = t; }
-      if (m.name === 'Revenue') { enable_revenue = true; total_revenue_target = t; }
-      if (m.name === 'Productive Visits') { enable_visits = true; total_visits_target = t; }
-      if (m.name === 'Retailer Activation') { enable_retailer_activation = true; total_retailer_activation_target = t; }
+      if (m.name === 'Quantity') { enable_quantity = true; total_quantity_target = t; anyMatched = true; }
+      if (m.name === 'Revenue') { enable_revenue = true; total_revenue_target = t; anyMatched = true; }
+      if (m.name === 'Productive Visits') { enable_visits = true; total_visits_target = t; anyMatched = true; }
+      if (m.name === 'Retailer Activation') { enable_retailer_activation = true; total_retailer_activation_target = t; anyMatched = true; }
     });
+    // If no dynamic metrics matched, preserve existing config values
+    if (!anyMatched && configData) {
+      return {
+        enable_quantity: configData.enable_quantity,
+        enable_revenue: configData.enable_revenue,
+        enable_visits: configData.enable_visits,
+        enable_retailer_activation: configData.enable_retailer_activation,
+        total_quantity_target: configData.total_quantity_target,
+        total_revenue_target: configData.total_revenue_target,
+        total_visits_target: configData.total_visits_target,
+        total_retailer_activation_target: configData.total_retailer_activation_target,
+      };
+    }
     return { enable_quantity, enable_revenue, enable_visits, enable_retailer_activation, total_quantity_target, total_revenue_target, total_visits_target, total_retailer_activation_target };
   }
 
