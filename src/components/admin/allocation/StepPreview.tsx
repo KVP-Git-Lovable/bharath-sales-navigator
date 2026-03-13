@@ -75,17 +75,21 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }
     const qty = alloc?.quantityTarget ?? node.quantityTarget;
     const rev = alloc?.revenueTarget ?? node.revenueTarget;
     const vis = alloc?.visitsTarget ?? node.visitsTarget;
+    const personalQty = alloc?.personalQuantityTarget ?? node.personalQuantityTarget ?? 0;
+    const personalRev = alloc?.personalRevenueTarget ?? node.personalRevenueTarget ?? 0;
+    const personalVis = alloc?.personalVisitsTarget ?? node.personalVisitsTarget ?? 0;
     const strategy = alloc?.targetStrategy ?? node.targetStrategy;
+    const isIndependent = strategy === 'independent';
 
-    // Compute child sum for managers
+    // Compute child sum for managers (skip for independent — target is personal)
     let childSum = 0;
-    if (hasChildren && enabledMetrics.quantity) {
+    if (hasChildren && enabledMetrics.quantity && !isIndependent) {
       node.children.forEach(c => {
         const ca = allocations.get(c.userId);
         childSum += ca?.quantityTarget ?? c.quantityTarget;
       });
     }
-    const overUnder = hasChildren ? qty - childSum : 0;
+    const overUnder = hasChildren && !isIndependent ? qty - childSum : 0;
 
     return (
       <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
