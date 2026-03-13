@@ -1,49 +1,73 @@
 
-# Scalable Target Management — Plan
 
-## Status: ✅ Implemented
+# Redesign Target Allocation — Step-Based Manager-First Flow
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Problem
+The current allocation UI dumps everything on one screen: strategy config, level config, auto-calculate, and the full tree. It's confusing. The user wants a clear, guided flow:
 
-## What Was Done
+1. Set annual target (already done in Target Config tab)
+2. Assign targets to **L1 managers only** (direct reports) with per-manager strategy selection
+3. Auto-calculate & preview the full tree (cascaded results)
+4. Fine-tune any individual user's target
+5. Save — and each user can see/edit their own assigned target
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+## Current State
+- `AllocationTable.tsx` (1152 lines) renders everything at once: LevelStrategyConfig panel + tree/table view + fine-tune mode
+- `autoDistributeTargets()` already handles roll_down/roll_up/independent recursion
+- Strategy explanations exist in `TargetStrategySelector.tsx` but are tooltip-only (not prominently displayed)
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+## Plan
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+### 1. Add Strategy Explanation Cards (TargetStrategySelector.tsx)
+Add a new `StrategyExplanationPanel` component that shows all three strategies with clear visual explanations:
+- **Roll Down** ↓ — "Manager's target is split among subordinates. As subordinates achieve, it fills the manager's target."
+- **Roll Up** ↑ — "Subordinates set their own targets. Manager's target = sum of all subordinate targets."
+- **Independent** — — "Manager and subordinates have separate targets. They don't affect each other."
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+Display this as a collapsible info section at the top of the allocation card.
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+### 2. Restructure AllocationTable into a Step-Based Flow (AllocationTable.tsx)
+Replace the current single-view with a **3-step wizard** inside the same card:
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+**Step 1: "Assign Manager Targets"**
+- Show only L1 direct reports (managers)
+- Each manager row shows: Avatar, Name, Designation, Subordinate count
+- Editable target inputs (Qty/Revenue/Visits) for each manager
+- Per-manager strategy dropdown (Roll Down / Roll Up / Independent)
+- A remaining-to-allocate bar at the top showing how much of the total is left
+- Quick-fill buttons: "Equal Split" and "Percentage Split"
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+**Step 2: "Auto-Calculate & Preview"**
+- Button triggers `autoDistributeTargets()` using per-manager strategies
+- Shows the full hierarchy tree (read-only) with calculated values for all levels
+- Highlights managers vs leaf users with different styling
+- Shows distribution progress bars per manager
+
+**Step 3: "Review & Save"**
+- Same tree/table view but now editable (fine-tune mode ON by default)
+- Any user's target can be edited manually
+- Over/under allocation warnings shown inline
+- Save button at the bottom
+
+Navigation: "Next" / "Back" buttons between steps. Step indicators at top.
+
+### 3. Wire the Step State (AllocationTable.tsx)
+- Add `currentStep` state (1 | 2 | 3)
+- Step 1 renders only L1 manager rows with editable inputs + strategy selectors
+- Step 2 calls auto-calculate on entry, renders full tree read-only
+- Step 3 enables fine-tune mode, renders full tree editable
+- Keep existing save mutation logic
+
+### 4. Show Strategy Descriptions Inline
+In each manager row (Step 1), after the strategy dropdown, show a one-line description of what the selected strategy means for that manager's subordinates.
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `TargetStrategySelector.tsx` | Add `StrategyExplanationPanel` component with visual descriptions |
+| `AllocationTable.tsx` | Refactor into 3-step wizard flow, step navigation, L1-only editing in step 1 |
+
+### No Database Changes Required
+All data structures (`user_business_plans`, `target_strategy` field) already support this flow.
+
