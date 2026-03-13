@@ -51,7 +51,13 @@ interface StepPreviewProps {
   onTargetChange?: (userId: string, field: string, value: number) => void;
 }
 
-export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }: StepPreviewProps) {
+const parseNum = (value: string) => {
+  const num = parseFloat(value.replace(/,/g, ''));
+  return isNaN(num) ? 0 : num;
+};
+
+export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, onTargetChange }: StepPreviewProps) {
+  const [editingUser, setEditingUser] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const all = new Set<string>();
     const collect = (nodes: PreviewNode[]) => {
