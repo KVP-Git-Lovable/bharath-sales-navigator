@@ -159,8 +159,8 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }
           </div>
         </div>
 
-        {/* Over/under warning */}
-        {hasChildren && enabledMetrics.quantity && overUnder !== 0 && (
+        {/* Over/under warning — hidden for independent strategy */}
+        {hasChildren && !isIndependent && enabledMetrics.quantity && overUnder !== 0 && (
           <div className={cn(
             'flex items-center gap-1.5 text-[11px] px-3 py-1 rounded mb-1',
             overUnder < 0 ? 'text-destructive bg-destructive/10' : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30'

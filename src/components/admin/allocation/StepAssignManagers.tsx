@@ -142,45 +142,132 @@ export function StepAssignManagers({
             <p className="text-[10px] text-muted-foreground italic">
               {strategyDescriptions[nodeStrategy]}
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {enabledMetrics.quantity && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-muted-foreground">Qty</span>
-                  <Input
-                    type="text"
-                    value={(node.quantityTarget || 0) > 0 ? formatNumber(node.quantityTarget!) : ''}
-                    onChange={(e) => onTargetChange(node.userId, 'quantityTarget', parseNumber(e.target.value))}
-                    placeholder="0"
-                    className="h-7 w-20 text-right text-xs"
-                  />
-                  <span className="text-[10px] text-muted-foreground">{quantityUnit}</span>
+
+            {/* For Independent strategy, show Personal + Team Target separately */}
+            {nodeStrategy === 'independent' ? (
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Personal Target</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {enabledMetrics.quantity && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">Qty</span>
+                      <Input
+                        type="text"
+                        value={(node.personalQuantityTarget || 0) > 0 ? formatNumber(node.personalQuantityTarget!) : ''}
+                        onChange={(e) => onTargetChange(node.userId, 'personalQuantityTarget', parseNumber(e.target.value))}
+                        placeholder="0"
+                        className="h-7 w-20 text-right text-xs"
+                      />
+                      <span className="text-[10px] text-muted-foreground">{quantityUnit}</span>
+                    </div>
+                  )}
+                  {enabledMetrics.revenue && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">₹</span>
+                      <Input
+                        type="text"
+                        value={(node.personalRevenueTarget || 0) > 0 ? formatNumber(node.personalRevenueTarget!) : ''}
+                        onChange={(e) => onTargetChange(node.userId, 'personalRevenueTarget', parseNumber(e.target.value))}
+                        placeholder="0"
+                        className="h-7 w-24 text-right text-xs"
+                      />
+                    </div>
+                  )}
+                  {enabledMetrics.visits && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">Visits</span>
+                      <Input
+                        type="text"
+                        value={(node.personalVisitsTarget || 0) > 0 ? formatNumber(node.personalVisitsTarget!) : ''}
+                        onChange={(e) => onTargetChange(node.userId, 'personalVisitsTarget', Math.round(parseNumber(e.target.value)))}
+                        placeholder="0"
+                        className="h-7 w-16 text-right text-xs"
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-              {enabledMetrics.revenue && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-muted-foreground">₹</span>
-                  <Input
-                    type="text"
-                    value={(node.revenueTarget || 0) > 0 ? formatNumber(node.revenueTarget!) : ''}
-                    onChange={(e) => onTargetChange(node.userId, 'revenueTarget', parseNumber(e.target.value))}
-                    placeholder="0"
-                    className="h-7 w-24 text-right text-xs"
-                  />
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Team Target</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {enabledMetrics.quantity && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">Qty</span>
+                      <Input
+                        type="text"
+                        value={(node.quantityTarget || 0) > 0 ? formatNumber(node.quantityTarget!) : ''}
+                        onChange={(e) => onTargetChange(node.userId, 'quantityTarget', parseNumber(e.target.value))}
+                        placeholder="0"
+                        className="h-7 w-20 text-right text-xs"
+                      />
+                      <span className="text-[10px] text-muted-foreground">{quantityUnit}</span>
+                    </div>
+                  )}
+                  {enabledMetrics.revenue && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">₹</span>
+                      <Input
+                        type="text"
+                        value={(node.revenueTarget || 0) > 0 ? formatNumber(node.revenueTarget!) : ''}
+                        onChange={(e) => onTargetChange(node.userId, 'revenueTarget', parseNumber(e.target.value))}
+                        placeholder="0"
+                        className="h-7 w-24 text-right text-xs"
+                      />
+                    </div>
+                  )}
+                  {enabledMetrics.visits && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">Visits</span>
+                      <Input
+                        type="text"
+                        value={(node.visitsTarget || 0) > 0 ? formatNumber(node.visitsTarget!) : ''}
+                        onChange={(e) => onTargetChange(node.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                        placeholder="0"
+                        className="h-7 w-16 text-right text-xs"
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-              {enabledMetrics.visits && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-muted-foreground">Visits</span>
-                  <Input
-                    type="text"
-                    value={(node.visitsTarget || 0) > 0 ? formatNumber(node.visitsTarget!) : ''}
-                    onChange={(e) => onTargetChange(node.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
-                    placeholder="0"
-                    className="h-7 w-16 text-right text-xs"
-                  />
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {enabledMetrics.quantity && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">Qty</span>
+                    <Input
+                      type="text"
+                      value={(node.quantityTarget || 0) > 0 ? formatNumber(node.quantityTarget!) : ''}
+                      onChange={(e) => onTargetChange(node.userId, 'quantityTarget', parseNumber(e.target.value))}
+                      placeholder="0"
+                      className="h-7 w-20 text-right text-xs"
+                    />
+                    <span className="text-[10px] text-muted-foreground">{quantityUnit}</span>
+                  </div>
+                )}
+                {enabledMetrics.revenue && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">₹</span>
+                    <Input
+                      type="text"
+                      value={(node.revenueTarget || 0) > 0 ? formatNumber(node.revenueTarget!) : ''}
+                      onChange={(e) => onTargetChange(node.userId, 'revenueTarget', parseNumber(e.target.value))}
+                      placeholder="0"
+                      className="h-7 w-24 text-right text-xs"
+                    />
+                  </div>
+                )}
+                {enabledMetrics.visits && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">Visits</span>
+                    <Input
+                      type="text"
+                      value={(node.visitsTarget || 0) > 0 ? formatNumber(node.visitsTarget!) : ''}
+                      onChange={(e) => onTargetChange(node.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                      placeholder="0"
+                      className="h-7 w-16 text-right text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );

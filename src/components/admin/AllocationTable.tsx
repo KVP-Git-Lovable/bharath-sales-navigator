@@ -525,6 +525,9 @@ export function AllocationTable({
         quantityTarget: childAlloc?.quantityTarget ?? 0,
         revenueTarget: childAlloc?.revenueTarget ?? 0,
         visitsTarget: childAlloc?.visitsTarget ?? 0,
+        personalQuantityTarget: childAlloc?.personalQuantityTarget ?? 0,
+        personalRevenueTarget: childAlloc?.personalRevenueTarget ?? 0,
+        personalVisitsTarget: childAlloc?.personalVisitsTarget ?? 0,
         targetStrategy: (childAlloc?.targetStrategy ?? 'roll_down') as TargetStrategy,
       };
     };
