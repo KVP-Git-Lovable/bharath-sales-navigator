@@ -96,6 +96,21 @@ export default function AllInvoicesList() {
   const handleSendWhatsApp = async (orderId: string, invoiceNumber: string) => {
     setSendingWhatsAppId(orderId);
     try {
+      // Generate and upload the PDF first so the correct invoice is available
+      const { blob } = await fetchAndGenerateInvoice(orderId);
+      const fileName = `${invoiceNumber || orderId}.pdf`;
+      const filePath = `public/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("invoices")
+        .upload(filePath, blob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Now send via WhatsApp (edge function builds URL from invoiceNumber)
       await autoSendInvoiceWhatsApp({ invoiceNumber });
       toast.success("Invoice sent via WhatsApp!");
     } catch (error: any) {
