@@ -1,49 +1,88 @@
 
-# Scalable Target Management — Plan
 
-## Status: ✅ Implemented
+# Custom Target Parameters — Plan
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## What You Want
+Add a "+ Custom Parameter" button next to the Target Parameters section (similar to the existing "+ Custom Metric" button), allowing admins to create custom breakdown parameters that pull values from existing database tables.
 
-## What Was Done
+## Current State
+- **Target Parameters** are hardcoded: Product, Retailer, Beat, Distributor, Territory, Monthly
+- They're stored as a JSON object (`enabled_parameters`) on `fy_target_config`
+- The `target_breakdowns` table already supports arbitrary `parameter_type` and `parameter_id`/`parameter_name` — so the downstream allocation already works with any parameter type
+- **Custom Metrics** already follow a similar pattern via `target_metric_definitions` table
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+## Design
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+### 1. New Database Table: `target_parameter_definitions`
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+Stores custom parameter types admins create:
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | |
+| name | text | e.g., "Channel-wise", "Zone-wise" |
+| parameter_key | text unique | e.g., "channel", "zone" (used in enabled_parameters JSON) |
+| icon | text | Emoji or icon key |
+| data_source_table | text | Table to pull values from, e.g., "beats", "products" |
+| data_source_id_column | text | Column for the ID, e.g., "id" |
+| data_source_name_column | text | Column for the display name, e.g., "name" |
+| data_source_filter | jsonb | Optional filter (e.g., `{"type": "channel"}`) |
+| is_system | boolean | true for built-in params, false for custom |
+| display_order | int | |
+| created_at | timestamptz | |
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+Pre-seed system parameters (product, retailer, beat, distributor, territory, monthly) so everything is unified.
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+### 2. Frontend Changes
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+**TargetConfigTab.tsx** — Target Parameters section (lines 790-828):
+- Fetch parameter definitions from `target_parameter_definitions` instead of hardcoded list
+- Add a "+ Custom Parameter" button (same pattern as Custom Metric)
+- Show delete button on non-system parameters
+
+**New: CreateParameterDialog component:**
+- Fields: Name, Key (auto-generated from name), Icon (emoji picker)
+- Data source selector: dropdown of available tables (curated list: products, retailers, beats, distributors, territories, or a custom table)
+- ID column and Name column fields
+- Optional filter JSON
+
+**New hook: `useTargetParameters.ts`:**
+- `useParameterDefinitions()` — fetch all parameter definitions
+- `useCreateParameterDefinition()` — create custom parameter
+- `useDeleteParameterDefinition()` — delete (non-system only)
+
+### 3. How Custom Parameters Work Functionally
+
+When a custom parameter is enabled for a plan:
+1. During **target allocation**, the system queries `data_source_table` using the configured columns to get the list of values
+2. Admin sees those values as breakdown rows (just like Product-wise or Retailer-wise)
+3. Breakdown rows are saved to `target_breakdowns` with `parameter_type` = the custom key
+4. Dashboard/reports already work since they read `parameter_type` dynamically
+
+### 4. Available Data Sources (Curated List)
+
+Rather than exposing raw table names, we present friendly options:
+- Products → `products` table (id, name)
+- Retailers → `retailers` table (id, retailer_name)
+- Beats → `beats` table (id, name)
+- Distributors → `distributors` table (id, name)
+- Territories → `territories` table (id, name)
+- Custom tables the user may have
+
+### 5. Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| Migration SQL | Create `target_parameter_definitions` table + seed system rows |
+| `src/hooks/useTargetParameters.ts` | New hook for CRUD |
+| `src/components/admin/TargetConfigTab.tsx` | Replace hardcoded params with DB-driven list + add button |
+| `src/components/admin/CreateParameterDialog.tsx` | New dialog for creating custom parameters |
+| Allocation components | Update to dynamically fetch values from configured data source |
+
+### 6. Summary
+
+The `target_breakdowns` table already supports arbitrary parameter types, so the core infrastructure is in place. The main work is:
+1. A new definitions table to store custom parameters with their data source config
+2. UI to create/manage custom parameters
+3. Dynamic data fetching during allocation based on the configured source table
+
