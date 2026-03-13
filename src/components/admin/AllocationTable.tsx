@@ -500,6 +500,13 @@ export function AllocationTable({
 
   // Prepare manager rows for Step 1
   const managerRows = useMemo(() => {
+    const toTeamNode = (node: SubordinateAllocation): TeamHierarchyNode => ({
+      userId: node.userId,
+      fullName: node.fullName,
+      subordinateCount: node.subordinateCount,
+      children: node.children.map(toTeamNode),
+    });
+
     return directReports.map(dr => {
       const alloc = allocations.get(dr.userId);
       return {
@@ -511,7 +518,8 @@ export function AllocationTable({
         quantityTarget: alloc?.quantityTarget ?? 0,
         revenueTarget: alloc?.revenueTarget ?? 0,
         visitsTarget: alloc?.visitsTarget ?? 0,
-        targetStrategy: alloc?.targetStrategy ?? 'roll_down' as TargetStrategy,
+        targetStrategy: (alloc?.targetStrategy ?? 'roll_down') as TargetStrategy,
+        children: dr.children.map(toTeamNode),
       };
     });
   }, [directReports, allocations]);
