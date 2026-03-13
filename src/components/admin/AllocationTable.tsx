@@ -516,11 +516,33 @@ export function AllocationTable({
     });
   };
 
-  // Handle level strategy change
+  // Handle level strategy change — also update all users at that level
   const handleLevelStrategyChange = useCallback((level: number, strategy: TargetStrategy) => {
     setLevelStrategies(prev => {
       const next = new Map(prev);
       next.set(level, strategy);
+      return next;
+    });
+    // Update all users at this level
+    setAllocations(prev => {
+      const next = new Map(prev);
+      next.forEach((alloc, userId) => {
+        if (alloc.level === level) {
+          next.set(userId, { ...alloc, targetStrategy: strategy });
+        }
+      });
+      return next;
+    });
+  }, []);
+
+  // Handle per-user strategy change
+  const handleUserStrategyChange = useCallback((userId: string, strategy: TargetStrategy) => {
+    setAllocations(prev => {
+      const next = new Map(prev);
+      const current = next.get(userId);
+      if (current) {
+        next.set(userId, { ...current, targetStrategy: strategy });
+      }
       return next;
     });
   }, []);
