@@ -436,16 +436,17 @@ export function AllocationTable({
 
   // Compute level info for the config panel
   const levelInfos = useMemo((): LevelInfo[] => {
-    const levelMap = new Map<number, { users: number; managers: number }>();
+    const levelMap = new Map<number, { users: number; managers: number; userDetails: Array<{ fullName: string; designation?: string }> }>();
     allocations.forEach(alloc => {
-      const existing = levelMap.get(alloc.level) || { users: 0, managers: 0 };
+      const existing = levelMap.get(alloc.level) || { users: 0, managers: 0, userDetails: [] };
       existing.users++;
       if (alloc.subordinateCount > 0) existing.managers++;
+      existing.userDetails.push({ fullName: alloc.fullName, designation: alloc.designation });
       levelMap.set(alloc.level, existing);
     });
     return Array.from(levelMap.entries())
       .sort(([a], [b]) => a - b)
-      .map(([level, info]) => ({ level, userCount: info.users, managerCount: info.managers }));
+      .map(([level, info]) => ({ level, userCount: info.users, managerCount: info.managers, users: info.userDetails }));
   }, [allocations]);
 
   // Compute per-manager distribution status
