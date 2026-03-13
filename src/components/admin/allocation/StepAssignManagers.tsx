@@ -81,6 +81,7 @@ export function StepAssignManagers({
 
   const qtyPct = totalQuantity > 0 ? Math.min(100, (allocatedQty / totalQuantity) * 100) : 0;
   const revPct = totalRevenue > 0 ? Math.min(100, (allocatedRev / totalRevenue) * 100) : 0;
+  const visPct = totalVisits > 0 ? Math.min(100, (allocatedVis / totalVisits) * 100) : 0;
 
   const toggleManager = (userId: string) => {
     setExpandedManagers((prev) => {
