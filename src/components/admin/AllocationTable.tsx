@@ -440,24 +440,33 @@ export function AllocationTable({
 
   const handleEqualSplit = useCallback(() => {
     if (!directReports.length) return;
-    // Equal split among direct reports (weight = 1 each)
-    const count = directReports.length;
-    setAllocations(prev => {
+
+    const weightedEntries = directReports.map((dr) => ({
+      userId: dr.userId,
+      weight: Math.max(dr.subordinateCount, 1),
+    }));
+
+    const quantitySplit = enabledMetrics.quantity ? splitByWeights(totalQuantity, weightedEntries) : new Map<string, number>();
+    const revenueSplit = enabledMetrics.revenue ? splitByWeights(totalRevenue, weightedEntries) : new Map<string, number>();
+    const visitsSplit = enabledMetrics.visits ? splitByWeights(totalVisits, weightedEntries) : new Map<string, number>();
+
+    setAllocations((prev) => {
       const next = new Map(prev);
-      directReports.forEach(dr => {
+      directReports.forEach((dr) => {
         const current = next.get(dr.userId);
         if (current) {
           next.set(dr.userId, {
             ...current,
-            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity / count) : 0,
-            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue / count) : 0,
-            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits / count) : 0,
+            quantityTarget: enabledMetrics.quantity ? (quantitySplit.get(dr.userId) || 0) : 0,
+            revenueTarget: enabledMetrics.revenue ? (revenueSplit.get(dr.userId) || 0) : 0,
+            visitsTarget: enabledMetrics.visits ? (visitsSplit.get(dr.userId) || 0) : 0,
           });
         }
       });
       return next;
     });
-    toast.success('Targets split equally among direct reports');
+
+    toast.success('Targets distributed by team size (including subordinates)');
   }, [directReports, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
 
   // Auto-calculate when entering Step 2
