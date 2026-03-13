@@ -612,8 +612,8 @@ export function AllocationTable({
         year: fyYear,
         target_strategy: rootStrategy,
         quantity_unit: quantityUnit,
-        quantity_target: totalQuantity,
-        revenue_target: totalRevenue,
+        quantity_target: 0,
+        revenue_target: 0,
       };
 
       const { error: managerError } = await supabase
