@@ -1,29 +1,49 @@
 
+# Scalable Target Management — Plan
 
-# Update WhatsApp Invoice Sender — Use Business Number + Approved Template
+## Status: ✅ Implemented
 
-## What Changes
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-Update the `send-invoice-whatsapp` edge function to:
+## What Was Done
 
-1. **From number**: Change from Twilio Sandbox (`+14155238886`) to your WhatsApp Business number `+917411681616`
-2. **To number**: Send only to `+919741435887` (remove the second recipient `+917338319619`)
-3. **Use approved template**: Instead of a free-form `Body`, use the Twilio Content SID `HX2b27e4c3a2353117297ef3d48c04e292` via the `ContentSid` parameter — this is required for business-initiated WhatsApp messages outside the 24-hour session window
-4. **Remove `Body` and `MediaUrl`**: When using a Content Template, Twilio uses the template's pre-approved structure. The invoice PDF URL will be passed as a template variable if the template supports media, or kept as `MediaUrl` if the template allows it.
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-## Key Technical Detail
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-For Twilio WhatsApp Business API with approved templates, the message parameters change:
-- Remove `Body` → use `ContentSid: 'HX2b27e4c3a2353117297ef3d48c04e292'`
-- Keep `MediaUrl` for the invoice PDF attachment (Twilio templates can include media)
-- `From: 'whatsapp:+917411681616'`
-- `To: 'whatsapp:+919741435887'`
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-## File to Edit
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-| File | Change |
-|------|--------|
-| `supabase/functions/send-invoice-whatsapp/index.ts` | Update From, To, replace Body with ContentSid, keep MediaUrl |
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-No database changes needed. The existing `TWILIO_AUTH_TOKEN` secret and Account SID remain the same.
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
