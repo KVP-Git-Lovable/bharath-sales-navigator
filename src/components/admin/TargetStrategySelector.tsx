@@ -35,6 +35,7 @@ export interface LevelInfo {
   level: number;
   userCount: number;
   managerCount: number;
+  users?: Array<{ fullName: string; designation?: string }>;
 }
 
 interface LevelStrategyConfigProps {
