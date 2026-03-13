@@ -227,6 +227,17 @@ export function AllocationTable({
         }
       });
 
+      // Recursively compute total subordinate count (all descendants, not just direct)
+      const computeSubordinateCount = (node: SubordinateAllocation): number => {
+        let count = node.children.length;
+        node.children.forEach(child => {
+          count += computeSubordinateCount(child);
+        });
+        node.subordinateCount = count;
+        return count;
+      };
+      roots.forEach(r => computeSubordinateCount(r));
+
       return { roots };
     },
     enabled: !!parentUserId,
