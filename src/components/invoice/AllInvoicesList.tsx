@@ -108,10 +108,12 @@ export default function AllInvoicesList() {
           upsert: true,
         });
 
-      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from("invoices")
+        .getPublicUrl(filePath);
 
-      // Now send via WhatsApp (edge function builds URL from invoiceNumber)
-      await autoSendInvoiceWhatsApp({ invoiceNumber });
+      // Now send via WhatsApp with explicit PDF URL + invoice number template variable
+      await autoSendInvoiceWhatsApp({ invoiceNumber, pdfUrl: urlData.publicUrl });
       toast.success("Invoice sent via WhatsApp!");
     } catch (error: any) {
       console.error("Error sending invoice via WhatsApp:", error);

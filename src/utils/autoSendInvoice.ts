@@ -1,19 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Send invoice notification via WhatsApp (Twilio Sandbox template).
- * Hardcoded recipient: +919741435887
+ * Send invoice notification via WhatsApp.
  */
 export async function autoSendInvoiceWhatsApp({
   invoiceNumber,
+  pdfUrl,
 }: {
   invoiceNumber: string;
+  pdfUrl?: string;
 }): Promise<void> {
   try {
     console.log("📤 Sending invoice WhatsApp for", invoiceNumber);
 
     const { error } = await supabase.functions.invoke("send-invoice-whatsapp", {
-      body: { invoiceNumber },
+      body: { invoiceNumber, pdfUrl },
     });
 
     if (error) throw error;
