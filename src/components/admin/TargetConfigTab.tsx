@@ -858,7 +858,6 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
 
         {/* Create Parameter Dialog */}
         <CreateParameterDialog open={showCreateParamDialog} onOpenChange={setShowCreateParamDialog} />
-        </div>
 
         <Separator />
 
