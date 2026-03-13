@@ -296,8 +296,8 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
     mutationFn: async (configData: TargetConfig) => {
       const isLocked = configData.plan_status === 'active' || configData.plan_status === 'closed';
       
-      // Sync legacy fields from dynamic metrics
-      const legacyFields = syncLegacyFromMetrics(metricDefinitions, enabledMetricIds, metricTargets);
+      // Sync legacy fields from dynamic metrics, falling back to config values if no metrics enabled
+      const legacyFields = syncLegacyFromMetrics(metricDefinitions, enabledMetricIds, metricTargets, configData);
 
       if (configData.id) {
         const { error } = await supabase
