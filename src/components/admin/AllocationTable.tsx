@@ -736,7 +736,12 @@ export function AllocationTable({
                   <Users className="h-3 w-3" />{user.subordinateCount}
                 </Badge>
               )}
-              {isManager && <StrategyBadge strategy={levelStrategy} />}
+              {isManager && (
+                <InlineStrategySelector
+                  value={userStrategy}
+                  onChange={(s) => handleUserStrategyChange(user.userId, s)}
+                />
+              )}
             </div>
 
             <div className="flex-1" />
