@@ -40,6 +40,13 @@ interface SubordinateAllocation {
   targetStrategy: TargetStrategy;
 }
 
+interface TeamHierarchyNode {
+  userId: string;
+  fullName: string;
+  subordinateCount: number;
+  children: TeamHierarchyNode[];
+}
+
 interface AllocationTableProps {
   parentUserId: string;
   totalQuantity: number;
@@ -260,24 +267,97 @@ export function AllocationTable({
 
   const directReports = useMemo(() => hierarchyData?.roots || [], [hierarchyData]);
 
+  const hierarchyRelations = useMemo(() => {
+    const parentByChild = new Map<string, string>();
+    const childrenByParent = new Map<string, string[]>();
+
+    const traverse = (nodes: SubordinateAllocation[], parentId?: string) => {
+      nodes.forEach((node) => {
+        if (parentId) {
+          parentByChild.set(node.userId, parentId);
+          const currentChildren = childrenByParent.get(parentId) || [];
+          childrenByParent.set(parentId, [...currentChildren, node.userId]);
+        }
+        if (node.children.length > 0) {
+          traverse(node.children, node.userId);
+        }
+      });
+    };
+
+    traverse(directReports);
+    return { parentByChild, childrenByParent };
+  }, [directReports]);
+
+  const recomputeRollUpManager = useCallback((managerId: string, next: Map<string, SubordinateAllocation>) => {
+    const managerAlloc = next.get(managerId);
+    if (!managerAlloc) return;
+
+    const childIds = hierarchyRelations.childrenByParent.get(managerId) || [];
+    if (!childIds.length) return;
+
+    let quantityTotal = 0;
+    let revenueTotal = 0;
+    let visitsTotal = 0;
+
+    childIds.forEach((childId) => {
+      const childAlloc = next.get(childId);
+      if (!childAlloc) return;
+      quantityTotal += childAlloc.quantityTarget;
+      revenueTotal += childAlloc.revenueTarget;
+      visitsTotal += childAlloc.visitsTarget;
+    });
+
+    next.set(managerId, {
+      ...managerAlloc,
+      quantityTarget: enabledMetrics.quantity ? quantityTotal : managerAlloc.quantityTarget,
+      revenueTarget: enabledMetrics.revenue ? revenueTotal : managerAlloc.revenueTarget,
+      visitsTarget: enabledMetrics.visits ? visitsTotal : managerAlloc.visitsTarget,
+    });
+  }, [hierarchyRelations.childrenByParent, enabledMetrics]);
+
+  const cascadeRollUpToAncestors = useCallback((userId: string, next: Map<string, SubordinateAllocation>) => {
+    let currentParent = hierarchyRelations.parentByChild.get(userId);
+
+    while (currentParent) {
+      const parentAlloc = next.get(currentParent);
+      if (parentAlloc?.targetStrategy === 'roll_up') {
+        recomputeRollUpManager(currentParent, next);
+      }
+      currentParent = hierarchyRelations.parentByChild.get(currentParent);
+    }
+  }, [hierarchyRelations.parentByChild, recomputeRollUpManager]);
+
   // Handlers
   const handleTargetChange = useCallback((userId: string, field: string, value: number) => {
     setAllocations(prev => {
       const next = new Map(prev);
       const current = next.get(userId);
-      if (current) next.set(userId, { ...current, [field]: value });
+      if (current) {
+        next.set(userId, { ...current, [field]: value });
+        cascadeRollUpToAncestors(userId, next);
+      }
       return next;
     });
-  }, []);
+  }, [cascadeRollUpToAncestors]);
 
   const handleStrategyChange = useCallback((userId: string, strategy: TargetStrategy) => {
     setAllocations(prev => {
       const next = new Map(prev);
       const current = next.get(userId);
-      if (current) next.set(userId, { ...current, targetStrategy: strategy });
+
+      if (current) {
+        next.set(userId, { ...current, targetStrategy: strategy });
+
+        if (strategy === 'roll_up') {
+          recomputeRollUpManager(userId, next);
+        }
+
+        cascadeRollUpToAncestors(userId, next);
+      }
+
       return next;
     });
-  }, []);
+  }, [recomputeRollUpManager, cascadeRollUpToAncestors]);
 
   const handleEqualSplit = useCallback(() => {
     if (!directReports.length) return;
@@ -351,12 +431,13 @@ export function AllocationTable({
             visitsTarget: child.visitsTarget,
             percentage: child.percentage,
           });
+          cascadeRollUpToAncestors(child.userId, next);
         }
       });
       return next;
     });
     toast.success('Split applied successfully');
-  }, []);
+  }, [cascadeRollUpToAncestors]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -419,6 +500,13 @@ export function AllocationTable({
 
   // Prepare manager rows for Step 1
   const managerRows = useMemo(() => {
+    const toTeamNode = (node: SubordinateAllocation): TeamHierarchyNode => ({
+      userId: node.userId,
+      fullName: node.fullName,
+      subordinateCount: node.subordinateCount,
+      children: node.children.map(toTeamNode),
+    });
+
     return directReports.map(dr => {
       const alloc = allocations.get(dr.userId);
       return {
@@ -430,7 +518,8 @@ export function AllocationTable({
         quantityTarget: alloc?.quantityTarget ?? 0,
         revenueTarget: alloc?.revenueTarget ?? 0,
         visitsTarget: alloc?.visitsTarget ?? 0,
-        targetStrategy: alloc?.targetStrategy ?? 'roll_down' as TargetStrategy,
+        targetStrategy: (alloc?.targetStrategy ?? 'roll_down') as TargetStrategy,
+        children: dr.children.map(toTeamNode),
       };
     });
   }, [directReports, allocations]);
