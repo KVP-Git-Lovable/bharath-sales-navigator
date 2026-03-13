@@ -22,6 +22,8 @@ import { type PeriodType } from './target-config/PeriodTypeSelector';
 import { generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
 import { useTargetPeriods } from '@/hooks/useTargetPeriods';
 import { generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
+import { useParameterDefinitions, useDeleteParameterDefinition } from '@/hooks/useTargetParameters';
+import { CreateParameterDialog } from './CreateParameterDialog';
 
 // Icon map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
