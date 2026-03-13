@@ -35,6 +35,9 @@ export interface PreviewNode {
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
+  personalQuantityTarget?: number;
+  personalRevenueTarget?: number;
+  personalVisitsTarget?: number;
   targetStrategy: TargetStrategy;
   children: PreviewNode[];
 }
