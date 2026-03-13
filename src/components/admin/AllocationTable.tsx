@@ -480,9 +480,10 @@ export function AllocationTable({
   const handleEqualSplit = useCallback(() => {
     if (!directReports.length) return;
 
+    const contributorCache = new Map<string, number>();
     const weightedEntries = directReports.map((dr) => ({
       userId: dr.userId,
-      weight: Math.max(dr.subordinateCount, 1),
+      weight: Math.max(getContributorCountForNode(dr, allocations, contributorCache), 1),
     }));
 
     const quantitySplit = enabledMetrics.quantity ? splitByWeights(totalQuantity, weightedEntries) : new Map<string, number>();
@@ -491,22 +492,39 @@ export function AllocationTable({
 
     setAllocations((prev) => {
       const next = new Map(prev);
+      const branchCache = new Map<string, number>();
+
       directReports.forEach((dr) => {
         const current = next.get(dr.userId);
-        if (current) {
-          next.set(dr.userId, {
-            ...current,
-            quantityTarget: enabledMetrics.quantity ? (quantitySplit.get(dr.userId) || 0) : 0,
-            revenueTarget: enabledMetrics.revenue ? (revenueSplit.get(dr.userId) || 0) : 0,
-            visitsTarget: enabledMetrics.visits ? (visitsSplit.get(dr.userId) || 0) : 0,
-          });
-        }
+        if (!current) return;
+
+        const assignedQty = enabledMetrics.quantity ? (quantitySplit.get(dr.userId) || 0) : current.quantityTarget;
+        const assignedRev = enabledMetrics.revenue ? (revenueSplit.get(dr.userId) || 0) : current.revenueTarget;
+        const assignedVis = enabledMetrics.visits ? (visitsSplit.get(dr.userId) || 0) : current.visitsTarget;
+
+        const isPlayerManager = current.targetStrategy === 'independent' && dr.children.length > 0;
+        const contributors = isPlayerManager ? Math.max(getContributorCountForNode(dr, next, branchCache), 1) : 1;
+
+        const personalQty = enabledMetrics.quantity && isPlayerManager ? Math.round(assignedQty / contributors) : 0;
+        const personalRev = enabledMetrics.revenue && isPlayerManager ? Math.round(assignedRev / contributors) : 0;
+        const personalVis = enabledMetrics.visits && isPlayerManager ? Math.round(assignedVis / contributors) : 0;
+
+        next.set(dr.userId, {
+          ...current,
+          quantityTarget: enabledMetrics.quantity ? (isPlayerManager ? Math.max(assignedQty - personalQty, 0) : assignedQty) : current.quantityTarget,
+          revenueTarget: enabledMetrics.revenue ? (isPlayerManager ? Math.max(assignedRev - personalRev, 0) : assignedRev) : current.revenueTarget,
+          visitsTarget: enabledMetrics.visits ? (isPlayerManager ? Math.max(assignedVis - personalVis, 0) : assignedVis) : current.visitsTarget,
+          personalQuantityTarget: enabledMetrics.quantity ? (isPlayerManager ? personalQty : 0) : current.personalQuantityTarget,
+          personalRevenueTarget: enabledMetrics.revenue ? (isPlayerManager ? personalRev : 0) : current.personalRevenueTarget,
+          personalVisitsTarget: enabledMetrics.visits ? (isPlayerManager ? personalVis : 0) : current.personalVisitsTarget,
+        });
       });
+
       return next;
     });
 
-    toast.success('Targets distributed by team size (including subordinates)');
-  }, [directReports, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
+    toast.success('Targets distributed by contributor count');
+  }, [directReports, allocations, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
 
   // Auto-calculate when entering Step 2
   const handleAutoCalculate = useCallback(() => {
