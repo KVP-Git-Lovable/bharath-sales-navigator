@@ -216,9 +216,9 @@ export function StepAssignManagers({
                   </button>
 
                   {isExpanded && (
-                    <div className="rounded-md border bg-muted/20 p-2">
-                      {renderTeamTree(mgr.children)}
-                    </div>
+                     <div className="rounded-md border bg-muted/20 p-2 space-y-0.5">
+                       {renderDirectReports(mgr.children)}
+                     </div>
                   )}
                 </div>
               )}
