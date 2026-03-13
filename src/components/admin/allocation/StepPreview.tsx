@@ -120,16 +120,41 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }
           </div>
 
           <div className="flex items-center gap-3">
-            {enabledMetrics.quantity && (
-              <span className="text-sm font-mono font-semibold">
-                {formatNumber(qty)} <span className="text-xs text-muted-foreground font-normal">{quantityUnit}</span>
-              </span>
-            )}
-            {enabledMetrics.revenue && (
-              <span className="text-sm font-mono font-semibold">{formatCurrency(rev)}</span>
-            )}
-            {enabledMetrics.visits && (
-              <span className="text-sm font-mono font-semibold">{formatNumber(vis)} <span className="text-xs text-muted-foreground font-normal">visits</span></span>
+            {isIndependent && isManager ? (
+              <>
+                {enabledMetrics.quantity && personalQty > 0 && (
+                  <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    {formatNumber(personalQty)} <span className="text-[10px] text-muted-foreground font-normal">personal</span>
+                  </span>
+                )}
+                {enabledMetrics.quantity && (
+                  <span className="text-sm font-mono font-semibold">
+                    {formatNumber(qty)} <span className="text-[10px] text-muted-foreground font-normal">team {quantityUnit}</span>
+                  </span>
+                )}
+                {enabledMetrics.revenue && personalRev > 0 && (
+                  <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    {formatCurrency(personalRev)} <span className="text-[10px] text-muted-foreground font-normal">personal</span>
+                  </span>
+                )}
+                {enabledMetrics.revenue && (
+                  <span className="text-sm font-mono font-semibold">{formatCurrency(rev)} <span className="text-[10px] text-muted-foreground font-normal">team</span></span>
+                )}
+              </>
+            ) : (
+              <>
+                {enabledMetrics.quantity && (
+                  <span className="text-sm font-mono font-semibold">
+                    {formatNumber(qty)} <span className="text-xs text-muted-foreground font-normal">{quantityUnit}</span>
+                  </span>
+                )}
+                {enabledMetrics.revenue && (
+                  <span className="text-sm font-mono font-semibold">{formatCurrency(rev)}</span>
+                )}
+                {enabledMetrics.visits && (
+                  <span className="text-sm font-mono font-semibold">{formatNumber(vis)} <span className="text-xs text-muted-foreground font-normal">visits</span></span>
+                )}
+              </>
             )}
           </div>
         </div>
