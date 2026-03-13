@@ -25,7 +25,7 @@ const getInitials = (name: string) =>
 const strategyDescriptions: Record<TargetStrategy, string> = {
   roll_down: 'Target will be distributed to subordinates',
   roll_up: 'Target = sum of subordinate targets',
-  independent: 'Separate personal target, not linked to subordinates',
+  independent: 'Personal + team target; team target can be distributed to subordinates',
 };
 
 interface TeamNode {

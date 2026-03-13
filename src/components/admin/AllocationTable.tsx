@@ -88,7 +88,41 @@ const WIZARD_STEPS = [
 ];
 
 /**
- * Recursively auto-distribute targets based on per-user strategies and equal split.
+ * Split a target across users by weight while preserving total after rounding.
+ */
+const splitByWeights = (
+  total: number,
+  entries: Array<{ userId: string; weight: number }>,
+): Map<string, number> => {
+  const result = new Map<string, number>();
+  if (!entries.length) return result;
+
+  const normalized = entries.map((entry) => ({
+    userId: entry.userId,
+    weight: Math.max(1, entry.weight || 1),
+  }));
+  const safeTotal = Math.max(0, Math.round(total || 0));
+  const totalWeight = normalized.reduce((sum, entry) => sum + entry.weight, 0);
+
+  const withFractions = normalized.map((entry) => {
+    const raw = totalWeight > 0 ? (safeTotal * entry.weight) / totalWeight : 0;
+    const base = Math.floor(raw);
+    return { userId: entry.userId, base, fraction: raw - base };
+  });
+
+  let remainder = safeTotal - withFractions.reduce((sum, entry) => sum + entry.base, 0);
+  withFractions
+    .sort((a, b) => b.fraction - a.fraction)
+    .forEach((entry, index) => {
+      const bonus = remainder > index ? 1 : 0;
+      result.set(entry.userId, entry.base + bonus);
+    });
+
+  return result;
+};
+
+/**
+ * Recursively auto-distribute targets based on per-user strategies and team-size weighted split.
  */
 function autoDistributeTargets(
   nodes: SubordinateAllocation[],
@@ -96,8 +130,14 @@ function autoDistributeTargets(
   allocations: Map<string, SubordinateAllocation>,
   enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean },
 ): Map<string, SubordinateAllocation> {
+  const getChildWeight = (childAlloc: SubordinateAllocation) => {
+    if (childAlloc.subordinateCount <= 0) return 1;
+    // Independent managers carry personal + team visibility, include self in weight.
+    if (childAlloc.targetStrategy === 'independent') return childAlloc.subordinateCount + 1;
+    return childAlloc.subordinateCount;
+  };
 
-  function distribute(nodeList: SubordinateAllocation[], parentTgt: { quantity: number; revenue: number; visits: number }) {
+  const distribute = (nodeList: SubordinateAllocation[], parentTgt: { quantity: number; revenue: number; visits: number }) => {
     if (nodeList.length === 0) return;
 
     nodeList.forEach((node) => {
@@ -105,50 +145,76 @@ function autoDistributeTargets(
       if (!alloc) return;
       const strategy = alloc.targetStrategy || 'roll_down';
 
-      if (strategy === 'roll_down' && node.children.length > 0) {
-        // This node's target is already set by the user (Step 1 for L1, or inherited).
-        // Distribute THIS node's target equally to its children.
-        const count = node.children.length;
-        const nodeTarget = { quantity: alloc.quantityTarget, revenue: alloc.revenueTarget, visits: alloc.visitsTarget };
-        
-        node.children.forEach(child => {
-          const childAlloc = allocations.get(child.userId);
-          if (!childAlloc) return;
-          const qty = enabledMetrics.quantity ? Math.floor(nodeTarget.quantity / count) : 0;
-          const rev = enabledMetrics.revenue ? Math.floor(nodeTarget.revenue / count) : 0;
-          const vis = enabledMetrics.visits ? Math.floor(nodeTarget.visits / count) : 0;
-          allocations.set(child.userId, { ...childAlloc, quantityTarget: qty, revenueTarget: rev, visitsTarget: vis });
-        });
+      if ((strategy === 'roll_down' || strategy === 'independent') && node.children.length > 0) {
+        const children = node.children
+          .map((child) => ({ child, childAlloc: allocations.get(child.userId) }))
+          .filter((entry): entry is { child: SubordinateAllocation; childAlloc: SubordinateAllocation } => Boolean(entry.childAlloc));
+
+        if (children.length > 0) {
+          const weightedEntries = children.map(({ childAlloc }) => ({
+            userId: childAlloc.userId,
+            weight: getChildWeight(childAlloc),
+          }));
+
+          const quantitySplit = enabledMetrics.quantity ? splitByWeights(alloc.quantityTarget, weightedEntries) : new Map<string, number>();
+          const revenueSplit = enabledMetrics.revenue ? splitByWeights(alloc.revenueTarget, weightedEntries) : new Map<string, number>();
+          const visitsSplit = enabledMetrics.visits ? splitByWeights(alloc.visitsTarget, weightedEntries) : new Map<string, number>();
+
+          children.forEach(({ child, childAlloc }) => {
+            const assignedQty = enabledMetrics.quantity ? (quantitySplit.get(child.userId) || 0) : childAlloc.quantityTarget;
+            const assignedRev = enabledMetrics.revenue ? (revenueSplit.get(child.userId) || 0) : childAlloc.revenueTarget;
+            const assignedVis = enabledMetrics.visits ? (visitsSplit.get(child.userId) || 0) : childAlloc.visitsTarget;
+
+            if (childAlloc.targetStrategy === 'independent' && child.children.length > 0) {
+              const denominator = Math.max(childAlloc.subordinateCount + 1, 1);
+              const personalQty = enabledMetrics.quantity ? Math.round(assignedQty / denominator) : childAlloc.personalQuantityTarget;
+              const personalRev = enabledMetrics.revenue ? Math.round(assignedRev / denominator) : childAlloc.personalRevenueTarget;
+              const personalVis = enabledMetrics.visits ? Math.round(assignedVis / denominator) : childAlloc.personalVisitsTarget;
+
+              allocations.set(child.userId, {
+                ...childAlloc,
+                quantityTarget: enabledMetrics.quantity ? Math.max(assignedQty - personalQty, 0) : childAlloc.quantityTarget,
+                revenueTarget: enabledMetrics.revenue ? Math.max(assignedRev - personalRev, 0) : childAlloc.revenueTarget,
+                visitsTarget: enabledMetrics.visits ? Math.max(assignedVis - personalVis, 0) : childAlloc.visitsTarget,
+                personalQuantityTarget: enabledMetrics.quantity ? personalQty : childAlloc.personalQuantityTarget,
+                personalRevenueTarget: enabledMetrics.revenue ? personalRev : childAlloc.personalRevenueTarget,
+                personalVisitsTarget: enabledMetrics.visits ? personalVis : childAlloc.personalVisitsTarget,
+              });
+              return;
+            }
+
+            allocations.set(child.userId, {
+              ...childAlloc,
+              quantityTarget: enabledMetrics.quantity ? assignedQty : childAlloc.quantityTarget,
+              revenueTarget: enabledMetrics.revenue ? assignedRev : childAlloc.revenueTarget,
+              visitsTarget: enabledMetrics.visits ? assignedVis : childAlloc.visitsTarget,
+            });
+          });
+        }
+
         // Recurse into children
-        node.children.forEach(child => {
+        node.children.forEach((child) => {
           if (child.children.length > 0) {
             distribute([child], { quantity: 0, revenue: 0, visits: 0 });
           }
         });
       } else if (strategy === 'roll_up' && node.children.length > 0) {
         // First recurse children
-        node.children.forEach(child => {
+        node.children.forEach((child) => {
           if (child.children.length > 0) {
             distribute([child], { quantity: 0, revenue: 0, visits: 0 });
           }
         });
         // Then sum children into this node
         let sumQ = 0, sumR = 0, sumV = 0;
-        node.children.forEach(child => {
+        node.children.forEach((child) => {
           const ca = allocations.get(child.userId);
           if (ca) { sumQ += ca.quantityTarget; sumR += ca.revenueTarget; sumV += ca.visitsTarget; }
         });
         allocations.set(node.userId, { ...alloc, quantityTarget: sumQ, revenueTarget: sumR, visitsTarget: sumV });
-      } else if (strategy === 'independent' && node.children.length > 0) {
-        // Keep this node's target as-is, recurse children independently
-        node.children.forEach(child => {
-          if (child.children.length > 0) {
-            distribute([child], { quantity: 0, revenue: 0, visits: 0 });
-          }
-        });
       }
     });
-  }
+  };
 
   distribute(nodes, parentTarget);
   return allocations;
@@ -374,24 +440,33 @@ export function AllocationTable({
 
   const handleEqualSplit = useCallback(() => {
     if (!directReports.length) return;
-    // Equal split among direct reports (weight = 1 each)
-    const count = directReports.length;
-    setAllocations(prev => {
+
+    const weightedEntries = directReports.map((dr) => ({
+      userId: dr.userId,
+      weight: Math.max(dr.subordinateCount, 1),
+    }));
+
+    const quantitySplit = enabledMetrics.quantity ? splitByWeights(totalQuantity, weightedEntries) : new Map<string, number>();
+    const revenueSplit = enabledMetrics.revenue ? splitByWeights(totalRevenue, weightedEntries) : new Map<string, number>();
+    const visitsSplit = enabledMetrics.visits ? splitByWeights(totalVisits, weightedEntries) : new Map<string, number>();
+
+    setAllocations((prev) => {
       const next = new Map(prev);
-      directReports.forEach(dr => {
+      directReports.forEach((dr) => {
         const current = next.get(dr.userId);
         if (current) {
           next.set(dr.userId, {
             ...current,
-            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity / count) : 0,
-            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue / count) : 0,
-            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits / count) : 0,
+            quantityTarget: enabledMetrics.quantity ? (quantitySplit.get(dr.userId) || 0) : 0,
+            revenueTarget: enabledMetrics.revenue ? (revenueSplit.get(dr.userId) || 0) : 0,
+            visitsTarget: enabledMetrics.visits ? (visitsSplit.get(dr.userId) || 0) : 0,
           });
         }
       });
       return next;
     });
-    toast.success('Targets split equally among direct reports');
+
+    toast.success('Targets distributed by team size (including subordinates)');
   }, [directReports, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
 
   // Auto-calculate when entering Step 2
