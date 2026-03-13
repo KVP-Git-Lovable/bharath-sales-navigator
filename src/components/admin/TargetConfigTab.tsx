@@ -22,6 +22,8 @@ import { type PeriodType } from './target-config/PeriodTypeSelector';
 import { generateInitialPeriods, type PeriodTarget } from './target-config/PeriodBreakdownGrid';
 import { useTargetPeriods } from '@/hooks/useTargetPeriods';
 import { generateInitialMonthlyTargets } from './target-config/AnnualMonthlyBreakdown';
+import { useParameterDefinitions, useDeleteParameterDefinition } from '@/hooks/useTargetParameters';
+import { CreateParameterDialog } from './CreateParameterDialog';
 
 // Icon map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -169,6 +171,11 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
 
   // Fetch metric definitions
   const { data: metricDefinitions = [], isLoading: metricsDefLoading } = useMetricDefinitions();
+
+  // Fetch parameter definitions from DB
+  const { data: parameterDefinitions = [] } = useParameterDefinitions();
+  const deleteParamMutation = useDeleteParameterDefinition();
+  const [showCreateParamDialog, setShowCreateParamDialog] = useState(false);
 
   // Fetch plan-enabled metrics
   const { data: planEnabledMetrics = [] } = usePlanEnabledMetrics(config.id);
@@ -789,44 +796,68 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
 
         {/* Step 3: Target Parameters */}
         <div className="space-y-4">
-          <div>
-            <Label className="text-sm font-semibold text-foreground">Target Parameters</Label>
-            <p className="text-xs text-muted-foreground mt-1">Select the breakdowns for target allocation</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Target Parameters</Label>
+              <p className="text-xs text-muted-foreground mt-1">Select the breakdowns for target allocation</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCreateParamDialog(true)}
+              className="flex items-center gap-1.5 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Custom Parameter
+            </Button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {Object.entries({
-              product: { label: 'Product-wise', icon: '📦' },
-              retailer: { label: 'Retailer-wise', icon: '🏪' },
-              beat: { label: 'Beat-wise', icon: '📍' },
-              distributor: { label: 'Distributor-wise', icon: '🚛' },
-              territory: { label: 'Territory-wise', icon: '🗺️' },
-              monthly: { label: 'Month-wise', icon: '📅' },
-            }).map(([key, { label, icon }]) => {
-              const isChecked = config.enabled_parameters[key as keyof typeof config.enabled_parameters];
+            {parameterDefinitions.map((param) => {
+              const isChecked = !!(config.enabled_parameters as Record<string, boolean>)?.[param.parameter_key];
               return (
                 <div
-                  key={key}
-                  onClick={() => handleParameterChange(key as keyof typeof config.enabled_parameters, !isChecked)}
-                  className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                  key={param.parameter_key}
+                  className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all relative group ${
                     isChecked
                       ? 'border-primary bg-primary/5'
                       : 'border-border hover:border-muted-foreground/40'
                   }`}
                 >
-                  <span className="text-base">{icon}</span>
-                  <span className="font-medium text-sm text-foreground">{label}</span>
-                  {isChecked && (
-                    <div className="ml-auto w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
+                  <div
+                    className="flex items-center gap-2.5 flex-1"
+                    onClick={() => handleParameterChange(param.parameter_key as keyof typeof config.enabled_parameters, !isChecked)}
+                  >
+                    <span className="text-base">{param.icon}</span>
+                    <span className="font-medium text-sm text-foreground">{param.name}</span>
+                    {isChecked && (
+                      <div className="ml-auto w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                        <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {!param.is_system && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete parameter "${param.name}"?`)) {
+                          deleteParamMutation.mutate(param.id);
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   )}
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* Create Parameter Dialog */}
+        <CreateParameterDialog open={showCreateParamDialog} onOpenChange={setShowCreateParamDialog} />
 
         <Separator />
 
