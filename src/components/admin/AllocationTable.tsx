@@ -520,6 +520,14 @@ export function AllocationTable({
         });
       });
 
+      // Now recursively distribute down the entire tree (L2, L3, etc.)
+      autoDistributeTargets(
+        directReports,
+        { quantity: totalQuantity, revenue: totalRevenue, visits: totalVisits },
+        next,
+        enabledMetrics,
+      );
+
       return next;
     });
 
