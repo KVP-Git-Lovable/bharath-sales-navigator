@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronDown, ChevronRight, Users, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Users, AlertTriangle, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StrategyBadge } from '../TargetStrategySelector';
 import type { TargetStrategy } from '../TargetStrategySelector';
