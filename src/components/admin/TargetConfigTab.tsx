@@ -172,6 +172,11 @@ export function TargetConfigTab({ fyYear, onLockedAndAssign, selectedPlanId, onP
   // Fetch metric definitions
   const { data: metricDefinitions = [], isLoading: metricsDefLoading } = useMetricDefinitions();
 
+  // Fetch parameter definitions from DB
+  const { data: parameterDefinitions = [] } = useParameterDefinitions();
+  const deleteParamMutation = useDeleteParameterDefinition();
+  const [showCreateParamDialog, setShowCreateParamDialog] = useState(false);
+
   // Fetch plan-enabled metrics
   const { data: planEnabledMetrics = [] } = usePlanEnabledMetrics(config.id);
 
