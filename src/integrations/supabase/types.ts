@@ -13236,6 +13236,48 @@ export type Database = {
         }
         Relationships: []
       }
+      target_parameter_definitions: {
+        Row: {
+          created_at: string
+          data_source_filter: Json | null
+          data_source_id_column: string | null
+          data_source_name_column: string | null
+          data_source_table: string | null
+          display_order: number
+          icon: string
+          id: string
+          is_system: boolean
+          name: string
+          parameter_key: string
+        }
+        Insert: {
+          created_at?: string
+          data_source_filter?: Json | null
+          data_source_id_column?: string | null
+          data_source_name_column?: string | null
+          data_source_table?: string | null
+          display_order?: number
+          icon?: string
+          id?: string
+          is_system?: boolean
+          name: string
+          parameter_key: string
+        }
+        Update: {
+          created_at?: string
+          data_source_filter?: Json | null
+          data_source_id_column?: string | null
+          data_source_name_column?: string | null
+          data_source_table?: string | null
+          display_order?: number
+          icon?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+          parameter_key?: string
+        }
+        Relationships: []
+      }
       target_plans: {
         Row: {
           created_at: string | null
