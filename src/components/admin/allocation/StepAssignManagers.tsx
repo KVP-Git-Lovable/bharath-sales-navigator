@@ -33,6 +33,10 @@ interface TeamNode {
   fullName: string;
   subordinateCount: number;
   children: TeamNode[];
+  quantityTarget?: number;
+  revenueTarget?: number;
+  visitsTarget?: number;
+  targetStrategy?: TargetStrategy;
 }
 
 interface ManagerRow {
