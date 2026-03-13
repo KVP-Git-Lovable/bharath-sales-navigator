@@ -45,6 +45,10 @@ interface TeamHierarchyNode {
   fullName: string;
   subordinateCount: number;
   children: TeamHierarchyNode[];
+  quantityTarget?: number;
+  revenueTarget?: number;
+  visitsTarget?: number;
+  targetStrategy?: TargetStrategy;
 }
 
 interface AllocationTableProps {
