@@ -122,101 +122,139 @@ const splitByWeights = (
 };
 
 /**
- * Recursively auto-distribute targets based on per-user strategies and team-size weighted split.
+ * Count effective contributors in a branch:
+ * - Individual contributor (no children): 1
+ * - Pure manager: sum(children)
+ * - Player-manager (independent): 1 + sum(children)
+ */
+const getContributorCountForNode = (
+  node: SubordinateAllocation,
+  allocations: Map<string, SubordinateAllocation>,
+  cache: Map<string, number>,
+): number => {
+  const cached = cache.get(node.userId);
+  if (cached !== undefined) return cached;
+
+  if (node.children.length === 0) {
+    cache.set(node.userId, 1);
+    return 1;
+  }
+
+  const currentAlloc = allocations.get(node.userId) || node;
+  const childContributors = node.children.reduce(
+    (sum, child) => sum + getContributorCountForNode(child, allocations, cache),
+    0,
+  );
+
+  const includeSelf = currentAlloc.targetStrategy === 'independent';
+  const total = Math.max(1, childContributors + (includeSelf ? 1 : 0));
+  cache.set(node.userId, total);
+  return total;
+};
+
+const getEffectiveQuantity = (alloc: SubordinateAllocation) =>
+  alloc.quantityTarget + (alloc.targetStrategy === 'independent' && alloc.children.length > 0 ? alloc.personalQuantityTarget : 0);
+
+const getEffectiveRevenue = (alloc: SubordinateAllocation) =>
+  alloc.revenueTarget + (alloc.targetStrategy === 'independent' && alloc.children.length > 0 ? alloc.personalRevenueTarget : 0);
+
+const getEffectiveVisits = (alloc: SubordinateAllocation) =>
+  alloc.visitsTarget + (alloc.targetStrategy === 'independent' && alloc.children.length > 0 ? alloc.personalVisitsTarget : 0);
+
+/**
+ * Recursively auto-distribute targets based on per-user strategies and contributor count.
  */
 function autoDistributeTargets(
   nodes: SubordinateAllocation[],
-  parentTarget: { quantity: number; revenue: number; visits: number },
+  _parentTarget: { quantity: number; revenue: number; visits: number },
   allocations: Map<string, SubordinateAllocation>,
   enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean },
 ): Map<string, SubordinateAllocation> {
-  const getChildWeight = (childAlloc: SubordinateAllocation) => {
-    if (childAlloc.subordinateCount <= 0) return 1;
-    // Independent managers carry personal + team visibility, include self in weight.
-    if (childAlloc.targetStrategy === 'independent') return childAlloc.subordinateCount + 1;
-    return childAlloc.subordinateCount;
-  };
+  const contributorCache = new Map<string, number>();
+  const getContributors = (node: SubordinateAllocation) => getContributorCountForNode(node, allocations, contributorCache);
 
-  const distribute = (nodeList: SubordinateAllocation[], parentTgt: { quantity: number; revenue: number; visits: number }) => {
-    if (nodeList.length === 0) return;
+  const distributeNode = (node: SubordinateAllocation) => {
+    const managerAlloc = allocations.get(node.userId);
+    if (!managerAlloc || node.children.length === 0) return;
 
-    nodeList.forEach((node) => {
-      const alloc = allocations.get(node.userId);
-      if (!alloc) return;
-      const strategy = alloc.targetStrategy || 'roll_down';
+    const strategy = managerAlloc.targetStrategy || 'roll_down';
+    const children = node.children
+      .map((child) => ({ childNode: child, childAlloc: allocations.get(child.userId) }))
+      .filter((entry): entry is { childNode: SubordinateAllocation; childAlloc: SubordinateAllocation } => Boolean(entry.childAlloc));
 
-      if ((strategy === 'roll_down' || strategy === 'independent') && node.children.length > 0) {
-        const children = node.children
-          .map((child) => ({ child, childAlloc: allocations.get(child.userId) }))
-          .filter((entry): entry is { child: SubordinateAllocation; childAlloc: SubordinateAllocation } => Boolean(entry.childAlloc));
+    if (!children.length) return;
 
-        if (children.length > 0) {
-          const weightedEntries = children.map(({ childAlloc }) => ({
-            userId: childAlloc.userId,
-            weight: getChildWeight(childAlloc),
-          }));
+    if (strategy === 'roll_up') {
+      children.forEach(({ childNode }) => distributeNode(childNode));
 
-          const quantitySplit = enabledMetrics.quantity ? splitByWeights(alloc.quantityTarget, weightedEntries) : new Map<string, number>();
-          const revenueSplit = enabledMetrics.revenue ? splitByWeights(alloc.revenueTarget, weightedEntries) : new Map<string, number>();
-          const visitsSplit = enabledMetrics.visits ? splitByWeights(alloc.visitsTarget, weightedEntries) : new Map<string, number>();
+      let sumQ = 0;
+      let sumR = 0;
+      let sumV = 0;
+      children.forEach(({ childAlloc }) => {
+        const latest = allocations.get(childAlloc.userId);
+        if (!latest) return;
+        sumQ += getEffectiveQuantity(latest);
+        sumR += getEffectiveRevenue(latest);
+        sumV += getEffectiveVisits(latest);
+      });
 
-          children.forEach(({ child, childAlloc }) => {
-            const assignedQty = enabledMetrics.quantity ? (quantitySplit.get(child.userId) || 0) : childAlloc.quantityTarget;
-            const assignedRev = enabledMetrics.revenue ? (revenueSplit.get(child.userId) || 0) : childAlloc.revenueTarget;
-            const assignedVis = enabledMetrics.visits ? (visitsSplit.get(child.userId) || 0) : childAlloc.visitsTarget;
+      allocations.set(node.userId, {
+        ...managerAlloc,
+        quantityTarget: enabledMetrics.quantity ? sumQ : managerAlloc.quantityTarget,
+        revenueTarget: enabledMetrics.revenue ? sumR : managerAlloc.revenueTarget,
+        visitsTarget: enabledMetrics.visits ? sumV : managerAlloc.visitsTarget,
+      });
+      return;
+    }
 
-            if (childAlloc.targetStrategy === 'independent' && child.children.length > 0) {
-              const denominator = Math.max(childAlloc.subordinateCount + 1, 1);
-              const personalQty = enabledMetrics.quantity ? Math.round(assignedQty / denominator) : childAlloc.personalQuantityTarget;
-              const personalRev = enabledMetrics.revenue ? Math.round(assignedRev / denominator) : childAlloc.personalRevenueTarget;
-              const personalVis = enabledMetrics.visits ? Math.round(assignedVis / denominator) : childAlloc.personalVisitsTarget;
+    const weightedEntries = children.map(({ childNode, childAlloc }) => ({
+      userId: childAlloc.userId,
+      weight: Math.max(1, getContributors(childNode)),
+    }));
 
-              allocations.set(child.userId, {
-                ...childAlloc,
-                quantityTarget: enabledMetrics.quantity ? Math.max(assignedQty - personalQty, 0) : childAlloc.quantityTarget,
-                revenueTarget: enabledMetrics.revenue ? Math.max(assignedRev - personalRev, 0) : childAlloc.revenueTarget,
-                visitsTarget: enabledMetrics.visits ? Math.max(assignedVis - personalVis, 0) : childAlloc.visitsTarget,
-                personalQuantityTarget: enabledMetrics.quantity ? personalQty : childAlloc.personalQuantityTarget,
-                personalRevenueTarget: enabledMetrics.revenue ? personalRev : childAlloc.personalRevenueTarget,
-                personalVisitsTarget: enabledMetrics.visits ? personalVis : childAlloc.personalVisitsTarget,
-              });
-              return;
-            }
+    const quantitySplit = enabledMetrics.quantity ? splitByWeights(managerAlloc.quantityTarget, weightedEntries) : new Map<string, number>();
+    const revenueSplit = enabledMetrics.revenue ? splitByWeights(managerAlloc.revenueTarget, weightedEntries) : new Map<string, number>();
+    const visitsSplit = enabledMetrics.visits ? splitByWeights(managerAlloc.visitsTarget, weightedEntries) : new Map<string, number>();
 
-            allocations.set(child.userId, {
-              ...childAlloc,
-              quantityTarget: enabledMetrics.quantity ? assignedQty : childAlloc.quantityTarget,
-              revenueTarget: enabledMetrics.revenue ? assignedRev : childAlloc.revenueTarget,
-              visitsTarget: enabledMetrics.visits ? assignedVis : childAlloc.visitsTarget,
-            });
-          });
-        }
+    children.forEach(({ childNode, childAlloc }) => {
+      const assignedQty = enabledMetrics.quantity ? (quantitySplit.get(childNode.userId) || 0) : childAlloc.quantityTarget;
+      const assignedRev = enabledMetrics.revenue ? (revenueSplit.get(childNode.userId) || 0) : childAlloc.revenueTarget;
+      const assignedVis = enabledMetrics.visits ? (visitsSplit.get(childNode.userId) || 0) : childAlloc.visitsTarget;
 
-        // Recurse into children
-        node.children.forEach((child) => {
-          if (child.children.length > 0) {
-            distribute([child], { quantity: 0, revenue: 0, visits: 0 });
-          }
+      const isPlayerManager = childNode.children.length > 0 && childAlloc.targetStrategy === 'independent';
+
+      if (isPlayerManager) {
+        const contributorCount = Math.max(getContributors(childNode), 1);
+        const personalQty = enabledMetrics.quantity ? Math.round(assignedQty / contributorCount) : childAlloc.personalQuantityTarget;
+        const personalRev = enabledMetrics.revenue ? Math.round(assignedRev / contributorCount) : childAlloc.personalRevenueTarget;
+        const personalVis = enabledMetrics.visits ? Math.round(assignedVis / contributorCount) : childAlloc.personalVisitsTarget;
+
+        allocations.set(childNode.userId, {
+          ...childAlloc,
+          quantityTarget: enabledMetrics.quantity ? Math.max(assignedQty - personalQty, 0) : childAlloc.quantityTarget,
+          revenueTarget: enabledMetrics.revenue ? Math.max(assignedRev - personalRev, 0) : childAlloc.revenueTarget,
+          visitsTarget: enabledMetrics.visits ? Math.max(assignedVis - personalVis, 0) : childAlloc.visitsTarget,
+          personalQuantityTarget: enabledMetrics.quantity ? personalQty : childAlloc.personalQuantityTarget,
+          personalRevenueTarget: enabledMetrics.revenue ? personalRev : childAlloc.personalRevenueTarget,
+          personalVisitsTarget: enabledMetrics.visits ? personalVis : childAlloc.personalVisitsTarget,
         });
-      } else if (strategy === 'roll_up' && node.children.length > 0) {
-        // First recurse children
-        node.children.forEach((child) => {
-          if (child.children.length > 0) {
-            distribute([child], { quantity: 0, revenue: 0, visits: 0 });
-          }
+      } else {
+        allocations.set(childNode.userId, {
+          ...childAlloc,
+          quantityTarget: enabledMetrics.quantity ? assignedQty : childAlloc.quantityTarget,
+          revenueTarget: enabledMetrics.revenue ? assignedRev : childAlloc.revenueTarget,
+          visitsTarget: enabledMetrics.visits ? assignedVis : childAlloc.visitsTarget,
+          personalQuantityTarget: enabledMetrics.quantity ? 0 : childAlloc.personalQuantityTarget,
+          personalRevenueTarget: enabledMetrics.revenue ? 0 : childAlloc.personalRevenueTarget,
+          personalVisitsTarget: enabledMetrics.visits ? 0 : childAlloc.personalVisitsTarget,
         });
-        // Then sum children into this node
-        let sumQ = 0, sumR = 0, sumV = 0;
-        node.children.forEach((child) => {
-          const ca = allocations.get(child.userId);
-          if (ca) { sumQ += ca.quantityTarget; sumR += ca.revenueTarget; sumV += ca.visitsTarget; }
-        });
-        allocations.set(node.userId, { ...alloc, quantityTarget: sumQ, revenueTarget: sumR, visitsTarget: sumV });
       }
+
+      distributeNode(childNode);
     });
   };
 
-  distribute(nodes, parentTarget);
+  nodes.forEach(distributeNode);
   return allocations;
 }
 
