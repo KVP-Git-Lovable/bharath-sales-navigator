@@ -462,6 +462,9 @@ export function AllocationTable({
         revenue_target: alloc.revenueTarget,
         quantity_unit: quantityUnit,
         target_strategy: alloc.targetStrategy || 'roll_down',
+        personal_quantity_target: alloc.personalQuantityTarget || 0,
+        personal_revenue_target: alloc.personalRevenueTarget || 0,
+        personal_visits_target: alloc.personalVisitsTarget || 0,
       }));
 
       const { error } = await supabase
