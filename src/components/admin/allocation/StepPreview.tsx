@@ -35,6 +35,9 @@ export interface PreviewNode {
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
+  personalQuantityTarget?: number;
+  personalRevenueTarget?: number;
+  personalVisitsTarget?: number;
   targetStrategy: TargetStrategy;
   children: PreviewNode[];
 }
@@ -43,7 +46,7 @@ interface StepPreviewProps {
   roots: PreviewNode[];
   quantityUnit: string;
   enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean };
-  allocations: Map<string, { quantityTarget: number; revenueTarget: number; visitsTarget: number; targetStrategy: TargetStrategy }>;
+  allocations: Map<string, { quantityTarget: number; revenueTarget: number; visitsTarget: number; personalQuantityTarget?: number; personalRevenueTarget?: number; personalVisitsTarget?: number; targetStrategy: TargetStrategy }>;
 }
 
 export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }: StepPreviewProps) {
@@ -72,17 +75,21 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }
     const qty = alloc?.quantityTarget ?? node.quantityTarget;
     const rev = alloc?.revenueTarget ?? node.revenueTarget;
     const vis = alloc?.visitsTarget ?? node.visitsTarget;
+    const personalQty = alloc?.personalQuantityTarget ?? node.personalQuantityTarget ?? 0;
+    const personalRev = alloc?.personalRevenueTarget ?? node.personalRevenueTarget ?? 0;
+    const personalVis = alloc?.personalVisitsTarget ?? node.personalVisitsTarget ?? 0;
     const strategy = alloc?.targetStrategy ?? node.targetStrategy;
+    const isIndependent = strategy === 'independent';
 
-    // Compute child sum for managers
+    // Compute child sum for managers (skip for independent — target is personal)
     let childSum = 0;
-    if (hasChildren && enabledMetrics.quantity) {
+    if (hasChildren && enabledMetrics.quantity && !isIndependent) {
       node.children.forEach(c => {
         const ca = allocations.get(c.userId);
         childSum += ca?.quantityTarget ?? c.quantityTarget;
       });
     }
-    const overUnder = hasChildren ? qty - childSum : 0;
+    const overUnder = hasChildren && !isIndependent ? qty - childSum : 0;
 
     return (
       <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
@@ -113,22 +120,47 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }
           </div>
 
           <div className="flex items-center gap-3">
-            {enabledMetrics.quantity && (
-              <span className="text-sm font-mono font-semibold">
-                {formatNumber(qty)} <span className="text-xs text-muted-foreground font-normal">{quantityUnit}</span>
-              </span>
-            )}
-            {enabledMetrics.revenue && (
-              <span className="text-sm font-mono font-semibold">{formatCurrency(rev)}</span>
-            )}
-            {enabledMetrics.visits && (
-              <span className="text-sm font-mono font-semibold">{formatNumber(vis)} <span className="text-xs text-muted-foreground font-normal">visits</span></span>
+            {isIndependent && isManager ? (
+              <>
+                {enabledMetrics.quantity && personalQty > 0 && (
+                  <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    {formatNumber(personalQty)} <span className="text-[10px] text-muted-foreground font-normal">personal</span>
+                  </span>
+                )}
+                {enabledMetrics.quantity && (
+                  <span className="text-sm font-mono font-semibold">
+                    {formatNumber(qty)} <span className="text-[10px] text-muted-foreground font-normal">team {quantityUnit}</span>
+                  </span>
+                )}
+                {enabledMetrics.revenue && personalRev > 0 && (
+                  <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    {formatCurrency(personalRev)} <span className="text-[10px] text-muted-foreground font-normal">personal</span>
+                  </span>
+                )}
+                {enabledMetrics.revenue && (
+                  <span className="text-sm font-mono font-semibold">{formatCurrency(rev)} <span className="text-[10px] text-muted-foreground font-normal">team</span></span>
+                )}
+              </>
+            ) : (
+              <>
+                {enabledMetrics.quantity && (
+                  <span className="text-sm font-mono font-semibold">
+                    {formatNumber(qty)} <span className="text-xs text-muted-foreground font-normal">{quantityUnit}</span>
+                  </span>
+                )}
+                {enabledMetrics.revenue && (
+                  <span className="text-sm font-mono font-semibold">{formatCurrency(rev)}</span>
+                )}
+                {enabledMetrics.visits && (
+                  <span className="text-sm font-mono font-semibold">{formatNumber(vis)} <span className="text-xs text-muted-foreground font-normal">visits</span></span>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* Over/under warning */}
-        {hasChildren && enabledMetrics.quantity && overUnder !== 0 && (
+        {/* Over/under warning — hidden for independent strategy */}
+        {hasChildren && !isIndependent && enabledMetrics.quantity && overUnder !== 0 && (
           <div className={cn(
             'flex items-center gap-1.5 text-[11px] px-3 py-1 rounded mb-1',
             overUnder < 0 ? 'text-destructive bg-destructive/10' : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30'

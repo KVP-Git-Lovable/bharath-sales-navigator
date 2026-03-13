@@ -14221,6 +14221,9 @@ export type Database = {
           manager_own_quantity_target: number | null
           manager_own_revenue_target: number | null
           notes: string | null
+          personal_quantity_target: number | null
+          personal_revenue_target: number | null
+          personal_visits_target: number | null
           quantity_target: number | null
           quantity_unit: string | null
           revenue_target: number | null
@@ -14237,6 +14240,9 @@ export type Database = {
           manager_own_quantity_target?: number | null
           manager_own_revenue_target?: number | null
           notes?: string | null
+          personal_quantity_target?: number | null
+          personal_revenue_target?: number | null
+          personal_visits_target?: number | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
@@ -14253,6 +14259,9 @@ export type Database = {
           manager_own_quantity_target?: number | null
           manager_own_revenue_target?: number | null
           notes?: string | null
+          personal_quantity_target?: number | null
+          personal_revenue_target?: number | null
+          personal_visits_target?: number | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null

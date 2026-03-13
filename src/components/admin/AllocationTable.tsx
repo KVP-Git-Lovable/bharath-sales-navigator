@@ -32,6 +32,9 @@ interface SubordinateAllocation {
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
+  personalQuantityTarget: number;
+  personalRevenueTarget: number;
+  personalVisitsTarget: number;
   percentage: number;
   existingPlanId?: string;
   level: number;
@@ -48,6 +51,9 @@ interface TeamHierarchyNode {
   quantityTarget?: number;
   revenueTarget?: number;
   visitsTarget?: number;
+  personalQuantityTarget?: number;
+  personalRevenueTarget?: number;
+  personalVisitsTarget?: number;
   targetStrategy?: TargetStrategy;
 }
 
@@ -219,6 +225,9 @@ export function AllocationTable({
           quantityTarget: existingPlan?.quantity_target || 0,
           revenueTarget: existingPlan?.revenue_target || 0,
           visitsTarget: 0,
+          personalQuantityTarget: (existingPlan as any)?.personal_quantity_target || 0,
+          personalRevenueTarget: (existingPlan as any)?.personal_revenue_target || 0,
+          personalVisitsTarget: (existingPlan as any)?.personal_visits_target || 0,
           percentage: 0,
           existingPlanId: existingPlan?.id,
           level: sub.level,
@@ -365,25 +374,24 @@ export function AllocationTable({
 
   const handleEqualSplit = useCallback(() => {
     if (!directReports.length) return;
-    // Weight by subordinate count — managers with more subordinates get proportionally more
-    const totalSubs = directReports.reduce((sum, dr) => sum + Math.max(dr.subordinateCount, 1), 0);
+    // Equal split among direct reports (weight = 1 each)
+    const count = directReports.length;
     setAllocations(prev => {
       const next = new Map(prev);
       directReports.forEach(dr => {
         const current = next.get(dr.userId);
         if (current) {
-          const weight = Math.max(dr.subordinateCount, 1) / totalSubs;
           next.set(dr.userId, {
             ...current,
-            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity * weight) : 0,
-            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue * weight) : 0,
-            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits * weight) : 0,
+            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity / count) : 0,
+            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue / count) : 0,
+            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits / count) : 0,
           });
         }
       });
       return next;
     });
-    toast.success('Targets distributed proportionally based on subordinate count');
+    toast.success('Targets split equally among direct reports');
   }, [directReports, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
 
   // Auto-calculate when entering Step 2
@@ -457,6 +465,9 @@ export function AllocationTable({
         revenue_target: alloc.revenueTarget,
         quantity_unit: quantityUnit,
         target_strategy: alloc.targetStrategy || 'roll_down',
+        personal_quantity_target: alloc.personalQuantityTarget || 0,
+        personal_revenue_target: alloc.personalRevenueTarget || 0,
+        personal_visits_target: alloc.personalVisitsTarget || 0,
       }));
 
       const { error } = await supabase
@@ -514,6 +525,9 @@ export function AllocationTable({
         quantityTarget: childAlloc?.quantityTarget ?? 0,
         revenueTarget: childAlloc?.revenueTarget ?? 0,
         visitsTarget: childAlloc?.visitsTarget ?? 0,
+        personalQuantityTarget: childAlloc?.personalQuantityTarget ?? 0,
+        personalRevenueTarget: childAlloc?.personalRevenueTarget ?? 0,
+        personalVisitsTarget: childAlloc?.personalVisitsTarget ?? 0,
         targetStrategy: (childAlloc?.targetStrategy ?? 'roll_down') as TargetStrategy,
       };
     };
