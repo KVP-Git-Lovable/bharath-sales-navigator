@@ -1,7 +1,6 @@
-
 # Scalable Target Management — Plan
 
-## Status: ✅ Implemented
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
 ## Summary
 Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
@@ -47,3 +46,21 @@ Upgraded the target management system from a rigid lock-based model to a flexibl
 - `is_locked` column remains in DB and is auto-synced from `plan_status`
 - Existing `user_business_plan_*` breakdown tables untouched
 - All existing data migrated automatically
+
+## Phase: Target Split, Dual Visibility & Manager Self-Service
+
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
+
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
+
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
