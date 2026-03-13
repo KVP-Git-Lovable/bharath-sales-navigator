@@ -686,8 +686,13 @@ export function AllocationTable({
                 <Users className="h-2.5 w-2.5" />{user.subordinateCount}
               </Badge>
             )}
-            {isManager && <StrategyBadge strategy={levelStrategy} />}
-            {/* Re-read levelStrategy from allocation for potential per-user override */}
+            {isManager && (
+              <InlineStrategySelector
+                value={userStrategy}
+                onChange={(s) => handleUserStrategyChange(user.userId, s)}
+              />
+            )}
+            <div className="flex-1" />
             {enabledMetrics.quantity && (
               <span className="text-sm font-mono font-medium">
                 {formatNumber(alloc?.quantityTarget || 0)} <span className="text-xs text-muted-foreground">{quantityUnit}</span>
