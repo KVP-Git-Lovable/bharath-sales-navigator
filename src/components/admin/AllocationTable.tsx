@@ -32,6 +32,9 @@ interface SubordinateAllocation {
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
+  personalQuantityTarget: number;
+  personalRevenueTarget: number;
+  personalVisitsTarget: number;
   percentage: number;
   existingPlanId?: string;
   level: number;
