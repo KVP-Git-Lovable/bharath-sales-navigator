@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { invoiceNumber } = await req.json();
+    const { invoiceNumber, pdfUrl } = await req.json();
 
     if (!invoiceNumber) {
       throw new Error('invoiceNumber is required');
@@ -23,11 +23,16 @@ serve(async (req) => {
       throw new Error('TWILIO_AUTH_TOKEN not configured');
     }
 
-    const invoiceUrl = `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
+    const invoiceUrl = pdfUrl || `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
 
     const recipients = ['whatsapp:+919741435887', 'whatsapp:+919148181465', 'whatsapp:+917338319619'];
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const base64Auth = btoa(`${accountSid}:${authToken}`);
+
+    const contentVariables = JSON.stringify({
+      "1": invoiceNumber,
+      "2": invoiceUrl,
+    });
 
     console.log(`Sending WhatsApp for invoice ${invoiceNumber}, URL: ${invoiceUrl}`);
 
@@ -37,6 +42,7 @@ serve(async (req) => {
           To: to,
           From: 'whatsapp:+917411681616',
           ContentSid: 'HX2b27e4c3a2353117297ef3d48c04e292',
+          ContentVariables: contentVariables,
           MediaUrl: invoiceUrl,
         });
 
