@@ -36,6 +36,7 @@ interface SubordinateAllocation {
   userId: string;
   fullName: string;
   profilePictureUrl: string | null;
+  designation?: string;
   quantityTarget: number;
   revenueTarget: number;
   visitsTarget: number;
