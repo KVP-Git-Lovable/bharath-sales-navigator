@@ -368,6 +368,7 @@ export function AllocationTable({
           userId: sub.subordinate_user_id,
           fullName: profile?.full_name || 'Unknown',
           profilePictureUrl: profile?.profile_picture_url || null,
+          designation: profile?.designation || undefined,
           quantityTarget: existingPlan?.quantity_target || 0,
           revenueTarget: existingPlan?.revenue_target || 0,
           visitsTarget: 0,
