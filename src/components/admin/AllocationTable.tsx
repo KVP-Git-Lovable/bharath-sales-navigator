@@ -336,7 +336,7 @@ export function AllocationTable({
       const userIds = subordinatesOnly.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
 
       const [profilesRes, plansRes, employeesRes] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, profile_picture_url').in('id', userIds),
+        supabase.from('profiles').select('id, full_name, profile_picture_url, designation').in('id', userIds),
         supabase.from('user_business_plans').select('*').in('user_id', userIds).eq('year', fyYear),
         supabase.from('employees').select('manager_id, user_id'),
       ]);
