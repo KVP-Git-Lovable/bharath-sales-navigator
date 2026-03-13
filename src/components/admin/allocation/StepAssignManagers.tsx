@@ -78,7 +78,7 @@ export function StepAssignManagers({
           <span className="text-sm font-medium">Total Target to Distribute</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={onEqualSplit}>
-              <Equal className="h-3 w-3" /> Equal Split
+              <Users className="h-3 w-3" /> Split by Team Size
             </Button>
           </div>
         </div>
