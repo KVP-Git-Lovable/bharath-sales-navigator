@@ -9,12 +9,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { 
   Save, AlertCircle, Loader2, ChevronDown, ChevronRight, Users, 
-  GitBranch, Table2, Equal, Percent, Edit3, ArrowUpCircle, Calendar, CalendarDays, TrendingUp,
-  Split, Maximize2, Minimize2, AlertTriangle
+  GitBranch, Table2, ArrowUpCircle, Calendar, CalendarDays, TrendingUp,
+  Split, Maximize2, Minimize2, AlertTriangle, Pencil, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { TargetStrategySelector, InlineStrategySelector, TargetStrategy } from './TargetStrategySelector';
+import { TargetStrategy, SplitMethod, LevelStrategyConfig, LevelInfo, StrategyBadge } from './TargetStrategySelector';
 import { TargetSplitDialog } from './TargetSplitDialog';
 import {
   Tooltip,
@@ -69,7 +69,6 @@ const FY_MONTHS_LIST = [
   'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar',
 ];
 
-type AllocationMethod = 'equal' | 'percentage' | 'manual';
 type ViewMode = 'tree' | 'table';
 type DisplayDensity = 'compact' | 'expanded';
 
@@ -188,50 +187,89 @@ function DailyAvgPanel({
 }
 
 /**
- * Recursively compute effective targets based on each node's strategy.
- * For `roll_up` managers: target = sum of children's effective targets.
- * For others: use the stored/manually-entered target.
- * Returns a Map of userId -> { quantity, revenue, visits }
+ * Recursively auto-distribute targets based on level strategies and split method.
+ * Modifies the allocations map in-place and returns it.
  */
-function computeEffectiveTargets(
+function autoDistributeTargets(
   nodes: SubordinateAllocation[],
+  parentTarget: { quantity: number; revenue: number; visits: number },
+  levelStrategies: Map<number, TargetStrategy>,
+  splitMethod: SplitMethod,
   allocations: Map<string, SubordinateAllocation>,
-  perUserStrategies: Map<string, TargetStrategy>,
-): Map<string, { quantity: number; revenue: number; visits: number }> {
-  const results = new Map<string, { quantity: number; revenue: number; visits: number }>();
+  enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean },
+): Map<string, SubordinateAllocation> {
 
-  function compute(node: SubordinateAllocation): { quantity: number; revenue: number; visits: number } {
-    const strategy = perUserStrategies.get(node.userId) || node.targetStrategy || 'roll_down';
-    const alloc = allocations.get(node.userId);
-    const storedTarget = {
-      quantity: alloc?.quantityTarget || 0,
-      revenue: alloc?.revenueTarget || 0,
-      visits: alloc?.visitsTarget || 0,
-    };
+  function distribute(nodeList: SubordinateAllocation[], parentTgt: { quantity: number; revenue: number; visits: number }) {
+    if (nodeList.length === 0) return;
 
-    if (node.children.length === 0 || strategy !== 'roll_up') {
-      results.set(node.userId, storedTarget);
-      // Still recurse children so they get their own results
-      node.children.forEach(child => compute(child));
-      return storedTarget;
+    const firstLevel = nodeList[0].level;
+    const strategy = levelStrategies.get(firstLevel) || 'roll_down';
+
+    if (strategy === 'roll_down') {
+      const count = nodeList.length;
+      nodeList.forEach((node) => {
+        const alloc = allocations.get(node.userId);
+        if (!alloc) return;
+
+        let qty = 0, rev = 0, vis = 0, pct = 0;
+        if (splitMethod === 'equal') {
+          qty = enabledMetrics.quantity ? Math.floor(parentTgt.quantity / count) : 0;
+          rev = enabledMetrics.revenue ? Math.floor(parentTgt.revenue / count) : 0;
+          vis = enabledMetrics.visits ? Math.floor(parentTgt.visits / count) : 0;
+          pct = Math.round((100 / count) * 100) / 100;
+        } else if (splitMethod === 'percentage') {
+          const p = (alloc.percentage || 0) / 100;
+          qty = enabledMetrics.quantity ? Math.round(parentTgt.quantity * p) : 0;
+          rev = enabledMetrics.revenue ? Math.round(parentTgt.revenue * p) : 0;
+          vis = enabledMetrics.visits ? Math.round(parentTgt.visits * p) : 0;
+          pct = alloc.percentage || 0;
+        } else {
+          // manual — keep existing values
+          qty = alloc.quantityTarget;
+          rev = alloc.revenueTarget;
+          vis = alloc.visitsTarget;
+          pct = alloc.percentage;
+        }
+
+        allocations.set(node.userId, { ...alloc, quantityTarget: qty, revenueTarget: rev, visitsTarget: vis, percentage: pct });
+
+        // Recurse into children with THIS node's target as parent
+        if (node.children.length > 0) {
+          distribute(node.children, { quantity: qty, revenue: rev, visits: vis });
+        }
+      });
+    } else if (strategy === 'roll_up') {
+      // First recurse into children (they keep their own values or get distributed further)
+      nodeList.forEach((node) => {
+        if (node.children.length > 0) {
+          distribute(node.children, { quantity: 0, revenue: 0, visits: 0 }); // parent target not used for roll_up children
+        }
+      });
+      // Then compute roll-up for each node
+      nodeList.forEach((node) => {
+        const alloc = allocations.get(node.userId);
+        if (!alloc) return;
+        if (node.children.length > 0) {
+          let sumQ = 0, sumR = 0, sumV = 0;
+          node.children.forEach(child => {
+            const ca = allocations.get(child.userId);
+            if (ca) { sumQ += ca.quantityTarget; sumR += ca.revenueTarget; sumV += ca.visitsTarget; }
+          });
+          allocations.set(node.userId, { ...alloc, quantityTarget: sumQ, revenueTarget: sumR, visitsTarget: sumV });
+        }
+      });
+    } else {
+      // independent — keep existing values, recurse children independently
+      nodeList.forEach((node) => {
+        if (node.children.length > 0) {
+          distribute(node.children, { quantity: 0, revenue: 0, visits: 0 });
+        }
+      });
     }
-
-    // roll_up: sum children's effective targets
-    let totalQty = 0, totalRev = 0, totalVis = 0;
-    node.children.forEach(child => {
-      const childResult = compute(child);
-      totalQty += childResult.quantity;
-      totalRev += childResult.revenue;
-      totalVis += childResult.visits;
-    });
-
-    const computed = { quantity: totalQty, revenue: totalRev, visits: totalVis };
-    results.set(node.userId, computed);
-    return computed;
   }
 
-  nodes.forEach(node => compute(node));
-  return results;
+  distribute(nodes, parentTarget);
+  return allocations;
 }
 
 export function AllocationTable({
@@ -249,17 +287,18 @@ export function AllocationTable({
   const queryClient = useQueryClient();
   const [allocations, setAllocations] = useState<Map<string, SubordinateAllocation>>(new Map());
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
-  const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>('manual');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [displayDensity, setDisplayDensity] = useState<DisplayDensity>('expanded');
-  const [targetStrategy, setTargetStrategy] = useState<TargetStrategy>('roll_down');
-  const [managerOwnQuantity, setManagerOwnQuantity] = useState<number>(0);
-  const [managerOwnRevenue, setManagerOwnRevenue] = useState<number>(0);
+  const [fineTuneMode, setFineTuneMode] = useState(false);
+  const [hasAutoCalculated, setHasAutoCalculated] = useState(false);
+
+  // Level-wise strategy config
+  const [levelStrategies, setLevelStrategies] = useState<Map<number, TargetStrategy>>(new Map());
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
+
   // Split dialog state
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [splitDialogManager, setSplitDialogManager] = useState<SubordinateAllocation | null>(null);
-  // Per-user strategy overrides (for sub-managers)
-  const [perUserStrategies, setPerUserStrategies] = useState<Map<string, TargetStrategy>>(new Map());
 
   // Fetch parent user's business plan
   const { data: parentPlan } = useQuery({
@@ -277,20 +316,6 @@ export function AllocationTable({
     enabled: !!parentUserId,
   });
 
-  useEffect(() => {
-    if (parentPlan) {
-      setTargetStrategy((parentPlan.target_strategy as TargetStrategy) || 'roll_down');
-      setManagerOwnQuantity(parentPlan.manager_own_quantity_target || 0);
-      setManagerOwnRevenue(parentPlan.manager_own_revenue_target || 0);
-    }
-  }, [parentPlan]);
-
-  useEffect(() => {
-    if (targetStrategy === 'roll_up') {
-      setAllocationMethod('manual');
-    }
-  }, [targetStrategy]);
-
   // Fetch hierarchy recursively
   const { data: hierarchyData, isLoading } = useQuery({
     queryKey: ['hierarchy-allocations', parentUserId, fyYear],
@@ -305,7 +330,7 @@ export function AllocationTable({
         (s: { subordinate_user_id: string; level: number }) => s.level > 0
       );
 
-      if (!subordinatesOnly.length) return { roots: [] as SubordinateAllocation[], initialStrategies: new Map<string, TargetStrategy>() };
+      if (!subordinatesOnly.length) return { roots: [] as SubordinateAllocation[] };
 
       const userIds = subordinatesOnly.map((s: { subordinate_user_id: string }) => s.subordinate_user_id);
 
@@ -333,9 +358,6 @@ export function AllocationTable({
 
       const nodeMap = new Map<string, SubordinateAllocation>();
 
-      // Initialize per-user strategies from DB
-      const initialStrategies = new Map<string, TargetStrategy>();
-
       subordinatesOnly.forEach((sub: { subordinate_user_id: string; level: number }) => {
         const profile = profileMap.get(sub.subordinate_user_id);
         const existingPlan = planMap.get(sub.subordinate_user_id);
@@ -355,11 +377,6 @@ export function AllocationTable({
           children: [],
           targetStrategy: savedStrategy,
         });
-
-        // Only set strategy for users who are managers (have subordinates)
-        if ((subordinateCounts.get(sub.subordinate_user_id) || 0) > 0) {
-          initialStrategies.set(sub.subordinate_user_id, savedStrategy);
-        }
       });
 
       const roots: SubordinateAllocation[] = [];
@@ -372,7 +389,7 @@ export function AllocationTable({
         }
       });
 
-      return { roots, initialStrategies };
+      return { roots };
     },
     enabled: !!parentUserId,
   });
@@ -381,9 +398,11 @@ export function AllocationTable({
   useEffect(() => {
     if (hierarchyData?.roots) {
       const newAllocations = new Map<string, SubordinateAllocation>();
+      const levelSet = new Set<number>();
       const flatten = (nodes: SubordinateAllocation[]) => {
         nodes.forEach(node => {
           newAllocations.set(node.userId, node);
+          levelSet.add(node.level);
           if (node.children.length > 0) {
             flatten(node.children);
           }
@@ -392,95 +411,67 @@ export function AllocationTable({
       flatten(hierarchyData.roots);
       setAllocations(newAllocations);
       setExpandedUsers(new Set(hierarchyData.roots.map(u => u.userId)));
-      // Initialize per-user strategies from DB data
-      setPerUserStrategies(hierarchyData.initialStrategies);
+
+      // Initialize level strategies from first node at each level
+      const initStrategies = new Map<number, TargetStrategy>();
+      levelSet.forEach(level => {
+        // Find first manager at this level to get their strategy
+        for (const [, node] of newAllocations) {
+          if (node.level === level && node.subordinateCount > 0) {
+            initStrategies.set(level, node.targetStrategy || 'roll_down');
+            break;
+          }
+        }
+        if (!initStrategies.has(level)) {
+          initStrategies.set(level, 'roll_down');
+        }
+      });
+      setLevelStrategies(initStrategies);
     }
   }, [hierarchyData]);
 
   const directReports = useMemo(() => hierarchyData?.roots || [], [hierarchyData]);
 
-  // Compute effective targets with cascading roll-up
-  const effectiveTargets = useMemo(() => {
-    if (!directReports.length) return new Map<string, { quantity: number; revenue: number; visits: number }>();
-    return computeEffectiveTargets(directReports, allocations, perUserStrategies);
-  }, [directReports, allocations, perUserStrategies]);
+  // Compute level info for the config panel
+  const levelInfos = useMemo((): LevelInfo[] => {
+    const levelMap = new Map<number, { users: number; managers: number }>();
+    allocations.forEach(alloc => {
+      const existing = levelMap.get(alloc.level) || { users: 0, managers: 0 };
+      existing.users++;
+      if (alloc.subordinateCount > 0) existing.managers++;
+      levelMap.set(alloc.level, existing);
+    });
+    return Array.from(levelMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([level, info]) => ({ level, userCount: info.users, managerCount: info.managers }));
+  }, [allocations]);
 
-  // Roll-up totals from direct reports (using effective targets)
-  const rollUpTotals = useMemo(() => {
-    let qty = 0, rev = 0, vis = 0;
-    directReports.forEach(u => {
-      const effective = effectiveTargets.get(u.userId);
-      if (effective) {
-        qty += effective.quantity;
-        rev += effective.revenue;
-        vis += effective.visits;
+  // Compute per-manager distribution status
+  const managerDistribution = useMemo(() => {
+    const result = new Map<string, { distributed: number; remaining: number; total: number }>();
+    const computeForNode = (node: SubordinateAllocation) => {
+      if (node.children.length > 0) {
+        const childSum = node.children.reduce((s, c) => s + (allocations.get(c.userId)?.quantityTarget || 0), 0);
+        const nodeTarget = allocations.get(node.userId)?.quantityTarget || 0;
+        result.set(node.userId, { distributed: childSum, remaining: nodeTarget - childSum, total: nodeTarget });
+        node.children.forEach(computeForNode);
       }
-    });
-    return { quantity: qty, revenue: rev, visits: vis };
-  }, [directReports, effectiveTargets]);
+    };
+    directReports.forEach(computeForNode);
+    return result;
+  }, [directReports, allocations]);
 
-  const effectiveManagerTarget = useMemo(() => {
-    switch (targetStrategy) {
-      case 'roll_up':
-        return { quantity: rollUpTotals.quantity, revenue: rollUpTotals.revenue, visits: rollUpTotals.visits };
-      case 'independent':
-        return { quantity: managerOwnQuantity, revenue: managerOwnRevenue, visits: 0 };
-      case 'roll_down':
-      default:
-        return { quantity: totalQuantity, revenue: totalRevenue, visits: totalVisits };
-    }
-  }, [targetStrategy, rollUpTotals, managerOwnQuantity, managerOwnRevenue, totalQuantity, totalRevenue, totalVisits]);
+  // Status dot
+  const getStatusDot = useCallback((user: SubordinateAllocation) => {
+    const alloc = allocations.get(user.userId);
+    const target = alloc?.quantityTarget || 0;
+    const dist = managerDistribution.get(user.userId);
 
-  // Distribution methods
-  const applyEqualDistribution = () => {
-    if (directReports.length === 0) return;
-    const equalQty = Math.floor(totalQuantity / directReports.length);
-    const equalRev = Math.floor(totalRevenue / directReports.length);
-    const equalVisits = Math.floor(totalVisits / directReports.length);
-    const equalPercent = Math.round((100 / directReports.length) * 100) / 100;
-
-    setAllocations(prev => {
-      const next = new Map(prev);
-      directReports.forEach(user => {
-        const current = next.get(user.userId);
-        if (current) {
-          next.set(user.userId, {
-            ...current,
-            quantityTarget: enabledMetrics.quantity ? equalQty : 0,
-            revenueTarget: enabledMetrics.revenue ? equalRev : 0,
-            visitsTarget: enabledMetrics.visits ? equalVisits : 0,
-            percentage: equalPercent,
-          });
-        }
-      });
-      return next;
-    });
-    toast.success(`Targets distributed equally among ${directReports.length} members`);
-  };
-
-  const applyPercentageDistribution = () => {
-    setAllocations(prev => {
-      const next = new Map(prev);
-      directReports.forEach(user => {
-        const current = next.get(user.userId);
-        if (current && current.percentage > 0) {
-          const pct = current.percentage / 100;
-          next.set(user.userId, {
-            ...current,
-            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity * pct) : 0,
-            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue * pct) : 0,
-            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits * pct) : 0,
-          });
-        }
-      });
-      return next;
-    });
-  };
-
-  const handleMethodChange = (method: AllocationMethod) => {
-    setAllocationMethod(method);
-    if (method === 'equal') applyEqualDistribution();
-  };
+    if (dist && dist.remaining < 0) return { color: 'bg-destructive', label: 'Over-allocated' };
+    if (dist && dist.remaining > 0 && dist.total > 0) return { color: 'bg-amber-500', label: 'Partially distributed' };
+    if (target === 0) return { color: 'bg-muted-foreground/40', label: 'Not assigned' };
+    return { color: 'bg-emerald-500', label: 'Assigned' };
+  }, [allocations, managerDistribution]);
 
   const handleAllocationChange = (userId: string, field: string, value: number) => {
     setAllocations(prev => {
@@ -498,26 +489,20 @@ export function AllocationTable({
       const next = new Map(prev);
       const current = next.get(userId);
       if (current) {
+        // Find parent target for this user
+        const parentTarget = { quantity: totalQuantity, revenue: totalRevenue, visits: totalVisits };
         const pct = percentage / 100;
         next.set(userId, {
           ...current,
           percentage,
-          quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity * pct) : 0,
-          revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue * pct) : 0,
-          visitsTarget: enabledMetrics.visits ? Math.round(totalVisits * pct) : 0,
+          quantityTarget: enabledMetrics.quantity ? Math.round(parentTarget.quantity * pct) : 0,
+          revenueTarget: enabledMetrics.revenue ? Math.round(parentTarget.revenue * pct) : 0,
+          visitsTarget: enabledMetrics.visits ? Math.round(parentTarget.visits * pct) : 0,
         });
       }
       return next;
     });
   };
-
-  const handlePerUserStrategyChange = useCallback((userId: string, strategy: TargetStrategy) => {
-    setPerUserStrategies(prev => {
-      const next = new Map(prev);
-      next.set(userId, strategy);
-      return next;
-    });
-  }, []);
 
   const toggleExpand = (userId: string) => {
     setExpandedUsers(prev => {
@@ -528,40 +513,47 @@ export function AllocationTable({
     });
   };
 
-  // Compute per-manager distribution status
-  const managerDistribution = useMemo(() => {
-    const result = new Map<string, { distributed: number; remaining: number; total: number }>();
-    const computeForNode = (node: SubordinateAllocation) => {
-      if (node.children.length > 0) {
-        const childSum = node.children.reduce((s, c) => s + (allocations.get(c.userId)?.quantityTarget || 0), 0);
-        const nodeTarget = allocations.get(node.userId)?.quantityTarget || 0;
-        result.set(node.userId, { distributed: childSum, remaining: nodeTarget - childSum, total: nodeTarget });
-        node.children.forEach(computeForNode);
-      }
+  // Handle level strategy change
+  const handleLevelStrategyChange = useCallback((level: number, strategy: TargetStrategy) => {
+    setLevelStrategies(prev => {
+      const next = new Map(prev);
+      next.set(level, strategy);
+      return next;
+    });
+  }, []);
+
+  // Auto-calculate handler
+  const handleAutoCalculate = useCallback(() => {
+    if (!directReports.length) return;
+
+    const newAllocations = new Map(allocations);
+    autoDistributeTargets(
+      directReports,
+      { quantity: totalQuantity, revenue: totalRevenue, visits: totalVisits },
+      levelStrategies,
+      splitMethod,
+      newAllocations,
+      enabledMetrics,
+    );
+    setAllocations(newAllocations);
+    setHasAutoCalculated(true);
+    setFineTuneMode(false);
+    // Expand all to show results
+    const allIds = new Set<string>();
+    const collectIds = (nodes: SubordinateAllocation[]) => {
+      nodes.forEach(n => { allIds.add(n.userId); if (n.children.length) collectIds(n.children); });
     };
-    directReports.forEach(computeForNode);
-    return result;
-  }, [directReports, allocations]);
+    collectIds(directReports);
+    setExpandedUsers(allIds);
+    toast.success('Targets auto-calculated! Review below and save.');
+  }, [directReports, allocations, levelStrategies, splitMethod, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
 
-  // Status dot: green=assigned, grey=0, orange=partial distribution, red=over-allocated
-  const getStatusDot = useCallback((user: SubordinateAllocation) => {
-    const alloc = allocations.get(user.userId);
-    const target = alloc?.quantityTarget || 0;
-    const dist = managerDistribution.get(user.userId);
-
-    if (dist && dist.remaining < 0) return { color: 'bg-destructive', label: 'Over-allocated' };
-    if (dist && dist.remaining > 0 && dist.total > 0) return { color: 'bg-amber-500', label: 'Partially distributed' };
-    if (target === 0) return { color: 'bg-muted-foreground/40', label: 'Not assigned' };
-    return { color: 'bg-emerald-500', label: 'Assigned' };
-  }, [allocations, managerDistribution]);
-
-  // Handle split dialog open
+  // Split dialog
   const openSplitDialog = useCallback((manager: SubordinateAllocation) => {
     setSplitDialogManager(manager);
     setSplitDialogOpen(true);
   }, []);
 
-  // Handle split dialog apply
   const handleSplitApply = useCallback((updatedChildren: Array<{
     userId: string; quantityTarget: number; revenueTarget: number; visitsTarget: number; percentage: number;
   }>) => {
@@ -584,13 +576,12 @@ export function AllocationTable({
     toast.success('Split applied successfully');
   }, []);
 
-  // Save mutation - saves each user's strategy + computed targets
+  // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       const upserts = Array.from(allocations.values()).map(alloc => {
-        const userStrategy = perUserStrategies.get(alloc.userId) || alloc.targetStrategy || 'roll_down';
-        const isRollUpManager = userStrategy === 'roll_up' && alloc.subordinateCount > 0;
-        const effective = effectiveTargets.get(alloc.userId);
+        const levelStrategy = levelStrategies.get(alloc.level) || 'roll_down';
+        const userStrategy = alloc.subordinateCount > 0 ? levelStrategy : 'roll_down';
 
         return {
           id: alloc.existingPlanId || undefined,
@@ -599,10 +590,10 @@ export function AllocationTable({
           fiscal_year: `${fyYear}-${fyYear + 1}`,
           year_start: fyYear,
           year_end: fyYear + 1,
-          quantity_target: isRollUpManager ? (effective?.quantity || 0) : alloc.quantityTarget,
-          revenue_target: isRollUpManager ? (effective?.revenue || 0) : alloc.revenueTarget,
+          quantity_target: alloc.quantityTarget,
+          revenue_target: alloc.revenueTarget,
           quantity_unit: quantityUnit,
-          target_strategy: alloc.subordinateCount > 0 ? userStrategy : 'roll_down',
+          target_strategy: userStrategy,
         };
       });
 
@@ -612,25 +603,15 @@ export function AllocationTable({
       if (error) throw error;
 
       // Save parent manager's plan
+      const rootStrategy = levelStrategies.get(0) || 'roll_down';
       const managerPlanData: Record<string, unknown> = {
         user_id: parentUserId,
         year: fyYear,
-        target_strategy: targetStrategy,
+        target_strategy: rootStrategy,
         quantity_unit: quantityUnit,
+        quantity_target: totalQuantity,
+        revenue_target: totalRevenue,
       };
-
-      if (targetStrategy === 'roll_up') {
-        managerPlanData.quantity_target = rollUpTotals.quantity;
-        managerPlanData.revenue_target = rollUpTotals.revenue;
-      } else if (targetStrategy === 'independent') {
-        managerPlanData.quantity_target = managerOwnQuantity;
-        managerPlanData.revenue_target = managerOwnRevenue;
-        managerPlanData.manager_own_quantity_target = managerOwnQuantity;
-        managerPlanData.manager_own_revenue_target = managerOwnRevenue;
-      } else {
-        managerPlanData.quantity_target = totalQuantity;
-        managerPlanData.revenue_target = totalRevenue;
-      }
 
       const { error: managerError } = await supabase
         .from('user_business_plans')
@@ -647,26 +628,18 @@ export function AllocationTable({
     },
   });
 
-  // Check if a user is a roll_up manager
-  const isRollUpUser = useCallback((userId: string, subordinateCount: number) => {
-    if (subordinateCount === 0) return false;
-    return (perUserStrategies.get(userId) || 'roll_down') === 'roll_up';
-  }, [perUserStrategies]);
-
   // Render a single user card (Tree View)
   const renderUserCard = (user: SubordinateAllocation, depth: number = 0) => {
     const isExpanded = expandedUsers.has(user.userId);
     const hasChildren = user.children.length > 0;
     const levelBg = getLevelBackground(user.level);
-    const isDirectReport = user.level === 1;
     const isManager = user.subordinateCount > 0;
-    const userIsRollUp = isRollUpUser(user.userId, user.subordinateCount);
-    const effective = effectiveTargets.get(user.userId);
     const statusDot = getStatusDot(user);
     const dist = managerDistribution.get(user.userId);
-    const canEdit = isDirectReport; // Only direct reports are editable
+    const alloc = allocations.get(user.userId);
+    const levelStrategy = levelStrategies.get(user.level) || 'roll_down';
 
-    // Compact mode: single line
+    // Compact mode
     if (displayDensity === 'compact') {
       return (
         <div key={user.userId} style={{ marginLeft: `${depth * 24}px` }}>
@@ -688,16 +661,17 @@ export function AllocationTable({
                 <Users className="h-2.5 w-2.5" />{user.subordinateCount}
               </Badge>
             )}
+            {isManager && <StrategyBadge strategy={levelStrategy} />}
             <div className="flex-1" />
             {enabledMetrics.quantity && (
               <span className="text-sm font-mono font-medium">
-                {formatNumber(allocations.get(user.userId)?.quantityTarget || 0)} <span className="text-xs text-muted-foreground">{quantityUnit}</span>
+                {formatNumber(alloc?.quantityTarget || 0)} <span className="text-xs text-muted-foreground">{quantityUnit}</span>
               </span>
             )}
             {enabledMetrics.revenue && (
-              <span className="text-sm font-mono font-medium">{formatCurrency(allocations.get(user.userId)?.revenueTarget || 0)}</span>
+              <span className="text-sm font-mono font-medium">{formatCurrency(alloc?.revenueTarget || 0)}</span>
             )}
-            {isManager && canEdit && (
+            {fineTuneMode && isManager && (
               <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => openSplitDialog(user)}>
                 <Split className="h-3 w-3" /> Split
               </Button>
@@ -710,26 +684,19 @@ export function AllocationTable({
       );
     }
 
-    // Expanded mode (full card)
+    // Expanded mode
     return (
       <div key={user.userId} style={{ marginLeft: `${depth * 24}px` }}>
         <div className={cn('flex flex-col gap-1 p-3 rounded-lg border transition-all mb-2', levelBg)}>
           <div className="flex items-center gap-3">
-            {/* Expand/Collapse */}
             <button onClick={() => toggleExpand(user.userId)} className="p-1 hover:bg-muted/50 rounded shrink-0">
               {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </button>
-
-            {/* Status dot */}
             <div className={cn('h-3 w-3 rounded-full shrink-0', statusDot.color)} title={statusDot.label} />
-
-            {/* Avatar */}
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={user.profilePictureUrl || undefined} alt={user.fullName} />
               <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">{getInitials(user.fullName)}</AvatarFallback>
             </Avatar>
-
-            {/* Name and badges */}
             <div className="flex items-center gap-2 min-w-[120px]">
               <span className="font-medium text-sm truncate">{user.fullName}</span>
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0">L{user.level}</Badge>
@@ -738,107 +705,63 @@ export function AllocationTable({
                   <Users className="h-3 w-3" />{user.subordinateCount}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 shrink-0 gap-1">
-                <Calendar className="h-3 w-3" />{getMonthRangeLabel(targetStartMonth, targetEndMonth)}
-              </Badge>
+              {isManager && <StrategyBadge strategy={levelStrategy} />}
             </div>
-
-            {/* Per-user strategy selector (only for sub-managers) */}
-            {isManager && (
-              <InlineStrategySelector
-                value={perUserStrategies.get(user.userId) || user.targetStrategy || 'roll_down'}
-                onChange={(s) => handlePerUserStrategyChange(user.userId, s)}
-              />
-            )}
 
             <div className="flex-1" />
 
-            {/* Split button for managers that are direct reports */}
-            {isManager && canEdit && (
+            {/* Fine-tune: split button */}
+            {fineTuneMode && isManager && (
               <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => openSplitDialog(user)}>
                 <Split className="h-3 w-3" /> Split
               </Button>
             )}
 
-            {/* Input fields - only editable for direct reports */}
-            {canEdit && (
+            {/* Editable fields in fine-tune mode, read-only otherwise */}
+            {fineTuneMode ? (
               <div className="flex items-center gap-3">
-                {allocationMethod === 'percentage' && !userIsRollUp && (
+                {splitMethod === 'percentage' && (
                   <div className="flex items-center gap-1">
-                    <Input type="number" value={user.percentage || ''} onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)} placeholder="0" className="h-8 w-16 text-right text-sm" min={0} max={100} step={0.5} />
+                    <Input type="number" value={alloc?.percentage || ''} onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)} placeholder="0" className="h-8 w-16 text-right text-sm" min={0} max={100} step={0.5} />
                     <span className="text-xs text-muted-foreground">%</span>
                   </div>
                 )}
                 {enabledMetrics.quantity && (
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground hidden sm:inline">Qty</span>
-                    {userIsRollUp ? (
-                      <TooltipProvider delayDuration={200}><Tooltip><TooltipTrigger asChild>
-                        <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
-                          <ArrowUpCircle className="h-3 w-3" />{formatNumber(effective?.quantity || 0)}
-                        </span>
-                      </TooltipTrigger><TooltipContent><p className="text-xs">Auto-calculated: Sum of {user.subordinateCount} subordinates</p></TooltipContent></Tooltip></TooltipProvider>
-                    ) : (
-                      <Input type="text" value={(allocations.get(user.userId)?.quantityTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.quantityTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))} placeholder="0" className="h-8 w-20 text-right text-sm" disabled={allocationMethod === 'equal'} />
-                    )}
+                    <Input type="text" value={(alloc?.quantityTarget || 0) > 0 ? formatNumber(alloc!.quantityTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))} placeholder="0" className="h-8 w-20 text-right text-sm" />
                     <span className="text-xs text-muted-foreground">{quantityUnit}</span>
                   </div>
                 )}
                 {enabledMetrics.revenue && (
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">₹</span>
-                    {userIsRollUp ? (
-                      <TooltipProvider delayDuration={200}><Tooltip><TooltipTrigger asChild>
-                        <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
-                          <ArrowUpCircle className="h-3 w-3" />{formatNumber(effective?.revenue || 0)}
-                        </span>
-                      </TooltipTrigger><TooltipContent><p className="text-xs">Auto-calculated: Sum of {user.subordinateCount} subordinates</p></TooltipContent></Tooltip></TooltipProvider>
-                    ) : (
-                      <Input type="text" value={(allocations.get(user.userId)?.revenueTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.revenueTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))} placeholder="0" className="h-8 w-24 text-right text-sm" disabled={allocationMethod === 'equal'} />
-                    )}
+                    <Input type="text" value={(alloc?.revenueTarget || 0) > 0 ? formatNumber(alloc!.revenueTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))} placeholder="0" className="h-8 w-24 text-right text-sm" />
                   </div>
                 )}
                 {enabledMetrics.visits && (
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">Visits</span>
-                    {userIsRollUp ? (
-                      <span className="inline-flex items-center gap-1 h-8 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary">
-                        <ArrowUpCircle className="h-3 w-3" />{formatNumber(effective?.visits || 0)}
-                      </span>
-                    ) : (
-                      <Input type="text" value={(allocations.get(user.userId)?.visitsTarget || 0) > 0 ? formatNumber(allocations.get(user.userId)!.visitsTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))} placeholder="0" className="h-8 w-16 text-right text-sm" disabled={allocationMethod === 'equal'} />
-                    )}
+                    <Input type="text" value={(alloc?.visitsTarget || 0) > 0 ? formatNumber(alloc!.visitsTarget) : ''} onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))} placeholder="0" className="h-8 w-16 text-right text-sm" />
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Read-only display for non-direct reports */}
-            {!canEdit && (
+            ) : (
               <div className="flex items-center gap-3">
                 {enabledMetrics.quantity && (
-                  <span className="text-sm font-mono text-muted-foreground">
-                    {formatNumber(allocations.get(user.userId)?.quantityTarget || 0)} {quantityUnit}
+                  <span className="text-sm font-mono font-medium">
+                    {formatNumber(alloc?.quantityTarget || 0)} <span className="text-xs text-muted-foreground">{quantityUnit}</span>
                   </span>
                 )}
                 {enabledMetrics.revenue && (
-                  <span className="text-sm font-mono text-muted-foreground">
-                    {formatCurrency(allocations.get(user.userId)?.revenueTarget || 0)}
-                  </span>
+                  <span className="text-sm font-mono font-medium">{formatCurrency(alloc?.revenueTarget || 0)}</span>
                 )}
-                {!isDirectReport && (
-                  <Badge variant="outline" className="text-[9px] px-1.5 py-0">Read-only</Badge>
+                {enabledMetrics.visits && (
+                  <span className="text-sm font-mono font-medium">{formatNumber(alloc?.visitsTarget || 0)} <span className="text-xs text-muted-foreground">visits</span></span>
                 )}
               </div>
             )}
           </div>
-
-          {/* Auto-calculated label for roll-up managers */}
-          {userIsRollUp && (
-            <p className="text-[11px] text-primary/70 ml-10 flex items-center gap-1">
-              <ArrowUpCircle className="h-3 w-3" />Auto-calculated from {user.subordinateCount} subordinates
-            </p>
-          )}
 
           {/* Distribution warning for managers */}
           {dist && dist.total > 0 && dist.remaining !== 0 && (
@@ -874,12 +797,12 @@ export function AllocationTable({
             </div>
           )}
 
-          {/* Daily Average Section (expandable) */}
+          {/* Daily Average Section */}
           {isExpanded && !hasChildren && (
             <DailyAvgPanel
-              quantityTarget={allocations.get(user.userId)?.quantityTarget || 0}
-              revenueTarget={allocations.get(user.userId)?.revenueTarget || 0}
-              visitsTarget={allocations.get(user.userId)?.visitsTarget || 0}
+              quantityTarget={alloc?.quantityTarget || 0}
+              revenueTarget={alloc?.revenueTarget || 0}
+              visitsTarget={alloc?.visitsTarget || 0}
               quantityUnit={quantityUnit}
               enabledMetrics={enabledMetrics}
               targetStartMonth={targetStartMonth}
@@ -888,7 +811,6 @@ export function AllocationTable({
           )}
         </div>
 
-        {/* Children */}
         {isExpanded && hasChildren && (
           <div>{user.children.map(child => renderUserCard(child, depth + 1))}</div>
         )}
@@ -896,7 +818,7 @@ export function AllocationTable({
     );
   };
 
-  // Render Table View
+  // Table View
   const renderTableView = () => {
     const allUsers = Array.from(allocations.values()).sort((a, b) => a.level - b.level || a.fullName.localeCompare(b.fullName));
 
@@ -908,9 +830,6 @@ export function AllocationTable({
               <th className="text-left p-3 text-sm font-medium">Team Member</th>
               <th className="text-center p-3 text-sm font-medium w-16">Level</th>
               <th className="text-center p-3 text-sm font-medium w-28">Strategy</th>
-              {allocationMethod === 'percentage' && (
-                <th className="text-right p-3 text-sm font-medium w-20">%</th>
-              )}
               {enabledMetrics.quantity && (
                 <th className="text-right p-3 text-sm font-medium">Qty ({quantityUnit})</th>
               )}
@@ -925,8 +844,8 @@ export function AllocationTable({
           <tbody>
             {allUsers.map(user => {
               const isManager = user.subordinateCount > 0;
-              const userIsRollUp = isRollUpUser(user.userId, user.subordinateCount);
-              const effective = effectiveTargets.get(user.userId);
+              const levelStrategy = levelStrategies.get(user.level) || 'roll_down';
+              const alloc = allocations.get(user.userId);
 
               return (
                 <tr key={user.userId} className="border-b hover:bg-muted/30 transition-colors">
@@ -945,10 +864,6 @@ export function AllocationTable({
                           {user.subordinateCount}
                         </Badge>
                       )}
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
-                        <Calendar className="h-2.5 w-2.5" />
-                        {getMonthRangeLabel(targetStartMonth, targetEndMonth)}
-                      </Badge>
                     </div>
                   </td>
                   <td className="p-3 text-center">
@@ -956,92 +871,53 @@ export function AllocationTable({
                   </td>
                   <td className="p-3 text-center">
                     {isManager ? (
-                      <InlineStrategySelector
-                        value={perUserStrategies.get(user.userId) || user.targetStrategy || 'roll_down'}
-                        onChange={(s) => handlePerUserStrategyChange(user.userId, s)}
-                      />
+                      <StrategyBadge strategy={levelStrategy} />
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
-                  {allocationMethod === 'percentage' && (
-                    <td className="p-3">
-                      <Input
-                        type="number"
-                        value={user.percentage || ''}
-                        onChange={(e) => handlePercentageChange(user.userId, parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        className="h-7 w-16 text-right text-sm ml-auto"
-                        min={0}
-                        max={100}
-                        step={0.5}
-                        disabled={user.level !== 1 || userIsRollUp}
-                      />
-                    </td>
-                  )}
                   {enabledMetrics.quantity && (
-                    <td className="p-3">
-                      {userIsRollUp ? (
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-flex items-center gap-1 h-7 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary ml-auto">
-                                <ArrowUpCircle className="h-3 w-3" />
-                                {formatNumber(effective?.quantity || 0)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">Sum of {user.subordinateCount} subordinates</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
+                    <td className="p-3 text-right">
+                      {fineTuneMode ? (
                         <Input
                           type="text"
-                          value={user.quantityTarget > 0 ? formatNumber(user.quantityTarget) : ''}
+                          value={(alloc?.quantityTarget || 0) > 0 ? formatNumber(alloc!.quantityTarget) : ''}
                           onChange={(e) => handleAllocationChange(user.userId, 'quantityTarget', parseNumber(e.target.value))}
                           placeholder="0"
                           className="h-7 w-24 text-right text-sm ml-auto"
-                          disabled={allocationMethod === 'equal' || (allocationMethod === 'percentage' && user.level === 1)}
                         />
+                      ) : (
+                        <span className="text-sm font-mono">{formatNumber(alloc?.quantityTarget || 0)}</span>
                       )}
                     </td>
                   )}
                   {enabledMetrics.revenue && (
-                    <td className="p-3">
-                      {userIsRollUp ? (
-                        <span className="inline-flex items-center gap-1 h-7 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary ml-auto">
-                          <ArrowUpCircle className="h-3 w-3" />
-                          {formatCurrency(effective?.revenue || 0)}
-                        </span>
-                      ) : (
+                    <td className="p-3 text-right">
+                      {fineTuneMode ? (
                         <Input
                           type="text"
-                          value={user.revenueTarget > 0 ? formatNumber(user.revenueTarget) : ''}
+                          value={(alloc?.revenueTarget || 0) > 0 ? formatNumber(alloc!.revenueTarget) : ''}
                           onChange={(e) => handleAllocationChange(user.userId, 'revenueTarget', parseNumber(e.target.value))}
                           placeholder="0"
                           className="h-7 w-28 text-right text-sm ml-auto"
-                          disabled={allocationMethod === 'equal' || (allocationMethod === 'percentage' && user.level === 1)}
                         />
+                      ) : (
+                        <span className="text-sm font-mono">{formatCurrency(alloc?.revenueTarget || 0)}</span>
                       )}
                     </td>
                   )}
                   {enabledMetrics.visits && (
-                    <td className="p-3">
-                      {userIsRollUp ? (
-                        <span className="inline-flex items-center gap-1 h-7 px-2 bg-primary/10 border border-primary/20 rounded-md text-sm font-mono text-primary ml-auto">
-                          <ArrowUpCircle className="h-3 w-3" />
-                          {formatNumber(effective?.visits || 0)}
-                        </span>
-                      ) : (
+                    <td className="p-3 text-right">
+                      {fineTuneMode ? (
                         <Input
                           type="text"
-                          value={user.visitsTarget > 0 ? formatNumber(user.visitsTarget) : ''}
+                          value={(alloc?.visitsTarget || 0) > 0 ? formatNumber(alloc!.visitsTarget) : ''}
                           onChange={(e) => handleAllocationChange(user.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
                           placeholder="0"
                           className="h-7 w-20 text-right text-sm ml-auto"
-                          disabled={allocationMethod === 'equal' || (allocationMethod === 'percentage' && user.level === 1)}
                         />
+                      ) : (
+                        <span className="text-sm font-mono">{formatNumber(alloc?.visitsTarget || 0)}</span>
                       )}
                     </td>
                   )}
@@ -1054,22 +930,18 @@ export function AllocationTable({
     );
   };
 
-  // Calculate totals using effective targets for direct reports
-  const allocatedQuantity = directReports.reduce((sum, u) => sum + (effectiveTargets.get(u.userId)?.quantity || 0), 0);
-  const allocatedRevenue = directReports.reduce((sum, u) => sum + (effectiveTargets.get(u.userId)?.revenue || 0), 0);
-  const allocatedVisits = directReports.reduce((sum, u) => sum + (effectiveTargets.get(u.userId)?.visits || 0), 0);
-  const totalPercentage = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.percentage || 0), 0);
+  // Calculate totals
+  const allocatedQuantity = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.quantityTarget || 0), 0);
+  const allocatedRevenue = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.revenueTarget || 0), 0);
+  const allocatedVisits = directReports.reduce((sum, u) => sum + (allocations.get(u.userId)?.visitsTarget || 0), 0);
 
-  const showRemaining = targetStrategy === 'roll_down';
   const remainingQuantity = totalQuantity - allocatedQuantity;
   const remainingRevenue = totalRevenue - allocatedRevenue;
   const remainingVisits = totalVisits - allocatedVisits;
-  const hasOverAllocation = showRemaining && (
+  const hasOverAllocation =
     (enabledMetrics.quantity && remainingQuantity < 0) || 
     (enabledMetrics.revenue && remainingRevenue < 0) || 
-    (enabledMetrics.visits && remainingVisits < 0) ||
-    (allocationMethod === 'percentage' && totalPercentage > 100)
-  );
+    (enabledMetrics.visits && remainingVisits < 0);
 
   if (isLoading) {
     return (
@@ -1104,6 +976,17 @@ export function AllocationTable({
           </CardTitle>
           
           <div className="flex items-center gap-2 sm:ml-auto">
+            {/* Fine-tune toggle */}
+            <Button
+              variant={fineTuneMode ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setFineTuneMode(!fineTuneMode)}
+            >
+              {fineTuneMode ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+              {fineTuneMode ? 'Preview' : 'Fine-tune'}
+            </Button>
+
             {/* Compact/Expanded toggle */}
             <ToggleGroup type="single" value={displayDensity} onValueChange={(v) => v && setDisplayDensity(v as DisplayDensity)} size="sm">
               <ToggleGroupItem value="compact" aria-label="Compact View" className="gap-1 px-2">
@@ -1129,121 +1012,17 @@ export function AllocationTable({
           </div>
         </div>
 
-        {/* Target Strategy Selector (for the parent/selected node) */}
+        {/* Level-wise Strategy Configuration Panel */}
         <div className="mt-3 pt-3 border-t">
-          <TargetStrategySelector value={targetStrategy} onChange={setTargetStrategy} />
+          <LevelStrategyConfig
+            levels={levelInfos}
+            levelStrategies={levelStrategies}
+            onLevelStrategyChange={handleLevelStrategyChange}
+            splitMethod={splitMethod}
+            onSplitMethodChange={setSplitMethod}
+            onAutoCalculate={handleAutoCalculate}
+          />
         </div>
-
-        {/* Manager's Own Target (Independent mode) */}
-        {targetStrategy === 'independent' && (
-          <div className="mt-3 p-3 bg-muted/30 rounded-lg border space-y-2">
-            <span className="text-sm font-medium">Manager's Own Target</span>
-            <div className="flex flex-wrap items-center gap-3">
-              {enabledMetrics.quantity && (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">Qty</span>
-                  <Input
-                    type="text"
-                    value={managerOwnQuantity > 0 ? formatNumber(managerOwnQuantity) : ''}
-                    onChange={(e) => setManagerOwnQuantity(parseNumber(e.target.value))}
-                    placeholder="0"
-                    className="h-8 w-24 text-right text-sm"
-                  />
-                  <span className="text-xs text-muted-foreground">{quantityUnit}</span>
-                </div>
-              )}
-              {enabledMetrics.revenue && (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">₹</span>
-                  <Input
-                    type="text"
-                    value={managerOwnRevenue > 0 ? formatNumber(managerOwnRevenue) : ''}
-                    onChange={(e) => setManagerOwnRevenue(parseNumber(e.target.value))}
-                    placeholder="0"
-                    className="h-8 w-28 text-right text-sm"
-                  />
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              This is the manager's personal target. Subordinate targets below are set independently.
-            </p>
-          </div>
-        )}
-
-        {/* Roll Up Summary */}
-        {targetStrategy === 'roll_up' && (
-          <div className="mt-3 p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-1">
-            <span className="text-sm font-medium text-primary">Manager's Target (Auto-calculated from subordinates)</span>
-            <div className="flex flex-wrap items-center gap-3">
-              {enabledMetrics.quantity && (
-                <Badge variant="outline" className="font-mono text-sm border-primary/30">
-                  {formatNumber(rollUpTotals.quantity)} {quantityUnit}
-                </Badge>
-              )}
-              {enabledMetrics.revenue && (
-                <Badge variant="outline" className="font-mono text-sm border-primary/30">
-                  {formatCurrency(rollUpTotals.revenue)}
-                </Badge>
-              )}
-              {enabledMetrics.visits && (
-                <Badge variant="outline" className="font-mono text-sm border-primary/30">
-                  {formatNumber(rollUpTotals.visits)} visits
-                </Badge>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Allocation Method Toggle */}
-        {targetStrategy !== 'roll_up' && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t">
-            <span className="text-sm text-muted-foreground">Method:</span>
-            <ToggleGroup 
-              type="single" 
-              value={allocationMethod} 
-              onValueChange={(v) => v && handleMethodChange(v as AllocationMethod)} 
-              size="sm"
-              className="bg-muted/50 p-0.5 rounded-lg"
-            >
-              <ToggleGroupItem 
-                value="equal" 
-                aria-label="Equal Distribution" 
-                className="gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-              >
-                <Equal className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium">Equal</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="percentage" 
-                aria-label="Percentage Based"
-                className="gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-              >
-                <Percent className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium">Percentage</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="manual" 
-                aria-label="Manual Entry"
-                className="gap-1.5 px-3 py-1.5 rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium">Manual</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
-            
-            {allocationMethod === 'equal' && (
-              <Button variant="outline" size="sm" onClick={applyEqualDistribution} className="ml-2 h-7 text-xs">
-                Re-distribute
-              </Button>
-            )}
-            {allocationMethod === 'percentage' && (
-              <Button variant="outline" size="sm" onClick={applyPercentageDistribution} className="ml-2 h-7 text-xs">
-                Apply %
-              </Button>
-            )}
-          </div>
-        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -1257,48 +1036,30 @@ export function AllocationTable({
 
         {/* Summary Section */}
         <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border">
-          <span className="font-medium text-sm">
-            {targetStrategy === 'roll_up' ? 'Total from subordinates:' 
-              : targetStrategy === 'independent' ? 'Subordinate totals:'
-              : 'Remaining to allocate:'}
-          </span>
+          <span className="font-medium text-sm">Remaining to allocate:</span>
           <div className="flex flex-wrap items-center gap-2">
-            {showRemaining && allocationMethod === 'percentage' && (
-              <Badge 
-                variant={totalPercentage > 100 ? 'destructive' : totalPercentage === 100 ? 'default' : 'secondary'}
-                className="font-mono"
-              >
-                {(100 - totalPercentage).toFixed(1)}%
-              </Badge>
-            )}
             {enabledMetrics.quantity && (
               <Badge 
-                variant={showRemaining 
-                  ? (remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary')
-                  : 'outline'}
+                variant={remainingQuantity < 0 ? 'destructive' : remainingQuantity === 0 ? 'default' : 'secondary'}
                 className="font-mono"
               >
-                {showRemaining ? formatNumber(remainingQuantity) : formatNumber(allocatedQuantity)} {quantityUnit}
+                {formatNumber(remainingQuantity)} {quantityUnit}
               </Badge>
             )}
             {enabledMetrics.revenue && (
               <Badge 
-                variant={showRemaining 
-                  ? (remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary')
-                  : 'outline'}
+                variant={remainingRevenue < 0 ? 'destructive' : remainingRevenue === 0 ? 'default' : 'secondary'}
                 className="font-mono"
               >
-                {showRemaining ? formatCurrency(remainingRevenue) : formatCurrency(allocatedRevenue)}
+                {formatCurrency(remainingRevenue)}
               </Badge>
             )}
             {enabledMetrics.visits && (
               <Badge 
-                variant={showRemaining 
-                  ? (remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary')
-                  : 'outline'}
+                variant={remainingVisits < 0 ? 'destructive' : remainingVisits === 0 ? 'default' : 'secondary'}
                 className="font-mono"
               >
-                {showRemaining ? formatNumber(remainingVisits) : formatNumber(allocatedVisits)} visits
+                {formatNumber(remainingVisits)} visits
               </Badge>
             )}
           </div>
@@ -1307,12 +1068,7 @@ export function AllocationTable({
         {hasOverAllocation && (
           <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span className="text-sm">
-              {allocationMethod === 'percentage' && totalPercentage > 100 
-                ? `Total percentage (${totalPercentage.toFixed(1)}%) exceeds 100%. Please adjust.`
-                : 'Total allocations exceed the target. Please adjust.'
-              }
-            </span>
+            <span className="text-sm">Total allocations exceed the target. Please adjust.</span>
           </div>
         )}
 

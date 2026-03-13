@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowUpCircle, ArrowDownCircle, Minus } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Minus, Users } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,8 +14,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 export type TargetStrategy = 'roll_down' | 'roll_up' | 'independent';
+export type SplitMethod = 'equal' | 'percentage' | 'manual';
 
 interface TargetStrategySelectorProps {
   value: TargetStrategy;
@@ -27,6 +29,22 @@ interface InlineStrategySelectorProps {
   value: TargetStrategy;
   onChange: (strategy: TargetStrategy) => void;
   disabled?: boolean;
+}
+
+export interface LevelInfo {
+  level: number;
+  userCount: number;
+  managerCount: number;
+}
+
+interface LevelStrategyConfigProps {
+  levels: LevelInfo[];
+  levelStrategies: Map<number, TargetStrategy>;
+  onLevelStrategyChange: (level: number, strategy: TargetStrategy) => void;
+  splitMethod: SplitMethod;
+  onSplitMethodChange: (method: SplitMethod) => void;
+  onAutoCalculate: () => void;
+  isCalculating?: boolean;
 }
 
 const strategies: { value: TargetStrategy; label: string; description: string; icon: React.ElementType }[] = [
@@ -187,5 +205,112 @@ export function StrategyBadge({ strategy }: { strategy: TargetStrategy }) {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  );
+}
+
+// NEW: Level-wise strategy configuration panel
+export function LevelStrategyConfig({
+  levels,
+  levelStrategies,
+  onLevelStrategyChange,
+  splitMethod,
+  onSplitMethodChange,
+  onAutoCalculate,
+  isCalculating,
+}: LevelStrategyConfigProps) {
+  return (
+    <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+      <div className="flex items-center gap-2">
+        <Users className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">Configure Target Distribution</span>
+      </div>
+
+      {/* Level-wise strategy */}
+      <div className="space-y-2">
+        {levels.map((lvl) => {
+          const strategy = levelStrategies.get(lvl.level) || 'roll_down';
+          const Icon = strategyIcons[strategy];
+          return (
+            <div key={lvl.level} className="flex items-center gap-3 py-1.5">
+              <Badge variant="outline" className="text-xs min-w-[40px] justify-center">
+                L{lvl.level}
+              </Badge>
+              <span className="text-sm text-muted-foreground min-w-[80px]">
+                {lvl.userCount} user{lvl.userCount !== 1 ? 's' : ''}
+                {lvl.managerCount > 0 && (
+                  <span className="text-[10px]"> ({lvl.managerCount} mgr{lvl.managerCount !== 1 ? 's' : ''})</span>
+                )}
+              </span>
+              <Select
+                value={strategy}
+                onValueChange={(v) => onLevelStrategyChange(lvl.level, v as TargetStrategy)}
+              >
+                <SelectTrigger className={cn(
+                  "h-8 w-[140px] text-xs gap-1.5",
+                  strategyColors[strategy]
+                )}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {strategies.map((s) => {
+                    const SIcon = s.icon;
+                    return (
+                      <SelectItem key={s.value} value={s.value} className="text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <SIcon className={cn('h-3.5 w-3.5', strategyColors[s.value])} />
+                          <span>{s.label}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                {strategies.find(s => s.value === strategy)?.description.slice(0, 60)}…
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Split method */}
+      <div className="flex items-center gap-3 pt-2 border-t">
+        <span className="text-sm text-muted-foreground">Split Method:</span>
+        <div className="flex gap-1">
+          {([
+            { value: 'equal' as SplitMethod, label: 'Equal Split', desc: 'Divide equally among children' },
+            { value: 'percentage' as SplitMethod, label: 'Percentage', desc: 'Distribute by percentage' },
+            { value: 'manual' as SplitMethod, label: 'Manual', desc: 'Enter values manually' },
+          ]).map((m) => (
+            <button
+              key={m.value}
+              onClick={() => onSplitMethodChange(m.value)}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-xs font-medium transition-all border',
+                splitMethod === m.value
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card border-border hover:border-primary/40 text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Auto-calculate button */}
+      <button
+        onClick={onAutoCalculate}
+        disabled={isCalculating}
+        className={cn(
+          'w-full py-2.5 rounded-lg text-sm font-semibold transition-all',
+          'bg-primary text-primary-foreground hover:bg-primary/90',
+          'disabled:opacity-50 disabled:cursor-not-allowed'
+        )}
+      >
+        {isCalculating ? 'Calculating…' : '⚡ Auto-Calculate & Preview'}
+      </button>
+    </div>
   );
 }
