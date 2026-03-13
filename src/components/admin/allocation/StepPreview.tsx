@@ -1,0 +1,151 @@
+import React, { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ChevronDown, ChevronRight, Users, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { StrategyBadge } from '../TargetStrategySelector';
+import type { TargetStrategy } from '../TargetStrategySelector';
+
+const formatNumber = (num: number) => new Intl.NumberFormat('en-IN').format(num);
+const formatCurrency = (num: number) => {
+  if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
+  if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`;
+  return `₹${formatNumber(num)}`;
+};
+const getInitials = (name: string) =>
+  name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+const getLevelBackground = (level: number) => {
+  switch (level) {
+    case 0: return 'bg-background border-border';
+    case 1: return 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800';
+    case 2: return 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800';
+    case 3: return 'bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800';
+    default: return 'bg-muted/30 border-border';
+  }
+};
+
+export interface PreviewNode {
+  userId: string;
+  fullName: string;
+  profilePictureUrl: string | null;
+  designation?: string;
+  level: number;
+  subordinateCount: number;
+  quantityTarget: number;
+  revenueTarget: number;
+  visitsTarget: number;
+  targetStrategy: TargetStrategy;
+  children: PreviewNode[];
+}
+
+interface StepPreviewProps {
+  roots: PreviewNode[];
+  quantityUnit: string;
+  enabledMetrics: { quantity: boolean; revenue: boolean; visits: boolean };
+  allocations: Map<string, { quantityTarget: number; revenueTarget: number; visitsTarget: number; targetStrategy: TargetStrategy }>;
+}
+
+export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations }: StepPreviewProps) {
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const all = new Set<string>();
+    const collect = (nodes: PreviewNode[]) => {
+      nodes.forEach(n => { all.add(n.userId); if (n.children.length) collect(n.children); });
+    };
+    collect(roots);
+    return all;
+  });
+
+  const toggle = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const renderNode = (node: PreviewNode, depth: number = 0) => {
+    const isExp = expanded.has(node.userId);
+    const hasChildren = node.children.length > 0;
+    const isManager = node.subordinateCount > 0;
+    const alloc = allocations.get(node.userId);
+    const qty = alloc?.quantityTarget ?? node.quantityTarget;
+    const rev = alloc?.revenueTarget ?? node.revenueTarget;
+    const vis = alloc?.visitsTarget ?? node.visitsTarget;
+    const strategy = alloc?.targetStrategy ?? node.targetStrategy;
+
+    // Compute child sum for managers
+    let childSum = 0;
+    if (hasChildren && enabledMetrics.quantity) {
+      node.children.forEach(c => {
+        const ca = allocations.get(c.userId);
+        childSum += ca?.quantityTarget ?? c.quantityTarget;
+      });
+    }
+    const overUnder = hasChildren ? qty - childSum : 0;
+
+    return (
+      <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
+        <div className={cn('flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-1.5 transition-all', getLevelBackground(node.level))}>
+          {hasChildren ? (
+            <button onClick={() => toggle(node.userId)} className="p-0.5 hover:bg-muted/50 rounded shrink-0">
+              {isExp ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+            </button>
+          ) : <div className="w-5" />}
+
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarImage src={node.profilePictureUrl || undefined} alt={node.fullName} />
+            <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary">{getInitials(node.fullName)}</AvatarFallback>
+          </Avatar>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium truncate">{node.fullName}</span>
+              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">L{node.level}</Badge>
+              {isManager && (
+                <Badge variant="secondary" className="text-[9px] gap-0.5 px-1 py-0 h-4">
+                  <Users className="h-2.5 w-2.5" />{node.subordinateCount}
+                </Badge>
+              )}
+              {isManager && <StrategyBadge strategy={strategy} />}
+            </div>
+            {node.designation && <p className="text-[10px] text-muted-foreground">{node.designation}</p>}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {enabledMetrics.quantity && (
+              <span className="text-sm font-mono font-semibold">
+                {formatNumber(qty)} <span className="text-xs text-muted-foreground font-normal">{quantityUnit}</span>
+              </span>
+            )}
+            {enabledMetrics.revenue && (
+              <span className="text-sm font-mono font-semibold">{formatCurrency(rev)}</span>
+            )}
+            {enabledMetrics.visits && (
+              <span className="text-sm font-mono font-semibold">{formatNumber(vis)} <span className="text-xs text-muted-foreground font-normal">visits</span></span>
+            )}
+          </div>
+        </div>
+
+        {/* Over/under warning */}
+        {hasChildren && enabledMetrics.quantity && overUnder !== 0 && (
+          <div className={cn(
+            'flex items-center gap-1.5 text-[11px] px-3 py-1 rounded mb-1',
+            overUnder < 0 ? 'text-destructive bg-destructive/10' : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30'
+          )} style={{ marginLeft: `${depth * 20 + 20}px` }}>
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            {overUnder > 0 ? `${formatNumber(overUnder)} ${quantityUnit} not yet distributed to subordinates` : `Over-allocated by ${formatNumber(Math.abs(overUnder))} ${quantityUnit}`}
+          </div>
+        )}
+
+        {isExp && hasChildren && node.children.map(c => renderNode(c, depth + 1))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-1">
+      {roots.map(r => renderNode(r))}
+    </div>
+  );
+}
