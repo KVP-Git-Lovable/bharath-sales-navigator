@@ -662,7 +662,7 @@ export function AllocationTable({
     const statusDot = getStatusDot(user);
     const dist = managerDistribution.get(user.userId);
     const alloc = allocations.get(user.userId);
-    const levelStrategy = levelStrategies.get(user.level) || 'roll_down';
+    const userStrategy = alloc?.targetStrategy || levelStrategy;
 
     // Compact mode
     if (displayDensity === 'compact') {
