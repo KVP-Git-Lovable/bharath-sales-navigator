@@ -605,8 +605,7 @@ export function AllocationTable({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const upserts = Array.from(allocations.values()).map(alloc => {
-        const levelStrategy = levelStrategies.get(alloc.level) || 'roll_down';
-        const userStrategy = alloc.subordinateCount > 0 ? levelStrategy : 'roll_down';
+        const userStrategy = alloc.targetStrategy || levelStrategies.get(alloc.level) || 'roll_down';
 
         return {
           id: alloc.existingPlanId || undefined,
