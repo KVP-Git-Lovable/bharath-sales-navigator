@@ -32,9 +32,16 @@ serve(async (req) => {
     const contentVariables = JSON.stringify({
       "1": invoiceNumber,
       "2": invoiceUrl,
+      "invoice_number": invoiceNumber,
+      "invoiceNumber": invoiceNumber,
+      "invoice_url": invoiceUrl,
+      "invoiceUrl": invoiceUrl,
+      "Infinity": invoiceNumber,
+      "-Infinity": invoiceNumber,
     });
 
     console.log(`Sending WhatsApp for invoice ${invoiceNumber}, URL: ${invoiceUrl}`);
+    console.log(`Using ContentVariables: ${contentVariables}`);
 
     const results = await Promise.all(
       recipients.map(async (to) => {
@@ -43,7 +50,6 @@ serve(async (req) => {
           From: 'whatsapp:+917411681616',
           ContentSid: 'HX2b27e4c3a2353117297ef3d48c04e292',
           ContentVariables: contentVariables,
-          MediaUrl: invoiceUrl,
         });
 
         const response = await fetch(twilioUrl, {
