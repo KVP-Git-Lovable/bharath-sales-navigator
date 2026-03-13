@@ -368,25 +368,24 @@ export function AllocationTable({
 
   const handleEqualSplit = useCallback(() => {
     if (!directReports.length) return;
-    // Weight by subordinate count — managers with more subordinates get proportionally more
-    const totalSubs = directReports.reduce((sum, dr) => sum + Math.max(dr.subordinateCount, 1), 0);
+    // Equal split among direct reports (weight = 1 each)
+    const count = directReports.length;
     setAllocations(prev => {
       const next = new Map(prev);
       directReports.forEach(dr => {
         const current = next.get(dr.userId);
         if (current) {
-          const weight = Math.max(dr.subordinateCount, 1) / totalSubs;
           next.set(dr.userId, {
             ...current,
-            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity * weight) : 0,
-            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue * weight) : 0,
-            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits * weight) : 0,
+            quantityTarget: enabledMetrics.quantity ? Math.round(totalQuantity / count) : 0,
+            revenueTarget: enabledMetrics.revenue ? Math.round(totalRevenue / count) : 0,
+            visitsTarget: enabledMetrics.visits ? Math.round(totalVisits / count) : 0,
           });
         }
       });
       return next;
     });
-    toast.success('Targets distributed proportionally based on subordinate count');
+    toast.success('Targets split equally among direct reports');
   }, [directReports, totalQuantity, totalRevenue, totalVisits, enabledMetrics]);
 
   // Auto-calculate when entering Step 2
