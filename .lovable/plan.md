@@ -1,37 +1,49 @@
 
+# Scalable Target Management — Plan
 
-# Show Only Direct Subordinates + Strategy Selector for Sub-Managers
-
-## Problem
-Currently, Step 1 shows the full nested hierarchy under each L1 manager (e.g., Shravya's team members are visible under Prajwal). The user wants:
-1. Each manager card in Step 1 should only show **direct subordinate names** (not their sub-teams)
-2. If a direct subordinate is also a manager (like Shravya under Prajwal), she should get her own **strategy selector** (Roll Down/Roll Up/Independent)
-3. Sub-managers like Shravya manage their own team's targets at their own level -- the parent manager doesn't see or manage those details
-
-## Changes
-
-### 1. `StepAssignManagers.tsx` -- Simplify team tree to direct reports only
-- Replace the recursive `renderTeamTree` with a flat list showing only `depth === 0` children (direct subordinates)
-- For each direct subordinate who is also a manager (`subordinateCount > 0`), show:
-  - Name + team size badge
-  - An `InlineStrategySelector` so the parent can set their strategy
-  - A note like "Manages X team members" (but don't list those members)
-- Remove the recursive rendering of indirect subordinates entirely
-- Keep the expand/collapse toggle but now it just shows the flat list of direct reports with strategy options
-
-### 2. `StepAssignManagers.tsx` -- Update interfaces
-- Update `TeamNode` usage: only render first level, don't recurse into `node.children`
-- Add `onStrategyChange` callback support for sub-manager nodes (not just the L1 manager card)
-- The `onStrategyChange` prop already accepts any userId, so sub-manager strategy changes will work with the existing `handleStrategyChange` in `AllocationTable.tsx`
-
-### 3. `AllocationTable.tsx` -- No structural changes needed
-- The existing `handleStrategyChange` already works for any userId in the allocations map
-- The `autoDistributeTargets` function already recurses through the full tree using per-node strategies
-- Preview (Step 2) and Review (Step 3) already show the full hierarchy correctly
+## Status: ✅ Implemented
 
 ## Summary
-The only file changing is `StepAssignManagers.tsx`:
-- Direct subordinates shown as a simple list (no deeper nesting)
-- Sub-managers get an `InlineStrategySelector` + "Manages N members" indicator
-- No recursive tree display of indirect reports
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
+## What Was Done
+
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
+
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
+
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
+
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
+
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically

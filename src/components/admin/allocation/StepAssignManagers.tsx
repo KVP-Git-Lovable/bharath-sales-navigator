@@ -95,26 +95,30 @@ export function StepAssignManagers({
     });
   };
 
-  const renderTeamTree = (nodes: TeamNode[], depth = 0): React.ReactNode => {
+  const renderDirectReports = (nodes: TeamNode[]): React.ReactNode => {
     return nodes.map((node) => (
-      <div key={`${node.userId}-${depth}`} className="space-y-1">
-        <div
-          className="flex items-center gap-2 py-1"
-          style={{ marginLeft: `${depth * 14}px` }}
-        >
-          <span className="text-xs text-muted-foreground">{depth === 0 ? '↳' : '•'}</span>
+      <div key={node.userId} className="flex items-center justify-between py-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">↳</span>
           <span className="text-xs font-medium text-foreground">{node.fullName}</span>
-          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
-            {depth === 0 ? 'Direct' : 'Indirect'}
-          </Badge>
           {node.subordinateCount > 0 && (
-            <Badge variant="secondary" className="text-[9px] gap-0.5 px-1 py-0 h-4">
-              <Users className="h-2.5 w-2.5" />
-              {node.subordinateCount}
-            </Badge>
+            <>
+              <Badge variant="secondary" className="text-[9px] gap-0.5 px-1 py-0 h-4">
+                <Users className="h-2.5 w-2.5" />
+                {node.subordinateCount}
+              </Badge>
+              <span className="text-[10px] text-muted-foreground">
+                Manages {node.subordinateCount} member{node.subordinateCount > 1 ? 's' : ''}
+              </span>
+            </>
           )}
         </div>
-        {node.children.length > 0 && renderTeamTree(node.children, depth + 1)}
+        {node.subordinateCount > 0 && (
+          <InlineStrategySelector
+            value={(node as any).targetStrategy || 'roll_down'}
+            onChange={(s) => onStrategyChange(node.userId, s)}
+          />
+        )}
       </div>
     ));
   };
@@ -212,9 +216,9 @@ export function StepAssignManagers({
                   </button>
 
                   {isExpanded && (
-                    <div className="rounded-md border bg-muted/20 p-2">
-                      {renderTeamTree(mgr.children)}
-                    </div>
+                     <div className="rounded-md border bg-muted/20 p-2 space-y-0.5">
+                       {renderDirectReports(mgr.children)}
+                     </div>
                   )}
                 </div>
               )}
