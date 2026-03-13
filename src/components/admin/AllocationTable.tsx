@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { TargetStrategy, SplitMethod, LevelStrategyConfig, LevelInfo, StrategyBadge } from './TargetStrategySelector';
+import { TargetStrategy, SplitMethod, LevelStrategyConfig, LevelInfo, StrategyBadge, InlineStrategySelector } from './TargetStrategySelector';
 import { TargetSplitDialog } from './TargetSplitDialog';
 import {
   Tooltip,
