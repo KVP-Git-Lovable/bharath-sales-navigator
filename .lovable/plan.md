@@ -1,67 +1,49 @@
 
+# Scalable Target Management — Plan
 
-# Nested Mini Target Boxes for Sub-Managers
+## Status: ✅ Implemented
 
-## What Changes
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-In `StepAssignManagers.tsx`, when rendering direct reports inside a manager's card, sub-managers (those with `subordinateCount > 0`) will get a **mini nested target input box** instead of just a name row. Regular users (no subordinates) remain as simple name rows.
+## What Was Done
 
-## Current vs Proposed
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-**Current**: Shravya shows as a flat row with name + badge + strategy selector
-**Proposed**: Shravya gets a small bordered card with:
-- Name + team badge + strategy selector (top row)
-- Strategy description text
-- Target input fields (Qty/Revenue/Visits) matching enabled metrics
-- "Distributed to team" label when strategy is roll_down
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-## Changes
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-### `StepAssignManagers.tsx`
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-1. **Extend `TeamNode` interface** to include target fields: `quantityTarget`, `revenueTarget`, `visitsTarget`, `targetStrategy`
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-2. **Replace `renderDirectReports`** logic:
-   - For nodes with `subordinateCount === 0`: render simple name row (current behavior)
-   - For nodes with `subordinateCount > 0`: render a mini card with:
-     - Name + badge + strategy selector header
-     - Strategy description
-     - Editable target inputs (same style as parent but slightly smaller/indented)
-     - Uses existing `onTargetChange(node.userId, field, value)` and `onStrategyChange(node.userId, strategy)`
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-3. **Pass `enabledMetrics` and `quantityUnit`** into `renderDirectReports` (already available in scope)
-
-### `AllocationTable.tsx`
-
-4. **Ensure `TeamNode` children carry target data**: When building manager rows, populate each child's `quantityTarget`, `revenueTarget`, `visitsTarget`, and `targetStrategy` from the allocations map so the mini boxes show current values.
-
-### Visual Layout
-
-```text
-┌─ Prajwal Card ──────────────────────────────┐
-│ [Avatar] Prajwal (8 members)  [Roll Down ▾] │
-│ Target will be distributed to subordinates   │
-│                                              │
-│ ▾ Reporting structure (5 direct)             │
-│ ┌──────────────────────────────────────────┐ │
-│ │ ↳ Alice                                  │ │
-│ │ ↳ Dharmesh                               │ │
-│ │ ↳ Nishdeep                               │ │
-│ │ ↳ Suyog                                  │ │
-│ │                                          │ │
-│ │ ↳ Shravya  [👥 3]  Manages 3 members     │ │
-│ │   ┌────────────────────────────────────┐ │ │
-│ │   │ [Roll Down ▾]                      │ │ │
-│ │   │ Distributed to team                │ │ │
-│ │   │ Qty [____] Kg                      │ │ │
-│ │   └────────────────────────────────────┘ │ │
-│ └──────────────────────────────────────────┘ │
-│                                              │
-│ Qty [____] Kg                                │
-└──────────────────────────────────────────────┘
-```
-
-## Files to Modify
-- `StepAssignManagers.tsx` — Extend TeamNode, add mini target card for sub-managers
-- `AllocationTable.tsx` — Populate target data on TeamNode children
-
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically

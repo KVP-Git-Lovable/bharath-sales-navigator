@@ -33,6 +33,10 @@ interface TeamNode {
   fullName: string;
   subordinateCount: number;
   children: TeamNode[];
+  quantityTarget?: number;
+  revenueTarget?: number;
+  visitsTarget?: number;
+  targetStrategy?: TargetStrategy;
 }
 
 interface ManagerRow {
@@ -96,31 +100,88 @@ export function StepAssignManagers({
   };
 
   const renderDirectReports = (nodes: TeamNode[]): React.ReactNode => {
-    return nodes.map((node) => (
-      <div key={node.userId} className="flex items-center justify-between py-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">↳</span>
-          <span className="text-xs font-medium text-foreground">{node.fullName}</span>
-          {node.subordinateCount > 0 && (
-            <>
-              <Badge variant="secondary" className="text-[9px] gap-0.5 px-1 py-0 h-4">
-                <Users className="h-2.5 w-2.5" />
-                {node.subordinateCount}
-              </Badge>
-              <span className="text-[10px] text-muted-foreground">
-                Manages {node.subordinateCount} member{node.subordinateCount > 1 ? 's' : ''}
-              </span>
-            </>
-          )}
+    return nodes.map((node) => {
+      const isSubManager = node.subordinateCount > 0;
+      const nodeStrategy = node.targetStrategy || 'roll_down';
+
+      if (!isSubManager) {
+        // Simple name row for regular users
+        return (
+          <div key={node.userId} className="flex items-center gap-2 py-1.5">
+            <span className="text-xs text-muted-foreground">↳</span>
+            <span className="text-xs font-medium text-foreground">{node.fullName}</span>
+          </div>
+        );
+      }
+
+      // Mini target card for sub-managers
+      return (
+        <div key={node.userId} className="space-y-1 py-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">↳</span>
+            <span className="text-xs font-medium text-foreground">{node.fullName}</span>
+            <Badge variant="secondary" className="text-[9px] gap-0.5 px-1 py-0 h-4">
+              <Users className="h-2.5 w-2.5" />
+              {node.subordinateCount}
+            </Badge>
+            <span className="text-[10px] text-muted-foreground">
+              Manages {node.subordinateCount} member{node.subordinateCount > 1 ? 's' : ''}
+            </span>
+          </div>
+          {/* Mini nested target box */}
+          <div className="ml-5 rounded-md border border-border/60 bg-muted/30 p-2.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <InlineStrategySelector
+                value={nodeStrategy}
+                onChange={(s) => onStrategyChange(node.userId, s)}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground italic">
+              {strategyDescriptions[nodeStrategy]}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {enabledMetrics.quantity && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">Qty</span>
+                  <Input
+                    type="text"
+                    value={(node.quantityTarget || 0) > 0 ? formatNumber(node.quantityTarget!) : ''}
+                    onChange={(e) => onTargetChange(node.userId, 'quantityTarget', parseNumber(e.target.value))}
+                    placeholder="0"
+                    className="h-7 w-20 text-right text-xs"
+                  />
+                  <span className="text-[10px] text-muted-foreground">{quantityUnit}</span>
+                </div>
+              )}
+              {enabledMetrics.revenue && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">₹</span>
+                  <Input
+                    type="text"
+                    value={(node.revenueTarget || 0) > 0 ? formatNumber(node.revenueTarget!) : ''}
+                    onChange={(e) => onTargetChange(node.userId, 'revenueTarget', parseNumber(e.target.value))}
+                    placeholder="0"
+                    className="h-7 w-24 text-right text-xs"
+                  />
+                </div>
+              )}
+              {enabledMetrics.visits && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">Visits</span>
+                  <Input
+                    type="text"
+                    value={(node.visitsTarget || 0) > 0 ? formatNumber(node.visitsTarget!) : ''}
+                    onChange={(e) => onTargetChange(node.userId, 'visitsTarget', Math.round(parseNumber(e.target.value)))}
+                    placeholder="0"
+                    className="h-7 w-16 text-right text-xs"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        {node.subordinateCount > 0 && (
-          <InlineStrategySelector
-            value={(node as any).targetStrategy || 'roll_down'}
-            onChange={(s) => onStrategyChange(node.userId, s)}
-          />
-        )}
-      </div>
-    ));
+      );
+    });
   };
 
   return (
