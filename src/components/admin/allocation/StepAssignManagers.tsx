@@ -154,6 +154,17 @@ export function StepAssignManagers({
             <Progress value={revPct} className="h-2" />
           </div>
         )}
+        {enabledMetrics.visits && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Visits: {formatNumber(allocatedVis)} / {formatNumber(totalVisits)}</span>
+              <span className={cn('font-medium', allocatedVis > totalVisits ? 'text-destructive' : allocatedVis === totalVisits ? 'text-emerald-600' : 'text-muted-foreground')}>
+                {totalVisits - allocatedVis > 0 ? `${formatNumber(totalVisits - allocatedVis)} remaining` : allocatedVis === totalVisits ? '✓ Fully allocated' : `Over by ${formatNumber(allocatedVis - totalVisits)}`}
+              </span>
+            </div>
+            <Progress value={visPct} className="h-2" />
+          </div>
+        )}
       </div>
 
       {/* Manager cards */}
