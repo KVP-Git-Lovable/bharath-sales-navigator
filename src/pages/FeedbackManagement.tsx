@@ -734,7 +734,16 @@ export default function FeedbackManagement() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+          </TabsContent>
+
+          {/* Configuration Tab */}
+          <TabsContent value="configuration">
+            <div className="space-y-8">
+              <FeedbackQuestionConfig />
+              <FeedbackPolicyConfig />
+            </div>
+          </TabsContent>
+        </Tabs>
 
       {/* Detail Modals */}
       <RetailerFeedbackDetailModal
