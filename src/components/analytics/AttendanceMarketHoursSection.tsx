@@ -299,6 +299,12 @@ export const AttendanceMarketHoursSection = ({
     return `${h}h ${m}m`;
   };
 
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return '-';
+    const d = new Date(timeStr);
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
   const scrollViewportClassName = cn(
     userSummaries.length > 6 && 'max-h-[320px]'
   );
