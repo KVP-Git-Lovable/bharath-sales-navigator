@@ -27,8 +27,11 @@ interface ProductivityData {
   productivity_ratio: number;
 }
 
+const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
 const ProductivityTracking = () => {
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
+  const [additionalTotal, setAdditionalTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
