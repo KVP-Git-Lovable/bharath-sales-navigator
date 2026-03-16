@@ -135,6 +135,11 @@ export const VisitCard = ({
   const [activityEvent, setActivityEvent] = useState<ActivityEvent | null>(null);
   const { user } = useAuth();
   const { fetchActivityForVisit } = useActivityEvents();
+  const { isFeedbackRequired, requiredAction: feedbackAction } = useFeedbackPolicyCheck(
+    visit.retailerId || visit.id,
+    user?.id,
+    'visit'
+  );
   // SOURCE PRIORITY for order values: db (4) > snapshot (3) > cache (2) > props (1)
   // This prevents lower-priority sources from overwriting higher-priority ones
   type OrderValueSource = 'db' | 'snapshot' | 'cache' | 'props' | null;
