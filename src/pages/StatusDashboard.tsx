@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogOut, RefreshCw, HardDrive, Clock, Activity, Database } from 'lucide-react';
+import { Eye, EyeOff, LogOut, RefreshCw, Clock, Activity, Database } from 'lucide-react';
 import { monitoring } from '@/services/MonitoringService';
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 import { ActivityLoggingSection } from '@/components/status/ActivityLoggingSection';
@@ -96,13 +96,6 @@ const StatusDashboard = () => {
           icon: <Clock className="h-6 w-6" />,
           description: `Since ${new Date(m.postmaster_start_time).toLocaleDateString()}`,
           health: uptimeSec > 86400 ? 'good' : uptimeSec > 3600 ? 'average' : 'bad',
-        },
-        {
-          label: 'Disk Reads',
-          value: formatNumber(m.blks_read),
-          icon: <HardDrive className="h-6 w-6" />,
-          description: 'Blocks read from disk',
-          health: m.cache_hit_ratio >= 99 ? 'good' : m.cache_hit_ratio >= 95 ? 'average' : 'bad',
         },
       ]);
       setLastRefreshed(new Date());
