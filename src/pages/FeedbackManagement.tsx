@@ -26,7 +26,6 @@ export default function FeedbackManagement() {
   const navigate = useNavigate();
   const { hasAdminAccess } = useAdminAccess();
   const [topTab, setTopTab] = useState("overview");
-  const { hasAdminAccess } = useAdminAccess();
   
   const [retailerFeedback, setRetailerFeedback] = useState<any[]>([]);
   const [competitionData, setCompetitionData] = useState<any[]>([]);
