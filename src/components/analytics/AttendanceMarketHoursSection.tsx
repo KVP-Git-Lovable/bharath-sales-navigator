@@ -145,7 +145,10 @@ export const AttendanceMarketHoursSection = ({
           user_id: string; 
           full_name: string; 
           date: string; 
-          startTimes: number[] 
+          startTimes: number[];
+          endTimes: number[];
+          rawStartTimes: string[];
+          rawEndTimes: string[];
         }> = {};
         
         (visitLogs || []).forEach(log => {
@@ -157,34 +160,44 @@ export const AttendanceMarketHoursSection = ({
               user_id: log.user_id,
               full_name: userNames[log.user_id] || 'Unknown',
               date: log.visit_date,
-              startTimes: []
+              startTimes: [],
+              endTimes: [],
+              rawStartTimes: [],
+              rawEndTimes: []
             };
           }
           
-          // Store the start_time timestamp
           const startTime = new Date(log.start_time).getTime();
           dateUserMap[key].startTimes.push(startTime);
+          dateUserMap[key].rawStartTimes.push(log.start_time);
+          
+          if (log.end_time) {
+            const endTime = new Date(log.end_time).getTime();
+            dateUserMap[key].endTimes.push(endTime);
+            dateUserMap[key].rawEndTimes.push(log.end_time);
+          }
         });
 
-        // Calculate retailer hours as span from first to last start_time (matching TodaySummary)
         const processedRetailerTime: RetailerTimeData[] = Object.values(dateUserMap).map(item => {
           let retailerHours = 0;
           
           if (item.startTimes.length >= 2) {
-            // Find earliest and latest start times
             const earliestStart = Math.min(...item.startTimes);
             const latestStart = Math.max(...item.startTimes);
-            
-            // Time at retailers = span from first visit to last visit
             retailerHours = (latestStart - earliestStart) / (1000 * 60 * 60);
           }
-          // If only 1 visit, retailer hours = 0 (no span)
+
+          // First check-in = earliest start_time, last check-out = latest end_time
+          const earliestStartIdx = item.startTimes.indexOf(Math.min(...item.startTimes));
+          const latestEndIdx = item.endTimes.length > 0 ? item.endTimes.indexOf(Math.max(...item.endTimes)) : -1;
           
           return {
             user_id: item.user_id,
             full_name: item.full_name,
             date: item.date,
-            retailer_hours: Math.max(0, retailerHours)
+            retailer_hours: Math.max(0, retailerHours),
+            first_check_in: item.rawStartTimes[earliestStartIdx] || null,
+            last_check_out: latestEndIdx >= 0 ? item.rawEndTimes[latestEndIdx] : null
           };
         });
         
