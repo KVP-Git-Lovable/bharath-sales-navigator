@@ -23,6 +23,8 @@ interface RetailerTimeData {
   full_name: string;
   date: string;
   retailer_hours: number;
+  first_check_in: string | null;
+  last_check_out: string | null;
 }
 
 interface UserSummary {
