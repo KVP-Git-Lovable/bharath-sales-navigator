@@ -67,6 +67,7 @@ interface BusinessPlan {
   quantity_target: number;
   quantity_unit: string;
   notes: string | null;
+  has_no_target: boolean;
 }
 
 interface Product {
