@@ -67,25 +67,71 @@ export const UsageReport = () => {
     setLoading(true);
 
     try {
-      // Get subordinates
-      const { data: subordinates } = await supabase
-        .rpc('get_all_subordinates', { manager_user_id: user.id });
+      // Check if user is admin
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      
+      const isAdmin = roleData?.some((r: any) => r.role === 'admin');
 
-      const userIds = (subordinates || []).map((s: any) => s.subordinate_user_id);
+      let userIds: string[] = [];
+
+      if (isAdmin) {
+        // Admin sees all users
+        const { data: allProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .limit(1000);
+        userIds = (allProfiles || []).map((p: any) => p.id);
+      } else {
+        // Manager sees subordinates
+        const { data: subordinates } = await supabase
+          .rpc('get_all_subordinates', { manager_user_id: user.id });
+        userIds = (subordinates || []).map((s: any) => s.subordinate_user_id);
+        // Also include self
+        if (!userIds.includes(user.id)) {
+          userIds.push(user.id);
+        }
+      }
+
       if (userIds.length === 0) {
         setUsageData([]);
         setLoading(false);
         return;
       }
 
-      // Get profiles with manager info
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, manager_id, designation')
-        .in('id', userIds);
+      // Get profiles with manager info - fetch in batches for large teams
+      const allProfiles: any[] = [];
+      const profileBatchSize = 50;
+      for (let i = 0; i < userIds.length; i += profileBatchSize) {
+        const batch = userIds.slice(i, i + profileBatchSize);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, manager_id, designation')
+          .in('id', batch);
+        if (profiles) allProfiles.push(...profiles);
+      }
 
       const profileMap: Record<string, any> = {};
-      (profiles || []).forEach(p => { profileMap[p.id] = p; });
+      allProfiles.forEach(p => { profileMap[p.id] = p; });
+
+      // Also fetch manager names not in our list
+      const missingManagerIds = allProfiles
+        .filter(p => p.manager_id && !profileMap[p.manager_id])
+        .map(p => p.manager_id);
+      
+      if (missingManagerIds.length > 0) {
+        const uniqueManagerIds = [...new Set(missingManagerIds)];
+        for (let i = 0; i < uniqueManagerIds.length; i += profileBatchSize) {
+          const batch = uniqueManagerIds.slice(i, i + profileBatchSize);
+          const { data: managerProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', batch);
+          if (managerProfiles) managerProfiles.forEach(p => { profileMap[p.id] = { ...profileMap[p.id], ...p }; });
+        }
+      }
 
       // Get module usage logs
       const fromStr = format(dateRange.from, "yyyy-MM-dd'T'HH:mm:ss");
@@ -144,7 +190,6 @@ export const UsageReport = () => {
 
       setUsageData(
         Object.values(userMap)
-          .filter(u => u.userId !== user.id) // Exclude self from list
           .sort((a, b) => b.usagePercent - a.usagePercent || b.totalTimeSeconds - a.totalTimeSeconds)
       );
     } catch (e) {
