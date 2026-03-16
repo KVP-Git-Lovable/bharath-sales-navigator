@@ -97,13 +97,6 @@ const StatusDashboard = () => {
           description: `Since ${new Date(m.postmaster_start_time).toLocaleDateString()}`,
           health: uptimeSec > 86400 ? 'good' : uptimeSec > 3600 ? 'average' : 'bad',
         },
-        {
-          label: 'Disk Reads',
-          value: formatNumber(m.blks_read),
-          icon: <HardDrive className="h-6 w-6" />,
-          description: 'Blocks read from disk',
-          health: m.cache_hit_ratio >= 99 ? 'good' : m.cache_hit_ratio >= 95 ? 'average' : 'bad',
-        },
       ]);
       setLastRefreshed(new Date());
       await fetchMemoryUsage();
