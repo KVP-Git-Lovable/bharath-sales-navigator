@@ -313,6 +313,7 @@ export function UserFYPlanTarget({
     quantity_unit: "Units",
     revenue_target: "",
     notes: "",
+    has_no_target: false,
   });
 
   // Also check hierarchy for the FY being created (in dialog) - must be after planForm is defined
