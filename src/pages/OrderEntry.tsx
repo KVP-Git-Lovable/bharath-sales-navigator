@@ -3008,5 +3008,26 @@ export const OrderEntry = () => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Overstock Prompt Dialog */}
+    <AlertDialog open={showOverstockPrompt} onOpenChange={setShowOverstockPrompt}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Update Stock Count?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Would you like to update the retailer's current stock quantities before submitting? You can update stock counts in the Grid or Table view.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>No, Continue</AlertDialogCancel>
+          <AlertDialogAction onClick={() => {
+            setShowOverstockPrompt(false);
+            setOrderMode("grid");
+          }}>
+            Yes, Update Stock
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </Layout>;
 };
