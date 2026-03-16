@@ -109,6 +109,11 @@ export const VisitCard = ({
   }>>([]);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showLocationCaptureModal, setShowLocationCaptureModal] = useState(false);
+  const [isCapturingLocation, setIsCapturingLocation] = useState(false);
+  const [retailerLat, setRetailerLat] = useState<number | undefined>(visit.retailerLat);
+  const [retailerLng, setRetailerLng] = useState<number | undefined>(visit.retailerLng);
+  const hasRetailerLocation = retailerLat != null && retailerLng != null;
   const [isNoOrderMarked, setIsNoOrderMarked] = useState(!!visit.noOrderReason);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [isCheckedOut, setIsCheckedOut] = useState(false);
@@ -2552,12 +2557,12 @@ export const VisitCard = ({
               {/* Location and Phone icons - right aligned */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${visit.retailerLat && visit.retailerLng ? `${visit.retailerLat},${visit.retailerLng}` : encodeURIComponent(visit.address || '')}`} 
+                  href={hasRetailerLocation ? `https://www.google.com/maps/search/?api=1&query=${retailerLat},${retailerLng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visit.address || '')}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="text-primary hover:text-primary/80 cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors" 
+                  className={`${hasRetailerLocation ? 'text-primary hover:text-primary/80' : 'text-destructive hover:text-destructive/80'} cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors`}
                   onClick={e => e.stopPropagation()} 
-                  title="Open in Google Maps"
+                  title={hasRetailerLocation ? "Open in Google Maps" : "Location not captured"}
                 >
                   <MapPin size={16} />
                 </a>
@@ -2734,6 +2739,12 @@ export const VisitCard = ({
                     description: "Please check in first to place an order.",
                     variant: "destructive",
                   });
+                  return;
+                }
+
+                // Check if retailer location is missing - show capture modal
+                if (!hasRetailerLocation) {
+                  setShowLocationCaptureModal(true);
                   return;
                 }
 
@@ -3703,6 +3714,73 @@ export const VisitCard = ({
             }));
           }}
         />
+
+        {/* Location Capture Modal */}
+        <Dialog open={showLocationCaptureModal} onOpenChange={setShowLocationCaptureModal}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MapPin size={18} className="text-destructive" />
+                Location Not Captured
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This retailer doesn't have a GPS location saved. Please capture the current location before placing an order.
+            </p>
+            <div className="flex gap-2 justify-end mt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowLocationCaptureModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                disabled={isCapturingLocation}
+                onClick={async () => {
+                  setIsCapturingLocation(true);
+                  try {
+                    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                      navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0,
+                      });
+                    });
+                    
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const retailerId = (visit.retailerId || visit.id) as string;
+
+                    const { error } = await supabase
+                      .from('retailers')
+                      .update({ latitude: lat, longitude: lng })
+                      .eq('id', retailerId);
+
+                    if (error) throw error;
+
+                    setRetailerLat(lat);
+                    setRetailerLng(lng);
+                    setShowLocationCaptureModal(false);
+
+                    toast({
+                      title: "Location Captured",
+                      description: "Retailer location has been saved successfully. You can now place the order.",
+                    });
+                  } catch (err: any) {
+                    console.error('Location capture error:', err);
+                    toast({
+                      title: "Location Capture Failed",
+                      description: err?.message || "Could not get your current location. Please enable GPS and try again.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsCapturingLocation(false);
+                  }
+                }}
+              >
+                {isCapturingLocation ? "Capturing..." : "Capture Location"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>;
 };

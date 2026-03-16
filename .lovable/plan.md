@@ -1,35 +1,66 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-# Plan: Location-Missing Indicator + Capture Gate on Visit Cards
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-## Problem
-Retailers created via bulk upload or without GPS often lack latitude/longitude. Currently, the MapPin icon on visit cards shows the same color regardless. Users can place orders without the retailer having stored coordinates, leaving data gaps.
+## What Was Done
 
-## What We'll Do
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-### 1. Red MapPin indicator when location is missing
-In `VisitCard.tsx`, change the MapPin icon color based on whether `visit.retailerLat` and `visit.retailerLng` exist:
-- **Has coordinates**: Current primary color (blue)
-- **Missing coordinates**: Red color with a tooltip "Location not captured"
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-### 2. Location capture gate before placing an order
-When the user taps the **Order** button and the retailer has no coordinates (`!visit.retailerLat || !visit.retailerLng`):
-- Show a modal/dialog prompting them to capture their current GPS location
-- On "Capture Location": get `navigator.geolocation.getCurrentPosition`, then update the `retailers` table with the captured `latitude` and `longitude`
-- On success: proceed to order entry as normal
-- On cancel: block navigation to order entry
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-### 3. Update retailer master with captured coordinates
-Once GPS is captured in the modal, save it to the `retailers` table via Supabase update, and update the local visit state so the MapPin turns blue immediately.
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-## Files to Modify
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-- **`src/components/VisitCard.tsx`**:
-  - Change MapPin color conditionally (red vs primary) at ~line 2554-2563
-  - Add state for location capture modal
-  - Add intercept logic in the Order button onClick (~line 2716) to check for missing coords
-  - Add a location capture dialog component (inline or extracted)
-  - After capture, update `visit.retailerLat`/`retailerLng` locally and save to DB
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-No database schema changes needed — `retailers` table already has `latitude` and `longitude` columns.
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
+## Phase: Target Split, Dual Visibility & Manager Self-Service
+
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
+
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
+
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
