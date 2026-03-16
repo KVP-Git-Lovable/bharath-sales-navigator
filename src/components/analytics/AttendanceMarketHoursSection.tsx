@@ -527,6 +527,8 @@ export const AttendanceMarketHoursSection = ({
                     <TableHead className="text-right">Check In</TableHead>
                     <TableHead className="text-right">Check Out</TableHead>
                     <TableHead className="text-right">Working Hours</TableHead>
+                    <TableHead className="text-right">Retailer In</TableHead>
+                    <TableHead className="text-right">Retailer Out</TableHead>
                     <TableHead className="text-right">Time at Retailers</TableHead>
                   </TableRow>
                 </thead>
@@ -542,6 +544,12 @@ export const AttendanceMarketHoursSection = ({
                       </TableCell>
                       <TableCell className="text-right text-blue-600 font-medium">
                         {formatHours(row.working_hours)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.retailer_check_in)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.retailer_check_out)}
                       </TableCell>
                       <TableCell className="text-right text-green-600 font-medium">
                         {formatHours(row.retailer_hours)}
@@ -559,6 +567,8 @@ export const AttendanceMarketHoursSection = ({
                         drilldownData.reduce((sum, r) => sum + r.working_hours, 0) / drilldownData.length
                       )}
                     </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right font-bold text-green-600">
                       {formatHours(
                         drilldownData.reduce((sum, r) => sum + r.retailer_hours, 0) / drilldownData.length
