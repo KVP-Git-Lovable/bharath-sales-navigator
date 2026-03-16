@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MessageSquare, Trophy, Image, Users, Calendar, Filter, RefreshCw, Eye } from "lucide-react";
+import { ArrowLeft, MessageSquare, Trophy, Image, Users, Calendar, Filter, RefreshCw, Eye, Settings, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
@@ -17,12 +17,15 @@ import { RetailerFeedbackDetailModal } from "@/components/admin/RetailerFeedback
 import { CompetitionDetailModal } from "@/components/admin/CompetitionDetailModal";
 import { BrandingRequestDetailModal } from "@/components/admin/BrandingRequestDetailModal";
 import { JointSalesDetailModal } from "@/components/admin/JointSalesDetailModal";
+import FeedbackQuestionConfig from "@/components/admin/FeedbackQuestionConfig";
+import FeedbackPolicyConfig from "@/components/admin/FeedbackPolicyConfig";
 
 type DetailModalType = 'retailer' | 'branding' | 'competition' | 'jointsales' | null;
 
 export default function FeedbackManagement() {
   const navigate = useNavigate();
   const { hasAdminAccess } = useAdminAccess();
+  const [topTab, setTopTab] = useState("overview");
   
   const [retailerFeedback, setRetailerFeedback] = useState<any[]>([]);
   const [competitionData, setCompetitionData] = useState<any[]>([]);
@@ -408,6 +411,20 @@ export default function FeedbackManagement() {
           </div>
         </Card>
 
+        {/* Top-level Tabs: Overview | Configuration */}
+        <Tabs value={topTab} onValueChange={setTopTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="configuration" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Feedback Configuration
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
         {/* Tabs */}
         <Tabs defaultValue="retailer" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
@@ -715,6 +732,16 @@ export default function FeedbackManagement() {
                 </div>
               )}
             </Card>
+          </TabsContent>
+        </Tabs>
+          </TabsContent>
+
+          {/* Configuration Tab */}
+          <TabsContent value="configuration">
+            <div className="space-y-8">
+              <FeedbackQuestionConfig />
+              <FeedbackPolicyConfig />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

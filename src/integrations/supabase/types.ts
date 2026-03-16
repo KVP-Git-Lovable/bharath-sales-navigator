@@ -4995,6 +4995,140 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_policies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          module: string
+          name: string
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          module?: string
+          name: string
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          module?: string
+          name?: string
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      feedback_policy_rules: {
+        Row: {
+          action_type: string
+          condition_operator: string
+          condition_type: string
+          condition_value: string
+          created_at: string
+          id: string
+          is_active: boolean
+          policy_id: string
+          question_set_module: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          action_type?: string
+          condition_operator?: string
+          condition_type: string
+          condition_value?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          policy_id: string
+          question_set_module?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          condition_operator?: string
+          condition_type?: string
+          condition_value?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          policy_id?: string
+          question_set_module?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_policy_rules_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_questions: {
+        Row: {
+          applies_to: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          module: string
+          options: Json | null
+          question_text: string
+          question_type: string
+          retailer_ids: string[] | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          applies_to?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          module?: string
+          options?: Json | null
+          question_text: string
+          question_type?: string
+          retailer_ids?: string[] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          applies_to?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          module?: string
+          options?: Json | null
+          question_text?: string
+          question_type?: string
+          retailer_ids?: string[] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fy_period_targets: {
         Row: {
           created_at: string | null

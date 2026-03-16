@@ -49,6 +49,7 @@ import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
 import { CancelOrderDialog } from "./CancelOrderDialog";
 import { useActivityEvents, formatActivityDuration, type ActivityEvent } from "@/hooks/useActivityEvents";
+import { useFeedbackPolicyCheck } from "@/hooks/useFeedbackPolicyCheck";
 interface Visit {
   id: string;
   retailerId?: string;
@@ -134,6 +135,11 @@ export const VisitCard = ({
   const [activityEvent, setActivityEvent] = useState<ActivityEvent | null>(null);
   const { user } = useAuth();
   const { fetchActivityForVisit } = useActivityEvents();
+  const { isFeedbackRequired, requiredAction: feedbackAction } = useFeedbackPolicyCheck(
+    visit.retailerId || visit.id,
+    user?.id,
+    'visit'
+  );
   // SOURCE PRIORITY for order values: db (4) > snapshot (3) > cache (2) > props (1)
   // This prevents lower-priority sources from overwriting higher-priority ones
   type OrderValueSource = 'db' | 'snapshot' | 'cache' | 'props' | null;
@@ -2630,6 +2636,12 @@ export const VisitCard = ({
                   <Package size={12} className="mr-1" />
                   {stockRecordCount} Stock{stockRecordCount !== 1 ? 's' : ''}
                 </Badge>}
+              {isFeedbackRequired && (
+                <Badge className="bg-destructive text-destructive-foreground text-xs px-2 py-1">
+                  <MessageSquare size={12} className="mr-1" />
+                  Feedback Required
+                </Badge>
+              )}
               {/* Activity Badge */}
               {visit.visitType === 'activity' && activityEvent && (
                 <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs px-2 py-1">
@@ -2739,6 +2751,18 @@ export const VisitCard = ({
                     description: "Please check in first to place an order.",
                     variant: "destructive",
                   });
+                  return;
+                }
+
+                // Check if feedback policy requires feedback before ordering
+                if (isFeedbackRequired && (feedbackAction === 'block_order' || feedbackAction === 'mandatory_feedback')) {
+                  toast({
+                    title: "Feedback Required",
+                    description: "Please submit feedback for this retailer before placing an order.",
+                    variant: "destructive",
+                  });
+                  setShowFeedbackModal(true);
+                  setFeedbackActiveTab("retailer");
                   return;
                 }
 
