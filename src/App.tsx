@@ -20,6 +20,7 @@ import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import ForcedPasswordChangeDialog from "@/components/auth/ForcedPasswordChangeDialog";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
+import { useModuleUsageTracker } from "@/hooks/useModuleUsageTracker";
 
 // Initialize visit status cache early to avoid flicker
 visitStatusCache.init();
@@ -147,6 +148,7 @@ import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
 import AIFeaturesExport from "./pages/AIFeaturesExport";
 import { TeamApprovals } from "./pages/TeamApprovals";
+import { UsageReport } from "./pages/UsageReport";
 
 // Distributor Portal Pages
 import DistributorLogin from "./pages/distributor-portal/DistributorLogin";
@@ -303,6 +305,7 @@ const App = () => {
 const AppContent = ({ hasError }: { hasError: boolean }) => {
   useAndroidBackButton();
   useActivityTracker();
+  useModuleUsageTracker();
   const { user, mustChangePassword, onPasswordChanged, dismissPasswordChange } = useAuth();
 
   if (hasError) {
@@ -444,6 +447,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/my-targets" element={<ProtectedRoute><MyTargets /></ProtectedRoute>} />
         <Route path="/team-targets" element={<ProtectedRoute><TeamTargets /></ProtectedRoute>} />
         <Route path="/joint-sales-analytics" element={<ProtectedRoute><JointSalesAnalytics /></ProtectedRoute>} />
+        <Route path="/usage-report" element={<ProtectedRoute><UsageReport /></ProtectedRoute>} />
         <Route path="/features/beat-planning" element={<BeatPlanningFeature />} />
         <Route path="/features/retailer-management" element={<RetailerManagementFeature />} />
         <Route path="/features/visit-scheduling" element={<VisitSchedulingFeature />} />

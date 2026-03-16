@@ -7639,6 +7639,42 @@ export type Database = {
         }
         Relationships: []
       }
+      module_usage_logs: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          module_category: string
+          module_name: string
+          route_path: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          module_category?: string
+          module_name: string
+          route_path: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          module_category?: string
+          module_name?: string
+          route_path?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_event_log: {
         Row: {
           actor_user_id: string | null
