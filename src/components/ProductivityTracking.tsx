@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown } from 'lucide-react';
+import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown, Car, Utensils, Receipt, IndianRupee, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, isSameDay } from 'date-fns';
@@ -27,8 +27,11 @@ interface ProductivityData {
   productivity_ratio: number;
 }
 
+const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
 const ProductivityTracking = () => {
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
+  const [additionalTotal, setAdditionalTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
@@ -209,6 +212,16 @@ const ProductivityTracking = () => {
 
       setProductivityData(dataArray);
 
+      // Fetch additional expenses for the date range
+      const { data: addExpData } = await (supabase as any)
+        .from('additional_expenses')
+        .select('amount, status')
+        .gte('expense_date', format(start, 'yyyy-MM-dd'))
+        .lte('expense_date', format(end, 'yyyy-MM-dd'))
+        .in('status', ['manager_approved', 'paid']);
+
+      const addTotal = (addExpData || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      setAdditionalTotal(addTotal);
     } catch (error) {
       console.error('Error fetching productivity data:', error);
       toast({
@@ -290,8 +303,42 @@ const ProductivityTracking = () => {
     );
   }
 
+  // Aggregated totals
+  const totalTA = productivityData.reduce((s, d) => s + d.travel_allowance, 0);
+  const totalDA = productivityData.reduce((s, d) => s + d.daily_allowance, 0);
+  const totalOrderValue = productivityData.reduce((s, d) => s + d.total_order_value, 0);
+  const totalExpenses = totalTA + totalDA + additionalTotal;
+
+  const summaryCards = [
+    { label: 'Travel (TA)', value: fmt(totalTA), icon: Car, bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-200 dark:border-blue-800', iconColor: 'text-blue-600', valueColor: 'text-blue-700 dark:text-blue-400' },
+    { label: 'Daily (DA)', value: fmt(totalDA), icon: Utensils, bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-200 dark:border-green-800', iconColor: 'text-green-600', valueColor: 'text-green-700 dark:text-green-400' },
+    { label: 'Additional', value: fmt(additionalTotal), icon: Receipt, bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-200 dark:border-purple-800', iconColor: 'text-purple-600', valueColor: 'text-purple-700 dark:text-purple-400' },
+    { label: 'Total Expenses', value: fmt(totalExpenses), icon: IndianRupee, bg: 'bg-primary/5', border: 'border-primary/20', iconColor: 'text-primary', valueColor: 'text-primary' },
+    { label: 'Order Value', value: fmt(totalOrderValue), icon: ShoppingCart, bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-200 dark:border-orange-800', iconColor: 'text-orange-600', valueColor: 'text-orange-700 dark:text-orange-400' },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* Team Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {summaryCards.map((card, idx) => (
+          <div
+            key={card.label}
+            className={cn(
+              'flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all',
+              card.bg, card.border,
+              idx === summaryCards.length - 1 && summaryCards.length % 2 !== 0 ? 'col-span-2 sm:col-span-1' : ''
+            )}
+          >
+            <card.icon className={cn('h-4.5 w-4.5 sm:h-5 sm:w-5 shrink-0', card.iconColor)} />
+            <div className="min-w-0">
+              <p className="text-[10px] text-muted-foreground leading-tight truncate">{card.label}</p>
+              <p className={cn('text-sm font-bold', card.valueColor)}>{card.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
