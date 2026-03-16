@@ -205,6 +205,7 @@ export const OrderEntry = () => {
   const [noOrderReason, setNoOrderReason] = useState<string>("");
   const [customNoOrderReason, setCustomNoOrderReason] = useState<string>("");
   const [noOrderSubmitting, setNoOrderSubmitting] = useState(false);
+  const [showOverstockPrompt, setShowOverstockPrompt] = useState(false);
   const [hasCompetitionData, setHasCompetitionData] = useState(false);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [products, setProducts] = useState<GridProduct[]>([]);
@@ -2117,17 +2118,12 @@ export const OrderEntry = () => {
                   e.preventDefault();
                   console.log('No order reason clicked:', reason.value);
                   
-                  if (reason.value === "over-stocked") {
-                    toast({
-                      title: "Information",
-                      description: "Update stock quantities in Grid/Table view - this option will auto-select",
-                      duration: 4000
-                    });
-                    return;
-                  }
-                  
                   // Mark as selected
                   setNoOrderReason(reason.value);
+                  
+                  if (reason.value === "over-stocked") {
+                    setShowOverstockPrompt(true);
+                  }
                   
                   // Reset custom reason if switching away from "other"
                   if (reason.value !== "other") {
@@ -2163,8 +2159,8 @@ export const OrderEntry = () => {
               </div>
             )}
             
-            {/* Show submit button when any reason is selected (except over-stocked) */}
-            {noOrderReason && noOrderReason !== "over-stocked" && (
+            {/* Show submit button when any reason is selected */}
+            {noOrderReason && (
               <Button 
                 onClick={async (e) => {
                   e.preventDefault();
@@ -3008,6 +3004,27 @@ export const OrderEntry = () => {
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={clearAllFormData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             Clear All
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Overstock Prompt Dialog */}
+    <AlertDialog open={showOverstockPrompt} onOpenChange={setShowOverstockPrompt}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Update Stock Count?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Would you like to update the retailer's current stock quantities before submitting? You can update stock counts in the Grid or Table view.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>No, Continue</AlertDialogCancel>
+          <AlertDialogAction onClick={() => {
+            setShowOverstockPrompt(false);
+            setOrderMode("grid");
+          }}>
+            Yes, Update Stock
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
