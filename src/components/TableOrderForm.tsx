@@ -1272,6 +1272,29 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         loading={schemesLoading}
       />
 
+      {/* Save Stock button - visible when there are stock-only rows */}
+      {onStockUpdate && orderRows.some(row => row.product && row.closingStock > 0) && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            const stockRows = orderRows.filter(row => row.product && row.closingStock > 0);
+            stockRows.forEach(row => {
+              const productName = row.variant ? row.variant.variant_name : row.product!.name;
+              const productId = row.variant ? `${row.product!.id}_variant_${row.variant.id}` : row.product!.id;
+              onStockUpdate(productId, row.closingStock, productName);
+            });
+            toast({
+              title: "Stock Updated",
+              description: `Stock quantities saved for ${stockRows.length} item(s).`,
+            });
+          }}
+        >
+          <Package className="h-4 w-4 mr-2" />
+          Save Stock ({orderRows.filter(row => row.product && row.closingStock > 0).length})
+        </Button>
+      )}
+
       <Button
         onClick={addToCart}
         className="w-full"
