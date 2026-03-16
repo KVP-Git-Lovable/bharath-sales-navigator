@@ -1,5 +1,5 @@
 import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff, AlertTriangle } from "lucide-react";
-import { Capacitor } from '@capacitor/core';
+
 
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from "react-router-dom";
