@@ -67,6 +67,7 @@ interface BusinessPlan {
   quantity_target: number;
   quantity_unit: string;
   notes: string | null;
+  has_no_target: boolean;
 }
 
 interface Product {
@@ -312,6 +313,7 @@ export function UserFYPlanTarget({
     quantity_unit: "Units",
     revenue_target: "",
     notes: "",
+    has_no_target: false,
   });
 
   // Also check hierarchy for the FY being created (in dialog) - must be after planForm is defined
@@ -360,7 +362,8 @@ export function UserFYPlanTarget({
       const plansData = (data || []).map((p: any) => ({
         ...p,
         quantity_target: p.quantity_target || 0,
-        quantity_unit: p.quantity_unit || 'Units'
+        quantity_unit: p.quantity_unit || 'Units',
+        has_no_target: p.has_no_target || false,
       }));
       setPlans(plansData);
       if (plansData.length > 0) {
@@ -796,10 +799,11 @@ export function UserFYPlanTarget({
         .insert({
           user_id: effectiveUserId,
           year: planForm.year,
-          quantity_target: parseFloat(planForm.quantity_target) || 0,
+          quantity_target: planForm.has_no_target ? 0 : (parseFloat(planForm.quantity_target) || 0),
           quantity_unit: planForm.quantity_unit,
-          revenue_target: parseFloat(planForm.revenue_target) || 0,
+          revenue_target: planForm.has_no_target ? 0 : (parseFloat(planForm.revenue_target) || 0),
           notes: planForm.notes || null,
+          has_no_target: planForm.has_no_target,
         })
         .select()
         .single();
@@ -813,12 +817,14 @@ export function UserFYPlanTarget({
         quantity_unit: "Units",
         revenue_target: "",
         notes: "",
+        has_no_target: false,
       });
       loadPlans();
       setSelectedPlan({
         ...data,
         quantity_target: data.quantity_target || 0,
-        quantity_unit: data.quantity_unit || 'Units'
+        quantity_unit: data.quantity_unit || 'Units',
+        has_no_target: data.has_no_target || false,
       });
     } catch (error: any) {
       toast.error("Failed to create plan: " + error.message);
@@ -833,10 +839,11 @@ export function UserFYPlanTarget({
         .from('user_business_plans')
         .update({
           year: planForm.year,
-          quantity_target: parseFloat(planForm.quantity_target) || 0,
+          quantity_target: planForm.has_no_target ? 0 : (parseFloat(planForm.quantity_target) || 0),
           quantity_unit: planForm.quantity_unit,
-          revenue_target: parseFloat(planForm.revenue_target) || 0,
+          revenue_target: planForm.has_no_target ? 0 : (parseFloat(planForm.revenue_target) || 0),
           notes: planForm.notes || null,
+          has_no_target: planForm.has_no_target,
         })
         .eq('id', selectedPlan.id);
 
@@ -881,6 +888,7 @@ export function UserFYPlanTarget({
         quantity_unit: selectedPlan.quantity_unit,
         revenue_target: selectedPlan.revenue_target.toString(),
         notes: selectedPlan.notes || "",
+        has_no_target: selectedPlan.has_no_target || false,
       });
       setEditDialogOpen(true);
     }
@@ -1670,8 +1678,23 @@ export function UserFYPlanTarget({
                 />
               </div>
               
+              {/* No Target Toggle */}
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-muted bg-muted/30">
+                <Checkbox
+                  id="no-target-create"
+                  checked={planForm.has_no_target}
+                  onCheckedChange={(checked) => setPlanForm(prev => ({ ...prev, has_no_target: checked as boolean }))}
+                />
+                <Label htmlFor="no-target-create" className="text-sm cursor-pointer">
+                  No Target for this FY
+                  <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                    Mark this user as having no target assigned
+                  </p>
+                </Label>
+              </div>
+              
               {/* Hierarchy allocation hint */}
-              {hasDialogHierarchyTarget && dialogHierarchyAllocation && (
+              {hasDialogHierarchyTarget && dialogHierarchyAllocation && !planForm.has_no_target && (
                 <Alert className="border-blue-500/50 bg-blue-500/10">
                   <Info className="h-4 w-4 text-blue-500" />
                   <AlertDescription className="text-xs">
@@ -1685,42 +1708,46 @@ export function UserFYPlanTarget({
                 </Alert>
               )}
               
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Quantity Target</Label>
-                  <Input
-                    type="number"
-                    value={planForm.quantity_target}
-                    onChange={(e) => setPlanForm(prev => ({ ...prev, quantity_target: e.target.value }))}
-                    placeholder="Annual quantity"
-                  />
-                </div>
-                <div>
-                  <Label>Unit of Measure</Label>
-                  <Select
-                    value={planForm.quantity_unit}
-                    onValueChange={(value) => setPlanForm(prev => ({ ...prev, quantity_unit: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {QUANTITY_UNITS.map(unit => (
-                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Revenue Target (₹)</Label>
-                <Input
-                  type="number"
-                  value={planForm.revenue_target}
-                  onChange={(e) => setPlanForm(prev => ({ ...prev, revenue_target: e.target.value }))}
-                  placeholder="Annual revenue target"
-                />
-              </div>
+              {!planForm.has_no_target && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Quantity Target</Label>
+                      <Input
+                        type="number"
+                        value={planForm.quantity_target}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, quantity_target: e.target.value }))}
+                        placeholder="Annual quantity"
+                      />
+                    </div>
+                    <div>
+                      <Label>Unit of Measure</Label>
+                      <Select
+                        value={planForm.quantity_unit}
+                        onValueChange={(value) => setPlanForm(prev => ({ ...prev, quantity_unit: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {QUANTITY_UNITS.map(unit => (
+                            <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Revenue Target (₹)</Label>
+                    <Input
+                      type="number"
+                      value={planForm.revenue_target}
+                      onChange={(e) => setPlanForm(prev => ({ ...prev, revenue_target: e.target.value }))}
+                      placeholder="Annual revenue target"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <Label>Notes</Label>
                 <Input
@@ -1777,104 +1804,146 @@ export function UserFYPlanTarget({
                 </Alert>
               )}
 
-              {/* Plan Overview - Editable */}
-              <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
-                      {hasHierarchyTarget && (
-                        <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-600">
-                          <Users className="h-3 w-3 mr-1" />
-                          From Hierarchy
-                        </Badge>
-                      )}
+              {/* Plan Overview */}
+              {selectedPlan.has_no_target ? (
+                /* No Target Banner */
+                <Card className="border-muted bg-muted/30">
+                  <CardContent className="p-6 text-center space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <Badge variant="outline" className="text-sm py-1.5 px-4 bg-muted border-muted-foreground/20 text-muted-foreground">
+                        No Target Assigned
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={openEditDialog}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" />
+                            Edit Plan
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => setDeleteDialogOpen(true)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete Plan
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => setDeleteDialogOpen(true)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" />
-                          Delete Plan
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                      <Label className="text-xs font-semibold whitespace-nowrap text-primary">Qty Target ({quantityUnit})</Label>
-                      <Input
-                        type="number"
-                        value={selectedPlan.quantity_target || ''}
-                        onChange={(e) => {
-                          const newQty = parseFloat(e.target.value) || 0;
-                          setSelectedPlan(prev => prev ? { ...prev, quantity_target: newQty } : null);
-                          handleProductTotalTargetChange(newQty, selectedPlan.revenue_target);
-                          handleRetailerTotalTargetChange(newQty, selectedPlan.revenue_target);
-                          handleMonthTotalTargetChange(newQty, selectedPlan.revenue_target);
-                        }}
-                        className="w-28 h-9 text-right font-bold text-lg bg-background border-primary/30 focus:border-primary"
-                      />
+                    <p className="text-sm text-muted-foreground">
+                      This user has been marked as having no target for FY {selectedPlan.year}.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        // Convert to regular target
+                        openEditDialog();
+                      }}
+                    >
+                      Convert to Regular Target
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Regular Plan Overview - Editable */
+                <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
+                        {hasHierarchyTarget && (
+                          <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-600">
+                            <Users className="h-3 w-3 mr-1" />
+                            From Hierarchy
+                          </Badge>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => setDeleteDialogOpen(true)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete Plan
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Revenue Target (₹)</Label>
-                      <Input
-                        type="number"
-                        value={selectedPlan.revenue_target || ''}
-                        onChange={(e) => {
-                          const newRev = parseFloat(e.target.value) || 0;
-                          setSelectedPlan(prev => prev ? { ...prev, revenue_target: newRev } : null);
-                          handleProductTotalTargetChange(selectedPlan.quantity_target, newRev);
-                          handleRetailerTotalTargetChange(selectedPlan.quantity_target, newRev);
-                          handleMonthTotalTargetChange(selectedPlan.quantity_target, newRev);
-                        }}
-                        className="w-32 h-9 text-right font-bold text-lg bg-background border-green-500/30 focus:border-green-500"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                        <Label className="text-xs font-semibold whitespace-nowrap text-primary">Qty Target ({quantityUnit})</Label>
+                        <Input
+                          type="number"
+                          value={selectedPlan.quantity_target || ''}
+                          onChange={(e) => {
+                            const newQty = parseFloat(e.target.value) || 0;
+                            setSelectedPlan(prev => prev ? { ...prev, quantity_target: newQty } : null);
+                            handleProductTotalTargetChange(newQty, selectedPlan.revenue_target);
+                            handleRetailerTotalTargetChange(newQty, selectedPlan.revenue_target);
+                            handleMonthTotalTargetChange(newQty, selectedPlan.revenue_target);
+                          }}
+                          className="w-28 h-9 text-right font-bold text-lg bg-background border-primary/30 focus:border-primary"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Revenue Target (₹)</Label>
+                        <Input
+                          type="number"
+                          value={selectedPlan.revenue_target || ''}
+                          onChange={(e) => {
+                            const newRev = parseFloat(e.target.value) || 0;
+                            setSelectedPlan(prev => prev ? { ...prev, revenue_target: newRev } : null);
+                            handleProductTotalTargetChange(selectedPlan.quantity_target, newRev);
+                            handleRetailerTotalTargetChange(selectedPlan.quantity_target, newRev);
+                            handleMonthTotalTargetChange(selectedPlan.quantity_target, newRev);
+                          }}
+                          className="w-32 h-9 text-right font-bold text-lg bg-background border-green-500/30 focus:border-green-500"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    onClick={async () => {
-                      if (!selectedPlan) return;
-                      try {
-                        // Save FY plan totals
-                        const { error: planError } = await supabase
-                          .from('user_business_plans')
-                          .update({
-                            quantity_target: selectedPlan.quantity_target,
-                            revenue_target: selectedPlan.revenue_target,
-                          })
-                          .eq('id', selectedPlan.id);
-                        if (planError) throw planError;
+                    <Button 
+                      className="w-full" 
+                      onClick={async () => {
+                        if (!selectedPlan) return;
+                        try {
+                          const { error: planError } = await supabase
+                            .from('user_business_plans')
+                            .update({
+                              quantity_target: selectedPlan.quantity_target,
+                              revenue_target: selectedPlan.revenue_target,
+                            })
+                            .eq('id', selectedPlan.id);
+                          if (planError) throw planError;
 
-                        // Save product targets
-                        await saveProductTargets();
-                        // Save retailer targets
-                        await saveRetailerTargets();
-                        // Save month targets
-                        await saveMonthTargets();
-                        // Save distributor targets
-                        await saveDistributorTargets();
+                          await saveProductTargets();
+                          await saveRetailerTargets();
+                          await saveMonthTargets();
+                          await saveDistributorTargets();
 
-                        toast.success("All targets saved successfully");
-                        loadPlans();
-                      } catch (error: any) {
-                        toast.error("Failed to save: " + error.message);
-                      }
-                    }}
-                  >
-                    <Target className="h-4 w-4 mr-2" />
-                    Save Target
-                  </Button>
-                </CardContent>
-              </Card>
+                          toast.success("All targets saved successfully");
+                          loadPlans();
+                        } catch (error: any) {
+                          toast.error("Failed to save: " + error.message);
+                        }
+                      }}
+                    >
+                      <Target className="h-4 w-4 mr-2" />
+                      Save Target
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Edit Plan Dialog */}
               <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -1893,42 +1962,62 @@ export function UserFYPlanTarget({
                         max={2050}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Quantity Target</Label>
-                        <Input
-                          type="number"
-                          value={planForm.quantity_target}
-                          onChange={(e) => setPlanForm(prev => ({ ...prev, quantity_target: e.target.value }))}
-                          placeholder="Annual quantity"
-                        />
-                      </div>
-                      <div>
-                        <Label>Unit of Measure</Label>
-                        <Select
-                          value={planForm.quantity_unit}
-                          onValueChange={(value) => setPlanForm(prev => ({ ...prev, quantity_unit: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {QUANTITY_UNITS.map(unit => (
-                              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Revenue Target (₹)</Label>
-                      <Input
-                        type="number"
-                        value={planForm.revenue_target}
-                        onChange={(e) => setPlanForm(prev => ({ ...prev, revenue_target: e.target.value }))}
-                        placeholder="Annual revenue target"
+                    
+                    {/* No Target Toggle */}
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-muted bg-muted/30">
+                      <Checkbox
+                        id="no-target-edit"
+                        checked={planForm.has_no_target}
+                        onCheckedChange={(checked) => setPlanForm(prev => ({ ...prev, has_no_target: checked as boolean }))}
                       />
+                      <Label htmlFor="no-target-edit" className="text-sm cursor-pointer">
+                        No Target for this FY
+                        <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                          Mark this user as having no target assigned
+                        </p>
+                      </Label>
                     </div>
+                    
+                    {!planForm.has_no_target && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Quantity Target</Label>
+                            <Input
+                              type="number"
+                              value={planForm.quantity_target}
+                              onChange={(e) => setPlanForm(prev => ({ ...prev, quantity_target: e.target.value }))}
+                              placeholder="Annual quantity"
+                            />
+                          </div>
+                          <div>
+                            <Label>Unit of Measure</Label>
+                            <Select
+                              value={planForm.quantity_unit}
+                              onValueChange={(value) => setPlanForm(prev => ({ ...prev, quantity_unit: value }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {QUANTITY_UNITS.map(unit => (
+                                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Revenue Target (₹)</Label>
+                          <Input
+                            type="number"
+                            value={planForm.revenue_target}
+                            onChange={(e) => setPlanForm(prev => ({ ...prev, revenue_target: e.target.value }))}
+                            placeholder="Annual revenue target"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div>
                       <Label>Notes</Label>
                       <Input
@@ -1961,7 +2050,7 @@ export function UserFYPlanTarget({
               </AlertDialog>
 
               {/* Tabs for Product, Retailer, Month, Territory and Distributor Targets */}
-              {visibleTabs.length === 0 ? (
+              {selectedPlan.has_no_target ? null : visibleTabs.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
                     <p className="text-sm text-muted-foreground">No target parameters are enabled for this plan</p>

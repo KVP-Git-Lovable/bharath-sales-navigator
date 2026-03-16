@@ -14252,6 +14252,7 @@ export type Database = {
       user_business_plans: {
         Row: {
           created_at: string
+          has_no_target: boolean
           hierarchy_allocation_id: string | null
           id: string
           manager_own_quantity_target: number | null
@@ -14271,6 +14272,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          has_no_target?: boolean
           hierarchy_allocation_id?: string | null
           id?: string
           manager_own_quantity_target?: number | null
@@ -14290,6 +14292,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          has_no_target?: boolean
           hierarchy_allocation_id?: string | null
           id?: string
           manager_own_quantity_target?: number | null

@@ -220,7 +220,11 @@ export default function MyTargets() {
             {(!targets || targets.length === 0) && (
               <Card className="col-span-full">
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  No targets set for this period. Please contact your admin.
+                  <TargetIcon className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p className="font-medium">No Target Assigned</p>
+                  <p className="text-sm mt-1">
+                    You have no targets set for this period. This may be intentional — please contact your admin if you believe this is an error.
+                  </p>
                 </CardContent>
               </Card>
             )}
