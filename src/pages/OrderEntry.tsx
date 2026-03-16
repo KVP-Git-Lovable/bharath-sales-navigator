@@ -2815,7 +2815,10 @@ export const OrderEntry = () => {
         products={cachedProducts}
         loading={offlineLoading}
         onReloadProducts={fetchOfflineProducts}
-        onCartUpdate={handleBulkCartUpdate} 
+        onCartUpdate={handleBulkCartUpdate}
+        onStockUpdate={(productId, stockQuantity, productName) => {
+          saveStockData(productId, stockQuantity, productName);
+        }}
       />)}
 
         
@@ -3022,7 +3025,7 @@ export const OrderEntry = () => {
           <AlertDialogCancel>No, Continue</AlertDialogCancel>
           <AlertDialogAction onClick={() => {
             setShowOverstockPrompt(false);
-            setOrderMode("grid");
+            setOrderMode("table");
           }}>
             Yes, Update Stock
           </AlertDialogAction>
