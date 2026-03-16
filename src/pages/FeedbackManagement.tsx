@@ -744,6 +744,7 @@ export default function FeedbackManagement() {
             </div>
           </TabsContent>
         </Tabs>
+      </div>
 
       {/* Detail Modals */}
       <RetailerFeedbackDetailModal
