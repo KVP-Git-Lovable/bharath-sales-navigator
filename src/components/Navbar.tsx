@@ -131,6 +131,7 @@ export const Navbar = memo(() => {
       // { id: 'projects', icon: FolderKanban, label: 'Projects', href: "/projects", color: "from-sky-500 to-sky-600" }, // ARCHIVED: Projects module hidden
       { id: 'my-competency', icon: Target, label: t('nav.competency'), href: "/competency-dashboard", color: "from-indigo-500 to-indigo-600" },
       { id: 'help-center', icon: HelpCircle, label: 'Help Center', href: "/help-center", color: "from-teal-500 to-teal-600" },
+      { id: 'usage-report', icon: BarChart3, label: t('nav.usageReport'), href: "/usage-report", color: "from-sky-500 to-sky-600" },
       { id: 'recycle-bin', icon: Trash2, label: t('nav.recycleBin'), href: "/recycle-bin", color: "from-rose-500 to-rose-600" },
     );
 
