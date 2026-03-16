@@ -205,6 +205,7 @@ export const OrderEntry = () => {
   const [noOrderReason, setNoOrderReason] = useState<string>("");
   const [customNoOrderReason, setCustomNoOrderReason] = useState<string>("");
   const [noOrderSubmitting, setNoOrderSubmitting] = useState(false);
+  const [showOverstockPrompt, setShowOverstockPrompt] = useState(false);
   const [hasCompetitionData, setHasCompetitionData] = useState(false);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [products, setProducts] = useState<GridProduct[]>([]);
