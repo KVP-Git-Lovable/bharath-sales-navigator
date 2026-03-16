@@ -351,8 +351,22 @@ export default function FeedbackManagement() {
           </Button>
         </div>
 
+        {/* Top-level Tabs: Overview | Configuration */}
+        <Tabs value={topTab} onValueChange={setTopTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="configuration" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Feedback Configuration
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
         {/* Date Filter */}
-        <Card className="p-4">
+        <Card className="p-4 mb-6">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
@@ -410,21 +424,6 @@ export default function FeedbackManagement() {
             )}
           </div>
         </Card>
-
-        {/* Top-level Tabs: Overview | Configuration */}
-        <Tabs value={topTab} onValueChange={setTopTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="configuration" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Feedback Configuration
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
         {/* Tabs */}
         <Tabs defaultValue="retailer" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
