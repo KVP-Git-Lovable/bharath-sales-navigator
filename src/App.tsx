@@ -147,6 +147,7 @@ import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
 import AIFeaturesExport from "./pages/AIFeaturesExport";
 import { TeamApprovals } from "./pages/TeamApprovals";
+import { UsageReport } from "./pages/UsageReport";
 
 // Distributor Portal Pages
 import DistributorLogin from "./pages/distributor-portal/DistributorLogin";
