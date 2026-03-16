@@ -263,7 +263,7 @@ const StatusDashboard = () => {
 
         {/* Metrics grid */}
         <div className="px-4 md:px-8 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {metrics.map((metric, idx) => {
               const healthColor = HEALTH_DOT[metric.health];
               const healthLabel = metric.health === 'good' ? 'Healthy' : metric.health === 'average' ? 'Warning' : 'Critical';
