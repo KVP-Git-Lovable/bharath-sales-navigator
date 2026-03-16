@@ -190,7 +190,6 @@ export const UsageReport = () => {
 
       setUsageData(
         Object.values(userMap)
-          .filter(u => u.userId !== user.id) // Exclude self from list
           .sort((a, b) => b.usagePercent - a.usagePercent || b.totalTimeSeconds - a.totalTimeSeconds)
       );
     } catch (e) {
