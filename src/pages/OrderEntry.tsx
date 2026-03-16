@@ -2159,8 +2159,8 @@ export const OrderEntry = () => {
               </div>
             )}
             
-            {/* Show submit button when any reason is selected (except over-stocked) */}
-            {noOrderReason && noOrderReason !== "over-stocked" && (
+            {/* Show submit button when any reason is selected */}
+            {noOrderReason && (
               <Button 
                 onClick={async (e) => {
                   e.preventDefault();
