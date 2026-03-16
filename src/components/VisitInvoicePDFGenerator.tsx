@@ -84,7 +84,8 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
     setSendingWhatsApp(true);
     try {
       const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
-      const fileName = `invoice-${invoiceNumber}.pdf`;
+      const fileName = `${invoiceNumber || orderId}.pdf`;
+      const filePath = `public/${fileName}`;
 
       if (connectivityStatus === 'offline') {
         console.log('📴 Offline: Queueing invoice send for later');
@@ -112,33 +113,24 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
         return;
       }
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // Upload to public/ path (same as AllInvoicesList)
+      const { error: uploadError } = await supabase.storage
         .from('invoices')
-        .upload(fileName, blob, {
+        .upload(filePath, blob, {
           contentType: 'application/pdf',
           upsert: true
         });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = await supabase.storage
+      const { data: urlData } = supabase.storage
         .from('invoices')
-        .getPublicUrl(uploadData.path);
+        .getPublicUrl(filePath);
 
-      console.log('PDF uploaded to:', publicUrl);
-
-      const { error } = await supabase.functions.invoke('send-invoice-whatsapp', {
-        body: { 
-          invoiceId: orderId,
-          customerPhone: customerPhone,
-          pdfUrl: publicUrl,
-          invoiceNumber: invoiceNumber
-        }
-      });
-
-      if (error) throw error;
+      // Send via WhatsApp using the same template-based approach as AllInvoicesList
+      await autoSendInvoiceWhatsApp({ invoiceNumber, pdfUrl: urlData.publicUrl });
       
-      toast.success("Invoice sent via WhatsApp successfully!");
+      toast.success("Invoice sent via WhatsApp!");
     } catch (error: any) {
       console.error('Error sending invoice via WhatsApp:', error);
       toast.error(error.message || "Failed to send invoice via WhatsApp");
