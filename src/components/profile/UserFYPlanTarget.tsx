@@ -1804,104 +1804,146 @@ export function UserFYPlanTarget({
                 </Alert>
               )}
 
-              {/* Plan Overview - Editable */}
-              <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
-                      {hasHierarchyTarget && (
-                        <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-600">
-                          <Users className="h-3 w-3 mr-1" />
-                          From Hierarchy
-                        </Badge>
-                      )}
+              {/* Plan Overview */}
+              {selectedPlan.has_no_target ? (
+                /* No Target Banner */
+                <Card className="border-muted bg-muted/30">
+                  <CardContent className="p-6 text-center space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <Badge variant="outline" className="text-sm py-1.5 px-4 bg-muted border-muted-foreground/20 text-muted-foreground">
+                        No Target Assigned
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={openEditDialog}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" />
+                            Edit Plan
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => setDeleteDialogOpen(true)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete Plan
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => setDeleteDialogOpen(true)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" />
-                          Delete Plan
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                      <Label className="text-xs font-semibold whitespace-nowrap text-primary">Qty Target ({quantityUnit})</Label>
-                      <Input
-                        type="number"
-                        value={selectedPlan.quantity_target || ''}
-                        onChange={(e) => {
-                          const newQty = parseFloat(e.target.value) || 0;
-                          setSelectedPlan(prev => prev ? { ...prev, quantity_target: newQty } : null);
-                          handleProductTotalTargetChange(newQty, selectedPlan.revenue_target);
-                          handleRetailerTotalTargetChange(newQty, selectedPlan.revenue_target);
-                          handleMonthTotalTargetChange(newQty, selectedPlan.revenue_target);
-                        }}
-                        className="w-28 h-9 text-right font-bold text-lg bg-background border-primary/30 focus:border-primary"
-                      />
+                    <p className="text-sm text-muted-foreground">
+                      This user has been marked as having no target for FY {selectedPlan.year}.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        // Convert to regular target
+                        openEditDialog();
+                      }}
+                    >
+                      Convert to Regular Target
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Regular Plan Overview - Editable */
+                <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">FY {selectedPlan.year} Overview</span>
+                        {hasHierarchyTarget && (
+                          <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-600">
+                            <Users className="h-3 w-3 mr-1" />
+                            From Hierarchy
+                          </Badge>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => setDeleteDialogOpen(true)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete Plan
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Revenue Target (₹)</Label>
-                      <Input
-                        type="number"
-                        value={selectedPlan.revenue_target || ''}
-                        onChange={(e) => {
-                          const newRev = parseFloat(e.target.value) || 0;
-                          setSelectedPlan(prev => prev ? { ...prev, revenue_target: newRev } : null);
-                          handleProductTotalTargetChange(selectedPlan.quantity_target, newRev);
-                          handleRetailerTotalTargetChange(selectedPlan.quantity_target, newRev);
-                          handleMonthTotalTargetChange(selectedPlan.quantity_target, newRev);
-                        }}
-                        className="w-32 h-9 text-right font-bold text-lg bg-background border-green-500/30 focus:border-green-500"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                        <Label className="text-xs font-semibold whitespace-nowrap text-primary">Qty Target ({quantityUnit})</Label>
+                        <Input
+                          type="number"
+                          value={selectedPlan.quantity_target || ''}
+                          onChange={(e) => {
+                            const newQty = parseFloat(e.target.value) || 0;
+                            setSelectedPlan(prev => prev ? { ...prev, quantity_target: newQty } : null);
+                            handleProductTotalTargetChange(newQty, selectedPlan.revenue_target);
+                            handleRetailerTotalTargetChange(newQty, selectedPlan.revenue_target);
+                            handleMonthTotalTargetChange(newQty, selectedPlan.revenue_target);
+                          }}
+                          className="w-28 h-9 text-right font-bold text-lg bg-background border-primary/30 focus:border-primary"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <Label className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400">Revenue Target (₹)</Label>
+                        <Input
+                          type="number"
+                          value={selectedPlan.revenue_target || ''}
+                          onChange={(e) => {
+                            const newRev = parseFloat(e.target.value) || 0;
+                            setSelectedPlan(prev => prev ? { ...prev, revenue_target: newRev } : null);
+                            handleProductTotalTargetChange(selectedPlan.quantity_target, newRev);
+                            handleRetailerTotalTargetChange(selectedPlan.quantity_target, newRev);
+                            handleMonthTotalTargetChange(selectedPlan.quantity_target, newRev);
+                          }}
+                          className="w-32 h-9 text-right font-bold text-lg bg-background border-green-500/30 focus:border-green-500"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    onClick={async () => {
-                      if (!selectedPlan) return;
-                      try {
-                        // Save FY plan totals
-                        const { error: planError } = await supabase
-                          .from('user_business_plans')
-                          .update({
-                            quantity_target: selectedPlan.quantity_target,
-                            revenue_target: selectedPlan.revenue_target,
-                          })
-                          .eq('id', selectedPlan.id);
-                        if (planError) throw planError;
+                    <Button 
+                      className="w-full" 
+                      onClick={async () => {
+                        if (!selectedPlan) return;
+                        try {
+                          const { error: planError } = await supabase
+                            .from('user_business_plans')
+                            .update({
+                              quantity_target: selectedPlan.quantity_target,
+                              revenue_target: selectedPlan.revenue_target,
+                            })
+                            .eq('id', selectedPlan.id);
+                          if (planError) throw planError;
 
-                        // Save product targets
-                        await saveProductTargets();
-                        // Save retailer targets
-                        await saveRetailerTargets();
-                        // Save month targets
-                        await saveMonthTargets();
-                        // Save distributor targets
-                        await saveDistributorTargets();
+                          await saveProductTargets();
+                          await saveRetailerTargets();
+                          await saveMonthTargets();
+                          await saveDistributorTargets();
 
-                        toast.success("All targets saved successfully");
-                        loadPlans();
-                      } catch (error: any) {
-                        toast.error("Failed to save: " + error.message);
-                      }
-                    }}
-                  >
-                    <Target className="h-4 w-4 mr-2" />
-                    Save Target
-                  </Button>
-                </CardContent>
-              </Card>
+                          toast.success("All targets saved successfully");
+                          loadPlans();
+                        } catch (error: any) {
+                          toast.error("Failed to save: " + error.message);
+                        }
+                      }}
+                    >
+                      <Target className="h-4 w-4 mr-2" />
+                      Save Target
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Edit Plan Dialog */}
               <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
