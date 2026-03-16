@@ -432,11 +432,19 @@ export const AttendanceMarketHoursSection = ({
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.retailer_check_in)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.retailer_check_out)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.retailer_hours)}
                               </TableCell>
                             </TableRow>
-                          )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => (
+                          )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => {
+                            const retailerData = retailerTimeData.find(r => r.user_id === row.user_id && r.date === row.date);
+                            return (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
                               <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
