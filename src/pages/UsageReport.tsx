@@ -439,8 +439,8 @@ export const UsageReport = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                User-wise Module Usage
+                <Users className="h-4 w-4 text-primary" />
+                User-wise Module Usage ({usageData.length} users)
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -449,13 +449,16 @@ export const UsageReport = () => {
               ) : usageData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No usage data found</div>
               ) : (
-                <div className="divide-y">
+                <div className="divide-y max-h-[60vh] overflow-auto">
                   {usageData.map((u) => (
                     <div
                       key={u.userId}
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => setSelectedUser(u)}
                     >
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                        {u.fullName.charAt(0).toUpperCase()}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm truncate">{u.fullName}</span>
@@ -475,7 +478,7 @@ export const UsageReport = () => {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-xs font-medium text-muted-foreground">
-                          {u.modulesUsed.size}/{ALL_MODULES.length} modules
+                          {u.modulesUsed.size}/{ALL_MODULES.length}
                         </div>
                         <div className="text-[10px] text-muted-foreground">
                           {formatDuration(u.totalTimeSeconds)}
@@ -490,135 +493,224 @@ export const UsageReport = () => {
           </Card>
         </div>
 
-        {/* User Detail Dialog */}
+        {/* User Detail Dialog - Android App Activity Style */}
         <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col p-0">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col p-0">
             <DialogHeader className="p-4 pb-2 border-b">
               <DialogTitle className="flex items-center gap-2 text-lg">
-                <Activity className="h-5 w-5 text-primary" />
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                  {selectedUser?.fullName.charAt(0).toUpperCase()}
+                </div>
                 {selectedUser?.fullName}
               </DialogTitle>
               <p className="text-xs text-muted-foreground">
-                {selectedUser?.designation || 'Team Member'} • {formatDuration(selectedUser?.totalTimeSeconds || 0)} total screen time
+                {selectedUser?.designation || 'Team Member'} • {formatDurationLong(selectedUser?.totalTimeSeconds || 0)} total
               </p>
             </DialogHeader>
 
-            <div className="flex-1 overflow-auto p-4 space-y-5">
+            <div className="flex-1 overflow-auto">
               {selectedUser && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium">Overall Usage</span>
-                    <Progress value={selectedUser.usagePercent} className="h-2 flex-1" />
-                    <span className="text-sm font-bold text-primary">{selectedUser.usagePercent}%</span>
-                  </div>
-
-                  {/* Core Modules */}
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-primary" />
-                      Core Modules
-                    </h3>
-                    <div className="space-y-2">
-                      {CORE_MODULES.map((mod) => {
-                        const detail = selectedUser.moduleDetails[mod];
-                        const isUsed = selectedUser.modulesUsed.has(mod);
-                        return (
-                          <div
-                            key={mod}
-                            className={cn(
-                              "flex items-center justify-between px-3 py-2.5 rounded-lg border",
-                              isUsed ? "bg-primary/5 border-primary/20" : "bg-muted/30 border-transparent"
-                            )}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className={cn("h-2 w-2 rounded-full", isUsed ? "bg-green-500" : "bg-muted-foreground/30")} />
-                              <span className={cn("text-sm", isUsed ? "font-medium" : "text-muted-foreground")}>{mod}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {detail && (
-                                <>
-                                  <Badge variant="secondary" className="text-[10px]">
-                                    {detail.count} {detail.count === 1 ? 'visit' : 'visits'}
-                                  </Badge>
-                                  <span className="text-xs font-medium text-primary min-w-[50px] text-right">
-                                    {formatDuration(detail.timeSeconds)}
-                                  </span>
-                                </>
-                              )}
-                              {!isUsed && <span className="text-[10px] text-muted-foreground">Not used</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Performance Modules */}
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-amber-500" />
-                      Performance Modules
-                    </h3>
-                    <div className="space-y-2">
-                      {PERFORMANCE_MODULES.map((mod) => {
-                        const detail = selectedUser.moduleDetails[mod];
-                        const isUsed = selectedUser.modulesUsed.has(mod);
-                        return (
-                          <div
-                            key={mod}
-                            className={cn(
-                              "flex items-center justify-between px-3 py-2.5 rounded-lg border",
-                              isUsed ? "bg-amber-500/5 border-amber-500/20" : "bg-muted/30 border-transparent"
-                            )}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className={cn("h-2 w-2 rounded-full", isUsed ? "bg-green-500" : "bg-muted-foreground/30")} />
-                              <span className={cn("text-sm", isUsed ? "font-medium" : "text-muted-foreground")}>{mod}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {detail && (
-                                <>
-                                  <Badge variant="secondary" className="text-[10px]">
-                                    {detail.count} {detail.count === 1 ? 'visit' : 'visits'}
-                                  </Badge>
-                                  <span className="text-xs font-medium text-amber-600 min-w-[50px] text-right">
-                                    {formatDuration(detail.timeSeconds)}
-                                  </span>
-                                </>
-                              )}
-                              {!isUsed && <span className="text-[10px] text-muted-foreground">Not used</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* AI Features */}
-                  {selectedUser.modulesUsed.has('AI Features') && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-purple-500" />
-                        AI Features Used
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {AI_FEATURES.map((feat) => (
-                          <Badge key={feat} variant="outline" className="text-xs bg-purple-500/10 text-purple-700 border-purple-500/30">
-                            {feat}
-                          </Badge>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-2">
-                        AI feature breakdown based on recorded usage within the selected period.
-                      </p>
-                    </div>
-                  )}
-                </>
+                <UserDetailContent
+                  selectedUser={selectedUser}
+                  allLogs={allLogs}
+                />
               )}
             </div>
           </DialogContent>
         </Dialog>
       </div>
     </Layout>
+  );
+};
+
+// Separate component for user detail content
+const UserDetailContent = ({ selectedUser, allLogs }: { selectedUser: UserUsage; allLogs: any[] }) => {
+  const [userSelectedDate, setUserSelectedDate] = useState<Date>(new Date());
+
+  // Filter logs for this user only
+  const userLogs = useMemo(() => {
+    return allLogs.filter(log => log.user_id === selectedUser.userId);
+  }, [allLogs, selectedUser.userId]);
+
+  // Weekly bar chart for this user
+  const userWeeklyData = useMemo((): DailyUsage[] => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    return days.map(day => ({
+      date: day,
+      totalSeconds: userLogs
+        .filter(log => isSameDay(new Date(log.started_at), day))
+        .reduce((sum, log) => sum + (log.duration_seconds || 0), 0),
+      label: DAY_LABELS[day.getDay()],
+    }));
+  }, [userLogs]);
+
+  const userMaxBar = useMemo(() => Math.max(...userWeeklyData.map(d => d.totalSeconds), 1), [userWeeklyData]);
+
+  const userTotalTime = useMemo(() => userLogs.reduce((sum, l) => sum + (l.duration_seconds || 0), 0), [userLogs]);
+
+  // Module breakdown for selected date, split by category
+  const { coreModules, perfModules } = useMemo(() => {
+    const dayLogs = userLogs.filter(log => isSameDay(new Date(log.started_at), userSelectedDate));
+    const moduleMap: Record<string, { seconds: number; count: number }> = {};
+    dayLogs.forEach(log => {
+      if (!moduleMap[log.module_name]) moduleMap[log.module_name] = { seconds: 0, count: 0 };
+      moduleMap[log.module_name].seconds += (log.duration_seconds || 0);
+      moduleMap[log.module_name].count += 1;
+    });
+
+    const core = CORE_MODULES.map(name => ({
+      name,
+      seconds: moduleMap[name]?.seconds || 0,
+      count: moduleMap[name]?.count || 0,
+      used: !!moduleMap[name],
+    }));
+
+    const perf = PERFORMANCE_MODULES.map(name => ({
+      name,
+      seconds: moduleMap[name]?.seconds || 0,
+      count: moduleMap[name]?.count || 0,
+      used: !!moduleMap[name],
+    }));
+
+    return { coreModules: core, perfModules: perf };
+  }, [userLogs, userSelectedDate]);
+
+  const isUserToday = isSameDay(userSelectedDate, new Date());
+
+  return (
+    <div className="space-y-4">
+      {/* Weekly Bar Chart */}
+      <div className="px-4 pt-3">
+        <div className="text-center mb-3">
+          <div className="text-3xl font-bold text-foreground">{formatDurationLong(userTotalTime)}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Total screen time this week</div>
+        </div>
+
+        <div className="flex items-end justify-between gap-1 h-20 px-1 mb-1">
+          {userWeeklyData.map((day, i) => {
+            const heightPercent = userMaxBar > 0 ? (day.totalSeconds / userMaxBar) * 100 : 0;
+            const isSelected = isSameDay(day.date, userSelectedDate);
+            return (
+              <div
+                key={i}
+                className="flex-1 flex flex-col items-center gap-0.5 cursor-pointer"
+                onClick={() => setUserSelectedDate(day.date)}
+              >
+                <div className="w-full flex items-end justify-center" style={{ height: '56px' }}>
+                  <div
+                    className={cn(
+                      "w-full max-w-[28px] rounded-t-sm transition-all",
+                      isSelected ? "bg-primary" : "bg-muted-foreground/20"
+                    )}
+                    style={{ height: `${Math.max(heightPercent, 4)}%` }}
+                  />
+                </div>
+                <span className={cn(
+                  "text-[10px]",
+                  isSelected ? "font-bold text-primary" : "text-muted-foreground"
+                )}>
+                  {day.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Date Navigator */}
+      <div className="flex items-center justify-center gap-3 px-4">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setUserSelectedDate(prev => subDays(prev, 1))}>
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-xs font-medium">
+          {isUserToday ? 'Today' : format(userSelectedDate, 'EEE, d MMM')}
+        </span>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setUserSelectedDate(prev => subDays(prev, -1))} disabled={isUserToday}>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* Core Modules Section */}
+      <div className="px-4">
+        <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+          <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+          Core Modules
+        </h3>
+        <div className="space-y-1">
+          {coreModules.map(mod => (
+            <div
+              key={mod.name}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                mod.used ? "bg-primary/5" : "bg-muted/30"
+              )}
+            >
+              <div className={cn(
+                "h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                mod.used ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+              )}>
+                {mod.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={cn("text-sm", mod.used ? "font-medium text-foreground" : "text-muted-foreground")}>
+                  {mod.name}
+                </div>
+                {mod.used && (
+                  <div className="text-[10px] text-muted-foreground">
+                    {mod.count} {mod.count === 1 ? 'session' : 'sessions'}
+                  </div>
+                )}
+              </div>
+              <span className={cn("text-xs font-medium", mod.used ? "text-primary" : "text-muted-foreground/50")}>
+                {mod.used ? formatDuration(mod.seconds) : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Performance Modules Section */}
+      <div className="px-4 pb-4">
+        <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+          <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+          Performance Modules
+        </h3>
+        <div className="space-y-1">
+          {perfModules.map(mod => (
+            <div
+              key={mod.name}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                mod.used ? "bg-amber-500/5" : "bg-muted/30"
+              )}
+            >
+              <div className={cn(
+                "h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                mod.used ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"
+              )}>
+                {mod.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={cn("text-sm", mod.used ? "font-medium text-foreground" : "text-muted-foreground")}>
+                  {mod.name}
+                </div>
+                {mod.used && (
+                  <div className="text-[10px] text-muted-foreground">
+                    {mod.count} {mod.count === 1 ? 'session' : 'sessions'}
+                  </div>
+                )}
+              </div>
+              <span className={cn("text-xs font-medium", mod.used ? "text-amber-600" : "text-muted-foreground/50")}>
+                {mod.used ? formatDuration(mod.seconds) : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 };
