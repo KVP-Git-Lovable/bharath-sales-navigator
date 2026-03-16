@@ -272,18 +272,20 @@ export const AttendanceMarketHoursSection = ({
     const userRetailer = retailerTimeData.filter(r => r.full_name === selectedUserForDrilldown);
     
     // Combine by date
-    const dateMap: Record<string, { date: string; working_hours: number; retailer_hours: number }> = {};
+    const dateMap: Record<string, { date: string; working_hours: number; retailer_hours: number; check_in_time: string | null; check_out_time: string | null }> = {};
     
     userAttendance.forEach(a => {
       if (!dateMap[a.date]) {
-        dateMap[a.date] = { date: a.date, working_hours: 0, retailer_hours: 0 };
+        dateMap[a.date] = { date: a.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null };
       }
       dateMap[a.date].working_hours = a.working_hours;
+      dateMap[a.date].check_in_time = a.check_in_time;
+      dateMap[a.date].check_out_time = a.check_out_time;
     });
     
     userRetailer.forEach(r => {
       if (!dateMap[r.date]) {
-        dateMap[r.date] = { date: r.date, working_hours: 0, retailer_hours: 0 };
+        dateMap[r.date] = { date: r.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null };
       }
       dateMap[r.date].retailer_hours = r.retailer_hours;
     });
@@ -295,6 +297,12 @@ export const AttendanceMarketHoursSection = ({
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
     return `${h}h ${m}m`;
+  };
+
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return '-';
+    const d = new Date(timeStr);
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   const scrollViewportClassName = cn(
@@ -382,6 +390,8 @@ export const AttendanceMarketHoursSection = ({
                       <thead className="sticky top-0 bg-muted z-20">
                         <TableRow className="border-b">
                           <TableHead className={cn(isMobile ? "py-1 px-2 whitespace-nowrap" : "py-1.5")}>{isSingleUserMode ? 'Date' : 'User'}</TableHead>
+                          <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Check In</TableHead>
+                          <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Check Out</TableHead>
                           <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Working Hours</TableHead>
                           <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Time at Retailers</TableHead>
                           {!isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Days</TableHead>}
@@ -394,6 +404,12 @@ export const AttendanceMarketHoursSection = ({
                           drilldownData.length > 0 ? drilldownData.map((row, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_in_time)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_out_time)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
@@ -404,6 +420,12 @@ export const AttendanceMarketHoursSection = ({
                           )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_in_time)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_out_time)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
@@ -442,6 +464,8 @@ export const AttendanceMarketHoursSection = ({
                           <TableCell className={cn("font-semibold whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {isSingleUserMode ? `Total (${attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).length} days)` : `Total (${userSummaries.length} users)`}
                           </TableCell>
+                          {isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
+                          {isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
                           <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {formatHours(overallAverages.avgWorkingHours)}
                           </TableCell>
@@ -483,6 +507,8 @@ export const AttendanceMarketHoursSection = ({
                 <thead className="sticky top-0 bg-muted z-20">
                   <TableRow className="border-b">
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Check In</TableHead>
+                    <TableHead className="text-right">Check Out</TableHead>
                     <TableHead className="text-right">Working Hours</TableHead>
                     <TableHead className="text-right">Time at Retailers</TableHead>
                   </TableRow>
@@ -491,6 +517,12 @@ export const AttendanceMarketHoursSection = ({
                   {drilldownData.map((row, index) => (
                     <TableRow key={index} className="hover:bg-muted/30">
                       <TableCell className="font-medium">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.check_in_time)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.check_out_time)}
+                      </TableCell>
                       <TableCell className="text-right text-blue-600 font-medium">
                         {formatHours(row.working_hours)}
                       </TableCell>
@@ -503,6 +535,8 @@ export const AttendanceMarketHoursSection = ({
                 <tfoot className="bg-muted/30 sticky bottom-0">
                   <TableRow>
                     <TableCell className="font-semibold">Average ({drilldownData.length} days)</TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right font-bold text-blue-600">
                       {formatHours(
                         drilldownData.reduce((sum, r) => sum + r.working_hours, 0) / drilldownData.length
