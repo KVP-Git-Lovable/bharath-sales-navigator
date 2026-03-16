@@ -370,6 +370,7 @@ export const MyVisits = () => {
         retailerLat: retailer.latitude != null ? Number(retailer.latitude) : undefined,
         retailerLng: retailer.longitude != null ? Number(retailer.longitude) : undefined,
         pendingAmount: retailer.pending_amount || 0, // Include pending_amount from hook
+        beatId: retailer.beat_id || undefined,
       };
     });
   }, [optimizedRetailers, optimizedVisits, optimizedOrders, selectedDate]);
@@ -1013,8 +1014,20 @@ export const MyVisits = () => {
     }).filter(Boolean)));
   }, [retailers]);
 
+  // Beat filter state
+  const [selectedBeatFilter, setSelectedBeatFilter] = useState<string>('all');
+
+  // Reset beat filter when date changes
+  useEffect(() => {
+    setSelectedBeatFilter('all');
+  }, [selectedDate]);
+
   // Show visits for selected date based on planned beats
-  const allVisits = retailers;
+  const allVisits = useMemo(() => {
+    if (selectedBeatFilter === 'all') return retailers;
+    return retailers.filter(r => r.beatId === selectedBeatFilter);
+  }, [retailers, selectedBeatFilter]);
+
   const filteredVisits = useMemo(() => {
     // REMOVED: Don't return empty array when loading - show cached data while refreshing in background
     // if (dataLoading) return [];
@@ -1196,7 +1209,37 @@ export const MyVisits = () => {
               <div className="flex items-center gap-1.5">
                 <div>
                   <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
-                  <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+                  {optimizedBeatPlans.length <= 1 ? (
+                    <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-1 overflow-x-auto no-scrollbar">
+                      <button
+                        onClick={() => setSelectedBeatFilter('all')}
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap transition-colors border",
+                          selectedBeatFilter === 'all'
+                            ? "bg-primary-foreground text-primary border-primary-foreground"
+                            : "bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/20"
+                        )}
+                      >
+                        All
+                      </button>
+                      {optimizedBeatPlans.map(plan => (
+                        <button
+                          key={plan.beat_id}
+                          onClick={() => setSelectedBeatFilter(plan.beat_id)}
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap transition-colors border",
+                            selectedBeatFilter === plan.beat_id
+                              ? "bg-primary-foreground text-primary border-primary-foreground"
+                              : "bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/20"
+                          )}
+                        >
+                          {plan.beat_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <ModuleHelpButton categoryId="my-visit" variant="onDark" />
               </div>

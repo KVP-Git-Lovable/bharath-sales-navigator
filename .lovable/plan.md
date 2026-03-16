@@ -1,26 +1,66 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-# Plan: Beat Filter Chips on My Visits Page
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-## What
-When multiple beats are planned for a day, display each beat name as a clickable chip/pill. Clicking a beat filters the retailer visit cards to show only retailers belonging to that beat. An "All" option shows all retailers (default).
+## What Was Done
 
-## How
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-### Modify `src/pages/MyVisits.tsx`
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-1. **Add state**: `selectedBeatFilter` — stores the selected `beat_id` or `'all'` (default).
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-2. **Include `beat_id` in processed retailers**: Add `beatId: retailer.beat_id` to the return object in the `retailers` useMemo (~line 352-373).
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-3. **Replace the static beat name text** (~line 1199) with clickable beat chips:
-   - Render an "All" chip + one chip per beat from `optimizedBeatPlans`
-   - Active chip gets a highlighted style (e.g., solid bg), inactive gets outline
-   - On click, set `selectedBeatFilter` to that beat's `beat_id` (or `'all'`)
-   - Chips are horizontally scrollable on mobile
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-4. **Filter retailers by selected beat**: Add a `filteredRetailers` useMemo that filters `retailers` by `beatId` when `selectedBeatFilter !== 'all'`. Use this filtered list wherever retailers are rendered (visit cards list).
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-### No other files need changes
-All data (`beat_id` on retailers, `beat_name` on beat plans) is already available from the existing hooks.
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
+## Phase: Target Split, Dual Visibility & Manager Self-Service
+
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
+
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
+
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
