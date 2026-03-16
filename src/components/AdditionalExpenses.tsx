@@ -614,60 +614,6 @@ const AdditionalExpenses: React.FC<AdditionalExpensesProps> = ({
                       />
                     </div>
 
-                    <div>
-                      <Label className="text-xs">Attach Bill</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        {/* Hidden file inputs */}
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          ref={(el) => { fileInputRefs.current[index] = el; }}
-                          onChange={(e) => handleFileSelected(index, e.target.files?.[0] || null)}
-                          className="hidden"
-                        />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          ref={(el) => { cameraInputRefs.current[index] = el; }}
-                          onChange={(e) => handleFileSelected(index, e.target.files?.[0] || null)}
-                          className="hidden"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs flex-1"
-                          onClick={() => fileInputRefs.current[index]?.click()}
-                        >
-                          <Upload size={12} className="mr-1" />
-                          Upload
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs flex-1"
-                          onClick={() => cameraInputRefs.current[index]?.click()}
-                        >
-                          <Camera size={12} className="mr-1" />
-                          Camera
-                        </Button>
-                      </div>
-                      {expense.bill_file && (
-                        <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                          ✓ {expense.bill_file.name} ({(expense.bill_file.size / 1024).toFixed(0)}KB)
-                        </p>
-                      )}
-                      {!expense.bill_file && expense.bill_url && (
-                        <p className="text-[10px] text-primary mt-1 truncate">
-                          ✓ Existing bill attached · <span className="underline cursor-pointer" onClick={async () => {
-                            const { data } = await supabase.storage.from('expense-bills').createSignedUrl(expense.bill_url!, 300);
-                            if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-                          }}>View</span>
-                        </p>
-                      )}
-                    </div>
                   </div>
                 </div>
               ))}
