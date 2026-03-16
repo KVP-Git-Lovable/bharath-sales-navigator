@@ -3714,6 +3714,73 @@ export const VisitCard = ({
             }));
           }}
         />
+
+        {/* Location Capture Modal */}
+        <Dialog open={showLocationCaptureModal} onOpenChange={setShowLocationCaptureModal}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MapPin size={18} className="text-destructive" />
+                Location Not Captured
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This retailer doesn't have a GPS location saved. Please capture the current location before placing an order.
+            </p>
+            <div className="flex gap-2 justify-end mt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowLocationCaptureModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                disabled={isCapturingLocation}
+                onClick={async () => {
+                  setIsCapturingLocation(true);
+                  try {
+                    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                      navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0,
+                      });
+                    });
+                    
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const retailerId = (visit.retailerId || visit.id) as string;
+
+                    const { error } = await supabase
+                      .from('retailers')
+                      .update({ latitude: lat, longitude: lng })
+                      .eq('id', retailerId);
+
+                    if (error) throw error;
+
+                    setRetailerLat(lat);
+                    setRetailerLng(lng);
+                    setShowLocationCaptureModal(false);
+
+                    toast({
+                      title: "Location Captured",
+                      description: "Retailer location has been saved successfully. You can now place the order.",
+                    });
+                  } catch (err: any) {
+                    console.error('Location capture error:', err);
+                    toast({
+                      title: "Location Capture Failed",
+                      description: err?.message || "Could not get your current location. Please enable GPS and try again.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsCapturingLocation(false);
+                  }
+                }}
+              >
+                {isCapturingLocation ? "Capturing..." : "Capture Location"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>;
 };
