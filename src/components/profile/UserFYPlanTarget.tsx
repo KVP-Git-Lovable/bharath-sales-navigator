@@ -362,7 +362,8 @@ export function UserFYPlanTarget({
       const plansData = (data || []).map((p: any) => ({
         ...p,
         quantity_target: p.quantity_target || 0,
-        quantity_unit: p.quantity_unit || 'Units'
+        quantity_unit: p.quantity_unit || 'Units',
+        has_no_target: p.has_no_target || false,
       }));
       setPlans(plansData);
       if (plansData.length > 0) {
