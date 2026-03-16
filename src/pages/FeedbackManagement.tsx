@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MessageSquare, Trophy, Image, Users, Calendar, Filter, RefreshCw, Eye } from "lucide-react";
+import { ArrowLeft, MessageSquare, Trophy, Image, Users, Calendar, Filter, RefreshCw, Eye, Settings, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
@@ -17,6 +17,8 @@ import { RetailerFeedbackDetailModal } from "@/components/admin/RetailerFeedback
 import { CompetitionDetailModal } from "@/components/admin/CompetitionDetailModal";
 import { BrandingRequestDetailModal } from "@/components/admin/BrandingRequestDetailModal";
 import { JointSalesDetailModal } from "@/components/admin/JointSalesDetailModal";
+import FeedbackQuestionConfig from "@/components/admin/FeedbackQuestionConfig";
+import FeedbackPolicyConfig from "@/components/admin/FeedbackPolicyConfig";
 
 type DetailModalType = 'retailer' | 'branding' | 'competition' | 'jointsales' | null;
 
