@@ -48,6 +48,7 @@ import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
 import { CancelOrderDialog } from "./CancelOrderDialog";
+import { useActivityEvents, formatActivityDuration, type ActivityEvent } from "@/hooks/useActivityEvents";
 import { useFeedbackPolicyCheck } from "@/hooks/useFeedbackPolicyCheck";
 interface Visit {
   id: string;
