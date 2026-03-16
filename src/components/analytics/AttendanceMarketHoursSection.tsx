@@ -503,6 +503,8 @@ export const AttendanceMarketHoursSection = ({
                           <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {formatHours(overallAverages.avgWorkingHours)}
                           </TableCell>
+                          {isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
+                          {isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
                           <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {formatHours(overallAverages.avgRetailerHours)}
                           </TableCell>
