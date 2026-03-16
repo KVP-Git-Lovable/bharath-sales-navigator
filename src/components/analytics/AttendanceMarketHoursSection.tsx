@@ -23,6 +23,8 @@ interface RetailerTimeData {
   full_name: string;
   date: string;
   retailer_hours: number;
+  first_check_in: string | null;
+  last_check_out: string | null;
 }
 
 interface UserSummary {
@@ -127,7 +129,7 @@ export const AttendanceMarketHoursSection = ({
       // Only require start_time (matching TodaySummary logic)
       const { data: visitLogs, error: visitError } = await supabase
         .from('retailer_visit_logs')
-        .select('user_id, visit_date, start_time')
+        .select('user_id, visit_date, start_time, end_time')
         .in('user_id', effectiveUserIds)
         .gte('visit_date', fromDate)
         .lte('visit_date', toDate)
@@ -143,7 +145,10 @@ export const AttendanceMarketHoursSection = ({
           user_id: string; 
           full_name: string; 
           date: string; 
-          startTimes: number[] 
+          startTimes: number[];
+          endTimes: number[];
+          rawStartTimes: string[];
+          rawEndTimes: string[];
         }> = {};
         
         (visitLogs || []).forEach(log => {
@@ -155,34 +160,44 @@ export const AttendanceMarketHoursSection = ({
               user_id: log.user_id,
               full_name: userNames[log.user_id] || 'Unknown',
               date: log.visit_date,
-              startTimes: []
+              startTimes: [],
+              endTimes: [],
+              rawStartTimes: [],
+              rawEndTimes: []
             };
           }
           
-          // Store the start_time timestamp
           const startTime = new Date(log.start_time).getTime();
           dateUserMap[key].startTimes.push(startTime);
+          dateUserMap[key].rawStartTimes.push(log.start_time);
+          
+          if (log.end_time) {
+            const endTime = new Date(log.end_time).getTime();
+            dateUserMap[key].endTimes.push(endTime);
+            dateUserMap[key].rawEndTimes.push(log.end_time);
+          }
         });
 
-        // Calculate retailer hours as span from first to last start_time (matching TodaySummary)
         const processedRetailerTime: RetailerTimeData[] = Object.values(dateUserMap).map(item => {
           let retailerHours = 0;
           
           if (item.startTimes.length >= 2) {
-            // Find earliest and latest start times
             const earliestStart = Math.min(...item.startTimes);
             const latestStart = Math.max(...item.startTimes);
-            
-            // Time at retailers = span from first visit to last visit
             retailerHours = (latestStart - earliestStart) / (1000 * 60 * 60);
           }
-          // If only 1 visit, retailer hours = 0 (no span)
+
+          // First check-in = earliest start_time, last check-out = latest end_time
+          const earliestStartIdx = item.startTimes.indexOf(Math.min(...item.startTimes));
+          const latestEndIdx = item.endTimes.length > 0 ? item.endTimes.indexOf(Math.max(...item.endTimes)) : -1;
           
           return {
             user_id: item.user_id,
             full_name: item.full_name,
             date: item.date,
-            retailer_hours: Math.max(0, retailerHours)
+            retailer_hours: Math.max(0, retailerHours),
+            first_check_in: item.rawStartTimes[earliestStartIdx] || null,
+            last_check_out: latestEndIdx >= 0 ? item.rawEndTimes[latestEndIdx] : null
           };
         });
         
@@ -272,11 +287,11 @@ export const AttendanceMarketHoursSection = ({
     const userRetailer = retailerTimeData.filter(r => r.full_name === selectedUserForDrilldown);
     
     // Combine by date
-    const dateMap: Record<string, { date: string; working_hours: number; retailer_hours: number; check_in_time: string | null; check_out_time: string | null }> = {};
+    const dateMap: Record<string, { date: string; working_hours: number; retailer_hours: number; check_in_time: string | null; check_out_time: string | null; retailer_check_in: string | null; retailer_check_out: string | null }> = {};
     
     userAttendance.forEach(a => {
       if (!dateMap[a.date]) {
-        dateMap[a.date] = { date: a.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null };
+        dateMap[a.date] = { date: a.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null, retailer_check_in: null, retailer_check_out: null };
       }
       dateMap[a.date].working_hours = a.working_hours;
       dateMap[a.date].check_in_time = a.check_in_time;
@@ -285,9 +300,11 @@ export const AttendanceMarketHoursSection = ({
     
     userRetailer.forEach(r => {
       if (!dateMap[r.date]) {
-        dateMap[r.date] = { date: r.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null };
+        dateMap[r.date] = { date: r.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null, retailer_check_in: null, retailer_check_out: null };
       }
       dateMap[r.date].retailer_hours = r.retailer_hours;
+      dateMap[r.date].retailer_check_in = r.first_check_in;
+      dateMap[r.date].retailer_check_out = r.last_check_out;
     });
     
     return Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
@@ -393,6 +410,8 @@ export const AttendanceMarketHoursSection = ({
                           {isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Check In</TableHead>}
                           {isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Check Out</TableHead>}
                           <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Working Hours</TableHead>
+                          {isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Retailer In</TableHead>}
+                          {isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Retailer Out</TableHead>}
                           <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Time at Retailers</TableHead>
                           {!isSingleUserMode && <TableHead className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>Days</TableHead>}
                           {!isSingleUserMode && <TableHead className={cn("whitespace-nowrap", isMobile ? "w-6 py-1 px-1" : "w-8 py-1.5")}></TableHead>}
@@ -413,11 +432,19 @@ export const AttendanceMarketHoursSection = ({
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.retailer_check_in)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.retailer_check_out)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.retailer_hours)}
                               </TableCell>
                             </TableRow>
-                          )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => (
+                          )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => {
+                            const retailerData = retailerTimeData.find(r => r.user_id === row.user_id && r.date === row.date);
+                            return (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
                               <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
@@ -429,11 +456,18 @@ export const AttendanceMarketHoursSection = ({
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(retailerData?.first_check_in || null)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(retailerData?.last_check_out || null)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-green-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
-                                {formatHours(retailerTimeData.find(r => r.user_id === row.user_id && r.date === row.date)?.retailer_hours || 0)}
+                                {formatHours(retailerData?.retailer_hours || 0)}
                               </TableCell>
                             </TableRow>
-                          ))
+                            );
+                          })
                         ) : (
                           // Multi-user: show user-wise summary
                           userSummaries.map((row, index) => (
@@ -469,6 +503,8 @@ export const AttendanceMarketHoursSection = ({
                           <TableCell className={cn("text-right font-bold text-blue-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {formatHours(overallAverages.avgWorkingHours)}
                           </TableCell>
+                          {isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
+                          {isSingleUserMode && <TableCell className={cn(isMobile ? "py-1 px-2" : "py-1.5")}></TableCell>}
                           <TableCell className={cn("text-right font-bold text-green-600 whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                             {formatHours(overallAverages.avgRetailerHours)}
                           </TableCell>
@@ -510,6 +546,8 @@ export const AttendanceMarketHoursSection = ({
                     <TableHead className="text-right">Check In</TableHead>
                     <TableHead className="text-right">Check Out</TableHead>
                     <TableHead className="text-right">Working Hours</TableHead>
+                    <TableHead className="text-right">Retailer In</TableHead>
+                    <TableHead className="text-right">Retailer Out</TableHead>
                     <TableHead className="text-right">Time at Retailers</TableHead>
                   </TableRow>
                 </thead>
@@ -525,6 +563,12 @@ export const AttendanceMarketHoursSection = ({
                       </TableCell>
                       <TableCell className="text-right text-blue-600 font-medium">
                         {formatHours(row.working_hours)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.retailer_check_in)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.retailer_check_out)}
                       </TableCell>
                       <TableCell className="text-right text-green-600 font-medium">
                         {formatHours(row.retailer_hours)}
@@ -542,6 +586,8 @@ export const AttendanceMarketHoursSection = ({
                         drilldownData.reduce((sum, r) => sum + r.working_hours, 0) / drilldownData.length
                       )}
                     </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right font-bold text-green-600">
                       {formatHours(
                         drilldownData.reduce((sum, r) => sum + r.retailer_hours, 0) / drilldownData.length
