@@ -2636,6 +2636,12 @@ export const VisitCard = ({
                   <Package size={12} className="mr-1" />
                   {stockRecordCount} Stock{stockRecordCount !== 1 ? 's' : ''}
                 </Badge>}
+              {isFeedbackRequired && (
+                <Badge className="bg-destructive text-destructive-foreground text-xs px-2 py-1">
+                  <MessageSquare size={12} className="mr-1" />
+                  Feedback Required
+                </Badge>
+              )}
               {/* Activity Badge */}
               {visit.visitType === 'activity' && activityEvent && (
                 <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs px-2 py-1">
