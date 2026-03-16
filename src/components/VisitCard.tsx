@@ -109,6 +109,11 @@ export const VisitCard = ({
   }>>([]);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showLocationCaptureModal, setShowLocationCaptureModal] = useState(false);
+  const [isCapturingLocation, setIsCapturingLocation] = useState(false);
+  const [retailerLat, setRetailerLat] = useState<number | undefined>(visit.retailerLat);
+  const [retailerLng, setRetailerLng] = useState<number | undefined>(visit.retailerLng);
+  const hasRetailerLocation = retailerLat != null && retailerLng != null;
   const [isNoOrderMarked, setIsNoOrderMarked] = useState(!!visit.noOrderReason);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [isCheckedOut, setIsCheckedOut] = useState(false);
