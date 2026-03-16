@@ -839,10 +839,11 @@ export function UserFYPlanTarget({
         .from('user_business_plans')
         .update({
           year: planForm.year,
-          quantity_target: parseFloat(planForm.quantity_target) || 0,
+          quantity_target: planForm.has_no_target ? 0 : (parseFloat(planForm.quantity_target) || 0),
           quantity_unit: planForm.quantity_unit,
-          revenue_target: parseFloat(planForm.revenue_target) || 0,
+          revenue_target: planForm.has_no_target ? 0 : (parseFloat(planForm.revenue_target) || 0),
           notes: planForm.notes || null,
+          has_no_target: planForm.has_no_target,
         })
         .eq('id', selectedPlan.id);
 
