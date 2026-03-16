@@ -305,6 +305,7 @@ const App = () => {
 const AppContent = ({ hasError }: { hasError: boolean }) => {
   useAndroidBackButton();
   useActivityTracker();
+  useModuleUsageTracker();
   const { user, mustChangePassword, onPasswordChanged, dismissPasswordChange } = useAuth();
 
   if (hasError) {
