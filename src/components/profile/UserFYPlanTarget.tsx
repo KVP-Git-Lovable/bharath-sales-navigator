@@ -888,6 +888,7 @@ export function UserFYPlanTarget({
         quantity_unit: selectedPlan.quantity_unit,
         revenue_target: selectedPlan.revenue_target.toString(),
         notes: selectedPlan.notes || "",
+        has_no_target: selectedPlan.has_no_target || false,
       });
       setEditDialogOpen(true);
     }
