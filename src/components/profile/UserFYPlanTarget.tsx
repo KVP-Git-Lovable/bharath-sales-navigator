@@ -799,10 +799,11 @@ export function UserFYPlanTarget({
         .insert({
           user_id: effectiveUserId,
           year: planForm.year,
-          quantity_target: parseFloat(planForm.quantity_target) || 0,
+          quantity_target: planForm.has_no_target ? 0 : (parseFloat(planForm.quantity_target) || 0),
           quantity_unit: planForm.quantity_unit,
-          revenue_target: parseFloat(planForm.revenue_target) || 0,
+          revenue_target: planForm.has_no_target ? 0 : (parseFloat(planForm.revenue_target) || 0),
           notes: planForm.notes || null,
+          has_no_target: planForm.has_no_target,
         })
         .select()
         .single();
@@ -816,12 +817,14 @@ export function UserFYPlanTarget({
         quantity_unit: "Units",
         revenue_target: "",
         notes: "",
+        has_no_target: false,
       });
       loadPlans();
       setSelectedPlan({
         ...data,
         quantity_target: data.quantity_target || 0,
-        quantity_unit: data.quantity_unit || 'Units'
+        quantity_unit: data.quantity_unit || 'Units',
+        has_no_target: data.has_no_target || false,
       });
     } catch (error: any) {
       toast.error("Failed to create plan: " + error.message);
