@@ -507,6 +507,8 @@ export const AttendanceMarketHoursSection = ({
                 <thead className="sticky top-0 bg-muted z-20">
                   <TableRow className="border-b">
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Check In</TableHead>
+                    <TableHead className="text-right">Check Out</TableHead>
                     <TableHead className="text-right">Working Hours</TableHead>
                     <TableHead className="text-right">Time at Retailers</TableHead>
                   </TableRow>
@@ -515,6 +517,12 @@ export const AttendanceMarketHoursSection = ({
                   {drilldownData.map((row, index) => (
                     <TableRow key={index} className="hover:bg-muted/30">
                       <TableCell className="font-medium">{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.check_in_time)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatTime(row.check_out_time)}
+                      </TableCell>
                       <TableCell className="text-right text-blue-600 font-medium">
                         {formatHours(row.working_hours)}
                       </TableCell>
@@ -527,6 +535,8 @@ export const AttendanceMarketHoursSection = ({
                 <tfoot className="bg-muted/30 sticky bottom-0">
                   <TableRow>
                     <TableCell className="font-semibold">Average ({drilldownData.length} days)</TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right font-bold text-blue-600">
                       {formatHours(
                         drilldownData.reduce((sum, r) => sum + r.working_hours, 0) / drilldownData.length
