@@ -1,4 +1,4 @@
-import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff, AlertTriangle, Bug } from "lucide-react";
+import { Menu, X, LogOut, ArrowLeft, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { Capacitor } from '@capacitor/core';
 import { testCrash } from '@/utils/crashlytics';
 import { toast } from 'sonner';
