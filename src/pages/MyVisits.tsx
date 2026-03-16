@@ -370,6 +370,7 @@ export const MyVisits = () => {
         retailerLat: retailer.latitude != null ? Number(retailer.latitude) : undefined,
         retailerLng: retailer.longitude != null ? Number(retailer.longitude) : undefined,
         pendingAmount: retailer.pending_amount || 0, // Include pending_amount from hook
+        beatId: retailer.beat_id || undefined,
       };
     });
   }, [optimizedRetailers, optimizedVisits, optimizedOrders, selectedDate]);
