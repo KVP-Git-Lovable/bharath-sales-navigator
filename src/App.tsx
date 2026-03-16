@@ -20,6 +20,7 @@ import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import ForcedPasswordChangeDialog from "@/components/auth/ForcedPasswordChangeDialog";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
+import { useModuleUsageTracker } from "@/hooks/useModuleUsageTracker";
 
 // Initialize visit status cache early to avoid flicker
 visitStatusCache.init();
