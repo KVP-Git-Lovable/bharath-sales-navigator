@@ -2742,6 +2742,12 @@ export const VisitCard = ({
                   return;
                 }
 
+                // Check if retailer location is missing - show capture modal
+                if (!hasRetailerLocation) {
+                  setShowLocationCaptureModal(true);
+                  return;
+                }
+
                 // NAVIGATE IMMEDIATELY - this is the key to instant opening
                 const retailerNameEncoded = encodeURIComponent(visit.retailerName);
                 const retailerIdEncoded = encodeURIComponent(retailerId);
