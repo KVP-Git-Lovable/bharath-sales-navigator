@@ -2748,6 +2748,18 @@ export const VisitCard = ({
                   return;
                 }
 
+                // Check if feedback policy requires feedback before ordering
+                if (isFeedbackRequired && (feedbackAction === 'block_order' || feedbackAction === 'mandatory_feedback')) {
+                  toast({
+                    title: "Feedback Required",
+                    description: "Please submit feedback for this retailer before placing an order.",
+                    variant: "destructive",
+                  });
+                  setShowFeedbackModal(true);
+                  setFeedbackActiveTab("retailer");
+                  return;
+                }
+
                 // Check if retailer location is missing - show capture modal
                 if (!hasRetailerLocation) {
                   setShowLocationCaptureModal(true);
