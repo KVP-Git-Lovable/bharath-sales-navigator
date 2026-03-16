@@ -2118,17 +2118,12 @@ export const OrderEntry = () => {
                   e.preventDefault();
                   console.log('No order reason clicked:', reason.value);
                   
-                  if (reason.value === "over-stocked") {
-                    toast({
-                      title: "Information",
-                      description: "Update stock quantities in Grid/Table view - this option will auto-select",
-                      duration: 4000
-                    });
-                    return;
-                  }
-                  
                   // Mark as selected
                   setNoOrderReason(reason.value);
+                  
+                  if (reason.value === "over-stocked") {
+                    setShowOverstockPrompt(true);
+                  }
                   
                   // Reset custom reason if switching away from "other"
                   if (reason.value !== "other") {
