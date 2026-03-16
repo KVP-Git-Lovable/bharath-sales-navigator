@@ -404,6 +404,12 @@ export const AttendanceMarketHoursSection = ({
                           drilldownData.length > 0 ? drilldownData.map((row, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_in_time)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_out_time)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
@@ -414,6 +420,12 @@ export const AttendanceMarketHoursSection = ({
                           )) : attendanceData.filter(a => effectiveUserIds.includes(a.user_id)).map((row, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className={cn("font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>{format(new Date(row.date), 'dd-MM-yyyy')}</TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_in_time)}
+                              </TableCell>
+                              <TableCell className={cn("text-right whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
+                                {formatTime(row.check_out_time)}
+                              </TableCell>
                               <TableCell className={cn("text-right text-blue-600 font-medium whitespace-nowrap", isMobile ? "py-1 px-2" : "py-1.5")}>
                                 {formatHours(row.working_hours)}
                               </TableCell>
