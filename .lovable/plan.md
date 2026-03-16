@@ -1,33 +1,66 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-# Plan: Fix Beat ID Showing Instead of Beat Name
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-## Problem
-The BeatDetail page shows the raw `beat_id` code (e.g., `beat_1770806648518_sop441izi`) as the title instead of the human-readable beat name (e.g., "Nagasaki"). The DB has the correct `beat_name`, but the query fails silently.
+## What Was Done
 
-## Root Cause
-In `src/pages/BeatDetail.tsx` line 130, the query `or(\`id.eq.${id},beat_id.eq.${id}\`)` tries to match the URL parameter against both the `id` (UUID) column and `beat_id` (text) column. When the URL contains a non-UUID string like `beat_1770806648518_sop441izi`, PostgreSQL throws an error on `id.eq.beat_1770806648518_sop441izi` because `id` is a UUID column. This error causes the entire query to return null, making the page fall back to displaying the raw `beat_id` code as the title.
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-## Fix
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-### Modify `src/pages/BeatDetail.tsx` (~lines 126-131)
-Change the beat fetch logic to detect whether the URL `id` is a UUID format or a beat_id code, and query accordingly:
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-```typescript
-// Detect if id is a UUID
-const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-let query = supabase.from('beats').select('*');
-if (isUUID) {
-  query = query.or(`id.eq.${id},beat_id.eq.${id}`);
-} else {
-  query = query.eq('beat_id', id);
-}
-const { data: beat, error: beatError } = await query.maybeSingle();
-```
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-This prevents the UUID type mismatch error and ensures the beat record is found correctly, so `beat.beat_name` ("Nagasaki") is used for the title instead of the fallback `beat_id` code.
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-### Files to Modify
-- **`src/pages/BeatDetail.tsx`** — Fix the beat query logic (~lines 126-131)
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
+## Phase: Target Split, Dual Visibility & Manager Self-Service
+
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
+
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
+
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics

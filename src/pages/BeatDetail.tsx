@@ -124,11 +124,14 @@ export const BeatDetail = () => {
         setLoading(true);
 
         // Fetch beat from beats table (support both beats.id UUID and beats.beat_id code)
-        const { data: beat, error: beatError } = await supabase
-          .from('beats')
-          .select('*')
-          .or(`id.eq.${id},beat_id.eq.${id}`)
-          .maybeSingle();
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        let beatQuery = supabase.from('beats').select('*');
+        if (isUUID) {
+          beatQuery = beatQuery.or(`id.eq.${id},beat_id.eq.${id}`);
+        } else {
+          beatQuery = beatQuery.eq('beat_id', id);
+        }
+        const { data: beat, error: beatError } = await beatQuery.maybeSingle();
 
         if (beatError && beatError.code !== 'PGRST116') {
           console.error('Error fetching beat:', beatError);
