@@ -129,7 +129,7 @@ export const AttendanceMarketHoursSection = ({
       // Only require start_time (matching TodaySummary logic)
       const { data: visitLogs, error: visitError } = await supabase
         .from('retailer_visit_logs')
-        .select('user_id, visit_date, start_time')
+        .select('user_id, visit_date, start_time, end_time')
         .in('user_id', effectiveUserIds)
         .gte('visit_date', fromDate)
         .lte('visit_date', toDate)
