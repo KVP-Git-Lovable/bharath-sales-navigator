@@ -75,6 +75,7 @@ interface TableOrderFormProps {
   products: Product[];
   loading: boolean;
   onReloadProducts?: () => void;
+  onStockUpdate?: (productId: string, stockQuantity: number, productName: string) => void;
 }
 
 // Expose this handle type for refs
