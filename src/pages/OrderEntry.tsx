@@ -3022,7 +3022,7 @@ export const OrderEntry = () => {
           <AlertDialogCancel>No, Continue</AlertDialogCancel>
           <AlertDialogAction onClick={() => {
             setShowOverstockPrompt(false);
-            setOrderMode("grid");
+            setOrderMode("table");
           }}>
             Yes, Update Stock
           </AlertDialogAction>
