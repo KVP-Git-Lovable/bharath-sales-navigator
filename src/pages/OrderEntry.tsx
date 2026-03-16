@@ -2815,7 +2815,10 @@ export const OrderEntry = () => {
         products={cachedProducts}
         loading={offlineLoading}
         onReloadProducts={fetchOfflineProducts}
-        onCartUpdate={handleBulkCartUpdate} 
+        onCartUpdate={handleBulkCartUpdate}
+        onStockUpdate={(productId, stockQuantity, productName) => {
+          saveStockData(productId, stockQuantity, productName);
+        }}
       />)}
 
         

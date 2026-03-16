@@ -94,7 +94,7 @@ export interface VoiceAutoFillResult {
   searchTerm: string;
 }
 
-export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormProps>(({ onCartUpdate, products, loading, onReloadProducts }, ref) => {
+export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormProps>(({ onCartUpdate, products, loading, onReloadProducts, onStockUpdate }, ref) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const visitId = searchParams.get("visitId") || '';
