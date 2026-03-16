@@ -2557,12 +2557,12 @@ export const VisitCard = ({
               {/* Location and Phone icons - right aligned */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${visit.retailerLat && visit.retailerLng ? `${visit.retailerLat},${visit.retailerLng}` : encodeURIComponent(visit.address || '')}`} 
+                  href={hasRetailerLocation ? `https://www.google.com/maps/search/?api=1&query=${retailerLat},${retailerLng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visit.address || '')}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="text-primary hover:text-primary/80 cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors" 
+                  className={`${hasRetailerLocation ? 'text-primary hover:text-primary/80' : 'text-destructive hover:text-destructive/80'} cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors`}
                   onClick={e => e.stopPropagation()} 
-                  title="Open in Google Maps"
+                  title={hasRetailerLocation ? "Open in Google Maps" : "Location not captured"}
                 >
                   <MapPin size={16} />
                 </a>
