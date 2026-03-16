@@ -287,11 +287,11 @@ export const AttendanceMarketHoursSection = ({
     const userRetailer = retailerTimeData.filter(r => r.full_name === selectedUserForDrilldown);
     
     // Combine by date
-    const dateMap: Record<string, { date: string; working_hours: number; retailer_hours: number; check_in_time: string | null; check_out_time: string | null }> = {};
+    const dateMap: Record<string, { date: string; working_hours: number; retailer_hours: number; check_in_time: string | null; check_out_time: string | null; retailer_check_in: string | null; retailer_check_out: string | null }> = {};
     
     userAttendance.forEach(a => {
       if (!dateMap[a.date]) {
-        dateMap[a.date] = { date: a.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null };
+        dateMap[a.date] = { date: a.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null, retailer_check_in: null, retailer_check_out: null };
       }
       dateMap[a.date].working_hours = a.working_hours;
       dateMap[a.date].check_in_time = a.check_in_time;
@@ -300,9 +300,11 @@ export const AttendanceMarketHoursSection = ({
     
     userRetailer.forEach(r => {
       if (!dateMap[r.date]) {
-        dateMap[r.date] = { date: r.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null };
+        dateMap[r.date] = { date: r.date, working_hours: 0, retailer_hours: 0, check_in_time: null, check_out_time: null, retailer_check_in: null, retailer_check_out: null };
       }
       dateMap[r.date].retailer_hours = r.retailer_hours;
+      dateMap[r.date].retailer_check_in = r.first_check_in;
+      dateMap[r.date].retailer_check_out = r.last_check_out;
     });
     
     return Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
