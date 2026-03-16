@@ -2050,7 +2050,7 @@ export function UserFYPlanTarget({
               </AlertDialog>
 
               {/* Tabs for Product, Retailer, Month, Territory and Distributor Targets */}
-              {visibleTabs.length === 0 ? (
+              {selectedPlan.has_no_target ? null : visibleTabs.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
                     <p className="text-sm text-muted-foreground">No target parameters are enabled for this plan</p>
