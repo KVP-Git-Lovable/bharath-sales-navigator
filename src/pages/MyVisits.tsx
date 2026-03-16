@@ -1209,7 +1209,37 @@ export const MyVisits = () => {
               <div className="flex items-center gap-1.5">
                 <div>
                   <CardTitle className="text-base sm:text-xl font-bold leading-tight">{t('visits.title')}</CardTitle>
-                  <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+                  {optimizedBeatPlans.length <= 1 ? (
+                    <p className="text-xs sm:text-base font-semibold mt-0.5 sm:mt-1 truncate leading-tight">{currentBeatName}</p>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-1 overflow-x-auto no-scrollbar">
+                      <button
+                        onClick={() => setSelectedBeatFilter('all')}
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap transition-colors border",
+                          selectedBeatFilter === 'all'
+                            ? "bg-primary-foreground text-primary border-primary-foreground"
+                            : "bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/20"
+                        )}
+                      >
+                        All
+                      </button>
+                      {optimizedBeatPlans.map(plan => (
+                        <button
+                          key={plan.beat_id}
+                          onClick={() => setSelectedBeatFilter(plan.beat_id)}
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap transition-colors border",
+                            selectedBeatFilter === plan.beat_id
+                              ? "bg-primary-foreground text-primary border-primary-foreground"
+                              : "bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/20"
+                          )}
+                        >
+                          {plan.beat_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <ModuleHelpButton categoryId="my-visit" variant="onDark" />
               </div>
