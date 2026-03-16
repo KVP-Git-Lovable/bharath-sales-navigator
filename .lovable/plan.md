@@ -64,3 +64,27 @@ Upgraded the target management system from a rigid lock-based model to a flexibl
 - New `ManagerTargets.tsx` page for managers to edit subordinate targets
 - View own target vs actual achievement
 - Reuse `useTeamTargetProgress` hook for analytics
+
+## Phase: Feedback Configuration & Policy Engine ✅
+
+### Database Schema ✅
+- Created `feedback_questions` table (per-module/customer configurable questions)
+- Created `feedback_policies` table (named policies with module, priority)
+- Created `feedback_policy_rules` table (condition+action pairs per policy)
+- RLS enabled on all 3 tables with authenticated access
+
+### Frontend Components ✅
+- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
+- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
+- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
+
+### Policy Engine ✅
+- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
+- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
+- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
+
+### Workflow Enforcement ✅
+- `VisitCard.tsx`: Integrated policy check hook
+- "Feedback Required" badge shown when policy triggers
+- Order button intercepted when block_order/mandatory_feedback action triggered
+- Opens feedback modal automatically when blocked
