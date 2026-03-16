@@ -1962,42 +1962,62 @@ export function UserFYPlanTarget({
                         max={2050}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Quantity Target</Label>
-                        <Input
-                          type="number"
-                          value={planForm.quantity_target}
-                          onChange={(e) => setPlanForm(prev => ({ ...prev, quantity_target: e.target.value }))}
-                          placeholder="Annual quantity"
-                        />
-                      </div>
-                      <div>
-                        <Label>Unit of Measure</Label>
-                        <Select
-                          value={planForm.quantity_unit}
-                          onValueChange={(value) => setPlanForm(prev => ({ ...prev, quantity_unit: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {QUANTITY_UNITS.map(unit => (
-                              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Revenue Target (₹)</Label>
-                      <Input
-                        type="number"
-                        value={planForm.revenue_target}
-                        onChange={(e) => setPlanForm(prev => ({ ...prev, revenue_target: e.target.value }))}
-                        placeholder="Annual revenue target"
+                    
+                    {/* No Target Toggle */}
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-muted bg-muted/30">
+                      <Checkbox
+                        id="no-target-edit"
+                        checked={planForm.has_no_target}
+                        onCheckedChange={(checked) => setPlanForm(prev => ({ ...prev, has_no_target: checked as boolean }))}
                       />
+                      <Label htmlFor="no-target-edit" className="text-sm cursor-pointer">
+                        No Target for this FY
+                        <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                          Mark this user as having no target assigned
+                        </p>
+                      </Label>
                     </div>
+                    
+                    {!planForm.has_no_target && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Quantity Target</Label>
+                            <Input
+                              type="number"
+                              value={planForm.quantity_target}
+                              onChange={(e) => setPlanForm(prev => ({ ...prev, quantity_target: e.target.value }))}
+                              placeholder="Annual quantity"
+                            />
+                          </div>
+                          <div>
+                            <Label>Unit of Measure</Label>
+                            <Select
+                              value={planForm.quantity_unit}
+                              onValueChange={(value) => setPlanForm(prev => ({ ...prev, quantity_unit: value }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {QUANTITY_UNITS.map(unit => (
+                                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Revenue Target (₹)</Label>
+                          <Input
+                            type="number"
+                            value={planForm.revenue_target}
+                            onChange={(e) => setPlanForm(prev => ({ ...prev, revenue_target: e.target.value }))}
+                            placeholder="Annual revenue target"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div>
                       <Label>Notes</Label>
                       <Input
