@@ -212,6 +212,16 @@ const ProductivityTracking = () => {
 
       setProductivityData(dataArray);
 
+      // Fetch additional expenses for the date range
+      const { data: addExpData } = await (supabase as any)
+        .from('additional_expenses')
+        .select('amount, status')
+        .gte('expense_date', format(start, 'yyyy-MM-dd'))
+        .lte('expense_date', format(end, 'yyyy-MM-dd'))
+        .in('status', ['manager_approved', 'paid']);
+
+      const addTotal = (addExpData || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      setAdditionalTotal(addTotal);
     } catch (error) {
       console.error('Error fetching productivity data:', error);
       toast({
