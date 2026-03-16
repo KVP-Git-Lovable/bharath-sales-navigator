@@ -1014,8 +1014,20 @@ export const MyVisits = () => {
     }).filter(Boolean)));
   }, [retailers]);
 
+  // Beat filter state
+  const [selectedBeatFilter, setSelectedBeatFilter] = useState<string>('all');
+
+  // Reset beat filter when date changes
+  useEffect(() => {
+    setSelectedBeatFilter('all');
+  }, [selectedDate]);
+
   // Show visits for selected date based on planned beats
-  const allVisits = retailers;
+  const allVisits = useMemo(() => {
+    if (selectedBeatFilter === 'all') return retailers;
+    return retailers.filter(r => r.beatId === selectedBeatFilter);
+  }, [retailers, selectedBeatFilter]);
+
   const filteredVisits = useMemo(() => {
     // REMOVED: Don't return empty array when loading - show cached data while refreshing in background
     // if (dataLoading) return [];
