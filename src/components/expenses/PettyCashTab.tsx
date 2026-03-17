@@ -86,7 +86,7 @@ const PettyCashTab: React.FC<PettyCashTabProps> = ({ fund, limits }) => {
     }
 
     setSaving(true);
-    const { error } = await supabase.from('petty_cash_transactions').insert({
+    const { error } = await (supabase as any).from('petty_cash_transactions').insert({
       fund_id: fund.id,
       user_id: user.id,
       amount,
