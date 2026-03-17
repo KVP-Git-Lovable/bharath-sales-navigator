@@ -1110,11 +1110,34 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
 
       if (!mountedRef.current || lastDateRef.current !== date) return;
 
+      // FIX #1: Merge unsynced local orders with DB orders (local-first)
+      let mergedOrders = ordersData;
+      try {
+        const localOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+        const dbIds = new Set(ordersData.map((o: any) => o.id));
+        const dbIdemKeys = new Set(ordersData.filter((o: any) => o.idempotency_key).map((o: any) => o.idempotency_key));
+        const unsyncedLocal = localOrders.filter((o: any) => 
+          o.user_id === uid && 
+          o.order_date === date && 
+          o.status === 'confirmed' &&
+          !dbIds.has(o.id) &&
+          !(o.idempotency_key && dbIdemKeys.has(o.idempotency_key))
+        );
+        if (unsyncedLocal.length > 0) {
+          // Mark local orders with sync status
+          const localWithStatus = unsyncedLocal.map((o: any) => ({ ...o, _syncStatus: 'pending' }));
+          mergedOrders = [...ordersData.map((o: any) => ({ ...o, _syncStatus: 'synced' })), ...localWithStatus];
+          console.log(`[FullLoad] Merged ${unsyncedLocal.length} unsynced local orders with ${ordersData.length} DB orders`);
+        }
+      } catch (e) {
+        console.warn('[FullLoad] Error merging local orders:', e);
+      }
+
       // Set state
       setBeatPlans(beatPlansData);
       setVisits(visitsData);
       setRetailers(retailersData);
-      setOrders(ordersData);
+      setOrders(mergedOrders);
       setPointsData(pointsFetched);
 
       // Update cache with timestamp for staleness check
@@ -1122,7 +1145,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         beatPlans: beatPlansData,
         visits: visitsData,
         retailers: retailersData,
-        orders: ordersData,
+        orders: mergedOrders,
         points: { total: pointsFetched.total, byRetailer: Array.from(pointsFetched.byRetailer.entries()) },
         timestamp: Date.now()
       };
@@ -1143,8 +1166,8 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         beatPlans: beatPlansData,
         visits: visitsData,
         retailers: retailersData,
-        orders: ordersData,
-        progressStats: calculateStats(visitsData, ordersData, retailersData, date),
+        orders: mergedOrders,
+        progressStats: calculateStats(visitsData, mergedOrders, retailersData, date),
         currentBeatName: beatPlansData.map(p => p.beat_name).join(', '),
         pointsTotal: pointsFetched.total,
         pointsByRetailer: Array.from(pointsFetched.byRetailer.entries())
