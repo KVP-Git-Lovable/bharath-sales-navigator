@@ -284,9 +284,9 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
                 <AlertTriangle className="h-3 w-3 mr-1" /> {retryingCount} Retrying
               </Badge>
             )}
-            {failedCount > 0 && (
-              <Badge variant="destructive" className="text-xs">
-                <XCircle className="h-3 w-3 mr-1" /> {failedCount} Failed
+            {slowRetryCount > 0 && (
+              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" /> {slowRetryCount} Slow Retry
               </Badge>
             )}
           </div>
