@@ -50,10 +50,10 @@ export const LicenseDetailsSection = () => {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   const stats = [
-    { label: 'Users', value: counts.users, icon: <Users className="h-5 w-5" /> },
-    { label: 'Retailers', value: counts.retailers, icon: <Store className="h-5 w-5" /> },
-    { label: 'Orders', value: counts.orders, icon: <ShoppingCart className="h-5 w-5" /> },
-    { label: 'Visits', value: counts.visits, icon: <MapPin className="h-5 w-5" /> },
+    { label: 'Users', value: counts.users, icon: <Users className="h-5 w-5" />, note: 'No. of unique users who logged-in to the app during this period' },
+    { label: 'Retailers', value: counts.retailers, icon: <Store className="h-5 w-5" />, note: 'No. of retailers newly created during the period' },
+    { label: 'Orders', value: counts.orders, icon: <ShoppingCart className="h-5 w-5" />, note: 'No. of orders newly created during this period' },
+    { label: 'Visits', value: counts.visits, icon: <MapPin className="h-5 w-5" />, note: 'No. of new visits created during this period' },
   ];
 
   return (
@@ -90,6 +90,7 @@ export const LicenseDetailsSection = () => {
                 <div className="text-primary">{s.icon}</div>
                 <p className="text-2xl font-bold text-foreground">{s.value.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="text-[10px] text-muted-foreground/70 text-center leading-tight mt-1">{s.note}</p>
               </div>
             ))}
           </div>
