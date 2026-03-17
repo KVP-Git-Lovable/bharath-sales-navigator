@@ -4,12 +4,11 @@ import { Input } from './ui/input';
 import { Card, CardContent } from './ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Check, Plus, ChevronsUpDown, FileText, Trash2, Loader2 } from 'lucide-react';
+import { Package, Plus, ChevronsUpDown, FileText, Trash2, Loader2, ArrowLeft, ArrowRight, CheckCircle2, Download, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { generateCreditNotePDF, getNextCreditNoteNumber, CreditNoteItem, CreditNoteData } from '@/utils/creditNoteGenerator';
 import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Badge } from './ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { cn } from '@/lib/utils';
@@ -58,14 +57,20 @@ const returnReasons = [
   'Other'
 ];
 
+const units = ['Piece', 'Box', 'Case', 'Kg', 'grams', 'Litre', 'ml', 'Dozen', 'Pack', 'Carton'];
+
 export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete }: ReturnStockFormProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [generatingCN, setGeneratingCN] = useState(false);
-  
-  // Form state for adding new return
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  // Step 3 state
+  const [creditNoteNumber, setCreditNoteNumber] = useState('');
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+
+  // Form state
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [returnQuantity, setReturnQuantity] = useState<number>(0);
   const [returnReason, setReturnReason] = useState<string>('');
@@ -77,25 +82,12 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     loadProducts();
   }, []);
 
-
   const loadProducts = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('products')
-        .select(`
-          id,
-          name,
-          unit,
-          rate,
-          sku,
-          product_variants (
-            id,
-            variant_name,
-            sku,
-            price
-          )
-        `)
+        .select(`id, name, unit, rate, sku, product_variants (id, variant_name, sku, price)`)
         .eq('is_active', true)
         .order('name');
 
@@ -120,23 +112,12 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   };
 
   const handleAddReturn = () => {
-    // Collect all validation errors
     const errors: string[] = [];
-    
-    if (!selectedProduct) {
-      errors.push('select a product');
-    }
-    if (returnQuantity <= 0) {
-      errors.push('enter a valid quantity');
-    }
-    if (!returnReason) {
-      errors.push('select a return reason');
-    }
-    if (returnReason === 'Other' && !otherReason.trim()) {
-      errors.push('enter the reason for returning');
-    }
-    
-    // Show single error message if any validation fails
+    if (!selectedProduct) errors.push('select a product');
+    if (returnQuantity <= 0) errors.push('enter a valid quantity');
+    if (!returnReason) errors.push('select a return reason');
+    if (returnReason === 'Other' && !otherReason.trim()) errors.push('enter the reason for returning');
+
     if (errors.length > 0) {
       toast.error(`Please ${errors.join(', ')}`);
       return;
@@ -144,7 +125,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
 
     const [productId, variantId] = selectedProduct.split('_variant_');
     const product = products.find(p => p.id === productId);
-    
     if (!product) return;
 
     const variant = variantId ? product.variants?.find(v => v.id === variantId) : undefined;
@@ -162,82 +142,16 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     };
 
     setReturnItems(prev => [...prev, newItem]);
-    
-    // Reset form
     setSelectedProduct('');
     setReturnQuantity(0);
     setReturnReason('');
-    setSelectedUnit('');
+    setSelectedUnit('Kg');
     setOtherReason('');
-    
     toast.success(`Added ${newItem.productName}${newItem.variantName ? ` - ${newItem.variantName}` : ''}`);
   };
 
   const handleRemoveItem = (index: number) => {
     setReturnItems(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSaveReturns = async () => {
-    if (returnItems.length === 0) {
-      toast.error('No items added for return');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const dateStr = new Date().toISOString().split('T')[0];
-      const grnNumber = `RET-${Date.now()}`;
-
-      // Create Return GRN - handle empty visit_id
-      const validVisitId = visitId && visitId.trim() !== '' ? visitId : null;
-      
-      const { data: returnGRN, error: grnError } = await supabase
-        .from('van_return_grn')
-        .insert({
-          user_id: user.id,
-          retailer_id: retailerId,
-          visit_id: validVisitId,
-          return_date: dateStr,
-          return_grn_number: grnNumber,
-          notes: `Returns from ${retailerName}`
-        })
-        .select()
-        .single();
-
-      if (grnError) throw grnError;
-
-      // Create Return GRN Items
-      const returnGRNItems = returnItems.map(item => ({
-        return_grn_id: returnGRN.id,
-        product_id: item.productId,
-        variant_id: item.variantId && item.variantId.trim() !== '' ? item.variantId : null,
-        return_quantity: item.returnQuantity,
-        return_reason: item.returnReason
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('van_return_grn_items')
-        .insert(returnGRNItems);
-
-      if (itemsError) throw itemsError;
-
-      
-      // Reset form
-      setReturnItems([]);
-      setSelectedProduct('');
-      setReturnQuantity(0);
-      setReturnReason('');
-      
-      onComplete();
-    } catch (error: any) {
-      console.error('Error saving returns:', error);
-      toast.error('Failed to save returns: ' + error.message);
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleGenerateCreditNote = async () => {
@@ -251,7 +165,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // 1. Fetch company info
       const { data: company } = await supabase
         .from('companies')
         .select('*')
@@ -259,14 +172,12 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         .limit(1)
         .maybeSingle();
 
-      // 2. Fetch retailer info
       const { data: retailer } = await supabase
         .from('retailers')
         .select('*')
         .eq('id', retailerId)
         .single();
 
-      // 3. Lookup past invoices for this retailer to find reference invoice numbers per product
       const { data: pastOrders } = await supabase
         .from('orders')
         .select('id, invoice_number, order_items(product_id, variant_id)')
@@ -275,7 +186,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         .order('created_at', { ascending: false })
         .limit(50);
 
-      // Build product->invoice map
       const productInvoiceMap: Record<string, string> = {};
       if (pastOrders) {
         for (const order of pastOrders) {
@@ -289,12 +199,11 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         }
       }
 
-      // 4. Build credit note items
       const cnItems: CreditNoteItem[] = returnItems.map(item => {
         const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
         const refInvoice = productInvoiceMap[key] || 'N/A';
         const total = item.price * item.returnQuantity;
-        const taxableAmount = total; // base price is pre-tax
+        const taxableAmount = total;
         const sgst = taxableAmount * 0.025;
         const cgst = taxableAmount * 0.025;
 
@@ -320,11 +229,9 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       const referenceInvoices = [...new Set(cnItems.map(i => i.original_invoice_number).filter(v => v !== 'N/A'))];
       if (referenceInvoices.length === 0) referenceInvoices.push('N/A');
 
-      // 5. Get next CN number
-      const creditNoteNumber = await getNextCreditNoteNumber();
+      const cnNumber = await getNextCreditNoteNumber();
       const creditNoteDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-      // Map return reason to credit note reason
       const primaryReason = returnItems[0]?.returnReason || 'Other';
       const reasonMap: Record<string, string> = {
         'Damaged': 'damaged',
@@ -336,11 +243,10 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         'Other': 'other',
       };
 
-      // 6. Save credit note to DB
       const { data: cnRecord, error: cnError } = await supabase
         .from('credit_notes')
         .insert({
-          credit_note_number: creditNoteNumber,
+          credit_note_number: cnNumber,
           credit_note_date: new Date().toISOString().split('T')[0],
           retailer_id: retailerId,
           retailer_name: retailerName,
@@ -358,7 +264,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
 
       if (cnError) throw cnError;
 
-      // 7. Save credit note items
       const cnItemRecords = cnItems.map(item => ({
         credit_note_id: cnRecord.id,
         product_name: item.product_name,
@@ -375,7 +280,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
 
       await supabase.from('credit_note_items').insert(cnItemRecords);
 
-      // 8. Also save the return GRN (so user doesn't need to click Save Return separately)
       const dateStr = new Date().toISOString().split('T')[0];
       const grnNumber = `RET-${Date.now()}`;
       const validVisitId = visitId && visitId.trim() !== '' ? visitId : null;
@@ -388,7 +292,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
           visit_id: validVisitId,
           return_date: dateStr,
           return_grn_number: grnNumber,
-          notes: `Returns from ${retailerName} — CN: ${creditNoteNumber}`
+          notes: `Returns from ${retailerName} — CN: ${cnNumber}`
         })
         .select()
         .single();
@@ -404,9 +308,8 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         await supabase.from('van_return_grn_items').insert(returnGRNItems);
       }
 
-      // 9. Generate & download PDF
       const cnData: CreditNoteData = {
-        creditNoteNumber,
+        creditNoteNumber: cnNumber,
         creditNoteDate,
         referenceInvoices,
         company: company || { name: 'Company' },
@@ -420,24 +323,11 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         totalAmount,
       };
 
-      const pdfBlob = await generateCreditNotePDF(cnData);
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${creditNoteNumber.replace(/\//g, '-')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success(`Credit Note ${creditNoteNumber} generated & downloaded`);
-
-      // Reset form
-      setReturnItems([]);
-      setSelectedProduct('');
-      setReturnQuantity(0);
-      setReturnReason('');
-      onComplete();
+      const blob = await generateCreditNotePDF(cnData);
+      setCreditNoteNumber(cnNumber);
+      setPdfBlob(blob);
+      setStep(3);
+      toast.success(`Credit Note ${cnNumber} generated!`);
     } catch (error: any) {
       console.error('Error generating credit note:', error);
       toast.error('Failed to generate credit note: ' + error.message);
@@ -446,19 +336,34 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     }
   };
 
+  const handleDownloadPDF = () => {
+    if (!pdfBlob) return;
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${creditNoteNumber.replace(/\//g, '-')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleNewReturn = () => {
+    setReturnItems([]);
+    setSelectedProduct('');
+    setReturnQuantity(0);
+    setReturnReason('');
+    setSelectedUnit('Kg');
+    setOtherReason('');
+    setCreditNoteNumber('');
+    setPdfBlob(null);
+    setStep(1);
+  };
+
   const getProductOptions = () => {
     const options: Array<{ value: string; label: string; sku?: string; price: number }> = [];
-    
     products.forEach(product => {
-      // Always add the base product
-      options.push({
-        value: product.id,
-        label: product.name,
-        sku: product.sku,
-        price: product.rate
-      });
-      
-      // Also add variants if they exist
+      options.push({ value: product.id, label: product.name, sku: product.sku, price: product.rate });
       if (product.variants && product.variants.length > 0) {
         product.variants.forEach(variant => {
           options.push({
@@ -470,19 +375,24 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         });
       }
     });
-    
     return options;
   };
 
   const getSelectedProductLabel = () => {
-    if (!selectedProduct) return 'Select...';
+    if (!selectedProduct) return 'Search product...';
     const option = getProductOptions().find(opt => opt.value === selectedProduct);
-    return option ? option.label : 'Select...';
+    return option ? option.label : 'Search product...';
   };
 
-  const getTotalReturns = () => {
-    return returnItems.reduce((sum, item) => sum + item.returnQuantity, 0);
+  const getRunningTotal = () => {
+    return returnItems.reduce((sum, item) => sum + item.price * item.returnQuantity, 0);
   };
+
+  // Review calculations
+  const subTotal = returnItems.reduce((sum, item) => sum + item.price * item.returnQuantity, 0);
+  const sgstAmount = subTotal * 0.025;
+  const cgstAmount = subTotal * 0.025;
+  const grandTotal = subTotal + sgstAmount + cgstAmount;
 
   if (loading) {
     return (
@@ -496,230 +406,323 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   }
 
   return (
-    <div className="space-y-4">
-      {/* Add Product Button */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-muted-foreground">Return items for <span className="text-foreground font-semibold">{retailerName}</span></p>
+    <div className="space-y-3 pb-20">
+      {/* Step Indicator */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-sm font-medium text-muted-foreground truncate max-w-[50vw]">
+          {retailerName}
+        </p>
+        <div className="flex items-center gap-1.5">
+          {[1, 2, 3].map((s) => (
+            <div
+              key={s}
+              className={cn(
+                "flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-colors",
+                step === s
+                  ? "bg-primary text-primary-foreground"
+                  : step > s
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {step > s ? <CheckCircle2 className="h-4 w-4" /> : s}
             </div>
-            <Button onClick={handleAddReturn} className="h-10">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
-      {/* Add Return Form */}
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          {/* Product Selection */}
-          <div>
-            <Label>Product</Label>
-            <Popover open={productDropdownOpen} onOpenChange={setProductDropdownOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={productDropdownOpen}
-                  className="w-full justify-between"
-                >
-                  {getSelectedProductLabel()}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search products..." />
-                  <CommandList>
-                    <CommandEmpty>No product found.</CommandEmpty>
-                    <CommandGroup>
-                      {getProductOptions().map(option => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={(currentValue) => {
-                            setSelectedProduct(currentValue === selectedProduct ? '' : currentValue);
-                            setProductDropdownOpen(false);
-                          }}
-                          className="flex flex-col items-start py-3"
-                        >
-                          <div className="font-medium">{option.label}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {option.sku && `SKU: ${option.sku} | `}₹{option.price}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Product Details Row - Only show when product is selected */}
-          {selectedProduct && (() => {
-            const option = getProductOptions().find(opt => opt.value === selectedProduct);
-            const [productId] = selectedProduct.split('_variant_');
-            const product = products.find(p => p.id === productId);
-            const priceWithGST = option ? option.price * 1.05 : 0;
-            const totalPrice = priceWithGST * returnQuantity;
-            
-            return (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-muted/50 rounded-lg">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Price (incl. GST)</Label>
-                  <p className="font-medium">₹{priceWithGST.toFixed(2)}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Unit</Label>
-                  <Select value={selectedUnit || product?.unit || 'Kg'} onValueChange={setSelectedUnit}>
-                    <SelectTrigger className="h-8 mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {['Piece', 'Box', 'Case', 'Kg', 'grams', 'Litre', 'ml', 'Dozen', 'Pack', 'Carton'].map(u => (
-                        <SelectItem key={u} value={u}>{u}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Qty</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={returnQuantity || ''}
-                    onChange={(e) => setReturnQuantity(parseFloat(e.target.value) || 0)}
-                    min="0"
-                    step="0.01"
-                    className="h-8 mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Reason</Label>
-                  <Select value={returnReason} onValueChange={(val) => { setReturnReason(val); if (val !== 'Other') setOtherReason(''); }}>
-                    <SelectTrigger className="h-8 mt-1">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {returnReasons.map(reason => (
-                        <SelectItem key={reason} value={reason}>
-                          {reason}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {returnReason === 'Other' && (
-                  <div className="col-span-2">
-                    <Label className="text-xs text-muted-foreground">Specify Reason</Label>
-                    <Input
-                      placeholder="Enter reason for return..."
-                      value={otherReason}
-                      onChange={(e) => setOtherReason(e.target.value)}
-                      className="h-8 mt-1"
-                      maxLength={200}
-                    />
-                  </div>
-                )}
-                <div>
-                  <Label className="text-xs text-muted-foreground">Total Price</Label>
-                  <p className="font-semibold text-primary">₹{Math.round(totalPrice)}</p>
-                </div>
-              </div>
-            );
-          })()}
-        </CardContent>
-      </Card>
-
-      {/* Added Items List */}
-      {returnItems.length > 0 && (
+      {/* ─── STEP 1: Add Items ─── */}
+      {step === 1 && (
         <>
-          <Card className="bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Total Items: {returnItems.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Quantity: {getTotalReturns()}</p>
+          {/* Product Search */}
+          <Card>
+            <CardContent className="p-3 space-y-3">
+              <Popover open={productDropdownOpen} onOpenChange={setProductDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between h-11"
+                  >
+                    <span className="truncate">{getSelectedProductLabel()}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[calc(100vw-2rem)] max-w-md p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search products..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {getProductOptions().map(option => (
+                          <CommandItem
+                            key={option.value}
+                            value={option.value}
+                            onSelect={(val) => {
+                              setSelectedProduct(val === selectedProduct ? '' : val);
+                              setProductDropdownOpen(false);
+                            }}
+                            className="flex flex-col items-start py-2.5"
+                          >
+                            <span className="font-medium text-sm">{option.label}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {option.sku && `SKU: ${option.sku} · `}₹{option.price}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Detail fields - show when product selected */}
+              {selectedProduct && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Unit</Label>
+                      <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                        <SelectTrigger className="h-9 mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {units.map(u => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Quantity</Label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={returnQuantity || ''}
+                        onChange={(e) => setReturnQuantity(parseFloat(e.target.value) || 0)}
+                        min="0"
+                        step="0.01"
+                        className="h-9 mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Rate</Label>
+                      <p className="h-9 mt-1 flex items-center text-sm font-medium">
+                        ₹{getProductOptions().find(o => o.value === selectedProduct)?.price.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Reason</Label>
+                    <Select value={returnReason} onValueChange={(val) => { setReturnReason(val); if (val !== 'Other') setOtherReason(''); }}>
+                      <SelectTrigger className="h-9 mt-1">
+                        <SelectValue placeholder="Select reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {returnReasons.map(r => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {returnReason === 'Other' && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Specify Reason</Label>
+                      <Input
+                        placeholder="Enter reason for return..."
+                        value={otherReason}
+                        onChange={(e) => setOtherReason(e.target.value)}
+                        className="h-9 mt-1"
+                        maxLength={200}
+                      />
+                    </div>
+                  )}
+
+                  <Button onClick={handleAddReturn} className="w-full h-10">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[35%]">Product</TableHead>
-                    <TableHead className="w-[18%]">Qty</TableHead>
-                    <TableHead className="w-[22%]">Reason</TableHead>
-                    <TableHead className="w-[18%]">Price</TableHead>
-                    <TableHead className="w-[7%]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {returnItems.map((item, index) => {
-                    const itemTotal = Math.round(item.price * 1.05 * item.returnQuantity);
-                    return (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">{item.productName}</p>
-                            {item.variantName && (
-                              <p className="text-xs text-muted-foreground">{item.variantName}</p>
-                            )}
+          {/* Added Items */}
+          {returnItems.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Added Items
+                </p>
+                <Badge variant="secondary" className="text-xs">
+                  {returnItems.length} items · ₹{Math.round(getRunningTotal())}
+                </Badge>
+              </div>
+
+              {returnItems.map((item, index) => {
+                const itemTotal = item.price * item.returnQuantity;
+                return (
+                  <Card key={index}>
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">
+                            {item.productName}
+                            {item.variantName && <span className="text-muted-foreground"> · {item.variantName}</span>}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-muted-foreground">
+                              {item.returnQuantity} {item.unit} × ₹{item.price.toFixed(2)}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {item.returnReason}
+                            </Badge>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-sm">{item.returnQuantity} {item.unit}</TableCell>
-                        <TableCell className="text-sm">{item.returnReason}</TableCell>
-                        <TableCell className="text-sm font-medium">₹{itemTotal}</TableCell>
-                        <TableCell>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-semibold">₹{Math.round(itemTotal)}</span>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleRemoveItem(index)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
-      {/* Bottom Action Buttons - Fixed at bottom with proper styling */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-3 flex gap-2 z-40">
-        <Button 
-          onClick={handleSaveReturns} 
-          disabled={saving || returnItems.length === 0} 
-          className="flex-1"
-        >
-          <Check className="h-4 w-4 mr-2" />
-          {saving ? 'Saving...' : 'Save Return'}
-        </Button>
-        <Button 
-          variant="outline" 
-          className="flex-1"
-          disabled={returnItems.length === 0 || generatingCN}
-          onClick={handleGenerateCreditNote}
-        >
-          {generatingCN ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-          {generatingCN ? 'Generating...' : 'Generate Credits'}
-        </Button>
-      </div>
-      
-      {/* Bottom spacer for fixed buttons */}
-      <div className="h-16" />
+      {/* ─── STEP 2: Review & Confirm ─── */}
+      {step === 2 && (
+        <div className="space-y-3">
+          {/* Items grouped by reason */}
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Return Items</p>
+              {returnItems.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center text-sm py-1.5 border-b last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">
+                      {item.productName}
+                      {item.variantName && <span className="text-muted-foreground text-xs"> · {item.variantName}</span>}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {item.returnQuantity} {item.unit} × ₹{item.price.toFixed(2)}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {item.returnReason}
+                      </Badge>
+                    </div>
+                  </div>
+                  <span className="font-medium shrink-0 ml-2">₹{(item.price * item.returnQuantity).toFixed(2)}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Tax Breakdown */}
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Sub Total</span>
+                <span>₹{subTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">SGST (2.5%)</span>
+                <span>₹{sgstAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">CGST (2.5%)</span>
+                <span>₹{cgstAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t pt-2">
+                <span>Total Credit</span>
+                <span className="text-destructive">₹{Math.round(grandTotal)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ─── STEP 3: Done ─── */}
+      {step === 3 && (
+        <Card>
+          <CardContent className="p-6 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">Credit Note Generated</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {creditNoteNumber}
+              </p>
+              <p className="text-2xl font-bold text-destructive mt-2">
+                ₹{Math.round(grandTotal)}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <Button onClick={handleDownloadPDF} className="w-full">
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button variant="outline" onClick={handleNewReturn} className="w-full">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                New Return
+              </Button>
+              <Button variant="ghost" onClick={onComplete} className="w-full text-muted-foreground">
+                Done
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── Fixed Bottom Bar ─── */}
+      {step < 3 && (
+        <>
+          <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-3 flex gap-2 z-40">
+            {step === 2 && (
+              <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            )}
+            {step === 1 && (
+              <Button
+                onClick={() => setStep(2)}
+                disabled={returnItems.length === 0}
+                className="flex-1"
+              >
+                Review
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+            {step === 2 && (
+              <Button
+                onClick={handleGenerateCreditNote}
+                disabled={generatingCN}
+                className="flex-1"
+              >
+                {generatingCN ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                {generatingCN ? 'Generating...' : 'Generate Credit Note'}
+              </Button>
+            )}
+          </div>
+          <div className="h-16" />
+        </>
+      )}
     </div>
   );
 }
