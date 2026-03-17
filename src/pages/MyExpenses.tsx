@@ -3,12 +3,13 @@ import { Layout } from '@/components/Layout';
 import { ModuleHelpButton } from '@/components/help/ModuleHelpButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Users, User as UserIcon, CalendarDays, CalendarRange, X } from 'lucide-react';
+import { Users, User as UserIcon, CalendarDays, CalendarRange, X, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
+import { usePettyCashFund } from '@/hooks/usePettyCashFund';
 import MonthNavigator from '@/components/expenses/MonthNavigator';
 import ExpenseSummaryCards from '@/components/expenses/ExpenseSummaryCards';
 import WeeklyBreakdown from '@/components/expenses/WeeklyBreakdown';
@@ -16,6 +17,7 @@ import DailyBreakdown from '@/components/expenses/DailyBreakdown';
 import TeamExpenseSummary from '@/components/expenses/TeamExpenseSummary';
 import AdditionalExpenses from '@/components/AdditionalExpenses';
 import BeatAllowanceManagement from '@/components/BeatAllowanceManagement';
+import PettyCashTab from '@/components/expenses/PettyCashTab';
 
 type BreakdownView = 'weekly' | 'daily';
 
