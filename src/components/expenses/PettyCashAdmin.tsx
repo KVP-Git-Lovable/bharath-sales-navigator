@@ -151,7 +151,7 @@ const PettyCashAdmin: React.FC = () => {
   });
 
   const updateFundStatus = async (fundId: string, status: string) => {
-    const { error } = await supabase.from('petty_cash_funds').update({ status, updated_at: new Date().toISOString() }).eq('id', fundId);
+    const { error } = await (supabase as any).from('petty_cash_funds').update({ status, updated_at: new Date().toISOString() }).eq('id', fundId);
     if (error) { toast.error(error.message); return; }
     toast.success(`Fund ${status}`);
     queryClient.invalidateQueries({ queryKey: ['admin-petty-cash-funds'] });
