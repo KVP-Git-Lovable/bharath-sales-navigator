@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowUpCircle, ArrowDownCircle, Minus, Users, AlertTriangle } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Minus, Users, AlertTriangle, Ban } from 'lucide-react';
 import {
   Select,
   SelectContent,
