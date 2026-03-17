@@ -69,7 +69,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [returnQuantity, setReturnQuantity] = useState<number>(0);
   const [returnReason, setReturnReason] = useState<string>('');
-  const [selectedUnit, setSelectedUnit] = useState<string>('');
+  const [selectedUnit, setSelectedUnit] = useState<string>('Kg');
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
 
   useEffect(() => {
