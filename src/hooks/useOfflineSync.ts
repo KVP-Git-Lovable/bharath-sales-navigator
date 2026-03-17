@@ -134,48 +134,31 @@ export function useOfflineSync() {
       let failCount = 0;
       const failedItems: any[] = [];
 
-      for (const item of syncQueue) {
-        // No items are ever permanently skipped — all items get retried
-        // Backoff timing handles spacing between retries
-
-        // Exponential backoff: skip if not enough time has passed since last retry
+      // Helper to check if an item is ready for retry (respects backoff)
+      const isReadyForRetry = (item: any): boolean => {
         if (item.retryCount > 0 && item.lastRetryAt) {
           const backoffDelay = getBackoffDelay(item.retryCount);
           const timeSinceLastRetry = Date.now() - new Date(item.lastRetryAt).getTime();
           if (timeSinceLastRetry < backoffDelay) {
             console.log(`⏳ Backoff: skipping ${item.action} (${Math.round((backoffDelay - timeSinceLastRetry) / 1000)}s remaining)`);
-            continue;
+            return false;
           }
         }
+        return true;
+      };
 
+      // Process a single sync item with error handling
+      const processAndHandleItem = async (item: any): Promise<void> => {
         try {
           console.log(`⏳ Syncing ${item.action}...`, item.data);
           
-          // Update sync state to SYNCING
-          await offlineStorage.save(STORES.SYNC_QUEUE, { ...item, syncState: 'SYNCING' });
-          
-          // Process each sync item based on action type
+          // Process each sync item based on action type (no SYNCING state write — saves a round-trip)
           await processSyncItem(item);
           
-          // Server verification for CREATE_ORDER before removing from queue
-          if (item.action === 'CREATE_ORDER') {
-            const orderId = item.data?.order?.id;
-            if (orderId && isValidUUID(orderId)) {
-              const { data: verified } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('id', orderId)
-                .maybeSingle();
-              if (!verified) {
-                throw new Error('Order not confirmed in database after sync');
-              }
-            }
-          }
-          
-          // Log success
+          // Log success (no separate verification query — RPC already confirms)
           await logSyncAttempt(item, true);
           
-          // Remove from queue after successful sync + verification
+          // Remove from queue after successful sync
           await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
           console.log(`✅ Successfully synced ${item.action}`);
           successCount++;
@@ -206,24 +189,29 @@ export function useOfflineSync() {
             await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
             successCount++;
             failCount--;
-            continue;
+            return;
           }
           
           // All retryable errors stay in RETRYING state indefinitely
-          // Non-retryable errors (only CONFLICT, handled above) are removed
-          // Items with many retries just get longer backoff, never stop
-          let syncState: string = 'RETRYING';
-          
           const updatedItem = {
             ...item,
             retryCount: newRetryCount,
             lastError: errorMsg,
             errorType,
-            syncState,
+            syncState: 'RETRYING',
             lastRetryAt: new Date().toISOString()
           };
           await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
         }
+      };
+
+      // PARALLEL BATCHING: Process up to 3 items concurrently for faster sync
+      const BATCH_SIZE = 3;
+      const readyItems = syncQueue.filter(isReadyForRetry);
+      
+      for (let i = 0; i < readyItems.length; i += BATCH_SIZE) {
+        const batch = readyItems.slice(i, i + BATCH_SIZE);
+        await Promise.allSettled(batch.map(item => processAndHandleItem(item)));
       }
 
       // SILENT SYNC: Per offline-first architecture, sync should NOT dispatch UI refresh events
