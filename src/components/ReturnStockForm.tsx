@@ -75,21 +75,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     loadProducts();
   }, []);
 
-  const loadVans = async () => {
-    const { data, error } = await supabase
-      .from('vans')
-      .select('id, registration_number, make_model')
-      .eq('is_active', true);
-    
-    if (error) {
-      console.error('Error loading vans:', error);
-    } else {
-      setVans(data || []);
-      if (data && data.length > 0) {
-        setSelectedVan(data[0].id);
-      }
-    }
-  };
 
   const loadProducts = async () => {
     setLoading(true);
