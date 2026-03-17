@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, 
   Building2, 
-  Briefcase, 
   Truck,
   ArrowRight,
   CheckCircle,
