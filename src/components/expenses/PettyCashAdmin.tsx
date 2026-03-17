@@ -118,7 +118,7 @@ const PettyCashAdmin: React.FC = () => {
       if (!user?.id || !assignForm.user_id || !assignForm.allocated_amount) throw new Error('Missing fields');
       const amount = parseFloat(assignForm.allocated_amount);
 
-      const { data: fundData, error: fundErr } = await supabase.from('petty_cash_funds').insert({
+      const { data: fundData, error: fundErr } = await (supabase as any).from('petty_cash_funds').insert({
         user_id: assignForm.user_id,
         allocated_amount: amount,
         balance: amount,
