@@ -63,6 +63,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingCN, setGeneratingCN] = useState(false);
   const [selectedVan, setSelectedVan] = useState<string>('');
   const [vans, setVans] = useState<any[]>([]);
   
