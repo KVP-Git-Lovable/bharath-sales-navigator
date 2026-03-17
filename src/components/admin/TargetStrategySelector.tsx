@@ -67,6 +67,12 @@ const strategies: { value: TargetStrategy; label: string; description: string; i
     description: "Manager has their own separate target. Subordinate targets are set independently and don't affect the manager's target.",
     icon: Minus,
   },
+  {
+    value: 'no_target',
+    label: 'No Target',
+    description: "This user has no target assigned. They are excluded from target distribution calculations.",
+    icon: Ban,
+  },
 ];
 
 const strategyIcons: Record<TargetStrategy, React.ElementType> = {
