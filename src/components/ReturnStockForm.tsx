@@ -69,6 +69,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [returnQuantity, setReturnQuantity] = useState<number>(0);
   const [returnReason, setReturnReason] = useState<string>('');
+  const [selectedUnit, setSelectedUnit] = useState<string>('');
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -150,7 +151,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       variantId: variantId || undefined,
       productName: product.name,
       variantName: variant?.variant_name,
-      unit: product.unit,
+      unit: selectedUnit || product.unit,
       returnQuantity,
       returnReason,
       price: itemPrice
@@ -162,6 +163,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     setSelectedProduct('');
     setReturnQuantity(0);
     setReturnReason('');
+    setSelectedUnit('');
     
     toast.success(`Added ${newItem.productName}${newItem.variantName ? ` - ${newItem.variantName}` : ''}`);
   };
@@ -568,7 +570,16 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Unit</Label>
-                  <p className="font-medium">{product?.unit || '-'}</p>
+                  <Select value={selectedUnit || product?.unit || 'Piece'} onValueChange={setSelectedUnit}>
+                    <SelectTrigger className="h-8 mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Piece', 'Box', 'Case', 'Kg', 'grams', 'Litre', 'ml', 'Dozen', 'Pack', 'Carton'].map(u => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Qty</Label>
