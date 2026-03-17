@@ -132,7 +132,7 @@ const PettyCashAdmin: React.FC = () => {
       // Insert limits if any set
       const hasLimits = assignForm.max_per_transaction || assignForm.max_per_day || assignForm.require_bill_above;
       if (hasLimits && fundData) {
-        const { error: limErr } = await supabase.from('petty_cash_limits').insert({
+        const { error: limErr } = await (supabase as any).from('petty_cash_limits').insert({
           fund_id: fundData.id,
           max_per_transaction: assignForm.max_per_transaction ? parseFloat(assignForm.max_per_transaction) : null,
           max_per_day: assignForm.max_per_day ? parseFloat(assignForm.max_per_day) : null,
