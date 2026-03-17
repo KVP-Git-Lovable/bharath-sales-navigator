@@ -182,7 +182,7 @@ function autoDistributeTargets(
 
   const distributeNode = (node: SubordinateAllocation) => {
     const managerAlloc = allocations.get(node.userId);
-    if (!managerAlloc || node.children.length === 0) return;
+    if (!managerAlloc || node.children.length === 0 || managerAlloc.targetStrategy === 'no_target') return;
 
     const strategy = managerAlloc.targetStrategy || 'roll_down';
     const children = node.children
