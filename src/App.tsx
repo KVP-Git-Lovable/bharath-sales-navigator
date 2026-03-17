@@ -31,7 +31,7 @@ import FeatureListPage from "./pages/website/FeatureListPage";
 import TechnologyPage from "./pages/website/TechnologyPage";
 import FieldSalesSolution from "./pages/website/solutions/FieldSalesSolution";
 import DistributorPortalSolution from "./pages/website/solutions/DistributorPortalSolution";
-import InstitutionalSalesSolution from "./pages/website/solutions/InstitutionalSalesSolution";
+
 import VanSalesSolution from "./pages/website/solutions/VanSalesSolution";
 import { ProfessionalServicesSolution } from "./pages/website/solutions/ProfessionalServicesSolution";
 import ROICalculator from "./pages/website/ROICalculator";
