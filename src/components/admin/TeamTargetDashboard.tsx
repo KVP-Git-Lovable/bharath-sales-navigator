@@ -21,10 +21,6 @@ import { useHierarchyTeamStructure, HierarchyGroup } from '@/hooks/useHierarchyT
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useFYTargetConfig } from '@/hooks/useFYTargetConfig';
-import { ProductMonthBreakdownTable } from './ProductMonthBreakdownTable';
-import { UserScope } from '@/pages/admin/TargetVsActual';
-import { useHierarchyTeamStructure, HierarchyGroup } from '@/hooks/useHierarchyTeamProgress';
 
 interface TeamTargetDashboardProps {
   userScope?: UserScope;
