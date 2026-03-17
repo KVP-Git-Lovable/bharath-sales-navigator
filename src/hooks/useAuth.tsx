@@ -341,21 +341,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string, role?: 'admin' | 'user') => {
     await monitoring.trace('user_login_process', async () => {
       let data, error: AuthError | null;
-      try {
-        const result = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        data = result.data;
-        error = result.error;
-      } catch (networkError: any) {
-        const msg = networkError?.message || '';
-        if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('fetch failed') || msg.includes('Load failed')) {
-          toast.error('Network error. Please check your internet connection and try again.');
-          throw new Error('Network error during sign in');
+      
+      const MAX_RETRIES = 2;
+      const RETRY_DELAYS = [2000, 4000];
+      const TIMEOUT_MS = 15000;
+      
+      const attemptSignIn = async (): Promise<{ data: any; error: AuthError | null }> => {
+        return Promise.race([
+          supabase.auth.signInWithPassword({ email, password }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Login request timed out. Please try again.')), TIMEOUT_MS)
+          ),
+        ]);
+      };
+      
+      const isNetworkError = (msg: string) =>
+        msg.includes('Failed to fetch') || msg.includes('NetworkError') ||
+        msg.includes('fetch failed') || msg.includes('Load failed') ||
+        msg.includes('timed out');
+      
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const result = await attemptSignIn();
+          data = result.data;
+          error = result.error;
+          break; // Success, exit retry loop
+        } catch (networkError: any) {
+          const msg = networkError?.message || '';
+          if (isNetworkError(msg)) {
+            if (attempt < MAX_RETRIES) {
+              devLog(`Login attempt ${attempt + 1} failed, retrying in ${RETRY_DELAYS[attempt]}ms...`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]));
+              continue;
+            }
+            toast.error('Network error. Please check your internet connection and try again.');
+            throw new Error('Network error during sign in');
+          }
+          toast.error('An unexpected error occurred. Please try again.');
+          throw networkError;
         }
-        toast.error('An unexpected error occurred. Please try again.');
-        throw networkError;
       }
 
       if (error) {
