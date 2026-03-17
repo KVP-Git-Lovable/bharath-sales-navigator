@@ -158,7 +158,7 @@ const PettyCashAdmin: React.FC = () => {
   };
 
   const approveTx = async (txId: string) => {
-    const { error } = await supabase.from('petty_cash_transactions').update({ status: 'approved', approved_by: user?.id, approved_at: new Date().toISOString() }).eq('id', txId);
+    const { error } = await (supabase as any).from('petty_cash_transactions').update({ status: 'approved', approved_by: user?.id, approved_at: new Date().toISOString() }).eq('id', txId);
     if (error) { toast.error(error.message); return; }
     toast.success('Transaction approved');
     queryClient.invalidateQueries({ queryKey: ['admin-petty-cash-txns'] });
