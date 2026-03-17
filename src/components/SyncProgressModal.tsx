@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CheckCircle2, AlertCircle, Clock, RefreshCw, AlertTriangle, XCircle, WifiOff, ChevronDown, ChevronUp, Package, MapPin, User, Calendar } from "lucide-react";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { useManagedInterval } from "@/utils/intervalManager";
-import { type SyncErrorType, type SyncState, MAX_AUTO_RETRIES } from "@/lib/syncErrorClassifier";
+import { type SyncErrorType, type SyncState, SLOW_RETRY_THRESHOLD } from "@/lib/syncErrorClassifier";
 
 interface SyncItem {
   id: string;
@@ -165,18 +165,23 @@ const SyncItemDetails = ({ item }: { item: SyncItem }) => {
 };
 
 const SyncStateIcon = ({ item }: { item: SyncItem }) => {
+  const isSlowRetry = (item.retryCount || 0) >= SLOW_RETRY_THRESHOLD;
   switch (item.syncState) {
-    case 'FAILED_SYNC': return <XCircle className="h-4 w-4 text-destructive" />;
-    case 'RETRYING': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+    case 'RETRYING': return isSlowRetry
+      ? <AlertTriangle className="h-4 w-4 text-orange-500" />
+      : <RefreshCw className="h-4 w-4 text-orange-500" />;
     case 'SYNCING': return <RefreshCw className="h-4 w-4 text-primary animate-spin" />;
     default: return <Clock className="h-4 w-4 text-muted-foreground" />;
   }
 };
 
 const SyncStateBadge = ({ item }: { item: SyncItem }) => {
+  const retryCount = item.retryCount || 0;
+  const isSlowRetry = retryCount >= SLOW_RETRY_THRESHOLD;
   switch (item.syncState) {
-    case 'FAILED_SYNC': return <Badge variant="destructive" className="text-[10px] px-1.5">Failed</Badge>;
-    case 'RETRYING': return <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">Retry {item.retryCount}/{MAX_AUTO_RETRIES}</Badge>;
+    case 'RETRYING': return isSlowRetry
+      ? <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">Retrying (slow)</Badge>
+      : <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">Retry #{retryCount}</Badge>;
     case 'SYNCING': return <Badge className="bg-blue-100 text-blue-700 text-[10px] px-1.5">Syncing</Badge>;
     default: return <Badge variant="secondary" className="text-[10px] px-1.5">Queued</Badge>;
   }
@@ -210,7 +215,7 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
     try {
       const queue = await offlineStorage.getSyncQueue();
       for (const item of queue) {
-        if (item.syncState === 'FAILED_SYNC' || (item.retryCount || 0) >= MAX_AUTO_RETRIES) {
+        if (item.syncState === 'RETRYING' || (item.retryCount || 0) >= SLOW_RETRY_THRESHOLD) {
           await offlineStorage.save(STORES.SYNC_QUEUE, {
             ...item,
             retryCount: 0,
@@ -246,8 +251,8 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
     });
   };
 
-  const failedCount = syncItems.filter(i => i.syncState === 'FAILED_SYNC').length;
-  const retryingCount = syncItems.filter(i => i.syncState === 'RETRYING').length;
+  const slowRetryCount = syncItems.filter(i => i.syncState === 'RETRYING' && (i.retryCount || 0) >= SLOW_RETRY_THRESHOLD).length;
+  const retryingCount = syncItems.filter(i => i.syncState === 'RETRYING' && (i.retryCount || 0) < SLOW_RETRY_THRESHOLD).length;
   const queuedCount = syncItems.filter(i => i.syncState === 'QUEUED' || i.syncState === 'SYNCING').length;
 
   const ERROR_TYPE_LABELS: Record<SyncErrorType, { label: string; icon: React.ReactNode }> = {
@@ -279,9 +284,9 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
                 <AlertTriangle className="h-3 w-3 mr-1" /> {retryingCount} Retrying
               </Badge>
             )}
-            {failedCount > 0 && (
-              <Badge variant="destructive" className="text-xs">
-                <XCircle className="h-3 w-3 mr-1" /> {failedCount} Failed
+            {slowRetryCount > 0 && (
+              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" /> {slowRetryCount} Slow Retry
               </Badge>
             )}
           </div>
@@ -290,10 +295,10 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">Pending Items ({totalItems})</h4>
             <div className="flex gap-2">
-              {failedCount > 0 && (
+              {slowRetryCount > 0 && (
                 <Button size="sm" variant="outline" onClick={handleManualRetry} className="h-7 text-xs">
                   <RefreshCw className="h-3 w-3 mr-1" />
-                  Reset & Retry Failed
+                  Force Retry All
                 </Button>
               )}
               {onTriggerSync && syncItems.length > 0 && (
@@ -321,7 +326,7 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
                   <Collapsible key={item.id} open={isExpanded} onOpenChange={() => toggleExpand(item.id)}>
                     <div
                       className={`rounded-lg border bg-card ${
-                        item.syncState === 'FAILED_SYNC' ? 'border-destructive/30 bg-destructive/5' : ''
+                        (item.retryCount || 0) >= SLOW_RETRY_THRESHOLD ? 'border-orange-300/30 bg-orange-50/5' : ''
                       }`}
                     >
                       <CollapsibleTrigger asChild>

@@ -5,7 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { syncOrdersToVanStock, getTodayDateString } from '@/utils/vanStockSync';
 import { visitStatusCache } from '@/lib/visitStatusCache';
-import { classifySyncError, isRetryableError, getBackoffDelay, MAX_AUTO_RETRIES, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
+import { classifySyncError, isRetryableError, getBackoffDelay, SLOW_RETRY_THRESHOLD, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
 // Removed isSlowConnection import - sync should always attempt when online
 
 export function useOfflineSync() {
@@ -135,20 +135,8 @@ export function useOfflineSync() {
       const failedItems: any[] = [];
 
       for (const item of syncQueue) {
-        // Skip items that have exceeded max retries (FAILED_SYNC state)
-        // They need manual retry which resets the counter
-        if ((item.retryCount || 0) >= MAX_AUTO_RETRIES && item.syncState === 'FAILED_SYNC') {
-          console.log(`⏭️ Skipping ${item.action} — FAILED_SYNC (needs manual retry)`);
-          continue;
-        }
-
-        // Skip VALIDATION errors only when the item is marked as failed.
-        // If the user manually resets an item to QUEUED (e.g., after a schema/config fix),
-        // we should allow retrying it.
-        if (item.errorType === 'VALIDATION' && item.syncState === 'FAILED_SYNC') {
-          console.log(`⏭️ Skipping ${item.action} — VALIDATION error (needs data fix or manual reset)`);
-          continue;
-        }
+        // No items are ever permanently skipped — all items get retried
+        // Backoff timing handles spacing between retries
 
         // Exponential backoff: skip if not enough time has passed since last retry
         if (item.retryCount > 0 && item.lastRetryAt) {
@@ -221,13 +209,10 @@ export function useOfflineSync() {
             continue;
           }
           
-          // Determine new sync state
+          // All retryable errors stay in RETRYING state indefinitely
+          // Non-retryable errors (only CONFLICT, handled above) are removed
+          // Items with many retries just get longer backoff, never stop
           let syncState: string = 'RETRYING';
-          if (!retryable) {
-            syncState = 'FAILED_SYNC';
-          } else if (newRetryCount >= MAX_AUTO_RETRIES) {
-            syncState = 'FAILED_SYNC';
-          }
           
           const updatedItem = {
             ...item,

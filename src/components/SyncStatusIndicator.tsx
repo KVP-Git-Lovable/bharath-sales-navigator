@@ -22,7 +22,7 @@ export const SyncStatusIndicator = memo(() => {
   const { processSyncQueue } = useOfflineSync();
   const { warmCacheWithProgress } = useMasterDataCache();
   const [syncQueueCount, setSyncQueueCount] = useState(0);
-  const [failedSyncCount, setFailedSyncCount] = useState(0);
+  const [slowRetryCount, setSlowRetryCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncingUI, setShowSyncingUI] = useState(false); // Only show if sync takes >500ms
   const [lastSyncStatus, setLastSyncStatus] = useState<'success' | 'error' | null>(null);
@@ -71,9 +71,8 @@ export const SyncStatusIndicator = memo(() => {
       const queue = await offlineStorage.getSyncQueue();
       if (mountedRef.current) {
         setSyncQueueCount(queue.length);
-        // Count failed items that need manual retry
-        const failedCount = queue.filter((i: any) => i.syncState === 'FAILED_SYNC').length;
-        setFailedSyncCount(failedCount);
+        const slowCount = queue.filter((i: any) => i.syncState === 'RETRYING' && (i.retryCount || 0) >= 5).length;
+        setSlowRetryCount(slowCount);
       }
     } catch (error) {
       console.error('Error checking sync queue:', error);
@@ -211,16 +210,16 @@ export const SyncStatusIndicator = memo(() => {
       return (
         <button
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          title={isOnline ? `${syncQueueCount} items pending sync${failedSyncCount > 0 ? ` (${failedSyncCount} failed)` : ''}` : `${syncQueueCount} items waiting to sync when online`}
+          title={isOnline ? `${syncQueueCount} items pending sync${slowRetryCount > 0 ? ` (${slowRetryCount} retrying slow)` : ''}` : `${syncQueueCount} items waiting to sync when online`}
         >
-          {failedSyncCount > 0 ? (
-            <AlertCircle className="h-4 w-4 text-red-400" />
+          {slowRetryCount > 0 ? (
+            <AlertCircle className="h-4 w-4 text-orange-400" />
           ) : isOnline ? (
             <Cloud className="h-4 w-4 text-primary-foreground/70" />
           ) : (
             <CloudOff className="h-4 w-4 text-yellow-400" />
           )}
-          <span className={`text-xs ${failedSyncCount > 0 ? 'text-red-400' : 'text-primary-foreground/70'}`}>{syncQueueCount}</span>
+          <span className={`text-xs ${slowRetryCount > 0 ? 'text-orange-400' : 'text-primary-foreground/70'}`}>{syncQueueCount}</span>
         </button>
       );
     }

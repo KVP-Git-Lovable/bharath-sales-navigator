@@ -5,9 +5,10 @@
 
 export type SyncErrorType = 'NETWORK' | 'VALIDATION' | 'AUTH' | 'CONFLICT' | 'SERVER' | 'UNKNOWN';
 
-export type SyncState = 'QUEUED' | 'SYNCING' | 'RETRYING' | 'FAILED_SYNC' | 'SUCCESS';
+export type SyncState = 'QUEUED' | 'SYNCING' | 'RETRYING' | 'SUCCESS';
 
-export const MAX_AUTO_RETRIES = 5;
+/** After this many retries, backoff switches to slow mode (max 30 min) but never stops */
+export const SLOW_RETRY_THRESHOLD = 5;
 
 export interface SyncLogEntry {
   id: string;
@@ -97,7 +98,7 @@ export function isRetryableError(errorType: SyncErrorType): boolean {
     case 'AUTH':
       return true; // Retry after re-auth
     case 'VALIDATION':
-      return false; // Bad data, won't fix itself
+      return true; // Retry — constraint issues may be fixed server-side
     case 'CONFLICT':
       return false; // Already exists, treat as success
     default:
@@ -110,7 +111,7 @@ export function isRetryableError(errorType: SyncErrorType): boolean {
  */
 export function getBackoffDelay(retryCount: number): number {
   const baseDelay = 2000; // 2 seconds
-  const maxDelay = 300000; // 5 minutes
+  const maxDelay = 1800000; // 30 minutes — never stops, just slows down
   const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
   // Add jitter (±25%)
   const jitter = delay * 0.25 * (Math.random() * 2 - 1);
