@@ -333,7 +333,7 @@ const ProductivityTracking = () => {
   return (
     <div className="space-y-6">
       {/* Team Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {summaryCards.map((card, idx) => (
           <div
             key={card.label}
