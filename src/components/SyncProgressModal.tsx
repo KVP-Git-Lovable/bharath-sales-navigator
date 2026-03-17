@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CheckCircle2, AlertCircle, Clock, RefreshCw, AlertTriangle, XCircle, WifiOff, ChevronDown, ChevronUp, Package, MapPin, User, Calendar } from "lucide-react";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { useManagedInterval } from "@/utils/intervalManager";
-import { type SyncErrorType, type SyncState, MAX_AUTO_RETRIES } from "@/lib/syncErrorClassifier";
+import { type SyncErrorType, type SyncState, SLOW_RETRY_THRESHOLD } from "@/lib/syncErrorClassifier";
 
 interface SyncItem {
   id: string;
