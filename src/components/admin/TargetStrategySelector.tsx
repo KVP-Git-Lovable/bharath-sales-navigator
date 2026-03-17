@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
-export type TargetStrategy = 'roll_down' | 'roll_up' | 'independent';
+export type TargetStrategy = 'roll_down' | 'roll_up' | 'independent' | 'no_target';
 export type SplitMethod = 'equal' | 'percentage' | 'manual';
 
 interface TargetStrategySelectorProps {
