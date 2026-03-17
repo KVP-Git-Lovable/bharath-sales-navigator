@@ -86,6 +86,7 @@ export function StepReviewSave({
     const rev = alloc?.revenueTarget ?? 0;
     const vis = alloc?.visitsTarget ?? 0;
     const strategy = alloc?.targetStrategy ?? 'roll_down';
+    const isNoTarget = strategy === 'no_target';
 
     // Compute child sum for distribution warning
     let childSum = 0;
