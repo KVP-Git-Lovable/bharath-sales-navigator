@@ -218,7 +218,10 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
                 )}
               </>
             )}
-          </div>
+          </div>}
+          {isNoTarget && (
+            <span className="text-xs text-muted-foreground italic">No target assigned</span>
+          )}
         </div>
 
         {/* Over/under warning — hidden for independent strategy */}
