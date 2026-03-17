@@ -72,7 +72,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
   // Invoice linking state for step 2
-  const [invoiceOptions, setInvoiceOptions] = useState<Record<string, { invoice_number: string; order_id: string; created_at: string }[]>>({});
+  const [invoiceOptions, setInvoiceOptions] = useState<Record<string, { invoice_number: string; order_id: string; created_at: string; matched_quantity: number; matched_rate: number }[]>>({});
   const [selectedInvoices, setSelectedInvoices] = useState<Record<string, string>>({});
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
