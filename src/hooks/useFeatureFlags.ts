@@ -14,7 +14,7 @@ export const NAV_ITEM_FEATURE_MAP: Record<string, string> = {
   'my-target': 'my_target',
   'performance': 'target_vs_actual',
   'analytics': 'analytics',
-  'institutional-sales': 'institutional_sales',
+  
   'distributor-master': 'distributor_master',
   'primary-orders': 'primary_orders',
   'territories': 'territories',
