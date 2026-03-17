@@ -696,7 +696,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="text-xs text-amber-600">No matching invoice found — will show as N/A</p>
+                        <p className="text-xs text-destructive/70">No matching invoice found — will show as N/A</p>
                       )}
                     </div>
                   );
