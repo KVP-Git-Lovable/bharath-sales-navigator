@@ -801,7 +801,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
             )}
             {step === 1 && (
               <Button
-                onClick={() => setStep(2)}
+                onClick={handleGoToStep2}
                 disabled={returnItems.length === 0}
                 className="flex-1"
               >
