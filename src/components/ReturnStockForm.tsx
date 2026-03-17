@@ -190,7 +190,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       const { data: returnGRN, error: grnError } = await supabase
         .from('van_return_grn')
         .insert({
-          van_id: selectedVan,
           user_id: user.id,
           retailer_id: retailerId,
           visit_id: validVisitId,
