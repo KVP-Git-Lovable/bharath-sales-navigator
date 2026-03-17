@@ -151,7 +151,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       variantId: variantId || undefined,
       productName: product.name,
       variantName: variant?.variant_name,
-      unit: product.unit,
+      unit: selectedUnit || product.unit,
       returnQuantity,
       returnReason,
       price: itemPrice
