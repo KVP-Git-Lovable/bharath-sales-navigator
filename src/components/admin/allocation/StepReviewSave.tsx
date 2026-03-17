@@ -129,7 +129,10 @@ export function StepReviewSave({
               )}
             </div>
 
-            {/* Editable target inputs */}
+            {/* Editable target inputs — hidden for no_target */}
+            {isNoTarget ? (
+              <span className="text-xs text-muted-foreground italic">No target assigned</span>
+            ) : (
             <div className="flex items-center gap-2">
               {isManager && (
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => onSplitManager(node.userId)}>
@@ -173,6 +176,7 @@ export function StepReviewSave({
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Distribution warning */}
