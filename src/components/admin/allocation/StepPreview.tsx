@@ -133,7 +133,7 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
             {node.designation && <p className="text-[10px] text-muted-foreground">{node.designation}</p>}
           </div>
 
-          <div className="flex items-center gap-3">
+          {!isNoTarget && <div className="flex items-center gap-3">
             {onTargetChange && !isManager && (
               <button
                 onClick={() => setEditingUser(isEditing ? null : node.userId)}
