@@ -295,10 +295,10 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">Pending Items ({totalItems})</h4>
             <div className="flex gap-2">
-              {failedCount > 0 && (
+              {slowRetryCount > 0 && (
                 <Button size="sm" variant="outline" onClick={handleManualRetry} className="h-7 text-xs">
                   <RefreshCw className="h-3 w-3 mr-1" />
-                  Reset & Retry Failed
+                  Force Retry All
                 </Button>
               )}
               {onTriggerSync && syncItems.length > 0 && (
