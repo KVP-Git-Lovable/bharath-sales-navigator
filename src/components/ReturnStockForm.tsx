@@ -655,15 +655,15 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       {/* ─── STEP 2: Review & Confirm ─── */}
       {step === 2 && (
         <div className="space-y-3">
-          {/* Invoice Linking */}
+          {/* Invoice Linking - Radio style per product */}
           <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-3 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <CardContent className="p-3 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
-                Link to Invoice
+                Link Items to Invoices
               </p>
               {loadingInvoices ? (
-                <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Finding matching invoices...
                 </div>
@@ -674,29 +674,52 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                   const selected = selectedInvoices[key] || '';
                   
                   return (
-                    <div key={idx} className="p-2 rounded-md bg-background border space-y-1.5">
-                      <p className="text-sm font-medium truncate">
+                    <div key={idx} className="rounded-lg bg-background border p-3 space-y-2">
+                      <p className="text-sm font-semibold">
                         {item.productName}
-                        {item.variantName && <span className="text-muted-foreground text-xs"> · {item.variantName}</span>}
+                        {item.variantName && <span className="text-muted-foreground font-normal"> · {item.variantName}</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Returning: {item.returnQuantity} {item.unit} × ₹{item.price.toFixed(2)}
                       </p>
                       {options.length > 0 ? (
-                        <Select
+                        <RadioGroup
                           value={selected}
                           onValueChange={(v) => setSelectedInvoices(prev => ({ ...prev, [key]: v }))}
+                          className="space-y-1.5 mt-1"
                         >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Select invoice..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {options.map((opt) => (
-                              <SelectItem key={opt.invoice_number} value={opt.invoice_number}>
-                                {opt.invoice_number} — {new Date(opt.created_at).toLocaleDateString('en-GB')}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {options.map((opt) => (
+                            <label
+                              key={opt.invoice_number}
+                              className={cn(
+                                "flex items-start gap-2.5 rounded-md border p-2.5 cursor-pointer transition-colors",
+                                selected === opt.invoice_number
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border hover:bg-muted/50"
+                              )}
+                            >
+                              <RadioGroupItem value={opt.invoice_number} className="mt-0.5 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium">{opt.invoice_number}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {new Date(opt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-xs text-muted-foreground">
+                                    Qty: <span className="font-medium text-foreground">{opt.matched_quantity}</span>
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Rate: <span className="font-medium text-foreground">₹{opt.matched_rate.toFixed(2)}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </RadioGroup>
                       ) : (
-                        <p className="text-xs text-destructive/70">No matching invoice found — will show as N/A</p>
+                        <div className="flex items-center gap-1.5 text-xs text-destructive/80 bg-destructive/5 rounded-md p-2">
+                          ⚠ No matching invoice found — will show as N/A
+                        </div>
                       )}
                     </div>
                   );
