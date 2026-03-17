@@ -392,7 +392,8 @@ export function StepAssignManagers({
                 </div>
               )}
 
-              {/* Target inputs */}
+              {/* Target inputs — hide for no_target */}
+              {mgr.targetStrategy !== 'no_target' && (
               <div className="flex flex-wrap items-center gap-3 pl-[52px]">
                 {enabledMetrics.quantity && (
                   <div className="flex items-center gap-1.5">
