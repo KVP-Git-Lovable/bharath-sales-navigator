@@ -157,7 +157,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       variantName: variant?.variant_name,
       unit: selectedUnit || product.unit,
       returnQuantity,
-      returnReason,
+      returnReason: returnReason === 'Other' ? `Other: ${otherReason.trim()}` : returnReason,
       price: itemPrice
     };
 
