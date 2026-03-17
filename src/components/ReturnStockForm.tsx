@@ -600,7 +600,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Reason</Label>
-                  <Select value={returnReason} onValueChange={setReturnReason}>
+                  <Select value={returnReason} onValueChange={(val) => { setReturnReason(val); if (val !== 'Other') setOtherReason(''); }}>
                     <SelectTrigger className="h-8 mt-1">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
@@ -613,6 +613,18 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                     </SelectContent>
                   </Select>
                 </div>
+                {returnReason === 'Other' && (
+                  <div className="col-span-2">
+                    <Label className="text-xs text-muted-foreground">Specify Reason</Label>
+                    <Input
+                      placeholder="Enter reason for return..."
+                      value={otherReason}
+                      onChange={(e) => setOtherReason(e.target.value)}
+                      className="h-8 mt-1"
+                      maxLength={200}
+                    />
+                  </div>
+                )}
                 <div>
                   <Label className="text-xs text-muted-foreground">Total Price</Label>
                   <p className="font-semibold text-primary">₹{Math.round(totalPrice)}</p>
