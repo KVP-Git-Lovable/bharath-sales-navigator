@@ -135,12 +135,19 @@ const getContributorCountForNode = (
   const cached = cache.get(node.userId);
   if (cached !== undefined) return cached;
 
+  const currentAlloc = allocations.get(node.userId) || node;
+  
+  // No target users contribute 0
+  if (currentAlloc.targetStrategy === 'no_target') {
+    cache.set(node.userId, 0);
+    return 0;
+  }
+
   if (node.children.length === 0) {
     cache.set(node.userId, 1);
     return 1;
   }
 
-  const currentAlloc = allocations.get(node.userId) || node;
   const childContributors = node.children.reduce(
     (sum, child) => sum + getContributorCountForNode(child, allocations, cache),
     0,
@@ -175,7 +182,7 @@ function autoDistributeTargets(
 
   const distributeNode = (node: SubordinateAllocation) => {
     const managerAlloc = allocations.get(node.userId);
-    if (!managerAlloc || node.children.length === 0) return;
+    if (!managerAlloc || node.children.length === 0 || managerAlloc.targetStrategy === 'no_target') return;
 
     const strategy = managerAlloc.targetStrategy || 'roll_down';
     const children = node.children
@@ -207,10 +214,27 @@ function autoDistributeTargets(
       return;
     }
 
-    const weightedEntries = children.map(({ childNode, childAlloc }) => ({
-      userId: childAlloc.userId,
-      weight: Math.max(1, getContributors(childNode)),
-    }));
+    const weightedEntries = children
+      .filter(({ childAlloc }) => childAlloc.targetStrategy !== 'no_target')
+      .map(({ childNode, childAlloc }) => ({
+        userId: childAlloc.userId,
+        weight: Math.max(1, getContributors(childNode)),
+      }));
+
+    // Zero out no_target children
+    children.forEach(({ childNode, childAlloc }) => {
+      if (childAlloc.targetStrategy === 'no_target') {
+        allocations.set(childNode.userId, {
+          ...childAlloc,
+          quantityTarget: 0,
+          revenueTarget: 0,
+          visitsTarget: 0,
+          personalQuantityTarget: 0,
+          personalRevenueTarget: 0,
+          personalVisitsTarget: 0,
+        });
+      }
+    });
 
     const quantitySplit = enabledMetrics.quantity ? splitByWeights(managerAlloc.quantityTarget, weightedEntries) : new Map<string, number>();
     const revenueSplit = enabledMetrics.revenue ? splitByWeights(managerAlloc.revenueTarget, weightedEntries) : new Map<string, number>();
@@ -464,7 +488,21 @@ export function AllocationTable({
       const current = next.get(userId);
 
       if (current) {
-        next.set(userId, { ...current, targetStrategy: strategy });
+        // When switching to no_target, zero out all targets
+        if (strategy === 'no_target') {
+          next.set(userId, {
+            ...current,
+            targetStrategy: strategy,
+            quantityTarget: 0,
+            revenueTarget: 0,
+            visitsTarget: 0,
+            personalQuantityTarget: 0,
+            personalRevenueTarget: 0,
+            personalVisitsTarget: 0,
+          });
+        } else {
+          next.set(userId, { ...current, targetStrategy: strategy });
+        }
 
         if (strategy === 'roll_up') {
           recomputeRollUpManager(userId, next);
@@ -481,10 +519,12 @@ export function AllocationTable({
     if (!directReports.length) return;
 
     const contributorCache = new Map<string, number>();
-    const weightedEntries = directReports.map((dr) => ({
-      userId: dr.userId,
-      weight: Math.max(getContributorCountForNode(dr, allocations, contributorCache), 1),
-    }));
+    const weightedEntries = directReports
+      .filter(dr => (allocations.get(dr.userId)?.targetStrategy || 'roll_down') !== 'no_target')
+      .map((dr) => ({
+        userId: dr.userId,
+        weight: Math.max(getContributorCountForNode(dr, allocations, contributorCache), 1),
+      }));
 
     const quantitySplit = enabledMetrics.quantity ? splitByWeights(totalQuantity, weightedEntries) : new Map<string, number>();
     const revenueSplit = enabledMetrics.revenue ? splitByWeights(totalRevenue, weightedEntries) : new Map<string, number>();
@@ -608,6 +648,7 @@ export function AllocationTable({
         personal_quantity_target: alloc.personalQuantityTarget || 0,
         personal_revenue_target: alloc.personalRevenueTarget || 0,
         personal_visits_target: alloc.personalVisitsTarget || 0,
+        has_no_target: alloc.targetStrategy === 'no_target',
       }));
 
       const { error } = await supabase

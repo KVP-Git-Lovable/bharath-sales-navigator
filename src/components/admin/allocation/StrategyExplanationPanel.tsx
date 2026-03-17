@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, Minus, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Minus, Ban, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -34,10 +34,20 @@ const strategyExplanations = [
     detail: "The manager has their own personal target. Subordinate targets are set independently and have no effect on the manager's target. Both operate in isolation.",
     example: 'Manager: ₹5L (own) | Each rep: ₹2L (own)',
   },
+  {
+    key: 'no_target',
+    label: 'No Target',
+    icon: Ban,
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted/50 border-border',
+    description: "User has no target assigned for this period.",
+    detail: "Use this for users who have left, are on extended leave, or new joiners who shouldn't have a target yet. Their allocation is excluded from distribution calculations. You can reassign their target to other team members.",
+    example: 'User on leave → Target: ₹0 (excluded from split)',
+  },
 ];
 
 export function StrategyExplanationPanel() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -47,7 +57,7 @@ export function StrategyExplanationPanel() {
         {isOpen ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 pb-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 pb-3">
           {strategyExplanations.map((s) => {
             const Icon = s.icon;
             return (

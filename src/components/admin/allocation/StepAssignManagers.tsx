@@ -26,6 +26,7 @@ const strategyDescriptions: Record<TargetStrategy, string> = {
   roll_down: 'Target will be distributed to subordinates',
   roll_up: 'Target = sum of subordinate targets',
   independent: 'Personal + team target; team target can be distributed to subordinates',
+  no_target: 'No target assigned — excluded from distribution',
 };
 
 interface TeamNode {
@@ -106,6 +107,23 @@ export function StepAssignManagers({
     return nodes.map((node) => {
       const isSubManager = node.subordinateCount > 0;
       const nodeStrategy = node.targetStrategy || 'roll_down';
+
+      // No Target users — show badge, no inputs
+      if (nodeStrategy === 'no_target') {
+        return (
+          <div key={node.userId} className="flex items-center gap-2 py-1.5 opacity-60">
+            <span className="text-xs text-muted-foreground">↳</span>
+            <span className="text-xs font-medium text-muted-foreground line-through">{node.fullName}</span>
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">No Target</Badge>
+            {isSubManager && (
+              <InlineStrategySelector
+                value={nodeStrategy}
+                onChange={(s) => onStrategyChange(node.userId, s)}
+              />
+            )}
+          </div>
+        );
+      }
 
       if (!isSubManager) {
         // Simple name row for regular users
@@ -374,7 +392,8 @@ export function StepAssignManagers({
                 </div>
               )}
 
-              {/* Target inputs */}
+              {/* Target inputs — hide for no_target */}
+              {mgr.targetStrategy !== 'no_target' && (
               <div className="flex flex-wrap items-center gap-3 pl-[52px]">
                 {enabledMetrics.quantity && (
                   <div className="flex items-center gap-1.5">
@@ -414,6 +433,12 @@ export function StepAssignManagers({
                   </div>
                 )}
               </div>
+              )}
+              {mgr.targetStrategy === 'no_target' && (
+                <div className="pl-[52px]">
+                  <Badge variant="outline" className="text-xs text-muted-foreground">No Target — excluded from allocation</Badge>
+                </div>
+              )}
             </div>
           );
         })}

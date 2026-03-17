@@ -88,21 +88,25 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
     const personalVis = alloc?.personalVisitsTarget ?? node.personalVisitsTarget ?? 0;
     const strategy = alloc?.targetStrategy ?? node.targetStrategy;
     const isIndependent = strategy === 'independent';
+    const isNoTarget = strategy === 'no_target';
     const isEditing = editingUser === node.userId;
 
-    // Compute child sum for managers (skip for independent — target is personal)
+    // Compute child sum for managers (skip for independent/no_target)
     let childSum = 0;
-    if (hasChildren && enabledMetrics.quantity && !isIndependent) {
+    if (hasChildren && enabledMetrics.quantity && !isIndependent && !isNoTarget) {
       node.children.forEach(c => {
         const ca = allocations.get(c.userId);
-        childSum += ca?.quantityTarget ?? c.quantityTarget;
+        const childStrategy = ca?.targetStrategy ?? c.targetStrategy;
+        if (childStrategy !== 'no_target') {
+          childSum += ca?.quantityTarget ?? c.quantityTarget;
+        }
       });
     }
-    const overUnder = hasChildren && !isIndependent ? qty - childSum : 0;
+    const overUnder = hasChildren && !isIndependent && !isNoTarget ? qty - childSum : 0;
 
     return (
       <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
-        <div className={cn('flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-1.5 transition-all', getLevelBackground(node.level))}>
+        <div className={cn('flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-1.5 transition-all', isNoTarget ? 'opacity-50 bg-muted/30 border-border' : getLevelBackground(node.level))}>
           {hasChildren ? (
             <button onClick={() => toggle(node.userId)} className="p-0.5 hover:bg-muted/50 rounded shrink-0">
               {isExp ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -124,11 +128,12 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
                 </Badge>
               )}
               {isManager && <StrategyBadge strategy={strategy} />}
+              {isNoTarget && !isManager && <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">No Target</Badge>}
             </div>
             {node.designation && <p className="text-[10px] text-muted-foreground">{node.designation}</p>}
           </div>
 
-          <div className="flex items-center gap-3">
+          {!isNoTarget && <div className="flex items-center gap-3">
             {onTargetChange && !isManager && (
               <button
                 onClick={() => setEditingUser(isEditing ? null : node.userId)}
@@ -213,7 +218,10 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
                 )}
               </>
             )}
-          </div>
+          </div>}
+          {isNoTarget && (
+            <span className="text-xs text-muted-foreground italic">No target assigned</span>
+          )}
         </div>
 
         {/* Over/under warning — hidden for independent strategy */}

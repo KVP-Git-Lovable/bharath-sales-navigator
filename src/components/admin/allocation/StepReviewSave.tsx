@@ -86,20 +86,24 @@ export function StepReviewSave({
     const rev = alloc?.revenueTarget ?? 0;
     const vis = alloc?.visitsTarget ?? 0;
     const strategy = alloc?.targetStrategy ?? 'roll_down';
+    const isNoTarget = strategy === 'no_target';
 
-    // Compute child sum for distribution warning
+    // Compute child sum for distribution warning (skip no_target children)
     let childSum = 0;
-    if (hasChildren && enabledMetrics.quantity) {
+    if (hasChildren && enabledMetrics.quantity && !isNoTarget) {
       node.children.forEach(c => {
         const ca = allocations.get(c.userId);
-        childSum += ca?.quantityTarget ?? 0;
+        const childStrategy = ca?.targetStrategy ?? 'roll_down';
+        if (childStrategy !== 'no_target') {
+          childSum += ca?.quantityTarget ?? 0;
+        }
       });
     }
-    const overUnder = hasChildren ? qty - childSum : 0;
+    const overUnder = hasChildren && !isNoTarget ? qty - childSum : 0;
 
     return (
       <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
-        <div className={cn('flex flex-col gap-1.5 p-3 rounded-lg border mb-1.5 transition-all', getLevelBackground(node.level))}>
+        <div className={cn('flex flex-col gap-1.5 p-3 rounded-lg border mb-1.5 transition-all', isNoTarget ? 'opacity-50 bg-muted/30 border-border' : getLevelBackground(node.level))}>
           <div className="flex items-center gap-2.5">
             {hasChildren ? (
               <button onClick={() => toggle(node.userId)} className="p-0.5 hover:bg-muted/50 rounded shrink-0">
@@ -128,7 +132,10 @@ export function StepReviewSave({
               )}
             </div>
 
-            {/* Editable target inputs */}
+            {/* Editable target inputs — hidden for no_target */}
+            {isNoTarget ? (
+              <span className="text-xs text-muted-foreground italic">No target assigned</span>
+            ) : (
             <div className="flex items-center gap-2">
               {isManager && (
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => onSplitManager(node.userId)}>
@@ -172,6 +179,7 @@ export function StepReviewSave({
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Distribution warning */}

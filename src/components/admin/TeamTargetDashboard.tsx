@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, Trophy, TrendingUp, TrendingDown, Filter, Globe, ChevronDown, ChevronRight, Package, Network, User } from 'lucide-react';
+import { Users, Trophy, TrendingUp, TrendingDown, Filter, Globe, ChevronDown, ChevronRight, Package, Network, User, Ban } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays, subWeeks, subMonths, subQuarters } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,9 @@ import { useFYTargetConfig } from '@/hooks/useFYTargetConfig';
 import { ProductMonthBreakdownTable } from './ProductMonthBreakdownTable';
 import { UserScope } from '@/pages/admin/TargetVsActual';
 import { useHierarchyTeamStructure, HierarchyGroup } from '@/hooks/useHierarchyTeamProgress';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface TeamTargetDashboardProps {
   userScope?: UserScope;
@@ -173,6 +176,30 @@ export function TeamTargetDashboard({
   const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved'>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+
+  // No Target toggle mutation
+  const toggleNoTargetMutation = useMutation({
+    mutationFn: async ({ userId, hasNoTarget }: { userId: string; hasNoTarget: boolean }) => {
+      const currentFY = fyYear || (new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1);
+      const { error } = await supabase
+        .from('user_business_plans')
+        .update({
+          has_no_target: hasNoTarget,
+          target_strategy: hasNoTarget ? 'no_target' : 'roll_down',
+          quantity_target: hasNoTarget ? 0 : undefined,
+          revenue_target: hasNoTarget ? 0 : undefined,
+        } as any)
+        .eq('user_id', userId)
+        .eq('year', currentFY);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-target-progress'] });
+      toast.success('Target status updated');
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
 
   // Fetch FY config to get enabled parameters
   const { data: fyConfig } = useFYTargetConfig(fyYear || new Date().getFullYear());
@@ -395,6 +422,24 @@ export function TeamTargetDashboard({
 
           {/* Status */}
           <div className="shrink-0">{getStatusBadge(member.status)}</div>
+
+          {/* No Target toggle for managers */}
+          {isManager && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                const isCurrentlyNoTarget = member.target === 0 && member.actual === 0;
+                toggleNoTargetMutation.mutate({ userId: member.userId, hasNoTarget: !isCurrentlyNoTarget });
+              }}
+              disabled={toggleNoTargetMutation.isPending}
+              title={member.target === 0 ? 'Assign target' : 'Set to No Target'}
+            >
+              <Ban className="h-3 w-3" />
+            </Button>
+          )}
         </div>
 
         {/* Product breakdown */}
