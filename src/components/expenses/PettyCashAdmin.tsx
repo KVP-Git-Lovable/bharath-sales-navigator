@@ -215,7 +215,7 @@ const PettyCashAdmin: React.FC = () => {
                   )}
                   {fund.status === 'frozen' && (
                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={e => { e.stopPropagation(); updateFundStatus(fund.id, 'active'); }}>
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                      <CheckCircle className="h-3.5 w-3.5 text-primary" />
                     </Button>
                   )}
                   {fund.status !== 'closed' && (
