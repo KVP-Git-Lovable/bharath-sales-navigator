@@ -570,7 +570,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Unit</Label>
-                  <Select value={product?.unit || 'Piece'} onValueChange={() => {}}>
+                  <Select value={selectedUnit || product?.unit || 'Piece'} onValueChange={setSelectedUnit}>
                     <SelectTrigger className="h-8 mt-1">
                       <SelectValue />
                     </SelectTrigger>
