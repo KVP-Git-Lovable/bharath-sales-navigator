@@ -407,8 +407,38 @@ export function useOfflineSync() {
               .maybeSingle();
             
             if (existingById) {
-              console.log('✅ Order already synced by ID, skipping:', offlineOrderId);
-              return; // Already synced by offlineOrderUtils direct sync
+              console.log('✅ Order already synced by ID, checking items:', offlineOrderId);
+              // Don't return - fall through to check if items also exist
+              // This handles partial syncs where order header was inserted but items failed
+              const { data: existingItemsCheck } = await supabase
+                .from('order_items')
+                .select('id')
+                .eq('order_id', offlineOrderId)
+                .limit(1);
+              
+              if (existingItemsCheck && existingItemsCheck.length > 0) {
+                console.log('✅ Order and items both exist, skipping:', offlineOrderId);
+                return;
+              }
+              
+              // Items missing - insert them below
+              console.log('⚠️ Order exists but items missing, inserting items...');
+              const missingItems = data.items.map((item: any) => ({
+                ...item,
+                order_id: offlineOrderId,
+                id: isValidUUID(item.id) ? item.id : undefined
+              }));
+              
+              const { error: missingItemsError } = await supabase
+                .from('order_items')
+                .insert(missingItems);
+              
+              if (missingItemsError) {
+                console.error('⚠️ Error inserting missing items:', missingItemsError.message);
+              } else {
+                console.log('✅ Missing items inserted for order:', offlineOrderId);
+              }
+              return;
             }
           }
           
