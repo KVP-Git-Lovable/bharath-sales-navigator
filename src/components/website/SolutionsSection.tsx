@@ -72,7 +72,7 @@ export const SolutionsSection = () => {
           </h2>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
             With our success-based pricing, everyone in your organization gets access to all solutions — 
-            Field Sales, Distributor Portal, and Institutional CRM. <strong>No per-user fees, no limits.</strong>
+            Field Sales, Distributor Portal, and Van Sales. <strong>No per-user fees, no limits.</strong>
           </p>
         </div>
 
