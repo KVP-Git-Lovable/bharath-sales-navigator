@@ -298,18 +298,33 @@ async function findLastActivityTime(
     if (logTime) activities.push(new Date(logTime))
   }
 
-  // Check GPS positions if available
-  const { data: gpsPositions } = await supabase
-    .from('gps_positions')
-    .select('recorded_at')
+  // Check user_page_views for last app interaction (clicks/page views)
+  const { data: pageViews } = await supabase
+    .from('user_page_views')
+    .select('visited_at')
     .eq('user_id', userId)
-    .gte('recorded_at', `${dateStr}T00:00:00`)
-    .lt('recorded_at', `${dateStr}T23:59:59`)
-    .order('recorded_at', { ascending: false })
+    .gte('visited_at', `${dateStr}T00:00:00`)
+    .lte('visited_at', `${dateStr}T23:59:59`)
+    .order('visited_at', { ascending: false })
     .limit(1)
 
-  if (gpsPositions && gpsPositions.length > 0) {
-    activities.push(new Date(gpsPositions[0].recorded_at))
+  if (pageViews && pageViews.length > 0) {
+    activities.push(new Date(pageViews[0].visited_at))
+  }
+
+  // Check user_sessions for last session activity
+  const { data: sessions } = await supabase
+    .from('user_sessions')
+    .select('logout_at, created_at')
+    .eq('user_id', userId)
+    .gte('created_at', `${dateStr}T00:00:00`)
+    .lte('created_at', `${dateStr}T23:59:59`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (sessions && sessions.length > 0) {
+    const sessionTime = sessions[0].logout_at || sessions[0].created_at
+    if (sessionTime) activities.push(new Date(sessionTime))
   }
 
   // If no activity found, use check-in time as fallback
