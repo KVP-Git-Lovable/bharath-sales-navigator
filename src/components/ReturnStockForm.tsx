@@ -366,6 +366,217 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     }
   };
 
+  const handleGenerateCreditNote = async () => {
+    if (!selectedVan) {
+      toast.error('Please select a van');
+      return;
+    }
+    if (returnItems.length === 0) {
+      toast.error('No items added for return');
+      return;
+    }
+
+    setGeneratingCN(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // 1. Fetch company info
+      const { data: company } = await supabase
+        .from('companies')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      // 2. Fetch retailer info
+      const { data: retailer } = await supabase
+        .from('retailers')
+        .select('*')
+        .eq('id', retailerId)
+        .single();
+
+      // 3. Lookup past invoices for this retailer to find reference invoice numbers per product
+      const { data: pastOrders } = await supabase
+        .from('orders')
+        .select('id, invoice_number, order_items(product_id, variant_id)')
+        .eq('retailer_id', retailerId)
+        .not('invoice_number', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // Build product->invoice map
+      const productInvoiceMap: Record<string, string> = {};
+      if (pastOrders) {
+        for (const order of pastOrders) {
+          const items = (order as any).order_items || [];
+          for (const oi of items) {
+            const key = oi.variant_id ? `${oi.product_id}_${oi.variant_id}` : oi.product_id;
+            if (!productInvoiceMap[key] && order.invoice_number) {
+              productInvoiceMap[key] = order.invoice_number;
+            }
+          }
+        }
+      }
+
+      // 4. Build credit note items
+      const cnItems: CreditNoteItem[] = returnItems.map(item => {
+        const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
+        const refInvoice = productInvoiceMap[key] || 'N/A';
+        const total = item.price * item.returnQuantity;
+        const taxableAmount = total; // base price is pre-tax
+        const sgst = taxableAmount * 0.025;
+        const cgst = taxableAmount * 0.025;
+
+        return {
+          product_name: item.variantName ? `${item.productName} - ${item.variantName}` : item.productName,
+          hsn_code: '',
+          unit: item.unit,
+          quantity: item.returnQuantity,
+          rate: item.price,
+          total,
+          taxable_amount: taxableAmount,
+          sgst_amount: sgst,
+          cgst_amount: cgst,
+          original_invoice_number: refInvoice,
+        };
+      });
+
+      const subTotal = cnItems.reduce((s, i) => s + i.total, 0);
+      const sgstTotal = cnItems.reduce((s, i) => s + i.sgst_amount, 0);
+      const cgstTotal = cnItems.reduce((s, i) => s + i.cgst_amount, 0);
+      const totalAmount = subTotal + sgstTotal + cgstTotal;
+
+      const referenceInvoices = [...new Set(cnItems.map(i => i.original_invoice_number).filter(v => v !== 'N/A'))];
+      if (referenceInvoices.length === 0) referenceInvoices.push('N/A');
+
+      // 5. Get next CN number
+      const creditNoteNumber = await getNextCreditNoteNumber();
+      const creditNoteDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+      // Map return reason to credit note reason
+      const primaryReason = returnItems[0]?.returnReason || 'Other';
+      const reasonMap: Record<string, string> = {
+        'Damaged': 'damaged',
+        'Expired': 'expired',
+        'Wrong Product': 'quality_issue',
+        'Quality Issue': 'quality_issue',
+        'Excess Stock': 'unsold_stock',
+        'Customer Return': 'unsold_stock',
+        'Other': 'other',
+      };
+
+      // 6. Save credit note to DB
+      const { data: cnRecord, error: cnError } = await supabase
+        .from('credit_notes')
+        .insert({
+          credit_note_number: creditNoteNumber,
+          credit_note_date: new Date().toISOString().split('T')[0],
+          retailer_id: retailerId,
+          retailer_name: retailerName,
+          reason: reasonMap[primaryReason] || 'other',
+          reason_notes: returnItems.map(i => `${i.productName}: ${i.returnReason} (Qty: ${i.returnQuantity})`).join('; '),
+          sub_total: subTotal,
+          sgst_total: sgstTotal,
+          cgst_total: cgstTotal,
+          total_amount: totalAmount,
+          status: 'issued',
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (cnError) throw cnError;
+
+      // 7. Save credit note items
+      const cnItemRecords = cnItems.map(item => ({
+        credit_note_id: cnRecord.id,
+        product_name: item.product_name,
+        hsn_code: item.hsn_code,
+        unit: item.unit,
+        quantity: item.quantity,
+        rate: item.rate,
+        total: item.total,
+        taxable_amount: item.taxable_amount,
+        sgst_amount: item.sgst_amount,
+        cgst_amount: item.cgst_amount,
+        original_invoice_number: item.original_invoice_number,
+      }));
+
+      await supabase.from('credit_note_items').insert(cnItemRecords);
+
+      // 8. Also save the return GRN (so user doesn't need to click Save Return separately)
+      const dateStr = new Date().toISOString().split('T')[0];
+      const grnNumber = `RET-${Date.now()}`;
+      const validVisitId = visitId && visitId.trim() !== '' ? visitId : null;
+
+      const { data: returnGRN, error: grnError } = await supabase
+        .from('van_return_grn')
+        .insert({
+          van_id: selectedVan,
+          user_id: user.id,
+          retailer_id: retailerId,
+          visit_id: validVisitId,
+          return_date: dateStr,
+          return_grn_number: grnNumber,
+          notes: `Returns from ${retailerName} — CN: ${creditNoteNumber}`
+        })
+        .select()
+        .single();
+
+      if (!grnError && returnGRN) {
+        const returnGRNItems = returnItems.map(item => ({
+          return_grn_id: returnGRN.id,
+          product_id: item.productId,
+          variant_id: item.variantId && item.variantId.trim() !== '' ? item.variantId : null,
+          return_quantity: item.returnQuantity,
+          return_reason: item.returnReason
+        }));
+        await supabase.from('van_return_grn_items').insert(returnGRNItems);
+      }
+
+      // 9. Generate & download PDF
+      const cnData: CreditNoteData = {
+        creditNoteNumber,
+        creditNoteDate,
+        referenceInvoices,
+        company: company || { name: 'Company' },
+        retailer: retailer || { name: retailerName },
+        items: cnItems,
+        reason: reasonMap[primaryReason] || 'other',
+        reasonNotes: returnItems.map(i => `${i.productName}: ${i.returnReason} (Qty: ${i.returnQuantity})`).join('; '),
+        subTotal,
+        sgstTotal,
+        cgstTotal,
+        totalAmount,
+      };
+
+      const pdfBlob = await generateCreditNotePDF(cnData);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${creditNoteNumber.replace(/\//g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Credit Note ${creditNoteNumber} generated & downloaded`);
+
+      // Reset form
+      setReturnItems([]);
+      setSelectedProduct('');
+      setReturnQuantity(0);
+      setReturnReason('');
+      onComplete();
+    } catch (error: any) {
+      console.error('Error generating credit note:', error);
+      toast.error('Failed to generate credit note: ' + error.message);
+    } finally {
+      setGeneratingCN(false);
+    }
+  };
+
   const getProductOptions = () => {
     const options: Array<{ value: string; label: string; sku?: string; price: number }> = [];
     
