@@ -106,7 +106,7 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
 
     return (
       <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
-        <div className={cn('flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-1.5 transition-all', getLevelBackground(node.level))}>
+        <div className={cn('flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-1.5 transition-all', isNoTarget ? 'opacity-50 bg-muted/30 border-border' : getLevelBackground(node.level))}>
           {hasChildren ? (
             <button onClick={() => toggle(node.userId)} className="p-0.5 hover:bg-muted/50 rounded shrink-0">
               {isExp ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
