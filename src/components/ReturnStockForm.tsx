@@ -490,24 +490,12 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
 
   return (
     <div className="space-y-4">
-      {/* Van Selection & Add Product Button */}
+      {/* Add Product Button */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-end gap-4">
             <div className="flex-1">
-              <Label>Select Van</Label>
-              <Select value={selectedVan} onValueChange={setSelectedVan}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a van" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vans.map(van => (
-                    <SelectItem key={van.id} value={van.id}>
-                      {van.registration_number} - {van.make_model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-sm font-medium text-muted-foreground">Return items for <span className="text-foreground font-semibold">{retailerName}</span></p>
             </div>
             <Button onClick={handleAddReturn} className="h-10">
               <Plus className="h-4 w-4 mr-2" />
