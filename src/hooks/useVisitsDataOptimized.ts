@@ -1532,14 +1532,31 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           setBeatPlans(snapshot.beatPlans || []);
           setVisits(snapshot.visits || []);
           setRetailers(filteredRetailers);
-          setOrders(snapshot.orders || []);
           
-          // Update cache
+          // FIX #3: Merge snapshot orders with current local orders to preserve unsynced ones
+          setOrders(prev => {
+            const snapshotOrders = snapshot.orders || [];
+            const snapshotIds = new Set(snapshotOrders.map((o: any) => o.id));
+            const snapshotIdemKeys = new Set(snapshotOrders.filter((o: any) => o.idempotency_key).map((o: any) => o.idempotency_key));
+            // Preserve local orders not in snapshot (pending sync)
+            const preserveLocal = prev.filter((o: any) => 
+              o.order_date === currentDate &&
+              !snapshotIds.has(o.id) &&
+              !(o.idempotency_key && snapshotIdemKeys.has(o.idempotency_key))
+            );
+            if (preserveLocal.length > 0) {
+              console.log(`[LocalEvent] Preserved ${preserveLocal.length} local orders not in snapshot`);
+            }
+            return [...snapshotOrders, ...preserveLocal];
+          });
+          
+          // Update cache (include preserved local orders from current state)
+          const currentOrders = snapshot.orders || [];
           cacheRef.current.set(currentDate, {
             beatPlans: snapshot.beatPlans || [],
             visits: snapshot.visits || [],
             retailers: filteredRetailers,
-            orders: snapshot.orders || [],
+            orders: currentOrders,
             timestamp: Date.now()
           });
           
