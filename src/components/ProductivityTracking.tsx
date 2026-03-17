@@ -319,12 +319,13 @@ const ProductivityTracking = () => {
   const totalTA = productivityData.reduce((s, d) => s + d.travel_allowance, 0);
   const totalDA = productivityData.reduce((s, d) => s + d.daily_allowance, 0);
   const totalOrderValue = productivityData.reduce((s, d) => s + d.total_order_value, 0);
-  const totalExpenses = totalTA + totalDA + additionalTotal;
+  const totalExpenses = totalTA + totalDA + additionalTotal + pettyCashTotal;
 
   const summaryCards = [
     { label: 'Travel (TA)', value: fmt(totalTA), icon: Car, bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-200 dark:border-blue-800', iconColor: 'text-blue-600', valueColor: 'text-blue-700 dark:text-blue-400' },
     { label: 'Daily (DA)', value: fmt(totalDA), icon: Utensils, bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-200 dark:border-green-800', iconColor: 'text-green-600', valueColor: 'text-green-700 dark:text-green-400' },
     { label: 'Additional', value: fmt(additionalTotal), icon: Receipt, bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-200 dark:border-purple-800', iconColor: 'text-purple-600', valueColor: 'text-purple-700 dark:text-purple-400' },
+    { label: 'Petty Cash', value: fmt(pettyCashTotal), icon: Wallet, bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200 dark:border-amber-800', iconColor: 'text-amber-600', valueColor: 'text-amber-700 dark:text-amber-400' },
     { label: 'Total Expenses', value: fmt(totalExpenses), icon: IndianRupee, bg: 'bg-primary/5', border: 'border-primary/20', iconColor: 'text-primary', valueColor: 'text-primary' },
     { label: 'Order Value', value: fmt(totalOrderValue), icon: ShoppingCart, bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-200 dark:border-orange-800', iconColor: 'text-orange-600', valueColor: 'text-orange-700 dark:text-orange-400' },
   ];
