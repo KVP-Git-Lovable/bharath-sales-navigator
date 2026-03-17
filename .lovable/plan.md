@@ -88,3 +88,31 @@ Upgraded the target management system from a rigid lock-based model to a flexibl
 - "Feedback Required" badge shown when policy triggers
 - Order button intercepted when block_order/mandatory_feedback action triggered
 - Opens feedback modal automatically when blocked
+
+## Phase: No Target Strategy & Mid-Year Flexibility ✅
+
+### Strategy Explanation Panel ✅
+- Panel now open by default (`useState(true)`)
+- Added 4th "No Target" card with explanation
+
+### No Target Strategy ✅
+- Added `'no_target'` to `TargetStrategy` type union
+- Added Ban icon, gray color scheme, labels across all strategy components
+- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
+
+### Allocation Logic ✅
+- `getContributorCountForNode` returns 0 for `no_target` users
+- `autoDistributeTargets` skips `no_target` children, zeros their targets
+- `splitByWeights` filters out `no_target` entries
+- `handleEqualSplit` excludes `no_target` from weight calculation
+- `handleStrategyChange` zeros all targets when switching to `no_target`
+- Save mutation includes `has_no_target: true` flag
+
+### Wizard Steps UI ✅
+- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
+- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
+- `StepReviewSave`: No Target rows read-only with grayed appearance
+
+### Manager Self-Service ✅
+- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
