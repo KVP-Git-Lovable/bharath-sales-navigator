@@ -282,6 +282,7 @@ const ProductivityTracking = () => {
       'Order Value (₹)': item.total_order_value.toFixed(2),
       'DA (₹)': item.daily_allowance.toFixed(2),
       'TA (₹)': item.travel_allowance.toFixed(2),
+      'Petty Cash (₹)': pettyCashTotal.toFixed(2),
       'Total Allowance (₹)': item.total_allowance.toFixed(2),
       'Productivity Ratio': item.productivity_ratio.toFixed(2),
       'Performance': getProductivityLabel(item.productivity_ratio)
