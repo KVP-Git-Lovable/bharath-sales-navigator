@@ -41,20 +41,6 @@ const solutions = [
     link: "/solutions/distributor-portal"
   },
   {
-    icon: Briefcase,
-    title: "Institutional Sales CRM",
-    description: "Full-featured CRM for B2B and institutional sales with leads, opportunities, quotes, and account management.",
-    features: [
-      "Lead & opportunity pipeline",
-      "Quote generation & tracking",
-      "Account & contact management",
-      "Collections & invoice management"
-    ],
-    color: "from-violet-500 to-purple-600",
-    cta: "Explore Institutional CRM",
-    link: "/solutions/institutional-sales"
-  },
-  {
     icon: Truck,
     title: "Van Sales",
     description: "Mobile sales and delivery management for direct store delivery and route sales operations.",

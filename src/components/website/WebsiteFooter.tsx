@@ -9,7 +9,7 @@ export const WebsiteFooter = () => {
     solutions: [
       { label: "Field Sales", href: "#solutions" },
       { label: "Distributor Portal", href: "#solutions" },
-      { label: "Institutional CRM", href: "#solutions" },
+      
       { label: "Van Sales", href: "#solutions" },
     ],
     platform: [

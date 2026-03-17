@@ -7,7 +7,7 @@ import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 const solutionLinks = [
   { label: "Field Sales Automation", href: "/solutions/field-sales", external: false },
   { label: "Distributor Portal", href: "/solutions/distributor-portal", external: false },
-  { label: "Institutional Sales CRM", href: "/solutions/institutional-sales", external: false },
+  
   { label: "Van Sales", href: "/solutions/van-sales", external: false },
   { label: "Store Operations", href: "https://storeops.quickapp.ai/", external: true },
   { label: "Professional Services", href: "/solutions/professional-services", external: false },

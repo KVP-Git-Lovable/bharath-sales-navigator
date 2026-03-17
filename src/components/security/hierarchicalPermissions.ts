@@ -297,27 +297,6 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
     ],
   },
   {
-    name: 'institutional_sales',
-    label: 'Institutional Sales',
-    fields: [
-      { name: 'field_inst_order_number', label: 'Order Number' },
-      { name: 'field_inst_institution_name', label: 'Institution Name' },
-      { name: 'field_inst_amount', label: 'Amount' },
-      { name: 'field_inst_status', label: 'Status' },
-      { name: 'field_inst_date', label: 'Date' },
-    ],
-    actions: [
-      { name: 'action_inst_create_order', label: 'Create Order' },
-      { name: 'action_inst_edit_order', label: 'Edit Order' },
-      { name: 'action_inst_export', label: 'Export' },
-    ],
-    widgets: [
-      { name: 'widget_inst_order_list', label: 'Order List' },
-      { name: 'widget_inst_order_details', label: 'Order Details' },
-      { name: 'widget_inst_summary', label: 'Summary' },
-    ],
-  },
-  {
     name: 'distributor_master',
     label: 'Distributor Master',
     fields: [

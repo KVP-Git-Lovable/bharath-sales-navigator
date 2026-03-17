@@ -70,7 +70,7 @@ export const NAV_ITEM_MODULE_NAME: Record<string, string> = {
   'my-target': 'target',
   'performance': 'performance',
   'analytics': 'analytics',
-  'institutional-sales': 'institutional',
+  
   'distributor-master': 'distributor',
   'primary-orders': 'primary_order',
   'territories': 'territory',
