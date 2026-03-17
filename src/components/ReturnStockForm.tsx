@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Package, Plus, ChevronsUpDown, FileText, Trash2, Loader2, ArrowLeft, ArrowRight, CheckCircle2, Download, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { generateCreditNotePDF, getNextCreditNoteNumber, CreditNoteItem, CreditNoteData } from '@/utils/creditNoteGenerator';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
