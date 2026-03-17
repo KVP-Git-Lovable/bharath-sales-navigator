@@ -69,7 +69,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [returnQuantity, setReturnQuantity] = useState<number>(0);
   const [returnReason, setReturnReason] = useState<string>('');
-  const [selectedUnit, setSelectedUnit] = useState<string>('');
+  const [selectedUnit, setSelectedUnit] = useState<string>('Kg');
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -570,7 +570,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Unit</Label>
-                  <Select value={selectedUnit || product?.unit || 'Piece'} onValueChange={setSelectedUnit}>
+                  <Select value={selectedUnit || product?.unit || 'Kg'} onValueChange={setSelectedUnit}>
                     <SelectTrigger className="h-8 mt-1">
                       <SelectValue />
                     </SelectTrigger>
