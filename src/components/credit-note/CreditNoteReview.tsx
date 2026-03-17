@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FileText, Link2 } from "lucide-react";
 import { SelectedItem } from "./RetailerInvoiceList";
 
 interface CreditNoteReviewProps {
@@ -20,8 +21,36 @@ export default function CreditNoteReview({ items, reason, reasonNotes }: CreditN
     return acc;
   }, {} as Record<string, SelectedItem[]>);
 
+  const referenceInvoices = Object.keys(groupedByInvoice);
+
   return (
     <div className="space-y-4">
+      {/* Reference Invoices - prominent display */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-primary" />
+            Linked Reference Invoice(s)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 pt-0">
+          {referenceInvoices.map((inv) => (
+            <div key={inv} className="flex items-center justify-between p-2 rounded-md bg-background border">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{inv || "N/A"}</span>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {groupedByInvoice[inv].length} item(s)
+              </Badge>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground mt-1">
+            This credit note will reference the above invoice(s)
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Items to Credit</CardTitle>
