@@ -568,7 +568,17 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Unit</Label>
-                  <p className="font-medium">{product?.unit || '-'}</p>
+                  <Select value={product?.unit || 'Piece'} onValueChange={() => {}}>
+                    <SelectTrigger className="h-8 mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Piece', 'Box', 'Case', 'Kg', 'grams', 'Litre', 'ml', 'Dozen', 'Pack', 'Carton'].map(u => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Qty</Label>
