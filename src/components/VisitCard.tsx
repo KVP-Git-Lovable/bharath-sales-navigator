@@ -2566,7 +2566,7 @@ export const VisitCard = ({
                   href={hasRetailerLocation ? `https://www.google.com/maps/search/?api=1&query=${retailerLat},${retailerLng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visit.address || '')}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className={`${hasRetailerLocation ? 'text-primary hover:text-primary/80' : 'text-destructive hover:text-destructive/80'} cursor-pointer p-1 rounded-full hover:bg-primary/10 transition-colors`}
+                  className={`${hasRetailerLocation ? 'text-success hover:text-success/80' : 'text-destructive hover:text-destructive/80'} cursor-pointer p-1 rounded-full hover:bg-muted transition-colors`}
                   onClick={e => e.stopPropagation()} 
                   title={hasRetailerLocation ? "Open in Google Maps" : "Location not captured"}
                 >
