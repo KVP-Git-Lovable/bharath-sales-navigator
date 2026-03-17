@@ -1,158 +1,66 @@
-# Scalable Target Management — Plan
 
-## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Improve Invoice Linking UI in Step 2
 
-## What Was Done
+### Problem
+The current Step 2 shows a basic dropdown per product with just the invoice number and date. The user wants to see **which products were in each invoice** so they can make an informed mapping decision — essentially a richer, more transparent invoice selection experience.
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+### Changes — `src/components/ReturnStockForm.tsx`
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+**1. Enhance `fetchInvoiceOptions` to include order item details (quantity, rate) per invoice**
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+Update the query to also fetch `order_items(product_id, variant_id, product_name, quantity, rate)` and store richer data in `invoiceOptions` so each option includes the matched product's original quantity and rate from that invoice.
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+**2. Redesign the Invoice Linking card in Step 2**
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+Replace the current flat dropdown-per-product layout with a grouped view:
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+- **Group return items by available invoices** — show each invoice as an expandable card with its number, date, and the list of return products that match it.
+- Each product row within an invoice card shows: product name, original qty purchased, original rate.
+- A **radio button or Select** per product lets the user pick which invoice to link that product to.
+- If a product appears in multiple invoices, all options are shown with clear labels.
+- If no matching invoice exists for a product, show a "No matching invoice" warning inline.
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+**3. Keep the auto-select default behavior** — most recent matching invoice is pre-selected, but user can change it.
 
-## Phase: Target Split, Dual Visibility & Manager Self-Service
+### UI Layout for Step 2 Invoice Section
 
-### Phase 1: Fix Equal Split ✅
-- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
-- Each manager handles their own team's internal distribution via their strategy
+```text
+┌─────────────────────────────────────┐
+│ 🔗 Link Items to Invoices          │
+├─────────────────────────────────────┤
+│ Product: Tata Salt                  │
+│ ┌─────────────────────────────────┐ │
+│ │ ○ INV2026-105 (12/03/2026)     │ │
+│ │   Qty: 10, Rate: ₹22.00       │ │
+│ │ ● INV2026-098 (05/03/2026)     │ │
+│ │   Qty: 5, Rate: ₹22.00        │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Product: Parle-G Biscuit            │
+│ ┌─────────────────────────────────┐ │
+│ │ ● INV2026-105 (12/03/2026)     │ │
+│ │   Qty: 20, Rate: ₹10.00       │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Product: Vim Bar                    │
+│ ⚠ No matching invoice found        │
+└─────────────────────────────────────┘
+```
 
-### Phase 2: Dual Target for Independent Strategy ✅
-- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
-- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
-- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
-- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
-- Save mutation includes personal target fields
+### Data Changes
 
-### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
-- New `ManagerTargets.tsx` page for managers to edit subordinate targets
-- View own target vs actual achievement
-- Reuse `useTeamTargetProgress` hook for analytics
+Expand `invoiceOptions` type to include per-product details:
+```typescript
+Record<string, { 
+  invoice_number: string; 
+  order_id: string; 
+  created_at: string;
+  matched_quantity: number;
+  matched_rate: number;
+}[]>
+```
 
-## Phase: Feedback Configuration & Policy Engine ✅
+### Files Changed
+- `src/components/ReturnStockForm.tsx` — enhanced fetch + redesigned Step 2 invoice linking UI with radio-style selection showing invoice details per product.
 
-### Database Schema ✅
-- Created `feedback_questions` table (per-module/customer configurable questions)
-- Created `feedback_policies` table (named policies with module, priority)
-- Created `feedback_policy_rules` table (condition+action pairs per policy)
-- RLS enabled on all 3 tables with authenticated access
-
-### Frontend Components ✅
-- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
-- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
-- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
-
-### Policy Engine ✅
-- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
-- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
-- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
-
-### Workflow Enforcement ✅
-- `VisitCard.tsx`: Integrated policy check hook
-- "Feedback Required" badge shown when policy triggers
-- Order button intercepted when block_order/mandatory_feedback action triggered
-- Opens feedback modal automatically when blocked
-
-## Phase: No Target Strategy & Mid-Year Flexibility ✅
-
-### Strategy Explanation Panel ✅
-- Panel now open by default (`useState(true)`)
-- Added 4th "No Target" card with explanation
-
-### No Target Strategy ✅
-- Added `'no_target'` to `TargetStrategy` type union
-- Added Ban icon, gray color scheme, labels across all strategy components
-- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
-
-### Allocation Logic ✅
-- `getContributorCountForNode` returns 0 for `no_target` users
-- `autoDistributeTargets` skips `no_target` children, zeros their targets
-- `splitByWeights` filters out `no_target` entries
-- `handleEqualSplit` excludes `no_target` from weight calculation
-- `handleStrategyChange` zeros all targets when switching to `no_target`
-- Save mutation includes `has_no_target: true` flag
-
-### Wizard Steps UI ✅
-- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
-- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
-- `StepReviewSave`: No Target rows read-only with grayed appearance
-
-### Manager Self-Service ✅
-- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
-
-## Phase: Credit Note Generation System ✅
-
-### Database Schema ✅
-- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
-- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
-- RLS enabled with authenticated access
-- Auto-incrementing CN number sequence
-
-### Credit Note Creation Page ✅ (`/credit-note/create`)
-- Retailer selector → shows all invoices for selected retailer
-- Multi-invoice item selection with checkboxes and return quantity input
-- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
-- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
-- Review step with grouped items by invoice, GST totals
-- Saves to DB and auto-generates PDF on confirmation
-
-### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
-- Matches invoice style: dark header, company logo, BILL TO section
-- Title: "CREDIT NOTE" with red accent (vs green for invoices)
-- Header: CN#, Credit Date, Reference Invoice(s), Reason
-- Items table with red header and light red alternating rows
-- Totals: Sub Total, SGST, CGST, Total (red bar)
-- Amount in words, Reason for Credit section, Authorized Signature
-
-### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
-- Lists all credit notes with status badges (draft/issued/cancelled)
-- Download PDF button per credit note
-- "New Credit Note" button linking to creation page
-
-### Files Created
-- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
-- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
-- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
-- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
-- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
-- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
-- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
-- Modified `src/App.tsx` — Added `/credit-note/create` route
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
