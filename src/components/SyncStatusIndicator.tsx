@@ -22,7 +22,7 @@ export const SyncStatusIndicator = memo(() => {
   const { processSyncQueue } = useOfflineSync();
   const { warmCacheWithProgress } = useMasterDataCache();
   const [syncQueueCount, setSyncQueueCount] = useState(0);
-  const [failedSyncCount, setFailedSyncCount] = useState(0);
+  const [slowRetryCount, setSlowRetryCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncingUI, setShowSyncingUI] = useState(false); // Only show if sync takes >500ms
   const [lastSyncStatus, setLastSyncStatus] = useState<'success' | 'error' | null>(null);
