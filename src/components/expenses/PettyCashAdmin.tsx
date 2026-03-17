@@ -101,7 +101,7 @@ const PettyCashAdmin: React.FC = () => {
     queryKey: ['admin-petty-cash-txns', expandedFund],
     queryFn: async () => {
       if (!expandedFund) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('petty_cash_transactions')
         .select('*, profiles!petty_cash_transactions_user_id_fkey(full_name)')
         .eq('fund_id', expandedFund)
