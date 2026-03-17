@@ -1363,35 +1363,28 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       
       if (orderToProcess && orderToProcess.total_amount > 0) {
         setOrders(prev => {
-          // Check for existing order by ID first
+          // FIX #2: Deduplicate by ID or idempotency_key only (NOT retailer+amount)
+          const orderWithStatus = { ...orderToProcess, _syncStatus: 'pending' };
+          
+          // Check for existing order by ID
           const existingById = prev.find(o => o.id === orderToProcess.id);
+          // Check by idempotency_key if available
+          const existingByKey = orderToProcess.idempotency_key 
+            ? prev.find(o => o.idempotency_key === orderToProcess.idempotency_key)
+            : null;
+          
           let updated;
           
           if (existingById) {
-            // Update existing order
-            updated = prev.map(o => o.id === orderToProcess.id ? orderToProcess : o);
+            updated = prev.map(o => o.id === orderToProcess.id ? orderWithStatus : o);
             console.log('[LocalEvent] Updated existing order by ID:', orderToProcess.id);
+          } else if (existingByKey) {
+            updated = prev.map(o => o.idempotency_key === orderToProcess.idempotency_key ? orderWithStatus : o);
+            console.log('[LocalEvent] Updated existing order by idempotency_key');
           } else {
-            // Check if there's already an order for this retailer today (avoid duplicates)
-            const existingRetailerOrder = prev.find(o => 
-              o.retailer_id === orderToProcess.retailer_id && 
-              o.order_date === currentDate &&
-              Math.abs(Number(o.total_amount) - Number(orderToProcess.total_amount)) < 0.01 // Same amount = likely duplicate
-            );
-            
-            if (existingRetailerOrder) {
-              // Update existing order value instead of adding duplicate
-              updated = prev.map(o => 
-                o.id === existingRetailerOrder.id 
-                  ? { ...o, total_amount: orderToProcess.total_amount, updated_at: new Date().toISOString() } 
-                  : o
-              );
-              console.log('[LocalEvent] Updated existing retailer order:', existingRetailerOrder.id);
-            } else {
-              // Add new order
-              updated = [...prev, orderToProcess];
-              console.log('[LocalEvent] Added new order:', orderToProcess.id);
-            }
+            // Add new order — allows multiple orders for the same retailer
+            updated = [...prev, orderWithStatus];
+            console.log('[LocalEvent] Added new order:', orderToProcess.id);
           }
           
           // Update cache using ref value
