@@ -1,90 +1,63 @@
-# Scalable Target Management — Plan
 
-## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Plan: Robust Login on Slow Networks & Prevent Auto-Logout
 
-## What Was Done
+### Problem Analysis
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+1. **"Failed to fetch" on slow network/WiFi switch**: The current `signIn` function catches network errors, but doesn't retry. Users on slow connections or switching WiFi get a one-shot failure.
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+2. **Auto-logout risk**: The `onAuthStateChange` listener can trigger state clearing if a token refresh fails on a slow network. Supabase's `autoRefreshToken` may fail silently, causing the session to appear expired.
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+### Changes
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+#### 1. Add login retry with timeout in `src/hooks/useAuth.tsx`
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+In the `signIn` function, wrap the `supabase.auth.signInWithPassword` call with a retry mechanism (up to 2 retries with increasing delay: 2s, 4s). Also add an `AbortController`-style timeout of 15 seconds per attempt so slow networks don't hang indefinitely.
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+```
+Attempt 1 → fail (network) → wait 2s → Attempt 2 → fail → wait 4s → Attempt 3 → fail → show error
+```
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+#### 2. Prevent auto-logout on token refresh failure in `src/hooks/useAuth.tsx`
 
-## Phase: Target Split, Dual Visibility & Manager Self-Service
+In the `onAuthStateChange` callback, when session becomes `null` but we have a cached user, **don't immediately clear state**. Instead:
+- Check if the user is offline (via `navigator.onLine`)
+- If offline or network is unstable, preserve the cached auth state and don't set `user` to `null`
+- Only clear auth state on explicit `SIGNED_OUT` event (which only fires on manual sign-out)
 
-### Phase 1: Fix Equal Split ✅
-- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
-- Each manager handles their own team's internal distribution via their strategy
+Current code clears cached auth whenever `session?.user` is falsy:
+```typescript
+} else {
+  clearCachedAuth();  // This causes auto-logout on token refresh failure
+}
+```
 
-### Phase 2: Dual Target for Independent Strategy ✅
-- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
-- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
-- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
-- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
-- Save mutation includes personal target fields
+Change to only clear on explicit `SIGNED_OUT`:
+```typescript
+if (event === 'SIGNED_OUT') {
+  clearCachedAuth();
+  setUser(null);
+  // ...clear everything
+}
+```
 
-### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
-- New `ManagerTargets.tsx` page for managers to edit subordinate targets
-- View own target vs actual achievement
-- Reuse `useTeamTargetProgress` hook for analytics
+#### 3. Add session recovery attempt in `src/hooks/useAuth.tsx`
 
-## Phase: Feedback Configuration & Policy Engine ✅
+When `getSession()` fails (network error), fall back to cached auth state instead of leaving the user logged out. The current `.catch` sets `loading = false` but doesn't restore cached state.
 
-### Database Schema ✅
-- Created `feedback_questions` table (per-module/customer configurable questions)
-- Created `feedback_policies` table (named policies with module, priority)
-- Created `feedback_policy_rules` table (condition+action pairs per policy)
-- RLS enabled on all 3 tables with authenticated access
+#### 4. Improve Supabase client resilience in `src/integrations/supabase/client.ts`
 
-### Frontend Components ✅
-- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
-- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
-- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
+Add `detectSessionInUrl: true` and keep existing config. No changes needed to `autoRefreshToken: true` since it's already set.
 
-### Policy Engine ✅
-- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
-- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
-- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
+### Files to Modify
 
-### Workflow Enforcement ✅
-- `VisitCard.tsx`: Integrated policy check hook
-- "Feedback Required" badge shown when policy triggers
-- Order button intercepted when block_order/mandatory_feedback action triggered
-- Opens feedback modal automatically when blocked
+- **`src/hooks/useAuth.tsx`** — Retry logic in `signIn`, protect `onAuthStateChange` from clearing state on non-explicit logout, fallback to cache on `getSession` failure
+- **`src/integrations/supabase/client.ts`** — Minor: add `detectSessionInUrl: true` for robustness
+
+### What This Fixes
+
+- Users on slow WiFi will get automatic retries instead of immediate failure
+- Token refresh failures on unstable networks won't log users out
+- Only manual sign-out (`signOut()` call) will clear the session
+- Cached auth state is preserved as a safety net during connectivity gaps
+
