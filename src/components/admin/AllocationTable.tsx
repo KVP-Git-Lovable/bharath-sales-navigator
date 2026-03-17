@@ -488,7 +488,21 @@ export function AllocationTable({
       const current = next.get(userId);
 
       if (current) {
-        next.set(userId, { ...current, targetStrategy: strategy });
+        // When switching to no_target, zero out all targets
+        if (strategy === 'no_target') {
+          next.set(userId, {
+            ...current,
+            targetStrategy: strategy,
+            quantityTarget: 0,
+            revenueTarget: 0,
+            visitsTarget: 0,
+            personalQuantityTarget: 0,
+            personalRevenueTarget: 0,
+            personalVisitsTarget: 0,
+          });
+        } else {
+          next.set(userId, { ...current, targetStrategy: strategy });
+        }
 
         if (strategy === 'roll_up') {
           recomputeRollUpManager(userId, next);
