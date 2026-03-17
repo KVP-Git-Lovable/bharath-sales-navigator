@@ -160,17 +160,15 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const fetchInvoiceOptions = async () => {
     setLoadingInvoices(true);
     try {
-      const productIds = [...new Set(returnItems.map(i => i.productId))];
-      
       const { data: pastOrders } = await supabase
         .from('orders')
-        .select('id, invoice_number, created_at, order_items(product_id, variant_id)')
+        .select('id, invoice_number, created_at, order_items(product_id, variant_id, product_name, quantity, rate)')
         .eq('retailer_id', retailerId)
         .not('invoice_number', 'is', null)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      const optionsMap: Record<string, { invoice_number: string; order_id: string; created_at: string }[]> = {};
+      const optionsMap: Record<string, { invoice_number: string; order_id: string; created_at: string; matched_quantity: number; matched_rate: number }[]> = {};
       const defaultSelections: Record<string, string> = {};
 
       if (pastOrders) {
@@ -180,26 +178,27 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
           
           for (const order of pastOrders) {
             const orderItems = (order as any).order_items || [];
-            const match = orderItems.some((oi: any) => {
+            const matchedItem = orderItems.find((oi: any) => {
               if (item.variantId) {
                 return oi.product_id === item.productId && oi.variant_id === item.variantId;
               }
               return oi.product_id === item.productId;
             });
             
-            if (match && order.invoice_number) {
+            if (matchedItem && order.invoice_number) {
               const exists = optionsMap[key].some(o => o.invoice_number === order.invoice_number);
               if (!exists) {
                 optionsMap[key].push({
                   invoice_number: order.invoice_number,
                   order_id: order.id,
                   created_at: order.created_at,
+                  matched_quantity: matchedItem.quantity || 0,
+                  matched_rate: matchedItem.rate || 0,
                 });
               }
             }
           }
           
-          // Auto-select the most recent invoice
           if (optionsMap[key].length > 0 && !selectedInvoices[key]) {
             defaultSelections[key] = optionsMap[key][0].invoice_number;
           }
