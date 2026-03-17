@@ -128,6 +128,7 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
                 </Badge>
               )}
               {isManager && <StrategyBadge strategy={strategy} />}
+              {isNoTarget && !isManager && <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">No Target</Badge>}
             </div>
             {node.designation && <p className="text-[10px] text-muted-foreground">{node.designation}</p>}
           </div>
