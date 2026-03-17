@@ -328,7 +328,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/technology" element={<TechnologyPage />} />
         <Route path="/solutions/field-sales" element={<FieldSalesSolution />} />
         <Route path="/solutions/distributor-portal" element={<DistributorPortalSolution />} />
-        <Route path="/solutions/institutional-sales" element={<InstitutionalSalesSolution />} />
+        
         <Route path="/solutions/van-sales" element={<VanSalesSolution />} />
         <Route path="/solutions/professional-services" element={<ProfessionalServicesSolution />} />
         <Route path="/pricing" element={<PricingPage />} />
