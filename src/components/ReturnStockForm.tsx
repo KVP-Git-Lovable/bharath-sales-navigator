@@ -234,10 +234,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   };
 
   const handleGenerateCreditNote = async () => {
-    if (!selectedVan) {
-      toast.error('Please select a van');
-      return;
-    }
     if (returnItems.length === 0) {
       toast.error('No items added for return');
       return;
