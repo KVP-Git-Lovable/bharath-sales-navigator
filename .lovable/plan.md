@@ -1,86 +1,158 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Credit Note Generation System
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-### Current State
-- Products have `barcode`, `sku`, `product_number`, and `qr_code` fields
-- Product variants also have `barcode`, `sku`, `qr_code`
-- Order items link to `product_id` with full pricing/GST data
-- Orders have `invoice_number` and `retailer_id`
-- Invoice PDF uses jsPDF + autoTable with dark header, green accent, GST breakdown
-- The uploaded reference PDF (KVP credit note) shows: company header, CN number, reference invoice#/date, bill-to, items table, GST totals, amount in words
+## What Was Done
 
-### Database Changes
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-**New table: `credit_notes`**
-- `id`, `credit_note_number` (auto-generated, e.g. CN/25-26/001), `credit_note_date`
-- `retailer_id` (FK → retailers), `retailer_name`
-- `reason` (enum: unsold_stock, damaged, expired, quality_issue, other)
-- `reason_notes` (text)
-- `sub_total`, `sgst_total`, `cgst_total`, `total_amount`, `amount_in_words`
-- `status` (draft, issued, cancelled)
-- `created_by` (FK → auth.users), `created_at`, `updated_at`
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-**New table: `credit_note_items`**
-- `id`, `credit_note_id` (FK → credit_notes)
-- `original_order_id` (FK → orders), `original_invoice_number`
-- `product_id`, `product_name`, `hsn_code`, `unit`
-- `quantity` (return qty), `rate`, `total`
-- `sgst_amount`, `cgst_amount`, `taxable_amount`
-- `barcode` (stored for traceability)
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-RLS: authenticated users can insert/select their own; admins can see all.
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-### UI Components
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-**1. Credit Note Creation Page** (`/credit-note/create?retailerId=xxx`)
-- Step 1: Show all invoices for the selected retailer (from `orders` where `invoice_number` is not null)
-- Step 2: For each invoice, show its line items with checkboxes. User selects items to return and enters return quantity (up to original qty)
-- Step 3: Items from multiple invoices can be selected together (e.g., two 500g orders returned together)
-- Step 4: Select return reason, add notes
-- Step 5: Review totals (auto-calculated with GST) → Generate credit note
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-**2. Barcode/Product Code Scanner**
-- Add a barcode scan input at the top of the item selection screen
-- When scanned, search `products.barcode`, `product_variants.barcode`, `products.sku`, `products.product_number`
-- Auto-highlight matching items across all displayed invoices, showing which invoice(s) contain that product
-- This enables quick identification: "scan product → see it was in Invoice #X and #Y"
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
-**3. Credit Note List** (in Invoice Management → new tab "Credit Notes")
-- List all credit notes with download/share options
-- Filter by retailer, date range, status
+## Phase: Target Split, Dual Visibility & Manager Self-Service
 
-### PDF Generation
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
 
-**`generateCreditNotePDF()`** in `src/utils/creditNoteGenerator.ts`
-- Same visual style as current invoice (dark header, green accents, company logo)
-- Title changed to **"CREDIT NOTE"** (instead of "INVOICE")
-- Header right side: CN#, Credit Date, Reference Invoice#, Invoice Date (matching the uploaded PDF format)
-- Items table: NO, PRODUCT, HSN, UNIT, QTY, RATE, AMOUNT
-- Totals: Sub Total, SGST, CGST, Total
-- Amount in words
-- "Reason for Credit" section
-- Footer with company signature
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
 
-### Files to Create/Modify
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
 
-| File | Action |
-|------|--------|
-| `src/utils/creditNoteGenerator.ts` | New — PDF generation for credit notes |
-| `src/pages/CreditNoteCreate.tsx` | New — multi-invoice item selection UI |
-| `src/components/credit-note/RetailerInvoiceList.tsx` | New — shows retailer's invoices with items |
-| `src/components/credit-note/BarcodeScanInput.tsx` | New — barcode/product code scanner |
-| `src/components/credit-note/CreditNoteReview.tsx` | New — review & generate |
-| `src/components/credit-note/CreditNoteList.tsx` | New — list all credit notes |
-| `src/pages/InvoiceManagement.tsx` | Modify — add "Credit Notes" tab |
-| `src/App.tsx` | Modify — add route `/credit-note/create` |
-| Migration SQL | New tables `credit_notes` + `credit_note_items` with RLS |
+## Phase: Feedback Configuration & Policy Engine ✅
 
-### Implementation Order
-1. Create database tables via migration
-2. Build credit note creation page with invoice/item selection
-3. Add barcode scan lookup feature
-4. Build credit note PDF generator (matching invoice style)
-5. Add credit notes list tab to Invoice Management
-6. Wire up routes
+### Database Schema ✅
+- Created `feedback_questions` table (per-module/customer configurable questions)
+- Created `feedback_policies` table (named policies with module, priority)
+- Created `feedback_policy_rules` table (condition+action pairs per policy)
+- RLS enabled on all 3 tables with authenticated access
 
+### Frontend Components ✅
+- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
+- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
+- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
+
+### Policy Engine ✅
+- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
+- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
+- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
+
+### Workflow Enforcement ✅
+- `VisitCard.tsx`: Integrated policy check hook
+- "Feedback Required" badge shown when policy triggers
+- Order button intercepted when block_order/mandatory_feedback action triggered
+- Opens feedback modal automatically when blocked
+
+## Phase: No Target Strategy & Mid-Year Flexibility ✅
+
+### Strategy Explanation Panel ✅
+- Panel now open by default (`useState(true)`)
+- Added 4th "No Target" card with explanation
+
+### No Target Strategy ✅
+- Added `'no_target'` to `TargetStrategy` type union
+- Added Ban icon, gray color scheme, labels across all strategy components
+- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
+
+### Allocation Logic ✅
+- `getContributorCountForNode` returns 0 for `no_target` users
+- `autoDistributeTargets` skips `no_target` children, zeros their targets
+- `splitByWeights` filters out `no_target` entries
+- `handleEqualSplit` excludes `no_target` from weight calculation
+- `handleStrategyChange` zeros all targets when switching to `no_target`
+- Save mutation includes `has_no_target: true` flag
+
+### Wizard Steps UI ✅
+- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
+- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
+- `StepReviewSave`: No Target rows read-only with grayed appearance
+
+### Manager Self-Service ✅
+- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+
+## Phase: Credit Note Generation System ✅
+
+### Database Schema ✅
+- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
+- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
+- RLS enabled with authenticated access
+- Auto-incrementing CN number sequence
+
+### Credit Note Creation Page ✅ (`/credit-note/create`)
+- Retailer selector → shows all invoices for selected retailer
+- Multi-invoice item selection with checkboxes and return quantity input
+- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
+- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
+- Review step with grouped items by invoice, GST totals
+- Saves to DB and auto-generates PDF on confirmation
+
+### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
+- Matches invoice style: dark header, company logo, BILL TO section
+- Title: "CREDIT NOTE" with red accent (vs green for invoices)
+- Header: CN#, Credit Date, Reference Invoice(s), Reason
+- Items table with red header and light red alternating rows
+- Totals: Sub Total, SGST, CGST, Total (red bar)
+- Amount in words, Reason for Credit section, Authorized Signature
+
+### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
+- Lists all credit notes with status badges (draft/issued/cancelled)
+- Download PDF button per credit note
+- "New Credit Note" button linking to creation page
+
+### Files Created
+- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
+- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
+- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
+- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
+- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
+- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
+- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
+- Modified `src/App.tsx` — Added `/credit-note/create` route
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`

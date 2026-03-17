@@ -1,10 +1,11 @@
 import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2, ReceiptText, Plus } from "lucide-react";
 import InvoiceTemplateSelector from "@/components/invoice/InvoiceTemplateSelector";
 import AllInvoicesList from "@/components/invoice/AllInvoicesList";
 import InvoiceDisplaySettings from "@/components/invoice/InvoiceDisplaySettings";
+import CreditNoteList from "@/components/credit-note/CreditNoteList";
 import { Layout } from "@/components/Layout";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 
@@ -46,11 +47,10 @@ export default function InvoiceManagement() {
         </div>
 
         <Tabs defaultValue="display-settings" className="space-y-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="display-settings" className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Display Settings</span>
-              <span className="sm:hidden">Settings</span>
+              <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
             <TabsTrigger value="template" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -58,8 +58,12 @@ export default function InvoiceManagement() {
             </TabsTrigger>
             <TabsTrigger value="invoices" className="flex items-center gap-2">
               <ListOrdered className="h-4 w-4" />
-              <span className="hidden sm:inline">All Invoices</span>
-              <span className="sm:hidden">Invoices</span>
+              <span className="hidden sm:inline">Invoices</span>
+            </TabsTrigger>
+            <TabsTrigger value="credit-notes" className="flex items-center gap-2">
+              <ReceiptText className="h-4 w-4" />
+              <span className="hidden sm:inline">Credit Notes</span>
+              <span className="sm:hidden">CN</span>
             </TabsTrigger>
           </TabsList>
 
@@ -73,6 +77,15 @@ export default function InvoiceManagement() {
 
           <TabsContent value="invoices">
             <AllInvoicesList />
+          </TabsContent>
+
+          <TabsContent value="credit-notes">
+            <div className="flex justify-end mb-4">
+              <Button onClick={() => navigate("/credit-note/create")} size="sm">
+                <Plus className="h-4 w-4 mr-1" /> New Credit Note
+              </Button>
+            </div>
+            <CreditNoteList />
           </TabsContent>
         </Tabs>
       </div>
