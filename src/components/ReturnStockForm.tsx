@@ -132,6 +132,9 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     if (!returnReason) {
       errors.push('select a return reason');
     }
+    if (returnReason === 'Other' && !otherReason.trim()) {
+      errors.push('enter the reason for returning');
+    }
     
     // Show single error message if any validation fails
     if (errors.length > 0) {
