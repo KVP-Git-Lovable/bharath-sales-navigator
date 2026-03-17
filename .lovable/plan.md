@@ -116,3 +116,43 @@ Upgraded the target management system from a rigid lock-based model to a flexibl
 ### Manager Self-Service ✅
 - `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
 - Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+
+## Phase: Credit Note Generation System ✅
+
+### Database Schema ✅
+- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
+- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
+- RLS enabled with authenticated access
+- Auto-incrementing CN number sequence
+
+### Credit Note Creation Page ✅ (`/credit-note/create`)
+- Retailer selector → shows all invoices for selected retailer
+- Multi-invoice item selection with checkboxes and return quantity input
+- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
+- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
+- Review step with grouped items by invoice, GST totals
+- Saves to DB and auto-generates PDF on confirmation
+
+### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
+- Matches invoice style: dark header, company logo, BILL TO section
+- Title: "CREDIT NOTE" with red accent (vs green for invoices)
+- Header: CN#, Credit Date, Reference Invoice(s), Reason
+- Items table with red header and light red alternating rows
+- Totals: Sub Total, SGST, CGST, Total (red bar)
+- Amount in words, Reason for Credit section, Authorized Signature
+
+### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
+- Lists all credit notes with status badges (draft/issued/cancelled)
+- Download PDF button per credit note
+- "New Credit Note" button linking to creation page
+
+### Files Created
+- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
+- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
+- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
+- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
+- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
+- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
+- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
+- Modified `src/App.tsx` — Added `/credit-note/create` route
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
