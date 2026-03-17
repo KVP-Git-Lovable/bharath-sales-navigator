@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown, Car, Utensils, Receipt, IndianRupee, ShoppingCart } from 'lucide-react';
+import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown, Car, Utensils, Receipt, IndianRupee, ShoppingCart, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, isSameDay } from 'date-fns';
@@ -32,6 +32,7 @@ const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 const ProductivityTracking = () => {
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
   const [additionalTotal, setAdditionalTotal] = useState(0);
+  const [pettyCashTotal, setPettyCashTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
@@ -222,6 +223,17 @@ const ProductivityTracking = () => {
 
       const addTotal = (addExpData || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
       setAdditionalTotal(addTotal);
+
+      // Fetch petty cash transactions for the date range
+      const { data: pettyCashData } = await (supabase as any)
+        .from('petty_cash_transactions')
+        .select('amount, status')
+        .gte('transaction_date', format(start, 'yyyy-MM-dd'))
+        .lte('transaction_date', format(end, 'yyyy-MM-dd'))
+        .in('status', ['submitted', 'approved']);
+
+      const pcTotal = (pettyCashData || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      setPettyCashTotal(pcTotal);
     } catch (error) {
       console.error('Error fetching productivity data:', error);
       toast({
@@ -270,6 +282,7 @@ const ProductivityTracking = () => {
       'Order Value (₹)': item.total_order_value.toFixed(2),
       'DA (₹)': item.daily_allowance.toFixed(2),
       'TA (₹)': item.travel_allowance.toFixed(2),
+      'Petty Cash (₹)': pettyCashTotal.toFixed(2),
       'Total Allowance (₹)': item.total_allowance.toFixed(2),
       'Productivity Ratio': item.productivity_ratio.toFixed(2),
       'Performance': getProductivityLabel(item.productivity_ratio)
@@ -307,12 +320,13 @@ const ProductivityTracking = () => {
   const totalTA = productivityData.reduce((s, d) => s + d.travel_allowance, 0);
   const totalDA = productivityData.reduce((s, d) => s + d.daily_allowance, 0);
   const totalOrderValue = productivityData.reduce((s, d) => s + d.total_order_value, 0);
-  const totalExpenses = totalTA + totalDA + additionalTotal;
+  const totalExpenses = totalTA + totalDA + additionalTotal + pettyCashTotal;
 
   const summaryCards = [
     { label: 'Travel (TA)', value: fmt(totalTA), icon: Car, bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-200 dark:border-blue-800', iconColor: 'text-blue-600', valueColor: 'text-blue-700 dark:text-blue-400' },
     { label: 'Daily (DA)', value: fmt(totalDA), icon: Utensils, bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-200 dark:border-green-800', iconColor: 'text-green-600', valueColor: 'text-green-700 dark:text-green-400' },
     { label: 'Additional', value: fmt(additionalTotal), icon: Receipt, bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-200 dark:border-purple-800', iconColor: 'text-purple-600', valueColor: 'text-purple-700 dark:text-purple-400' },
+    { label: 'Petty Cash', value: fmt(pettyCashTotal), icon: Wallet, bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200 dark:border-amber-800', iconColor: 'text-amber-600', valueColor: 'text-amber-700 dark:text-amber-400' },
     { label: 'Total Expenses', value: fmt(totalExpenses), icon: IndianRupee, bg: 'bg-primary/5', border: 'border-primary/20', iconColor: 'text-primary', valueColor: 'text-primary' },
     { label: 'Order Value', value: fmt(totalOrderValue), icon: ShoppingCart, bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-200 dark:border-orange-800', iconColor: 'text-orange-600', valueColor: 'text-orange-700 dark:text-orange-400' },
   ];
@@ -320,7 +334,7 @@ const ProductivityTracking = () => {
   return (
     <div className="space-y-6">
       {/* Team Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {summaryCards.map((card, idx) => (
           <div
             key={card.label}
