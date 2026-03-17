@@ -1,10 +1,11 @@
 import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, ListOrdered, Settings2, Loader2, ReceiptText, Plus } from "lucide-react";
 import InvoiceTemplateSelector from "@/components/invoice/InvoiceTemplateSelector";
 import AllInvoicesList from "@/components/invoice/AllInvoicesList";
 import InvoiceDisplaySettings from "@/components/invoice/InvoiceDisplaySettings";
+import CreditNoteList from "@/components/credit-note/CreditNoteList";
 import { Layout } from "@/components/Layout";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 
