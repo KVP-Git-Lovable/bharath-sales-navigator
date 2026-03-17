@@ -17068,6 +17068,10 @@ export type Database = {
         }
         Returns: string
       }
+      sync_order_with_items: {
+        Args: { p_items: Json; p_order: Json }
+        Returns: Json
+      }
       unlock_password_reset: { Args: { user_email: string }; Returns: boolean }
       update_security_info: {
         Args: { new_hint_answer: string; new_hint_question: string }
