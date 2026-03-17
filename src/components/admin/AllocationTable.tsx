@@ -135,12 +135,19 @@ const getContributorCountForNode = (
   const cached = cache.get(node.userId);
   if (cached !== undefined) return cached;
 
+  const currentAlloc = allocations.get(node.userId) || node;
+  
+  // No target users contribute 0
+  if (currentAlloc.targetStrategy === 'no_target') {
+    cache.set(node.userId, 0);
+    return 0;
+  }
+
   if (node.children.length === 0) {
     cache.set(node.userId, 1);
     return 1;
   }
 
-  const currentAlloc = allocations.get(node.userId) || node;
   const childContributors = node.children.reduce(
     (sum, child) => sum + getContributorCountForNode(child, allocations, cache),
     0,
