@@ -78,7 +78,7 @@ const PettyCashAdmin: React.FC = () => {
   const { data: funds = [], isLoading: fundsLoading } = useQuery({
     queryKey: ['admin-petty-cash-funds'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('petty_cash_funds')
         .select('*, profiles!petty_cash_funds_user_id_fkey(full_name)')
         .order('created_at', { ascending: false });
