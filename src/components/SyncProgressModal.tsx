@@ -251,8 +251,8 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
     });
   };
 
-  const failedCount = syncItems.filter(i => i.syncState === 'FAILED_SYNC').length;
-  const retryingCount = syncItems.filter(i => i.syncState === 'RETRYING').length;
+  const slowRetryCount = syncItems.filter(i => i.syncState === 'RETRYING' && (i.retryCount || 0) >= SLOW_RETRY_THRESHOLD).length;
+  const retryingCount = syncItems.filter(i => i.syncState === 'RETRYING' && (i.retryCount || 0) < SLOW_RETRY_THRESHOLD).length;
   const queuedCount = syncItems.filter(i => i.syncState === 'QUEUED' || i.syncState === 'SYNCING').length;
 
   const ERROR_TYPE_LABELS: Record<SyncErrorType, { label: string; icon: React.ReactNode }> = {
