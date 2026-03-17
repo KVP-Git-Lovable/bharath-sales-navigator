@@ -7,7 +7,8 @@ export type SyncErrorType = 'NETWORK' | 'VALIDATION' | 'AUTH' | 'CONFLICT' | 'SE
 
 export type SyncState = 'QUEUED' | 'SYNCING' | 'RETRYING' | 'FAILED_SYNC' | 'SUCCESS';
 
-export const MAX_AUTO_RETRIES = 5;
+/** After this many retries, backoff switches to slow mode (max 30 min) but never stops */
+export const SLOW_RETRY_THRESHOLD = 5;
 
 export interface SyncLogEntry {
   id: string;
