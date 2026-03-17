@@ -340,10 +340,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string, role?: 'admin' | 'user') => {
     await monitoring.trace('user_login_process', async () => {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      let data, error: AuthError | null;
+      try {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        data = result.data;
+        error = result.error;
+      } catch (networkError: any) {
+        const msg = networkError?.message || '';
+        if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('fetch failed') || msg.includes('Load failed')) {
+          toast.error('Network error. Please check your internet connection and try again.');
+          throw new Error('Network error during sign in');
+        }
+        toast.error('An unexpected error occurred. Please try again.');
+        throw networkError;
+      }
 
       if (error) {
         toast.error(error.message);
