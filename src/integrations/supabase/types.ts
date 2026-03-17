@@ -8672,6 +8672,168 @@ export type Database = {
         }
         Relationships: []
       }
+      petty_cash_funds: {
+        Row: {
+          allocated_amount: number
+          balance: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          allocated_amount?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          allocated_amount?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_funds_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_funds_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_limits: {
+        Row: {
+          created_at: string
+          fund_id: string
+          id: string
+          max_per_day: number | null
+          max_per_transaction: number | null
+          require_bill_above: number | null
+        }
+        Insert: {
+          created_at?: string
+          fund_id: string
+          id?: string
+          max_per_day?: number | null
+          max_per_transaction?: number | null
+          require_bill_above?: number | null
+        }
+        Update: {
+          created_at?: string
+          fund_id?: string
+          id?: string
+          max_per_day?: number | null
+          max_per_transaction?: number | null
+          require_bill_above?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_limits_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: true
+            referencedRelation: "petty_cash_funds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_transactions: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          bill_url: string | null
+          category: string
+          created_at: string
+          description: string | null
+          fund_id: string
+          id: string
+          rejection_reason: string | null
+          status: string
+          transaction_date: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          bill_url?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          fund_id: string
+          id?: string
+          rejection_reason?: string | null
+          status?: string
+          transaction_date?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          bill_url?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          fund_id?: string
+          id?: string
+          rejection_reason?: string | null
+          status?: string
+          transaction_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_transactions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_funds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pincode_master: {
         Row: {
           created_at: string | null
