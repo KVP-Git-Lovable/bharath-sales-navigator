@@ -50,46 +50,19 @@ export const LicenseDetailsSection = () => {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   const stats = [
-    { label: 'Users', value: counts.users, icon: <Users className="h-5 w-5" /> },
-    { label: 'Retailers', value: counts.retailers, icon: <Store className="h-5 w-5" /> },
-    { label: 'Orders', value: counts.orders, icon: <ShoppingCart className="h-5 w-5" /> },
-    { label: 'Visits', value: counts.visits, icon: <MapPin className="h-5 w-5" /> },
+    { label: 'Users', value: counts.users, icon: <Users className="h-5 w-5" />, note: 'No. of unique users who logged-in to the app during this period' },
+    { label: 'Retailers', value: counts.retailers, icon: <Store className="h-5 w-5" />, note: 'No. of retailers newly created during the period' },
+    { label: 'Orders', value: counts.orders, icon: <ShoppingCart className="h-5 w-5" />, note: 'No. of orders newly created during this period' },
+    { label: 'Visits', value: counts.visits, icon: <MapPin className="h-5 w-5" />, note: 'No. of new visits created during this period' },
   ];
 
-  return (
-    <Card className="bg-white/95 backdrop-blur-sm border-white/20 shadow-lg">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="text-lg font-semibold text-foreground">Activity Details</CardTitle>
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Current license plan:</span>
-              <a href="https://quickapp.ai/pricing" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View pricing plans</a>
-            </div>
-            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger className="w-[140px] bg-white border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white z-50">
-                <SelectItem value="this_month">This Month</SelectItem>
-                <SelectItem value="last_month">Last Month</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
           <div className="grid grid-cols-4 gap-4">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-muted/30 p-4">
                 <div className="text-primary">{s.icon}</div>
                 <p className="text-2xl font-bold text-foreground">{s.value.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="text-[10px] text-muted-foreground/70 text-center leading-tight mt-1">{s.note}</p>
               </div>
             ))}
           </div>
