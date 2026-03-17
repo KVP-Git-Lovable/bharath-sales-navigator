@@ -155,6 +155,71 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     toast.success(`Added ${newItem.productName}${newItem.variantName ? ` - ${newItem.variantName}` : ''}`);
   };
 
+  // Fetch invoice options for return items when moving to step 2
+  const fetchInvoiceOptions = async () => {
+    setLoadingInvoices(true);
+    try {
+      const productIds = [...new Set(returnItems.map(i => i.productId))];
+      
+      const { data: pastOrders } = await supabase
+        .from('orders')
+        .select('id, invoice_number, created_at, order_items(product_id, variant_id)')
+        .eq('retailer_id', retailerId)
+        .not('invoice_number', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const optionsMap: Record<string, { invoice_number: string; order_id: string; created_at: string }[]> = {};
+      const defaultSelections: Record<string, string> = {};
+
+      if (pastOrders) {
+        for (const item of returnItems) {
+          const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
+          optionsMap[key] = [];
+          
+          for (const order of pastOrders) {
+            const orderItems = (order as any).order_items || [];
+            const match = orderItems.some((oi: any) => {
+              if (item.variantId) {
+                return oi.product_id === item.productId && oi.variant_id === item.variantId;
+              }
+              return oi.product_id === item.productId;
+            });
+            
+            if (match && order.invoice_number) {
+              const exists = optionsMap[key].some(o => o.invoice_number === order.invoice_number);
+              if (!exists) {
+                optionsMap[key].push({
+                  invoice_number: order.invoice_number,
+                  order_id: order.id,
+                  created_at: order.created_at,
+                });
+              }
+            }
+          }
+          
+          // Auto-select the most recent invoice
+          if (optionsMap[key].length > 0 && !selectedInvoices[key]) {
+            defaultSelections[key] = optionsMap[key][0].invoice_number;
+          }
+        }
+      }
+
+      setInvoiceOptions(optionsMap);
+      setSelectedInvoices(prev => ({ ...defaultSelections, ...prev }));
+    } catch (err) {
+      console.error('Error fetching invoices for linking:', err);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  const handleGoToStep2 = async () => {
+    if (returnItems.length === 0) return;
+    setStep(2);
+    await fetchInvoiceOptions();
+  };
+
   const handleRemoveItem = (index: number) => {
     setReturnItems(prev => prev.filter((_, i) => i !== index));
   };
