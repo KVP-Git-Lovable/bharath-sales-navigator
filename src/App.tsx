@@ -420,6 +420,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/retailer-loyalty-admin" element={<ProtectedRoute><RetailerLoyaltyAdmin /></ProtectedRoute>} />
         <Route path="/retailer-loyalty" element={<ProtectedRoute><RetailerLoyalty /></ProtectedRoute>} />
         <Route path="/invoice-management" element={<ProtectedRoute><InvoiceManagement /></ProtectedRoute>} />
+        <Route path="/credit-note/create" element={<ProtectedRoute><CreditNoteCreate /></ProtectedRoute>} />
         <Route path="/company-profile" element={<ProtectedRoute><CompanyProfile /></ProtectedRoute>} />
         <Route path="/pending-payments-all" element={<ProtectedRoute><PendingPaymentsAll /></ProtectedRoute>} />
         <Route path="/admin/performance-module" element={<ProtectedRoute><PerformanceModuleAdmin /></ProtectedRoute>} />
