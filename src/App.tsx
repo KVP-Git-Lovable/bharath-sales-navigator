@@ -180,28 +180,8 @@ import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
 import PackingListDetailPage from "./pages/PackingListDetail";
 
-// Institutional Sales pages
-import InstitutionalSalesDashboard from "./pages/institutional/InstitutionalSalesDashboard";
-import LeadManagement from "./pages/institutional/LeadManagement";
-import AccountManagement from "./pages/institutional/AccountManagement";
-import AccountDetail from "./pages/institutional/AccountDetail";
-import ContactManagement from "./pages/institutional/ContactManagement";
-import ContactDetail from "./pages/institutional/ContactDetail";
-import OpportunityManagement from "./pages/institutional/OpportunityManagement";
-import OpportunityDetail from "./pages/institutional/OpportunityDetail";
-import QuoteManagement from "./pages/institutional/QuoteManagement";
-import QuoteDetail from "./pages/institutional/QuoteDetail";
-import InstitutionalProducts from "./pages/institutional/InstitutionalProducts";
-import OrderCommitments from "./pages/institutional/OrderCommitments";
-import InstitutionalInvoices from "./pages/institutional/InstitutionalInvoices";
 // ARCHIVED: Projects module hidden
 // import ProjectsPage from "./pages/pm/ProjectsPage";
-// import ProjectDetailPage from "./pages/pm/ProjectDetailPage";
-// import ResourceDetailPage from "./pages/pm/ResourceDetailPage";
-// import TemplatesPage from "./pages/pm/TemplatesPage";
-// import TemplateBuilderPage from "./pages/pm/TemplateBuilderPage";
-import PriceBooks from "./pages/institutional/PriceBooks";
-import Collections from "./pages/institutional/Collections";
 
 const queryClient = new QueryClient({
   defaultOptions: {
