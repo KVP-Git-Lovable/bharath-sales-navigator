@@ -422,6 +422,24 @@ export function TeamTargetDashboard({
 
           {/* Status */}
           <div className="shrink-0">{getStatusBadge(member.status)}</div>
+
+          {/* No Target toggle for managers */}
+          {isManager && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                const isCurrentlyNoTarget = member.target === 0 && member.actual === 0;
+                toggleNoTargetMutation.mutate({ userId: member.userId, hasNoTarget: !isCurrentlyNoTarget });
+              }}
+              disabled={toggleNoTargetMutation.isPending}
+              title={member.target === 0 ? 'Assign target' : 'Set to No Target'}
+            >
+              <Ban className="h-3 w-3" />
+            </Button>
+          )}
         </div>
 
         {/* Product breakdown */}
