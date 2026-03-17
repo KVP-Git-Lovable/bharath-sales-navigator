@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Layout } from '@/components/Layout';
 import ExpensePolicyConfig from '@/components/expenses/ExpensePolicyConfig';
 import ProductivityTracking from '@/components/ProductivityTracking';
+import PettyCashAdmin from '@/components/expenses/PettyCashAdmin';
 
 const AdminExpenseManagement = () => {
   const { hasAdminAccess, loading: authLoading } = useAdminAccess();
