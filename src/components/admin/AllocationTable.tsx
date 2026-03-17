@@ -214,10 +214,27 @@ function autoDistributeTargets(
       return;
     }
 
-    const weightedEntries = children.map(({ childNode, childAlloc }) => ({
-      userId: childAlloc.userId,
-      weight: Math.max(1, getContributors(childNode)),
-    }));
+    const weightedEntries = children
+      .filter(({ childAlloc }) => childAlloc.targetStrategy !== 'no_target')
+      .map(({ childNode, childAlloc }) => ({
+        userId: childAlloc.userId,
+        weight: Math.max(1, getContributors(childNode)),
+      }));
+
+    // Zero out no_target children
+    children.forEach(({ childNode, childAlloc }) => {
+      if (childAlloc.targetStrategy === 'no_target') {
+        allocations.set(childNode.userId, {
+          ...childAlloc,
+          quantityTarget: 0,
+          revenueTarget: 0,
+          visitsTarget: 0,
+          personalQuantityTarget: 0,
+          personalRevenueTarget: 0,
+          personalVisitsTarget: 0,
+        });
+      }
+    });
 
     const quantitySplit = enabledMetrics.quantity ? splitByWeights(managerAlloc.quantityTarget, weightedEntries) : new Map<string, number>();
     const revenueSplit = enabledMetrics.revenue ? splitByWeights(managerAlloc.revenueTarget, weightedEntries) : new Map<string, number>();
