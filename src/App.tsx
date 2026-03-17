@@ -107,6 +107,7 @@ import UserProfile from "./pages/UserProfile";
 import CompleteProfile from "./pages/CompleteProfile";
 import GamificationAdmin from "./pages/GamificationAdmin";
 import InvoiceManagement from "./pages/InvoiceManagement";
+import CreditNoteCreate from "./pages/CreditNoteCreate";
 import CompanyProfile from "./pages/CompanyProfile";
 import GamePolicy from "./pages/GamePolicy";
 import CreditManagement from "./pages/CreditManagement";
