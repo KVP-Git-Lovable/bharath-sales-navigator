@@ -72,7 +72,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
 
   useEffect(() => {
-    loadVans();
     loadProducts();
   }, []);
 
