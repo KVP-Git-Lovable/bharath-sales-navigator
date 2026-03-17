@@ -5,7 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { syncOrdersToVanStock, getTodayDateString } from '@/utils/vanStockSync';
 import { visitStatusCache } from '@/lib/visitStatusCache';
-import { classifySyncError, isRetryableError, getBackoffDelay, MAX_AUTO_RETRIES, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
+import { classifySyncError, isRetryableError, getBackoffDelay, SLOW_RETRY_THRESHOLD, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
 // Removed isSlowConnection import - sync should always attempt when online
 
 export function useOfflineSync() {
