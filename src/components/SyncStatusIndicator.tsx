@@ -71,9 +71,8 @@ export const SyncStatusIndicator = memo(() => {
       const queue = await offlineStorage.getSyncQueue();
       if (mountedRef.current) {
         setSyncQueueCount(queue.length);
-        // Count failed items that need manual retry
-        const failedCount = queue.filter((i: any) => i.syncState === 'FAILED_SYNC').length;
-        setFailedSyncCount(failedCount);
+        const slowCount = queue.filter((i: any) => i.syncState === 'RETRYING' && (i.retryCount || 0) >= 5).length;
+        setSlowRetryCount(slowCount);
       }
     } catch (error) {
       console.error('Error checking sync queue:', error);
