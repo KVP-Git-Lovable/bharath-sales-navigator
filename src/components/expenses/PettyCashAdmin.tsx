@@ -210,7 +210,7 @@ const PettyCashAdmin: React.FC = () => {
                   </Badge>
                   {fund.status === 'active' && (
                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={e => { e.stopPropagation(); updateFundStatus(fund.id, 'frozen'); }}>
-                      <Snowflake className="h-3.5 w-3.5 text-blue-500" />
+                      <Snowflake className="h-3.5 w-3.5 text-primary" />
                     </Button>
                   )}
                   {fund.status === 'frozen' && (
