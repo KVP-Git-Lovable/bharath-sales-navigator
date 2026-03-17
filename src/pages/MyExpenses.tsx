@@ -29,8 +29,12 @@ const MyExpenses = () => {
   const [breakdownView, setBreakdownView] = useState<BreakdownView>('weekly');
   const [isAdditionalOpen, setIsAdditionalOpen] = useState(false);
 
+  const { fund, limits, hasPettyCash } = usePettyCashFund();
+
   const yearMonth = format(selectedMonth, 'yyyy-MM');
   const { data: summary, isLoading } = useMonthlyExpenseSummary(user?.id, yearMonth);
+
+  const tabCount = (isManager ? 2 : 1) + (hasPettyCash ? 1 : 0);
 
   return (
     <Layout>
