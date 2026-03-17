@@ -98,7 +98,7 @@ export function isRetryableError(errorType: SyncErrorType): boolean {
     case 'AUTH':
       return true; // Retry after re-auth
     case 'VALIDATION':
-      return false; // Bad data, won't fix itself
+      return true; // Retry — constraint issues may be fixed server-side
     case 'CONFLICT':
       return false; // Already exists, treat as success
     default:
