@@ -223,6 +223,17 @@ const ProductivityTracking = () => {
 
       const addTotal = (addExpData || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
       setAdditionalTotal(addTotal);
+
+      // Fetch petty cash transactions for the date range
+      const { data: pettyCashData } = await (supabase as any)
+        .from('petty_cash_transactions')
+        .select('amount, status')
+        .gte('transaction_date', format(start, 'yyyy-MM-dd'))
+        .lte('transaction_date', format(end, 'yyyy-MM-dd'))
+        .in('status', ['submitted', 'approved']);
+
+      const pcTotal = (pettyCashData || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      setPettyCashTotal(pcTotal);
     } catch (error) {
       console.error('Error fetching productivity data:', error);
       toast({
