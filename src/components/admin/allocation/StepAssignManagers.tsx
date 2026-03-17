@@ -108,6 +108,23 @@ export function StepAssignManagers({
       const isSubManager = node.subordinateCount > 0;
       const nodeStrategy = node.targetStrategy || 'roll_down';
 
+      // No Target users — show badge, no inputs
+      if (nodeStrategy === 'no_target') {
+        return (
+          <div key={node.userId} className="flex items-center gap-2 py-1.5 opacity-60">
+            <span className="text-xs text-muted-foreground">↳</span>
+            <span className="text-xs font-medium text-muted-foreground line-through">{node.fullName}</span>
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">No Target</Badge>
+            {isSubManager && (
+              <InlineStrategySelector
+                value={nodeStrategy}
+                onChange={(s) => onStrategyChange(node.userId, s)}
+              />
+            )}
+          </div>
+        );
+      }
+
       if (!isSubManager) {
         // Simple name row for regular users
         return (
