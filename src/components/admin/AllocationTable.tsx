@@ -519,10 +519,12 @@ export function AllocationTable({
     if (!directReports.length) return;
 
     const contributorCache = new Map<string, number>();
-    const weightedEntries = directReports.map((dr) => ({
-      userId: dr.userId,
-      weight: Math.max(getContributorCountForNode(dr, allocations, contributorCache), 1),
-    }));
+    const weightedEntries = directReports
+      .filter(dr => (allocations.get(dr.userId)?.targetStrategy || 'roll_down') !== 'no_target')
+      .map((dr) => ({
+        userId: dr.userId,
+        weight: Math.max(getContributorCountForNode(dr, allocations, contributorCache), 1),
+      }));
 
     const quantitySplit = enabledMetrics.quantity ? splitByWeights(totalQuantity, weightedEntries) : new Map<string, number>();
     const revenueSplit = enabledMetrics.revenue ? splitByWeights(totalRevenue, weightedEntries) : new Map<string, number>();
