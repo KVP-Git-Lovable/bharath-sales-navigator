@@ -111,7 +111,7 @@ export function isRetryableError(errorType: SyncErrorType): boolean {
  */
 export function getBackoffDelay(retryCount: number): number {
   const baseDelay = 2000; // 2 seconds
-  const maxDelay = 300000; // 5 minutes
+  const maxDelay = 1800000; // 30 minutes — never stops, just slows down
   const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
   // Add jitter (±25%)
   const jitter = delay * 0.25 * (Math.random() * 2 - 1);
