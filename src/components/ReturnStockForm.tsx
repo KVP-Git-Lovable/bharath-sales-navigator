@@ -579,7 +579,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                     </SelectContent>
                   </Select>
                 </div>
-                </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Qty</Label>
                   <Input
