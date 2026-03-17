@@ -100,7 +100,7 @@ export const Navbar = memo(() => {
       { id: 'my-target', icon: Target, label: t('nav.target'), href: "/my-target", color: "from-cyan-500 to-cyan-600" },
       { id: 'performance', icon: TrendingUp, label: t('nav.targetVsActual'), href: "/performance-dashboard", color: "from-emerald-500 to-emerald-600" },
       { id: 'analytics', icon: BarChart3, label: t('nav.analytics'), href: "/analytics", color: "from-violet-500 to-violet-600" },
-      { id: 'institutional-sales', icon: Building2, label: t('nav.institutionalSales'), href: "/institutional-sales", color: "from-indigo-500 to-indigo-600" },
+      
       { id: 'distributor-master', icon: Factory, label: t('nav.distributorMaster'), href: "/distributor-master", color: "from-cyan-500 to-cyan-600" },
       { id: 'primary-orders', icon: ShoppingCart, label: t('nav.primaryOrders'), href: "/primary-orders", color: "from-rose-500 to-rose-600" },
       { id: 'territories', icon: MapPin, label: t('nav.territories'), href: "/territories-and-distributors", color: "from-amber-500 to-amber-600" },

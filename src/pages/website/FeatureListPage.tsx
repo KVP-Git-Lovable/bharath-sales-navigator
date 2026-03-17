@@ -140,25 +140,6 @@ const featureCategories = [
     ]
   },
   {
-    id: "institutional",
-    title: "Institutional Sales",
-    shortTitle: "B2B Sales",
-    icon: Building2,
-    color: "from-teal-500 to-green-500",
-    tagline: "Win big accounts",
-    features: [
-      { name: "Lead Management", description: "Capture and nurture sales leads" },
-      { name: "Opportunity Tracking", description: "Pipeline and deal management" },
-      { name: "Quote Generation", description: "Create and send quotations" },
-      { name: "Account Management", description: "Manage institutional accounts" },
-      { name: "Contact Management", description: "Track key contacts per account" },
-      { name: "Order Commitments", description: "Track committed orders" },
-      { name: "Collections", description: "Track and collect payments" },
-      { name: "Price Books", description: "Account-specific pricing" },
-      { name: "Invoice Management", description: "Generate and track invoices" },
-    ]
-  },
-  {
     id: "enterprise",
     title: "Enterprise Features",
     shortTitle: "Enterprise",

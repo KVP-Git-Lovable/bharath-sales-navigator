@@ -14,7 +14,7 @@ export const NAV_ITEM_FEATURE_MAP: Record<string, string> = {
   'my-target': 'my_target',
   'performance': 'target_vs_actual',
   'analytics': 'analytics',
-  'institutional-sales': 'institutional_sales',
+  
   'distributor-master': 'distributor_master',
   'primary-orders': 'primary_orders',
   'territories': 'territories',
@@ -41,7 +41,7 @@ export const NAV_ITEM_PERMISSION_PREFIX: Record<string, string> = {
   'my-target': 'target_',
   'performance': 'performance_',
   'analytics': 'analytics_',
-  'institutional-sales': 'institutional_',
+  
   'distributor-master': 'distributor_',
   'primary-orders': 'primary_order_',
   'territories': 'territory_',
@@ -70,7 +70,7 @@ export const NAV_ITEM_MODULE_NAME: Record<string, string> = {
   'my-target': 'target',
   'performance': 'performance',
   'analytics': 'analytics',
-  'institutional-sales': 'institutional',
+  
   'distributor-master': 'distributor',
   'primary-orders': 'primary_order',
   'territories': 'territory',

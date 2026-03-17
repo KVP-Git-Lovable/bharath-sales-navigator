@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, 
   Building2, 
-  Briefcase, 
+  Briefcase,
   Truck,
   ArrowRight,
   CheckCircle,
@@ -41,20 +41,6 @@ const solutions = [
     link: "/solutions/distributor-portal"
   },
   {
-    icon: Briefcase,
-    title: "Institutional Sales CRM",
-    description: "Full-featured CRM for B2B and institutional sales with leads, opportunities, quotes, and account management.",
-    features: [
-      "Lead & opportunity pipeline",
-      "Quote generation & tracking",
-      "Account & contact management",
-      "Collections & invoice management"
-    ],
-    color: "from-violet-500 to-purple-600",
-    cta: "Explore Institutional CRM",
-    link: "/solutions/institutional-sales"
-  },
-  {
     icon: Truck,
     title: "Van Sales",
     description: "Mobile sales and delivery management for direct store delivery and route sales operations.",
@@ -86,7 +72,7 @@ export const SolutionsSection = () => {
           </h2>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
             With our success-based pricing, everyone in your organization gets access to all solutions — 
-            Field Sales, Distributor Portal, and Institutional CRM. <strong>No per-user fees, no limits.</strong>
+            Field Sales, Distributor Portal, and Van Sales. <strong>No per-user fees, no limits.</strong>
           </p>
         </div>
 

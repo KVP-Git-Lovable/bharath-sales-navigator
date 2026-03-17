@@ -78,8 +78,6 @@ export const HeroSection = () => {
           <span className="text-white/50"> • </span>
           <span className="font-semibold text-white">Distributor Management</span>
           <span className="text-white/50"> • </span>
-          <span className="font-semibold text-white">Institutional Sales</span>
-          <span className="text-white/50"> • </span>
           <span className="font-semibold text-white">Van Sales</span>
           <span className="text-white/70"> — all powered by AI that </span>
           <span className="italic text-white/90">guides</span>

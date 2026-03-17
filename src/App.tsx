@@ -31,7 +31,7 @@ import FeatureListPage from "./pages/website/FeatureListPage";
 import TechnologyPage from "./pages/website/TechnologyPage";
 import FieldSalesSolution from "./pages/website/solutions/FieldSalesSolution";
 import DistributorPortalSolution from "./pages/website/solutions/DistributorPortalSolution";
-import InstitutionalSalesSolution from "./pages/website/solutions/InstitutionalSalesSolution";
+
 import VanSalesSolution from "./pages/website/solutions/VanSalesSolution";
 import { ProfessionalServicesSolution } from "./pages/website/solutions/ProfessionalServicesSolution";
 import ROICalculator from "./pages/website/ROICalculator";
@@ -180,28 +180,8 @@ import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
 import PackingListDetailPage from "./pages/PackingListDetail";
 
-// Institutional Sales pages
-import InstitutionalSalesDashboard from "./pages/institutional/InstitutionalSalesDashboard";
-import LeadManagement from "./pages/institutional/LeadManagement";
-import AccountManagement from "./pages/institutional/AccountManagement";
-import AccountDetail from "./pages/institutional/AccountDetail";
-import ContactManagement from "./pages/institutional/ContactManagement";
-import ContactDetail from "./pages/institutional/ContactDetail";
-import OpportunityManagement from "./pages/institutional/OpportunityManagement";
-import OpportunityDetail from "./pages/institutional/OpportunityDetail";
-import QuoteManagement from "./pages/institutional/QuoteManagement";
-import QuoteDetail from "./pages/institutional/QuoteDetail";
-import InstitutionalProducts from "./pages/institutional/InstitutionalProducts";
-import OrderCommitments from "./pages/institutional/OrderCommitments";
-import InstitutionalInvoices from "./pages/institutional/InstitutionalInvoices";
 // ARCHIVED: Projects module hidden
 // import ProjectsPage from "./pages/pm/ProjectsPage";
-// import ProjectDetailPage from "./pages/pm/ProjectDetailPage";
-// import ResourceDetailPage from "./pages/pm/ResourceDetailPage";
-// import TemplatesPage from "./pages/pm/TemplatesPage";
-// import TemplateBuilderPage from "./pages/pm/TemplateBuilderPage";
-import PriceBooks from "./pages/institutional/PriceBooks";
-import Collections from "./pages/institutional/Collections";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -348,7 +328,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/technology" element={<TechnologyPage />} />
         <Route path="/solutions/field-sales" element={<FieldSalesSolution />} />
         <Route path="/solutions/distributor-portal" element={<DistributorPortalSolution />} />
-        <Route path="/solutions/institutional-sales" element={<InstitutionalSalesSolution />} />
+        
         <Route path="/solutions/van-sales" element={<VanSalesSolution />} />
         <Route path="/solutions/professional-services" element={<ProfessionalServicesSolution />} />
         <Route path="/pricing" element={<PricingPage />} />
@@ -507,22 +487,6 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/packing-list/:id" element={<ProtectedRoute><PackingListDetailPage /></ProtectedRoute>} />
         <Route path="/delivery-run" element={<ProtectedRoute><DeliveryRun /></ProtectedRoute>} />
 
-        {/* Institutional Sales Routes */}
-        <Route path="/institutional-sales" element={<ProtectedRoute><InstitutionalSalesDashboard /></ProtectedRoute>} />
-        <Route path="/institutional-sales/leads" element={<ProtectedRoute><LeadManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/accounts" element={<ProtectedRoute><AccountManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
-        <Route path="/institutional-sales/contacts" element={<ProtectedRoute><ContactManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/contacts/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
-        <Route path="/institutional-sales/opportunities" element={<ProtectedRoute><OpportunityManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/opportunities/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
-        <Route path="/institutional-sales/quotes" element={<ProtectedRoute><QuoteManagement /></ProtectedRoute>} />
-        <Route path="/institutional-sales/quotes/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
-        <Route path="/institutional-sales/products" element={<ProtectedRoute><InstitutionalProducts /></ProtectedRoute>} />
-        <Route path="/institutional-sales/order-commitments" element={<ProtectedRoute><OrderCommitments /></ProtectedRoute>} />
-        <Route path="/institutional-sales/invoices" element={<ProtectedRoute><InstitutionalInvoices /></ProtectedRoute>} />
-        <Route path="/institutional-sales/price-books" element={<ProtectedRoute><PriceBooks /></ProtectedRoute>} />
-        <Route path="/institutional-sales/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
 
         {/* ARCHIVED: Projects module hidden
         <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />

@@ -54,7 +54,7 @@ const MODULE_GROUPS: Record<string, { label: string; categories: string[] }> = {
   employee: { label: 'Employee Data', categories: ['Employee'] },
   jointSales: { label: 'Joint Sales', categories: ['Joint Sales'] },
   distributor: { label: 'Distributor', categories: ['Distributor'] },
-  institutional: { label: 'Institutional', categories: ['Institutional'] },
+  
   ai: { label: 'AI & Insights', categories: ['AI'] },
   other: { label: 'Other', categories: ['Other', 'Security'] },
 };
