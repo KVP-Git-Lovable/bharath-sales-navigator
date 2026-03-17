@@ -433,6 +433,12 @@ export function StepAssignManagers({
                   </div>
                 )}
               </div>
+              )}
+              {mgr.targetStrategy === 'no_target' && (
+                <div className="pl-[52px]">
+                  <Badge variant="outline" className="text-xs text-muted-foreground">No Target — excluded from allocation</Badge>
+                </div>
+              )}
             </div>
           );
         })}

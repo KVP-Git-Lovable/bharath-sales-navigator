@@ -648,6 +648,7 @@ export function AllocationTable({
         personal_quantity_target: alloc.personalQuantityTarget || 0,
         personal_revenue_target: alloc.personalRevenueTarget || 0,
         personal_visits_target: alloc.personalVisitsTarget || 0,
+        has_no_target: alloc.targetStrategy === 'no_target',
       }));
 
       const { error } = await supabase
