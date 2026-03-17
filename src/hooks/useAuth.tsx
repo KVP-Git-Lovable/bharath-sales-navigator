@@ -200,50 +200,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Only synchronous state updates here
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
+        devLog('Auth state change:', event);
         
-        // Cache auth state for offline use with integrity
-        if (session?.user) {
-          setCachedUser(session.user);
-          localStorage.setItem('cached_user_id', session.user.id);
-        } else {
+        // Only clear auth on explicit sign out — never on token refresh failures
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
+          setUserProfile(null);
+          setSecurityProfileName(null);
           clearCachedAuth();
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+          return;
         }
         
-        // Defer Supabase calls with setTimeout
-        if (session?.user) {
+        // For all other events, update state normally
+        setSession(session);
+        const currentUser = session?.user ?? null;
+        
+        if (currentUser) {
+          setUser(currentUser);
+          setCachedUser(currentUser);
+          localStorage.setItem('cached_user_id', currentUser.id);
+          
+          // Defer Supabase calls with setTimeout
           setTimeout(async () => {
             try {
-              const role = await fetchUserRole(session.user.id);
+              const role = await fetchUserRole(currentUser.id);
               setUserRole(role);
               if (role) localStorage.setItem('cached_role', role);
               
-              const profile = await fetchUserProfile(session.user.id);
+              const profile = await fetchUserProfile(currentUser.id);
               setUserProfile(profile);
               if (profile) localStorage.setItem('cached_profile', JSON.stringify(profile));
               
-              const secProfile = await fetchSecurityProfileName(session.user.id);
+              const secProfile = await fetchSecurityProfileName(currentUser.id);
               setSecurityProfileName(secProfile);
               if (secProfile) localStorage.setItem('cached_security_profile', secProfile);
             } catch (err) {
               devError('Error loading user data in auth change:', err);
-              // Set basic profile from user metadata as fallback
               const basicProfile: UserProfile = {
-                id: session.user.id,
-                username: session.user.email?.split('@')[0] || 'User',
-                full_name: session.user.user_metadata?.full_name || 'Unknown User'
+                id: currentUser.id,
+                username: currentUser.email?.split('@')[0] || 'User',
+                full_name: currentUser.user_metadata?.full_name || 'Unknown User'
               };
               setUserProfile(basicProfile);
               localStorage.setItem('cached_profile', JSON.stringify(basicProfile));
             }
           }, 0);
+        } else if (!navigator.onLine) {
+          // Offline and no session — preserve cached state, don't log out
+          devLog('No session but offline — preserving cached auth state');
         } else {
-          setUserRole(null);
-          setUserProfile(null);
-          setSecurityProfileName(null);
+          // Online but no user and not SIGNED_OUT — could be token refresh issue
+          // Preserve cached state to prevent unexpected logouts
+          devLog('No session user but not explicit sign-out — preserving cached state');
         }
         
         clearTimeout(loadingTimeout);
