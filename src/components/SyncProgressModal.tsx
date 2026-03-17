@@ -215,7 +215,7 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
     try {
       const queue = await offlineStorage.getSyncQueue();
       for (const item of queue) {
-        if (item.syncState === 'FAILED_SYNC' || (item.retryCount || 0) >= MAX_AUTO_RETRIES) {
+        if (item.syncState === 'RETRYING' || (item.retryCount || 0) >= SLOW_RETRY_THRESHOLD) {
           await offlineStorage.save(STORES.SYNC_QUEUE, {
             ...item,
             retryCount: 0,
