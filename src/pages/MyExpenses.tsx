@@ -48,18 +48,26 @@ const MyExpenses = () => {
             </div>
           </div>
 
-          {/* Manager tabs or direct content */}
-          {isManager ? (
+          {/* Show tabs if manager OR has petty cash, otherwise direct content */}
+          {(isManager || hasPettyCash) ? (
             <Tabs defaultValue="my" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-9">
+              <TabsList className={`grid w-full h-9`} style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
                 <TabsTrigger value="my" className="text-xs gap-1.5">
                   <UserIcon className="h-3.5 w-3.5" />
                   My Expenses
                 </TabsTrigger>
-                <TabsTrigger value="team" className="text-xs gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  Team Summary
-                </TabsTrigger>
+                {isManager && (
+                  <TabsTrigger value="team" className="text-xs gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Team Summary
+                  </TabsTrigger>
+                )}
+                {hasPettyCash && (
+                  <TabsTrigger value="petty-cash" className="text-xs gap-1.5">
+                    <Wallet className="h-3.5 w-3.5" />
+                    Petty Cash
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="my" className="space-y-4 mt-3">
@@ -72,9 +80,17 @@ const MyExpenses = () => {
                 />
               </TabsContent>
 
-              <TabsContent value="team" className="mt-3">
-                <TeamExpenseSummary yearMonth={yearMonth} />
-              </TabsContent>
+              {isManager && (
+                <TabsContent value="team" className="mt-3">
+                  <TeamExpenseSummary yearMonth={yearMonth} />
+                </TabsContent>
+              )}
+
+              {hasPettyCash && fund && (
+                <TabsContent value="petty-cash" className="mt-3">
+                  <PettyCashTab fund={fund} limits={limits} />
+                </TabsContent>
+              )}
             </Tabs>
           ) : (
             <div className="space-y-4">
