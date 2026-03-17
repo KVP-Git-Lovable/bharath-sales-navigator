@@ -313,6 +313,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }).catch((error) => {
       devError('Error getting session:', error);
+      // On network failure, fall back to cached auth state
+      const cachedUser = localStorage.getItem('cached_user');
+      if (cachedUser) {
+        try {
+          const parsed = JSON.parse(cachedUser);
+          setUser(parsed);
+          setUserRole(localStorage.getItem('cached_role') as 'admin' | 'user' | null);
+          const cachedProfile = localStorage.getItem('cached_profile');
+          setUserProfile(cachedProfile ? JSON.parse(cachedProfile) : null);
+          setSecurityProfileName(localStorage.getItem('cached_security_profile') || null);
+          devLog('Session fetch failed — restored from cached auth state');
+        } catch (parseErr) {
+          devError('Error parsing cached auth on fallback:', parseErr);
+        }
+      }
       clearTimeout(loadingTimeout);
       setLoading(false);
     });
