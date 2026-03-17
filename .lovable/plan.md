@@ -1,52 +1,87 @@
 
 
-## Analysis: Invoice Duplication & Order Sync + Duplicate Detection Fix
+## Improve Sync Speed — Reduce Round-Trips and Enable Parallel Processing
 
-### Current State — Invoice Numbers
+### Current Bottlenecks
 
-**No duplicate invoice issue exists currently.** Here's why:
+After reviewing `useOfflineSync.ts` and `syncErrorClassifier.ts`, here are the speed issues:
 
-1. **Invoice numbers are generated server-side only** — the `set_order_invoice_number` trigger calls `generate_invoice_number()` which uses a PostgreSQL sequence (`invoice_number_seq`). Each insert gets a unique sequential number (e.g., `INV2026-001`, `INV2026-002`).
+**1. Sequential processing (biggest bottleneck)**
+Orders sync one-at-a-time in a `for` loop (line 137). If you have 5 orders, each taking 3-4 network round-trips, that's 15-20 sequential requests on slow networks.
 
-2. **Offline orders never set `invoice_number`** — `offlineOrderUtils.ts` and `Cart.tsx` don't include `invoice_number` in the order data. The field is `NULL` when inserted, and the trigger fills it automatically.
+**2. Too many round-trips per order (4-6 requests per CREATE_ORDER)**
+Each order sync does:
+- Check if order exists by ID → 1 request
+- Insert order → 1 request
+- Check if items exist → 1 request
+- Insert items → 1 request
+- Verification query (line 164) → 1 request
+- State update to SYNCING (line 155) → 1 write
 
-3. **There IS a unique constraint** on `invoice_number` (`orders_invoice_number_unique`), but since the sequence guarantees uniqueness, this won't cause conflicts.
+That's 5-6 operations per order. On a 500ms latency network, that's 2.5-3 seconds minimum per order.
 
-4. **The `23505` duplicate key handling in sync** (line 456-478 of `useOfflineSync.ts`) correctly treats duplicate key errors as "already synced" and continues to ensure items exist. So even if a race condition somehow occurs, the order won't be lost.
+**3. Aggressive backoff on first failure**
+Base delay is 2 seconds doubling each retry. After just 3 failures: 2s → 4s → 8s → 16s. On flaky networks, items quickly reach 30+ second backoff.
 
-**Previous issue (now fixed)**: If someone manually set `invoice_number` on the offline order or two orders arrived at the exact same moment, the unique constraint could reject the second. The current code already handles this gracefully (line 456-478).
+**4. Redundant sync queue state writes**
+Writing `syncState: 'SYNCING'` to IndexedDB before each item (line 155) adds latency with no user-visible benefit.
 
-### Your Scenario: Same Retailer, Same Product, 500g × 2 Instead of 1kg
+### Proposed Fixes
 
-**This is already fixed.** Looking at the current code in `useVisitsDataOptimized.ts` lines 1366-1388:
+**File: `src/hooks/useOfflineSync.ts`**
 
+**Fix 1: Batch parallel sync (up to 3 concurrent items)**
+Replace the sequential `for` loop with a controlled parallel executor. Process up to 3 sync items concurrently using `Promise.allSettled` in batches:
 ```typescript
-// FIX #2: Deduplicate by ID or idempotency_key only (NOT retailer+amount)
-const existingById = prev.find(o => o.id === orderToProcess.id);
-const existingByKey = orderToProcess.idempotency_key 
-  ? prev.find(o => o.idempotency_key === orderToProcess.idempotency_key)
-  : null;
+const BATCH_SIZE = 3;
+for (let i = 0; i < syncQueue.length; i += BATCH_SIZE) {
+  const batch = syncQueue.slice(i, i + BATCH_SIZE);
+  const results = await Promise.allSettled(
+    batch.map(item => processAndHandleItem(item))
+  );
+  // Handle results...
+}
+```
+This cuts total sync time by ~3x on slow networks.
+
+**Fix 2: Combine order insert + items into single RPC call**
+Create a Supabase database function `sync_order_with_items` that does the upsert of order + items in one transaction. This reduces 4-5 round-trips to 1:
+```sql
+CREATE OR REPLACE FUNCTION sync_order_with_items(
+  p_order jsonb, p_items jsonb
+) RETURNS jsonb AS $$ ... $$
 ```
 
-Each order gets a unique UUID from `crypto.randomUUID()` in `offlineOrderUtils.ts` line 30. Two orders for the same retailer with the same product/quantity will have **different IDs** and **different idempotency_keys**, so they'll both be kept.
+**Fix 3: Remove redundant verification query**
+The verification query at line 164 adds an extra round-trip after every successful order insert. Since we already get the inserted row back from `.select().single()`, this is unnecessary. Remove it.
 
-The old retailer+amount matching that was blocking this has already been removed in the previous fix.
+**Fix 4: Skip sync queue state write for SYNCING**
+Remove the `offlineStorage.save(STORES.SYNC_QUEUE, { ...item, syncState: 'SYNCING' })` at line 155. It adds a write operation before every sync attempt with no meaningful UX benefit.
 
-### What Still Needs Verification
+**Fix 5: Reduce initial backoff for first retry**
+Change base delay from 2000ms to 1000ms for the first 3 retries to be more aggressive on flaky networks:
+```typescript
+export function getBackoffDelay(retryCount: number): number {
+  const baseDelay = retryCount <= 3 ? 1000 : 2000;
+  const maxDelay = 1800000;
+  ...
+}
+```
 
-There's one remaining edge case in `ordersForDate.ts` that could still merge/deduplicate orders incorrectly. Let me check:
+**File: `src/lib/syncErrorClassifier.ts`**
+- Update `getBackoffDelay` with shorter initial delays.
 
-The `ordersForDate.ts` utility deduplicates by `id` and `idempotency_key` only (lines 82-88) — this is correct and won't block same-retailer orders.
+**New migration: `sync_order_with_items` RPC function**
+- Single DB function that handles order upsert + items insert in one call.
 
-### Summary: No Code Changes Needed
+### Impact
+- **3x faster** for multiple queued items (parallel batching)
+- **4-5x fewer round-trips** per order (single RPC vs 5 queries)
+- **Faster recovery** on flaky networks (reduced initial backoff)
+- No changes to sync architecture, retry logic, or queue lifecycle
 
-Both issues are already resolved:
-1. **Invoice duplication** — not possible because invoice numbers are generated by DB sequence, never set client-side
-2. **Same retailer duplicate blocking** — already fixed; deduplication uses only `id` and `idempotency_key`
-3. **Sync rejection** — the `23505` handler treats duplicates as success and ensures items still get inserted
-
-No implementation changes are required. The system correctly handles:
-- Two 500g orders for the same retailer → different UUIDs → both sync independently
-- Each gets a unique invoice number from the DB trigger
-- Both appear in the UI immediately via local-first events
+### Files Changed
+- `src/hooks/useOfflineSync.ts` — parallel batching, remove verification query, remove SYNCING state write
+- `src/lib/syncErrorClassifier.ts` — reduce initial backoff
+- New migration — `sync_order_with_items` database function
 
