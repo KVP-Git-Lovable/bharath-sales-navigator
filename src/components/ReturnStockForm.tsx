@@ -587,8 +587,9 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                     type="number"
                     placeholder="0"
                     value={returnQuantity || ''}
-                    onChange={(e) => setReturnQuantity(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setReturnQuantity(parseFloat(e.target.value) || 0)}
                     min="0"
+                    step="0.01"
                     className="h-8 mt-1"
                   />
                 </div>
