@@ -3,12 +3,13 @@ import { Layout } from '@/components/Layout';
 import { ModuleHelpButton } from '@/components/help/ModuleHelpButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Users, User as UserIcon, CalendarDays, CalendarRange, X } from 'lucide-react';
+import { Users, User as UserIcon, CalendarDays, CalendarRange, X, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import { useMonthlyExpenseSummary } from '@/hooks/useMonthlyExpenseSummary';
+import { usePettyCashFund } from '@/hooks/usePettyCashFund';
 import MonthNavigator from '@/components/expenses/MonthNavigator';
 import ExpenseSummaryCards from '@/components/expenses/ExpenseSummaryCards';
 import WeeklyBreakdown from '@/components/expenses/WeeklyBreakdown';
@@ -16,6 +17,7 @@ import DailyBreakdown from '@/components/expenses/DailyBreakdown';
 import TeamExpenseSummary from '@/components/expenses/TeamExpenseSummary';
 import AdditionalExpenses from '@/components/AdditionalExpenses';
 import BeatAllowanceManagement from '@/components/BeatAllowanceManagement';
+import PettyCashTab from '@/components/expenses/PettyCashTab';
 
 type BreakdownView = 'weekly' | 'daily';
 
@@ -27,8 +29,12 @@ const MyExpenses = () => {
   const [breakdownView, setBreakdownView] = useState<BreakdownView>('weekly');
   const [isAdditionalOpen, setIsAdditionalOpen] = useState(false);
 
+  const { fund, limits, hasPettyCash } = usePettyCashFund();
+
   const yearMonth = format(selectedMonth, 'yyyy-MM');
   const { data: summary, isLoading } = useMonthlyExpenseSummary(user?.id, yearMonth);
+
+  const tabCount = (isManager ? 2 : 1) + (hasPettyCash ? 1 : 0);
 
   return (
     <Layout>
@@ -42,18 +48,26 @@ const MyExpenses = () => {
             </div>
           </div>
 
-          {/* Manager tabs or direct content */}
-          {isManager ? (
+          {/* Show tabs if manager OR has petty cash, otherwise direct content */}
+          {(isManager || hasPettyCash) ? (
             <Tabs defaultValue="my" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-9">
+              <TabsList className={`grid w-full h-9`} style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
                 <TabsTrigger value="my" className="text-xs gap-1.5">
                   <UserIcon className="h-3.5 w-3.5" />
                   My Expenses
                 </TabsTrigger>
-                <TabsTrigger value="team" className="text-xs gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  Team Summary
-                </TabsTrigger>
+                {isManager && (
+                  <TabsTrigger value="team" className="text-xs gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Team Summary
+                  </TabsTrigger>
+                )}
+                {hasPettyCash && (
+                  <TabsTrigger value="petty-cash" className="text-xs gap-1.5">
+                    <Wallet className="h-3.5 w-3.5" />
+                    Petty Cash
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="my" className="space-y-4 mt-3">
@@ -66,9 +80,17 @@ const MyExpenses = () => {
                 />
               </TabsContent>
 
-              <TabsContent value="team" className="mt-3">
-                <TeamExpenseSummary yearMonth={yearMonth} />
-              </TabsContent>
+              {isManager && (
+                <TabsContent value="team" className="mt-3">
+                  <TeamExpenseSummary yearMonth={yearMonth} />
+                </TabsContent>
+              )}
+
+              {hasPettyCash && fund && (
+                <TabsContent value="petty-cash" className="mt-3">
+                  <PettyCashTab fund={fund} limits={limits} />
+                </TabsContent>
+              )}
             </Tabs>
           ) : (
             <div className="space-y-4">
