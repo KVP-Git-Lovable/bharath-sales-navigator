@@ -88,6 +88,7 @@ export function StepPreview({ roots, quantityUnit, enabledMetrics, allocations, 
     const personalVis = alloc?.personalVisitsTarget ?? node.personalVisitsTarget ?? 0;
     const strategy = alloc?.targetStrategy ?? node.targetStrategy;
     const isIndependent = strategy === 'independent';
+    const isNoTarget = strategy === 'no_target';
     const isEditing = editingUser === node.userId;
 
     // Compute child sum for managers (skip for independent — target is personal)
