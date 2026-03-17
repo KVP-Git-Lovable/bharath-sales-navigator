@@ -339,24 +339,6 @@ export const ReportSummaryDialog = ({
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">Summary</span>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handlePlaySummary}
-                  disabled={isProcessing}
-                >
-                  {isPlaying ? (
-                    <>
-                      <VolumeX className="h-4 w-4 mr-2" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Volume2 className="h-4 w-4 mr-2" />
-                      Play
-                    </>
-                  )}
-                </Button>
                 <Button variant="outline" size="sm" onClick={handleCopy}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy
