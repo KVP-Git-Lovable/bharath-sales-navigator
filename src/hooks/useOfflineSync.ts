@@ -209,13 +209,10 @@ export function useOfflineSync() {
             continue;
           }
           
-          // Determine new sync state
+          // All retryable errors stay in RETRYING state indefinitely
+          // Non-retryable errors (only CONFLICT, handled above) are removed
+          // Items with many retries just get longer backoff, never stop
           let syncState: string = 'RETRYING';
-          if (!retryable) {
-            syncState = 'FAILED_SYNC';
-          } else if (newRetryCount >= MAX_AUTO_RETRIES) {
-            syncState = 'FAILED_SYNC';
-          }
           
           const updatedItem = {
             ...item,

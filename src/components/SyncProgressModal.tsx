@@ -165,18 +165,23 @@ const SyncItemDetails = ({ item }: { item: SyncItem }) => {
 };
 
 const SyncStateIcon = ({ item }: { item: SyncItem }) => {
+  const isSlowRetry = (item.retryCount || 0) >= SLOW_RETRY_THRESHOLD;
   switch (item.syncState) {
-    case 'FAILED_SYNC': return <XCircle className="h-4 w-4 text-destructive" />;
-    case 'RETRYING': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+    case 'RETRYING': return isSlowRetry
+      ? <AlertTriangle className="h-4 w-4 text-orange-500" />
+      : <RefreshCw className="h-4 w-4 text-orange-500" />;
     case 'SYNCING': return <RefreshCw className="h-4 w-4 text-primary animate-spin" />;
     default: return <Clock className="h-4 w-4 text-muted-foreground" />;
   }
 };
 
 const SyncStateBadge = ({ item }: { item: SyncItem }) => {
+  const retryCount = item.retryCount || 0;
+  const isSlowRetry = retryCount >= SLOW_RETRY_THRESHOLD;
   switch (item.syncState) {
-    case 'FAILED_SYNC': return <Badge variant="destructive" className="text-[10px] px-1.5">Failed</Badge>;
-    case 'RETRYING': return <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">Retry {item.retryCount}/{MAX_AUTO_RETRIES}</Badge>;
+    case 'RETRYING': return isSlowRetry
+      ? <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">Retrying (slow)</Badge>
+      : <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">Retry #{retryCount}</Badge>;
     case 'SYNCING': return <Badge className="bg-blue-100 text-blue-700 text-[10px] px-1.5">Syncing</Badge>;
     default: return <Badge variant="secondary" className="text-[10px] px-1.5">Queued</Badge>;
   }
