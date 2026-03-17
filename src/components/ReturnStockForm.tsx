@@ -64,8 +64,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingCN, setGeneratingCN] = useState(false);
-  const [selectedVan, setSelectedVan] = useState<string>('');
-  const [vans, setVans] = useState<any[]>([]);
   
   // Form state for adding new return
   const [selectedProduct, setSelectedProduct] = useState<string>('');
@@ -74,25 +72,9 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
 
   useEffect(() => {
-    loadVans();
     loadProducts();
   }, []);
 
-  const loadVans = async () => {
-    const { data, error } = await supabase
-      .from('vans')
-      .select('id, registration_number, make_model')
-      .eq('is_active', true);
-    
-    if (error) {
-      console.error('Error loading vans:', error);
-    } else {
-      setVans(data || []);
-      if (data && data.length > 0) {
-        setSelectedVan(data[0].id);
-      }
-    }
-  };
 
   const loadProducts = async () => {
     setLoading(true);
@@ -189,11 +171,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   };
 
   const handleSaveReturns = async () => {
-    if (!selectedVan) {
-      toast.error('Please select a van');
-      return;
-    }
-
     if (returnItems.length === 0) {
       toast.error('No items added for return');
       return;
@@ -213,7 +190,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       const { data: returnGRN, error: grnError } = await supabase
         .from('van_return_grn')
         .insert({
-          van_id: selectedVan,
           user_id: user.id,
           retailer_id: retailerId,
           visit_id: validVisitId,
@@ -241,115 +217,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
 
       if (itemsError) throw itemsError;
 
-      // Update van_live_inventory for each returned item
-      for (const item of returnItems) {
-        // Build query
-        let query = supabase
-          .from('van_live_inventory')
-          .select('*')
-          .eq('van_id', selectedVan)
-          .eq('product_id', item.productId)
-          .eq('date', dateStr);
-
-        // Add variant condition - check for valid non-empty variantId
-        const hasValidVariant = item.variantId && item.variantId.trim() !== '';
-        if (hasValidVariant) {
-          query = query.eq('variant_id', item.variantId);
-        } else {
-          query = query.is('variant_id', null);
-        }
-
-        const { data: inventoryData, error: inventoryError } = await query.maybeSingle();
-
-        if (inventoryError) {
-          console.error('Error fetching inventory:', inventoryError);
-          continue;
-        }
-
-        if (inventoryData) {
-          // Update existing inventory
-          const newReturnedQty = inventoryData.returned_quantity + item.returnQuantity;
-          const newCurrentStock = inventoryData.morning_stock - inventoryData.sold_quantity + newReturnedQty;
-
-          const { error: updateError } = await supabase
-            .from('van_live_inventory')
-            .update({
-              returned_quantity: newReturnedQty,
-              current_stock: newCurrentStock,
-              last_updated_at: new Date().toISOString()
-            })
-            .eq('id', inventoryData.id);
-
-          if (updateError) {
-            console.error('Error updating inventory:', updateError);
-          }
-        } else {
-          // Create new inventory record with return
-          const { error: insertError } = await supabase
-            .from('van_live_inventory')
-            .insert({
-              van_id: selectedVan,
-              product_id: item.productId,
-              variant_id: hasValidVariant ? item.variantId : null,
-              date: dateStr,
-              morning_stock: 0,
-              sold_quantity: 0,
-              returned_quantity: item.returnQuantity,
-              current_stock: item.returnQuantity,
-              pending_quantity: 0
-            });
-
-          if (insertError) {
-            console.error('Error inserting inventory:', insertError);
-          }
-        }
-      }
-
-      // Update van_stock_items with returned_qty and recalculate left_qty
-      const { data: vanStockData } = await supabase
-        .from('van_stock')
-        .select('id')
-        .eq('van_id', selectedVan)
-        .eq('stock_date', dateStr)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (vanStockData) {
-        for (const item of returnItems) {
-          // Find matching van_stock_item
-          const { data: stockItem, error: stockItemError } = await supabase
-            .from('van_stock_items')
-            .select('*')
-            .eq('van_stock_id', vanStockData.id)
-            .eq('product_id', item.productId)
-            .maybeSingle();
-
-          if (stockItemError) {
-            console.error('Error fetching van_stock_item:', stockItemError);
-            continue;
-          }
-
-          if (stockItem) {
-            // Update returned_qty and recalculate left_qty
-            const newReturnedQty = (stockItem.returned_qty || 0) + item.returnQuantity;
-            const newLeftQty = stockItem.start_qty - stockItem.ordered_qty + newReturnedQty;
-
-            const { error: updateStockError } = await supabase
-              .from('van_stock_items')
-              .update({
-                returned_qty: newReturnedQty,
-                left_qty: newLeftQty
-              })
-              .eq('id', stockItem.id);
-
-            if (updateStockError) {
-              console.error('Error updating van_stock_item:', updateStockError);
-            }
-          }
-        }
-      }
-
-      toast.success(`Return GRN ${grnNumber} created successfully`);
       
       // Reset form
       setReturnItems([]);
@@ -367,10 +234,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   };
 
   const handleGenerateCreditNote = async () => {
-    if (!selectedVan) {
-      toast.error('Please select a van');
-      return;
-    }
     if (returnItems.length === 0) {
       toast.error('No items added for return');
       return;
@@ -513,7 +376,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       const { data: returnGRN, error: grnError } = await supabase
         .from('van_return_grn')
         .insert({
-          van_id: selectedVan,
           user_id: user.id,
           retailer_id: retailerId,
           visit_id: validVisitId,
@@ -628,24 +490,12 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
 
   return (
     <div className="space-y-4">
-      {/* Van Selection & Add Product Button */}
+      {/* Add Product Button */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-end gap-4">
             <div className="flex-1">
-              <Label>Select Van</Label>
-              <Select value={selectedVan} onValueChange={setSelectedVan}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a van" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vans.map(van => (
-                    <SelectItem key={van.id} value={van.id}>
-                      {van.registration_number} - {van.make_model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-sm font-medium text-muted-foreground">Return items for <span className="text-foreground font-semibold">{retailerName}</span></p>
             </div>
             <Button onClick={handleAddReturn} className="h-10">
               <Plus className="h-4 w-4 mr-2" />
