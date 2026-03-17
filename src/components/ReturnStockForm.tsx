@@ -163,6 +163,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     setSelectedProduct('');
     setReturnQuantity(0);
     setReturnReason('');
+    setSelectedUnit('');
     
     toast.success(`Added ${newItem.productName}${newItem.variantName ? ` - ${newItem.variantName}` : ''}`);
   };
