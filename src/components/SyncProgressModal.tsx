@@ -326,7 +326,7 @@ export const SyncProgressModal = ({ open, onOpenChange, onTriggerSync }: SyncPro
                   <Collapsible key={item.id} open={isExpanded} onOpenChange={() => toggleExpand(item.id)}>
                     <div
                       className={`rounded-lg border bg-card ${
-                        item.syncState === 'FAILED_SYNC' ? 'border-destructive/30 bg-destructive/5' : ''
+                        (item.retryCount || 0) >= SLOW_RETRY_THRESHOLD ? 'border-orange-300/30 bg-orange-50/5' : ''
                       }`}
                     >
                       <CollapsibleTrigger asChild>
