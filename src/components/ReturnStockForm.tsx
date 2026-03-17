@@ -248,30 +248,10 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         .eq('id', retailerId)
         .single();
 
-      const { data: pastOrders } = await supabase
-        .from('orders')
-        .select('id, invoice_number, order_items(product_id, variant_id)')
-        .eq('retailer_id', retailerId)
-        .not('invoice_number', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      const productInvoiceMap: Record<string, string> = {};
-      if (pastOrders) {
-        for (const order of pastOrders) {
-          const items = (order as any).order_items || [];
-          for (const oi of items) {
-            const key = oi.variant_id ? `${oi.product_id}_${oi.variant_id}` : oi.product_id;
-            if (!productInvoiceMap[key] && order.invoice_number) {
-              productInvoiceMap[key] = order.invoice_number;
-            }
-          }
-        }
-      }
-
+      // Use the invoice selections from step 2 instead of re-fetching
       const cnItems: CreditNoteItem[] = returnItems.map(item => {
         const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
-        const refInvoice = productInvoiceMap[key] || 'N/A';
+        const refInvoice = selectedInvoices[key] || 'N/A';
         const total = item.price * item.returnQuantity;
         const taxableAmount = total;
         const sgst = taxableAmount * 0.025;
