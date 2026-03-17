@@ -1110,11 +1110,34 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
 
       if (!mountedRef.current || lastDateRef.current !== date) return;
 
+      // FIX #1: Merge unsynced local orders with DB orders (local-first)
+      let mergedOrders = ordersData;
+      try {
+        const localOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+        const dbIds = new Set(ordersData.map((o: any) => o.id));
+        const dbIdemKeys = new Set(ordersData.filter((o: any) => o.idempotency_key).map((o: any) => o.idempotency_key));
+        const unsyncedLocal = localOrders.filter((o: any) => 
+          o.user_id === uid && 
+          o.order_date === date && 
+          o.status === 'confirmed' &&
+          !dbIds.has(o.id) &&
+          !(o.idempotency_key && dbIdemKeys.has(o.idempotency_key))
+        );
+        if (unsyncedLocal.length > 0) {
+          // Mark local orders with sync status
+          const localWithStatus = unsyncedLocal.map((o: any) => ({ ...o, _syncStatus: 'pending' }));
+          mergedOrders = [...ordersData.map((o: any) => ({ ...o, _syncStatus: 'synced' })), ...localWithStatus];
+          console.log(`[FullLoad] Merged ${unsyncedLocal.length} unsynced local orders with ${ordersData.length} DB orders`);
+        }
+      } catch (e) {
+        console.warn('[FullLoad] Error merging local orders:', e);
+      }
+
       // Set state
       setBeatPlans(beatPlansData);
       setVisits(visitsData);
       setRetailers(retailersData);
-      setOrders(ordersData);
+      setOrders(mergedOrders);
       setPointsData(pointsFetched);
 
       // Update cache with timestamp for staleness check
@@ -1122,7 +1145,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         beatPlans: beatPlansData,
         visits: visitsData,
         retailers: retailersData,
-        orders: ordersData,
+        orders: mergedOrders,
         points: { total: pointsFetched.total, byRetailer: Array.from(pointsFetched.byRetailer.entries()) },
         timestamp: Date.now()
       };
@@ -1143,8 +1166,8 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         beatPlans: beatPlansData,
         visits: visitsData,
         retailers: retailersData,
-        orders: ordersData,
-        progressStats: calculateStats(visitsData, ordersData, retailersData, date),
+        orders: mergedOrders,
+        progressStats: calculateStats(visitsData, mergedOrders, retailersData, date),
         currentBeatName: beatPlansData.map(p => p.beat_name).join(', '),
         pointsTotal: pointsFetched.total,
         pointsByRetailer: Array.from(pointsFetched.byRetailer.entries())
@@ -1340,35 +1363,28 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       
       if (orderToProcess && orderToProcess.total_amount > 0) {
         setOrders(prev => {
-          // Check for existing order by ID first
+          // FIX #2: Deduplicate by ID or idempotency_key only (NOT retailer+amount)
+          const orderWithStatus = { ...orderToProcess, _syncStatus: 'pending' };
+          
+          // Check for existing order by ID
           const existingById = prev.find(o => o.id === orderToProcess.id);
+          // Check by idempotency_key if available
+          const existingByKey = orderToProcess.idempotency_key 
+            ? prev.find(o => o.idempotency_key === orderToProcess.idempotency_key)
+            : null;
+          
           let updated;
           
           if (existingById) {
-            // Update existing order
-            updated = prev.map(o => o.id === orderToProcess.id ? orderToProcess : o);
+            updated = prev.map(o => o.id === orderToProcess.id ? orderWithStatus : o);
             console.log('[LocalEvent] Updated existing order by ID:', orderToProcess.id);
+          } else if (existingByKey) {
+            updated = prev.map(o => o.idempotency_key === orderToProcess.idempotency_key ? orderWithStatus : o);
+            console.log('[LocalEvent] Updated existing order by idempotency_key');
           } else {
-            // Check if there's already an order for this retailer today (avoid duplicates)
-            const existingRetailerOrder = prev.find(o => 
-              o.retailer_id === orderToProcess.retailer_id && 
-              o.order_date === currentDate &&
-              Math.abs(Number(o.total_amount) - Number(orderToProcess.total_amount)) < 0.01 // Same amount = likely duplicate
-            );
-            
-            if (existingRetailerOrder) {
-              // Update existing order value instead of adding duplicate
-              updated = prev.map(o => 
-                o.id === existingRetailerOrder.id 
-                  ? { ...o, total_amount: orderToProcess.total_amount, updated_at: new Date().toISOString() } 
-                  : o
-              );
-              console.log('[LocalEvent] Updated existing retailer order:', existingRetailerOrder.id);
-            } else {
-              // Add new order
-              updated = [...prev, orderToProcess];
-              console.log('[LocalEvent] Added new order:', orderToProcess.id);
-            }
+            // Add new order — allows multiple orders for the same retailer
+            updated = [...prev, orderWithStatus];
+            console.log('[LocalEvent] Added new order:', orderToProcess.id);
           }
           
           // Update cache using ref value
@@ -1516,14 +1532,31 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
           setBeatPlans(snapshot.beatPlans || []);
           setVisits(snapshot.visits || []);
           setRetailers(filteredRetailers);
-          setOrders(snapshot.orders || []);
           
-          // Update cache
+          // FIX #3: Merge snapshot orders with current local orders to preserve unsynced ones
+          setOrders(prev => {
+            const snapshotOrders = snapshot.orders || [];
+            const snapshotIds = new Set(snapshotOrders.map((o: any) => o.id));
+            const snapshotIdemKeys = new Set(snapshotOrders.filter((o: any) => o.idempotency_key).map((o: any) => o.idempotency_key));
+            // Preserve local orders not in snapshot (pending sync)
+            const preserveLocal = prev.filter((o: any) => 
+              o.order_date === currentDate &&
+              !snapshotIds.has(o.id) &&
+              !(o.idempotency_key && snapshotIdemKeys.has(o.idempotency_key))
+            );
+            if (preserveLocal.length > 0) {
+              console.log(`[LocalEvent] Preserved ${preserveLocal.length} local orders not in snapshot`);
+            }
+            return [...snapshotOrders, ...preserveLocal];
+          });
+          
+          // Update cache (include preserved local orders from current state)
+          const currentOrders = snapshot.orders || [];
           cacheRef.current.set(currentDate, {
             beatPlans: snapshot.beatPlans || [],
             visits: snapshot.visits || [],
             retailers: filteredRetailers,
-            orders: snapshot.orders || [],
+            orders: currentOrders,
             timestamp: Date.now()
           });
           
