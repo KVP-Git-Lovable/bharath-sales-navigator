@@ -176,6 +176,30 @@ export function TeamTargetDashboard({
   const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'in_progress' | 'almost_there' | 'good_to_go' | 'achieved'>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+
+  // No Target toggle mutation
+  const toggleNoTargetMutation = useMutation({
+    mutationFn: async ({ userId, hasNoTarget }: { userId: string; hasNoTarget: boolean }) => {
+      const currentFY = fyYear || (new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1);
+      const { error } = await supabase
+        .from('user_business_plans')
+        .update({
+          has_no_target: hasNoTarget,
+          target_strategy: hasNoTarget ? 'no_target' : 'roll_down',
+          quantity_target: hasNoTarget ? 0 : undefined,
+          revenue_target: hasNoTarget ? 0 : undefined,
+        } as any)
+        .eq('user_id', userId)
+        .eq('year', currentFY);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-target-progress'] });
+      toast.success('Target status updated');
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
 
   // Fetch FY config to get enabled parameters
   const { data: fyConfig } = useFYTargetConfig(fyYear || new Date().getFullYear());
