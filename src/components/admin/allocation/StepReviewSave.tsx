@@ -88,15 +88,18 @@ export function StepReviewSave({
     const strategy = alloc?.targetStrategy ?? 'roll_down';
     const isNoTarget = strategy === 'no_target';
 
-    // Compute child sum for distribution warning
+    // Compute child sum for distribution warning (skip no_target children)
     let childSum = 0;
-    if (hasChildren && enabledMetrics.quantity) {
+    if (hasChildren && enabledMetrics.quantity && !isNoTarget) {
       node.children.forEach(c => {
         const ca = allocations.get(c.userId);
-        childSum += ca?.quantityTarget ?? 0;
+        const childStrategy = ca?.targetStrategy ?? 'roll_down';
+        if (childStrategy !== 'no_target') {
+          childSum += ca?.quantityTarget ?? 0;
+        }
       });
     }
-    const overUnder = hasChildren ? qty - childSum : 0;
+    const overUnder = hasChildren && !isNoTarget ? qty - childSum : 0;
 
     return (
       <div key={node.userId} style={{ marginLeft: `${depth * 20}px` }}>
