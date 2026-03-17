@@ -79,18 +79,21 @@ const strategyIcons: Record<TargetStrategy, React.ElementType> = {
   roll_down: ArrowDownCircle,
   roll_up: ArrowUpCircle,
   independent: Minus,
+  no_target: Ban,
 };
 
 const strategyLabels: Record<TargetStrategy, string> = {
   roll_down: 'Roll Down',
   roll_up: 'Roll Up',
   independent: 'Independent',
+  no_target: 'No Target',
 };
 
 const strategyColors: Record<TargetStrategy, string> = {
   roll_down: 'text-blue-600 dark:text-blue-400',
   roll_up: 'text-emerald-600 dark:text-emerald-400',
   independent: 'text-amber-600 dark:text-amber-400',
+  no_target: 'text-muted-foreground',
 };
 
 // Full card-based selector for top-level usage
