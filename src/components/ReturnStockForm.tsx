@@ -620,11 +620,11 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         <Button 
           variant="outline" 
           className="flex-1"
-          disabled={returnItems.length === 0}
-          onClick={() => toast.info('Credit Note generation coming soon')}
+          disabled={returnItems.length === 0 || generatingCN}
+          onClick={handleGenerateCreditNote}
         >
-          <FileText className="h-4 w-4 mr-2" />
-          Generate Credits
+          {generatingCN ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+          {generatingCN ? 'Generating...' : 'Generate Credits'}
         </Button>
       </div>
       
