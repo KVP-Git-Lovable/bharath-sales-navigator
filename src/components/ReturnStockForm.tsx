@@ -659,8 +659,8 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       {step === 3 && (
         <Card>
           <CardContent className="p-6 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="h-8 w-8 text-primary" />
             </div>
             <div>
               <h3 className="text-lg font-bold">Credit Note Generated</h3>
