@@ -1,118 +1,113 @@
-# Scalable Target Management — Plan
 
-## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Plan: Petty Cash Module — End-to-End
 
-## What Was Done
+### Overview
+Add a complete Petty Cash management feature spanning admin configuration (Expense Master) to user-facing expense tracking. Only users who have been assigned a petty cash fund will see the "Petty Cash" tab in their Expenses page.
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+---
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+### Database Changes (3 new tables)
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+**1. `petty_cash_funds`** — Admin assigns petty cash to users
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id | uuid (ref profiles) | The assigned user |
+| allocated_amount | numeric | Total fund assigned |
+| balance | numeric | Remaining balance (decremented on spend) |
+| valid_from | date | Fund start date |
+| valid_to | date | Fund end date (nullable = ongoing) |
+| status | text | `active`, `frozen`, `closed` |
+| notes | text | Admin notes |
+| created_by | uuid | Admin who assigned |
+| created_at / updated_at | timestamptz | |
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+**2. `petty_cash_transactions`** — Each spend against the fund
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| fund_id | uuid (ref petty_cash_funds) | |
+| user_id | uuid | |
+| amount | numeric | Spent amount |
+| category | text | e.g. stationery, transport, misc |
+| description | text | |
+| bill_url | text | Proof/receipt upload (storage) |
+| transaction_date | date | |
+| status | text | `draft`, `submitted`, `approved`, `rejected` |
+| created_at | timestamptz | |
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+**3. `petty_cash_limits`** — Optional per-transaction or daily limits
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| fund_id | uuid (ref petty_cash_funds) | |
+| max_per_transaction | numeric | Max single spend |
+| max_per_day | numeric | Max daily total |
+| require_bill_above | numeric | Bill required above this amount |
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+RLS: Standard authenticated policies scoped by `user_id` for transactions, admin-only for funds/limits.
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+---
 
-## Phase: Target Split, Dual Visibility & Manager Self-Service
+### Admin Side — Expense Master (new "Petty Cash" tab)
 
-### Phase 1: Fix Equal Split ✅
-- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
-- Each manager handles their own team's internal distribution via their strategy
+**File: `src/pages/AdminExpenseManagement.tsx`**
+- Add a 3rd tab: Overview | Configuration | **Petty Cash**
+- The Petty Cash tab renders a new `PettyCashAdmin` component
 
-### Phase 2: Dual Target for Independent Strategy ✅
-- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
-- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
-- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
-- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
-- Save mutation includes personal target fields
+**New file: `src/components/expenses/PettyCashAdmin.tsx`**
+- **Fund Assignment Table**: List all petty cash funds with user name, allocated amount, balance, status, valid dates
+- **Assign Fund button**: Dialog to select user(s) via MultiProfileSelector, set allocated amount, validity period, optional limits (max per transaction, max per day, require bill above amount)
+- **Edit/Freeze/Close actions** per fund row
+- **Transaction Log**: Expandable section per fund showing all transactions with proof thumbnails, approval status
+- **Approve/Reject** transaction actions for admin
 
-### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
-- New `ManagerTargets.tsx` page for managers to edit subordinate targets
-- View own target vs actual achievement
-- Reuse `useTeamTargetProgress` hook for analytics
+---
 
-## Phase: Feedback Configuration & Policy Engine ✅
+### User Side — Expenses Page (conditional "Petty Cash" tab)
 
-### Database Schema ✅
-- Created `feedback_questions` table (per-module/customer configurable questions)
-- Created `feedback_policies` table (named policies with module, priority)
-- Created `feedback_policy_rules` table (condition+action pairs per policy)
-- RLS enabled on all 3 tables with authenticated access
+**File: `src/pages/MyExpenses.tsx`**
+- Add a hook `usePettyCashFund` that checks if current user has an active fund in `petty_cash_funds`
+- If fund exists → show a **3rd tab "Petty Cash"** alongside My Expenses / Team Summary (for managers, becomes 3 tabs; for non-managers, show as tabs instead of direct content)
+- If no fund → tab is hidden entirely
 
-### Frontend Components ✅
-- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
-- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
-- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
+**New file: `src/components/expenses/PettyCashTab.tsx`**
+- **Balance Card**: Shows allocated amount, spent, remaining balance, validity period
+- **Spend Form**: Category dropdown, amount, description, bill upload (camera/file), date — validates against limits (max per transaction, daily cap, remaining balance)
+- **Transaction History**: List of past petty cash spends with status badges, bill preview (eye icon for signed URL)
+- **Submission**: Draft → Submit flow similar to Additional Expenses
 
-### Policy Engine ✅
-- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
-- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
-- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
+**New hook: `src/hooks/usePettyCashFund.ts`**
+- Queries `petty_cash_funds` for current user where status = `active`
+- Returns `{ fund, hasPettyCash, isLoading }`
+- Also fetches associated limits from `petty_cash_limits`
 
-### Workflow Enforcement ✅
-- `VisitCard.tsx`: Integrated policy check hook
-- "Feedback Required" badge shown when policy triggers
-- Order button intercepted when block_order/mandatory_feedback action triggered
-- Opens feedback modal automatically when blocked
+---
 
-## Phase: No Target Strategy & Mid-Year Flexibility ✅
+### Spending Limits Enforcement
+- **Client-side validation**: Before saving a transaction, check:
+  - `amount <= fund.balance` (can't exceed remaining)
+  - `amount <= limits.max_per_transaction` (if set)
+  - `today's total + amount <= limits.max_per_day` (if set)
+  - If `amount > limits.require_bill_above` → bill upload is mandatory
+- **Balance update**: On transaction insert/approval, decrement `petty_cash_funds.balance` via a DB trigger or in the mutation
 
-### Strategy Explanation Panel ✅
-- Panel now open by default (`useState(true)`)
-- Added 4th "No Target" card with explanation
+---
 
-### No Target Strategy ✅
-- Added `'no_target'` to `TargetStrategy` type union
-- Added Ban icon, gray color scheme, labels across all strategy components
-- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
+### Bill/Proof Upload
+- Reuse existing `additional-expenses` storage bucket or create `petty-cash-bills` bucket
+- Same pattern as AdditionalExpenses: compress image → upload → store URL in `bill_url`
 
-### Allocation Logic ✅
-- `getContributorCountForNode` returns 0 for `no_target` users
-- `autoDistributeTargets` skips `no_target` children, zeros their targets
-- `splitByWeights` filters out `no_target` entries
-- `handleEqualSplit` excludes `no_target` from weight calculation
-- `handleStrategyChange` zeros all targets when switching to `no_target`
-- Save mutation includes `has_no_target: true` flag
+---
 
-### Wizard Steps UI ✅
-- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
-- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
-- `StepReviewSave`: No Target rows read-only with grayed appearance
+### Files to Create
+- `src/components/expenses/PettyCashAdmin.tsx` — Admin fund management
+- `src/components/expenses/PettyCashTab.tsx` — User spending interface
+- `src/hooks/usePettyCashFund.ts` — User's active fund query
 
-### Manager Self-Service ✅
-- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+### Files to Modify
+- `src/pages/AdminExpenseManagement.tsx` — Add 3rd tab for Petty Cash
+- `src/pages/MyExpenses.tsx` — Conditionally show Petty Cash tab
+- DB migration: Create 3 tables + RLS policies + balance update trigger
+
