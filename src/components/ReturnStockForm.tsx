@@ -70,6 +70,11 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [creditNoteNumber, setCreditNoteNumber] = useState('');
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
+  // Invoice linking state for step 2
+  const [invoiceOptions, setInvoiceOptions] = useState<Record<string, { invoice_number: string; order_id: string; created_at: string }[]>>({});
+  const [selectedInvoices, setSelectedInvoices] = useState<Record<string, string>>({});
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+
   // Form state
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [returnQuantity, setReturnQuantity] = useState<number>(0);
@@ -150,6 +155,71 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
     toast.success(`Added ${newItem.productName}${newItem.variantName ? ` - ${newItem.variantName}` : ''}`);
   };
 
+  // Fetch invoice options for return items when moving to step 2
+  const fetchInvoiceOptions = async () => {
+    setLoadingInvoices(true);
+    try {
+      const productIds = [...new Set(returnItems.map(i => i.productId))];
+      
+      const { data: pastOrders } = await supabase
+        .from('orders')
+        .select('id, invoice_number, created_at, order_items(product_id, variant_id)')
+        .eq('retailer_id', retailerId)
+        .not('invoice_number', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const optionsMap: Record<string, { invoice_number: string; order_id: string; created_at: string }[]> = {};
+      const defaultSelections: Record<string, string> = {};
+
+      if (pastOrders) {
+        for (const item of returnItems) {
+          const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
+          optionsMap[key] = [];
+          
+          for (const order of pastOrders) {
+            const orderItems = (order as any).order_items || [];
+            const match = orderItems.some((oi: any) => {
+              if (item.variantId) {
+                return oi.product_id === item.productId && oi.variant_id === item.variantId;
+              }
+              return oi.product_id === item.productId;
+            });
+            
+            if (match && order.invoice_number) {
+              const exists = optionsMap[key].some(o => o.invoice_number === order.invoice_number);
+              if (!exists) {
+                optionsMap[key].push({
+                  invoice_number: order.invoice_number,
+                  order_id: order.id,
+                  created_at: order.created_at,
+                });
+              }
+            }
+          }
+          
+          // Auto-select the most recent invoice
+          if (optionsMap[key].length > 0 && !selectedInvoices[key]) {
+            defaultSelections[key] = optionsMap[key][0].invoice_number;
+          }
+        }
+      }
+
+      setInvoiceOptions(optionsMap);
+      setSelectedInvoices(prev => ({ ...defaultSelections, ...prev }));
+    } catch (err) {
+      console.error('Error fetching invoices for linking:', err);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  const handleGoToStep2 = async () => {
+    if (returnItems.length === 0) return;
+    setStep(2);
+    await fetchInvoiceOptions();
+  };
+
   const handleRemoveItem = (index: number) => {
     setReturnItems(prev => prev.filter((_, i) => i !== index));
   };
@@ -178,30 +248,10 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
         .eq('id', retailerId)
         .single();
 
-      const { data: pastOrders } = await supabase
-        .from('orders')
-        .select('id, invoice_number, order_items(product_id, variant_id)')
-        .eq('retailer_id', retailerId)
-        .not('invoice_number', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      const productInvoiceMap: Record<string, string> = {};
-      if (pastOrders) {
-        for (const order of pastOrders) {
-          const items = (order as any).order_items || [];
-          for (const oi of items) {
-            const key = oi.variant_id ? `${oi.product_id}_${oi.variant_id}` : oi.product_id;
-            if (!productInvoiceMap[key] && order.invoice_number) {
-              productInvoiceMap[key] = order.invoice_number;
-            }
-          }
-        }
-      }
-
+      // Use the invoice selections from step 2 instead of re-fetching
       const cnItems: CreditNoteItem[] = returnItems.map(item => {
         const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
-        const refInvoice = productInvoiceMap[key] || 'N/A';
+        const refInvoice = selectedInvoices[key] || 'N/A';
         const total = item.price * item.returnQuantity;
         const taxableAmount = total;
         const sgst = taxableAmount * 0.025;
@@ -605,7 +655,57 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
       {/* ─── STEP 2: Review & Confirm ─── */}
       {step === 2 && (
         <div className="space-y-3">
-          {/* Items grouped by reason */}
+          {/* Invoice Linking */}
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Link to Invoice
+              </p>
+              {loadingInvoices ? (
+                <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Finding matching invoices...
+                </div>
+              ) : (
+                returnItems.map((item, idx) => {
+                  const key = item.variantId ? `${item.productId}_${item.variantId}` : item.productId;
+                  const options = invoiceOptions[key] || [];
+                  const selected = selectedInvoices[key] || '';
+                  
+                  return (
+                    <div key={idx} className="p-2 rounded-md bg-background border space-y-1.5">
+                      <p className="text-sm font-medium truncate">
+                        {item.productName}
+                        {item.variantName && <span className="text-muted-foreground text-xs"> · {item.variantName}</span>}
+                      </p>
+                      {options.length > 0 ? (
+                        <Select
+                          value={selected}
+                          onValueChange={(v) => setSelectedInvoices(prev => ({ ...prev, [key]: v }))}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select invoice..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {options.map((opt) => (
+                              <SelectItem key={opt.invoice_number} value={opt.invoice_number}>
+                                {opt.invoice_number} — {new Date(opt.created_at).toLocaleDateString('en-GB')}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-xs text-destructive/70">No matching invoice found — will show as N/A</p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Return Items */}
           <Card>
             <CardContent className="p-3 space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Return Items</p>
@@ -701,7 +801,7 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
             )}
             {step === 1 && (
               <Button
-                onClick={() => setStep(2)}
+                onClick={handleGoToStep2}
                 disabled={returnItems.length === 0}
                 className="flex-1"
               >
