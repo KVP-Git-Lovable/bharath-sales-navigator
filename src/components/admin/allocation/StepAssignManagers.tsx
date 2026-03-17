@@ -26,6 +26,7 @@ const strategyDescriptions: Record<TargetStrategy, string> = {
   roll_down: 'Target will be distributed to subordinates',
   roll_up: 'Target = sum of subordinate targets',
   independent: 'Personal + team target; team target can be distributed to subordinates',
+  no_target: 'No target assigned — excluded from distribution',
 };
 
 interface TeamNode {
