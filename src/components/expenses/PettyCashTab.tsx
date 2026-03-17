@@ -114,7 +114,7 @@ const PettyCashTab: React.FC<PettyCashTabProps> = ({ fund, limits }) => {
     const err = validateSpend(tx.amount);
     if (err) { toast.error(err); return; }
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('petty_cash_transactions')
       .update({ status: 'submitted' })
       .eq('id', txId);

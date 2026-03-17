@@ -165,7 +165,7 @@ const PettyCashAdmin: React.FC = () => {
   };
 
   const rejectTx = async () => {
-    const { error } = await supabase.from('petty_cash_transactions').update({ status: 'rejected', rejection_reason: rejectReason || null }).eq('id', rejectDialog.txId);
+    const { error } = await (supabase as any).from('petty_cash_transactions').update({ status: 'rejected', rejection_reason: rejectReason || null }).eq('id', rejectDialog.txId);
     if (error) { toast.error(error.message); return; }
     toast.success('Transaction rejected');
     queryClient.invalidateQueries({ queryKey: ['admin-petty-cash-txns'] });
