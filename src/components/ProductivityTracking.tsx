@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown, Car, Utensils, Receipt, IndianRupee, ShoppingCart } from 'lucide-react';
+import { Search, Download, CalendarIcon, TableIcon, LayoutGrid, ExternalLink, ArrowUpDown, Car, Utensils, Receipt, IndianRupee, ShoppingCart, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, isSameDay } from 'date-fns';
