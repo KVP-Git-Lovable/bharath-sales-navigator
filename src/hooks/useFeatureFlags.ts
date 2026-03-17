@@ -41,7 +41,7 @@ export const NAV_ITEM_PERMISSION_PREFIX: Record<string, string> = {
   'my-target': 'target_',
   'performance': 'performance_',
   'analytics': 'analytics_',
-  'institutional-sales': 'institutional_',
+  
   'distributor-master': 'distributor_',
   'primary-orders': 'primary_order_',
   'territories': 'territory_',
