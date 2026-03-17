@@ -64,8 +64,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingCN, setGeneratingCN] = useState(false);
-  const [selectedVan, setSelectedVan] = useState<string>('');
-  const [vans, setVans] = useState<any[]>([]);
   
   // Form state for adding new return
   const [selectedProduct, setSelectedProduct] = useState<string>('');
