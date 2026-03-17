@@ -64,7 +64,7 @@ export const usePettyCashFund = (userId?: string) => {
     queryKey: ['petty-cash-limits', fund?.id],
     queryFn: async () => {
       if (!fund?.id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('petty_cash_limits')
         .select('*')
         .eq('fund_id', fund.id)
