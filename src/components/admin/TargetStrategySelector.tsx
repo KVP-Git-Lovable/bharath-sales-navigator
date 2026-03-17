@@ -203,6 +203,7 @@ export function StrategyBadge({ strategy }: { strategy: TargetStrategy }) {
             strategy === 'roll_up' && 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400',
             strategy === 'roll_down' && 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400',
             strategy === 'independent' && 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400',
+            strategy === 'no_target' && 'bg-muted/50 border-border text-muted-foreground',
           )}>
             <Icon className="h-2.5 w-2.5" />
             {strategyLabels[strategy]}
