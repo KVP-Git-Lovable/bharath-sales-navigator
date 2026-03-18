@@ -278,7 +278,7 @@ const Operations = () => {
             // Handle relative signed URLs
             checkInPhotoUrl = signedUrlData.signedUrl.startsWith('http') 
               ? signedUrlData.signedUrl 
-              : `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1${signedUrlData.signedUrl}`;
+              : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${signedUrlData.signedUrl}`;
           }
         }
 
