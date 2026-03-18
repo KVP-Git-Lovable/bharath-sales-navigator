@@ -11,7 +11,7 @@ import { PermissionSetGroupsTab } from '@/components/security/PermissionSetGroup
 
 export default function PermissionSetPage() {
   const navigate = useNavigate();
-  const { user, loading, securityProfileName } = useAuth();
+  const { user, loading } = useAuth();
   const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const [activeTab, setActiveTab] = useState('role-permissions');
 

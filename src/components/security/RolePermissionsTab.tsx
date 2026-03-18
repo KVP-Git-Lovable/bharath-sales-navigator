@@ -51,14 +51,6 @@ const getAllHierarchicalNames = (): string[] => [
   ...getAllWidgetNames(),
 ];
 
-const buildAllGranted = (): PermissionMap => {
-  const map: PermissionMap = {};
-  getAllHierarchicalNames().forEach(name => {
-    map[name] = { can_read: true, can_create: true, can_edit: true, can_delete: true };
-  });
-  return map;
-};
-
 export const RolePermissionsTab = () => {
   const queryClient = useQueryClient();
   const [selectedProfileId, setSelectedProfileId] = useState('');

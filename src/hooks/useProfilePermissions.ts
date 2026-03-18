@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { setCachedPermissions, getCachedPermissions } from '@/utils/cachedAuthIntegrity';
+import { validatePermissions } from '@/utils/permissionValidator';
 
 interface ProfilePermission {
   object_name: string;

@@ -14,7 +14,7 @@ import { ProfileManagement } from '@/components/security/ProfileManagement';
 
 export default function SecurityManagement() {
   const navigate = useNavigate();
-  const { loading, user, securityProfileName } = useAuth();
+  const { loading, user } = useAuth();
   const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const [activeTab, setActiveTab] = useState('profiles');
 
