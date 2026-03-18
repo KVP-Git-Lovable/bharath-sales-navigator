@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const SUPABASE_URL = "https://aoxdosjkwqyuvccuwhzc.supabase.co";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const STORAGE_URL_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/`;
 
 // Cache signed URLs to avoid repeated API calls
