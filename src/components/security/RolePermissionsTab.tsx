@@ -85,19 +85,9 @@ export const RolePermissionsTab = () => {
     }
   }, [profiles, selectedProfileId]);
 
-  const selectedProfileName = profiles?.find(p => p.id === selectedProfileId)?.name;
-  const isSystemAdmin = selectedProfileName === SYSTEM_ADMINISTRATOR_PROFILE;
-
   const { isLoading } = useQuery({
     queryKey: ['profile-hierarchical-permissions', selectedProfileId],
     queryFn: async () => {
-      if (isSystemAdmin) {
-        const granted = buildAllGranted();
-        setLocalPerms(granted);
-        setDirty(false);
-        return granted;
-      }
-
       const { data, error } = await supabase
         .from('profile_object_permissions')
         .select('object_name, permission_type, can_read, can_create, can_edit, can_delete')
