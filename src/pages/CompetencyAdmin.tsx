@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useProfilePermissions } from "@/hooks/useProfilePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +18,7 @@ import type { CompetencyTemplate } from "@/hooks/useCompetencyScores";
 
 export default function CompetencyAdmin() {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const queryClient = useQueryClient();
   const [companyName, setCompanyName] = useState("SalesCoach AI");
   const [isRunningCron, setIsRunningCron] = useState(false);
@@ -120,7 +120,7 @@ export default function CompetencyAdmin() {
     }
   };
 
-  if (userRole !== 'admin') {
+  if (!hasModuleAccess('admin_competency_') && !permLoading) {
     return (
       <div className="min-h-screen bg-background">
         <CompetencyHeader

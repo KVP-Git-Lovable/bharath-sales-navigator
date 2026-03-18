@@ -11,7 +11,7 @@ import { PermissionSetGroupsTab } from '@/components/security/PermissionSetGroup
 
 export default function PermissionSetPage() {
   const navigate = useNavigate();
-  const { user, loading, securityProfileName } = useAuth();
+  const { user, loading } = useAuth();
   const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const [activeTab, setActiveTab] = useState('role-permissions');
 
@@ -25,8 +25,8 @@ export default function PermissionSetPage() {
 
   if (!user) return <Navigate to="/auth" replace />;
   
-  // No profile = show all; profile assigned = check permission
-  if (securityProfileName && !hasModuleAccess('admin_security_')) {
+  // DB-driven: always check permission (no bypass for missing profile)
+  if (!hasModuleAccess('admin_security_')) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { setCachedPermissions, getCachedPermissions } from '@/utils/cachedAuthIntegrity';
+import { validatePermissions } from '@/utils/permissionValidator';
 
 interface ProfilePermission {
   object_name: string;
@@ -129,6 +130,13 @@ export const useProfilePermissions = () => {
     refetchOnWindowFocus: false,   // don't re-fetch on tab switch
     refetchOnMount: false,         // cached data is sufficient on mount
   });
+
+  // Dev-mode: validate that all UI permission keys exist in DB
+  useEffect(() => {
+    if (permissions.length > 0) {
+      validatePermissions(permissions);
+    }
+  }, [permissions]);
 
   const hasAnyAdminPermission = permissions.some(
     p => p.object_name.startsWith('admin_') && p.can_read

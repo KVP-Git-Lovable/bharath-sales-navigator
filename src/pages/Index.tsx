@@ -35,10 +35,8 @@ const Index = () => {
   const signedProfilePicture = useSignedUrl(profilePictureUrl);
   const { isNavItemEnabled } = useFeatureFlags();
   const { permissions, hasModuleAccess, hasFieldPermission, hasActionPermission, hasWidgetPermission } = useProfilePermissions();
-  const hasSecurityProfile = !!securityProfileName;
-
-  const canShow = (prefix: string) =>
-    !hasSecurityProfile || hasModuleAccess(prefix);
+  // DB-driven permission checks — no bypass for missing profile
+  const canShow = (prefix: string) => hasModuleAccess(prefix);
 
   const showCheckIn = canShow('attendance_') || hasWidgetPermission('widget_homepage_attendance');
   const showTodaysBeat = canShow('visit_') || hasWidgetPermission('widget_homepage_visit_plan');
@@ -47,8 +45,8 @@ const Index = () => {
   const showPendingPay = canShow('analytics_pending_payments') || canShow('analytics_') || hasFieldPermission('field_homepage_quick_stats');
   const showTarget = canShow('target_') || hasFieldPermission('field_homepage_target_progress');
   const showGreeting = canShow('attendance_') || hasFieldPermission('field_homepage_greeting');
-  const showQuickAdd = !hasSecurityProfile || canShow('visit_') || hasActionPermission('action_homepage_quick_add');
-  const showQuickNav = !hasSecurityProfile || hasWidgetPermission('widget_homepage_quick_links');
+  const showQuickAdd = canShow('visit_') || hasActionPermission('action_homepage_quick_add');
+  const showQuickNav = hasWidgetPermission('widget_homepage_quick_links');
 
   const refreshProfilePicture = async () => {
     if (!user?.id) return;

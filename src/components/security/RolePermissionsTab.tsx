@@ -7,7 +7,7 @@ import { Shield, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { CRUDFlags, PermissionMap } from './PermissionLayerTable';
 import { HierarchicalPermissionEditor } from './HierarchicalPermissionEditor';
-import { SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
+
 import {
   HIERARCHICAL_MODULES,
   getAllModuleNames,
@@ -51,14 +51,6 @@ const getAllHierarchicalNames = (): string[] => [
   ...getAllWidgetNames(),
 ];
 
-const buildAllGranted = (): PermissionMap => {
-  const map: PermissionMap = {};
-  getAllHierarchicalNames().forEach(name => {
-    map[name] = { can_read: true, can_create: true, can_edit: true, can_delete: true };
-  });
-  return map;
-};
-
 export const RolePermissionsTab = () => {
   const queryClient = useQueryClient();
   const [selectedProfileId, setSelectedProfileId] = useState('');
@@ -77,27 +69,16 @@ export const RolePermissionsTab = () => {
     },
   });
 
-  // Auto-select System Administrator profile on first load
+  // Auto-select first profile on load
   useEffect(() => {
     if (profiles && profiles.length > 0 && !selectedProfileId) {
-      const adminProfile = profiles.find(p => p.name === SYSTEM_ADMINISTRATOR_PROFILE);
-      if (adminProfile) setSelectedProfileId(adminProfile.id);
+      setSelectedProfileId(profiles[0].id);
     }
   }, [profiles, selectedProfileId]);
-
-  const selectedProfileName = profiles?.find(p => p.id === selectedProfileId)?.name;
-  const isSystemAdmin = selectedProfileName === SYSTEM_ADMINISTRATOR_PROFILE;
 
   const { isLoading } = useQuery({
     queryKey: ['profile-hierarchical-permissions', selectedProfileId],
     queryFn: async () => {
-      if (isSystemAdmin) {
-        const granted = buildAllGranted();
-        setLocalPerms(granted);
-        setDirty(false);
-        return granted;
-      }
-
       const { data, error } = await supabase
         .from('profile_object_permissions')
         .select('object_name, permission_type, can_read, can_create, can_edit, can_delete')
@@ -221,7 +202,6 @@ export const RolePermissionsTab = () => {
         <HierarchicalPermissionEditor
           permissions={localPerms}
           onChange={handleChange}
-          disabled={isSystemAdmin}
         />
       )}
     </div>

@@ -1,106 +1,158 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Audit: Fully Dynamic Permission System — Current State & Required Changes
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-### What's Already Done (Working Correctly)
+## What Was Done
 
-1. **`useProfilePermissions` hook** — Already 100% DB-driven. Reads from `profile_object_permissions` via `user_profiles` join. No hardcoded admin bypass.
-2. **`useAdminAccess` hook** — Already derives `hasAdminAccess` purely from `hasAnyAdminPermission` (DB-driven).
-3. **`RoutePermissionGuard`** — DB-driven with prefix matching. Comment explicitly states "No special admin bypass."
-4. **Admin login validation** — Checks `profile_object_permissions` for `admin_%` + `can_read`, not profile name.
-5. **Hierarchical permission model** — `hierarchicalPermissions.ts` defines 840+ lines of Module → Field → Action → Widget items, all stored in DB.
-6. **Dashboard (`Index.tsx`)** — Uses `hasModuleAccess`, `hasFieldPermission`, `hasWidgetPermission`, `hasActionPermission` — all DB-driven.
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-### What Still Has Issues (5 areas)
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
----
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-**Issue 1: System Administrator auto-grant bypass in ObjectPermissions.tsx (Security UI)**
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-Lines 99-113: When editing the "System Administrator" profile, `getPermissionValue()` returns `true` for ALL permissions regardless of what's actually in DB. This means:
-- The UI *shows* all checkboxes as checked
-- But if those permissions aren't actually *saved* to DB, the runtime hook won't find them
-- This is a display-only bypass that masks missing DB rows
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-**Fix:** Remove the `isSystemAdministrator` auto-grant logic in `getPermissionValue()`. Show actual DB state. When creating a System Administrator profile, provide a "Grant All" button that actually writes all permissions to DB.
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
----
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
-**Issue 2: `!securityProfileName` bypass (backward compat) in 4 files**
+## Phase: Target Split, Dual Visibility & Manager Self-Service
 
-These files grant full access when no security profile is assigned:
-- `RoutePermissionGuard.tsx` — `if (!securityProfileName) return <>{children}</>`
-- `SecurityManagement.tsx` — `if (securityProfileName && !hasModuleAccess(...))`
-- `PermissionSetPage.tsx` — same pattern
-- `Index.tsx` — `canShow()` returns true when `!hasSecurityProfile`
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
 
-This means any user without a profile assignment sees everything. For a fully DB-driven system, every user should have a profile.
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
 
-**Fix:** Remove the `!securityProfileName` bypass. Instead, treat "no profile" as "no permissions" (deny by default). Add a migration/seed step to ensure all existing users have a profile assigned.
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
 
----
+## Phase: Feedback Configuration & Policy Engine ✅
 
-**Issue 3: `userRole === 'admin'` check in CompetencyAdmin.tsx**
+### Database Schema ✅
+- Created `feedback_questions` table (per-module/customer configurable questions)
+- Created `feedback_policies` table (named policies with module, priority)
+- Created `feedback_policy_rules` table (condition+action pairs per policy)
+- RLS enabled on all 3 tables with authenticated access
 
-Line 123: `if (userRole !== 'admin')` — uses the legacy `user_roles` table role instead of profile permissions.
+### Frontend Components ✅
+- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
+- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
+- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
 
-**Fix:** Replace with `useAdminAccess()` or `useProfilePermissions()` check for the relevant admin permission key.
+### Policy Engine ✅
+- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
+- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
+- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
 
----
+### Workflow Enforcement ✅
+- `VisitCard.tsx`: Integrated policy check hook
+- "Feedback Required" badge shown when policy triggers
+- Order button intercepted when block_order/mandatory_feedback action triggered
+- Opens feedback modal automatically when blocked
 
-**Issue 4: `userRole` still exposed and used from `useAuth`**
+## Phase: No Target Strategy & Mid-Year Flexibility ✅
 
-`useAuth.tsx` still fetches `userRole` from `user_roles` table (line 79-97) and exposes it. Several components import it. While `useAdminAccess` no longer uses it for access decisions, its presence invites misuse.
+### Strategy Explanation Panel ✅
+- Panel now open by default (`useState(true)`)
+- Added 4th "No Target" card with explanation
 
-**Fix:** Keep `userRole` for now (used in ~5 non-security contexts like UserHierarchy display) but add a deprecation comment. Ensure no access-control decisions use it.
+### No Target Strategy ✅
+- Added `'no_target'` to `TargetStrategy` type union
+- Added Ban icon, gray color scheme, labels across all strategy components
+- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
 
----
+### Allocation Logic ✅
+- `getContributorCountForNode` returns 0 for `no_target` users
+- `autoDistributeTargets` skips `no_target` children, zeros their targets
+- `splitByWeights` filters out `no_target` entries
+- `handleEqualSplit` excludes `no_target` from weight calculation
+- `handleStrategyChange` zeros all targets when switching to `no_target`
+- Save mutation includes `has_no_target: true` flag
 
-**Issue 5: Missing validation layer for permission key mismatches**
+### Wizard Steps UI ✅
+- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
+- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
+- `StepReviewSave`: No Target rows read-only with grayed appearance
 
-The UI checks keys like `widget_homepage_sales`, `field_homepage_greeting`, `action_homepage_quick_add` — but if these don't exist in DB for a profile, features silently disappear. No warning or detection.
+### Manager Self-Service ✅
+- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
 
-**Fix:** Add a dev-mode validation utility that compares all permission keys defined in `hierarchicalPermissions.ts` and `permissionModules.ts` against actual DB rows for the current user's profile. Log warnings for any UI-referenced key not found in DB.
+## Phase: Credit Note Generation System ✅
 
----
+### Database Schema ✅
+- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
+- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
+- RLS enabled with authenticated access
+- Auto-incrementing CN number sequence
 
-### Implementation Plan (5 tasks)
+### Credit Note Creation Page ✅ (`/credit-note/create`)
+- Retailer selector → shows all invoices for selected retailer
+- Multi-invoice item selection with checkboxes and return quantity input
+- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
+- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
+- Review step with grouped items by invoice, GST totals
+- Saves to DB and auto-generates PDF on confirmation
 
-**Task 1: Remove System Administrator auto-grant in ObjectPermissions.tsx**
-- Delete lines 99-113 (`isSystemAdministrator` + auto-grant logic)
-- Add a "Select All" button that writes actual DB rows when toggled
-- Ensures System Admin permissions are real DB entries, not phantom UI values
+### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
+- Matches invoice style: dark header, company logo, BILL TO section
+- Title: "CREDIT NOTE" with red accent (vs green for invoices)
+- Header: CN#, Credit Date, Reference Invoice(s), Reason
+- Items table with red header and light red alternating rows
+- Totals: Sub Total, SGST, CGST, Total (red bar)
+- Amount in words, Reason for Credit section, Authorized Signature
 
-**Task 2: Remove `!securityProfileName` bypass (4 files)**
-- `RoutePermissionGuard.tsx`: Remove the early return on line 35; treat no-profile as deny
-- `SecurityManagement.tsx`: Remove the `securityProfileName &&` condition
-- `PermissionSetPage.tsx`: Same
-- `Index.tsx`: Change `canShow()` to always check DB permissions
+### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
+- Lists all credit notes with status badges (draft/issued/cancelled)
+- Download PDF button per credit note
+- "New Credit Note" button linking to creation page
 
-**Task 3: Fix CompetencyAdmin.tsx hardcoded role check**
-- Replace `userRole !== 'admin'` with `useProfilePermissions().hasModuleAccess('admin_competency_')` or equivalent
-
-**Task 4: Add dev-mode permission validation utility**
-- Create `src/utils/permissionValidator.ts`
-- On app load (dev only), compare all known permission keys from `hierarchicalPermissions.ts` + `permissionModules.ts` against the user's actual DB permissions
-- Log warnings like: `⚠️ Permission key "widget_homepage_sales" referenced in UI but not found in DB for current profile`
-
-**Task 5: Deprecate `userRole` in useAuth for access control**
-- Add deprecation comment on `userRole` in `useAuth.tsx`
-- Audit remaining `userRole` usages — ensure none are used for access gating (except CompetencyAdmin, fixed in Task 3)
-
-### Files Changed
-- `src/components/security/ObjectPermissions.tsx` — remove auto-grant
-- `src/components/auth/RoutePermissionGuard.tsx` — remove no-profile bypass
-- `src/pages/SecurityManagement.tsx` — remove conditional check
-- `src/pages/PermissionSetPage.tsx` — remove conditional check  
-- `src/pages/Index.tsx` — enforce DB-only permission checks
-- `src/pages/CompetencyAdmin.tsx` — replace `userRole` check
-- `src/hooks/useAuth.tsx` — deprecation comment
-- `src/utils/permissionValidator.ts` — new file, dev-mode validation
-
-### Important Prerequisite
-Before removing the `!securityProfileName` bypass, **all existing users must have a security profile assigned**. Otherwise they'll be locked out. This requires either:
-- A DB migration that assigns a default profile to users without one, OR
-- An admin action to bulk-assign profiles before deploying this change
-
+### Files Created
+- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
+- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
+- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
+- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
+- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
+- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
+- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
+- Modified `src/App.tsx` — Added `/credit-note/create` route
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`

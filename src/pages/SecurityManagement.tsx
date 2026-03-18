@@ -14,7 +14,7 @@ import { ProfileManagement } from '@/components/security/ProfileManagement';
 
 export default function SecurityManagement() {
   const navigate = useNavigate();
-  const { loading, user, securityProfileName } = useAuth();
+  const { loading, user } = useAuth();
   const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const [activeTab, setActiveTab] = useState('profiles');
 
@@ -32,9 +32,8 @@ export default function SecurityManagement() {
     return <Navigate to="/auth" replace />;
   }
 
-  // No profile assigned = show all (backward compat)
-  // Profile assigned = check admin_security_ permission
-  if (securityProfileName && !hasModuleAccess('admin_security_')) {
+  // DB-driven: always check permission (no bypass for missing profile)
+  if (!hasModuleAccess('admin_security_')) {
     return <Navigate to="/dashboard" replace />;
   }
 
