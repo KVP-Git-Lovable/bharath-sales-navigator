@@ -67,17 +67,20 @@ export const ObjectPermissions = () => {
       const updates = Object.entries(changes).map(([objectName, perms]) => ({
         profile_id: selectedProfileId,
         object_name: objectName,
+        permission_type: 'feature',
         ...perms
       }));
 
       const { error } = await supabase
         .from('profile_object_permissions')
-        .upsert(updates, { onConflict: 'profile_id,object_name' });
+        .upsert(updates, { onConflict: 'profile_id,object_name,permission_type' });
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile-object-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-permissions'] });
+      clearCachedPermissions();
       setPendingChanges({});
       toast.success('Permissions updated');
     },
