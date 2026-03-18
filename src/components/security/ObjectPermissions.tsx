@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Shield, Save, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAllModulePermissionItems, SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
+import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAllModulePermissionItems } from './permissionModules';
 
 interface ObjectPermission {
   id: string;
