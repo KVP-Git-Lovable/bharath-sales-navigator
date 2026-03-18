@@ -707,6 +707,9 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Pincode Master
       { name: 'action_admin_pincode_import', label: 'Pincode Master - Import' },
       { name: 'action_admin_pincode_edit', label: 'Pincode Master - Edit' },
+      // Retailer External Database
+      { name: 'action_admin_retailer_ext_search', label: 'Retailer Ext DB - Search' },
+      { name: 'action_admin_retailer_ext_export', label: 'Retailer Ext DB - Export' },
       // Tax Master
       { name: 'action_admin_tax_create', label: 'Tax Master - Create' },
       { name: 'action_admin_tax_edit', label: 'Tax Master - Edit' },
