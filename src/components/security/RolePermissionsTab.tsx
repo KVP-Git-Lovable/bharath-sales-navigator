@@ -77,11 +77,10 @@ export const RolePermissionsTab = () => {
     },
   });
 
-  // Auto-select System Administrator profile on first load
+  // Auto-select first profile on load
   useEffect(() => {
     if (profiles && profiles.length > 0 && !selectedProfileId) {
-      const adminProfile = profiles.find(p => p.name === SYSTEM_ADMINISTRATOR_PROFILE);
-      if (adminProfile) setSelectedProfileId(adminProfile.id);
+      setSelectedProfileId(profiles[0].id);
     }
   }, [profiles, selectedProfileId]);
 
