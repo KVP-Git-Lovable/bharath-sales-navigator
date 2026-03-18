@@ -593,6 +593,13 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Pincode Master
       { name: 'field_admin_pincode_code', label: 'Pincode Master - Code' },
       { name: 'field_admin_pincode_area', label: 'Pincode Master - Area' },
+      { name: 'field_admin_pincode_district', label: 'Pincode Master - District' },
+      { name: 'field_admin_pincode_state', label: 'Pincode Master - State' },
+      // Retailer External Database
+      { name: 'field_admin_retailer_ext_state', label: 'Retailer Ext DB - State' },
+      { name: 'field_admin_retailer_ext_city', label: 'Retailer Ext DB - City' },
+      { name: 'field_admin_retailer_ext_company', label: 'Retailer Ext DB - Company' },
+      { name: 'field_admin_retailer_ext_category', label: 'Retailer Ext DB - Category' },
       // Tax Master
       { name: 'field_admin_tax_name', label: 'Tax Master - Name' },
       { name: 'field_admin_tax_rate', label: 'Tax Master - Rate' },
