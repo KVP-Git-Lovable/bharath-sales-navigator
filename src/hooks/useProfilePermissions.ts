@@ -102,16 +102,28 @@ export const useProfilePermissions = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (profileError || !profilePerms?.profile_id) return [];
+      if (profileError) {
+        console.error('[Permissions] Failed to fetch user profile:', profileError);
+        return [];
+      }
+      if (!profilePerms?.profile_id) {
+        console.warn('[Permissions] No profile_id found for user:', user.id);
+        return [];
+      }
 
       const { data: perms, error: permsError } = await supabase
         .from('profile_object_permissions')
         .select('object_name, can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all')
         .eq('profile_id', profilePerms.profile_id);
 
-      if (permsError) return [];
+      if (permsError) {
+        console.error('[Permissions] Failed to fetch permissions:', permsError);
+        return [];
+      }
 
       const result = (perms || []) as ProfilePermission[];
+
+      console.info('[Permissions] Loaded', result.length, 'permissions for profile', profilePerms.profile_id);
 
       // ✅ Persist to localStorage after every successful fetch
       setCachedPermissions(user.id, result);
