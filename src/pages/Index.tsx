@@ -48,6 +48,8 @@ const Index = () => {
   const showQuickAdd = canShow('visit_') || hasActionPermission('action_homepage_quick_add');
   const showQuickNav = hasWidgetPermission('widget_homepage_quick_links');
 
+  const hasAnyDashboardContent = showCheckIn || showTodaysBeat || showAIInsights || showPerfCalendar || showPendingPay || showQuickNav;
+
   const refreshProfilePicture = async () => {
     if (!user?.id) return;
     
