@@ -1,158 +1,65 @@
-# Scalable Target Management — Plan
 
-## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Remove All Hardcoded Supabase URLs — Full Migration-Ready Fix
 
-## What Was Done
+### Summary
+7 files contain hardcoded Supabase project URLs/keys. Two different projects are hardcoded (`aoxdosjkwqyuvccuwhzc` and `etabpbfokzhhfuybeieu`). All will be replaced with environment variable references so the app works with any Supabase backend without code changes.
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+### Complete File-by-File Changes
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+**1. `src/integrations/supabase/client.ts`** — Use env vars instead of hardcoded strings
+```typescript
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+```
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+**2. `src/utils/storageUtils.ts`** — Derive storage prefix from env
+```typescript
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const STORAGE_URL_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/`;
+```
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+**3. `src/pages/Operations.tsx`** (3 occurrences) — Replace all 3 hardcoded fallback URLs
+```typescript
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+// then use `${SUPABASE_URL}/storage/v1${signedUrlData.signedUrl}`
+```
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+**4. `src/components/profile/InstagramSocialFeed.tsx`** — Fix `getStorageUrl`
+```typescript
+const getStorageUrl = (path: string) => {
+  return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/social-posts/${path}`;
+};
+```
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+**5. `src/components/profile/SocialFeed.tsx`** — Fix hardcoded `etab...` URL in image src
+```typescript
+src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/social-posts/${post.image_url}`}
+```
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+**6. `src/hooks/useReportVoiceChat.ts`** — Replace hardcoded `etab...` URL AND anon key (this is pointing to a completely wrong project)
+```typescript
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+```
 
-## Phase: Target Split, Dual Visibility & Manager Self-Service
+**7. `supabase/functions/send-invoice-whatsapp/index.ts`** — Use Deno env (auto-injected by Supabase)
+```typescript
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const invoiceUrl = pdfUrl || `${supabaseUrl}/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
+```
 
-### Phase 1: Fix Equal Split ✅
-- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
-- Each manager handles their own team's internal distribution via their strategy
+### Files NOT changed (already correct)
+- `supabase/config.toml` — `project_id` is managed by Supabase CLI, leave as-is
+- `.env` — already uses env vars correctly, auto-populated by Lovable
+- `src/service-worker.ts` — uses `.endsWith('.supabase.co')` for route matching, not a specific project ID — correct as-is
+- `src/pages/CompetencyAdmin.tsx` — contains `YOUR_PROJECT_REF` placeholder in a SQL comment, not actual code — no change needed
 
-### Phase 2: Dual Target for Independent Strategy ✅
-- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
-- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
-- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
-- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
-- Save mutation includes personal target fields
+### Important Note on `useReportVoiceChat.ts`
+This file currently points to a **completely different Supabase project** (`etabpbfokzhhfuybeieu`). After the fix, it will call edge functions (`elevenlabs-tts-stream`, `report-voice-assistant`) on the **connected** project. You need to ensure those edge functions exist on your current project, or the voice chat feature will not work. If they only exist on the other project, they need to be migrated.
 
-### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
-- New `ManagerTargets.tsx` page for managers to edit subordinate targets
-- View own target vs actual achievement
-- Reuse `useTeamTargetProgress` hook for analytics
+### Result After This Fix
+- Zero hardcoded Supabase URLs in the codebase
+- Switching projects = changing `.env` values only
+- Clone/remix works out of the box with any Supabase backend
 
-## Phase: Feedback Configuration & Policy Engine ✅
-
-### Database Schema ✅
-- Created `feedback_questions` table (per-module/customer configurable questions)
-- Created `feedback_policies` table (named policies with module, priority)
-- Created `feedback_policy_rules` table (condition+action pairs per policy)
-- RLS enabled on all 3 tables with authenticated access
-
-### Frontend Components ✅
-- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
-- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
-- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
-
-### Policy Engine ✅
-- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
-- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
-- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
-
-### Workflow Enforcement ✅
-- `VisitCard.tsx`: Integrated policy check hook
-- "Feedback Required" badge shown when policy triggers
-- Order button intercepted when block_order/mandatory_feedback action triggered
-- Opens feedback modal automatically when blocked
-
-## Phase: No Target Strategy & Mid-Year Flexibility ✅
-
-### Strategy Explanation Panel ✅
-- Panel now open by default (`useState(true)`)
-- Added 4th "No Target" card with explanation
-
-### No Target Strategy ✅
-- Added `'no_target'` to `TargetStrategy` type union
-- Added Ban icon, gray color scheme, labels across all strategy components
-- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
-
-### Allocation Logic ✅
-- `getContributorCountForNode` returns 0 for `no_target` users
-- `autoDistributeTargets` skips `no_target` children, zeros their targets
-- `splitByWeights` filters out `no_target` entries
-- `handleEqualSplit` excludes `no_target` from weight calculation
-- `handleStrategyChange` zeros all targets when switching to `no_target`
-- Save mutation includes `has_no_target: true` flag
-
-### Wizard Steps UI ✅
-- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
-- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
-- `StepReviewSave`: No Target rows read-only with grayed appearance
-
-### Manager Self-Service ✅
-- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
-
-## Phase: Credit Note Generation System ✅
-
-### Database Schema ✅
-- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
-- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
-- RLS enabled with authenticated access
-- Auto-incrementing CN number sequence
-
-### Credit Note Creation Page ✅ (`/credit-note/create`)
-- Retailer selector → shows all invoices for selected retailer
-- Multi-invoice item selection with checkboxes and return quantity input
-- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
-- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
-- Review step with grouped items by invoice, GST totals
-- Saves to DB and auto-generates PDF on confirmation
-
-### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
-- Matches invoice style: dark header, company logo, BILL TO section
-- Title: "CREDIT NOTE" with red accent (vs green for invoices)
-- Header: CN#, Credit Date, Reference Invoice(s), Reason
-- Items table with red header and light red alternating rows
-- Totals: Sub Total, SGST, CGST, Total (red bar)
-- Amount in words, Reason for Credit section, Authorized Signature
-
-### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
-- Lists all credit notes with status badges (draft/issued/cancelled)
-- Download PDF button per credit note
-- "New Credit Note" button linking to creation page
-
-### Files Created
-- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
-- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
-- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
-- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
-- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
-- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
-- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
-- Modified `src/App.tsx` — Added `/credit-note/create` route
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
