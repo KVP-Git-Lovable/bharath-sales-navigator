@@ -1,83 +1,158 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Audit: Permission Key Mismatch Across All Pages
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-### Summary of Findings
+## What Was Done
 
-Checked every file using `useProfilePermissions` for permission-based visibility. Here's the status:
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-### Broken — Key Mismatch (same pattern as MyVisits)
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-**1. `src/pages/MyVisits.tsx`** (confirmed, user-reported)
-- Uses `hasModuleAccess('visit_auto_plan')` etc. — `startsWith` match
-- DB keys are `action_visit_auto_plan` — does NOT start with `visit_auto_plan`
-- All 9 sub-buttons hidden even with full access
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-### Working Correctly — No Mismatch
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-**2. `src/pages/Analytics.tsx`** ✅
-- Uses `hasPermission('analytics_business_summary', 'can_read')` — **exact match**
-- Legacy key `analytics_business_summary` exists in `permissionModules.ts` and was seeded
-- No mismatch
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-**3. `src/pages/Vendors.tsx`** ✅
-- Uses `hasPermission('admin_vendor_list', 'can_edit')` — exact match against legacy key
-- Works if seeded
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-**4. `src/pages/VanSalesManagement.tsx`** ✅
-- Uses `hasPermission('admin_van_sales', 'can_view_all')` — exact match
-- Works if seeded
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
-**5. `src/pages/CompetitorDetail.tsx` & `CompetitionMaster.tsx`** ✅
-- Use `hasPermission('admin_competition_master', 'can_edit')` — exact match
-- Works if seeded
+## Phase: Target Split, Dual Visibility & Manager Self-Service
 
-**6. `src/pages/CompetencyAdmin.tsx`** ✅
-- Uses `hasModuleAccess('admin_competency_')` — prefix match against `admin_competency_*` keys
-- Works if seeded
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
 
-**7. `src/pages/SecurityManagement.tsx` & `PermissionSetPage.tsx`** ✅
-- Use `hasModuleAccess('admin_security_')` — prefix match against `admin_security_*` keys
-- Works if seeded
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
 
-**8. `src/pages/Index.tsx`** ✅ (partially)
-- Uses OR logic: `canShow('attendance_') || hasWidgetPermission('widget_homepage_attendance')`
-- Legacy prefixes (`attendance_`, `visit_`, `retailer_`, etc.) match existing DB keys
-- Hierarchical keys (`widget_homepage_*`, `field_homepage_*`, `action_homepage_*`) were seeded in latest migration
-- Quick-add dropdown items use `canShow('visit_')` which matches legacy `visit_*` keys
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
 
-**9. Attendance components** ✅
-- No permission checks inside attendance components — gating is at route/nav level only
+## Phase: Feedback Configuration & Policy Engine ✅
 
-### Only Fix Needed: `src/pages/MyVisits.tsx`
+### Database Schema ✅
+- Created `feedback_questions` table (per-module/customer configurable questions)
+- Created `feedback_policies` table (named policies with module, priority)
+- Created `feedback_policy_rules` table (condition+action pairs per policy)
+- RLS enabled on all 3 tables with authenticated access
 
-Replace `hasModuleAccess` prefix checks with the correct typed permission functions:
+### Frontend Components ✅
+- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
+- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
+- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
 
-```typescript
-const { permissions, hasModuleAccess, hasActionPermission, hasWidgetPermission } = useProfilePermissions();
+### Policy Engine ✅
+- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
+- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
+- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
 
-const hasSecurityProfile = permissions.length > 0;
-const hasFullModuleAccess = hasModuleAccess('module_my_visit');
+### Workflow Enforcement ✅
+- `VisitCard.tsx`: Integrated policy check hook
+- "Feedback Required" badge shown when policy triggers
+- Order button intercepted when block_order/mandatory_feedback action triggered
+- Opens feedback modal automatically when blocked
 
-const canShowAction = (actionName: string) =>
-  !hasSecurityProfile || hasFullModuleAccess || hasActionPermission(actionName);
-const canShowWidget = (widgetName: string) =>
-  !hasSecurityProfile || hasFullModuleAccess || hasWidgetPermission(widgetName);
+## Phase: No Target Strategy & Mid-Year Flexibility ✅
 
-const showAutoPlan = canShowAction('action_visit_auto_plan');
-const showAllBeat = canShowAction('action_visit_all_beat');
-const showRetailers = canShowAction('action_visit_retailers');
-const showSummary = canShowAction('action_visit_summary');
-const showTimeline = canShowAction('action_visit_timeline');
-const showGpsTrack = canShowAction('action_visit_gps_track');
-const showVanStock = canShowAction('action_visit_van_stock');
-const showActivity = canShowAction('action_visit_activity');
-const showTodaysProgress = canShowWidget('widget_visit_todays_progress');
-const showInsightsTarget = !hasSecurityProfile || hasModuleAccess('target_');
-```
+### Strategy Explanation Panel ✅
+- Panel now open by default (`useState(true)`)
+- Added 4th "No Target" card with explanation
 
-### Files Changed
-- `src/pages/MyVisits.tsx` — fix permission key references (lines 211-225)
+### No Target Strategy ✅
+- Added `'no_target'` to `TargetStrategy` type union
+- Added Ban icon, gray color scheme, labels across all strategy components
+- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
 
-No other pages have this mismatch pattern. All other pages either use exact-match `hasPermission()` against legacy keys or use correct prefix patterns that match DB key naming.
+### Allocation Logic ✅
+- `getContributorCountForNode` returns 0 for `no_target` users
+- `autoDistributeTargets` skips `no_target` children, zeros their targets
+- `splitByWeights` filters out `no_target` entries
+- `handleEqualSplit` excludes `no_target` from weight calculation
+- `handleStrategyChange` zeros all targets when switching to `no_target`
+- Save mutation includes `has_no_target: true` flag
 
+### Wizard Steps UI ✅
+- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
+- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
+- `StepReviewSave`: No Target rows read-only with grayed appearance
+
+### Manager Self-Service ✅
+- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+
+## Phase: Credit Note Generation System ✅
+
+### Database Schema ✅
+- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
+- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
+- RLS enabled with authenticated access
+- Auto-incrementing CN number sequence
+
+### Credit Note Creation Page ✅ (`/credit-note/create`)
+- Retailer selector → shows all invoices for selected retailer
+- Multi-invoice item selection with checkboxes and return quantity input
+- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
+- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
+- Review step with grouped items by invoice, GST totals
+- Saves to DB and auto-generates PDF on confirmation
+
+### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
+- Matches invoice style: dark header, company logo, BILL TO section
+- Title: "CREDIT NOTE" with red accent (vs green for invoices)
+- Header: CN#, Credit Date, Reference Invoice(s), Reason
+- Items table with red header and light red alternating rows
+- Totals: Sub Total, SGST, CGST, Total (red bar)
+- Amount in words, Reason for Credit section, Authorized Signature
+
+### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
+- Lists all credit notes with status badges (draft/issued/cancelled)
+- Download PDF button per credit note
+- "New Credit Note" button linking to creation page
+
+### Files Created
+- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
+- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
+- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
+- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
+- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
+- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
+- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
+- Modified `src/App.tsx` — Added `/credit-note/create` route
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
