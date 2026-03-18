@@ -803,6 +803,9 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Pincode Master
       { name: 'widget_admin_pincode_list', label: 'Pincode Master - List' },
       { name: 'widget_admin_pincode_search', label: 'Pincode Master - Search' },
+      // Retailer External Database
+      { name: 'widget_admin_retailer_ext_list', label: 'Retailer Ext DB - List' },
+      { name: 'widget_admin_retailer_ext_detail', label: 'Retailer Ext DB - Detail' },
       // Tax Master
       { name: 'widget_admin_tax_list', label: 'Tax Master - List' },
       { name: 'widget_admin_tax_detail', label: 'Tax Master - Detail' },
