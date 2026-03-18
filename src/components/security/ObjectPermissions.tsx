@@ -96,22 +96,38 @@ export const ObjectPermissions = () => {
     }));
   };
 
-  // Check if selected profile is System Administrator
-  const isSystemAdministrator = profiles?.find(p => p.id === selectedProfileId)?.name === SYSTEM_ADMINISTRATOR_PROFILE;
-  
-  // Get all permission items for auto-grant logic (System Administrator gets all)
-  const allPermissionItems = getAllModulePermissionItems();
+  // Grant All / Revoke All: writes real pending changes for every permission item
+  const handleGrantAll = () => {
+    const allItems = getAllModulePermissionItems();
+    const newChanges: Record<string, Partial<ObjectPermission>> = { ...pendingChanges };
+    allItems.forEach(itemName => {
+      PERMISSION_FIELDS.forEach(field => {
+        newChanges[itemName] = {
+          ...newChanges[itemName],
+          [field.key]: true,
+        };
+      });
+    });
+    setPendingChanges(newChanges);
+    toast.info('All permissions granted — click Save to persist');
+  };
+
+  const handleRevokeAll = () => {
+    const allItems = getAllModulePermissionItems();
+    const newChanges: Record<string, Partial<ObjectPermission>> = { ...pendingChanges };
+    allItems.forEach(itemName => {
+      PERMISSION_FIELDS.forEach(field => {
+        newChanges[itemName] = {
+          ...newChanges[itemName],
+          [field.key]: false,
+        };
+      });
+    });
+    setPendingChanges(newChanges);
+    toast.info('All permissions revoked — click Save to persist');
+  };
 
   const getPermissionValue = (objectName: string, field: string): boolean => {
-    // For System Administrator, auto-grant ALL permissions across all modules
-    if (isSystemAdministrator && allPermissionItems.includes(objectName)) {
-      // Still allow pending changes to override (in case admin wants to explicitly toggle)
-      if (pendingChanges[objectName]?.[field] !== undefined) {
-        return pendingChanges[objectName][field] as boolean;
-      }
-      return true; // Auto-grant for System Administrator
-    }
-    
     if (pendingChanges[objectName]?.[field] !== undefined) {
       return pendingChanges[objectName][field] as boolean;
     }
