@@ -18,7 +18,7 @@ import type { CompetencyTemplate } from "@/hooks/useCompetencyScores";
 
 export default function CompetencyAdmin() {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  const { hasModuleAccess, isLoading: permLoading } = useProfilePermissions();
   const queryClient = useQueryClient();
   const [companyName, setCompanyName] = useState("SalesCoach AI");
   const [isRunningCron, setIsRunningCron] = useState(false);
