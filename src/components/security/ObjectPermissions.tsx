@@ -81,7 +81,7 @@ export const ObjectPermissions = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile-object-permissions'] });
       queryClient.invalidateQueries({ queryKey: ['profile-permissions'] });
-      clearCachedPermissions();
+      clearAllCachedPermissions();
       setPendingChanges({});
       toast.success('Permissions updated');
     },
