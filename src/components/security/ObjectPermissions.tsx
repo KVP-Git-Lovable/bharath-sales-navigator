@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Shield, Save, ChevronDown, ChevronRight, Layers, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { PERMISSION_MODULES, PERMISSION_FIELDS, PermissionField, getAllPermissionItems, getTotalFeatureCount, getAllModulePermissionItems } from './permissionModules';
+import { clearAllCachedPermissions } from '@/utils/cachedAuthIntegrity';
 
 interface ObjectPermission {
   id: string;
@@ -67,17 +68,20 @@ export const ObjectPermissions = () => {
       const updates = Object.entries(changes).map(([objectName, perms]) => ({
         profile_id: selectedProfileId,
         object_name: objectName,
+        permission_type: 'feature',
         ...perms
       }));
 
       const { error } = await supabase
         .from('profile_object_permissions')
-        .upsert(updates, { onConflict: 'profile_id,object_name' });
+        .upsert(updates, { onConflict: 'profile_id,object_name,permission_type' });
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile-object-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-permissions'] });
+      clearAllCachedPermissions();
       setPendingChanges({});
       toast.success('Permissions updated');
     },

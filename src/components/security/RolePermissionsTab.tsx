@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Shield, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { clearAllCachedPermissions } from '@/utils/cachedAuthIntegrity';
 import { CRUDFlags, PermissionMap } from './PermissionLayerTable';
 import { HierarchicalPermissionEditor } from './HierarchicalPermissionEditor';
 
@@ -146,6 +147,8 @@ export const RolePermissionsTab = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile-hierarchical-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-permissions'] });
+      clearAllCachedPermissions();
       setDirty(false);
       toast.success('Permissions saved successfully');
     },

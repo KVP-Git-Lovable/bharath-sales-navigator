@@ -1,4 +1,4 @@
-import { Store, Users, Trophy, BarChart, CreditCard, MapPin, Plus, ShoppingCart, TrendingUp, Tag, Award, HelpCircle } from "lucide-react";
+import { Store, Users, Trophy, BarChart, CreditCard, MapPin, Plus, ShoppingCart, TrendingUp, Tag, Award, HelpCircle, ShieldAlert } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeDashboard } from "@/hooks/useHomeDashboard";
@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
@@ -47,6 +48,8 @@ const Index = () => {
   const showGreeting = canShow('attendance_') || hasFieldPermission('field_homepage_greeting');
   const showQuickAdd = canShow('visit_') || hasActionPermission('action_homepage_quick_add');
   const showQuickNav = hasWidgetPermission('widget_homepage_quick_links');
+
+  const hasAnyDashboardContent = showCheckIn || showTodaysBeat || showAIInsights || showPerfCalendar || showPendingPay || showQuickNav;
 
   const refreshProfilePicture = async () => {
     if (!user?.id) return;
@@ -213,6 +216,19 @@ const Index = () => {
             <DashboardSkeleton />
           ) : (
             <>
+              {!hasAnyDashboardContent && (
+                <Card className="border-dashed border-2 border-muted-foreground/20">
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                    <ShieldAlert className="h-12 w-12 text-muted-foreground/40" />
+                    <h3 className="text-lg font-semibold text-muted-foreground">No Permissions Assigned</h3>
+                    <p className="text-sm text-muted-foreground/70 max-w-md">
+                      Your security profile does not have any dashboard permissions enabled. 
+                      Please contact your administrator to get access.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Check-in Status */}
               {showCheckIn && (
                 <CheckInStatusBanner 

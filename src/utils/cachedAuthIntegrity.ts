@@ -133,3 +133,18 @@ export const getCachedPermissions = (userId: string): object[] | null => {
 export const clearCachedPermissions = (userId: string): void => {
   localStorage.removeItem(`permissions_${userId}`);
 };
+
+/**
+ * Clear ALL cached permissions (all users) from localStorage.
+ * Useful when admin saves permission changes and we don't know which user is affected.
+ */
+export const clearAllCachedPermissions = (): void => {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('permissions_')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+};

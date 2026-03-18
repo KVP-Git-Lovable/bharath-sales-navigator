@@ -1,62 +1,158 @@
+# Scalable Target Management — Plan
 
+## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Fix: Permission System — DB Seed, Save Conflict, Cache Invalidation & Empty State
+## Summary
+Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
 
-### Root Causes Identified
+## What Was Done
 
-1. **ObjectPermissions.tsx save fails silently** — upserts with `onConflict: 'profile_id,object_name'` but the DB unique constraint is `(profile_id, object_name, permission_type)`. Missing `permission_type` in the upsert payload causes errors or duplicate rows.
+### Phase 1: Database Migration ✅
+- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
+- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
+- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
+- Created `target_breakdowns` table for flexible multi-parameter target storage
+- RLS enabled on `target_breakdowns`
 
-2. **System Administrator has 268 `feature`-type rows but 0 hierarchical keys** — No `module_*`, `field_homepage_*`, `widget_homepage_*`, `action_homepage_*` rows exist. The dashboard checks these prefixes and finds nothing.
+### Phase 2: Hooks ✅
+- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
+- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
 
-3. **Cache not invalidated on save** — Both `ObjectPermissions` and `RolePermissionsTab` invalidate their own query keys but NOT `['profile-permissions', userId]` (the runtime hook). Plus the 30-min `staleTime` prevents refetch. Users must hard-refresh to see changes.
+### Phase 3: TargetConfigTab ✅
+- Removed Lock/Unlock buttons and locked read-only view
+- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
+- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
+- Replaced "Lock & Assign" with "Activate & Assign" button
+- Active plans show warning: "Changes will affect allocated targets"
+- Closed plans show read-only view with "Reopen as Draft" option
+- `is_locked` is now auto-derived from `plan_status` for backward compatibility
 
-4. **No empty-state UX** — When all `show*` flags are false, the dashboard renders a blank content area with no explanation.
+### Phase 4: HierarchyAllocationTab ✅
+- Replaced `is_locked` check with `plan_status` check
+- Draft plans show "Please activate" message instead of "Configuration not locked"
+- Active and Closed plans allow viewing allocations
+- Accepts `selectedPlanId` prop for multi-plan support
 
-### Implementation Plan
+### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
+- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
+- Backward compatible: falls back to `is_locked` if `plan_status` not set
 
-**Task 1: Fix ObjectPermissions.tsx save — include `permission_type` in upsert**
+### Phase 6: TargetVsActual Page ✅
+- Added `selectedPlanId` state management
+- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
+- Passes `selectedPlanId` to HierarchyAllocationTab
 
-Update the `saveMutation` to include `permission_type: 'feature'` for all legacy permission items, and use the correct 3-column conflict key:
-```typescript
-const updates = Object.entries(changes).map(([objectName, perms]) => ({
-  profile_id: selectedProfileId,
-  object_name: objectName,
-  permission_type: 'feature',
-  ...perms
-}));
-// onConflict: 'profile_id,object_name,permission_type'
-```
+## Backward Compatibility
+- `is_locked` column remains in DB and is auto-synced from `plan_status`
+- Existing `user_business_plan_*` breakdown tables untouched
+- All existing data migrated automatically
 
-Also update `handleGrantAll` and `handleRevokeAll` to include `permission_type`.
+## Phase: Target Split, Dual Visibility & Manager Self-Service
 
-**Task 2: Seed ALL permission keys for System Administrator profile**
+### Phase 1: Fix Equal Split ✅
+- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
+- Each manager handles their own team's internal distribution via their strategy
 
-Write a SQL INSERT that populates `profile_object_permissions` for the System Administrator profile (`3385dd99-c4f7-455b-94d7-c7b5105565ce`) with:
-- All hierarchical keys from `hierarchicalPermissions.ts`: `module_*`, `field_*`, `action_*`, `widget_*` (with correct `permission_type`)
-- All homepage-specific keys: `field_homepage_*`, `action_homepage_*`, `widget_homepage_*`
-- All legacy feature keys from `permissionModules.ts` (already partially present)
-- All with `can_read/can_create/can_edit/can_delete = true`
+### Phase 2: Dual Target for Independent Strategy ✅
+- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
+- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
+- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
+- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
+- Save mutation includes personal target fields
 
-This will be done via the Supabase insert tool using `ON CONFLICT ... DO UPDATE` to avoid duplicates.
+### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
+- New `ManagerTargets.tsx` page for managers to edit subordinate targets
+- View own target vs actual achievement
+- Reuse `useTeamTargetProgress` hook for analytics
 
-**Task 3: Fix cache invalidation — force runtime permission refresh after save**
+## Phase: Feedback Configuration & Policy Engine ✅
 
-In both `ObjectPermissions.tsx` and `RolePermissionsTab.tsx` `onSuccess` handlers:
-- Also invalidate `['profile-permissions']` (the runtime query key)
-- Clear localStorage cached permissions via `clearCachedPermissions()`
+### Database Schema ✅
+- Created `feedback_questions` table (per-module/customer configurable questions)
+- Created `feedback_policies` table (named policies with module, priority)
+- Created `feedback_policy_rules` table (condition+action pairs per policy)
+- RLS enabled on all 3 tables with authenticated access
 
-In `useProfilePermissions.ts`:
-- Export a `clearCachedPermissions` helper (or reuse existing)
-- Reduce `staleTime` or add manual invalidation path
+### Frontend Components ✅
+- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
+- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
+- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
 
-**Task 4: Add empty-state fallback in Index.tsx**
+### Policy Engine ✅
+- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
+- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
+- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
 
-When all `show*` flags are false, render a card explaining "No permissions assigned to your profile. Contact your administrator."
+### Workflow Enforcement ✅
+- `VisitCard.tsx`: Integrated policy check hook
+- "Feedback Required" badge shown when policy triggers
+- Order button intercepted when block_order/mandatory_feedback action triggered
+- Opens feedback modal automatically when blocked
 
-### Files to Change
-- `src/components/security/ObjectPermissions.tsx` — fix upsert conflict key + permission_type
-- `src/components/security/RolePermissionsTab.tsx` — add runtime cache invalidation
-- `src/hooks/useProfilePermissions.ts` — export cache clear helper
-- `src/pages/Index.tsx` — add empty-state card
-- DB: insert ~500+ permission rows for System Administrator profile
+## Phase: No Target Strategy & Mid-Year Flexibility ✅
 
+### Strategy Explanation Panel ✅
+- Panel now open by default (`useState(true)`)
+- Added 4th "No Target" card with explanation
+
+### No Target Strategy ✅
+- Added `'no_target'` to `TargetStrategy` type union
+- Added Ban icon, gray color scheme, labels across all strategy components
+- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
+
+### Allocation Logic ✅
+- `getContributorCountForNode` returns 0 for `no_target` users
+- `autoDistributeTargets` skips `no_target` children, zeros their targets
+- `splitByWeights` filters out `no_target` entries
+- `handleEqualSplit` excludes `no_target` from weight calculation
+- `handleStrategyChange` zeros all targets when switching to `no_target`
+- Save mutation includes `has_no_target: true` flag
+
+### Wizard Steps UI ✅
+- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
+- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
+- `StepReviewSave`: No Target rows read-only with grayed appearance
+
+### Manager Self-Service ✅
+- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+
+## Phase: Credit Note Generation System ✅
+
+### Database Schema ✅
+- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
+- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
+- RLS enabled with authenticated access
+- Auto-incrementing CN number sequence
+
+### Credit Note Creation Page ✅ (`/credit-note/create`)
+- Retailer selector → shows all invoices for selected retailer
+- Multi-invoice item selection with checkboxes and return quantity input
+- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
+- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
+- Review step with grouped items by invoice, GST totals
+- Saves to DB and auto-generates PDF on confirmation
+
+### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
+- Matches invoice style: dark header, company logo, BILL TO section
+- Title: "CREDIT NOTE" with red accent (vs green for invoices)
+- Header: CN#, Credit Date, Reference Invoice(s), Reason
+- Items table with red header and light red alternating rows
+- Totals: Sub Total, SGST, CGST, Total (red bar)
+- Amount in words, Reason for Credit section, Authorized Signature
+
+### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
+- Lists all credit notes with status badges (draft/issued/cancelled)
+- Download PDF button per credit note
+- "New Credit Note" button linking to creation page
+
+### Files Created
+- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
+- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
+- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
+- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
+- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
+- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
+- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
+- Modified `src/App.tsx` — Added `/credit-note/create` route
+- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
