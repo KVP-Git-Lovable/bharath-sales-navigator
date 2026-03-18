@@ -211,7 +211,6 @@ export const RolePermissionsTab = () => {
         <HierarchicalPermissionEditor
           permissions={localPerms}
           onChange={handleChange}
-          disabled={isSystemAdmin}
         />
       )}
     </div>
