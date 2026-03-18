@@ -131,6 +131,13 @@ export const useProfilePermissions = () => {
     refetchOnMount: false,         // cached data is sufficient on mount
   });
 
+  // Dev-mode: validate that all UI permission keys exist in DB
+  useEffect(() => {
+    if (permissions.length > 0) {
+      validatePermissions(permissions);
+    }
+  }, [permissions]);
+
   const hasAnyAdminPermission = permissions.some(
     p => p.object_name.startsWith('admin_') && p.can_read
   );
