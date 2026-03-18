@@ -208,21 +208,27 @@ export const MyVisits = () => {
   const navigate = useNavigate();
   const networkStatus = useConnectivity();
   const isOnline = networkStatus === 'online';
-  const { permissions, hasModuleAccess } = useProfilePermissions();
+  const { permissions, hasModuleAccess, hasActionPermission, hasWidgetPermission } = useProfilePermissions();
   
   // Permission-based visibility: if user has a security profile, filter buttons
   const hasSecurityProfile = permissions.length > 0;
-  const canShowButton = (prefix: string) => !hasSecurityProfile || hasModuleAccess(prefix);
-  const showAutoPlan = canShowButton('visit_auto_plan');
-  const showAllBeat = canShowButton('visit_all_beat');
-  const showRetailers = canShowButton('visit_retailer');
-  const showSummary = canShowButton('visit_summary');
-  const showTimeline = canShowButton('visit_timeline');
-  const showGpsTrack = canShowButton('visit_gps_track');
-  const showVanStock = canShowButton('visit_van_stock');
-  const showActivity = canShowButton('visit_activity');
-  const showTodaysProgress = canShowButton('visit_todays_progress');
-  const showInsightsTarget = canShowButton('target_');
+  const hasFullModuleAccess = hasModuleAccess('module_my_visit');
+  
+  const canShowAction = (actionName: string) =>
+    !hasSecurityProfile || hasFullModuleAccess || hasActionPermission(actionName);
+  const canShowWidget = (widgetName: string) =>
+    !hasSecurityProfile || hasFullModuleAccess || hasWidgetPermission(widgetName);
+  
+  const showAutoPlan = canShowAction('action_visit_auto_plan');
+  const showAllBeat = canShowAction('action_visit_all_beat');
+  const showRetailers = canShowAction('action_visit_retailers');
+  const showSummary = canShowAction('action_visit_summary');
+  const showTimeline = canShowAction('action_visit_timeline');
+  const showGpsTrack = canShowAction('action_visit_gps_track');
+  const showVanStock = canShowAction('action_visit_van_stock');
+  const showActivity = canShowAction('action_visit_activity');
+  const showTodaysProgress = canShowWidget('widget_visit_todays_progress');
+  const showInsightsTarget = !hasSecurityProfile || hasModuleAccess('target_');
 
   // NOTE: AI Recommendations hooks moved below after plannedBeats is defined
   const { isLocationEnabled } = useLocationFeature();
