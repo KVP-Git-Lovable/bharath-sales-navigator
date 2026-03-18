@@ -593,6 +593,13 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Pincode Master
       { name: 'field_admin_pincode_code', label: 'Pincode Master - Code' },
       { name: 'field_admin_pincode_area', label: 'Pincode Master - Area' },
+      { name: 'field_admin_pincode_district', label: 'Pincode Master - District' },
+      { name: 'field_admin_pincode_state', label: 'Pincode Master - State' },
+      // Retailer External Database
+      { name: 'field_admin_retailer_ext_state', label: 'Retailer Ext DB - State' },
+      { name: 'field_admin_retailer_ext_city', label: 'Retailer Ext DB - City' },
+      { name: 'field_admin_retailer_ext_company', label: 'Retailer Ext DB - Company' },
+      { name: 'field_admin_retailer_ext_category', label: 'Retailer Ext DB - Category' },
       // Tax Master
       { name: 'field_admin_tax_name', label: 'Tax Master - Name' },
       { name: 'field_admin_tax_rate', label: 'Tax Master - Rate' },
@@ -700,6 +707,9 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Pincode Master
       { name: 'action_admin_pincode_import', label: 'Pincode Master - Import' },
       { name: 'action_admin_pincode_edit', label: 'Pincode Master - Edit' },
+      // Retailer External Database
+      { name: 'action_admin_retailer_ext_search', label: 'Retailer Ext DB - Search' },
+      { name: 'action_admin_retailer_ext_export', label: 'Retailer Ext DB - Export' },
       // Tax Master
       { name: 'action_admin_tax_create', label: 'Tax Master - Create' },
       { name: 'action_admin_tax_edit', label: 'Tax Master - Edit' },
@@ -793,6 +803,9 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Pincode Master
       { name: 'widget_admin_pincode_list', label: 'Pincode Master - List' },
       { name: 'widget_admin_pincode_search', label: 'Pincode Master - Search' },
+      // Retailer External Database
+      { name: 'widget_admin_retailer_ext_list', label: 'Retailer Ext DB - List' },
+      { name: 'widget_admin_retailer_ext_detail', label: 'Retailer Ext DB - Detail' },
       // Tax Master
       { name: 'widget_admin_tax_list', label: 'Tax Master - List' },
       { name: 'widget_admin_tax_detail', label: 'Tax Master - Detail' },
