@@ -215,6 +215,19 @@ const Index = () => {
             <DashboardSkeleton />
           ) : (
             <>
+              {!hasAnyDashboardContent && (
+                <Card className="border-dashed border-2 border-muted-foreground/20">
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                    <ShieldAlert className="h-12 w-12 text-muted-foreground/40" />
+                    <h3 className="text-lg font-semibold text-muted-foreground">No Permissions Assigned</h3>
+                    <p className="text-sm text-muted-foreground/70 max-w-md">
+                      Your security profile does not have any dashboard permissions enabled. 
+                      Please contact your administrator to get access.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Check-in Status */}
               {showCheckIn && (
                 <CheckInStatusBanner 
