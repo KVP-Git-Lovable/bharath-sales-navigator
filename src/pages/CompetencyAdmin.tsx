@@ -120,7 +120,7 @@ export default function CompetencyAdmin() {
     }
   };
 
-  if (userRole !== 'admin') {
+  if (!hasModuleAccess('admin_competency_') && !permLoading) {
     return (
       <div className="min-h-screen bg-background">
         <CompetencyHeader

@@ -31,8 +31,8 @@ export const RoutePermissionGuard = ({ children, permissionPrefix }: RoutePermis
     );
   }
 
-  // Bypass: no security profile assigned (backward compat)
-  if (!securityProfileName) return <>{children}</>;
+  // No security profile assigned → deny by default (DB-driven only)
+  if (!securityProfileName) return <Navigate to="/dashboard" replace />;
 
   // Profile assigned but zero permissions → deny all
   if (permissions.length === 0) return <Navigate to="/dashboard" replace />;

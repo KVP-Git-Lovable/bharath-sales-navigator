@@ -76,6 +76,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMustChangePassword(false);
   };
 
+  /**
+   * @deprecated Do NOT use userRole for access control decisions.
+   * Use useProfilePermissions() hook instead, which reads from profile_object_permissions (DB-driven).
+   * userRole is kept only for non-security display purposes (e.g., UserHierarchy, designation display).
+   */
   const fetchUserRole = async (userId: string): Promise<'admin' | 'user' | null> => {
     try {
       const { data, error } = await supabase

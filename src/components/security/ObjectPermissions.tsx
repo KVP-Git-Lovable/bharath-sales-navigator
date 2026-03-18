@@ -312,6 +312,12 @@ export const ObjectPermissions = () => {
 
           {selectedProfileId && (
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleGrantAll}>
+                Grant All
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleRevokeAll}>
+                Revoke All
+              </Button>
               <Button variant="outline" size="sm" onClick={expandAll}>
                 Expand All
               </Button>

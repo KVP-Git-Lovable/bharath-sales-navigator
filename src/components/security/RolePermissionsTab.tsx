@@ -7,7 +7,7 @@ import { Shield, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { CRUDFlags, PermissionMap } from './PermissionLayerTable';
 import { HierarchicalPermissionEditor } from './HierarchicalPermissionEditor';
-import { SYSTEM_ADMINISTRATOR_PROFILE } from './permissionModules';
+
 import {
   HIERARCHICAL_MODULES,
   getAllModuleNames,
