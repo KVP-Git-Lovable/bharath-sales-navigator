@@ -23,7 +23,8 @@ serve(async (req) => {
       throw new Error('TWILIO_AUTH_TOKEN not configured');
     }
 
-    const invoiceUrl = pdfUrl || `https://aoxdosjkwqyuvccuwhzc.supabase.co/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const invoiceUrl = pdfUrl || `${supabaseUrl}/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
 
     const recipients = ['whatsapp:+919741435887'];
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;

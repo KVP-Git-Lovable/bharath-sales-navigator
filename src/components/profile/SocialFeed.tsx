@@ -472,7 +472,7 @@ export function SocialFeed() {
                   
                   {post.image_url && (
                     <img
-                      src={`https://etabpbfokzhhfuybeieu.supabase.co/storage/v1/object/public/social-posts/${post.image_url}`}
+                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/social-posts/${post.image_url}`}
                       alt="Post"
                       className="rounded-lg max-h-[400px] w-full object-cover mb-3"
                     />
