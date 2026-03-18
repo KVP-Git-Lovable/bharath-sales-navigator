@@ -147,6 +147,8 @@ export const RolePermissionsTab = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile-hierarchical-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-permissions'] });
+      clearAllCachedPermissions();
       setDirty(false);
       toast.success('Permissions saved successfully');
     },
