@@ -787,9 +787,6 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Credit Management
       { name: 'widget_admin_credit_list', label: 'Credit Mgmt - List' },
       { name: 'widget_admin_credit_settings', label: 'Credit Mgmt - Settings' },
-      // Notification Setup
-      { name: 'widget_admin_notification_list', label: 'Notification - List' },
-      { name: 'widget_admin_notification_templates', label: 'Notification - Templates' },
       // Recycle Bin Master
       { name: 'widget_admin_recycle_list', label: 'Recycle Bin - List' },
       { name: 'widget_admin_recycle_logs', label: 'Recycle Bin - Logs' },
