@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useProfilePermissions } from '@/hooks/useProfilePermissions';
 import { useAuth } from '@/hooks/useAuth';
+import { PermissionRedirect } from '@/components/security/PermissionRedirect';
 
 interface RoutePermissionGuardProps {
   children: ReactNode;
