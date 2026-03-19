@@ -278,6 +278,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
               username: profile.username || '',
               profile_picture_url: profile.profile_picture_url,
               role_name: sp?.name || 'Manager',
+              is_system_profile: sp?.is_system || false,
               manager_id: undefined,
               directReports: [],
             });
