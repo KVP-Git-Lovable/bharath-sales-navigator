@@ -182,6 +182,7 @@ import CollectPayment from "./pages/distributor-portal/CollectPayment";
 import SecondaryInvoiceList from "./pages/distributor-portal/SecondaryInvoiceList";
 import SecondaryInvoiceCreate from "./pages/distributor-portal/SecondaryInvoiceCreate";
 import RetailerFeedback from "./pages/distributor-portal/RetailerFeedback";
+import StockHealthDashboard from "./pages/distributor-portal/StockHealthDashboard";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
