@@ -94,6 +94,11 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
   const [userToDelete, setUserToDelete] = useState<DistributorUser | null>(null);
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<DistributorUser | null>(null);
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState({
     full_name: '',
