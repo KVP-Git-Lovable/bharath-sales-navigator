@@ -298,7 +298,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
       userMap.forEach((user, userId) => {
         const managerId = childToParent.get(userId);
         if (!managerId || !userMap.has(managerId)) {
-          if (user.role_name === 'System Administrator' || user.role_name === 'Super Admin') {
+          if (user.is_system_profile) {
             superAdmins.push(user);
           } else {
             rootNodes.push(user);

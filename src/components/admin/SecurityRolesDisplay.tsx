@@ -170,7 +170,7 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
           <div
             key={role.id}
             onClick={() => fetchUsersForRole(role)}
-            className={`px-3 py-2 rounded-lg border transition-all cursor-pointer min-w-[100px] ${getRoleColor(role.name)}`}
+            className={`px-3 py-2 rounded-lg border transition-all cursor-pointer min-w-[100px] ${getRoleColor(role)}`}
           >
             <h3 className="font-medium text-xs line-clamp-1">{role.name}</h3>
             <div className="flex items-center gap-1 text-base font-bold mt-0.5">
