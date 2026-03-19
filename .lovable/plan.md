@@ -1,25 +1,36 @@
 
 
-## Pricing Page Updates
+## Fix: ₹ Symbol Missing in PDF Revenue Values
 
-**File:** `src/pages/website/PricingPage.tsx` (lines 33-88)
+### Root Cause
 
-### Starter Plan (lines 33-43)
-- Remove: `"500 retailers/month"` and `"10,000 visits/month"`
-- Add: `"Storage space — 5 GB"`
-- Rename: `"AI-powered insights — 2,500 AI requests/month"` to `"AI-powered insights — 2,500 AI credits/month"`
+The Noto Sans font files fetched for PDF generation use the **`latin`** subset (line 1518-1519 in `SupervisorReport.tsx`):
+```
+noto-sans@latest/latin-400-normal.ttf
+noto-sans@latest/latin-700-normal.ttf
+```
 
-### Professional Plan (lines 52-64)
-- Change: `"15,000 orders/month"` to `"10,000 orders/month"`
-- Remove: `"1,500 retailers/month"` and `"30,000 visits/month"`
-- Add: `"Storage space — 10 GB"`
-- Rename: `"AI-powered insights — 5,000 AI requests/month"` to `"AI-powered insights — 5,000 AI credits/month"`
+The Latin subset does **not** include the ₹ (Rupee) symbol (Unicode U+20B9). The symbol is silently dropped during PDF rendering, resulting in values like `2,55,271` instead of `₹2,55,271`.
 
-### Enterprise Plan (lines 74-86)
-- Change: `"40,000 orders/month"` to `"20,000 orders/month"`
-- Remove: `"4,000 retailers/month"` and `"80,000 visits/month"`
-- Add: `"Storage space — 15 GB"`
-- Rename: `"AI-powered insights — 10,000 AI requests/month"` to `"AI-powered insights — 10,000 AI credits/month"`
+### Fix
 
-All changes are in a single file, updating the `plans` array data only.
+**File: `src/components/analytics/SupervisorReport.tsx` (lines 1518-1519)**
+
+Change the font subset from `latin` to `unicode` (full character set) which includes the ₹ symbol and all currency symbols:
+
+```
+Before:
+  noto-sans@latest/latin-400-normal.ttf
+  noto-sans@latest/latin-700-normal.ttf
+
+After:
+  noto-sans@latest/unicode-400-normal.ttf
+  noto-sans@latest/unicode-700-normal.ttf
+```
+
+This is a two-line change. No other files need modification -- the `fmtCurrency` function already correctly prepends `₹` to all revenue values.
+
+### Also check: `reportExportUtils.ts`
+
+Verify if the new Generate Report export utility has the same font subset issue and fix it if so.
 
