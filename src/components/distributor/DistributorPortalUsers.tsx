@@ -108,7 +108,11 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
     designation: '',
     user_level: 'staff',
     user_status: 'initiated' as 'initiated' | 'active' | 'inactive' | 'deactivated',
+    password: '',
+    confirmPassword: '',
   });
+  const [showFormPassword, setShowFormPassword] = useState(false);
+  const [showFormConfirmPassword, setShowFormConfirmPassword] = useState(false);
 
   useEffect(() => {
     loadUsers();
