@@ -17,6 +17,7 @@ interface HierarchyUser {
   username: string;
   profile_picture_url?: string;
   role_name?: string;
+  is_system_profile?: boolean;
   manager_id?: string;
   directReports: HierarchyUser[];
 }
