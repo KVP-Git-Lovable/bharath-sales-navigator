@@ -1,158 +1,133 @@
-# Scalable Target Management — Plan
 
-## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## DMS Portal Audit: Current State and Gap Analysis
 
-## What Was Done
+### What is Currently Built
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+Your DMS portal already has a solid foundation across several areas:
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+**Primary Orders (Supply Chain - Inbound)**
+- Order creation with product/variant selection and quantity entry
+- Order listing with status filtering (draft, submitted, confirmed, processing, dispatched, in_transit, delivered, cancelled)
+- Order detail view with line items
+- Packing list generation and management (aggregate products for delivery)
+- Packing list dispatch with delivery agent assignment
+- Goods Receipt Note (GRN) creation against dispatched orders (quantity verification, damage/shortage recording)
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+**Inventory Management**
+- Current stock view with search, filters (all/low/out of stock/expiring)
+- Stock levels with reorder points, batch numbers, expiry dates
+- Stock adjustments (manual corrections with reasons)
+- Inventory ledger (full transaction history with running balances)
+- Automatic inventory updates on GRN and secondary sales
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+**Secondary Sales (Outbound to Retailers)**
+- Create secondary orders to retailers with product selection
+- Order listing grouped by retailer
+- Status tracking (pending, dispatched, delivered, cancelled)
+- Inventory deduction on order creation with ledger sync
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+**Returns**
+- Retailer returns (inbound from retailers, with reason codes and approval workflow)
+- Company returns (outbound to company, with pickup/dispatch tracking)
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+**Support and Engagement**
+- Claims management (raise claims with type, amount, attachments, and approval status)
+- Support tickets (categorized: order issues, payment/invoice, product quality, delivery, scheme, technical)
+- Ideas/suggestions submission
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+**Settings and Profile**
+- Business profile with SWOT analysis
+- Invoice/company settings
+- Team/contacts management
+- FY plan with monthly targets, product-wise goals, payment tracking
 
-## Phase: Target Split, Dual Visibility & Manager Self-Service
+**Admin Side (Back Office)**
+- Admin tabs for portal users, orders, claims, support tickets, ideas, inventory
 
-### Phase 1: Fix Equal Split ✅
-- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
-- Each manager handles their own team's internal distribution via their strategy
+**Home Dashboard**
+- Sales snapshot (primary + secondary), AI insights, inventory widget, schemes widget, trends, quick actions, ad banner
 
-### Phase 2: Dual Target for Independent Strategy ✅
-- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
-- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
-- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
-- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
-- Save mutation includes personal target fields
+---
 
-### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
-- New `ManagerTargets.tsx` page for managers to edit subordinate targets
-- View own target vs actual achievement
-- Reuse `useTeamTargetProgress` hook for analytics
+### What is Missing for a "Strong DMS"
 
-## Phase: Feedback Configuration & Policy Engine ✅
+Here are the gaps organized by the areas you specified:
 
-### Database Schema ✅
-- Created `feedback_questions` table (per-module/customer configurable questions)
-- Created `feedback_policies` table (named policies with module, priority)
-- Created `feedback_policy_rules` table (condition+action pairs per policy)
-- RLS enabled on all 3 tables with authenticated access
+#### 1. Inventory and Supply Chain Visibility
+| Gap | Description | Priority |
+|---|---|---|
+| **Real-time stock dashboard** | Visual dashboard with stock health KPIs (days of inventory, fill rate, stockout frequency) | High |
+| **Expiry management alerts** | Proactive notifications for near-expiry stock with FEFO recommendations | High |
+| **Reorder automation** | Auto-suggest or auto-create primary orders when stock hits reorder level | Medium |
+| **Warehouse/location management** | Multi-location inventory support (godown-wise tracking) | Medium |
+| **Stock transfer between locations** | Move stock between godowns within a distributor | Low |
 
-### Frontend Components ✅
-- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
-- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
-- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
+#### 2. Primary Order Enhancements
+| Gap | Description | Priority |
+|---|---|---|
+| **Order tracking timeline** | Visual shipment tracking (submitted → confirmed → dispatched → delivered) with timestamps | High |
+| **Partial delivery handling** | Support for split deliveries against a single order | High |
+| **Credit limit enforcement** | Block orders when outstanding exceeds credit limit | High |
+| **Order templates / reorder** | Quick reorder from previous orders or saved templates | Medium |
+| **Purchase history analytics** | Trend charts showing order frequency, average order value, category mix over time | Medium |
 
-### Policy Engine ✅
-- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
-- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
-- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
+#### 3. Secondary Sales Enhancements
+| Gap | Description | Priority |
+|---|---|---|
+| **Beat/route-wise sales** | Link secondary sales to beats/routes for territory coverage analysis | High |
+| **Retailer outstanding/ledger** | Track retailer-wise payment balances, credit limits, aging | High |
+| **Payment collection** | Record payments against invoices, partial payments, payment modes | High |
+| **Invoice generation** | Generate and share invoices/bills for secondary sales | High |
+| **Salesman-wise tracking** | Attribute secondary sales to delivery agents/salesmen for performance | Medium |
+| **Scheme application** | Auto-apply schemes/discounts on secondary orders | Medium |
+| **Sales return credit notes** | Issue credit notes against retailer returns | Medium |
 
-### Workflow Enforcement ✅
-- `VisitCard.tsx`: Integrated policy check hook
-- "Feedback Required" badge shown when policy triggers
-- Order button intercepted when block_order/mandatory_feedback action triggered
-- Opens feedback modal automatically when blocked
+#### 4. Customer Feedback
+| Gap | Description | Priority |
+|---|---|---|
+| **Retailer feedback collection** | Capture feedback from retailers on product quality, service, delivery | High |
+| **Feedback analytics** | Dashboard showing feedback trends, NPS-style scoring | Medium |
+| **Complaint escalation** | Auto-escalate negative feedback to company with SLA tracking | Medium |
 
-## Phase: No Target Strategy & Mid-Year Flexibility ✅
+#### 5. Analytics and Reporting
+| Gap | Description | Priority |
+|---|---|---|
+| **Sales vs target dashboard** | Visual primary + secondary vs FY plan targets | High |
+| **Market-wise reporting** | Break down sales by territory/beat/market | High |
+| **Product performance** | Category and SKU-wise sales velocity, slow-moving analysis | Medium |
+| **Retailer performance** | Top/bottom retailers, purchase frequency, growth analysis | Medium |
+| **Downloadable reports** | Export MIS reports (PDF/Excel) for primary, secondary, inventory | Medium |
 
-### Strategy Explanation Panel ✅
-- Panel now open by default (`useState(true)`)
-- Added 4th "No Target" card with explanation
+#### 6. Notifications and Communication
+| Gap | Description | Priority |
+|---|---|---|
+| **In-app notifications** | Order status updates, claim approvals, stock alerts | High |
+| **Announcements from company** | Company-to-distributor broadcast messages | Medium |
+| **Scheme notifications** | Alert distributors about new/expiring schemes | Medium |
 
-### No Target Strategy ✅
-- Added `'no_target'` to `TargetStrategy` type union
-- Added Ban icon, gray color scheme, labels across all strategy components
-- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
+---
 
-### Allocation Logic ✅
-- `getContributorCountForNode` returns 0 for `no_target` users
-- `autoDistributeTargets` skips `no_target` children, zeros their targets
-- `splitByWeights` filters out `no_target` entries
-- `handleEqualSplit` excludes `no_target` from weight calculation
-- `handleStrategyChange` zeros all targets when switching to `no_target`
-- Save mutation includes `has_no_target: true` flag
+### Recommended Build Sequence
 
-### Wizard Steps UI ✅
-- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
-- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
-- `StepReviewSave`: No Target rows read-only with grayed appearance
+**Phase 1 — Core commercial completeness (high impact):**
+1. Retailer outstanding ledger and payment collection
+2. Invoice generation for secondary sales
+3. Credit limit enforcement on primary orders
+4. Order tracking timeline with visual status progression
+5. Retailer feedback collection module
 
-### Manager Self-Service ✅
-- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+**Phase 2 — Visibility and intelligence:**
+6. Sales vs target dashboard with FY plan integration
+7. Stock health dashboard with expiry alerts and reorder suggestions
+8. Market/beat-wise sales reporting
+9. In-app notification center
 
-## Phase: Credit Note Generation System ✅
+**Phase 3 — Operational efficiency:**
+10. Order templates and quick reorder
+11. Scheme auto-application on secondary orders
+12. Salesman performance tracking
+13. Downloadable MIS reports
 
-### Database Schema ✅
-- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
-- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
-- RLS enabled with authenticated access
-- Auto-incrementing CN number sequence
+This is a research summary — let me know which phase or specific feature set you want to tackle first, and I will create a detailed implementation plan.
 
-### Credit Note Creation Page ✅ (`/credit-note/create`)
-- Retailer selector → shows all invoices for selected retailer
-- Multi-invoice item selection with checkboxes and return quantity input
-- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
-- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
-- Review step with grouped items by invoice, GST totals
-- Saves to DB and auto-generates PDF on confirmation
-
-### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
-- Matches invoice style: dark header, company logo, BILL TO section
-- Title: "CREDIT NOTE" with red accent (vs green for invoices)
-- Header: CN#, Credit Date, Reference Invoice(s), Reason
-- Items table with red header and light red alternating rows
-- Totals: Sub Total, SGST, CGST, Total (red bar)
-- Amount in words, Reason for Credit section, Authorized Signature
-
-### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
-- Lists all credit notes with status badges (draft/issued/cancelled)
-- Download PDF button per credit note
-- "New Credit Note" button linking to creation page
-
-### Files Created
-- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
-- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
-- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
-- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
-- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
-- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
-- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
-- Modified `src/App.tsx` — Added `/credit-note/create` route
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
