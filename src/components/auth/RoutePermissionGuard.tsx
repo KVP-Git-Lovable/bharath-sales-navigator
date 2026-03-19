@@ -20,7 +20,7 @@ interface RoutePermissionGuardProps {
  * 
  * No special admin bypass - System Administrator has all permissions in DB.
  */
-export const RoutePermissionGuard = ({ children, permissionPrefix }: RoutePermissionGuardProps) => {
+export const RoutePermissionGuard = ({ children, permissionPrefix, moduleName }: RoutePermissionGuardProps) => {
   const { permissions, isLoading, hasModuleAccess } = useProfilePermissions();
   const { securityProfileName, loading: authLoading } = useAuth();
 
@@ -34,16 +34,16 @@ export const RoutePermissionGuard = ({ children, permissionPrefix }: RoutePermis
   }
 
   // No security profile assigned → deny by default (DB-driven only)
-  if (!securityProfileName) return <Navigate to="/dashboard" replace />;
+  if (!securityProfileName) return <PermissionRedirect moduleName={moduleName} />;
 
   // Profile assigned but zero permissions → deny all
-  if (permissions.length === 0) return <Navigate to="/dashboard" replace />;
+  if (permissions.length === 0) return <PermissionRedirect moduleName={moduleName} />;
 
   // Check if user has can_read on any object matching the prefix
   if (hasModuleAccess(permissionPrefix)) {
     return <>{children}</>;
   }
 
-  // No access → redirect to dashboard
-  return <Navigate to="/dashboard" replace />;
+  // No access → redirect with warning toast
+  return <PermissionRedirect moduleName={moduleName} />;
 };
