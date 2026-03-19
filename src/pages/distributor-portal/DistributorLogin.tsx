@@ -39,14 +39,14 @@ const DistributorLogin = () => {
         return;
       }
 
-      // Verify user is admin
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
+      // Verify admin role via security_profiles
+      const { data: adminCheck } = await supabase
+        .from('user_profiles')
+        .select('security_profiles!inner(is_system)')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (userRole?.role !== 'admin') {
+      if (!adminCheck?.security_profiles?.is_system) {
         toast.error('Only admins can impersonate users');
         setImpersonating(false);
         return;
