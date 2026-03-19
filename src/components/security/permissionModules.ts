@@ -228,14 +228,6 @@ export const PERMISSION_MODULES: PermissionModule[] = [
         ]
       },
       {
-        name: 'admin_notification_setup',
-        label: 'Notification Setup',
-        subFeatures: [
-          { name: 'admin_notification_templates', label: 'Notification Templates' },
-          { name: 'admin_notification_schedules', label: 'Notification Schedules' },
-        ]
-      },
-      {
         name: 'admin_recycle_bin',
         label: 'Recycle Bin',
         subFeatures: [

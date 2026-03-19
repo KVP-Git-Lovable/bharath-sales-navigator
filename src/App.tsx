@@ -114,7 +114,7 @@ import CreditManagement from "./pages/CreditManagement";
 import RetailerLoyaltyAdmin from "./pages/RetailerLoyaltyAdmin";
 import RetailerLoyalty from "./pages/RetailerLoyalty";
 import SecurityManagement from "./pages/SecurityManagement";
-import PushContentSetup from "./pages/admin/PushContentSetup";
+
 import PerformanceModuleAdmin from "./pages/admin/PerformanceModuleAdmin";
 import PriceBookAdmin from "./pages/admin/PriceBookAdmin";
 import PriceBookDetail from "./pages/admin/PriceBookDetail";
@@ -362,7 +362,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/admin-controls" element={<ProtectedRoute><AdminControls /></ProtectedRoute>} />
         <Route path="/feature-management" element={<ProtectedRoute><FeatureManagement /></ProtectedRoute>} />
-        <Route path="/push-content-setup" element={<ProtectedRoute><PushContentSetup /></ProtectedRoute>} />
+        
         <Route path="/user_roles" element={<ProtectedRoute><UserRoles /></ProtectedRoute>} />
         <Route path="/security-management" element={<ProtectedRoute><SecurityManagement /></ProtectedRoute>} />
         <Route path="/product-management" element={<ProtectedRoute><ProductManagementPage /></ProtectedRoute>} />
