@@ -372,6 +372,44 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
     }
   };
 
+  const handleSetPassword = async () => {
+    if (!passwordUser) return;
+    if (!passwordForm.password || passwordForm.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('set-distributor-portal-password', {
+        body: {
+          distributorUserId: passwordUser.id,
+          password: passwordForm.password,
+        }
+      });
+
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Password set for ${passwordUser.full_name}`);
+        setPasswordDialogOpen(false);
+        setPasswordUser(null);
+        setPasswordForm({ password: '', confirmPassword: '' });
+        setShowPassword(false);
+        loadUsers();
+      } else {
+        throw new Error(data?.error || 'Failed to set password');
+      }
+    } catch (error: any) {
+      toast.error("Failed to set password: " + error.message);
+    } finally {
+      setSettingPassword(false);
+    }
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'owner': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
