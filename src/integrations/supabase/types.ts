@@ -99,6 +99,8 @@ export type Database = {
       additional_expenses: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           bill_url: string | null
           category: string
           created_at: string
@@ -106,11 +108,16 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          rejection_reason: string | null
+          status: string
+          submitted_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           bill_url?: string | null
           category: string
           created_at?: string
@@ -118,11 +125,16 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          rejection_reason?: string | null
+          status?: string
+          submitted_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           bill_url?: string | null
           category?: string
           created_at?: string
@@ -130,6 +142,9 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          rejection_reason?: string | null
+          status?: string
+          submitted_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -4595,26 +4610,47 @@ export type Database = {
       }
       expense_master_config: {
         Row: {
+          allowed_categories: string[] | null
           created_at: string
           da_amount: number | null
+          da_calculation_basis: string | null
+          expense_policy_notes: string | null
           fixed_ta_amount: number | null
           id: string
+          max_additional_expense_per_day: number | null
+          max_additional_expense_per_month: number | null
+          require_bill_above_amount: number | null
+          ta_per_km_rate: number | null
           ta_type: string
           updated_at: string
         }
         Insert: {
+          allowed_categories?: string[] | null
           created_at?: string
           da_amount?: number | null
+          da_calculation_basis?: string | null
+          expense_policy_notes?: string | null
           fixed_ta_amount?: number | null
           id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          require_bill_above_amount?: number | null
+          ta_per_km_rate?: number | null
           ta_type?: string
           updated_at?: string
         }
         Update: {
+          allowed_categories?: string[] | null
           created_at?: string
           da_amount?: number | null
+          da_calculation_basis?: string | null
+          expense_policy_notes?: string | null
           fixed_ta_amount?: number | null
           id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          require_bill_above_amount?: number | null
+          ta_per_km_rate?: number | null
           ta_type?: string
           updated_at?: string
         }
@@ -4688,6 +4724,140 @@ export type Database = {
           is_enabled?: boolean
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      feedback_policies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          module: string
+          name: string
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          module?: string
+          name: string
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          module?: string
+          name?: string
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      feedback_policy_rules: {
+        Row: {
+          action_type: string
+          condition_operator: string
+          condition_type: string
+          condition_value: string
+          created_at: string
+          id: string
+          is_active: boolean
+          policy_id: string
+          question_set_module: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          action_type?: string
+          condition_operator?: string
+          condition_type: string
+          condition_value?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          policy_id: string
+          question_set_module?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          condition_operator?: string
+          condition_type?: string
+          condition_value?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          policy_id?: string
+          question_set_module?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_policy_rules_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_questions: {
+        Row: {
+          applies_to: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          module: string
+          options: Json | null
+          question_text: string
+          question_type: string
+          retailer_ids: string[] | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          applies_to?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          module?: string
+          options?: Json | null
+          question_text: string
+          question_type?: string
+          retailer_ids?: string[] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          applies_to?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          module?: string
+          options?: Json | null
+          question_text?: string
+          question_type?: string
+          retailer_ids?: string[] | null
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -7255,6 +7425,42 @@ export type Database = {
         }
         Relationships: []
       }
+      module_usage_logs: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          module_category: string
+          module_name: string
+          route_path: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          module_category?: string
+          module_name: string
+          route_path: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          module_category?: string
+          module_name?: string
+          route_path?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_event_log: {
         Row: {
           created_at: string | null
@@ -8063,6 +8269,48 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      plan_enabled_metrics: {
+        Row: {
+          created_at: string | null
+          fy_config_id: string
+          id: string
+          metric_id: string
+          total_target: number | null
+          unit_override: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          fy_config_id: string
+          id?: string
+          metric_id: string
+          total_target?: number | null
+          unit_override?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          fy_config_id?: string
+          id?: string
+          metric_id?: string
+          total_target?: number | null
+          unit_override?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_enabled_metrics_fy_config_id_fkey"
+            columns: ["fy_config_id"]
+            isOneToOne: false
+            referencedRelation: "fy_target_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_enabled_metrics_metric_id_fkey"
+            columns: ["metric_id"]
+            isOneToOne: false
+            referencedRelation: "target_metric_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pm_ai_insights: {
         Row: {
@@ -9641,6 +9889,8 @@ export type Database = {
           created_at: string | null
           id: string
           object_name: string
+          parent_module: string | null
+          permission_type: string
           profile_id: string | null
         }
         Insert: {
@@ -9653,6 +9903,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           object_name: string
+          parent_module?: string | null
+          permission_type?: string
           profile_id?: string | null
         }
         Update: {
@@ -9665,6 +9917,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           object_name?: string
+          parent_module?: string | null
+          permission_type?: string
           profile_id?: string | null
         }
         Relationships: [
@@ -12194,6 +12448,81 @@ export type Database = {
         }
         Relationships: []
       }
+      target_metric_definitions: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          unit: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          unit?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          unit?: string | null
+        }
+        Relationships: []
+      }
+      target_parameter_definitions: {
+        Row: {
+          created_at: string
+          data_source_filter: Json | null
+          data_source_id_column: string | null
+          data_source_name_column: string | null
+          data_source_table: string | null
+          display_order: number
+          icon: string
+          id: string
+          is_system: boolean
+          name: string
+          parameter_key: string
+        }
+        Insert: {
+          created_at?: string
+          data_source_filter?: Json | null
+          data_source_id_column?: string | null
+          data_source_name_column?: string | null
+          data_source_table?: string | null
+          display_order?: number
+          icon?: string
+          id?: string
+          is_system?: boolean
+          name: string
+          parameter_key: string
+        }
+        Update: {
+          created_at?: string
+          data_source_filter?: Json | null
+          data_source_id_column?: string | null
+          data_source_name_column?: string | null
+          data_source_table?: string | null
+          display_order?: number
+          icon?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+          parameter_key?: string
+        }
+        Relationships: []
+      }
       target_setup_master: {
         Row: {
           annual_quantity_target: number
@@ -12968,6 +13297,9 @@ export type Database = {
           manager_own_quantity_target: number | null
           manager_own_revenue_target: number | null
           notes: string | null
+          personal_quantity_target: number | null
+          personal_revenue_target: number | null
+          personal_visits_target: number | null
           quantity_target: number | null
           quantity_unit: string | null
           revenue_target: number | null
@@ -12984,6 +13316,9 @@ export type Database = {
           manager_own_quantity_target?: number | null
           manager_own_revenue_target?: number | null
           notes?: string | null
+          personal_quantity_target?: number | null
+          personal_revenue_target?: number | null
+          personal_visits_target?: number | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
@@ -13000,6 +13335,9 @@ export type Database = {
           manager_own_quantity_target?: number | null
           manager_own_revenue_target?: number | null
           notes?: string | null
+          personal_quantity_target?: number | null
+          personal_revenue_target?: number | null
+          personal_visits_target?: number | null
           quantity_target?: number | null
           quantity_unit?: string | null
           revenue_target?: number | null
@@ -14905,6 +15243,7 @@ export type Database = {
         Returns: undefined
       }
       generate_invoice_number: { Args: never; Returns: string }
+      get_activity_logging_summary: { Args: { p_days?: number }; Returns: Json }
       get_all_subordinates: {
         Args: { manager_user_id: string }
         Returns: {
@@ -14923,6 +15262,7 @@ export type Database = {
           username: string
         }[]
       }
+      get_database_metrics: { Args: never; Returns: Json }
       get_direct_reports: {
         Args: { manager_user_id: string }
         Returns: {
@@ -14951,6 +15291,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_estimated_memory_usage: { Args: never; Returns: number }
       get_limited_profiles_for_admin: {
         Args: never
         Returns: {
@@ -15138,6 +15479,10 @@ export type Database = {
           user_id_param: string
         }
         Returns: string
+      }
+      sync_order_with_items: {
+        Args: { p_items: Json; p_order: Json }
+        Returns: Json
       }
       unlock_password_reset: { Args: { user_email: string }; Returns: boolean }
       update_security_info: {
