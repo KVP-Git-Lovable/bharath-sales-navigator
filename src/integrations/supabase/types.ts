@@ -3943,6 +3943,78 @@ export type Database = {
           },
         ]
       }
+      distributor_payments: {
+        Row: {
+          amount: number
+          bank_name: string | null
+          cheque_date: string | null
+          cheque_number: string | null
+          created_at: string
+          created_by: string | null
+          distributor_id: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_mode: string
+          receipt_number: string | null
+          reference_number: string | null
+          retailer_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank_name?: string | null
+          cheque_date?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          distributor_id: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_mode?: string
+          receipt_number?: string | null
+          reference_number?: string | null
+          retailer_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_name?: string | null
+          cheque_date?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          distributor_id?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_mode?: string
+          receipt_number?: string | null
+          reference_number?: string | null
+          retailer_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_payments_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_payments_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_price_books: {
         Row: {
           assigned_at: string
@@ -3987,6 +4059,126 @@ export type Database = {
             columns: ["price_book_id"]
             isOneToOne: false
             referencedRelation: "price_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_retailer_credit_limits: {
+        Row: {
+          created_at: string
+          credit_days: number
+          credit_limit: number
+          distributor_id: string
+          id: string
+          is_active: boolean
+          retailer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_days?: number
+          credit_limit?: number
+          distributor_id: string
+          id?: string
+          is_active?: boolean
+          retailer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_days?: number
+          credit_limit?: number
+          distributor_id?: string
+          id?: string
+          is_active?: boolean
+          retailer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_retailer_credit_limits_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_retailer_credit_limits_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_retailer_ledger: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          credit_amount: number
+          debit_amount: number
+          description: string | null
+          distributor_id: string
+          id: string
+          notes: string | null
+          payment_mode: string | null
+          reference_id: string | null
+          reference_number: string | null
+          retailer_id: string
+          running_balance: number | null
+          transaction_date: string
+          transaction_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          credit_amount?: number
+          debit_amount?: number
+          description?: string | null
+          distributor_id: string
+          id?: string
+          notes?: string | null
+          payment_mode?: string | null
+          reference_id?: string | null
+          reference_number?: string | null
+          retailer_id: string
+          running_balance?: number | null
+          transaction_date?: string
+          transaction_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          credit_amount?: number
+          debit_amount?: number
+          description?: string | null
+          distributor_id?: string
+          id?: string
+          notes?: string | null
+          payment_mode?: string | null
+          reference_id?: string | null
+          reference_number?: string | null
+          retailer_id?: string
+          running_balance?: number | null
+          transaction_date?: string
+          transaction_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_retailer_ledger_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_retailer_ledger_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
         ]

@@ -176,6 +176,9 @@ import RetailerReturns from "./pages/distributor-portal/RetailerReturns";
 import CompanyReturns from "./pages/distributor-portal/CompanyReturns";
 import InventoryLedger from "./pages/distributor-portal/InventoryLedger";
 import StockAdjustments from "./pages/distributor-portal/StockAdjustments";
+import RetailerLedger from "./pages/distributor-portal/RetailerLedger";
+import RetailerLedgerDetail from "./pages/distributor-portal/RetailerLedgerDetail";
+import CollectPayment from "./pages/distributor-portal/CollectPayment";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
@@ -482,6 +485,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="company-returns" element={<CompanyReturns />} />
           <Route path="inventory-ledger" element={<InventoryLedger />} />
           <Route path="stock-adjustments" element={<StockAdjustments />} />
+          <Route path="retailer-ledger" element={<RetailerLedger />} />
+          <Route path="retailer-ledger/:retailerId" element={<RetailerLedgerDetail />} />
+          <Route path="collect-payment" element={<CollectPayment />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
