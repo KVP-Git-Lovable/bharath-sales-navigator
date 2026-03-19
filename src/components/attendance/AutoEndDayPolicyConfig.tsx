@@ -28,7 +28,17 @@ const AutoEndDayPolicyConfig = () => {
   const { data: policy, isLoading } = useAutoEndDayPolicy();
   const updatePolicy = useUpdateAutoEndDayPolicy();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    is_enabled: boolean;
+    auto_close_time: string;
+    timezone: string;
+    last_activity_source: 'all_activity' | 'last_order_only' | 'last_click';
+    pre_warning_enabled: boolean;
+    pre_warning_minutes_before: number;
+    close_in_progress_visits: boolean;
+    cancel_planned_visits: boolean;
+    mark_unproductive: boolean;
+  }>({
     is_enabled: true,
     auto_close_time: '22:00',
     timezone: 'Asia/Kolkata',
