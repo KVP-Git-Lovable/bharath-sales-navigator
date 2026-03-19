@@ -82,18 +82,9 @@ serve(async (req) => {
 
     let authUserId = distributorUser.auth_user_id;
 
-    // Check if auth user exists by email
     if (!authUserId) {
-      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === distributorUser.email);
-      if (existingUser) {
-        authUserId = existingUser.id;
-      }
-    }
-
-    if (!authUserId) {
-      // Create new auth user
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      // Try to create a new auth user first
+      const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: distributorUser.email,
         password,
         user_metadata: {
@@ -104,11 +95,41 @@ serve(async (req) => {
         email_confirm: true,
       });
 
-      if (authError) {
-        return new Response(JSON.stringify({ error: 'Failed to create auth user', details: authError.message }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (createError) {
+        // If user already exists, try to find by email and update
+        if (createError.message?.includes('already been registered') || createError.message?.includes('already exists')) {
+          // Use getUserByEmail (available in newer supabase-js) or try signInWithPassword approach
+          // Since we can't list users, we'll use the admin API to get user by email
+          const { data: userByEmail, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(distributorUser.email);
+          
+          if (getUserError || !userByEmail?.user) {
+            return new Response(JSON.stringify({ error: 'User exists but could not be found', details: getUserError?.message }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+
+          authUserId = userByEmail.user.id;
+
+          // Update existing user's password
+          const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+            password,
+            user_metadata: {
+              full_name: distributorUser.full_name,
+              distributor_user_id: distributorUserId,
+              is_distributor_portal_user: true,
+            },
+          });
+
+          if (updateError) {
+            return new Response(JSON.stringify({ error: 'Failed to update password', details: updateError.message }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        } else {
+          return new Response(JSON.stringify({ error: 'Failed to create auth user', details: createError.message }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      } else {
+        authUserId = authUser.user?.id;
       }
-      authUserId = authUser.user?.id;
     } else {
       // Update existing user's password
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
