@@ -1515,8 +1515,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
       // Fetch and register static Noto Sans font for ₹ symbol support
       const [regularRes, boldRes] = await Promise.all([
-        fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/unicode-400-normal.ttf'),
-        fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest/unicode-700-normal.ttf'),
+        fetch('https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSans/full/ttf/NotoSans-Regular.ttf'),
+        fetch('https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSans/full/ttf/NotoSans-Bold.ttf'),
       ]);
       const [regularBuf, boldBuf] = await Promise.all([regularRes.arrayBuffer(), boldRes.arrayBuffer()]);
       const toBase64 = (buf: ArrayBuffer) => {
