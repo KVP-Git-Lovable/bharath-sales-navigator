@@ -250,6 +250,8 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       designation: user.designation || '',
       user_level: user.user_level || 'staff',
       user_status: user.user_status || 'initiated',
+      password: '',
+      confirmPassword: '',
     });
     setDialogOpen(true);
   };
