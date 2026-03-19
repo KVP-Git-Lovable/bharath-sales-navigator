@@ -144,8 +144,12 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       designation: '',
       user_level: 'staff',
       user_status: 'initiated',
+      password: '',
+      confirmPassword: '',
     });
     setEditingUser(null);
+    setShowFormPassword(false);
+    setShowFormConfirmPassword(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
