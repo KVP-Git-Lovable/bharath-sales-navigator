@@ -259,8 +259,21 @@ const CreatePrimaryOrder = () => {
       return;
     }
 
-    setLoading(true);
     const { subtotal, tax, total } = calculateTotals();
+
+    // Credit limit enforcement on submit
+    if (submit && creditLimit > 0) {
+      const newOutstanding = outstanding + total;
+      if (newOutstanding > creditLimit) {
+        toast.error(
+          `Credit limit exceeded! Limit: ₹${creditLimit.toLocaleString('en-IN')}, Outstanding + this order: ₹${newOutstanding.toLocaleString('en-IN')}. Cannot submit.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+    }
+
+    setLoading(true);
     
     // Generate order number
     const orderNumber = `PO-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
