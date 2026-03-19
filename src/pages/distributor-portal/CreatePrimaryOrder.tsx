@@ -68,6 +68,9 @@ const CreatePrimaryOrder = () => {
   const [loading, setLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(true);
   const [priceBookName, setPriceBookName] = useState<string>('');
+  const [creditLimit, setCreditLimit] = useState<number>(0);
+  const [outstanding, setOutstanding] = useState<number>(0);
+  const [creditChecked, setCreditChecked] = useState(false);
   
   const distributorId = localStorage.getItem('distributor_id');
 
@@ -77,7 +80,32 @@ const CreatePrimaryOrder = () => {
       return;
     }
     loadData();
+    loadCreditInfo();
   }, [distributorId, navigate]);
+
+  const loadCreditInfo = async () => {
+    if (!distributorId) return;
+    try {
+      const [creditRes, ordersRes] = await Promise.all([
+        supabase
+          .from('distributor_credit_limits')
+          .select('credit_limit')
+          .eq('distributor_id', distributorId)
+          .maybeSingle(),
+        supabase
+          .from('primary_orders')
+          .select('total_amount')
+          .eq('distributor_id', distributorId)
+          .not('status', 'in', '("cancelled","delivered")'),
+      ]);
+      setCreditLimit(Number(creditRes.data?.credit_limit || 0));
+      const totalOutstanding = (ordersRes.data || []).reduce((s: number, o: any) => s + Number(o.total_amount || 0), 0);
+      setOutstanding(totalOutstanding);
+      setCreditChecked(true);
+    } catch (err) {
+      console.error('Credit check failed:', err);
+    }
+  };
 
   // Filter products when category changes
   useEffect(() => {
@@ -231,8 +259,21 @@ const CreatePrimaryOrder = () => {
       return;
     }
 
-    setLoading(true);
     const { subtotal, tax, total } = calculateTotals();
+
+    // Credit limit enforcement on submit
+    if (submit && creditLimit > 0) {
+      const newOutstanding = outstanding + total;
+      if (newOutstanding > creditLimit) {
+        toast.error(
+          `Credit limit exceeded! Limit: ₹${creditLimit.toLocaleString('en-IN')}, Outstanding + this order: ₹${newOutstanding.toLocaleString('en-IN')}. Cannot submit.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+    }
+
+    setLoading(true);
     
     // Generate order number
     const orderNumber = `PO-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -308,6 +349,25 @@ const CreatePrimaryOrder = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Credit Limit Warning */}
+        {creditChecked && creditLimit > 0 && (
+          <Card className={`border-l-4 ${outstanding > creditLimit ? 'border-l-destructive bg-destructive/5' : outstanding > creditLimit * 0.8 ? 'border-l-yellow-500 bg-yellow-50' : 'border-l-green-500 bg-green-50'}`}>
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">
+                  {outstanding > creditLimit ? '⚠️ Credit Limit Exceeded' : 'Credit Status'}
+                </span>
+                <span>
+                  ₹{outstanding.toLocaleString('en-IN')} / ₹{creditLimit.toLocaleString('en-IN')}
+                </span>
+              </div>
+              {outstanding > creditLimit && (
+                <p className="text-xs text-destructive mt-1">Order submission is blocked until outstanding is cleared.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Add Product Section */}
         <Card>
           <CardHeader className="pb-3">

@@ -3510,6 +3510,41 @@ export type Database = {
           },
         ]
       }
+      distributor_credit_limits: {
+        Row: {
+          credit_days: number
+          credit_limit: number
+          distributor_id: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          credit_days?: number
+          credit_limit?: number
+          distributor_id: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          credit_days?: number
+          credit_limit?: number
+          distributor_id?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_credit_limits_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: true
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_evaluation_tasks: {
         Row: {
           attachment_urls: string[] | null
@@ -4111,6 +4146,75 @@ export type Database = {
           },
         ]
       }
+      distributor_retailer_feedback: {
+        Row: {
+          comments: string | null
+          created_at: string
+          created_by: string | null
+          delivery_rating: number | null
+          distributor_id: string
+          feedback_type: string
+          follow_up_completed: boolean
+          follow_up_notes: string | null
+          follow_up_required: boolean
+          id: string
+          product_quality_rating: number | null
+          rating: number
+          retailer_id: string
+          service_rating: number | null
+          updated_at: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivery_rating?: number | null
+          distributor_id: string
+          feedback_type?: string
+          follow_up_completed?: boolean
+          follow_up_notes?: string | null
+          follow_up_required?: boolean
+          id?: string
+          product_quality_rating?: number | null
+          rating?: number
+          retailer_id: string
+          service_rating?: number | null
+          updated_at?: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivery_rating?: number | null
+          distributor_id?: string
+          feedback_type?: string
+          follow_up_completed?: boolean
+          follow_up_notes?: string | null
+          follow_up_required?: boolean
+          id?: string
+          product_quality_rating?: number | null
+          rating?: number
+          retailer_id?: string
+          service_rating?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_retailer_feedback_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_retailer_feedback_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distributor_retailer_ledger: {
         Row: {
           created_at: string
@@ -4361,6 +4465,134 @@ export type Database = {
           },
           {
             foreignKeyName: "distributor_returns_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_secondary_invoice_items: {
+        Row: {
+          cgst_amount: number
+          created_at: string
+          hsn_code: string | null
+          id: string
+          invoice_id: string
+          product_name: string
+          quantity: number
+          rate: number
+          sgst_amount: number
+          taxable_amount: number
+          total_amount: number
+          unit: string
+        }
+        Insert: {
+          cgst_amount?: number
+          created_at?: string
+          hsn_code?: string | null
+          id?: string
+          invoice_id: string
+          product_name: string
+          quantity?: number
+          rate?: number
+          sgst_amount?: number
+          taxable_amount?: number
+          total_amount?: number
+          unit?: string
+        }
+        Update: {
+          cgst_amount?: number
+          created_at?: string
+          hsn_code?: string | null
+          id?: string
+          invoice_id?: string
+          product_name?: string
+          quantity?: number
+          rate?: number
+          sgst_amount?: number
+          taxable_amount?: number
+          total_amount?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_secondary_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "distributor_secondary_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributor_secondary_invoices: {
+        Row: {
+          amount_paid: number
+          balance_due: number
+          cgst_amount: number
+          created_at: string
+          distributor_id: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          order_id: string | null
+          pdf_url: string | null
+          retailer_id: string
+          sgst_amount: number
+          status: string
+          subtotal: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          balance_due?: number
+          cgst_amount?: number
+          created_at?: string
+          distributor_id: string
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          notes?: string | null
+          order_id?: string | null
+          pdf_url?: string | null
+          retailer_id: string
+          sgst_amount?: number
+          status?: string
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          balance_due?: number
+          cgst_amount?: number
+          created_at?: string
+          distributor_id?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          order_id?: string | null
+          pdf_url?: string | null
+          retailer_id?: string
+          sgst_amount?: number
+          status?: string
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distributor_secondary_invoices_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "distributor_secondary_invoices_retailer_id_fkey"
             columns: ["retailer_id"]
             isOneToOne: false
             referencedRelation: "retailers"
@@ -10708,6 +10940,41 @@ export type Database = {
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_order_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          order_id: string
+          status: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          status: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -17225,6 +17492,7 @@ export type Database = {
         Args: { p_action: string; p_record_id: string; p_table_name: string }
         Returns: undefined
       }
+      nextval_text: { Args: { seq_name: string }; Returns: string }
       owns_completed_invitation: {
         Args: { _email: string; _user_id: string }
         Returns: boolean

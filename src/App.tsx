@@ -179,6 +179,9 @@ import StockAdjustments from "./pages/distributor-portal/StockAdjustments";
 import RetailerLedger from "./pages/distributor-portal/RetailerLedger";
 import RetailerLedgerDetail from "./pages/distributor-portal/RetailerLedgerDetail";
 import CollectPayment from "./pages/distributor-portal/CollectPayment";
+import SecondaryInvoiceList from "./pages/distributor-portal/SecondaryInvoiceList";
+import SecondaryInvoiceCreate from "./pages/distributor-portal/SecondaryInvoiceCreate";
+import RetailerFeedback from "./pages/distributor-portal/RetailerFeedback";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
@@ -488,6 +491,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="retailer-ledger" element={<RetailerLedger />} />
           <Route path="retailer-ledger/:retailerId" element={<RetailerLedgerDetail />} />
           <Route path="collect-payment" element={<CollectPayment />} />
+          <Route path="secondary-invoices" element={<SecondaryInvoiceList />} />
+          <Route path="secondary-invoices/create" element={<SecondaryInvoiceCreate />} />
+          <Route path="retailer-feedback" element={<RetailerFeedback />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}

@@ -13,6 +13,7 @@ import {
   ClipboardList,
   RotateCcw,
   FileText,
+  Receipt,
   Headphones,
   Lightbulb,
   Building,
@@ -29,7 +30,8 @@ import {
   Bell,
   Plus,
   TrendingUp,
-  ShieldCheck
+  ShieldCheck,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -54,6 +56,7 @@ const mainNavItems: NavItem[] = [
   { label: 'Home', icon: Home, path: '/distributor-portal/dashboard' },
   { label: 'Primary Orders', icon: ClipboardList, path: '/distributor-portal/primary-orders' },
   { label: 'Secondary Sales', icon: ShoppingCart, path: '/distributor-portal/secondary-sales' },
+  { label: 'Invoices', icon: Receipt, path: '/distributor-portal/secondary-invoices' },
   { label: 'Retailer Ledger', icon: FileText, path: '/distributor-portal/retailer-ledger' },
   { label: 'Inventory', icon: Package, path: '/distributor-portal/inventory' },
 ];
@@ -67,6 +70,7 @@ const operationsNavItems: NavItem[] = [
 ];
 
 const supportNavItems: NavItem[] = [
+  { label: 'Retailer Feedback', icon: MessageSquare, path: '/distributor-portal/retailer-feedback' },
   { label: 'Claims', icon: FileText, path: '/distributor-portal/claims' },
   { label: 'Support', icon: Headphones, path: '/distributor-portal/support' },
   { label: 'Ideas', icon: Lightbulb, path: '/distributor-portal/ideas' },
