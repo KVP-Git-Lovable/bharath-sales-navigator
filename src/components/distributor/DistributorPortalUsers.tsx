@@ -160,6 +160,18 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       return;
     }
 
+    // Validate password fields if provided (only for new users)
+    if (!editingUser && formData.password) {
+      if (formData.password.length < 6) {
+        toast.error("Password must be at least 6 characters");
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        toast.error("Passwords do not match");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       if (editingUser) {
@@ -181,7 +193,7 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
         toast.success("User updated successfully");
       } else {
         // Create new user
-        const { error } = await supabase
+        const { data: insertedData, error } = await supabase
           .from('distributor_users')
           .insert([{
             distributor_id: distributorId,
@@ -193,10 +205,29 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
             user_level: formData.user_level,
             user_status: formData.user_status,
             is_active: false,
-          }]);
+          }])
+          .select('id')
+          .single();
 
         if (error) throw error;
-        toast.success("Portal user created successfully");
+
+        // If password was provided, set it immediately
+        if (formData.password && insertedData?.id) {
+          const { data: pwData, error: pwError } = await supabase.functions.invoke('set-distributor-portal-password', {
+            body: {
+              distributorUserId: insertedData.id,
+              password: formData.password,
+            }
+          });
+
+          if (pwError || !pwData?.success) {
+            toast.warning("User created but password setup failed: " + (pwData?.error || pwError?.message || 'Unknown error'));
+          } else {
+            toast.success("Portal user created with login credentials!");
+          }
+        } else {
+          toast.success("Portal user created successfully");
+        }
       }
 
       setDialogOpen(false);
