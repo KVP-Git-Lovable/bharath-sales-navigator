@@ -495,6 +495,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="secondary-invoices" element={<SecondaryInvoiceList />} />
           <Route path="secondary-invoices/create" element={<SecondaryInvoiceCreate />} />
           <Route path="retailer-feedback" element={<RetailerFeedback />} />
+          <Route path="stock-health" element={<StockHealthDashboard />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
