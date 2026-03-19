@@ -67,7 +67,7 @@ export const ADMIN_MODULE_SUB_PREFIXES: Record<string, string[]> = {
   'admin_company_profile': ['admin_company_', 'admin_bank_', 'admin_header_'],
   'admin_invoice_mgmt': ['admin_invoice_'],
   'admin_credit_mgmt': ['admin_credit_'],
-  'admin_notification_setup': ['admin_notification_setup_'],
+  
   'admin_notification_rules': ['admin_notification_rules_'],
   'admin_distributor_portal': ['admin_portal_'],
   'admin_target_vs_actual': ['admin_target_'],

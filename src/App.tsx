@@ -362,7 +362,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/admin-controls" element={<ProtectedRoute><AdminControls /></ProtectedRoute>} />
         <Route path="/feature-management" element={<ProtectedRoute><FeatureManagement /></ProtectedRoute>} />
-        <Route path="/push-content-setup" element={<ProtectedRoute><PushContentSetup /></ProtectedRoute>} />
+        
         <Route path="/user_roles" element={<ProtectedRoute><UserRoles /></ProtectedRoute>} />
         <Route path="/security-management" element={<ProtectedRoute><SecurityManagement /></ProtectedRoute>} />
         <Route path="/product-management" element={<ProtectedRoute><ProductManagementPage /></ProtectedRoute>} />
