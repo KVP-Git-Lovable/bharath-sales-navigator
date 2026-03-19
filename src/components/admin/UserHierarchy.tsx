@@ -179,7 +179,7 @@ const OrgChartNode = ({ user }: { user: HierarchyUser }) => {
 
 // Flat list row for list view
 const FlatUserRow = ({ user }: { user: HierarchyUser }) => {
-  const colors = getRoleColors(user.role_name);
+  const colors = getRoleColors(user);
   return (
     <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/60 transition-colors">
       <Avatar className="h-7 w-7 shrink-0">
