@@ -17,6 +17,7 @@ import {
   Send,
   ClipboardCheck
 } from 'lucide-react';
+import OrderTrackingTimeline from '@/components/distributor-portal/OrderTrackingTimeline';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
