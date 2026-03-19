@@ -37,7 +37,7 @@ export const ADMIN_MODULE_PERMISSION_MAP: Record<string, string> = {
   'admin_company_profile': '/company-profile',
   'admin_invoice_mgmt': '/invoice-management',
   'admin_credit_mgmt': '/credit-management',
-  'admin_notification_setup': '/push-content-setup',
+  
   'admin_recycle_bin': '/admin/recycle-bin',
   'admin_distributor_portal': '/admin/distributor-portal',
   'admin_target_vs_actual': '/admin/target-vs-actual',
