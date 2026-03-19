@@ -52,7 +52,10 @@ export const validatePermissions = (dbPermissions: PermissionRecord[]): void => 
 
   if (missing.length > 0) {
     devWarn(
-      `⚠️ Permission Validator: ${missing.length} UI permission key(s) not found in DB for current profile:`,
+      `⚠️ Permission Validator: ${missing.length} UI permission key(s) not found in DB for current profile.\n` +
+      `→ To fix: Go to Security & Access Control → select the profile → enable the missing permissions.\n` +
+      `→ System Administrator profiles get new permissions automatically via DB trigger.\n` +
+      `→ Missing keys:`,
       missing.sort()
     );
   } else {
