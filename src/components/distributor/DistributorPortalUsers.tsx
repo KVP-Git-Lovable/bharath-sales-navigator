@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   Plus, User, Mail, Phone, Shield, CheckCircle, XCircle, 
-  Send, Edit, Trash2, LogIn, Clock, AlertCircle, UserX 
+  Send, Edit, Trash2, LogIn, Clock, AlertCircle, UserX, Key, Eye, EyeOff 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
