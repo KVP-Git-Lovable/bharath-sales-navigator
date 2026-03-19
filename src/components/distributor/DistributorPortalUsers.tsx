@@ -108,7 +108,11 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
     designation: '',
     user_level: 'staff',
     user_status: 'initiated' as 'initiated' | 'active' | 'inactive' | 'deactivated',
+    password: '',
+    confirmPassword: '',
   });
+  const [showFormPassword, setShowFormPassword] = useState(false);
+  const [showFormConfirmPassword, setShowFormConfirmPassword] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -140,8 +144,12 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       designation: '',
       user_level: 'staff',
       user_status: 'initiated',
+      password: '',
+      confirmPassword: '',
     });
     setEditingUser(null);
+    setShowFormPassword(false);
+    setShowFormConfirmPassword(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,6 +158,18 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
     if (!formData.email || !formData.full_name) {
       toast.error("Name and email are required");
       return;
+    }
+
+    // Validate password fields if provided (only for new users)
+    if (!editingUser && formData.password) {
+      if (formData.password.length < 6) {
+        toast.error("Password must be at least 6 characters");
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        toast.error("Passwords do not match");
+        return;
+      }
     }
 
     setSaving(true);
@@ -173,7 +193,7 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
         toast.success("User updated successfully");
       } else {
         // Create new user
-        const { error } = await supabase
+        const { data: insertedData, error } = await supabase
           .from('distributor_users')
           .insert([{
             distributor_id: distributorId,
@@ -185,10 +205,29 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
             user_level: formData.user_level,
             user_status: formData.user_status,
             is_active: false,
-          }]);
+          }])
+          .select('id')
+          .single();
 
         if (error) throw error;
-        toast.success("Portal user created successfully");
+
+        // If password was provided, set it immediately
+        if (formData.password && insertedData?.id) {
+          const { data: pwData, error: pwError } = await supabase.functions.invoke('set-distributor-portal-password', {
+            body: {
+              distributorUserId: insertedData.id,
+              password: formData.password,
+            }
+          });
+
+          if (pwError || !pwData?.success) {
+            toast.warning("User created but password setup failed: " + (pwData?.error || pwError?.message || 'Unknown error'));
+          } else {
+            toast.success("Portal user created with login credentials!");
+          }
+        } else {
+          toast.success("Portal user created successfully");
+        }
       }
 
       setDialogOpen(false);
@@ -211,6 +250,8 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       designation: user.designation || '',
       user_level: user.user_level || 'staff',
       user_status: user.user_status || 'initiated',
+      password: '',
+      confirmPassword: '',
     });
     setDialogOpen(true);
   };
@@ -579,6 +620,61 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
                     Initiated = Email sent, Active = Using portal, Inactive = 1 month no login, Deactivated = 2 months no login
                   </p>
                 </div>
+
+                {!editingUser && (
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <Key className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm font-medium">Set Login Password</Label>
+                      <span className="text-xs text-muted-foreground">(Optional)</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      If set, the user can log in immediately after creation.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="form_password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="form_password"
+                          type={showFormPassword ? 'text' : 'password'}
+                          value={formData.password}
+                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Min 6 characters"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowFormPassword(!showFormPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    {formData.password && (
+                      <div className="space-y-2">
+                        <Label htmlFor="form_confirmPassword">Confirm Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="form_confirmPassword"
+                            type={showFormConfirmPassword ? 'text' : 'password'}
+                            value={formData.confirmPassword}
+                            onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                            placeholder="Confirm password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowFormConfirmPassword(!showFormConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showFormConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => {
