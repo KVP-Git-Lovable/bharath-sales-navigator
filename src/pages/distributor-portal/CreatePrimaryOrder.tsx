@@ -80,7 +80,32 @@ const CreatePrimaryOrder = () => {
       return;
     }
     loadData();
+    loadCreditInfo();
   }, [distributorId, navigate]);
+
+  const loadCreditInfo = async () => {
+    if (!distributorId) return;
+    try {
+      const [creditRes, ordersRes] = await Promise.all([
+        supabase
+          .from('distributor_credit_limits')
+          .select('credit_limit')
+          .eq('distributor_id', distributorId)
+          .maybeSingle(),
+        supabase
+          .from('primary_orders')
+          .select('total_amount')
+          .eq('distributor_id', distributorId)
+          .not('status', 'in', '("cancelled","delivered")'),
+      ]);
+      setCreditLimit(Number(creditRes.data?.credit_limit || 0));
+      const totalOutstanding = (ordersRes.data || []).reduce((s: number, o: any) => s + Number(o.total_amount || 0), 0);
+      setOutstanding(totalOutstanding);
+      setCreditChecked(true);
+    } catch (err) {
+      console.error('Credit check failed:', err);
+    }
+  };
 
   // Filter products when category changes
   useEffect(() => {
