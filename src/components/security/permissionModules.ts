@@ -666,16 +666,14 @@ export const getTotalFeatureCount = (module: PermissionModule): number => {
   return getAllPermissionItems(module).length;
 };
 
-// Helper to get ALL permission item names across all modules (for System Administrator auto-grant)
+// Helper to get ALL permission item names across all modules (for auto-grant operations)
 export const getAllModulePermissionItems = (): string[] => {
   const items: string[] = [];
-  PERMISSION_MODULES.forEach(module => {
-    getAllPermissionItems(module).forEach(item => {
-      items.push(item.name);
+  PERMISSION_MODULES.forEach(mod => {
+    mod.features.forEach(feat => {
+      items.push(feat.name);
+      feat.subFeatures?.forEach(sub => items.push(sub.name));
     });
   });
   return items;
 };
-
-// Constant for System Administrator profile name
-export const SYSTEM_ADMINISTRATOR_PROFILE = 'System Administrator';

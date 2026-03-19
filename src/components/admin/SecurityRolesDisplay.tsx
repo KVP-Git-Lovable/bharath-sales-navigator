@@ -17,6 +17,7 @@ interface SecurityProfile {
   description: string | null;
   is_system: boolean;
   user_count: number;
+  colorIndex: number;
 }
 
 interface RoleUser {
@@ -30,14 +31,16 @@ interface SecurityRolesDisplayProps {
   className?: string;
 }
 
-const roleColors: Record<string, string> = {
-  'Super Admin': 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20',
-  'System Administrator': 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20',
-  'Sales Manager': 'bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20',
-  'Product Manager': 'bg-purple-500/10 text-purple-600 border-purple-500/20 hover:bg-purple-500/20',
-  'Field Sales Executive': 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20',
-  'Data Viewer': 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20',
-};
+// Dynamic color palette for roles — cycles through colors, system profiles get a distinct style
+const rolePalette = [
+  'bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20',
+  'bg-purple-500/10 text-purple-600 border-purple-500/20 hover:bg-purple-500/20',
+  'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20',
+  'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20',
+  'bg-cyan-500/10 text-cyan-600 border-cyan-500/20 hover:bg-cyan-500/20',
+  'bg-pink-500/10 text-pink-600 border-pink-500/20 hover:bg-pink-500/20',
+];
+const systemRoleColor = 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20';
 
 const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }) => {
   const [roles, setRoles] = useState<SecurityProfile[]>([]);
@@ -76,9 +79,11 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
         countMap.set(up.profile_id, current + 1);
       });
 
+      let nonSystemIndex = 0;
       const rolesWithCounts: SecurityProfile[] = (profiles || []).map(profile => ({
         ...profile,
-        user_count: countMap.get(profile.id) || 0
+        user_count: countMap.get(profile.id) || 0,
+        colorIndex: profile.is_system ? 0 : nonSystemIndex++,
       }));
 
       setRoles(rolesWithCounts);
@@ -131,8 +136,9 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
     }
   };
 
-  const getRoleColor = (name: string) => {
-    return roleColors[name] || 'bg-muted text-muted-foreground border-border hover:bg-muted/80';
+  const getRoleColor = (role: SecurityProfile) => {
+    if (role.is_system) return systemRoleColor;
+    return rolePalette[role.colorIndex % rolePalette.length];
   };
 
   const totalUsers = roles.reduce((sum, role) => sum + role.user_count, 0);
@@ -164,7 +170,7 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
           <div
             key={role.id}
             onClick={() => fetchUsersForRole(role)}
-            className={`px-3 py-2 rounded-lg border transition-all cursor-pointer min-w-[100px] ${getRoleColor(role.name)}`}
+            className={`px-3 py-2 rounded-lg border transition-all cursor-pointer min-w-[100px] ${getRoleColor(role)}`}
           >
             <h3 className="font-medium text-xs line-clamp-1">{role.name}</h3>
             <div className="flex items-center gap-1 text-base font-bold mt-0.5">

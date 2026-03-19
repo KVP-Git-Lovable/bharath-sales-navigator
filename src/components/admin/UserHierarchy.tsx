@@ -17,6 +17,7 @@ interface HierarchyUser {
   username: string;
   profile_picture_url?: string;
   role_name?: string;
+  is_system_profile?: boolean;
   manager_id?: string;
   directReports: HierarchyUser[];
 }
@@ -25,19 +26,13 @@ interface UserHierarchyProps {
   className?: string;
 }
 
-// Role-based color mapping
-const roleColorMap: Record<string, { bg: string; text: string; border: string; badge: string }> = {
-  'System Administrator': { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' },
-  'Super Admin': { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' },
-  'Admin': { bg: 'bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500' },
-  'Manager': { bg: 'bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/30', badge: 'bg-blue-500' },
-  'Team Lead': { bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/30', badge: 'bg-emerald-500' },
-  'default': { bg: 'bg-slate-500/10', text: 'text-slate-700 dark:text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-500' },
-};
+// Default role colors — system profiles get a distinct style, others use a generic palette
+const systemProfileColors = { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' };
+const defaultProfileColors = { bg: 'bg-slate-500/10', text: 'text-slate-700 dark:text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-500' };
 
-const getRoleColors = (role?: string) => {
-  if (!role) return roleColorMap['default'];
-  return roleColorMap[role] || roleColorMap['default'];
+const getRoleColors = (user: HierarchyUser) => {
+  if (user.is_system_profile) return systemProfileColors;
+  return defaultProfileColors;
 };
 
 // Level-based accent for depth indication
@@ -55,7 +50,7 @@ const getLevelAccent = (level: number) => levelAccents[Math.min(level, levelAcce
 const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number }) => {
   const [isOpen, setIsOpen] = useState(level < 1);
   const hasReports = user.directReports.length > 0;
-  const colors = getRoleColors(user.role_name);
+  const colors = getRoleColors(user);
   const accentClass = getLevelAccent(level);
 
   return (
@@ -130,7 +125,7 @@ const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number
 
 // ========== Org Chart Tree View ==========
 const OrgChartNode = ({ user }: { user: HierarchyUser }) => {
-  const colors = getRoleColors(user.role_name);
+  const colors = getRoleColors(user);
   const hasReports = user.directReports.length > 0;
 
   return (
@@ -184,7 +179,7 @@ const OrgChartNode = ({ user }: { user: HierarchyUser }) => {
 
 // Flat list row for list view
 const FlatUserRow = ({ user }: { user: HierarchyUser }) => {
-  const colors = getRoleColors(user.role_name);
+  const colors = getRoleColors(user);
   return (
     <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/60 transition-colors">
       <Avatar className="h-7 w-7 shrink-0">
@@ -243,7 +238,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
         supabase.from('profiles').select('id, full_name, username, profile_picture_url'),
         supabase.from('employees').select('user_id, manager_id, secondary_manager_id'),
         supabase.from('user_profiles').select('user_id, profile_id'),
-        supabase.from('security_profiles').select('id, name'),
+        supabase.from('security_profiles').select('id, name, is_system'),
       ]);
 
       if (pe || ee || ue || se) throw (pe || ee || ue || se);
@@ -263,6 +258,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
           username: profile.username || '',
           profile_picture_url: profile.profile_picture_url,
           role_name: secProfile?.name,
+          is_system_profile: secProfile?.is_system || false,
           manager_id: emp?.manager_id,
           directReports: [],
         });
@@ -282,6 +278,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
               username: profile.username || '',
               profile_picture_url: profile.profile_picture_url,
               role_name: sp?.name || 'Manager',
+              is_system_profile: sp?.is_system || false,
               manager_id: undefined,
               directReports: [],
             });
@@ -301,7 +298,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
       userMap.forEach((user, userId) => {
         const managerId = childToParent.get(userId);
         if (!managerId || !userMap.has(managerId)) {
-          if (user.role_name === 'System Administrator' || user.role_name === 'Super Admin') {
+          if (user.is_system_profile) {
             superAdmins.push(user);
           } else {
             rootNodes.push(user);
@@ -343,17 +340,17 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   }
 
   // Collect unique roles for legend
-  const collectRoles = (users: HierarchyUser[]): Set<string> => {
-    const roles = new Set<string>();
+  const collectRoles = (users: HierarchyUser[]): Map<string, boolean> => {
+    const roles = new Map<string, boolean>();
     users.forEach(u => {
-      if (u.role_name) roles.add(u.role_name);
+      if (u.role_name) roles.set(u.role_name, u.is_system_profile || false);
       if (u.directReports.length) {
-        collectRoles(u.directReports).forEach(r => roles.add(r));
+        collectRoles(u.directReports).forEach((isSys, name) => roles.set(name, isSys));
       }
     });
     return roles;
   };
-  const uniqueRoles = Array.from(collectRoles(hierarchy));
+  const uniqueRoles = collectRoles(hierarchy);
 
   return (
     <Card className={className}>
@@ -373,8 +370,8 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
         </div>
         {/* Role color legend */}
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {uniqueRoles.map(role => {
-            const c = getRoleColors(role);
+          {Array.from(uniqueRoles.entries()).map(([role, isSystem]) => {
+            const c = isSystem ? systemProfileColors : defaultProfileColors;
             return (
               <span
                 key={role}
