@@ -160,8 +160,8 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       return;
     }
 
-    // Validate password fields if provided (only for new users)
-    if (!editingUser && formData.password) {
+    // Validate password fields if provided
+    if (formData.password) {
       if (formData.password.length < 6) {
         toast.error("Password must be at least 6 characters");
         return;
@@ -190,7 +190,24 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
           .eq('id', editingUser.id);
 
         if (error) throw error;
-        toast.success("User updated successfully");
+
+        // If password was provided, reset it
+        if (formData.password) {
+          const { data: pwData, error: pwError } = await supabase.functions.invoke('set-distributor-portal-password', {
+            body: {
+              distributorUserId: editingUser.id,
+              password: formData.password,
+            }
+          });
+
+          if (pwError || !pwData?.success) {
+            toast.warning("User updated but password reset failed: " + (pwData?.error || pwError?.message || 'Unknown error'));
+          } else {
+            toast.success("User updated and password reset successfully!");
+          }
+        } else {
+          toast.success("User updated successfully");
+        }
       } else {
         // Create new user
         const { data: insertedData, error } = await supabase
