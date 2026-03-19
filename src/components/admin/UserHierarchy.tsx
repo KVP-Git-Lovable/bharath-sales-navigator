@@ -50,7 +50,7 @@ const getLevelAccent = (level: number) => levelAccents[Math.min(level, levelAcce
 const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number }) => {
   const [isOpen, setIsOpen] = useState(level < 1);
   const hasReports = user.directReports.length > 0;
-  const colors = getRoleColors(user.role_name);
+  const colors = getRoleColors(user);
   const accentClass = getLevelAccent(level);
 
   return (
