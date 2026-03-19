@@ -1818,6 +1818,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         const toDate = format(dateRange.to, 'yyyy-MM-dd');
         const userIds = selectedUserIds.length > 0 ? selectedUserIds : users.map(u => u.id);
 
+        // Fetch attendance data
         const { data: attendanceData } = await supabase
           .from('attendance')
           .select('user_id, total_hours, date, check_in_time, check_out_time')
@@ -1826,11 +1827,38 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           .lte('date', toDate)
           .in('status', ['present', 'half_day_leave']);
 
+        // Fetch retailer visit logs for time at retailers
+        const { data: visitLogs } = await supabase
+          .from('retailer_visit_logs')
+          .select('user_id, visit_date, start_time')
+          .in('user_id', userIds)
+          .gte('visit_date', fromDate)
+          .lte('visit_date', toDate)
+          .not('start_time', 'is', null);
+
+        // Calculate retailer hours per user (span from first to last start_time per day)
+        const userRetailerHours: Record<string, number> = {};
+        if (visitLogs && visitLogs.length > 0) {
+          const dateUserMap: Record<string, number[]> = {};
+          visitLogs.forEach(log => {
+            if (!log.start_time) return;
+            const key = `${log.user_id}_${log.visit_date}`;
+            if (!dateUserMap[key]) dateUserMap[key] = [];
+            dateUserMap[key].push(new Date(log.start_time).getTime());
+          });
+          Object.entries(dateUserMap).forEach(([key, times]) => {
+            const uid = key.split('_')[0];
+            if (times.length >= 2) {
+              const span = (Math.max(...times) - Math.min(...times)) / (1000 * 60 * 60);
+              userRetailerHours[uid] = (userRetailerHours[uid] || 0) + Math.max(0, span);
+            }
+          });
+        }
+
         if (attendanceData && attendanceData.length > 0) {
           const userAttendance: Record<string, { totalHours: number; days: number }> = {};
           attendanceData.forEach(a => {
             if (!userAttendance[a.user_id]) userAttendance[a.user_id] = { totalHours: 0, days: 0 };
-            // Use total_hours if available, otherwise calculate from check_in/check_out times
             let hours = a.total_hours || 0;
             if (!hours && a.check_in_time && a.check_out_time) {
               const checkIn = new Date(a.check_in_time);
@@ -1843,9 +1871,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
           const attendanceRows = Object.entries(userAttendance).map(([uid, data]) => {
             const userName = users.find(u => u.id === uid)?.full_name || 'Unknown';
-            const avgHours = data.days > 0 ? (data.totalHours / data.days).toFixed(1) : '0';
-            return [userName, avgHours, String(data.days)];
-          }).sort((a, b) => Number(b[2]) - Number(a[2]));
+            const avgWorkingHours = data.days > 0 ? (data.totalHours / data.days).toFixed(1) : '0.0';
+            const totalRetailerHrs = userRetailerHours[uid] || 0;
+            const avgRetailerHours = data.days > 0 ? (totalRetailerHrs / data.days).toFixed(1) : '0.0';
+            return [userName, avgWorkingHours, avgRetailerHours, String(data.days)];
+          }).sort((a, b) => Number(b[3]) - Number(a[3]));
 
           if (attendanceRows.length > 0) {
             checkPageBreak(60);
@@ -1853,7 +1883,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
             autoTable(doc, {
               startY: y,
-              head: [['User', 'Avg Working Hours', 'Days Present']],
+              head: [['User', 'Avg Working Hours', 'Avg Time at Retailer', 'Days Present']],
               body: attendanceRows,
               theme: 'plain',
               margin: { left: margin, right: margin },
