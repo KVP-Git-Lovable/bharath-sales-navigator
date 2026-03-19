@@ -17,6 +17,7 @@ interface SecurityProfile {
   description: string | null;
   is_system: boolean;
   user_count: number;
+  colorIndex: number;
 }
 
 interface RoleUser {
