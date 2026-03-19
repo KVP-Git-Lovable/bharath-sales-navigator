@@ -1,27 +1,35 @@
 
 
-## Plan: Create Standalone SQL Script for Target Project
+## Plan: Fix Distributor Portal Admin Check to Use Security Profiles
 
-Since you'll use `git pull` to move code files, you only need a SQL script to run on the target project's Supabase SQL Editor to set up the database.
+### Problem
+The "Login as User" button in Distributor Master and the impersonation handler in `DistributorLogin.tsx` both query the `user_roles` table for `role = 'admin'`. But your project migrated admin detection to `security_profiles` (via `is_system` flag) — the `user_roles` table no longer contains `admin` entries. Ajay is an administrator via the security profile system, but the old check doesn't see that.
 
-### What the script will include
+### Fix
+Replace the direct `user_roles` query in two files with a check against `security_profiles` via `user_profiles`, matching how the rest of the app determines admin status.
 
-The complete contents of the migration file — creating the `auto_end_day_policy` table, RLS policies, seed data, and the `AUTO_DAY_WARNING` notification event type. It's a single copy-paste script.
+### Files to change
 
-### Steps
+**1. `src/components/distributor/DistributorPortalUsers.tsx` (~line 285-294)**
+Replace the `user_roles` query with:
+```typescript
+const { data: adminCheck } = await supabase
+  .from('user_profiles')
+  .select('security_profiles!inner(is_system)')
+  .eq('user_id', adminSession.user.id)
+  .maybeSingle();
 
-1. **Generate the SQL script** — Copy the migration SQL into a standalone file at `/mnt/documents/auto_end_day_setup.sql` so you can download it
-2. **Usage** — Open the target project's Supabase SQL Editor, paste and run the script
+if (!adminCheck?.security_profiles?.is_system) {
+  toast.error("Only admins can login as users");
+  ...
+}
+```
 
-### What you get after `git pull` + running the script
+**2. `src/pages/distributor-portal/DistributorLogin.tsx` (~line 42-52)**
+Same replacement — swap the `user_roles` query for the `user_profiles` → `security_profiles(is_system)` check.
 
-| Layer | How it transfers |
-|-------|-----------------|
-| Edge function (`auto-end-day`) | Via git pull ✅ |
-| UI components & hooks | Via git pull ✅ |
-| `auto_end_day_policy` table + seed | Run SQL script ✅ |
-| `AUTO_DAY_WARNING` event type | Run SQL script ✅ |
-| Cron job schedule | Must set up separately per project |
-
-The script uses `IF NOT EXISTS` / `ON CONFLICT` guards so it's safe to run even if parts already exist.
+### Why this works
+- Matches how `is_system_admin()` and `has_role()` DB functions already work
+- No database changes needed — purely a frontend fix
+- Ajay (and any user with a `is_system = true` security profile) will be recognized as admin
 
