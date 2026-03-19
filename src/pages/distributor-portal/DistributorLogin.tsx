@@ -46,7 +46,7 @@ const DistributorLogin = () => {
         .eq('user_id', session.user.id)
         .maybeSingle();
 
-      if (!adminCheck?.security_profiles?.is_system) {
+      if (!(adminCheck?.security_profiles as any)?.is_system) {
         toast.error('Only admins can impersonate users');
         setImpersonating(false);
         return;

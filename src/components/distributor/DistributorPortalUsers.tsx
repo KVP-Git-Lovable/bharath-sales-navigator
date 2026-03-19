@@ -288,7 +288,7 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
         .eq('user_id', adminSession.user.id)
         .maybeSingle();
 
-      if (!adminCheck?.security_profiles?.is_system) {
+      if (!(adminCheck?.security_profiles as any)?.is_system) {
         toast.error("Only admins can login as users");
         setImpersonating(null);
         return;
