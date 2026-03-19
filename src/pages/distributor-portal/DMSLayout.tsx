@@ -32,6 +32,7 @@ import {
   TrendingUp,
   ShieldCheck,
   MessageSquare,
+  Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -59,6 +60,7 @@ const mainNavItems: NavItem[] = [
   { label: 'Invoices', icon: Receipt, path: '/distributor-portal/secondary-invoices' },
   { label: 'Retailer Ledger', icon: FileText, path: '/distributor-portal/retailer-ledger' },
   { label: 'Inventory', icon: Package, path: '/distributor-portal/inventory' },
+  { label: 'Stock Health', icon: Activity, path: '/distributor-portal/stock-health' },
 ];
 
 const operationsNavItems: NavItem[] = [

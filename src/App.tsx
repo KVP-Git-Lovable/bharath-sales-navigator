@@ -182,6 +182,7 @@ import CollectPayment from "./pages/distributor-portal/CollectPayment";
 import SecondaryInvoiceList from "./pages/distributor-portal/SecondaryInvoiceList";
 import SecondaryInvoiceCreate from "./pages/distributor-portal/SecondaryInvoiceCreate";
 import RetailerFeedback from "./pages/distributor-portal/RetailerFeedback";
+import StockHealthDashboard from "./pages/distributor-portal/StockHealthDashboard";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
@@ -494,6 +495,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="secondary-invoices" element={<SecondaryInvoiceList />} />
           <Route path="secondary-invoices/create" element={<SecondaryInvoiceCreate />} />
           <Route path="retailer-feedback" element={<RetailerFeedback />} />
+          <Route path="stock-health" element={<StockHealthDashboard />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
