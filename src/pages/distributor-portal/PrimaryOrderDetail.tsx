@@ -190,27 +190,8 @@ const PrimaryOrderDetail = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Status Card */}
-        <Card className={`border-l-4 ${order.status === 'delivered' ? 'border-l-green-500' : order.status === 'cancelled' ? 'border-l-red-500' : 'border-l-primary'}`}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              {getStatusIcon(order.status)}
-              <div>
-                <p className="font-medium capitalize">{order.status.replace('_', ' ')}</p>
-                <p className="text-sm text-muted-foreground">
-                  {order.status === 'draft' && 'Order is saved as draft. Submit to proceed.'}
-                  {order.status === 'submitted' && 'Waiting for confirmation from company.'}
-                  {order.status === 'confirmed' && 'Order confirmed. Processing will begin soon.'}
-                  {order.status === 'processing' && 'Order is being prepared for dispatch.'}
-                  {order.status === 'dispatched' && 'Order has been dispatched.'}
-                  {order.status === 'in_transit' && 'Order is on the way to you.'}
-                  {order.status === 'delivered' && 'Order delivered successfully.'}
-                  {order.status === 'cancelled' && 'Order has been cancelled.'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Order Tracking Timeline */}
+        <OrderTrackingTimeline orderId={order.id} currentStatus={order.status} />
 
         {/* Order Summary */}
         <Card>

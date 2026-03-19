@@ -349,6 +349,25 @@ const CreatePrimaryOrder = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Credit Limit Warning */}
+        {creditChecked && creditLimit > 0 && (
+          <Card className={`border-l-4 ${outstanding > creditLimit ? 'border-l-destructive bg-destructive/5' : outstanding > creditLimit * 0.8 ? 'border-l-yellow-500 bg-yellow-50' : 'border-l-green-500 bg-green-50'}`}>
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">
+                  {outstanding > creditLimit ? '⚠️ Credit Limit Exceeded' : 'Credit Status'}
+                </span>
+                <span>
+                  ₹{outstanding.toLocaleString('en-IN')} / ₹{creditLimit.toLocaleString('en-IN')}
+                </span>
+              </div>
+              {outstanding > creditLimit && (
+                <p className="text-xs text-destructive mt-1">Order submission is blocked until outstanding is cleared.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Add Product Section */}
         <Card>
           <CardHeader className="pb-3">
