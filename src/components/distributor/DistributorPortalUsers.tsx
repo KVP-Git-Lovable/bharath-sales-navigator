@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   Plus, User, Mail, Phone, Shield, CheckCircle, XCircle, 
-  Send, Edit, Trash2, LogIn, Clock, AlertCircle, UserX 
+  Send, Edit, Trash2, LogIn, Clock, AlertCircle, UserX, Key, Eye, EyeOff 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -94,6 +94,11 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
   const [userToDelete, setUserToDelete] = useState<DistributorUser | null>(null);
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<DistributorUser | null>(null);
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState({
     full_name: '',
@@ -364,6 +369,44 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
       loadUsers();
     } catch (error: any) {
       toast.error("Failed to update user: " + error.message);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (!passwordUser) return;
+    if (!passwordForm.password || passwordForm.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('set-distributor-portal-password', {
+        body: {
+          distributorUserId: passwordUser.id,
+          password: passwordForm.password,
+        }
+      });
+
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Password set for ${passwordUser.full_name}`);
+        setPasswordDialogOpen(false);
+        setPasswordUser(null);
+        setPasswordForm({ password: '', confirmPassword: '' });
+        setShowPassword(false);
+        loadUsers();
+      } else {
+        throw new Error(data?.error || 'Failed to set password');
+      }
+    } catch (error: any) {
+      toast.error("Failed to set password: " + error.message);
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -645,6 +688,20 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
                     size="sm"
                     variant="outline"
                     className="h-8 gap-1 flex-1"
+                    onClick={() => {
+                      setPasswordUser(user);
+                      setPasswordForm({ password: '', confirmPassword: '' });
+                      setShowPassword(false);
+                      setPasswordDialogOpen(true);
+                    }}
+                  >
+                    <Key className="h-3.5 w-3.5" />
+                    <span className="hidden xs:inline">Set Password</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1 flex-1"
                     onClick={() => loginAsUser(user)}
                     disabled={impersonating === user.id}
                   >
@@ -703,6 +760,66 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Set Password Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={(open) => {
+        setPasswordDialogOpen(open);
+        if (!open) {
+          setPasswordUser(null);
+          setPasswordForm({ password: '', confirmPassword: '' });
+          setShowPassword(false);
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Portal Password</DialogTitle>
+          </DialogHeader>
+          {passwordUser && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Set login password for <strong>{passwordUser.full_name}</strong> ({passwordUser.email})
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="set-password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="set-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordForm.password}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Min 6 characters"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  placeholder="Re-enter password"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleSetPassword} disabled={settingPassword}>
+                  {settingPassword ? 'Setting...' : 'Set Password'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
