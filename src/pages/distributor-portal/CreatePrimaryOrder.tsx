@@ -68,6 +68,9 @@ const CreatePrimaryOrder = () => {
   const [loading, setLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(true);
   const [priceBookName, setPriceBookName] = useState<string>('');
+  const [creditLimit, setCreditLimit] = useState<number>(0);
+  const [outstanding, setOutstanding] = useState<number>(0);
+  const [creditChecked, setCreditChecked] = useState(false);
   
   const distributorId = localStorage.getItem('distributor_id');
 
