@@ -30,14 +30,16 @@ interface SecurityRolesDisplayProps {
   className?: string;
 }
 
-const roleColors: Record<string, string> = {
-  'Super Admin': 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20',
-  'System Administrator': 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20',
-  'Sales Manager': 'bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20',
-  'Product Manager': 'bg-purple-500/10 text-purple-600 border-purple-500/20 hover:bg-purple-500/20',
-  'Field Sales Executive': 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20',
-  'Data Viewer': 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20',
-};
+// Dynamic color palette for roles — cycles through colors, system profiles get a distinct style
+const rolePalette = [
+  'bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20',
+  'bg-purple-500/10 text-purple-600 border-purple-500/20 hover:bg-purple-500/20',
+  'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20',
+  'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20',
+  'bg-cyan-500/10 text-cyan-600 border-cyan-500/20 hover:bg-cyan-500/20',
+  'bg-pink-500/10 text-pink-600 border-pink-500/20 hover:bg-pink-500/20',
+];
+const systemRoleColor = 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20';
 
 const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }) => {
   const [roles, setRoles] = useState<SecurityProfile[]>([]);
