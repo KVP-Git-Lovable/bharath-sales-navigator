@@ -79,9 +79,11 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
         countMap.set(up.profile_id, current + 1);
       });
 
+      let nonSystemIndex = 0;
       const rolesWithCounts: SecurityProfile[] = (profiles || []).map(profile => ({
         ...profile,
-        user_count: countMap.get(profile.id) || 0
+        user_count: countMap.get(profile.id) || 0,
+        colorIndex: profile.is_system ? 0 : nonSystemIndex++,
       }));
 
       setRoles(rolesWithCounts);
