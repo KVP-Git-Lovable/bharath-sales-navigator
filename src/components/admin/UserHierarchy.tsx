@@ -238,7 +238,7 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
         supabase.from('profiles').select('id, full_name, username, profile_picture_url'),
         supabase.from('employees').select('user_id, manager_id, secondary_manager_id'),
         supabase.from('user_profiles').select('user_id, profile_id'),
-        supabase.from('security_profiles').select('id, name'),
+        supabase.from('security_profiles').select('id, name, is_system'),
       ]);
 
       if (pe || ee || ue || se) throw (pe || ee || ue || se);
