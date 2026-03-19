@@ -125,7 +125,7 @@ const HierarchyRow = ({ user, level = 0 }: { user: HierarchyUser; level?: number
 
 // ========== Org Chart Tree View ==========
 const OrgChartNode = ({ user }: { user: HierarchyUser }) => {
-  const colors = getRoleColors(user.role_name);
+  const colors = getRoleColors(user);
   const hasReports = user.directReports.length > 0;
 
   return (
