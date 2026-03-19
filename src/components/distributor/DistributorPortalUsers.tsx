@@ -281,14 +281,14 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
         return;
       }
 
-      // Verify admin role
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
+      // Verify admin role via security_profiles
+      const { data: adminCheck } = await supabase
+        .from('user_profiles')
+        .select('security_profiles!inner(is_system)')
         .eq('user_id', adminSession.user.id)
-        .single();
+        .maybeSingle();
 
-      if (userRole?.role !== 'admin') {
+      if (!(adminCheck?.security_profiles as any)?.is_system) {
         toast.error("Only admins can login as users");
         setImpersonating(null);
         return;
