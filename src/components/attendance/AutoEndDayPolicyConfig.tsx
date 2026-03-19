@@ -161,7 +161,7 @@ const AutoEndDayPolicyConfig = () => {
 
             <Select
               value={form.last_activity_source}
-              onValueChange={(value) => setForm(prev => ({ ...prev, last_activity_source: value }))}
+              onValueChange={(value: 'all_activity' | 'last_order_only' | 'last_click') => setForm(prev => ({ ...prev, last_activity_source: value }))}
             >
               <SelectTrigger>
                 <SelectValue />
