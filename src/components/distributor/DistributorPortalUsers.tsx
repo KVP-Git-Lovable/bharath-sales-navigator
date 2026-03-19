@@ -760,6 +760,66 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Set Password Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={(open) => {
+        setPasswordDialogOpen(open);
+        if (!open) {
+          setPasswordUser(null);
+          setPasswordForm({ password: '', confirmPassword: '' });
+          setShowPassword(false);
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Portal Password</DialogTitle>
+          </DialogHeader>
+          {passwordUser && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Set login password for <strong>{passwordUser.full_name}</strong> ({passwordUser.email})
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="set-password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="set-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordForm.password}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Min 6 characters"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  placeholder="Re-enter password"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleSetPassword} disabled={settingPassword}>
+                  {settingPassword ? 'Setting...' : 'Set Password'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
