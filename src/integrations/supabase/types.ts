@@ -17492,6 +17492,7 @@ export type Database = {
         Args: { p_action: string; p_record_id: string; p_table_name: string }
         Returns: undefined
       }
+      nextval_text: { Args: { seq_name: string }; Returns: string }
       owns_completed_invitation: {
         Args: { _email: string; _user_id: string }
         Returns: boolean
