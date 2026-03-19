@@ -1820,7 +1820,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
 
         const { data: attendanceData } = await supabase
           .from('attendance')
-          .select('user_id, total_hours, date')
+          .select('user_id, total_hours, date, check_in_time, check_out_time')
           .in('user_id', userIds)
           .gte('date', fromDate)
           .lte('date', toDate)
@@ -1830,7 +1830,14 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           const userAttendance: Record<string, { totalHours: number; days: number }> = {};
           attendanceData.forEach(a => {
             if (!userAttendance[a.user_id]) userAttendance[a.user_id] = { totalHours: 0, days: 0 };
-            userAttendance[a.user_id].totalHours += (a.total_hours || 0);
+            // Use total_hours if available, otherwise calculate from check_in/check_out times
+            let hours = a.total_hours || 0;
+            if (!hours && a.check_in_time && a.check_out_time) {
+              const checkIn = new Date(a.check_in_time);
+              const checkOut = new Date(a.check_out_time);
+              hours = Math.max(0, (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60));
+            }
+            userAttendance[a.user_id].totalHours += hours;
             userAttendance[a.user_id].days += 1;
           });
 
