@@ -5,146 +5,171 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-/**
- * Auto End Day Edge Function
- * 
- * Runs at 10:00 PM IST (16:30 UTC) daily via pg_cron job
- * Automatically closes attendance for users who forgot to check out
- * Uses last activity time from visits, orders, and retailer_visit_logs
- */
-
-interface LastActivity {
-  user_id: string
-  last_activity_time: string
-}
-
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🌙 Auto End Day: Starting midnight cleanup...')
-    
-    // Create Supabase admin client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get today's date in IST (UTC+5:30)
-    // When this runs at 11:59 PM IST, we close the CURRENT day's attendance
-    const now = new Date()
-    const istOffset = 5.5 * 60 * 60 * 1000 // IST is UTC+5:30
-    const istNow = new Date(now.getTime() + istOffset)
-    
-    // The date we're closing is TODAY in IST terms since we run at 11:59 PM
-    const dateStr = istNow.toISOString().split('T')[0]
-    
-    console.log(`📅 Processing attendance for date: ${dateStr}`)
+    // Step 1: Read policy config from DB
+    const { data: policy, error: policyError } = await supabase
+      .from('auto_end_day_policy')
+      .select('*')
+      .limit(1)
+      .single()
 
-    // Step 1: Find all open attendance records (checked in but not checked out)
+    if (policyError || !policy) {
+      console.log('⚠️ No auto_end_day_policy found, skipping.')
+      return new Response(JSON.stringify({ success: false, message: 'No policy configured' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (!policy.is_enabled) {
+      console.log('⏸️ Auto End Day is disabled.')
+      return new Response(JSON.stringify({ success: true, message: 'Policy disabled' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Step 2: Calculate current time in configured timezone
+    const now = new Date()
+    const tzNow = new Date(now.toLocaleString('en-US', { timeZone: policy.timezone }))
+    const currentHours = tzNow.getHours()
+    const currentMinutes = tzNow.getMinutes()
+    const currentTimeMinutes = currentHours * 60 + currentMinutes
+
+    const [closeH, closeM] = (policy.auto_close_time as string).split(':').map(Number)
+    const closeTimeMinutes = closeH * 60 + closeM
+
+    const warningTimeMinutes = closeTimeMinutes - (policy.pre_warning_minutes_before || 60)
+
+    // Determine if this run is for warning or auto-close (±15 min window)
+    const isWarningWindow = policy.pre_warning_enabled &&
+      Math.abs(currentTimeMinutes - warningTimeMinutes) <= 15
+    const isCloseWindow = Math.abs(currentTimeMinutes - closeTimeMinutes) <= 15
+
+    if (!isWarningWindow && !isCloseWindow) {
+      console.log(`⏳ Not time yet. Current: ${currentHours}:${currentMinutes}, Close: ${closeH}:${closeM}`)
+      return new Response(JSON.stringify({ success: true, message: 'Not time yet', current: `${currentHours}:${currentMinutes}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const dateStr = `${tzNow.getFullYear()}-${String(tzNow.getMonth() + 1).padStart(2, '0')}-${String(tzNow.getDate()).padStart(2, '0')}`
+    console.log(`📅 Processing for date: ${dateStr}, mode: ${isCloseWindow ? 'CLOSE' : 'WARNING'}`)
+
+    // Step 3: Find open attendance records
     const { data: openAttendance, error: attendanceError } = await supabase
       .from('attendance')
       .select('id, user_id, check_in_time, date')
       .eq('date', dateStr)
       .not('check_in_time', 'is', null)
       .is('check_out_time', null)
-      .neq('status', 'leave') // Don't process leave records
+      .neq('status', 'leave')
 
-    if (attendanceError) {
-      console.error('Error fetching open attendance:', attendanceError)
-      throw attendanceError
-    }
+    if (attendanceError) throw attendanceError
 
     if (!openAttendance || openAttendance.length === 0) {
-      console.log('✅ No open attendance records found. All users have checked out.')
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'No open attendance records to process',
-          date: dateStr,
-          processed: 0 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.log('✅ No open attendance records.')
+      return new Response(JSON.stringify({ success: true, message: 'No open records', date: dateStr, processed: 0 }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log(`📋 Found ${openAttendance.length} open attendance records`)
+    // WARNING MODE: just send notifications
+    if (isWarningWindow && !isCloseWindow) {
+      console.log(`⚠️ Sending pre-warning to ${openAttendance.length} users`)
+      for (const record of openAttendance) {
+        try {
+          await supabase.rpc('emit_notification_event', {
+            p_event_code: 'AUTO_DAY_WARNING',
+            p_source_table: 'attendance',
+            p_record_id: record.id,
+            p_actor_user_id: record.user_id,
+            p_metadata: {
+              record_name: 'Attendance',
+              date: dateStr,
+              auto_close_time: policy.auto_close_time,
+              minutes_remaining: policy.pre_warning_minutes_before
+            }
+          })
+        } catch (e) {
+          console.error(`Warning notification failed for ${record.user_id}:`, e.message)
+        }
+      }
+      return new Response(JSON.stringify({ success: true, mode: 'warning', warned: openAttendance.length }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
-    // Step 2: For each user, find their last activity time
+    // CLOSE MODE: auto-close attendance
+    console.log(`🌙 Auto-closing ${openAttendance.length} records`)
     const processedUsers: string[] = []
     const errors: string[] = []
 
     for (const record of openAttendance) {
       try {
         const userId = record.user_id
-        console.log(`👤 Processing user: ${userId}`)
+        const lastActivityTime = await findLastActivityTime(
+          supabase, userId, dateStr, record.check_in_time, policy.last_activity_source
+        )
 
-        // Find last activity from multiple sources
-        const lastActivityTime = await findLastActivityTime(supabase, userId, dateStr, record.check_in_time)
-        
-        console.log(`⏰ Last activity for ${userId}: ${lastActivityTime}`)
-
-        // Step 3: Update attendance with check_out_time
+        // Update attendance
         const { error: updateError } = await supabase
           .from('attendance')
           .update({
             check_out_time: lastActivityTime,
-            check_out_address: 'Auto-closed at midnight',
-            notes: `Auto-closed by system at midnight. Last activity: ${lastActivityTime}`,
+            check_out_address: 'Auto-closed by system',
+            notes: `Auto-closed. Last activity: ${lastActivityTime}`,
             updated_at: new Date().toISOString()
           })
           .eq('id', record.id)
 
         if (updateError) {
-          console.error(`Error updating attendance for ${userId}:`, updateError)
-          errors.push(`User ${userId}: ${updateError.message}`)
+          errors.push(`${userId}: ${updateError.message}`)
           continue
         }
 
-        // Step 4: Close all in-progress visits for this user on this date
-        const { data: inProgressVisits } = await supabase
-          .from('visits')
-          .select('id, updated_at')
-          .eq('user_id', userId)
-          .eq('planned_date', dateStr)
-          .eq('status', 'in-progress')
+        // Close in-progress visits
+        if (policy.close_in_progress_visits) {
+          const { data: inProgressVisits } = await supabase
+            .from('visits')
+            .select('id, updated_at')
+            .eq('user_id', userId)
+            .eq('planned_date', dateStr)
+            .eq('status', 'in-progress')
 
-        if (inProgressVisits && inProgressVisits.length > 0) {
-          for (const visit of inProgressVisits) {
-            const visitCheckoutTime = visit.updated_at || lastActivityTime
-            
-            await supabase
-              .from('visits')
-              .update({
-                check_out_time: visitCheckoutTime,
-                status: 'unproductive',
-                no_order_reason: 'Auto-closed at midnight',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', visit.id)
+          if (inProgressVisits?.length) {
+            for (const visit of inProgressVisits) {
+              await supabase
+                .from('visits')
+                .update({
+                  check_out_time: visit.updated_at || lastActivityTime,
+                  status: policy.mark_unproductive ? 'unproductive' : 'completed',
+                  no_order_reason: 'Auto-closed by system',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', visit.id)
+            }
           }
-          console.log(`  ↳ Closed ${inProgressVisits.length} in-progress visits`)
         }
 
-        // Step 5: Cancel remaining planned visits
-        const { data: plannedVisits } = await supabase
-          .from('visits')
-          .update({
-            status: 'cancelled',
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', userId)
-          .eq('planned_date', dateStr)
-          .eq('status', 'planned')
-          .select('id')
-
-        if (plannedVisits && plannedVisits.length > 0) {
-          console.log(`  ↳ Cancelled ${plannedVisits.length} planned visits`)
+        // Cancel planned visits
+        if (policy.cancel_planned_visits) {
+          await supabase
+            .from('visits')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .eq('planned_date', dateStr)
+            .eq('status', 'planned')
         }
 
-        // Step 6: Close all active retailer visit logs
+        // Close retailer visit logs
         const { data: activeLogs } = await supabase
           .from('retailer_visit_logs')
           .select('id, start_time, updated_at')
@@ -152,189 +177,124 @@ Deno.serve(async (req) => {
           .eq('visit_date', dateStr)
           .is('end_time', null)
 
-        if (activeLogs && activeLogs.length > 0) {
+        if (activeLogs?.length) {
           for (const log of activeLogs) {
             const endTime = log.updated_at || lastActivityTime
-            const startTimeMs = new Date(log.start_time).getTime()
-            const endTimeMs = new Date(endTime).getTime()
-            const timeSpentSeconds = Math.max(0, Math.floor((endTimeMs - startTimeMs) / 1000))
-
+            const timeSpent = Math.max(0, Math.floor((new Date(endTime).getTime() - new Date(log.start_time).getTime()) / 1000))
             await supabase
               .from('retailer_visit_logs')
-              .update({
-                end_time: endTime,
-                time_spent_seconds: timeSpentSeconds
-              })
+              .update({ end_time: endTime, time_spent_seconds: timeSpent })
               .eq('id', log.id)
           }
-          console.log(`  ↳ Closed ${activeLogs.length} retailer visit logs`)
         }
 
-        // Step 7: Emit notification event through rules engine
+        // Emit close notification
         await supabase.rpc('emit_notification_event', {
           p_event_code: 'AUTO_DAY_CLOSED',
           p_source_table: 'attendance',
           p_record_id: record.id,
           p_actor_user_id: userId,
-          p_metadata: {
-            record_name: 'Attendance',
-            date: dateStr,
-            last_activity: lastActivityTime
-          }
+          p_metadata: { record_name: 'Attendance', date: dateStr, last_activity: lastActivityTime }
         })
 
         processedUsers.push(userId)
-        console.log(`✅ Successfully processed user: ${userId}`)
-
-      } catch (userError) {
-        console.error(`Error processing user ${record.user_id}:`, userError)
-        errors.push(`User ${record.user_id}: ${userError.message}`)
+      } catch (e) {
+        errors.push(`${record.user_id}: ${e.message}`)
       }
     }
 
-    const summary = {
-      success: true,
-      date: dateStr,
-      totalOpen: openAttendance.length,
-      processed: processedUsers.length,
-      errors: errors.length,
-      errorDetails: errors
-    }
-
-    console.log('🌙 Auto End Day: Completed!', summary)
-
-    // Refresh pre-computed admin summary tables for today
-    // This ensures LiveAttendanceMonitoring stat cards reflect auto-close results immediately
+    // Refresh summaries
     try {
-      console.log('📊 Refreshing admin summary tables...')
-      const { error: refreshDailyError } = await supabase.rpc('refresh_daily_admin_summary', { p_date: dateStr })
-      if (refreshDailyError) {
-        console.error('Warning: Failed to refresh daily summary:', refreshDailyError.message)
-      } else {
-        console.log('✅ Daily admin summary refreshed')
-      }
-
-      // Refresh monthly summary for each processed user
+      await supabase.rpc('refresh_daily_admin_summary', { p_date: dateStr })
       for (const userId of processedUsers) {
-        const [yearStr, monthStr] = dateStr.split('-')
-        const { error: refreshMonthlyError } = await supabase.rpc('refresh_user_monthly_summary', {
-          p_user_id: userId,
-          p_year: parseInt(yearStr),
-          p_month: parseInt(monthStr)
-        })
-        if (refreshMonthlyError) {
-          console.error(`Warning: Failed to refresh monthly summary for ${userId}:`, refreshMonthlyError.message)
-        }
+        const [y, m] = dateStr.split('-')
+        await supabase.rpc('refresh_user_monthly_summary', { p_user_id: userId, p_year: parseInt(y), p_month: parseInt(m) })
       }
-      console.log(`✅ Monthly summaries refreshed for ${processedUsers.length} users`)
-    } catch (refreshError) {
-      // Non-fatal: summaries will be refreshed by the DB trigger on next attendance change
-      console.error('Warning: Summary refresh failed (non-fatal):', refreshError.message)
+    } catch (e) {
+      console.error('Summary refresh failed (non-fatal):', e.message)
     }
 
-    return new Response(
-      JSON.stringify(summary),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    const summary = { success: true, date: dateStr, totalOpen: openAttendance.length, processed: processedUsers.length, errors: errors.length, errorDetails: errors }
+    console.log('🌙 Auto End Day completed:', summary)
 
+    return new Response(JSON.stringify(summary), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   } catch (error) {
     console.error('Auto End Day Error:', error)
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+    })
   }
 })
 
-/**
- * Find the last activity time for a user on a given date
- * Checks: visits, orders, retailer_visit_logs, attendance itself
- */
 async function findLastActivityTime(
-  supabase: any, 
-  userId: string, 
-  dateStr: string,
-  checkInTime: string
+  supabase: any, userId: string, dateStr: string, checkInTime: string, source: string
 ): Promise<string> {
   const activities: Date[] = []
 
-  // Check visits (use updated_at as activity indicator)
-  const { data: visits } = await supabase
-    .from('visits')
-    .select('updated_at, check_out_time')
-    .eq('user_id', userId)
-    .eq('planned_date', dateStr)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-
-  if (visits && visits.length > 0) {
-    const visitTime = visits[0].check_out_time || visits[0].updated_at
-    if (visitTime) activities.push(new Date(visitTime))
+  if (source === 'all_activity' || source === 'last_order_only') {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('created_at')
+      .eq('user_id', userId)
+      .eq('order_date', dateStr)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (orders?.[0]) activities.push(new Date(orders[0].created_at))
   }
 
-  // Check orders (use created_at as order time)
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('created_at')
-    .eq('user_id', userId)
-    .eq('order_date', dateStr)
-    .order('created_at', { ascending: false })
-    .limit(1)
+  if (source === 'all_activity') {
+    const { data: visits } = await supabase
+      .from('visits')
+      .select('updated_at, check_out_time')
+      .eq('user_id', userId)
+      .eq('planned_date', dateStr)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+    if (visits?.[0]) {
+      const t = visits[0].check_out_time || visits[0].updated_at
+      if (t) activities.push(new Date(t))
+    }
 
-  if (orders && orders.length > 0) {
-    activities.push(new Date(orders[0].created_at))
+    const { data: logs } = await supabase
+      .from('retailer_visit_logs')
+      .select('updated_at, end_time')
+      .eq('user_id', userId)
+      .eq('visit_date', dateStr)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+    if (logs?.[0]) {
+      const t = logs[0].end_time || logs[0].updated_at
+      if (t) activities.push(new Date(t))
+    }
   }
 
-  // Check retailer_visit_logs (use updated_at or end_time)
-  const { data: logs } = await supabase
-    .from('retailer_visit_logs')
-    .select('updated_at, end_time')
-    .eq('user_id', userId)
-    .eq('visit_date', dateStr)
-    .order('updated_at', { ascending: false })
-    .limit(1)
+  if (source === 'all_activity' || source === 'last_click') {
+    const { data: pageViews } = await supabase
+      .from('user_page_views')
+      .select('visited_at')
+      .eq('user_id', userId)
+      .gte('visited_at', `${dateStr}T00:00:00`)
+      .lte('visited_at', `${dateStr}T23:59:59`)
+      .order('visited_at', { ascending: false })
+      .limit(1)
+    if (pageViews?.[0]) activities.push(new Date(pageViews[0].visited_at))
 
-  if (logs && logs.length > 0) {
-    const logTime = logs[0].end_time || logs[0].updated_at
-    if (logTime) activities.push(new Date(logTime))
+    const { data: sessions } = await supabase
+      .from('user_sessions')
+      .select('logout_at, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', `${dateStr}T00:00:00`)
+      .lte('created_at', `${dateStr}T23:59:59`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (sessions?.[0]) {
+      const t = sessions[0].logout_at || sessions[0].created_at
+      if (t) activities.push(new Date(t))
+    }
   }
 
-  // Check user_page_views for last app interaction (clicks/page views)
-  const { data: pageViews } = await supabase
-    .from('user_page_views')
-    .select('visited_at')
-    .eq('user_id', userId)
-    .gte('visited_at', `${dateStr}T00:00:00`)
-    .lte('visited_at', `${dateStr}T23:59:59`)
-    .order('visited_at', { ascending: false })
-    .limit(1)
-
-  if (pageViews && pageViews.length > 0) {
-    activities.push(new Date(pageViews[0].visited_at))
-  }
-
-  // Check user_sessions for last session activity
-  const { data: sessions } = await supabase
-    .from('user_sessions')
-    .select('logout_at, created_at')
-    .eq('user_id', userId)
-    .gte('created_at', `${dateStr}T00:00:00`)
-    .lte('created_at', `${dateStr}T23:59:59`)
-    .order('created_at', { ascending: false })
-    .limit(1)
-
-  if (sessions && sessions.length > 0) {
-    const sessionTime = sessions[0].logout_at || sessions[0].created_at
-    if (sessionTime) activities.push(new Date(sessionTime))
-  }
-
-  // If no activity found, use check-in time as fallback
-  if (activities.length === 0) {
-    console.log(`  ⚠️ No activity found, using check-in time as fallback`)
-    return checkInTime
-  }
-
-  // Return the most recent activity time
-  const latestActivity = new Date(Math.max(...activities.map(d => d.getTime())))
-  return latestActivity.toISOString()
+  if (activities.length === 0) return checkInTime
+  return new Date(Math.max(...activities.map(d => d.getTime()))).toISOString()
 }

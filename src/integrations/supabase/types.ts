@@ -923,6 +923,51 @@ export type Database = {
           },
         ]
       }
+      auto_end_day_policy: {
+        Row: {
+          auto_close_time: string
+          cancel_planned_visits: boolean
+          close_in_progress_visits: boolean
+          created_at: string
+          id: string
+          is_enabled: boolean
+          last_activity_source: string
+          mark_unproductive: boolean
+          pre_warning_enabled: boolean
+          pre_warning_minutes_before: number
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          auto_close_time?: string
+          cancel_planned_visits?: boolean
+          close_in_progress_visits?: boolean
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_activity_source?: string
+          mark_unproductive?: boolean
+          pre_warning_enabled?: boolean
+          pre_warning_minutes_before?: number
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_close_time?: string
+          cancel_planned_visits?: boolean
+          close_in_progress_visits?: boolean
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_activity_source?: string
+          mark_unproductive?: boolean
+          pre_warning_enabled?: boolean
+          pre_warning_minutes_before?: number
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       badges: {
         Row: {
           badge_color: string | null
