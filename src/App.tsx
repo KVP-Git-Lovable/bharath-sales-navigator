@@ -485,6 +485,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="company-returns" element={<CompanyReturns />} />
           <Route path="inventory-ledger" element={<InventoryLedger />} />
           <Route path="stock-adjustments" element={<StockAdjustments />} />
+          <Route path="retailer-ledger" element={<RetailerLedger />} />
+          <Route path="retailer-ledger/:retailerId" element={<RetailerLedgerDetail />} />
+          <Route path="collect-payment" element={<CollectPayment />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
