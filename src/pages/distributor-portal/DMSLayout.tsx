@@ -70,6 +70,7 @@ const operationsNavItems: NavItem[] = [
 ];
 
 const supportNavItems: NavItem[] = [
+  { label: 'Retailer Feedback', icon: MessageSquare, path: '/distributor-portal/retailer-feedback' },
   { label: 'Claims', icon: FileText, path: '/distributor-portal/claims' },
   { label: 'Support', icon: Headphones, path: '/distributor-portal/support' },
   { label: 'Ideas', icon: Lightbulb, path: '/distributor-portal/ideas' },
