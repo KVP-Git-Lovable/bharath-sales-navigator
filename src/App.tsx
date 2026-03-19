@@ -491,6 +491,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="retailer-ledger" element={<RetailerLedger />} />
           <Route path="retailer-ledger/:retailerId" element={<RetailerLedgerDetail />} />
           <Route path="collect-payment" element={<CollectPayment />} />
+          <Route path="secondary-invoices" element={<SecondaryInvoiceList />} />
+          <Route path="secondary-invoices/create" element={<SecondaryInvoiceCreate />} />
+          <Route path="retailer-feedback" element={<RetailerFeedback />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
