@@ -650,6 +650,20 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
                     size="sm"
                     variant="outline"
                     className="h-8 gap-1 flex-1"
+                    onClick={() => {
+                      setPasswordUser(user);
+                      setPasswordForm({ password: '', confirmPassword: '' });
+                      setShowPassword(false);
+                      setPasswordDialogOpen(true);
+                    }}
+                  >
+                    <Key className="h-3.5 w-3.5" />
+                    <span className="hidden xs:inline">Set Password</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1 flex-1"
                     onClick={() => loginAsUser(user)}
                     disabled={impersonating === user.id}
                   >
