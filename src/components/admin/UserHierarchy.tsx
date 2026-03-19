@@ -340,17 +340,17 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
   }
 
   // Collect unique roles for legend
-  const collectRoles = (users: HierarchyUser[]): Set<string> => {
-    const roles = new Set<string>();
+  const collectRoles = (users: HierarchyUser[]): Map<string, boolean> => {
+    const roles = new Map<string, boolean>();
     users.forEach(u => {
-      if (u.role_name) roles.add(u.role_name);
+      if (u.role_name) roles.set(u.role_name, u.is_system_profile || false);
       if (u.directReports.length) {
-        collectRoles(u.directReports).forEach(r => roles.add(r));
+        collectRoles(u.directReports).forEach((isSys, name) => roles.set(name, isSys));
       }
     });
     return roles;
   };
-  const uniqueRoles = Array.from(collectRoles(hierarchy));
+  const uniqueRoles = collectRoles(hierarchy);
 
   return (
     <Card className={className}>
@@ -370,8 +370,8 @@ const UserHierarchy: React.FC<UserHierarchyProps> = ({ className }) => {
         </div>
         {/* Role color legend */}
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {uniqueRoles.map(role => {
-            const c = getRoleColors(role);
+          {Array.from(uniqueRoles.entries()).map(([role, isSystem]) => {
+            const c = isSystem ? systemProfileColors : defaultProfileColors;
             return (
               <span
                 key={role}
