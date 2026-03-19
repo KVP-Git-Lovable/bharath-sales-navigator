@@ -797,20 +797,7 @@ export function DistributorPortalUsers({ distributorId, distributorName }: Distr
                     <Send className={`h-3.5 w-3.5 ${sendingInvite === user.id ? 'animate-pulse' : ''}`} />
                     <span className="hidden xs:inline">Send Invite</span>
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1 flex-1"
-                    onClick={() => {
-                      setPasswordUser(user);
-                      setPasswordForm({ password: '', confirmPassword: '' });
-                      setShowPassword(false);
-                      setPasswordDialogOpen(true);
-                    }}
-                  >
-                    <Key className="h-3.5 w-3.5" />
-                    <span className="hidden xs:inline">Set Password</span>
-                  </Button>
+                  
                   <Button
                     size="sm"
                     variant="outline"
