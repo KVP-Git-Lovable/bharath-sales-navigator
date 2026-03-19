@@ -134,8 +134,9 @@ const SecurityRolesDisplay: React.FC<SecurityRolesDisplayProps> = ({ className }
     }
   };
 
-  const getRoleColor = (name: string) => {
-    return roleColors[name] || 'bg-muted text-muted-foreground border-border hover:bg-muted/80';
+  const getRoleColor = (role: SecurityProfile) => {
+    if (role.is_system) return systemRoleColor;
+    return rolePalette[role.colorIndex % rolePalette.length];
   };
 
   const totalUsers = roles.reduce((sum, role) => sum + role.user_count, 0);
