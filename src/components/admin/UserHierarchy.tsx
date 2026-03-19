@@ -26,19 +26,13 @@ interface UserHierarchyProps {
   className?: string;
 }
 
-// Role-based color mapping
-const roleColorMap: Record<string, { bg: string; text: string; border: string; badge: string }> = {
-  'System Administrator': { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' },
-  'Super Admin': { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' },
-  'Admin': { bg: 'bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500' },
-  'Manager': { bg: 'bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/30', badge: 'bg-blue-500' },
-  'Team Lead': { bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/30', badge: 'bg-emerald-500' },
-  'default': { bg: 'bg-slate-500/10', text: 'text-slate-700 dark:text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-500' },
-};
+// Default role colors — system profiles get a distinct style, others use a generic palette
+const systemProfileColors = { bg: 'bg-rose-500/10', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/30', badge: 'bg-rose-500' };
+const defaultProfileColors = { bg: 'bg-slate-500/10', text: 'text-slate-700 dark:text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-500' };
 
-const getRoleColors = (role?: string) => {
-  if (!role) return roleColorMap['default'];
-  return roleColorMap[role] || roleColorMap['default'];
+const getRoleColors = (user: HierarchyUser) => {
+  if (user.is_system_profile) return systemProfileColors;
+  return defaultProfileColors;
 };
 
 // Level-based accent for depth indication
