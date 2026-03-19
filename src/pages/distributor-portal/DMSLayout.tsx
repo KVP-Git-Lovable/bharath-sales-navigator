@@ -13,6 +13,7 @@ import {
   ClipboardList,
   RotateCcw,
   FileText,
+  Receipt,
   Headphones,
   Lightbulb,
   Building,
