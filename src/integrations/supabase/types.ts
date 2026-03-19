@@ -17276,6 +17276,10 @@ export type Database = {
           subordinate_user_id: string
         }[]
       }
+      get_auth_user_id_by_email: {
+        Args: { lookup_email: string }
+        Returns: string
+      }
       get_authenticated_email: { Args: never; Returns: string }
       get_basic_profiles_for_admin: {
         Args: never
