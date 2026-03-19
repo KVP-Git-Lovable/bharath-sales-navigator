@@ -7,6 +7,7 @@ import { PermissionRedirect } from '@/components/security/PermissionRedirect';
 interface RoutePermissionGuardProps {
   children: ReactNode;
   permissionPrefix: string;
+  moduleName?: string;
 }
 
 /**
