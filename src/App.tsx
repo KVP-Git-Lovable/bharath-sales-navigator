@@ -114,7 +114,7 @@ import CreditManagement from "./pages/CreditManagement";
 import RetailerLoyaltyAdmin from "./pages/RetailerLoyaltyAdmin";
 import RetailerLoyalty from "./pages/RetailerLoyalty";
 import SecurityManagement from "./pages/SecurityManagement";
-import PushContentSetup from "./pages/admin/PushContentSetup";
+
 import PerformanceModuleAdmin from "./pages/admin/PerformanceModuleAdmin";
 import PriceBookAdmin from "./pages/admin/PriceBookAdmin";
 import PriceBookDetail from "./pages/admin/PriceBookDetail";
