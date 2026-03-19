@@ -170,17 +170,18 @@ Deno.serve(async (req) => {
           console.log(`  ↳ Closed ${activeLogs.length} retailer visit logs`)
         }
 
-        // Step 7: Send notification to user
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: userId,
-            title: 'Day Auto-Closed',
-            message: `Your day was automatically closed at midnight. Last activity recorded at ${new Date(lastActivityTime).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
-            type: 'info',
-            related_table: 'attendance',
-            related_id: record.id
-          })
+        // Step 7: Emit notification event through rules engine
+        await supabase.rpc('emit_notification_event', {
+          p_event_code: 'AUTO_DAY_CLOSED',
+          p_source_table: 'attendance',
+          p_record_id: record.id,
+          p_actor_user_id: userId,
+          p_metadata: {
+            record_name: 'Attendance',
+            date: dateStr,
+            last_activity: lastActivityTime
+          }
+        })
 
         processedUsers.push(userId)
         console.log(`✅ Successfully processed user: ${userId}`)
