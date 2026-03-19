@@ -96,18 +96,23 @@ serve(async (req) => {
       });
 
       if (createError) {
-        // If user already exists, try to find by email and update
+        // If user already exists, find by querying auth.users via raw SQL through the DB
         if (createError.message?.includes('already been registered') || createError.message?.includes('already exists')) {
-          // Use getUserByEmail (available in newer supabase-js) or try signInWithPassword approach
-          // Since we can't list users, we'll use the admin API to get user by email
-          const { data: userByEmail, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(distributorUser.email);
-          
-          if (getUserError || !userByEmail?.user) {
-            return new Response(JSON.stringify({ error: 'User exists but could not be found', details: getUserError?.message }),
+          // Query auth.users directly via service role to find the user by email
+          const { data: existingUserRow, error: queryError } = await supabaseAdmin
+            .rpc('get_auth_user_id_by_email', { lookup_email: distributorUser.email });
+
+          if (queryError || !existingUserRow) {
+            // Fallback: try to use listUsers with per_page=1 filter workaround
+            // Since listUsers may fail due to NULL tokens, catch gracefully
+            return new Response(JSON.stringify({ 
+              error: 'User with this email already exists in auth but could not be linked. Please use the Set Password button on the user card instead.',
+              details: queryError?.message || 'Could not find existing auth user'
+            }),
               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
 
-          authUserId = userByEmail.user.id;
+          authUserId = existingUserRow;
 
           // Update existing user's password
           const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
