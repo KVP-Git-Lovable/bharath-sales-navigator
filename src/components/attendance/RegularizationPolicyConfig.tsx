@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Save, Shield, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { Save, Shield, Clock, CheckCircle, Loader2, AlertCircle, Info } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRegularizationPolicy } from '@/hooks/useRegularizationPolicy';
 
