@@ -8,8 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Save, Settings, Shield, Clock, CheckSquare, Loader2, CalendarDays } from 'lucide-react';
+import { Save, Settings, Shield, Clock, CheckSquare, Loader2, CalendarDays, AlertCircle, Info } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalLeavePolicy, useLeaveTypeOverrides, type GlobalLeavePolicy, type LeaveTypeOverride } from '@/hooks/useGlobalLeavePolicy';
 
@@ -36,7 +37,10 @@ interface AccrualForm {
 }
 
 const LeavePolicyConfig = () => {
-  const { data: globalPolicy, isLoading: loadingGlobal } = useGlobalLeavePolicy();
+  const { data: globalPolicyResult, isLoading: loadingGlobal } = useGlobalLeavePolicy();
+  const globalPolicy = globalPolicyResult?.data ?? null;
+  const globalPolicyError = globalPolicyResult?.error ?? null;
+  const isGlobalFallback = globalPolicyResult?.isFallback ?? false;
   const { data: overrides, isLoading: loadingOverrides } = useLeaveTypeOverrides();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
@@ -227,8 +231,36 @@ const LeavePolicyConfig = () => {
     );
   }
 
+  if (!globalPolicy && globalPolicyError) {
+    toast.error('Failed to load leave policy');
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Unable to load policy</AlertTitle>
+        <AlertDescription>Please try again or contact your administrator.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!globalPolicy && !globalPolicyError) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>No policy configured yet</AlertTitle>
+        <AlertDescription>Click Save to create the default leave policy.</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {isGlobalFallback && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Default config loaded</AlertTitle>
+          <AlertDescription>Check permissions if saving fails.</AlertDescription>
+        </Alert>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

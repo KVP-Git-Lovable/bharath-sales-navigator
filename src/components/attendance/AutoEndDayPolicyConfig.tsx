@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Save, Clock, Bell, MapPin, Loader2, Power } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toast } from 'sonner';
+import { Save, Clock, Bell, MapPin, Loader2, Power, AlertCircle, Info } from 'lucide-react';
 import { useAutoEndDayPolicy, useUpdateAutoEndDayPolicy } from '@/hooks/useAutoEndDayPolicy';
 
 const TIMEZONES = [
@@ -25,7 +27,10 @@ const ACTIVITY_SOURCES = [
 ];
 
 const AutoEndDayPolicyConfig = () => {
-  const { data: policy, isLoading } = useAutoEndDayPolicy();
+  const { data: policyResult, isLoading } = useAutoEndDayPolicy();
+  const policy = policyResult?.data ?? null;
+  const policyError = policyResult?.error ?? null;
+  const isFallback = policyResult?.isFallback ?? false;
   const updatePolicy = useUpdateAutoEndDayPolicy();
 
   const [form, setForm] = useState<{
@@ -85,8 +90,37 @@ const AutoEndDayPolicyConfig = () => {
     );
   }
 
+  if (!policy && policyError) {
+    toast.error('Failed to load Auto End Day policy');
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Unable to load policy</AlertTitle>
+        <AlertDescription>Please try again or contact your administrator.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!policy && !policyError) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>No policy configured yet</AlertTitle>
+        <AlertDescription>Click Save to create the default Auto End Day policy.</AlertDescription>
+      </Alert>
+    );
+  }
   return (
     <Card>
+      {isFallback && (
+        <div className="px-6 pt-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Default config loaded</AlertTitle>
+            <AlertDescription>Check permissions if saving fails.</AlertDescription>
+          </Alert>
+        </div>
+      )}
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

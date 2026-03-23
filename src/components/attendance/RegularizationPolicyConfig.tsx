@@ -7,13 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Save, Shield, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { Save, Shield, Clock, CheckCircle, Loader2, AlertCircle, Info } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRegularizationPolicy } from '@/hooks/useRegularizationPolicy';
 
 const RegularizationPolicyConfig = () => {
-  const { data: policy, isLoading } = useRegularizationPolicy();
+  const { data: policyResult, isLoading } = useRegularizationPolicy();
+  const policy = policyResult?.data ?? null;
+  const policyError = policyResult?.error ?? null;
+  const isFallback = policyResult?.isFallback ?? false;
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [unlimitedMonthly, setUnlimitedMonthly] = useState(true);
@@ -89,8 +93,40 @@ const RegularizationPolicyConfig = () => {
     );
   }
 
+  // Critical error: no data and error present
+  if (!policy && policyError) {
+    toast.error('Failed to load regularization policy');
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Unable to load policy</AlertTitle>
+        <AlertDescription>Please try again or contact your administrator.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Empty state: no data, no error
+  if (!policy && !policyError) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>No policy configured yet</AlertTitle>
+        <AlertDescription>Click Save to create the default regularization policy.</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <Card>
+      {isFallback && (
+        <div className="px-6 pt-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Default config loaded</AlertTitle>
+            <AlertDescription>Check permissions if saving fails.</AlertDescription>
+          </Alert>
+        </div>
+      )}
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
