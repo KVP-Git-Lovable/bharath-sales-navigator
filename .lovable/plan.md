@@ -1,118 +1,99 @@
 
 
-## Final Development Plan: Self-Healing Policy System with Error Handling & Observability
+## Analysis: Do You Need This Checklist Every Time?
 
-### Overview
+### Short Answer: No -- but only if we fix the remaining gaps now.
 
-Transform 3 singleton policy hooks and their UI components into a production-grade, self-healing system that works in any environment (fresh, remixed, or existing).
-
----
-
-### Step 1: Create Utility — `logPolicyError` helper + default configs
-
-**New file: `src/utils/policyDefaults.ts`**
-
-- Export default config objects for all 3 policy tables (reused by hooks and seed migration)
-- Export `logPolicyError(context, error)` structured logging helper using `devError` pattern
-- Export `PolicyResult<T>` type: `{ data: T | null, error: PostgrestError | null, isFallback: boolean }`
+The 3 policy hooks (`useGlobalLeavePolicy`, `useAutoEndDayPolicy`, `useRegularizationPolicy`) are already fixed with the self-healing pattern. But there are **other singleton/config hooks** in your codebase that still use `.single()` and will break on a fresh/remixed DB.
 
 ---
 
-### Step 2: Update 3 Hooks — Self-healing with structured responses
+### Current State
 
-**Modify: `src/hooks/useGlobalLeavePolicy.ts`**
-**Modify: `src/hooks/useAutoEndDayPolicy.ts`**
-**Modify: `src/hooks/useRegularizationPolicy.ts`**
+**Already safe (self-healing pattern applied):**
+- `useGlobalLeavePolicy` -- `.maybeSingle()` + auto-seed + `PolicyResult`
+- `useAutoEndDayPolicy` -- `.maybeSingle()` + auto-seed + `PolicyResult`
+- `useRegularizationPolicy` -- `.maybeSingle()` + auto-seed + `PolicyResult`
+- `useLocationFeature` -- already uses `.maybeSingle()` + fallback
+- `useVanSales` -- already uses `.maybeSingle()` + legacy fallback
+- `useResolvedExpenseConfig` -- already uses `.maybeSingle()`
 
-Each hook's `queryFn` changes to:
+**Still vulnerable (uses `.single()` on config/singleton tables):**
 
-1. `.maybeSingle()` instead of `.single()`
-2. If data exists → return `{ data, error: null, isFallback: false }`
-3. If null → auto-seed via `.insert()` with defaults from Step 1
-4. If insert fails (RLS) → **retry fetch** (handles race condition where another request already inserted) → return `{ data: retryData, error: insertError, isFallback: true }`
-5. If everything fails → return `{ data: null, error, isFallback: true }` — **no throw, no crash**
+| Hook | Table | Risk |
+|------|-------|------|
+| `useActivePerformanceModule` | `performance_module_config` | Crashes if table empty |
+| `useOrderBasedDelivery` | `feature_flags` | Crashes if flag row missing |
+| `useD1Delivery` | `feature_flags` (3 keys) | Crashes if flag rows missing |
 
-The hook return type becomes `PolicyResult<T>` so consuming components know whether data came from a fallback path.
-
-Also update `useEffectiveLeavePolicy` to handle the new structured response shape.
-
----
-
-### Step 3: Update 3 UI Components — 5-state rendering
-
-**Modify: `src/components/attendance/RegularizationPolicyConfig.tsx`**
-**Modify: `src/components/attendance/AutoEndDayPolicyConfig.tsx`**
-**Modify: `src/components/attendance/LeavePolicyConfig.tsx`**
-
-Each component handles 5 states:
-
-| State | Condition | UI |
-|-------|-----------|-----|
-| Loading | `isLoading` | Spinner (existing) |
-| Critical Error | `error && !data` | Alert card: "Unable to load policy. Please try again or contact admin." |
-| Fallback Warning | `isFallback && data` | Yellow banner: "Default config loaded. Check permissions if saving fails." + toast.warning |
-| Empty | `!data && !error` | Info card: "No policy configured yet. Click Save to create one." |
-| Success | `data` exists | Normal form (existing) |
-
-Add toast notifications:
-- `toast.error()` on critical failures
-- `toast.warning()` on fallback/permission issues
+**Safe `.single()` usage (not config tables -- these are fine):**
+- Insert-then-select patterns (e.g., `useTemplates`, `useOfflineBeats`) -- `.single()` after `.insert()` is correct
+- Lookup by specific ID (e.g., `useHierarchyTargets .eq('id', targetId).single()`) -- correct usage
+- `useAttendanceCache` -- fetches by user+date, handles missing gracefully
 
 ---
 
-### Step 4: Database Migration — Singleton constraints + seed data
+### Plan: Make ALL Config Hooks Self-Healing
 
-**New migration:**
+#### Step 1: Fix `useActivePerformanceModule`
+
+Change `.single()` to `.maybeSingle()`, return `'none'` as default if no row exists. No auto-seed needed -- the hook already defaults to `'none'`.
+
+#### Step 2: Fix `useOrderBasedDelivery`
+
+Change `.single()` to `.maybeSingle()`. Already has `if (!error && data)` guard, so just the query method needs updating.
+
+#### Step 3: Fix `useD1Delivery`
+
+Change all 3 `.single()` calls to `.maybeSingle()`. Already has `if (!error && data)` guards.
+
+#### Step 4: Add seed data for `feature_flags` and `performance_module_config`
+
+Add to the existing seed migration (or new migration):
 
 ```sql
--- Singleton constraints (only 1 row ever)
-CREATE UNIQUE INDEX IF NOT EXISTS one_row_global_leave 
-  ON global_leave_policy ((true));
-CREATE UNIQUE INDEX IF NOT EXISTS one_row_auto_end_day 
-  ON auto_end_day_policy ((true));
-CREATE UNIQUE INDEX IF NOT EXISTS one_row_regularization 
-  ON regularization_policy ((true));
+INSERT INTO feature_flags (feature_key, is_enabled)
+VALUES 
+  ('order_based_delivery', false),
+  ('d1_delivery', false),
+  ('packing_list_module', false),
+  ('delivery_agent_app', false),
+  ('location_check_in_enabled', true),
+  ('van_sales', false)
+ON CONFLICT DO NOTHING;
 
--- Seed defaults (safe to re-run)
-INSERT INTO global_leave_policy (is_enabled, reset_cycle, ...)
-  VALUES (true, 'calendar_year', ...)
-  ON CONFLICT DO NOTHING;
-
-INSERT INTO auto_end_day_policy (is_enabled, auto_close_time, timezone, ...)
-  VALUES (false, '22:00:00', 'Asia/Kolkata', ...)
-  ON CONFLICT DO NOTHING;
-
-INSERT INTO regularization_policy (is_enabled, daily_limit, approval_mode, ...)
-  VALUES (true, 1, 'manager', ...)
-  ON CONFLICT DO NOTHING;
+INSERT INTO performance_module_config (active_module)
+VALUES ('none')
+ON CONFLICT DO NOTHING;
 ```
 
 ---
 
-### Files Changed Summary
+### How This Prevents Future Issues
+
+After this fix, **every config/singleton hook** in your codebase follows one of two patterns:
+
+1. **Self-healing pattern** (for policy tables): `.maybeSingle()` + auto-seed + `PolicyResult`
+2. **Graceful fallback pattern** (for feature flags/config): `.maybeSingle()` + sensible default
+
+**You will NOT need to paste this checklist again** because:
+- All existing config hooks will be resilient
+- The `policyDefaults.ts` utility provides a reusable pattern for any future policy tables
+- Feature flags already default to `false` when missing
+
+**For future modules**, follow the same pattern:
+- Config/policy tables: use the `PolicyResult` pattern from `policyDefaults.ts`
+- Feature flags: use `.maybeSingle()` + `?? false`
+- Always add seed data in the migration that creates the table
+
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/utils/policyDefaults.ts` | **NEW** — defaults, types, logging helper |
-| `src/hooks/useGlobalLeavePolicy.ts` | `.maybeSingle()` + auto-seed + structured response |
-| `src/hooks/useAutoEndDayPolicy.ts` | `.maybeSingle()` + auto-seed + structured response |
-| `src/hooks/useRegularizationPolicy.ts` | `.maybeSingle()` + auto-seed + structured response |
-| `src/components/attendance/LeavePolicyConfig.tsx` | 5-state rendering + toasts |
-| `src/components/attendance/AutoEndDayPolicyConfig.tsx` | 5-state rendering + toasts |
-| `src/components/attendance/RegularizationPolicyConfig.tsx` | 5-state rendering + toasts |
-| 1 database migration | Singleton indexes + seed data |
+| `src/hooks/useActivePerformanceModule.ts` | `.single()` to `.maybeSingle()` + null fallback |
+| `src/hooks/useOrderBasedDelivery.ts` | `.single()` to `.maybeSingle()` |
+| `src/hooks/useD1Delivery.ts` | 3x `.single()` to `.maybeSingle()` |
+| 1 database migration | Seed `feature_flags` + `performance_module_config` rows |
 
-**Total: 1 new file + 6 modified files + 1 migration**
-
-### Result
-
-- Never crashes on empty DB
-- Never silently fails
-- Self-heals missing config rows
-- Race-condition safe (retry after failed insert)
-- RLS-failure safe (graceful fallback, no throw)
-- Clear UI states for every scenario
-- Structured logging for debugging
-- Singleton constraints at DB level prevent duplicates
-- Works in fresh, remixed, and existing environments
+**Total: 3 files modified + 1 migration**
 
