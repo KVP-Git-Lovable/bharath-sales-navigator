@@ -1,158 +1,118 @@
-# Scalable Target Management — Plan
 
-## Status: ✅ Phase 1 & 2 Implemented | Phase 3 Pending
 
-## Summary
-Upgraded the target management system from a rigid lock-based model to a flexible plan-status-driven architecture with multi-plan support and a unified `target_breakdowns` table.
+## Final Development Plan: Self-Healing Policy System with Error Handling & Observability
 
-## What Was Done
+### Overview
 
-### Phase 1: Database Migration ✅
-- Added `plan_status` column (`draft` / `active` / `closed`) to `fy_target_config`
-- Migrated existing data: `is_locked=true` → `active`, `is_locked=false` → `draft`
-- Dropped unique constraint on `fy_year`, replaced with composite `(fy_year, target_plan_name)` to support multiple plans per FY
-- Created `target_breakdowns` table for flexible multi-parameter target storage
-- RLS enabled on `target_breakdowns`
+Transform 3 singleton policy hooks and their UI components into a production-grade, self-healing system that works in any environment (fresh, remixed, or existing).
 
-### Phase 2: Hooks ✅
-- Updated `useFYTargetConfig` to support optional `planId` parameter and `plan_status` field
-- Created `useFYTargetPlans` hook to fetch all plans for a given FY year
+---
 
-### Phase 3: TargetConfigTab ✅
-- Removed Lock/Unlock buttons and locked read-only view
-- Added **Plan Selector** bar showing all plans for current FY with status icons + "New Plan" button
-- Added **Status Badge** (Draft/Active/Closed) with color-coded indicators
-- Replaced "Lock & Assign" with "Activate & Assign" button
-- Active plans show warning: "Changes will affect allocated targets"
-- Closed plans show read-only view with "Reopen as Draft" option
-- `is_locked` is now auto-derived from `plan_status` for backward compatibility
+### Step 1: Create Utility — `logPolicyError` helper + default configs
 
-### Phase 4: HierarchyAllocationTab ✅
-- Replaced `is_locked` check with `plan_status` check
-- Draft plans show "Please activate" message instead of "Configuration not locked"
-- Active and Closed plans allow viewing allocations
-- Accepts `selectedPlanId` prop for multi-plan support
+**New file: `src/utils/policyDefaults.ts`**
 
-### Phase 5: DistributionSummaryHeader + TargetSummaryCard ✅
-- Replaced `isLocked` badge with status badge (Draft/Active/Closed)
-- Backward compatible: falls back to `is_locked` if `plan_status` not set
+- Export default config objects for all 3 policy tables (reused by hooks and seed migration)
+- Export `logPolicyError(context, error)` structured logging helper using `devError` pattern
+- Export `PolicyResult<T>` type: `{ data: T | null, error: PostgrestError | null, isFallback: boolean }`
 
-### Phase 6: TargetVsActual Page ✅
-- Added `selectedPlanId` state management
-- Passes `selectedPlanId` and `onPlanChange` to TargetConfigTab
-- Passes `selectedPlanId` to HierarchyAllocationTab
+---
 
-## Backward Compatibility
-- `is_locked` column remains in DB and is auto-synced from `plan_status`
-- Existing `user_business_plan_*` breakdown tables untouched
-- All existing data migrated automatically
+### Step 2: Update 3 Hooks — Self-healing with structured responses
 
-## Phase: Target Split, Dual Visibility & Manager Self-Service
+**Modify: `src/hooks/useGlobalLeavePolicy.ts`**
+**Modify: `src/hooks/useAutoEndDayPolicy.ts`**
+**Modify: `src/hooks/useRegularizationPolicy.ts`**
 
-### Phase 1: Fix Equal Split ✅
-- Changed `handleEqualSplit` to split equally among direct reports (weight = 1 each) instead of weighting by `subordinateCount`
-- Each manager handles their own team's internal distribution via their strategy
+Each hook's `queryFn` changes to:
 
-### Phase 2: Dual Target for Independent Strategy ✅
-- Added `personal_quantity_target`, `personal_revenue_target`, `personal_visits_target` columns to `user_business_plans` table
-- Extended `SubordinateAllocation` and `TeamHierarchyNode` interfaces with personal target fields
-- `StepAssignManagers`: Independent strategy sub-managers now show two input sections — "Personal Target" and "Team Target"
-- `StepPreview`: Independent managers show personal (blue) + team targets separately; "not yet distributed" warning hidden for Independent
-- Save mutation includes personal target fields
+1. `.maybeSingle()` instead of `.single()`
+2. If data exists → return `{ data, error: null, isFallback: false }`
+3. If null → auto-seed via `.insert()` with defaults from Step 1
+4. If insert fails (RLS) → **retry fetch** (handles race condition where another request already inserted) → return `{ data: retryData, error: insertError, isFallback: true }`
+5. If everything fails → return `{ data: null, error, isFallback: true }` — **no throw, no crash**
 
-### Phase 3: Manager Self-Service Target Editing 🔜 (Next Sprint)
-- New `ManagerTargets.tsx` page for managers to edit subordinate targets
-- View own target vs actual achievement
-- Reuse `useTeamTargetProgress` hook for analytics
+The hook return type becomes `PolicyResult<T>` so consuming components know whether data came from a fallback path.
 
-## Phase: Feedback Configuration & Policy Engine ✅
+Also update `useEffectiveLeavePolicy` to handle the new structured response shape.
 
-### Database Schema ✅
-- Created `feedback_questions` table (per-module/customer configurable questions)
-- Created `feedback_policies` table (named policies with module, priority)
-- Created `feedback_policy_rules` table (condition+action pairs per policy)
-- RLS enabled on all 3 tables with authenticated access
+---
 
-### Frontend Components ✅
-- `FeedbackQuestionConfig.tsx`: Admin CRUD for feedback questions with module filter, type selection, required/active toggles
-- `FeedbackPolicyConfig.tsx`: Admin CRUD for policies with expandable rule management, condition/operator/value/action configuration
-- `FeedbackManagement.tsx`: Restructured with top-level Overview | Feedback Configuration tabs
+### Step 3: Update 3 UI Components — 5-state rendering
 
-### Policy Engine ✅
-- `useFeedbackPolicyCheck.ts`: Hook evaluates active rules against visit count, order status, days since feedback
-- Supports conditions: visit_count, no_order, order_placed, visit_completed, days_since_feedback
-- Supports actions: block_order, block_checkout, show_prompt, mandatory_feedback
+**Modify: `src/components/attendance/RegularizationPolicyConfig.tsx`**
+**Modify: `src/components/attendance/AutoEndDayPolicyConfig.tsx`**
+**Modify: `src/components/attendance/LeavePolicyConfig.tsx`**
 
-### Workflow Enforcement ✅
-- `VisitCard.tsx`: Integrated policy check hook
-- "Feedback Required" badge shown when policy triggers
-- Order button intercepted when block_order/mandatory_feedback action triggered
-- Opens feedback modal automatically when blocked
+Each component handles 5 states:
 
-## Phase: No Target Strategy & Mid-Year Flexibility ✅
+| State | Condition | UI |
+|-------|-----------|-----|
+| Loading | `isLoading` | Spinner (existing) |
+| Critical Error | `error && !data` | Alert card: "Unable to load policy. Please try again or contact admin." |
+| Fallback Warning | `isFallback && data` | Yellow banner: "Default config loaded. Check permissions if saving fails." + toast.warning |
+| Empty | `!data && !error` | Info card: "No policy configured yet. Click Save to create one." |
+| Success | `data` exists | Normal form (existing) |
 
-### Strategy Explanation Panel ✅
-- Panel now open by default (`useState(true)`)
-- Added 4th "No Target" card with explanation
+Add toast notifications:
+- `toast.error()` on critical failures
+- `toast.warning()` on fallback/permission issues
 
-### No Target Strategy ✅
-- Added `'no_target'` to `TargetStrategy` type union
-- Added Ban icon, gray color scheme, labels across all strategy components
-- `StrategyBadge`, `InlineStrategySelector`, `TargetStrategySelector` all support `no_target`
+---
 
-### Allocation Logic ✅
-- `getContributorCountForNode` returns 0 for `no_target` users
-- `autoDistributeTargets` skips `no_target` children, zeros their targets
-- `splitByWeights` filters out `no_target` entries
-- `handleEqualSplit` excludes `no_target` from weight calculation
-- `handleStrategyChange` zeros all targets when switching to `no_target`
-- Save mutation includes `has_no_target: true` flag
+### Step 4: Database Migration — Singleton constraints + seed data
 
-### Wizard Steps UI ✅
-- `StepAssignManagers`: No Target users show strikethrough name + badge, hidden inputs
-- `StepPreview`: No Target nodes grayed out with "No target assigned" text, excluded from distribution warnings
-- `StepReviewSave`: No Target rows read-only with grayed appearance
+**New migration:**
 
-### Manager Self-Service ✅
-- `TeamTargetDashboard`: Ban icon toggle button for managers to set subordinates to No Target
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+```sql
+-- Singleton constraints (only 1 row ever)
+CREATE UNIQUE INDEX IF NOT EXISTS one_row_global_leave 
+  ON global_leave_policy ((true));
+CREATE UNIQUE INDEX IF NOT EXISTS one_row_auto_end_day 
+  ON auto_end_day_policy ((true));
+CREATE UNIQUE INDEX IF NOT EXISTS one_row_regularization 
+  ON regularization_policy ((true));
 
-## Phase: Credit Note Generation System ✅
+-- Seed defaults (safe to re-run)
+INSERT INTO global_leave_policy (is_enabled, reset_cycle, ...)
+  VALUES (true, 'calendar_year', ...)
+  ON CONFLICT DO NOTHING;
 
-### Database Schema ✅
-- Created `credit_notes` table (CN number, retailer, reason, GST totals, status)
-- Created `credit_note_items` table (links to original order/invoice, product details, barcode)
-- RLS enabled with authenticated access
-- Auto-incrementing CN number sequence
+INSERT INTO auto_end_day_policy (is_enabled, auto_close_time, timezone, ...)
+  VALUES (false, '22:00:00', 'Asia/Kolkata', ...)
+  ON CONFLICT DO NOTHING;
 
-### Credit Note Creation Page ✅ (`/credit-note/create`)
-- Retailer selector → shows all invoices for selected retailer
-- Multi-invoice item selection with checkboxes and return quantity input
-- Barcode/SKU/product code scanner to filter & highlight matching items across invoices
-- Return reason selector (unsold_stock, damaged, expired, quality_issue, other)
-- Review step with grouped items by invoice, GST totals
-- Saves to DB and auto-generates PDF on confirmation
+INSERT INTO regularization_policy (is_enabled, daily_limit, approval_mode, ...)
+  VALUES (true, 1, 'manager', ...)
+  ON CONFLICT DO NOTHING;
+```
 
-### Credit Note PDF Generator ✅ (`src/utils/creditNoteGenerator.ts`)
-- Matches invoice style: dark header, company logo, BILL TO section
-- Title: "CREDIT NOTE" with red accent (vs green for invoices)
-- Header: CN#, Credit Date, Reference Invoice(s), Reason
-- Items table with red header and light red alternating rows
-- Totals: Sub Total, SGST, CGST, Total (red bar)
-- Amount in words, Reason for Credit section, Authorized Signature
+---
 
-### Credit Notes List ✅ (Invoice Management → "Credit Notes" tab)
-- Lists all credit notes with status badges (draft/issued/cancelled)
-- Download PDF button per credit note
-- "New Credit Note" button linking to creation page
+### Files Changed Summary
 
-### Files Created
-- `src/utils/creditNoteGenerator.ts` — PDF generation + CN numbering
-- `src/pages/CreditNoteCreate.tsx` — Multi-step creation flow
-- `src/components/credit-note/RetailerInvoiceList.tsx` — Invoice items with barcode filter
-- `src/components/credit-note/BarcodeScanInput.tsx` — Barcode/SKU scanner
-- `src/components/credit-note/CreditNoteReview.tsx` — Review summary
-- `src/components/credit-note/CreditNoteList.tsx` — List with PDF download
-- Modified `src/pages/InvoiceManagement.tsx` — Added 4th "Credit Notes" tab
-- Modified `src/App.tsx` — Added `/credit-note/create` route
-- Mutation updates `has_no_target` and `target_strategy` on `user_business_plans`
+| File | Change |
+|------|--------|
+| `src/utils/policyDefaults.ts` | **NEW** — defaults, types, logging helper |
+| `src/hooks/useGlobalLeavePolicy.ts` | `.maybeSingle()` + auto-seed + structured response |
+| `src/hooks/useAutoEndDayPolicy.ts` | `.maybeSingle()` + auto-seed + structured response |
+| `src/hooks/useRegularizationPolicy.ts` | `.maybeSingle()` + auto-seed + structured response |
+| `src/components/attendance/LeavePolicyConfig.tsx` | 5-state rendering + toasts |
+| `src/components/attendance/AutoEndDayPolicyConfig.tsx` | 5-state rendering + toasts |
+| `src/components/attendance/RegularizationPolicyConfig.tsx` | 5-state rendering + toasts |
+| 1 database migration | Singleton indexes + seed data |
+
+**Total: 1 new file + 6 modified files + 1 migration**
+
+### Result
+
+- Never crashes on empty DB
+- Never silently fails
+- Self-heals missing config rows
+- Race-condition safe (retry after failed insert)
+- RLS-failure safe (graceful fallback, no throw)
+- Clear UI states for every scenario
+- Structured logging for debugging
+- Singleton constraints at DB level prevent duplicates
+- Works in fresh, remixed, and existing environments
+
