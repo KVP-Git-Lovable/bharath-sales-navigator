@@ -183,6 +183,10 @@ import SecondaryInvoiceList from "./pages/distributor-portal/SecondaryInvoiceLis
 import SecondaryInvoiceCreate from "./pages/distributor-portal/SecondaryInvoiceCreate";
 import RetailerFeedback from "./pages/distributor-portal/RetailerFeedback";
 import StockHealthDashboard from "./pages/distributor-portal/StockHealthDashboard";
+import GoodsReceiptNew from "./pages/distributor-portal/GoodsReceiptNew";
+import PriceBookView from "./pages/distributor-portal/PriceBookView";
+import PrimarySchemesView from "./pages/distributor-portal/PrimarySchemesView";
+import PrimaryReturnCreate from "./pages/distributor-portal/PrimaryReturnCreate";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
