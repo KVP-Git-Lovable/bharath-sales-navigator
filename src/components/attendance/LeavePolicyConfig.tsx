@@ -36,7 +36,10 @@ interface AccrualForm {
 }
 
 const LeavePolicyConfig = () => {
-  const { data: globalPolicy, isLoading: loadingGlobal } = useGlobalLeavePolicy();
+  const { data: globalPolicyResult, isLoading: loadingGlobal } = useGlobalLeavePolicy();
+  const globalPolicy = globalPolicyResult?.data ?? null;
+  const globalPolicyError = globalPolicyResult?.error ?? null;
+  const isGlobalFallback = globalPolicyResult?.isFallback ?? false;
   const { data: overrides, isLoading: loadingOverrides } = useLeaveTypeOverrides();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);

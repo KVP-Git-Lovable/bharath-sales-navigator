@@ -56,7 +56,8 @@ const RegularizationRequestModal: React.FC<RegularizationRequestModalProps> = ({
   const [policyBlock, setPolicyBlock] = useState<string | null>(null);
   const [isCheckingLimits, setIsCheckingLimits] = useState(false);
 
-  const { data: policy, isLoading: policyLoading } = useRegularizationPolicy();
+  const { data: policyResult, isLoading: policyLoading } = useRegularizationPolicy();
+  const policy = policyResult?.data ?? null;
 
   // Reset form when opening
   useEffect(() => {

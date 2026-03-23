@@ -25,7 +25,10 @@ const ACTIVITY_SOURCES = [
 ];
 
 const AutoEndDayPolicyConfig = () => {
-  const { data: policy, isLoading } = useAutoEndDayPolicy();
+  const { data: policyResult, isLoading } = useAutoEndDayPolicy();
+  const policy = policyResult?.data ?? null;
+  const policyError = policyResult?.error ?? null;
+  const isFallback = policyResult?.isFallback ?? false;
   const updatePolicy = useUpdateAutoEndDayPolicy();
 
   const [form, setForm] = useState<{

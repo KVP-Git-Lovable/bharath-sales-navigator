@@ -13,7 +13,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRegularizationPolicy } from '@/hooks/useRegularizationPolicy';
 
 const RegularizationPolicyConfig = () => {
-  const { data: policy, isLoading } = useRegularizationPolicy();
+  const { data: policyResult, isLoading } = useRegularizationPolicy();
+  const policy = policyResult?.data ?? null;
+  const policyError = policyResult?.error ?? null;
+  const isFallback = policyResult?.isFallback ?? false;
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [unlimitedMonthly, setUnlimitedMonthly] = useState(true);
