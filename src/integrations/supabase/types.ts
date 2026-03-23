@@ -6234,6 +6234,66 @@ export type Database = {
         }
         Relationships: []
       }
+      goods_receipt_notes: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          distributor_id: string
+          grn_number: string
+          id: string
+          notes: string | null
+          order_id: string
+          receipt_type: string
+          received_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          distributor_id: string
+          grn_number: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          receipt_type?: string
+          received_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          distributor_id?: string
+          grn_number?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          receipt_type?: string
+          received_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipt_notes_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gps_tracking: {
         Row: {
           accuracy: number | null
@@ -6299,6 +6359,81 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      grn_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string | null
+          damaged_quantity: number
+          expiry_date: string | null
+          grn_id: string
+          id: string
+          order_item_id: string
+          ordered_quantity: number
+          product_id: string
+          product_name: string
+          received_quantity: number
+          return_reason: string | null
+          returned_quantity: number
+          unit: string
+          unit_price: number
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string | null
+          damaged_quantity?: number
+          expiry_date?: string | null
+          grn_id: string
+          id?: string
+          order_item_id: string
+          ordered_quantity?: number
+          product_id: string
+          product_name: string
+          received_quantity?: number
+          return_reason?: string | null
+          returned_quantity?: number
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string | null
+          damaged_quantity?: number
+          expiry_date?: string | null
+          grn_id?: string
+          id?: string
+          order_item_id?: string
+          ordered_quantity?: number
+          product_id?: string
+          product_name?: string
+          received_quantity?: number
+          return_reason?: string | null
+          returned_quantity?: number
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grn_items_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grn_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "primary_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hierarchy_target_allocations: {
         Row: {
@@ -7465,6 +7600,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_valuation_config: {
+        Row: {
+          id: string
+          updated_at: string | null
+          updated_by: string | null
+          valuation_method: string
+        }
+        Insert: {
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          valuation_method?: string
+        }
+        Update: {
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          valuation_method?: string
+        }
+        Relationships: []
       }
       invoice_display_settings: {
         Row: {
@@ -10904,6 +11060,78 @@ export type Database = {
           },
         ]
       }
+      primary_invoices: {
+        Row: {
+          created_at: string | null
+          discount_amount: number
+          distributor_id: string
+          due_date: string | null
+          finalized_at: string | null
+          finalized_by: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          order_id: string
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          discount_amount?: number
+          distributor_id: string
+          due_date?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          notes?: string | null
+          order_id: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          discount_amount?: number
+          distributor_id?: string
+          due_date?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          order_id?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_invoices_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       primary_order_items: {
         Row: {
           batch_number: string | null
@@ -10985,6 +11213,57 @@ export type Database = {
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_order_schemes: {
+        Row: {
+          applied_at: string | null
+          discount_amount: number | null
+          free_product_name: string | null
+          free_quantity: number | null
+          id: string
+          order_id: string
+          scheme_id: string
+          scheme_name: string
+          scheme_type: string
+        }
+        Insert: {
+          applied_at?: string | null
+          discount_amount?: number | null
+          free_product_name?: string | null
+          free_quantity?: number | null
+          id?: string
+          order_id: string
+          scheme_id: string
+          scheme_name: string
+          scheme_type: string
+        }
+        Update: {
+          applied_at?: string | null
+          discount_amount?: number | null
+          free_product_name?: string | null
+          free_quantity?: number | null
+          id?: string
+          order_id?: string
+          scheme_id?: string
+          scheme_name?: string
+          scheme_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_order_schemes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_order_schemes_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "product_schemes"
             referencedColumns: ["id"]
           },
         ]
@@ -11109,6 +11388,214 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_return_items: {
+        Row: {
+          batch_number: string | null
+          condition: string | null
+          created_at: string | null
+          id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          return_note_id: string
+          return_reason: string
+          unit: string
+          unit_price: number
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          condition?: string | null
+          created_at?: string | null
+          id?: string
+          product_id: string
+          product_name: string
+          quantity?: number
+          return_note_id: string
+          return_reason: string
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          condition?: string | null
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          return_note_id?: string
+          return_reason?: string
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_return_items_return_note_id_fkey"
+            columns: ["return_note_id"]
+            isOneToOne: false
+            referencedRelation: "primary_return_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_return_notes: {
+        Row: {
+          created_at: string | null
+          distributor_id: string
+          grn_id: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          return_date: string
+          return_number: string
+          status: string
+          total_return_value: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          distributor_id: string
+          grn_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          return_date?: string
+          return_number: string
+          status?: string
+          total_return_value?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          distributor_id?: string
+          grn_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          return_date?: string
+          return_number?: string
+          status?: string
+          total_return_value?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_return_notes_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_return_notes_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_return_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_shipments: {
+        Row: {
+          actual_delivery_date: string | null
+          created_at: string | null
+          dispatch_date: string | null
+          dispatch_warehouse: string | null
+          distributor_id: string
+          driver_name: string | null
+          driver_phone: string | null
+          expected_delivery_date: string | null
+          id: string
+          invoice_id: string | null
+          lr_number: string | null
+          notes: string | null
+          order_id: string
+          shipment_number: string
+          status: string
+          tracking_url: string | null
+          transporter_name: string | null
+          updated_at: string | null
+          vehicle_number: string | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          created_at?: string | null
+          dispatch_date?: string | null
+          dispatch_warehouse?: string | null
+          distributor_id: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          invoice_id?: string | null
+          lr_number?: string | null
+          notes?: string | null
+          order_id: string
+          shipment_number: string
+          status?: string
+          tracking_url?: string | null
+          transporter_name?: string | null
+          updated_at?: string | null
+          vehicle_number?: string | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          created_at?: string | null
+          dispatch_date?: string | null
+          dispatch_warehouse?: string | null
+          distributor_id?: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          invoice_id?: string | null
+          lr_number?: string | null
+          notes?: string | null
+          order_id?: string
+          shipment_number?: string
+          status?: string
+          tracking_url?: string | null
+          transporter_name?: string | null
+          updated_at?: string | null
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_shipments_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_shipments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "primary_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -17266,7 +17753,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      generate_grn_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
+      generate_primary_invoice_number: { Args: never; Returns: string }
+      generate_return_number: { Args: never; Returns: string }
+      generate_shipment_number: { Args: never; Returns: string }
       get_activity_logging_summary: { Args: { p_days: number }; Returns: Json }
       get_all_subordinates: {
         Args: { manager_user_id: string }
