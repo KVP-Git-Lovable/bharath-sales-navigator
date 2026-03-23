@@ -48,14 +48,14 @@ const PrimarySchemesView = () => {
         const { data: products } = productIds.length > 0
           ? await supabase.from('products').select('id, name').in('id', productIds)
           : { data: [] };
-        const productMap = new Map(products?.map(p => [p.id, p.name]) || []);
+        const productMap = new Map((products || []).map(p => [p.id, p.name] as [string, string]));
 
         // Get category names
         const catIds = data.filter(s => s.category_id).map(s => s.category_id!);
         const { data: cats } = catIds.length > 0
           ? await supabase.from('product_categories').select('id, name').in('id', catIds)
           : { data: [] };
-        const catMap = new Map(cats?.map(c => [c.id, c.name]) || []);
+        const catMap = new Map((cats || []).map(c => [c.id, c.name] as [string, string]));
 
         setSchemes(data.map(s => ({
           ...s,
