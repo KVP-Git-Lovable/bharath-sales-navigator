@@ -93,8 +93,28 @@ const RegularizationPolicyConfig = () => {
     );
   }
 
-  return (
-    <Card>
+  // Critical error: no data and error present
+  if (!policy && policyError) {
+    toast.error('Failed to load regularization policy');
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Unable to load policy</AlertTitle>
+        <AlertDescription>Please try again or contact your administrator.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Empty state: no data, no error
+  if (!policy && !policyError) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>No policy configured yet</AlertTitle>
+        <AlertDescription>Click Save to create the default regularization policy.</AlertDescription>
+      </Alert>
+    );
+  }
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
