@@ -1,5 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  type PolicyResult,
+  logPolicyError,
+  GLOBAL_LEAVE_POLICY_DEFAULTS,
+} from '@/utils/policyDefaults';
 
 export interface GlobalLeavePolicy {
   id: string;
@@ -36,16 +41,50 @@ export interface LeaveTypeOverride {
 }
 
 export const useGlobalLeavePolicy = () => {
-  return useQuery({
+  return useQuery<PolicyResult<GlobalLeavePolicy>>({
     queryKey: ['global-leave-policy'],
-    queryFn: async () => {
+    queryFn: async (): Promise<PolicyResult<GlobalLeavePolicy>> => {
+      // 1. Try to read existing row
       const { data, error } = await supabase
         .from('global_leave_policy')
         .select('*')
         .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        logPolicyError('global_leave_policy fetch', error);
+        return { data: null, error, isFallback: false };
+      }
+
+      if (data) {
+        return { data: data as GlobalLeavePolicy, error: null, isFallback: false };
+      }
+
+      // 2. Auto-seed default row
+      const { data: newRow, error: insertError } = await supabase
+        .from('global_leave_policy')
+        .insert(GLOBAL_LEAVE_POLICY_DEFAULTS)
+        .select()
         .single();
-      if (error) throw error;
-      return data as GlobalLeavePolicy;
+
+      if (insertError) {
+        logPolicyError('global_leave_policy auto-seed', insertError);
+
+        // 3. Retry fetch (another request may have inserted)
+        const { data: retryData } = await supabase
+          .from('global_leave_policy')
+          .select('*')
+          .limit(1)
+          .maybeSingle();
+
+        return {
+          data: (retryData as GlobalLeavePolicy) || null,
+          error: insertError,
+          isFallback: true,
+        };
+      }
+
+      return { data: newRow as GlobalLeavePolicy, error: null, isFallback: false };
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -104,8 +143,10 @@ export function getEffectivePolicy(
 }
 
 export const useEffectiveLeavePolicy = (leaveTypeId: string) => {
-  const { data: globalPolicy, isLoading: globalLoading } = useGlobalLeavePolicy();
+  const { data: result, isLoading: globalLoading } = useGlobalLeavePolicy();
   const { data: overrides, isLoading: overridesLoading } = useLeaveTypeOverrides();
+
+  const globalPolicy = result?.data ?? null;
 
   const effectivePolicy = globalPolicy && overrides && leaveTypeId
     ? getEffectivePolicy(globalPolicy, overrides, leaveTypeId)

@@ -1,11 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  type PolicyResult,
+  logPolicyError,
+  AUTO_END_DAY_POLICY_DEFAULTS,
+} from '@/utils/policyDefaults';
 
 export interface AutoEndDayPolicy {
   id: string;
   is_enabled: boolean;
-  auto_close_time: string; // TIME as string e.g. "22:00:00"
+  auto_close_time: string;
   timezone: string;
   last_activity_source: 'all_activity' | 'last_order_only' | 'last_click';
   pre_warning_enabled: boolean;
@@ -18,16 +23,48 @@ export interface AutoEndDayPolicy {
 }
 
 export const useAutoEndDayPolicy = () => {
-  return useQuery({
+  return useQuery<PolicyResult<AutoEndDayPolicy>>({
     queryKey: ['auto-end-day-policy'],
-    queryFn: async () => {
+    queryFn: async (): Promise<PolicyResult<AutoEndDayPolicy>> => {
       const { data, error } = await supabase
         .from('auto_end_day_policy')
         .select('*')
         .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        logPolicyError('auto_end_day_policy fetch', error);
+        return { data: null, error, isFallback: false };
+      }
+
+      if (data) {
+        return { data: data as AutoEndDayPolicy, error: null, isFallback: false };
+      }
+
+      // Auto-seed
+      const { data: newRow, error: insertError } = await supabase
+        .from('auto_end_day_policy')
+        .insert(AUTO_END_DAY_POLICY_DEFAULTS)
+        .select()
         .single();
-      if (error) throw error;
-      return data as AutoEndDayPolicy;
+
+      if (insertError) {
+        logPolicyError('auto_end_day_policy auto-seed', insertError);
+
+        const { data: retryData } = await supabase
+          .from('auto_end_day_policy')
+          .select('*')
+          .limit(1)
+          .maybeSingle();
+
+        return {
+          data: (retryData as AutoEndDayPolicy) || null,
+          error: insertError,
+          isFallback: true,
+        };
+      }
+
+      return { data: newRow as AutoEndDayPolicy, error: null, isFallback: false };
     },
     staleTime: 5 * 60 * 1000,
   });
