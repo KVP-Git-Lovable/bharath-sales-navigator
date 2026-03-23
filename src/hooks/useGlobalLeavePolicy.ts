@@ -97,7 +97,10 @@ export const useLeaveTypeOverrides = () => {
       const { data, error } = await supabase
         .from('leave_type_policy_override')
         .select('*');
-      if (error) throw error;
+      if (error) {
+        logPolicyError('leave_type_policy_override fetch', error);
+        return [] as LeaveTypeOverride[];
+      }
       return (data || []) as LeaveTypeOverride[];
     },
     staleTime: 5 * 60 * 1000,
