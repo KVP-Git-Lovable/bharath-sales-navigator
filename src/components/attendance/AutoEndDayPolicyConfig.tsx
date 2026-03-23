@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Save, Clock, Bell, MapPin, Loader2, Power } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toast } from 'sonner';
+import { Save, Clock, Bell, MapPin, Loader2, Power, AlertCircle, Info } from 'lucide-react';
 import { useAutoEndDayPolicy, useUpdateAutoEndDayPolicy } from '@/hooks/useAutoEndDayPolicy';
 
 const TIMEZONES = [
