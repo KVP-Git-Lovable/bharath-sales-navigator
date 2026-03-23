@@ -21,6 +21,18 @@ const RegularizationPolicyConfig = () => {
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [unlimitedMonthly, setUnlimitedMonthly] = useState(true);
+  const errorToastShown = useRef(false);
+
+  useEffect(() => {
+    if (policyError && !policy && !errorToastShown.current) {
+      toast.error('Failed to load regularization policy');
+      errorToastShown.current = true;
+    }
+    if (isFallback && policy && !errorToastShown.current) {
+      toast.warning('Default config loaded. Check permissions if saving fails.');
+      errorToastShown.current = true;
+    }
+  }, [policyError, policy, isFallback]);
 
   const [form, setForm] = useState({
     is_enabled: true,
