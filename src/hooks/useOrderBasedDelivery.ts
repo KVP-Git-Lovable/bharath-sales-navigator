@@ -22,7 +22,7 @@ export function useOrderBasedDelivery() {
           .from('feature_flags')
           .select('is_enabled')
           .eq('feature_key', 'order_based_delivery')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setIsEnabled(data.is_enabled);
