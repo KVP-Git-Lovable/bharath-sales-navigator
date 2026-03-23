@@ -68,7 +68,7 @@ export function usePackingListModule() {
           .from('feature_flags')
           .select('is_enabled')
           .eq('feature_key', 'packing_list_module')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setIsEnabled(data.is_enabled);
