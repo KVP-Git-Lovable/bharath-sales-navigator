@@ -90,6 +90,26 @@ const AutoEndDayPolicyConfig = () => {
     );
   }
 
+  if (!policy && policyError) {
+    toast.error('Failed to load Auto End Day policy');
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Unable to load policy</AlertTitle>
+        <AlertDescription>Please try again or contact your administrator.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!policy && !policyError) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>No policy configured yet</AlertTitle>
+        <AlertDescription>Click Save to create the default Auto End Day policy.</AlertDescription>
+      </Alert>
+    );
+  }
   return (
     <Card>
       <CardHeader>
