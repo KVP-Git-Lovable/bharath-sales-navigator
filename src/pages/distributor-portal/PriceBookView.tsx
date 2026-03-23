@@ -156,7 +156,7 @@ const PriceBookView = () => {
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <BookOpen className="w-6 h-6 text-primary" />
-          Price Book
+          Primary Price Book
         </h1>
         {priceBookName && (
           <p className="text-sm text-muted-foreground mt-1">
@@ -164,6 +164,10 @@ const PriceBookView = () => {
             {entries.length} products
           </p>
         )}
+        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+          <Tag className="w-3 h-3" />
+          This price book is used for billing your primary orders
+        </p>
       </div>
 
       <div className="relative">
