@@ -159,6 +159,9 @@ const FeatureManagement = () => {
           </Button>
         </div>
 
+        {/* Inventory Valuation Method - General Config */}
+        <InventoryValuationConfig />
+
         {/* Module-wise Feature List */}
         <div className="space-y-3">
           {Object.entries(filteredGroupedFeatures).map(([category, categoryFeatures]) => {
