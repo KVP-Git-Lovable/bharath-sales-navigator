@@ -44,6 +44,18 @@ const LeavePolicyConfig = () => {
   const { data: overrides, isLoading: loadingOverrides } = useLeaveTypeOverrides();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
+  const errorToastShown = useRef(false);
+
+  useEffect(() => {
+    if (globalPolicyError && !globalPolicy && !errorToastShown.current) {
+      toast.error('Failed to load leave policy');
+      errorToastShown.current = true;
+    }
+    if (isGlobalFallback && globalPolicy && !errorToastShown.current) {
+      toast.warning('Default config loaded. Check permissions if saving fails.');
+      errorToastShown.current = true;
+    }
+  }, [globalPolicyError, globalPolicy, isGlobalFallback]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
 
