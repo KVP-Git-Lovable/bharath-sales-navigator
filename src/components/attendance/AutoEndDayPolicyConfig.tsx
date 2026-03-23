@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,18 @@ const AutoEndDayPolicyConfig = () => {
   const policyError = policyResult?.error ?? null;
   const isFallback = policyResult?.isFallback ?? false;
   const updatePolicy = useUpdateAutoEndDayPolicy();
+  const errorToastShown = useRef(false);
+
+  useEffect(() => {
+    if (policyError && !policy && !errorToastShown.current) {
+      toast.error('Failed to load Auto End Day policy');
+      errorToastShown.current = true;
+    }
+    if (isFallback && policy && !errorToastShown.current) {
+      toast.warning('Default config loaded. Check permissions if saving fails.');
+      errorToastShown.current = true;
+    }
+  }, [policyError, policy, isFallback]);
 
   const [form, setForm] = useState<{
     is_enabled: boolean;
@@ -91,7 +103,6 @@ const AutoEndDayPolicyConfig = () => {
   }
 
   if (!policy && policyError) {
-    toast.error('Failed to load Auto End Day policy');
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />

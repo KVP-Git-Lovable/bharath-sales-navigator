@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,18 @@ const RegularizationPolicyConfig = () => {
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [unlimitedMonthly, setUnlimitedMonthly] = useState(true);
+  const errorToastShown = useRef(false);
+
+  useEffect(() => {
+    if (policyError && !policy && !errorToastShown.current) {
+      toast.error('Failed to load regularization policy');
+      errorToastShown.current = true;
+    }
+    if (isFallback && policy && !errorToastShown.current) {
+      toast.warning('Default config loaded. Check permissions if saving fails.');
+      errorToastShown.current = true;
+    }
+  }, [policyError, policy, isFallback]);
 
   const [form, setForm] = useState({
     is_enabled: true,
@@ -95,7 +107,6 @@ const RegularizationPolicyConfig = () => {
 
   // Critical error: no data and error present
   if (!policy && policyError) {
-    toast.error('Failed to load regularization policy');
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
