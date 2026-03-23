@@ -15,7 +15,7 @@ export function useD1Delivery() {
           .from('feature_flags')
           .select('is_enabled')
           .eq('feature_key', 'd1_delivery')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setIsEnabled(data.is_enabled);
