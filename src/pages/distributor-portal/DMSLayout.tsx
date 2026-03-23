@@ -61,12 +61,15 @@ const mainNavItems: NavItem[] = [
   { label: 'Retailer Ledger', icon: FileText, path: '/distributor-portal/retailer-ledger' },
   { label: 'Inventory', icon: Package, path: '/distributor-portal/inventory' },
   { label: 'Stock Health', icon: Activity, path: '/distributor-portal/stock-health' },
+  { label: 'Price Book', icon: FileText, path: '/distributor-portal/price-book' },
+  { label: 'Schemes', icon: Target, path: '/distributor-portal/schemes' },
 ];
 
 const operationsNavItems: NavItem[] = [
   { label: 'Goods Receipt', icon: Box, path: '/distributor-portal/goods-receipt' },
   { label: 'Retailer Returns', icon: RotateCcw, path: '/distributor-portal/returns' },
   { label: 'Company Returns', icon: Truck, path: '/distributor-portal/company-returns' },
+  { label: 'Create Return Note', icon: RotateCcw, path: '/distributor-portal/create-return' },
   { label: 'Stock Adjustments', icon: BarChart3, path: '/distributor-portal/stock-adjustments' },
   { label: 'Inventory Ledger', icon: FileText, path: '/distributor-portal/inventory-ledger' },
 ];

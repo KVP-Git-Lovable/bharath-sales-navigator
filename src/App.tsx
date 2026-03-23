@@ -183,6 +183,10 @@ import SecondaryInvoiceList from "./pages/distributor-portal/SecondaryInvoiceLis
 import SecondaryInvoiceCreate from "./pages/distributor-portal/SecondaryInvoiceCreate";
 import RetailerFeedback from "./pages/distributor-portal/RetailerFeedback";
 import StockHealthDashboard from "./pages/distributor-portal/StockHealthDashboard";
+import GoodsReceiptNew from "./pages/distributor-portal/GoodsReceiptNew";
+import PriceBookView from "./pages/distributor-portal/PriceBookView";
+import PrimarySchemesView from "./pages/distributor-portal/PrimarySchemesView";
+import PrimaryReturnCreate from "./pages/distributor-portal/PrimaryReturnCreate";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
@@ -477,7 +481,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="packing-list" element={<PackingList />} />
           <Route path="packing-list-management" element={<PackingListManagement />} />
           <Route path="packing-list/:id" element={<PackingListDetail />} />
-          <Route path="goods-receipt/:orderId" element={<GoodsReceipt />} />
+          <Route path="goods-receipt/:orderId" element={<GoodsReceiptNew />} />
           <Route path="goods-receipt" element={<GoodsReceiptList />} />
           <Route path="claims" element={<DistributorClaims />} />
           <Route path="support" element={<DistributorSupport />} />
@@ -496,6 +500,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="secondary-invoices/create" element={<SecondaryInvoiceCreate />} />
           <Route path="retailer-feedback" element={<RetailerFeedback />} />
           <Route path="stock-health" element={<StockHealthDashboard />} />
+          <Route path="price-book" element={<PriceBookView />} />
+          <Route path="schemes" element={<PrimarySchemesView />} />
+          <Route path="create-return" element={<PrimaryReturnCreate />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
