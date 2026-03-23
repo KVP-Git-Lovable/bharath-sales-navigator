@@ -121,7 +121,7 @@ export function useDeliveryAgentApp() {
           .from('feature_flags')
           .select('is_enabled')
           .eq('feature_key', 'delivery_agent_app')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setIsEnabled(data.is_enabled);

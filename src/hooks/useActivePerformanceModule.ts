@@ -10,9 +10,12 @@ export const useActivePerformanceModule = () => {
       const { data, error } = await supabase
         .from('performance_module_config')
         .select('*')
-        .single();
+        .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching performance module config:', error);
+        return null;
+      }
       return data;
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes - prevents repeated fetches
