@@ -107,7 +107,6 @@ const RegularizationPolicyConfig = () => {
 
   // Critical error: no data and error present
   if (!policy && policyError) {
-    toast.error('Failed to load regularization policy');
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />

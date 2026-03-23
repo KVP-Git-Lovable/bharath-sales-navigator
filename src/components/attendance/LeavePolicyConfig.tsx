@@ -244,7 +244,6 @@ const LeavePolicyConfig = () => {
   }
 
   if (!globalPolicy && globalPolicyError) {
-    toast.error('Failed to load leave policy');
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
