@@ -112,6 +112,15 @@ const AutoEndDayPolicyConfig = () => {
   }
   return (
     <Card>
+      {isFallback && (
+        <div className="px-6 pt-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Default config loaded</AlertTitle>
+            <AlertDescription>Check permissions if saving fails.</AlertDescription>
+          </Alert>
+        </div>
+      )}
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

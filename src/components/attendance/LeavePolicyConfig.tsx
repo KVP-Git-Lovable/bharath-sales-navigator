@@ -8,8 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Save, Settings, Shield, Clock, CheckSquare, Loader2, CalendarDays } from 'lucide-react';
+import { Save, Settings, Shield, Clock, CheckSquare, Loader2, CalendarDays, AlertCircle, Info } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalLeavePolicy, useLeaveTypeOverrides, type GlobalLeavePolicy, type LeaveTypeOverride } from '@/hooks/useGlobalLeavePolicy';
 
