@@ -57,7 +57,7 @@ const mainNavItems: NavItem[] = [
   { label: 'Home', icon: Home, path: '/distributor-portal/dashboard' },
   { label: 'Primary Orders', icon: ClipboardList, path: '/distributor-portal/primary-orders' },
   { label: 'Secondary Sales', icon: ShoppingCart, path: '/distributor-portal/secondary-sales' },
-  { label: 'Invoices', icon: Receipt, path: '/distributor-portal/secondary-invoices' },
+  { label: 'Secondary Invoice', icon: Receipt, path: '/distributor-portal/secondary-invoices' },
   { label: 'Retailer Ledger', icon: FileText, path: '/distributor-portal/retailer-ledger' },
   { label: 'Inventory', icon: Package, path: '/distributor-portal/inventory' },
   { label: 'Stock Health', icon: Activity, path: '/distributor-portal/stock-health' },
