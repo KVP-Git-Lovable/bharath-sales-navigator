@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { InventoryValuationConfig } from '@/components/admin/InventoryValuationConfig';
 
 const FeatureManagement = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
