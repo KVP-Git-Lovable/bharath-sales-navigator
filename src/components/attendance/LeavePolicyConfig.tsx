@@ -120,6 +120,28 @@ const LeavePolicyConfig = () => {
         setAccrualForms(forms);
         setOriginalAccrualForms(JSON.parse(JSON.stringify(forms)));
       });
+
+      // Load accrual_config
+      supabase.from('accrual_config').select('*').then(({ data }) => {
+        const configs: Record<string, AccrualConfigForm> = {};
+        leaveTypes.forEach(lt => {
+          const existing = (data || []).find((c: any) => c.leave_type_id === lt.id);
+          configs[lt.id] = existing ? {
+            frequency: existing.frequency || 'monthly',
+            divisor: existing.divisor ?? 12,
+            round_mode: existing.round_mode || 'round',
+            prorate_joining: existing.prorate_joining ?? false,
+            credit_day: existing.credit_day ?? 1,
+          } : {
+            frequency: 'monthly',
+            divisor: 12,
+            round_mode: 'round',
+            prorate_joining: false,
+            credit_day: 1,
+          };
+        });
+        setAccrualConfigForms(configs);
+      });
     }
   }, [leaveTypes]);
 
