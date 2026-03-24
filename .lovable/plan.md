@@ -1,99 +1,76 @@
 
 
-## Analysis: Do You Need This Checklist Every Time?
+# Retroactive vs Prospective Leave Accrual Update
 
-### Short Answer: No -- but only if we fix the remaining gaps now.
+## Problem
+When an admin changes the `yearly_entitlement` on an existing monthly accrual policy (e.g., 12 to 6), the system does not recalculate balances. There is no `AFTER UPDATE` trigger on `leave_policy`, and the save uses `upsert` which won't fire an `INSERT` trigger for existing rows.
 
-The 3 policy hooks (`useGlobalLeavePolicy`, `useAutoEndDayPolicy`, `useRegularizationPolicy`) are already fixed with the self-healing pattern. But there are **other singleton/config hooks** in your codebase that still use `.single()` and will break on a fresh/remixed DB.
-
----
-
-### Current State
-
-**Already safe (self-healing pattern applied):**
-- `useGlobalLeavePolicy` -- `.maybeSingle()` + auto-seed + `PolicyResult`
-- `useAutoEndDayPolicy` -- `.maybeSingle()` + auto-seed + `PolicyResult`
-- `useRegularizationPolicy` -- `.maybeSingle()` + auto-seed + `PolicyResult`
-- `useLocationFeature` -- already uses `.maybeSingle()` + fallback
-- `useVanSales` -- already uses `.maybeSingle()` + legacy fallback
-- `useResolvedExpenseConfig` -- already uses `.maybeSingle()`
-
-**Still vulnerable (uses `.single()` on config/singleton tables):**
-
-| Hook | Table | Risk |
-|------|-------|------|
-| `useActivePerformanceModule` | `performance_module_config` | Crashes if table empty |
-| `useOrderBasedDelivery` | `feature_flags` | Crashes if flag row missing |
-| `useD1Delivery` | `feature_flags` (3 keys) | Crashes if flag rows missing |
-
-**Safe `.single()` usage (not config tables -- these are fine):**
-- Insert-then-select patterns (e.g., `useTemplates`, `useOfflineBeats`) -- `.single()` after `.insert()` is correct
-- Lookup by specific ID (e.g., `useHierarchyTargets .eq('id', targetId).single()`) -- correct usage
-- `useAttendanceCache` -- fetches by user+date, handles missing gracefully
+## Solution
+Add an **"Effective Mode"** selector to the UI when saving accrual changes, and a database function that recalculates balances accordingly.
 
 ---
 
-### Plan: Make ALL Config Hooks Self-Healing
+### 1. Database Migration
 
-#### Step 1: Fix `useActivePerformanceModule`
+**New function: `recalculate_leave_accrual_on_update`**
+- Accepts parameters: `leave_type_id`, `new_yearly_entitlement`, `old_yearly_entitlement`, `update_mode` (`retroactive`, `current_month`, `next_month`)
+- Logic by mode:
+  - **Retroactive**: Recalculate from January to current month at new rate. Set `opening_balance = new_rate * months_elapsed - used_balance_adjustments`. Update all `leave_accrual_log` entries for this year to reflect new `days_credited`.
+  - **Current month forward**: Keep past accrual logs as-is. Only adjust the current month's credit if already applied (diff = new_rate - old_rate, apply delta to `opening_balance`). Future months use new rate automatically via cron.
+  - **Next month forward**: No balance changes now. Future cron runs pick up the new `yearly_entitlement` naturally.
 
-Change `.single()` to `.maybeSingle()`, return `'none'` as default if no row exists. No auto-seed needed -- the hook already defaults to `'none'`.
+**New trigger: `AFTER UPDATE` on `leave_policy`**
+- Fires when `yearly_entitlement` or `accrual_type` changes
+- Reads the `update_mode` from a new column `last_update_mode` on `leave_policy` (set by frontend before save)
+- Calls `recalculate_leave_accrual_on_update`
 
-#### Step 2: Fix `useOrderBasedDelivery`
+**Schema change on `leave_policy`**:
+- Add column `last_update_mode TEXT DEFAULT 'next_month'` (values: `retroactive`, `current_month`, `next_month`)
+- Add column `last_update_effective_date DATE` (optional, for custom effective dates)
 
-Change `.single()` to `.maybeSingle()`. Already has `if (!error && data)` guard, so just the query method needs updating.
+### 2. Frontend Changes (LeavePolicyConfig.tsx)
 
-#### Step 3: Fix `useD1Delivery`
+When the admin modifies `yearly_entitlement` or `accrual_type` for a leave type that already has an existing policy:
 
-Change all 3 `.single()` calls to `.maybeSingle()`. Already has `if (!error && data)` guards.
+- Show a modal/inline panel with three radio options:
+  1. **Retroactive** -- Recalculate all balances from Jan to now at the new rate
+  2. **From current month** -- Apply new rate starting this month; past months unchanged
+  3. **From next month** -- New rate applies from next month onward only
 
-#### Step 4: Add seed data for `feature_flags` and `performance_module_config`
+- Before the `upsert` call, set `last_update_mode` to the selected option
+- The trigger handles the rest server-side
 
-Add to the existing seed migration (or new migration):
+### 3. Flow Summary
 
-```sql
-INSERT INTO feature_flags (feature_key, is_enabled)
-VALUES 
-  ('order_based_delivery', false),
-  ('d1_delivery', false),
-  ('packing_list_module', false),
-  ('delivery_agent_app', false),
-  ('location_check_in_enabled', true),
-  ('van_sales', false)
-ON CONFLICT DO NOTHING;
-
-INSERT INTO performance_module_config (active_module)
-VALUES ('none')
-ON CONFLICT DO NOTHING;
+```text
+Admin changes entitlement (12 → 6)
+        │
+        ▼
+  UI shows mode selector
+  ┌─────────────────────────┐
+  │ ○ Retroactive           │
+  │ ○ From current month    │
+  │ ○ From next month       │
+  └─────────────────────────┘
+        │
+        ▼
+  Frontend upserts leave_policy
+  with last_update_mode = chosen
+        │
+        ▼
+  AFTER UPDATE trigger fires
+        │
+  ┌─────┴──────────┐
+  │ retroactive    │ → Recalc all months, update logs + balances
+  │ current_month  │ → Adjust current month delta only
+  │ next_month     │ → No balance change, cron uses new rate
+  └────────────────┘
 ```
 
----
-
-### How This Prevents Future Issues
-
-After this fix, **every config/singleton hook** in your codebase follows one of two patterns:
-
-1. **Self-healing pattern** (for policy tables): `.maybeSingle()` + auto-seed + `PolicyResult`
-2. **Graceful fallback pattern** (for feature flags/config): `.maybeSingle()` + sensible default
-
-**You will NOT need to paste this checklist again** because:
-- All existing config hooks will be resilient
-- The `policyDefaults.ts` utility provides a reusable pattern for any future policy tables
-- Feature flags already default to `false` when missing
-
-**For future modules**, follow the same pattern:
-- Config/policy tables: use the `PolicyResult` pattern from `policyDefaults.ts`
-- Feature flags: use `.maybeSingle()` + `?? false`
-- Always add seed data in the migration that creates the table
-
-### Files Changed
+### 4. Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `src/hooks/useActivePerformanceModule.ts` | `.single()` to `.maybeSingle()` + null fallback |
-| `src/hooks/useOrderBasedDelivery.ts` | `.single()` to `.maybeSingle()` |
-| `src/hooks/useD1Delivery.ts` | 3x `.single()` to `.maybeSingle()` |
-| 1 database migration | Seed `feature_flags` + `performance_module_config` rows |
-
-**Total: 3 files modified + 1 migration**
+| `supabase/migrations/...` | Add columns to `leave_policy`, create `recalculate_leave_accrual_on_update` function, create `AFTER UPDATE` trigger |
+| `src/components/attendance/LeavePolicyConfig.tsx` | Detect entitlement changes, show update mode selector before save, include `last_update_mode` in upsert payload |
 
