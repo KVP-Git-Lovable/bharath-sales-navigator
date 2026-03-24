@@ -303,6 +303,25 @@ const LeavePolicyConfig = () => {
         if (error) throw error;
       }
 
+      // Save accrual_config settings
+      for (const lt of leaveTypes) {
+        const config = accrualConfigForms[lt.id];
+        if (!config) continue;
+
+        const { error } = await supabase
+          .from('accrual_config')
+          .upsert({
+            leave_type_id: lt.id,
+            frequency: config.frequency,
+            divisor: config.divisor,
+            round_mode: config.round_mode,
+            prorate_joining: config.prorate_joining,
+            credit_day: config.credit_day,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'leave_type_id' });
+        if (error) throw error;
+      }
+
       // Update originals to reflect saved state
       setOriginalAccrualForms(JSON.parse(JSON.stringify(accrualForms)));
       setChangedLeaveTypeIds([]);
