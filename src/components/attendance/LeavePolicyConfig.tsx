@@ -109,6 +109,7 @@ const LeavePolicyConfig = () => {
           };
         });
         setAccrualForms(forms);
+        setOriginalAccrualForms(JSON.parse(JSON.stringify(forms)));
       });
     }
   }, [leaveTypes]);
