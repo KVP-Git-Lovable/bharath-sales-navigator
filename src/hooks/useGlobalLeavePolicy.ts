@@ -121,6 +121,10 @@ export interface EffectiveLeavePolicy {
   enable_sandwich_rule: boolean;
 }
 
+/**
+ * @deprecated Use useEffectiveLeavePolicy which resolves via server-side RPC.
+ * Kept for LeavePolicyConfig admin UI that still needs raw global + overrides.
+ */
 export function getEffectivePolicy(
   global: GlobalLeavePolicy,
   overrides: LeaveTypeOverride[],
@@ -145,19 +149,116 @@ export function getEffectivePolicy(
   };
 }
 
+// ─── Server-Side Policy Resolution (Phase 1) ───────────────────────
+
+export interface DateConstraints {
+  allow_half_day: boolean;
+  allow_backdated_leave: boolean;
+  max_backdate_date: string;
+  min_notice_date: string;
+  min_notice_period_days: number;
+  max_continuous_days: number | null;
+  is_enabled: boolean;
+  allow_negative_balance: boolean;
+  max_negative_limit: number;
+}
+
+export interface ValidationResult {
+  is_valid: boolean;
+  error_code?: string;
+  error_message?: string;
+  days_requested?: number;
+  balance_after?: number;
+  current_balance?: number;
+  sandwich_days?: number;
+}
+
+/**
+ * Resolves effective leave policy via server-side DB function.
+ * Merges global + override layers server-side — zero client logic.
+ */
 export const useEffectiveLeavePolicy = (leaveTypeId: string) => {
   const { data: result, isLoading: globalLoading } = useGlobalLeavePolicy();
-  const { data: overrides, isLoading: overridesLoading } = useLeaveTypeOverrides();
-
   const globalPolicy = result?.data ?? null;
 
-  const effectivePolicy = globalPolicy && overrides && leaveTypeId
-    ? getEffectivePolicy(globalPolicy, overrides, leaveTypeId)
-    : null;
+  const { data: constraints, isLoading: constraintsLoading } = useQuery<DateConstraints | null>({
+    queryKey: ['leave-date-constraints', leaveTypeId],
+    queryFn: async () => {
+      if (!leaveTypeId) return null;
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase.rpc('get_leave_date_constraints', {
+        p_user_id: user.id,
+        p_leave_type_id: leaveTypeId,
+      });
+
+      if (error) {
+        logPolicyError('get_leave_date_constraints RPC', error);
+        return null;
+      }
+
+      if (data && typeof data === 'object' && 'error' in (data as object)) {
+        return null;
+      }
+
+      return data as unknown as DateConstraints;
+    },
+    enabled: !!leaveTypeId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Map constraints to EffectiveLeavePolicy shape for backward compat
+  const effectivePolicy: EffectiveLeavePolicy | null = constraints ? {
+    is_enabled: constraints.is_enabled,
+    enable_half_day: constraints.allow_half_day,
+    enable_sandwich_rule: false, // not exposed in constraints
+    allow_backdated_leave: constraints.allow_backdated_leave,
+    max_backdate_days: constraints.min_notice_period_days, // will use constraints directly in modal
+    min_notice_period_days: constraints.min_notice_period_days,
+    max_continuous_leave_days: constraints.max_continuous_days,
+    allow_negative_balance: constraints.allow_negative_balance,
+    max_negative_limit: constraints.max_negative_limit,
+    enable_carry_forward: false,
+    max_carry_forward_limit: 0,
+  } : null;
 
   return {
     policy: effectivePolicy,
-    isLoading: globalLoading || overridesLoading,
+    constraints,
+    isLoading: globalLoading || constraintsLoading,
     globalPolicy,
   };
+};
+
+/**
+ * Validate a leave request server-side via RPC.
+ * Returns structured result — frontend just shows the message.
+ */
+export const validateLeaveRequestRPC = async (
+  userId: string,
+  leaveTypeId: string,
+  startDate: string,
+  endDate: string,
+  isHalfDay: boolean = false
+): Promise<ValidationResult> => {
+  const { data, error } = await supabase.rpc('validate_leave_request', {
+    p_user_id: userId,
+    p_leave_type_id: leaveTypeId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_is_half_day: isHalfDay,
+  });
+
+  if (error) {
+    return {
+      is_valid: false,
+      error_code: 'RPC_ERROR',
+      error_message: error.message,
+    };
+  }
+
+  return data as unknown as ValidationResult;
 };
