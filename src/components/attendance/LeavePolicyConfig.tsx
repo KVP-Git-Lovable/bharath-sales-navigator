@@ -38,6 +38,14 @@ interface AccrualForm {
   yearly_entitlement: number;
 }
 
+interface AccrualConfigForm {
+  frequency: string;
+  divisor: number;
+  round_mode: string;
+  prorate_joining: boolean;
+  credit_day: number;
+}
+
 const LeavePolicyConfig = () => {
   const { data: globalPolicyResult, isLoading: loadingGlobal } = useGlobalLeavePolicy();
   const globalPolicy = globalPolicyResult?.data ?? null;
