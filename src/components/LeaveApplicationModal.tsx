@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useEffectiveLeavePolicy } from '@/hooks/useGlobalLeavePolicy';
+import { useEffectiveLeavePolicy, validateLeaveRequestRPC } from '@/hooks/useGlobalLeavePolicy';
 
 interface LeaveType {
   id: string;
@@ -45,15 +45,15 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [halfDayPeriod, setHalfDayPeriod] = useState<'first_half' | 'second_half'>('first_half');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Policy hook
-  const { policy, isLoading: policyLoading } = useEffectiveLeavePolicy(leaveTypeId);
+  // Policy hook — now resolves via server-side RPC
+  const { policy, constraints, isLoading: policyLoading } = useEffectiveLeavePolicy(leaveTypeId);
 
   // Force full day when half-day is disabled by policy
   useEffect(() => {
-    if (policy && !policy.enable_half_day && leaveDay === 'half') {
+    if (constraints && !constraints.allow_half_day && leaveDay === 'half') {
       setLeaveDay('full');
     }
-  }, [policy, leaveDay]);
+  }, [constraints, leaveDay]);
 
   // Update leaveTypeId when defaultLeaveTypeId changes
   useEffect(() => {
@@ -98,29 +98,25 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     return 0;
   };
 
+  // Date constraints driven by server-side RPC — no hardcoded logic
   const getStartDateDisabled = (date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (!policy) {
-      // Default: no past dates
+    if (!constraints) {
       return date < today;
     }
 
-    // Backdated leave check
-    if (!policy.allow_backdated_leave) {
-      if (date < today) return true;
-    } else {
-      const minBackDate = new Date(today);
-      minBackDate.setDate(minBackDate.getDate() - policy.max_backdate_days);
-      if (date < minBackDate) return true;
-    }
+    // Use server-calculated backdate limit
+    const maxBackdate = new Date(constraints.max_backdate_date);
+    maxBackdate.setHours(0, 0, 0, 0);
+    if (date < maxBackdate) return true;
 
-    // Notice period check (only for future dates)
-    if (policy.min_notice_period_days > 0 && date >= today) {
-      const minNoticeDate = new Date(today);
-      minNoticeDate.setDate(minNoticeDate.getDate() + policy.min_notice_period_days);
-      if (date > today && date < minNoticeDate) return true;
+    // Use server-calculated notice period for future dates
+    if (constraints.min_notice_period_days > 0 && date >= today) {
+      const minNotice = new Date(constraints.min_notice_date);
+      minNotice.setHours(0, 0, 0, 0);
+      if (date > today && date < minNotice) return true;
     }
 
     return false;
@@ -146,55 +142,23 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       return;
     }
 
-    // Policy: master toggle
-    if (policy && !policy.is_enabled) {
-      toast.error('Leave applications are currently disabled');
-      return;
-    }
-
-    const daysRequested = calculateLeaveDays();
-
-    // Policy: max continuous leave days
-    if (policy?.max_continuous_leave_days && daysRequested > policy.max_continuous_leave_days) {
-      setValidationError(
-        `Maximum continuous leave allowed is ${policy.max_continuous_leave_days} day(s). You requested ${daysRequested} day(s).`
-      );
-      return;
-    }
-
     setIsSubmitting(true);
     setValidationError(null);
 
     try {
-      // Balance check
-      if (policy) {
-        const currentYear = new Date().getFullYear();
-        const { data: balanceData } = await supabase
-          .from('leave_balance')
-          .select('remaining_balance')
-          .eq('user_id', user.id)
-          .eq('leave_type_id', leaveTypeId)
-          .eq('year', currentYear)
-          .maybeSingle();
+      // Server-side validation — all policy checks happen in DB
+      const validation = await validateLeaveRequestRPC(
+        user.id,
+        leaveTypeId,
+        format(startDate, 'yyyy-MM-dd'),
+        format(endDate, 'yyyy-MM-dd'),
+        leaveDay === 'half'
+      );
 
-        const remainingBalance = balanceData?.remaining_balance ?? 0;
-        const balanceAfter = remainingBalance - daysRequested;
-
-        if (!policy.allow_negative_balance && balanceAfter < 0) {
-          setValidationError(
-            `Insufficient leave balance. Available: ${remainingBalance} day(s), Requested: ${daysRequested} day(s).`
-          );
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (policy.allow_negative_balance && policy.max_negative_limit > 0 && balanceAfter < -policy.max_negative_limit) {
-          setValidationError(
-            `Request exceeds maximum negative balance limit of ${policy.max_negative_limit} day(s). Available: ${remainingBalance} day(s), Requested: ${daysRequested} day(s).`
-          );
-          setIsSubmitting(false);
-          return;
-        }
+      if (!validation.is_valid) {
+        setValidationError(validation.error_message || 'Validation failed');
+        setIsSubmitting(false);
+        return;
       }
 
       const { error } = await supabase
@@ -208,7 +172,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           status: 'pending',
           is_half_day: leaveDay === 'half',
           half_day_period: leaveDay === 'half' ? halfDayPeriod : null,
-          days_requested: daysRequested,
+          days_requested: validation.days_requested ?? calculateLeaveDays(),
         });
 
       if (error) throw error;
@@ -234,7 +198,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     }
   };
 
-  const isDisabledByPolicy = policy ? !policy.is_enabled : false;
+  const isDisabledByPolicy = constraints ? !constraints.is_enabled : false;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -288,7 +252,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           </div>
 
           {/* Only show half-day option when policy allows it */}
-          {(!policy || policy.enable_half_day) && (
+          {(!constraints || constraints.allow_half_day) && (
             <div className="space-y-2">
               <Label>Leave Duration *</Label>
               <div className="flex gap-4">
@@ -406,9 +370,9 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-md">
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 Total Leave Days: <span className="font-semibold">{calculateLeaveDays()}</span>
-                {policy?.max_continuous_leave_days && (
+                {constraints?.max_continuous_days && (
                   <span className="ml-2 text-muted-foreground">
-                    (Max: {policy.max_continuous_leave_days})
+                    (Max: {constraints.max_continuous_days})
                   </span>
                 )}
               </p>

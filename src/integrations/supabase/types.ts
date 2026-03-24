@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      accrual_config: {
+        Row: {
+          created_at: string
+          credit_day: number
+          divisor: number
+          frequency: string
+          id: string
+          leave_type_id: string
+          prorate_joining: boolean
+          round_mode: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_day?: number
+          divisor?: number
+          frequency?: string
+          id?: string
+          leave_type_id: string
+          prorate_joining?: boolean
+          round_mode?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_day?: number
+          divisor?: number
+          frequency?: string
+          id?: string
+          leave_type_id?: string
+          prorate_joining?: boolean
+          round_mode?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accrual_config_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: true
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_events: {
         Row: {
           activity_date: string
@@ -17817,6 +17861,10 @@ export type Database = {
         }[]
       }
       get_estimated_memory_usage: { Args: never; Returns: Json }
+      get_leave_date_constraints: {
+        Args: { p_leave_type_id: string; p_user_id: string }
+        Returns: Json
+      }
       get_limited_profiles_for_admin: {
         Args: never
         Returns: {
@@ -18063,6 +18111,10 @@ export type Database = {
         Args: { p_month: number; p_user_id: string; p_year: number }
         Returns: undefined
       }
+      resolve_effective_leave_policy: {
+        Args: { p_leave_type_id: string; p_user_id: string }
+        Returns: Json
+      }
       send_notification: {
         Args: {
           message_param: string
@@ -18111,6 +18163,16 @@ export type Database = {
           manager_id: string
           phone_number: string
         }[]
+      }
+      validate_leave_request: {
+        Args: {
+          p_end_date: string
+          p_is_half_day?: boolean
+          p_leave_type_id: string
+          p_start_date: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       verify_hint_answer: {
         Args: { submitted_answer: string; user_email: string }
