@@ -26,7 +26,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const invoiceUrl = pdfUrl || `${supabaseUrl}/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
 
-    const recipients = ['whatsapp:+919741435887'];
+    const recipients = ['whatsapp:+919741435887', 'whatsapp:+919845671333'];
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const base64Auth = btoa(`${accountSid}:${authToken}`);
 
