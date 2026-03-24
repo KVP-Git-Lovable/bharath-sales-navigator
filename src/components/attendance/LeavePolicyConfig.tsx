@@ -207,6 +207,13 @@ const LeavePolicyConfig = () => {
     }));
   };
 
+  const updateAccrualConfig = (leaveTypeId: string, field: keyof AccrualConfigForm, value: any) => {
+    setAccrualConfigForms(prev => ({
+      ...prev,
+      [leaveTypeId]: { ...prev[leaveTypeId], [field]: value },
+    }));
+  };
+
   const detectAccrualChanges = (): string[] => {
     const changed: string[] = [];
     for (const lt of leaveTypes) {
