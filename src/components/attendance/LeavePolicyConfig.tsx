@@ -176,7 +176,36 @@ const LeavePolicyConfig = () => {
     }));
   };
 
+  const detectAccrualChanges = (): string[] => {
+    const changed: string[] = [];
+    for (const lt of leaveTypes) {
+      const current = accrualForms[lt.id];
+      const original = originalAccrualForms[lt.id];
+      if (!current || !original) continue;
+      // Only flag if this is an existing policy (original had values > 0 or was monthly)
+      if (original.yearly_entitlement > 0 && (
+        current.yearly_entitlement !== original.yearly_entitlement ||
+        current.accrual_type !== original.accrual_type
+      )) {
+        changed.push(lt.id);
+      }
+    }
+    return changed;
+  };
+
   const handleSave = async () => {
+    // Check if any existing monthly accrual policies changed
+    const changed = detectAccrualChanges();
+    const hasMonthlyChanges = changed.some(id => 
+      accrualForms[id]?.accrual_type === 'monthly' || originalAccrualForms[id]?.accrual_type === 'monthly'
+    );
+
+    if (hasMonthlyChanges && !showUpdateModeModal) {
+      setChangedLeaveTypeIds(changed);
+      setShowUpdateModeModal(true);
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Save global policy
@@ -217,20 +246,35 @@ const LeavePolicyConfig = () => {
       for (const lt of leaveTypes) {
         const accrual = accrualForms[lt.id];
         if (!accrual) continue;
+
+        // Include last_update_mode for changed monthly policies
+        const isChanged = changedLeaveTypeIds.includes(lt.id);
+        const payload: any = {
+          leave_type_id: lt.id,
+          accrual_type: accrual.accrual_type,
+          yearly_entitlement: accrual.yearly_entitlement,
+          is_active: true,
+        };
+        if (isChanged) {
+          payload.last_update_mode = updateMode;
+        }
+
         const { error } = await supabase
           .from('leave_policy')
-          .upsert({
-            leave_type_id: lt.id,
-            accrual_type: accrual.accrual_type,
-            yearly_entitlement: accrual.yearly_entitlement,
-            is_active: true,
-          }, { onConflict: 'leave_type_id' });
+          .upsert(payload, { onConflict: 'leave_type_id' });
         if (error) throw error;
       }
+
+      // Update originals to reflect saved state
+      setOriginalAccrualForms(JSON.parse(JSON.stringify(accrualForms)));
+      setChangedLeaveTypeIds([]);
+      setShowUpdateModeModal(false);
+      setUpdateMode('next_month');
 
       queryClient.invalidateQueries({ queryKey: ['global-leave-policy'] });
       queryClient.invalidateQueries({ queryKey: ['leave-type-overrides'] });
       queryClient.invalidateQueries({ queryKey: ['leave-policies'] });
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
       toast.success('Leave policy saved successfully');
     } catch (error) {
       console.error('Error saving leave policy:', error);
