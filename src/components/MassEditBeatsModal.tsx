@@ -41,59 +41,73 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
   const [loading, setLoading] = useState(false);
   const [availableBeats, setAvailableBeats] = useState<BeatOption[]>([]);
 
-  // Load beats - always try cache first, then supplement with provided beats
+  // Load beats from DB (primary) with offline cache fallback
   useEffect(() => {
     const loadBeats = async () => {
+      if (!user?.id) return;
+      
       try {
-        console.log('Loading beats for dropdown...');
+        console.log('Loading beats from DB...');
         
-        // Build beat map: beat_id -> beat_name
-        const beatMap = new Map<string, string>();
-        
-        // ALWAYS load from cache first (works both online and offline)
-        const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
-        const userRetailers = cachedRetailers.filter((r: any) => r.user_id === user?.id);
-        
-        // Extract beat_id -> beat_name from cached retailers
-        userRetailers.forEach((r: any) => {
-          if (r.beat_id && r.beat_id !== '') {
-            const currentName = beatMap.get(r.beat_id);
-            const newName = r.beat_name || r.beat_id;
-            // Prefer actual names over beat_id-style strings
-            if (!currentName || (currentName.startsWith('beat_') && !newName.startsWith('beat_'))) {
-              beatMap.set(r.beat_id, newName);
-            }
+        if (isOnline) {
+          // DB-first: fetch directly from beats table (RLS enforced)
+          const { data, error } = await supabase
+            .from('beats')
+            .select('beat_id, beat_name')
+            .eq('is_active', true)
+            .order('beat_name');
+
+          if (error) throw error;
+
+          const dbBeats = (data || []).map(b => ({
+            beat_id: b.beat_id,
+            beat_name: b.beat_name || b.beat_id,
+          }));
+
+          // Cache for offline use
+          for (const beat of data || []) {
+            await offlineStorage.save(STORES.BEATS, beat);
           }
-        });
-        
-        // Also include beats from props (handle both formats)
-        if (Array.isArray(beats)) {
-          beats.forEach((b: any) => {
-            if (typeof b === 'string' && b && !beatMap.has(b)) {
-              beatMap.set(b, b);
-            } else if (b?.beat_id && !beatMap.has(b.beat_id)) {
-              beatMap.set(b.beat_id, b.beat_name || b.beat_id);
-            }
-          });
+
+          console.log('Loaded beats from DB:', dbBeats.length);
+          setAvailableBeats(dbBeats);
+        } else {
+          // Offline fallback: use cached beats store
+          const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
+          const activeBeats = (cachedBeats as any[])
+            .filter((b: any) => b.is_active !== false)
+            .map((b: any) => ({
+              beat_id: b.beat_id,
+              beat_name: b.beat_name || b.beat_id,
+            }))
+            .sort((a, b) => a.beat_name.localeCompare(b.beat_name));
+
+          console.log('Loaded beats from cache:', activeBeats.length);
+          setAvailableBeats(activeBeats);
         }
-        
-        // Convert to sorted array
-        const allBeats = Array.from(beatMap.entries())
-          .map(([beat_id, beat_name]) => ({ beat_id, beat_name }))
-          .sort((a, b) => a.beat_name.localeCompare(b.beat_name));
-        
-        console.log('Loaded beats:', allBeats.length);
-        setAvailableBeats(allBeats);
       } catch (error) {
         console.error('Error loading beats:', error);
-        setAvailableBeats([]);
+        // Fallback to cache on error
+        try {
+          const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
+          const activeBeats = (cachedBeats as any[])
+            .filter((b: any) => b.is_active !== false)
+            .map((b: any) => ({
+              beat_id: b.beat_id,
+              beat_name: b.beat_name || b.beat_id,
+            }))
+            .sort((a, b) => a.beat_name.localeCompare(b.beat_name));
+          setAvailableBeats(activeBeats);
+        } catch {
+          setAvailableBeats([]);
+        }
       }
     };
     
     if (isOpen) {
       loadBeats();
     }
-  }, [isOpen, beats, user]);
+  }, [isOpen, user, isOnline]);
 
   const handleRetailerToggle = (retailerId: string) => {
     setSelectedRetailers(prev => 
