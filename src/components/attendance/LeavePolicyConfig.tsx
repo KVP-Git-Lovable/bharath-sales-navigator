@@ -745,6 +745,68 @@ const LeavePolicyConfig = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Update Mode Modal */}
+      <Dialog open={showUpdateModeModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowUpdateModeModal(false);
+          setUpdateMode('next_month');
+          setChangedLeaveTypeIds([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>How should the entitlement change take effect?</DialogTitle>
+            <DialogDescription>
+              You've changed the accrual entitlement for{' '}
+              {changedLeaveTypeIds.map(id => leaveTypes.find(lt => lt.id === id)?.name).filter(Boolean).join(', ')}.
+              Choose how to apply the update to existing balances.
+            </DialogDescription>
+          </DialogHeader>
+          <RadioGroup value={updateMode} onValueChange={(v) => setUpdateMode(v as any)} className="space-y-3 py-4">
+            <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+              <RadioGroupItem value="retroactive" id="retroactive" className="mt-0.5" />
+              <Label htmlFor="retroactive" className="cursor-pointer">
+                <div className="font-medium">Retroactive</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recalculate all balances from January to now at the new rate
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+              <RadioGroupItem value="current_month" id="current_month" className="mt-0.5" />
+              <Label htmlFor="current_month" className="cursor-pointer">
+                <div className="font-medium">From current month</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Apply new rate starting this month; past months unchanged
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+              <RadioGroupItem value="next_month" id="next_month" className="mt-0.5" />
+              <Label htmlFor="next_month" className="cursor-pointer">
+                <div className="font-medium">From next month</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  New rate applies from next month onward only
+                </p>
+              </Label>
+            </div>
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowUpdateModeModal(false);
+              setUpdateMode('next_month');
+              setChangedLeaveTypeIds([]);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Confirm & Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
