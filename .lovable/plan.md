@@ -1,34 +1,39 @@
 
 
-# Fully Data-Driven Leave Policy Engine — IMPLEMENTED ✅
+# Fix Mass Edit Beats: DB-First Beat Fetching
 
-## What Was Done
+## Problem
+The `MassEditBeatsModal` derives beat options from cached retailer records in IndexedDB, bypassing RLS, risking stale/cross-user data, and using the wrong source of truth.
 
-### Phase 1: Server-Side Policy Resolution ✅
-- Created `resolve_effective_leave_policy(p_user_id, p_leave_type_id)` DB function
-- Merges global + leave-type overrides server-side, returns flat JSONB
-- Future override layers (team, user) can be added here without frontend changes
+## Solution
+Fetch beats directly from the `beats` table (with RLS enforced), using cache only as offline fallback.
 
-### Phase 2: Server-Side Validation ✅
-- Created `validate_leave_request(p_user_id, p_leave_type_id, p_start_date, p_end_date, p_is_half_day)` RPC
-- Returns `{ is_valid, error_code, error_message, days_requested, balance_after }`
-- Created `get_leave_date_constraints(p_user_id, p_leave_type_id)` RPC
-- Returns date picker constraints (backdate limits, notice periods, half-day flag)
+## Changes
 
-### Phase 3: Configurable Accrual Engine ✅
-- Created `accrual_config` table (frequency, divisor, round_mode, prorate_joining, credit_day)
-- Updated `process_monthly_leave_accrual` to read from `accrual_config` instead of hardcoded `/ 12`
-- Supports monthly, quarterly, annual frequencies with configurable rounding
-- Seeded existing leave_policy data into accrual_config
+### 1. Refactor `loadBeats` in `MassEditBeatsModal.tsx`
 
-### Phase 4: Frontend Simplification ✅
-- `useEffectiveLeavePolicy` now calls `get_leave_date_constraints` RPC (server-side resolution)
-- `LeaveApplicationModal` uses `validateLeaveRequestRPC` — zero client-side policy logic
-- Date picker constraints driven by server-calculated values
-- `LeavePolicyConfig` now includes Advanced Accrual Settings UI (frequency, divisor, rounding, prorate, credit day)
-- Accrual config saved to `accrual_config` table on policy save
+Replace the current cache-first logic (lines 44-96) with:
 
-## Architecture
-- **Zero policy logic in frontend** — JS only renders and calls RPCs
-- **All rules in DB functions reading config tables**
-- **Future changes** (e.g., 12→6 entitlement, new frequency) = data updates only, no code deploys
+- **Online**: Query `supabase.from('beats').select('id, beat_id, beat_name').eq('owner_id', user.id).eq('is_active', true).order('beat_name')`
+- **Offline fallback**: Fall back to `offlineStorage.getAll(STORES.BEATS)` (already cached by `useMasterDataCache.ts` during sync)
+- Remove the retailer-derived beat extraction entirely
+- Remove the `beats` prop dependency for building the dropdown (props can still supplement if needed)
+
+### 2. Verify RLS on `beats` table
+
+Check existing RLS policies on `beats`. If no policy restricts SELECT to `owner_id = auth.uid()`, add one via migration:
+
+```sql
+CREATE POLICY "Users can select their own beats"
+ON beats FOR SELECT TO authenticated
+USING (owner_id = auth.uid() OR created_by = auth.uid()::text);
+```
+
+### 3. Update beat value mapping
+
+The `beats` table uses `id` (UUID) as primary key and `beat_id` (string code). Ensure the dropdown uses `beat_id` as the value (since retailers store `beat_id`, not `id`), matching the existing `handleMassEdit` logic that writes `beat_id` to the retailers table.
+
+## Files Modified
+- `src/components/MassEditBeatsModal.tsx` — refactor `loadBeats` useEffect
+- Possible migration — RLS policy on `beats` table if missing
+
