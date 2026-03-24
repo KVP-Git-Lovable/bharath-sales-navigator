@@ -80,6 +80,10 @@ const LeavePolicyConfig = () => {
 
   const [overrideForms, setOverrideForms] = useState<Record<string, OverrideForm>>({});
   const [accrualForms, setAccrualForms] = useState<Record<string, AccrualForm>>({});
+  const [originalAccrualForms, setOriginalAccrualForms] = useState<Record<string, AccrualForm>>({});
+  const [showUpdateModeModal, setShowUpdateModeModal] = useState(false);
+  const [updateMode, setUpdateMode] = useState<'retroactive' | 'current_month' | 'next_month'>('next_month');
+  const [changedLeaveTypeIds, setChangedLeaveTypeIds] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.from('leave_types').select('*').eq('is_active', true).order('name')
