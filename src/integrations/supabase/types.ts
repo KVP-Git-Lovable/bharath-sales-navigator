@@ -8338,6 +8338,8 @@ export type Database = {
           encashment_limit: number | null
           id: string
           is_active: boolean | null
+          last_update_effective_date: string | null
+          last_update_mode: string | null
           leave_type_id: string
           max_carry_forward: number | null
           max_leaves_per_month: number | null
@@ -8360,6 +8362,8 @@ export type Database = {
           encashment_limit?: number | null
           id?: string
           is_active?: boolean | null
+          last_update_effective_date?: string | null
+          last_update_mode?: string | null
           leave_type_id: string
           max_carry_forward?: number | null
           max_leaves_per_month?: number | null
@@ -8382,6 +8386,8 @@ export type Database = {
           encashment_limit?: number | null
           id?: string
           is_active?: boolean | null
+          last_update_effective_date?: string | null
+          last_update_mode?: string | null
           leave_type_id?: string
           max_carry_forward?: number | null
           max_leaves_per_month?: number | null

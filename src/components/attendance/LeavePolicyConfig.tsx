@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
 import { Save, Settings, Shield, Clock, CheckSquare, Loader2, CalendarDays, AlertCircle, Info } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -78,6 +80,10 @@ const LeavePolicyConfig = () => {
 
   const [overrideForms, setOverrideForms] = useState<Record<string, OverrideForm>>({});
   const [accrualForms, setAccrualForms] = useState<Record<string, AccrualForm>>({});
+  const [originalAccrualForms, setOriginalAccrualForms] = useState<Record<string, AccrualForm>>({});
+  const [showUpdateModeModal, setShowUpdateModeModal] = useState(false);
+  const [updateMode, setUpdateMode] = useState<'retroactive' | 'current_month' | 'next_month'>('next_month');
+  const [changedLeaveTypeIds, setChangedLeaveTypeIds] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.from('leave_types').select('*').eq('is_active', true).order('name')
@@ -103,6 +109,7 @@ const LeavePolicyConfig = () => {
           };
         });
         setAccrualForms(forms);
+        setOriginalAccrualForms(JSON.parse(JSON.stringify(forms)));
       });
     }
   }, [leaveTypes]);
@@ -169,7 +176,36 @@ const LeavePolicyConfig = () => {
     }));
   };
 
+  const detectAccrualChanges = (): string[] => {
+    const changed: string[] = [];
+    for (const lt of leaveTypes) {
+      const current = accrualForms[lt.id];
+      const original = originalAccrualForms[lt.id];
+      if (!current || !original) continue;
+      // Only flag if this is an existing policy (original had values > 0 or was monthly)
+      if (original.yearly_entitlement > 0 && (
+        current.yearly_entitlement !== original.yearly_entitlement ||
+        current.accrual_type !== original.accrual_type
+      )) {
+        changed.push(lt.id);
+      }
+    }
+    return changed;
+  };
+
   const handleSave = async () => {
+    // Check if any existing monthly accrual policies changed
+    const changed = detectAccrualChanges();
+    const hasMonthlyChanges = changed.some(id => 
+      accrualForms[id]?.accrual_type === 'monthly' || originalAccrualForms[id]?.accrual_type === 'monthly'
+    );
+
+    if (hasMonthlyChanges && !showUpdateModeModal) {
+      setChangedLeaveTypeIds(changed);
+      setShowUpdateModeModal(true);
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Save global policy
@@ -210,20 +246,35 @@ const LeavePolicyConfig = () => {
       for (const lt of leaveTypes) {
         const accrual = accrualForms[lt.id];
         if (!accrual) continue;
+
+        // Include last_update_mode for changed monthly policies
+        const isChanged = changedLeaveTypeIds.includes(lt.id);
+        const payload: any = {
+          leave_type_id: lt.id,
+          accrual_type: accrual.accrual_type,
+          yearly_entitlement: accrual.yearly_entitlement,
+          is_active: true,
+        };
+        if (isChanged) {
+          payload.last_update_mode = updateMode;
+        }
+
         const { error } = await supabase
           .from('leave_policy')
-          .upsert({
-            leave_type_id: lt.id,
-            accrual_type: accrual.accrual_type,
-            yearly_entitlement: accrual.yearly_entitlement,
-            is_active: true,
-          }, { onConflict: 'leave_type_id' });
+          .upsert(payload, { onConflict: 'leave_type_id' });
         if (error) throw error;
       }
+
+      // Update originals to reflect saved state
+      setOriginalAccrualForms(JSON.parse(JSON.stringify(accrualForms)));
+      setChangedLeaveTypeIds([]);
+      setShowUpdateModeModal(false);
+      setUpdateMode('next_month');
 
       queryClient.invalidateQueries({ queryKey: ['global-leave-policy'] });
       queryClient.invalidateQueries({ queryKey: ['leave-type-overrides'] });
       queryClient.invalidateQueries({ queryKey: ['leave-policies'] });
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
       toast.success('Leave policy saved successfully');
     } catch (error) {
       console.error('Error saving leave policy:', error);
@@ -694,6 +745,68 @@ const LeavePolicyConfig = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Update Mode Modal */}
+      <Dialog open={showUpdateModeModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowUpdateModeModal(false);
+          setUpdateMode('next_month');
+          setChangedLeaveTypeIds([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>How should the entitlement change take effect?</DialogTitle>
+            <DialogDescription>
+              You've changed the accrual entitlement for{' '}
+              {changedLeaveTypeIds.map(id => leaveTypes.find(lt => lt.id === id)?.name).filter(Boolean).join(', ')}.
+              Choose how to apply the update to existing balances.
+            </DialogDescription>
+          </DialogHeader>
+          <RadioGroup value={updateMode} onValueChange={(v) => setUpdateMode(v as any)} className="space-y-3 py-4">
+            <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+              <RadioGroupItem value="retroactive" id="retroactive" className="mt-0.5" />
+              <Label htmlFor="retroactive" className="cursor-pointer">
+                <div className="font-medium">Retroactive</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recalculate all balances from January to now at the new rate
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+              <RadioGroupItem value="current_month" id="current_month" className="mt-0.5" />
+              <Label htmlFor="current_month" className="cursor-pointer">
+                <div className="font-medium">From current month</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Apply new rate starting this month; past months unchanged
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+              <RadioGroupItem value="next_month" id="next_month" className="mt-0.5" />
+              <Label htmlFor="next_month" className="cursor-pointer">
+                <div className="font-medium">From next month</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  New rate applies from next month onward only
+                </p>
+              </Label>
+            </div>
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowUpdateModeModal(false);
+              setUpdateMode('next_month');
+              setChangedLeaveTypeIds([]);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Confirm & Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
