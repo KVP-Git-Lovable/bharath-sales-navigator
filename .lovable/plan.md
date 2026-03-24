@@ -1,76 +1,63 @@
 
 
-# Retroactive vs Prospective Leave Accrual Update
+# Fully Data-Driven Leave Policy Engine
 
 ## Problem
-When an admin changes the `yearly_entitlement` on an existing monthly accrual policy (e.g., 12 to 6), the system does not recalculate balances. There is no `AFTER UPDATE` trigger on `leave_policy`, and the save uses `upsert` which won't fire an `INSERT` trigger for existing rows.
+Policy **values** are configurable via tables, but policy **logic** (merging, validation, accrual math) is hardcoded in JS (`getEffectivePolicy`, `LeaveApplicationModal` validation) and SQL (`process_monthly_leave_accrual` with hardcoded `/ 12`).
 
-## Solution
-Add an **"Effective Mode"** selector to the UI when saving accrual changes, and a database function that recalculates balances accordingly.
+## Solution: Move All Logic to DB Functions, Driven by Config Tables
 
----
+### Phase 1: Server-Side Policy Resolution
 
-### 1. Database Migration
+**New DB function:** `resolve_effective_leave_policy(p_user_id UUID, p_leave_type_id UUID)`
+- Merges global + override internally, returns flat JSON
+- Replaces client-side `getEffectivePolicy()` in `useGlobalLeavePolicy.ts`
+- Future override layers (team, user) added here without frontend changes
 
-**New function: `recalculate_leave_accrual_on_update`**
-- Accepts parameters: `leave_type_id`, `new_yearly_entitlement`, `old_yearly_entitlement`, `update_mode` (`retroactive`, `current_month`, `next_month`)
-- Logic by mode:
-  - **Retroactive**: Recalculate from January to current month at new rate. Set `opening_balance = new_rate * months_elapsed - used_balance_adjustments`. Update all `leave_accrual_log` entries for this year to reflect new `days_credited`.
-  - **Current month forward**: Keep past accrual logs as-is. Only adjust the current month's credit if already applied (diff = new_rate - old_rate, apply delta to `opening_balance`). Future months use new rate automatically via cron.
-  - **Next month forward**: No balance changes now. Future cron runs pick up the new `yearly_entitlement` naturally.
+### Phase 2: Server-Side Validation
 
-**New trigger: `AFTER UPDATE` on `leave_policy`**
-- Fires when `yearly_entitlement` or `accrual_type` changes
-- Reads the `update_mode` from a new column `last_update_mode` on `leave_policy` (set by frontend before save)
-- Calls `recalculate_leave_accrual_on_update`
+**New DB function:** `validate_leave_request(p_user_id, p_leave_type_id, p_start_date, p_end_date, p_half_day, ...)`
+- Returns `{ is_valid, error_code, error_message, days_requested, balance_after }`
+- Moves all checks out of `LeaveApplicationModal`: balance, negative limit, max continuous days, backdating, notice period
+- Frontend becomes a thin UI — calls RPC, shows result
 
-**Schema change on `leave_policy`**:
-- Add column `last_update_mode TEXT DEFAULT 'next_month'` (values: `retroactive`, `current_month`, `next_month`)
-- Add column `last_update_effective_date DATE` (optional, for custom effective dates)
+**New DB function:** `get_leave_date_constraints(p_user_id, p_leave_type_id)`
+- Returns `{ min_start_date, max_backdate_date, min_notice_date, allow_half_day, max_continuous_days }`
+- Frontend date picker uses these values directly — no hardcoded date logic
 
-### 2. Frontend Changes (LeavePolicyConfig.tsx)
+### Phase 3: Configurable Accrual Engine
 
-When the admin modifies `yearly_entitlement` or `accrual_type` for a leave type that already has an existing policy:
+**New table: `accrual_config`**
 
-- Show a modal/inline panel with three radio options:
-  1. **Retroactive** -- Recalculate all balances from Jan to now at the new rate
-  2. **From current month** -- Apply new rate starting this month; past months unchanged
-  3. **From next month** -- New rate applies from next month onward only
+| Column | Type | Purpose |
+|--------|------|---------|
+| leave_type_id | uuid FK | Links to leave type |
+| frequency | text | 'monthly', 'quarterly', 'annual' |
+| divisor | integer | 12, 4, 1 — how to split yearly entitlement |
+| round_mode | text | 'floor', 'ceil', 'round' |
+| prorate_joining | boolean | Prorate for mid-year joiners |
+| credit_day | integer | Day of period to credit |
 
-- Before the `upsert` call, set `last_update_mode` to the selected option
-- The trigger handles the rest server-side
+**Modify `process_monthly_leave_accrual`:** Read divisor, rounding, frequency from `accrual_config` instead of hardcoding `/ 12`.
 
-### 3. Flow Summary
-
-```text
-Admin changes entitlement (12 → 6)
-        │
-        ▼
-  UI shows mode selector
-  ┌─────────────────────────┐
-  │ ○ Retroactive           │
-  │ ○ From current month    │
-  │ ○ From next month       │
-  └─────────────────────────┘
-        │
-        ▼
-  Frontend upserts leave_policy
-  with last_update_mode = chosen
-        │
-        ▼
-  AFTER UPDATE trigger fires
-        │
-  ┌─────┴──────────┐
-  │ retroactive    │ → Recalc all months, update logs + balances
-  │ current_month  │ → Adjust current month delta only
-  │ next_month     │ → No balance change, cron uses new rate
-  └────────────────┘
-```
-
-### 4. Files to Create/Modify
+### Phase 4: Frontend Simplification
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/...` | Add columns to `leave_policy`, create `recalculate_leave_accrual_on_update` function, create `AFTER UPDATE` trigger |
-| `src/components/attendance/LeavePolicyConfig.tsx` | Detect entitlement changes, show update mode selector before save, include `last_update_mode` in upsert payload |
+| `useGlobalLeavePolicy.ts` | Replace `getEffectivePolicy` + `useEffectiveLeavePolicy` with single RPC call to `resolve_effective_leave_policy` |
+| `LeaveApplicationModal.tsx` | Remove all validation logic; call `validate_leave_request` RPC on submit; call `get_leave_date_constraints` for date picker |
+| `LeavePolicyConfig.tsx` | Add accrual config UI (frequency, rounding, prorate dropdowns) |
+| Migration file | Create 3 DB functions + `accrual_config` table + update accrual function |
+
+### Result
+
+- **Zero policy logic in frontend** — JS only renders and calls RPCs
+- **All rules in DB functions reading config tables** — changes are data updates, not code deploys
+- **Future changes** (e.g., 12→6 entitlement, new accrual frequency) require zero code changes
+
+### Execution Order
+1. Phase 1 (resolution) — lowest risk, immediate cleanup
+2. Phase 2 (validation) — security win, removes client-side bypass
+3. Phase 3 (accrual config) — enables flexible accrual without code changes
+4. Phase 4 (frontend cleanup) — done incrementally with each phase
 
