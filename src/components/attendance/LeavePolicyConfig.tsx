@@ -682,13 +682,92 @@ const LeavePolicyConfig = () => {
                             </div>
                             {accrualForms[lt.id]?.accrual_type === 'monthly' && accrualForms[lt.id]?.yearly_entitlement > 0 && (
                               <p className="text-xs text-muted-foreground">
-                                ℹ Monthly credit: {(accrualForms[lt.id].yearly_entitlement / 12).toFixed(2)} days/month
+                                ℹ Monthly credit: {(accrualForms[lt.id].yearly_entitlement / (accrualConfigForms[lt.id]?.divisor || 12)).toFixed(2)} days/month
                               </p>
                             )}
                             {accrualForms[lt.id]?.accrual_type === 'quarterly' && accrualForms[lt.id]?.yearly_entitlement > 0 && (
                               <p className="text-xs text-muted-foreground">
-                                ℹ Quarterly credit: {(accrualForms[lt.id].yearly_entitlement / 4).toFixed(2)} days/quarter
+                                ℹ Quarterly credit: {(accrualForms[lt.id].yearly_entitlement / (accrualConfigForms[lt.id]?.divisor || 4)).toFixed(2)} days/quarter
                               </p>
+                            )}
+
+                            {/* Advanced Accrual Configuration */}
+                            {accrualForms[lt.id]?.accrual_type !== 'yearly' && (
+                              <div className="mt-3 pt-3 border-t space-y-3">
+                                <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Advanced Accrual Settings</h5>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Frequency</Label>
+                                    <Select
+                                      value={accrualConfigForms[lt.id]?.frequency || 'monthly'}
+                                      onValueChange={(value) => {
+                                        updateAccrualConfig(lt.id, 'frequency', value);
+                                        // Auto-set divisor
+                                        const divisorMap: Record<string, number> = { monthly: 12, quarterly: 4, annual: 1 };
+                                        updateAccrualConfig(lt.id, 'divisor', divisorMap[value] || 12);
+                                      }}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="monthly">Monthly</SelectItem>
+                                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                                        <SelectItem value="annual">Annual</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Divisor</Label>
+                                    <Input
+                                      type="number"
+                                      value={accrualConfigForms[lt.id]?.divisor ?? 12}
+                                      onChange={(e) => updateAccrualConfig(lt.id, 'divisor', parseInt(e.target.value) || 12)}
+                                      min={1}
+                                      max={365}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Yearly entitlement ÷ this = per-period credit</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Rounding</Label>
+                                    <Select
+                                      value={accrualConfigForms[lt.id]?.round_mode || 'round'}
+                                      onValueChange={(value) => updateAccrualConfig(lt.id, 'round_mode', value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="round">Round (nearest)</SelectItem>
+                                        <SelectItem value="floor">Floor (round down)</SelectItem>
+                                        <SelectItem value="ceil">Ceil (round up)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Credit Day of Period</Label>
+                                    <Input
+                                      type="number"
+                                      value={accrualConfigForms[lt.id]?.credit_day ?? 1}
+                                      onChange={(e) => updateAccrualConfig(lt.id, 'credit_day', parseInt(e.target.value) || 1)}
+                                      min={1}
+                                      max={28}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between p-2 rounded border">
+                                    <div>
+                                      <Label className="text-xs">Prorate for Mid-Period Joiners</Label>
+                                      <p className="text-[10px] text-muted-foreground">Reduce first credit based on joining date</p>
+                                    </div>
+                                    <Switch
+                                      checked={accrualConfigForms[lt.id]?.prorate_joining ?? false}
+                                      onCheckedChange={(checked) => updateAccrualConfig(lt.id, 'prorate_joining', checked)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
 
