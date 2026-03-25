@@ -2601,6 +2601,128 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_note_items: {
+        Row: {
+          barcode: string | null
+          cgst_amount: number | null
+          created_at: string | null
+          credit_note_id: string | null
+          hsn_code: string | null
+          id: string
+          original_invoice_number: string | null
+          original_order_id: string | null
+          product_id: string | null
+          product_name: string | null
+          quantity: number | null
+          rate: number | null
+          sgst_amount: number | null
+          taxable_amount: number | null
+          total: number | null
+          unit: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          cgst_amount?: number | null
+          created_at?: string | null
+          credit_note_id?: string | null
+          hsn_code?: string | null
+          id?: string
+          original_invoice_number?: string | null
+          original_order_id?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          quantity?: number | null
+          rate?: number | null
+          sgst_amount?: number | null
+          taxable_amount?: number | null
+          total?: number | null
+          unit?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          cgst_amount?: number | null
+          created_at?: string | null
+          credit_note_id?: string | null
+          hsn_code?: string | null
+          id?: string
+          original_invoice_number?: string | null
+          original_order_id?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          quantity?: number | null
+          rate?: number | null
+          sgst_amount?: number | null
+          taxable_amount?: number | null
+          total?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_note_items_credit_note_id_fkey"
+            columns: ["credit_note_id"]
+            isOneToOne: false
+            referencedRelation: "credit_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_notes: {
+        Row: {
+          amount_in_words: string | null
+          cgst_total: number | null
+          created_at: string | null
+          created_by: string | null
+          credit_note_date: string
+          credit_note_number: string
+          id: string
+          reason: string | null
+          reason_notes: string | null
+          retailer_id: string | null
+          retailer_name: string | null
+          sgst_total: number | null
+          status: string | null
+          sub_total: number | null
+          total_amount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_in_words?: string | null
+          cgst_total?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          credit_note_date?: string
+          credit_note_number: string
+          id?: string
+          reason?: string | null
+          reason_notes?: string | null
+          retailer_id?: string | null
+          retailer_name?: string | null
+          sgst_total?: number | null
+          status?: string | null
+          sub_total?: number | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_in_words?: string | null
+          cgst_total?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          credit_note_date?: string
+          credit_note_number?: string
+          id?: string
+          reason?: string | null
+          reason_notes?: string | null
+          retailer_id?: string | null
+          retailer_name?: string | null
+          sgst_total?: number | null
+          status?: string | null
+          sub_total?: number | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       custom_invoice_templates: {
         Row: {
           created_at: string | null
