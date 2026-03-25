@@ -54,6 +54,7 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
           const { data, error } = await supabase
             .from('beats')
             .select('beat_id, beat_name')
+            .eq('owner_id', user.id)
             .eq('is_active', true)
             .order('beat_name');
 
