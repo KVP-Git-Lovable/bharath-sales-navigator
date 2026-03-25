@@ -955,6 +955,7 @@ const Operations = () => {
     if (activeTab === 'stock') fetchStockData();
     if (activeTab === 'competitor') fetchCompetitorData();
     if (activeTab === 'returnstock') fetchReturnStockData();
+    if (activeTab === 'cancelled') fetchCancelledOrders();
   }, [activeTab]);
   
   useManagedInterval(
