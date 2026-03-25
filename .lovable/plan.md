@@ -1,121 +1,99 @@
 
 
-# Atomic Order Cancellation — Improved Plan with Ledger, Audit & Edge Cases
+# Atomic Order Cancellation — Refined Plan
 
-## Summary of Improvements (from your feedback)
+## 4 Refinements Applied
 
-Your 6 points are valid. Here is how each maps into the revised plan:
+### 1. Gamification reversal strictly by order_id
+The current `removeGamificationPoints` matches by `retailer_id + date range` — this can reverse points from unrelated orders on the same day. The RPC will query `gamification_points` using `reference_id = order_id` only. A fallback for legacy points (pre-fix, stored with `retailer_id` as `reference_id`) will use the old date+retailer match but only if no order-linked points are found.
 
-| Your Point | Action |
-|---|---|
-| 1. Credit Reversal via Ledger | New `credit_ledger` table; balance = SUM of entries |
-| 2. Gamification Reversal (not Delete) | INSERT negative points instead of DELETE |
-| 3. Visit Status edge case | Only revert if visit was marked productive *solely because of the order* |
-| 4. Analytics: use `.eq('confirmed')` not `.neq('cancelled')` | Whitelist approach across all queries |
-| 5. Double cancellation guard | `SELECT ... FOR UPDATE` + status check, return `already_cancelled` |
-| 6. Cancellation audit log | New `order_cancellation_log` table |
+### 2. Credit ledger trigger uses incremental update
+Instead of `SELECT SUM(amount) FROM credit_ledger` on every insert (expensive as ledger grows), the trigger will do:
+```sql
+UPDATE retailers
+SET pending_amount = GREATEST(0, COALESCE(pending_amount, 0) + NEW.amount)
+WHERE id = NEW.retailer_id;
+```
+This adds the entry's amount directly (negative for reversals), avoiding a full table scan.
+
+### 3. Visit completion_source flag
+Currently there is no way to know *why* a visit became `productive`. We add a `completion_source` column to the `visits` table:
+- `'order'` — set when an order makes the visit productive
+- `'manual'` — set when a rep independently marks visit complete
+- `'check_in'` — set on check-in based completion
+
+The RPC only reverts visit status to `planned` when `completion_source = 'order'` AND no other confirmed orders exist for that visit. If `completion_source` is `'manual'` or `'check_in'`, the visit stays as-is even if the order is cancelled.
+
+### 4. No DELETE on sequence/tracking — use update/reversal
+Current code deletes `gamification_retailer_sequences` rows when count reaches 0, and deletes `gamification_daily_tracking` rows when count reaches 1. Instead:
+- **Sequences**: Set `consecutive_orders = GREATEST(0, consecutive_orders - 1)` — never delete
+- **Daily tracking**: Set `count = GREATEST(0, count - 1)` — never delete
+This preserves history and avoids orphaned references.
 
 ---
 
-## Database Changes (Migration)
+## Implementation
 
-### New Table: `credit_ledger`
-```text
-credit_ledger
-  id          UUID PK
-  retailer_id UUID FK → retailers
-  amount      NUMERIC (positive = credit added, negative = reversal)
-  type        TEXT ('order_credit', 'order_cancel', 'payment', 'adjustment')
-  reference_id UUID (order_id or payment_id)
-  created_by  UUID
-  created_at  TIMESTAMPTZ DEFAULT now()
-```
-RLS: Users can SELECT/INSERT their own entries. Balance is always `SELECT SUM(amount) FROM credit_ledger WHERE retailer_id = X`.
+### Migration (single file)
 
-The `retailers.pending_amount` column becomes a **computed cache** — updated by a trigger on `credit_ledger` inserts for fast reads, but the ledger is the source of truth.
+**Tables:**
+- `credit_ledger` — retailer_id, amount, type, reference_id, created_by, created_at
+- `order_cancellation_log` — order_id, reason, cancelled_by, cancelled_at, reversal_summary (JSONB)
+- `ALTER TABLE visits ADD COLUMN completion_source TEXT` — values: `'order'`, `'manual'`, `'check_in'`
 
-### New Table: `order_cancellation_log`
-```text
-order_cancellation_log
-  id              UUID PK
-  order_id        UUID FK → orders
-  reason          TEXT
-  cancelled_by    UUID
-  cancelled_at    TIMESTAMPTZ DEFAULT now()
-  reversal_summary JSONB (credit reversed, points reversed, visit reverted, etc.)
-```
-RLS: Users can SELECT their own entries.
-
-### RPC: `cancel_order_atomic(p_order_id, p_reason, p_cancelled_by)`
-
-Single PL/pgSQL function wrapping everything in one transaction:
-
-```text
-1. SELECT order FOR UPDATE (row lock)
-2. IF status = 'cancelled' → RETURN {already_cancelled: true}
-3. IF status NOT IN ('confirmed','pending') → RETURN {error}
-4. UPDATE orders → status='cancelled', cancelled_at, cancellation_reason, cancelled_by
-5. UPDATE invoices → status='cancelled' WHERE order_id = p_order_id
-6. IF credit order:
-   INSERT INTO credit_ledger (retailer_id, amount, type, reference_id)
-   VALUES (retailer_id, -credit_amount, 'order_cancel', order_id)
-   — trigger auto-updates retailers.pending_amount
-7. Recalculate last_order_date from remaining confirmed orders
-8. Visit logic:
-   IF visit exists AND visit.status = 'productive'
-   AND visit was NOT checked-in independently (check if visit has check_in_time but order was the only reason for productive)
-   AND no other confirmed orders for this visit
-   → UPDATE visit SET status = 'planned'
-9. INSERT INTO gamification_points (user_id, points, action_id, reference_id, reference_type)
-   VALUES (user_id, -original_points, action_id, order_id, 'order_reversal')
-   — negative entry, not a delete
-10. INSERT INTO retailer_loyalty_points with negative points (same pattern)
-11. Decrement gamification sequences and daily tracking
-12. INSERT INTO order_cancellation_log (order_id, reason, cancelled_by, reversal_summary)
-13. RETURN jsonb summary
-```
-
-Any failure → automatic ROLLBACK. Nothing changes.
-
-### Trigger: `credit_ledger_sync_pending_amount`
-
-After INSERT on `credit_ledger`:
+**Trigger:** `credit_ledger_sync_pending_amount` — incremental:
 ```sql
 UPDATE retailers
-SET pending_amount = (
-  SELECT COALESCE(SUM(amount), 0) FROM credit_ledger WHERE retailer_id = NEW.retailer_id
-)
+SET pending_amount = GREATEST(0, COALESCE(pending_amount, 0) + NEW.amount)
 WHERE id = NEW.retailer_id;
 ```
 
-This keeps `retailers.pending_amount` in sync while the ledger remains the source of truth.
+**RPC:** `cancel_order_atomic(p_order_id UUID, p_reason TEXT, p_cancelled_by UUID)` returns JSONB
 
----
+Transaction flow:
+1. `SELECT ... FOR UPDATE` on order row (row lock)
+2. If already `cancelled` → return `{already_cancelled: true}`
+3. If status not in `('confirmed','pending')` → return error
+4. Update order status to `cancelled` with metadata
+5. Update linked invoices to `cancelled`
+6. If credit order: INSERT into `credit_ledger` with negative amount (trigger handles `pending_amount`)
+7. Recalculate `last_order_date` from remaining confirmed orders
+8. Visit: only revert if `completion_source = 'order'` AND no other confirmed orders for that visit
+9. Gamification: INSERT negative point entries matching by `reference_id = order_id, reference_type = 'order'` (fallback: retailer+date for legacy)
+10. Loyalty: INSERT negative point entries matching by `reference_id = order_id`
+11. Sequences: `UPDATE SET consecutive_orders = GREATEST(0, consecutive_orders - 1)` — no delete
+12. Daily tracking: `UPDATE SET count = GREATEST(0, count - 1)` — no delete
+13. INSERT into `order_cancellation_log` with full reversal summary
+14. Return JSONB summary
 
-## Frontend Changes
+RLS on new tables: authenticated users can SELECT their own rows.
 
-### Refactor `src/utils/orderCancellation.ts`
+### Frontend: `src/utils/orderCancellation.ts`
 
 Replace the 12-step orchestrator with:
-1. Client-side validation (`fetchOrderWithDetails` + `validateCancellable`) for fast UI feedback
-2. Single `supabase.rpc('cancel_order_atomic', {...})` call
-3. Handle response: `already_cancelled`, `success`, or `error`
-4. `clearLocalCaches()` stays client-side (cache invalidation + event dispatch)
+1. Client-side `validateCancellable` for fast UI feedback
+2. `supabase.rpc('cancel_order_atomic', { p_order_id, p_reason, p_cancelled_by })`
+3. Handle `already_cancelled`, `success`, `error` responses
+4. `clearLocalCaches()` for frontend cache invalidation
 
-### Fix Analytics Queries — Whitelist Pattern
+### Frontend: Set `completion_source` on order creation
 
-Change all order queries in analytics/reporting pages from `.neq('status', 'cancelled')` to `.eq('status', 'confirmed')` (or `.in('status', ['confirmed', 'delivered'])` where delivered orders should count):
+Update the order creation flow to set `completion_source = 'order'` on the visit when marking it productive due to an order. This needs a small update in the order placement logic.
 
-- **`src/pages/TerritoryDetail.tsx`** ~line 238 — add `.eq('status', 'confirmed')`
-- **`src/pages/Attendance.tsx`** — add status filter to order totals query
-- **`src/pages/Analytics.tsx`** — add status filter to leaderboard query
-- **`src/pages/GPSTrack.tsx`** ~line 284 — add `.eq('status', 'confirmed')`
-- **`src/pages/MyBeats.tsx`** ~line 898 — add `.eq('status', 'confirmed')`
+### Analytics query fixes (whitelist pattern)
+
+Add `.eq('status', 'confirmed')` (or `.in('status', ['confirmed', 'delivered'])`) to:
+- `src/pages/Analytics.tsx` ~line 370
+- `src/pages/TerritoryDetail.tsx` ~line 238
+- `src/pages/Attendance.tsx` ~line 944
+- `src/pages/GPSTrack.tsx` ~line 284
+- `src/pages/MyBeats.tsx` ~line 898
 
 ---
 
 ## Files Modified
-- **New migration** — `credit_ledger` table, `order_cancellation_log` table, `cancel_order_atomic` RPC, `credit_ledger_sync` trigger
-- **`src/utils/orderCancellation.ts`** — Replace orchestrator with single RPC call
-- **5 page files** — Add `.eq('status', 'confirmed')` to order queries
+- **New migration** — `credit_ledger`, `order_cancellation_log`, `visits.completion_source`, trigger, RPC, RLS
+- **`src/utils/orderCancellation.ts`** — Replace with single RPC call + cache cleanup
+- **Order creation flow** — Set `completion_source = 'order'` on visit
+- **5 page files** — Whitelist status filter on order queries
 
