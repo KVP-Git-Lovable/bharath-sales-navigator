@@ -216,7 +216,7 @@ export const useEffectiveLeavePolicy = (leaveTypeId: string) => {
     enable_half_day: constraints.allow_half_day,
     enable_sandwich_rule: false, // not exposed in constraints
     allow_backdated_leave: constraints.allow_backdated_leave,
-    max_backdate_days: constraints.min_notice_period_days, // will use constraints directly in modal
+    max_backdate_days: (constraints as any).max_backdate_days ?? 0,
     min_notice_period_days: constraints.min_notice_period_days,
     max_continuous_leave_days: constraints.max_continuous_days,
     allow_negative_balance: constraints.allow_negative_balance,

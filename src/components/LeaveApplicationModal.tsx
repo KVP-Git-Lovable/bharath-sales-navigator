@@ -105,7 +105,8 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     today.setHours(0, 0, 0, 0);
 
     if (!constraints) {
-      return date < today;
+      // If constraints RPC hasn't loaded yet, allow all dates (don't block backdates)
+      return false;
     }
 
     // Use server-calculated backdate limit
