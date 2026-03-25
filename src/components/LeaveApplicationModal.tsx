@@ -79,6 +79,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       const { data, error } = await supabase
         .from('leave_types')
         .select('*')
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -104,7 +105,8 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     today.setHours(0, 0, 0, 0);
 
     if (!constraints) {
-      return date < today;
+      // If constraints RPC hasn't loaded yet, allow all dates (don't block backdates)
+      return false;
     }
 
     // Use server-calculated backdate limit
