@@ -1075,6 +1075,7 @@ const Operations = () => {
                   if (activeTab === 'stock') fetchStockData();
                   if (activeTab === 'competitor') fetchCompetitorData();
                   if (activeTab === 'returnstock') fetchReturnStockData();
+                  if (activeTab === 'cancelled') fetchCancelledOrders();
                 }}
               >
                 <RefreshCw size={16} className="mr-2" />
