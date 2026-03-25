@@ -1,25 +1,24 @@
 
-# Atomic Order Cancellation — IMPLEMENTED
 
-## Status: ✅ Complete
+# Fix: Invoice Matching in Return Stock Form
 
-## What was done
+## Problem
+In Step 2 of "Return Stock" ("Link Items to Invoices"), the system shows "No matching invoice found" even when an invoice exists. The matching requires exact `variant_id` match, which fails when `order_items` doesn't store `variant_id` or a different variant of the same product was ordered.
 
-### Migration (deployed)
-- **`credit_ledger` table** — immutable ledger for credit transactions with incremental trigger
-- **`order_cancellation_log` table** — audit trail for all cancellations
-- **`visits.completion_source`** — tracks why a visit became productive
-- **`cancel_order_atomic` RPC** — single transaction handling all 14 reversal steps
-- **`credit_ledger_sync_pending_amount` trigger** — incremental pending_amount sync
+## Plan
 
-### Frontend changes
-- **`src/utils/orderCancellation.ts`** — replaced 12-step orchestrator with single RPC call
-- **`src/pages/Analytics.tsx`** — added `.eq('status', 'confirmed')` to leaderboard query
-- **`src/pages/TerritoryDetail.tsx`** — added `.eq('status', 'confirmed')` to territory orders
-- **`src/pages/Attendance.tsx`** — added `.eq('status', 'confirmed')` to visit orders
+### File: `src/components/ReturnStockForm.tsx` (lines 181-205)
 
-### Key design decisions
-1. Gamification reversal by `order_id` reference (with legacy fallback)
-2. Credit ledger uses incremental `+= amount` (not SUM recalc)
-3. Visit reversion only when `completion_source = 'order'`
-4. No DELETEs on sequences/tracking — decrement with `GREATEST(0, ...)`
+**Change 1 — Broaden match to product_id only:**
+Remove the `variant_id` check from the `matchedItem` finder (lines 181-186). Match solely on `product_id`:
+```ts
+const matchedItem = orderItems.find((oi: any) => {
+  return oi.product_id === item.productId;
+});
+```
+
+**Change 2 — Add fallback: show all retailer invoices:**
+After the product-matching loop for each item, if `optionsMap[key]` is still empty, populate it with ALL past invoices for that retailer as manual-selection fallbacks. Each fallback entry will have `matched_quantity: 0` and `matched_rate: 0` to indicate it's a manual link. The UI already handles displaying invoice options, so no rendering changes needed — the user will simply see available invoices instead of "No matching invoice found."
+
+**No database changes required.**
+
