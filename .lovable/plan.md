@@ -1,20 +1,27 @@
 
 
-## Fix: Credit Note Generation Failing — Missing Tables in Dev Database
+## Fix: Order Cancellation Failing on Dev Database
 
 ### Problem
-The error "Failed to generate credit note: undefined" occurs because the `credit_notes` and `credit_note_items` tables do not exist in the Dev Supabase database (`etabpbfokzhhfuybeieu`). The migration that creates these tables was never applied to this branch.
+The "Confirm Cancellation" button IS correctly connected to the `cancelOrder()` function which calls the `cancel_order_atomic` RPC. The failure occurs because this RPC function **does not exist** in the Dev Supabase database — it was only created on the previous production database.
 
-### Root Cause
-When you switched to the Dev Supabase project, the database doesn't have all the same tables as production. The `credit_notes`, `credit_note_items` tables, and the `credit_note_number_seq` sequence are missing.
+The RPC also depends on tables that may be missing: `credit_ledger`, `order_cancellation_log`, `invoices`, `gamification_points`, `retailer_loyalty_points`, `gamification_retailer_sequences`, `gamification_daily_tracking`.
 
 ### Fix
-Run a database migration on the Dev database to create the missing tables. The SQL is already defined in the existing migration file and includes:
+Run a single database migration that:
 
-1. **`credit_notes` table** — stores credit note header (number, date, retailer, totals, status)
-2. **`credit_note_items` table** — stores line items linked to credit notes
-3. **RLS policies** — allowing authenticated users to select, insert, and update
-4. **Sequence** — `credit_note_number_seq` for auto-numbering
+1. **Creates the `cancel_order_atomic` RPC function** — the full 200-line PL/pgSQL function that atomically cancels orders, reverses credit, gamification, loyalty, and visit status
+2. **Creates missing dependency tables** (with `IF NOT EXISTS`):
+   - `credit_ledger` — tracks credit reversals
+   - `order_cancellation_log` — audit log for cancellations
+   - `invoices` — referenced by the RPC for invoice cancellation
+   - `gamification_retailer_sequences` — consecutive order tracking
+   - `gamification_daily_tracking` — daily action counts
 
-This is a single migration with the exact same schema as production. No code changes needed — only the database migration.
+All tables will have RLS enabled with authenticated user policies. The RPC uses `SECURITY DEFINER` so it can operate across tables atomically.
+
+### Technical Details
+- **File**: New SQL migration
+- **No code changes** — the frontend logic in `CancelOrderDialog.tsx` → `cancelOrder()` → `supabase.rpc('cancel_order_atomic')` is already correct
+- The migration uses `CREATE TABLE IF NOT EXISTS` and `CREATE OR REPLACE FUNCTION` to be safe if some objects already exist
 
