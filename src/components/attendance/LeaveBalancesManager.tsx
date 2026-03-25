@@ -178,7 +178,7 @@ const LeaveBalancesManager = () => {
         .from('leave_balance')
         .upsert(balancesToInsert, { 
           onConflict: 'user_id,leave_type_id,year',
-          ignoreDuplicates: true 
+          ignoreDuplicates: false 
         });
 
       if (insertError) throw insertError;
