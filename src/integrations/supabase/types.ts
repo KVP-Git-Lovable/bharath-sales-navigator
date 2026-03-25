@@ -663,6 +663,39 @@ export type Database = {
           },
         ]
       }
+      approval_workflows: {
+        Row: {
+          approval_mode: string
+          created_at: string
+          entity_type: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          updated_at: string
+          workflow_name: string
+        }
+        Insert: {
+          approval_mode?: string
+          created_at?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          updated_at?: string
+          workflow_name: string
+        }
+        Update: {
+          approval_mode?: string
+          created_at?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          updated_at?: string
+          workflow_name?: string
+        }
+        Relationships: []
+      }
       approvers: {
         Row: {
           approver_level: number
@@ -5296,6 +5329,50 @@ export type Database = {
             columns: ["state_territory_id"]
             isOneToOne: false
             referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_approval_rules: {
+        Row: {
+          condition_type: string
+          condition_value: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number
+          rule_name: string
+          updated_at: string
+          workflow_id: string
+        }
+        Insert: {
+          condition_type: string
+          condition_value?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          rule_name: string
+          updated_at?: string
+          workflow_id: string
+        }
+        Update: {
+          condition_type?: string
+          condition_value?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          rule_name?: string
+          updated_at?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_approval_rules_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
             referencedColumns: ["id"]
           },
         ]
