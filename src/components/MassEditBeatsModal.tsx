@@ -53,9 +53,9 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
           // DB-first: fetch directly from beats table (RLS enforced)
           const { data, error } = await supabase
             .from('beats')
-            .select('beat_id, beat_name')
-            .eq('owner_id', user.id)
+            .select('id, beat_id, beat_name, owner_id, created_by, is_active')
             .eq('is_active', true)
+            .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
             .order('beat_name');
 
           if (error) throw error;
@@ -76,7 +76,7 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
           // Offline fallback: use cached beats store
           const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
           const activeBeats = (cachedBeats as any[])
-            .filter((b: any) => b.is_active !== false)
+            .filter((b: any) => b.is_active !== false && (b.owner_id === user.id || b.created_by === user.id))
             .map((b: any) => ({
               beat_id: b.beat_id,
               beat_name: b.beat_name || b.beat_id,
@@ -92,7 +92,7 @@ export const MassEditBeatsModal = ({ isOpen, onClose, retailers, beats, onSucces
         try {
           const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
           const activeBeats = (cachedBeats as any[])
-            .filter((b: any) => b.is_active !== false)
+            .filter((b: any) => b.is_active !== false && (b.owner_id === user.id || b.created_by === user.id))
             .map((b: any) => ({
               beat_id: b.beat_id,
               beat_name: b.beat_name || b.beat_id,
