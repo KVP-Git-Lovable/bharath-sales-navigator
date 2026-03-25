@@ -15837,6 +15837,7 @@ export type Database = {
           check_out_location: Json | null
           check_out_photo_url: string | null
           check_out_time: string | null
+          completion_source: string | null
           created_at: string
           feedback: Json | null
           id: string
@@ -15861,6 +15862,7 @@ export type Database = {
           check_out_location?: Json | null
           check_out_photo_url?: string | null
           check_out_time?: string | null
+          completion_source?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
@@ -15885,6 +15887,7 @@ export type Database = {
           check_out_location?: Json | null
           check_out_photo_url?: string | null
           check_out_time?: string | null
+          completion_source?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
@@ -16153,6 +16156,10 @@ export type Database = {
       }
       can_view_employee: { Args: { _target_user_id: string }; Returns: boolean }
       can_view_profile: { Args: { _target_user_id: string }; Returns: boolean }
+      cancel_order_atomic: {
+        Args: { p_cancelled_by: string; p_order_id: string; p_reason: string }
+        Returns: Json
+      }
       check_duplicate_competitor: {
         Args: { competitor_name_param: string }
         Returns: {
@@ -16167,6 +16174,14 @@ export type Database = {
       cleanup_expired_recommendations: { Args: never; Returns: undefined }
       cleanup_expired_reset_tokens: { Args: never; Returns: undefined }
       cleanup_old_execution_logs: { Args: never; Returns: undefined }
+      create_approval_request: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_requester_id: string
+        }
+        Returns: string
+      }
       create_approval_workflow: {
         Args: { user_id_param: string }
         Returns: undefined
@@ -16307,6 +16322,13 @@ export type Database = {
           state: string
         }[]
       }
+      get_reporting_chain: {
+        Args: { p_user_id: string }
+        Returns: {
+          level: number
+          manager_id: string
+        }[]
+      }
       get_subordinate_users: {
         Args: { user_id_param: string }
         Returns: {
@@ -16405,6 +16427,15 @@ export type Database = {
         Returns: boolean
       }
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
+      process_approval_step: {
+        Args: {
+          p_action: string
+          p_approval_request_id: string
+          p_approver_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       process_monthly_leave_accrual: { Args: never; Returns: undefined }
       process_year_end_carry_forward: { Args: never; Returns: undefined }
       resolve_effective_leave_policy: {
