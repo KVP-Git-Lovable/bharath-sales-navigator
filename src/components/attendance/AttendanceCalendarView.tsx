@@ -108,15 +108,15 @@ export const AttendanceCalendarView = ({
         continue;
       }
 
-      // Future date
-      if (isAfter(d, today) && !isToday(d)) {
-        days.push({ date: new Date(d), dateStr, status: 'future', inMonth });
+      // Holiday (check before future so future holidays show correctly)
+      if (holidayDates.has(dateStr)) {
+        days.push({ date: new Date(d), dateStr, status: 'holiday', inMonth });
         continue;
       }
 
-      // Holiday
-      if (holidayDates.has(dateStr)) {
-        days.push({ date: new Date(d), dateStr, status: 'holiday', inMonth });
+      // Future date
+      if (isAfter(d, today) && !isToday(d)) {
+        days.push({ date: new Date(d), dateStr, status: 'future', inMonth });
         continue;
       }
 
