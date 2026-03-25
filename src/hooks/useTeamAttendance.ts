@@ -158,7 +158,9 @@ export const useTeamAttendance = (
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data: steps, error } = await supabase
+      // Try embedded join first, fallback to separate queries if PGRST200
+      let steps: any[] = [];
+      const { data: joinedSteps, error: joinError } = await supabase
         .from('approval_steps')
         .select(`
           id,
@@ -179,7 +181,29 @@ export const useTeamAttendance = (
         .eq('approver_id', user.id)
         .eq('status', 'pending');
 
-      if (error) throw error;
+      if (joinError) {
+        console.warn('[useTeamAttendance] Join failed, using fallback:', joinError.message);
+        // Fallback: fetch separately and merge
+        const { data: rawSteps } = await supabase
+          .from('approval_steps')
+          .select('id, level, approver_id, status, approval_request_id')
+          .eq('approver_id', user.id)
+          .eq('status', 'pending');
+        if (rawSteps && rawSteps.length > 0) {
+          const arIds = [...new Set(rawSteps.map((s: any) => s.approval_request_id))];
+          const { data: arData } = await supabase
+            .from('approval_requests')
+            .select('id, entity_type, entity_id, current_level, total_levels, status, requester_id')
+            .in('id', arIds);
+          const arMap = new Map((arData || []).map((ar: any) => [ar.id, ar]));
+          steps = rawSteps.map((s: any) => ({
+            ...s,
+            approval_requests: arMap.get(s.approval_request_id) || null,
+          })).filter((s: any) => s.approval_requests);
+        }
+      } else {
+        steps = joinedSteps || [];
+      }
 
       // Parallel: show all pending steps for pending requests
       const myTurnSteps = (steps || []).filter((s: any) =>
