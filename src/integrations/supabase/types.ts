@@ -15837,6 +15837,7 @@ export type Database = {
           check_out_location: Json | null
           check_out_photo_url: string | null
           check_out_time: string | null
+          completion_source: string | null
           created_at: string
           feedback: Json | null
           id: string
@@ -15861,6 +15862,7 @@ export type Database = {
           check_out_location?: Json | null
           check_out_photo_url?: string | null
           check_out_time?: string | null
+          completion_source?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
@@ -15885,6 +15887,7 @@ export type Database = {
           check_out_location?: Json | null
           check_out_photo_url?: string | null
           check_out_time?: string | null
+          completion_source?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
@@ -16153,6 +16156,10 @@ export type Database = {
       }
       can_view_employee: { Args: { _target_user_id: string }; Returns: boolean }
       can_view_profile: { Args: { _target_user_id: string }; Returns: boolean }
+      cancel_order_atomic: {
+        Args: { p_cancelled_by: string; p_order_id: string; p_reason: string }
+        Returns: Json
+      }
       check_duplicate_competitor: {
         Args: { competitor_name_param: string }
         Returns: {
