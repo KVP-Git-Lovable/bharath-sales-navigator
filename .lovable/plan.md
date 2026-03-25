@@ -1,35 +1,34 @@
 
 
-## Fix: Future Holidays Not Showing as Blue in Attendance Calendar
+## Fix: Future Dates Gray Styling & Cancelled Leave Revert
 
-### Problem
-In `AttendanceCalendarView.tsx`, the calendar grid logic checks if a date is in the future **before** checking if it's a holiday. This means any holiday falling after today (e.g., March 26 "test") is classified as `'future'` (empty circle) instead of `'holiday'` (blue circle).
+### Problem 1: Future dates not gray
+The `future` status style is currently `border border-border text-muted-foreground` — a hollow white circle with a thin border. The user expects a **gray filled circle** similar to week-off styling.
 
-The priority order is currently:
+### Problem 2: Future leaves/week-offs not rendered correctly
+The current priority order checks `future` **before** `week-off` and `leave`. This means:
+- A future Sunday (week-off) shows as hollow white instead of gray week-off
+- A future date with approved leave shows as hollow white instead of orange
+
+When a leave is cancelled, it's already excluded from `leaveMap` (filters `status === 'approved'`), so the date correctly falls through — but it falls to the `future` status which currently looks white, not gray.
+
+### Fix (single file)
+**File**: `src/components/attendance/AttendanceCalendarView.tsx`
+
+1. **Move `future` check to the END** — after holiday, week-off, leave, and attendance checks. This way future holidays, week-offs, and approved leaves render with their proper colors. Only truly "empty" future dates get the `future` status.
+
+2. **Change `future` styling** from hollow border to gray filled:
+   ```
+   case 'future': return 'bg-muted text-muted-foreground';
+   ```
+
+Priority order after fix:
 1. Outside month → skip
-2. **Future date → mark as future** (blocks holiday check)
-3. Holiday → mark as holiday
-4. Week off → mark as week-off
-5. Leave / Present / Absent
-
-### Fix
-**File**: `src/components/attendance/AttendanceCalendarView.tsx` (lines 111-121)
-
-Move the **holiday check before the future-date check**, so holidays always show as blue regardless of whether they're in the past or future:
-
-```
-// Holiday (check before future so future holidays show correctly)
-if (holidayDates.has(dateStr)) {
-  days.push({ date: new Date(d), dateStr, status: 'holiday', inMonth });
-  continue;
-}
-
-// Future date
-if (isAfter(d, today) && !isToday(d)) {
-  days.push({ date: new Date(d), dateStr, status: 'future', inMonth });
-  continue;
-}
-```
-
-This is a 2-line swap — no other files need changes. The `holidayDates` Set is already correctly populated from Supabase via `useWorkingDaysConfig`.
+2. Holiday → blue
+3. Week off → gray (opacity)
+4. Half-day leave → gradient
+5. Full leave → orange
+6. Present → green
+7. Future (no status) → gray filled
+8. Absent (past, no record) → red
 
