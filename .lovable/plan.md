@@ -1,55 +1,47 @@
 
+Goal: Make pending approvals visible and policy-driven on Attendance → My Team.
 
-## Fix: Approval Workflow Not Working for Leave & Regularization
+What I verified
+- You are already logged in as the correct approver user (Ajay Prabhu).
+- Pending approval data exists in DB for Ajay (leave requests are present in `approval_steps` + `approval_requests`).
+- UI fails because Supabase returns `PGRST200`: no relationship found between `approval_steps` and `approval_requests`.
+- Root DB issue: approval tables exist but were created without constraints/indexes (no PK/FK), so PostgREST cannot resolve `approval_requests!inner(...)` joins used by `useTeamAttendance` and `useApprovalEngine`.
 
-### Problem
-The approval engine functions and triggers exist in migration files but **were never applied to the production database**. Specifically:
+Implementation plan
+1) Add a new forward migration to repair approval table structure (without data loss)
+- Add primary keys to:
+  - `approval_requests(id)`
+  - `approval_steps(id)`
+  - `approval_audit_log(id)`
+- Add foreign keys:
+  - `approval_steps.approval_request_id -> approval_requests.id ON DELETE CASCADE`
+  - `approval_audit_log.approval_request_id -> approval_requests.id`
+- Recreate missing performance indexes (request/status/approver/entity).
+- Keep existing rows intact (pre-checks already show no duplicate/null/orphan blockers).
 
-- **Missing functions**: `get_reporting_chain`, `create_approval_request`, `process_approval_step`, `trigger_create_leave_approval_request`, `trigger_create_regularization_approval_request`, `trigger_sync_entity_status`, `auto_approve_regularization`
-- **Missing triggers**: `trg_leave_approval_request` on `leave_applications`, `trg_regularization_approval_request` on `regularization_requests`, `trg_sync_entity_status` on `approval_requests`, `trg_auto_approve_regularization` on `regularization_requests`
-- **Result**: When amin submits a leave, no `approval_request` or `approval_steps` rows are created, so Ajay Prabhu (the manager) sees nothing in Team Approvals
-- **7 pending leaves** and **1 pending regularization** currently have no approval records
+2) Refresh PostgREST schema cache
+- Include `NOTIFY pgrst, 'reload schema';` in migration so embedded joins start working immediately.
 
-### Reporting Hierarchy (confirmed)
-- **amin** → manager: **Ajay Prabhu**
-- **Ajay** → manager: **Ajay Prabhu**
-- **Ajay Prabhu** → no manager
+3) Policy alignment hardening (same migration)
+- Ensure `approval_config` stays seeded for both `leave` and `regularization` with hierarchy mode enabled (matches your approved “Any manager in hierarchy” behavior).
+- Keep regularization `approval_mode` behavior from `regularization_policy` (`auto` vs `manager`) unchanged.
 
-### Plan
+4) Frontend resilience improvement (optional but recommended)
+- In `useTeamAttendance` / `useApprovalEngine`, add fallback path:
+  - If embedded join fails (`PGRST200`), fetch `approval_steps` and `approval_requests` separately and merge client-side.
+- Show a clear toast/error state instead of silently showing zero approvals.
 
-**Step 1: New database migration** — install the full approval engine
+5) Validation after fix
+- Login as Ajay Prabhu → Attendance → Team Approvals should show Amin’s pending requests.
+- Confirm approve/reject works for both leave and regularization.
+- Run SQL sanity checks:
+  - FK exists between `approval_steps` and `approval_requests`
+  - join query with `approval_requests!inner(...)` returns 200 (not 400)
+  - pending rows visible for approver `d7ba12f7-d8a6-4460-8e6e-5c58f9c751d7`.
 
-Create a single migration that:
-
-1. Creates `get_reporting_chain(uuid)` — recursive CTE walking `employees.manager_id` upward
-2. Creates `create_approval_request(text, uuid, uuid)` — builds approval_request + steps from reporting chain, respecting `approval_config.max_levels`. For single-level manager mode, creates 1 step per manager in chain (any can approve via parallel mode)
-3. Creates/replaces `process_approval_step` — parallel mode: any approver acts, result is final, other steps are skipped
-4. Creates trigger `trg_leave_approval_request` (AFTER INSERT on `leave_applications`) — calls `create_approval_request('leave', ...)`
-5. Creates trigger `trg_regularization_approval_request` (AFTER INSERT on `regularization_requests`) — checks `regularization_policy.approval_mode`:
-   - If `auto`: sets status to `approved`, skips engine
-   - If `manager`: calls `create_approval_request('regularization', ...)`
-6. Creates trigger `trg_sync_entity_status` (AFTER UPDATE on `approval_requests`) — syncs approved/rejected status back to `leave_applications` and `regularization_requests`
-7. Adds `approval_mode` column to `approval_config` if missing
-8. Backfills the 7 orphan pending leaves and 1 orphan pending regularization with proper approval records
-
-**Step 2: No frontend changes needed**
-
-The existing UI code already:
-- Queries `approval_steps` joined with `approval_requests` for pending approvals
-- Calls `process_approval_step` RPC for approve/reject actions
-- Shows legacy fallback for regularizations not in the engine
-- The `RegularizationPolicyConfig.tsx` already has the Approval Mode dropdown (auto/manager/multi_level)
-
-### After Fix
-- All new leave applications will auto-create approval workflow records
-- All new regularization requests respect the policy's `approval_mode` setting
-- Login as **Ajay Prabhu** to see and approve amin's pending leaves
-- The 7+1 existing orphan requests will also appear
-
-### Technical Details
-
-**Files to create/modify:**
-- `supabase/migrations/<timestamp>_install_approval_engine.sql` (new)
-
-**No frontend files need changes** — the hooks (`useTeamAttendance`, `useApprovalEngine`) and components (`PendingApprovalsSection`, `TeamApprovalsScreen`) already handle the approval engine flow correctly.
-
+Technical details
+- Files to change:
+  - `supabase/migrations/<new_timestamp>_repair_approval_relationships.sql` (new)
+  - `src/hooks/useTeamAttendance.ts` (fallback/error handling)
+  - `src/hooks/useApprovalEngine.ts` (fallback/error handling)
+- No changes to `src/integrations/supabase/types.ts` (generated file).
