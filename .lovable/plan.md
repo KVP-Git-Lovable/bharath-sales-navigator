@@ -1,47 +1,77 @@
 
 
-## Staging vs Dev Comparison - Results
+## Root Cause: Infinite RLS Recursion
 
-### Already aligned (no action needed)
-- **Triggers**: All 3 staging triggers are present in Dev (trg_leave_approval_request, trg_regularization_approval_request, trg_sync_entity_status). Additional Dev triggers (validate_leave, update_balance, mark_attendance) are also present.
-- **Primary keys**: All 4 tables have PKs.
-- **Foreign keys**: approval_steps → approval_requests and approval_audit_log → approval_requests both exist.
-- **Indexes**: All performance indexes present.
-- **Functions**: create_approval_request, process_approval_step, get_reporting_chain, trigger functions all exist.
+The network requests reveal the exact error:
+```
+500: "infinite recursion detected in policy for relation "approval_requests""
+```
 
-### One remaining blocker: Missing RLS Policies
+The RLS policies we added create a circular dependency:
+- `approval_requests` SELECT policy subqueries into `approval_steps`
+- `approval_steps` SELECT policy subqueries back into `approval_requests`
+- PostgreSQL detects this cycle and returns a 500 error
 
-RLS is enabled on all 4 approval tables but **zero policies exist**. Staging has exactly 10 policies. This is why the frontend returns empty results.
+There is also a **bug** in the policy condition: `s.approval_request_id = s.id` references `s` twice instead of the outer table. It should be `s.approval_request_id = approval_requests.id`.
 
-### Plan: Replicate staging RLS policies exactly
+The frontend fallback (separate queries) also fails because the `approval_steps` query alone triggers the recursion through its own "Requesters can view their steps" policy.
 
-Single migration file: `supabase/migrations/<timestamp>_add_approval_rls_policies.sql`
+## Fix
 
-Policies to create (copied verbatim from staging):
+Create a single migration that:
 
-**approval_requests (4 policies):**
-1. `Users can view their own approval requests` - SELECT where `requester_id = auth.uid()`
-2. `Approvers can view requests at their step` - SELECT where exists matching step with `approver_id = auth.uid()`
-3. `Users can insert approval requests` - INSERT where `auth.uid() IS NOT NULL`
-4. `Service can update approval requests` - UPDATE where `auth.uid() IS NOT NULL`
+1. **Drop the 2 recursive policies**:
+   - `"Approvers can view requests at their step"` on `approval_requests`
+   - `"Requesters can view their steps"` on `approval_steps`
 
-**approval_steps (3 policies):**
-1. `Approvers can view their own steps` - SELECT where `approver_id = auth.uid()`
-2. `Requesters can view their steps` - SELECT where exists matching request with `requester_id = auth.uid()`
-3. `Service can manage steps` - ALL where `auth.uid() IS NOT NULL`
+2. **Create 2 SECURITY DEFINER helper functions** (bypass RLS, breaking the cycle):
+   - `is_approver_for_request(request_id uuid)` — checks if `auth.uid()` has a step on the given request
+   - `is_requester_for_step(step_approval_request_id uuid)` — checks if `auth.uid()` is the requester on the given approval request
 
-**approval_audit_log (3 policies):**
-1. `Users can view own audit logs` - SELECT where `performed_by = auth.uid()` or requester on the request
-2. `Approvers can view audit for their steps` - SELECT where exists matching step with `approver_id = auth.uid()`
-3. `Service can insert audit logs` - INSERT where `auth.uid() IS NOT NULL`
+3. **Recreate the 2 policies using the helper functions** instead of inline subqueries, which avoids the recursion
 
-**approval_config (2 policies):**
-1. `Authenticated can read config` - SELECT where `auth.role() = 'authenticated'`
-2. `Admins can manage config` - ALL where `has_role(auth.uid(), 'admin'::app_role)`
+4. Similarly fix the `approval_audit_log` policies that reference these tables (they may also recurse)
 
-Note: The `has_role` function reference in the config admin policy — I will verify it exists in Dev before using it, and use a safe fallback if not.
+5. `NOTIFY pgrst, 'reload schema'`
 
-End migration with `NOTIFY pgrst, 'reload schema';`.
+### Technical Detail
 
-No frontend changes needed.
+```sql
+-- Helper: check if current user is an approver for a given request
+CREATE OR REPLACE FUNCTION public.is_approver_for_request(p_request_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = 'public' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM approval_steps
+    WHERE approval_request_id = p_request_id
+      AND approver_id = auth.uid()
+  );
+$$;
+
+-- Helper: check if current user is the requester for a step's request
+CREATE OR REPLACE FUNCTION public.is_requester_for_step(p_request_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = 'public' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM approval_requests
+    WHERE id = p_request_id
+      AND requester_id = auth.uid()
+  );
+$$;
+```
+
+Then replace the policies:
+```sql
+-- approval_requests: approvers can view
+CREATE POLICY "Approvers can view requests at their step"
+  ON approval_requests FOR SELECT
+  USING (is_approver_for_request(id));
+
+-- approval_steps: requesters can view
+CREATE POLICY "Requesters can view their steps"
+  ON approval_steps FOR SELECT
+  USING (is_requester_for_step(approval_request_id));
+```
+
+No frontend changes needed. The existing fallback logic will also start working once the recursion is resolved.
 
