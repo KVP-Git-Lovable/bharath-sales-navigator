@@ -2541,6 +2541,44 @@ export type Database = {
           },
         ]
       }
+      credit_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          reference_id: string | null
+          retailer_id: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reference_id?: string | null
+          retailer_id: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reference_id?: string | null
+          retailer_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_management_config: {
         Row: {
           config_name: string | null
