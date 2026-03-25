@@ -944,6 +944,7 @@ const Operations = () => {
       await fetchStockData();
       await fetchCompetitorData();
       await fetchReturnStockData();
+      await fetchCancelledOrders();
     })();
   }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, cancelledDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
 
