@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { visitStatusCache } from "@/lib/visitStatusCache";
 import { removeOrderFromSnapshot } from "@/lib/myVisitsSnapshot";
+import { offlineStorage, STORES } from "@/lib/offlineStorage";
 
 /**
  * Order Cancellation Utility — Atomic RPC Version
