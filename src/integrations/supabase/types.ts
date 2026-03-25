@@ -8368,6 +8368,33 @@ export type Database = {
         }
         Relationships: []
       }
+      order_cancellation_log: {
+        Row: {
+          cancelled_at: string
+          cancelled_by: string | null
+          id: string
+          order_id: string
+          reason: string | null
+          reversal_summary: Json | null
+        }
+        Insert: {
+          cancelled_at?: string
+          cancelled_by?: string | null
+          id?: string
+          order_id: string
+          reason?: string | null
+          reversal_summary?: Json | null
+        }
+        Update: {
+          cancelled_at?: string
+          cancelled_by?: string | null
+          id?: string
+          order_id?: string
+          reason?: string | null
+          reversal_summary?: Json | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           category: string
@@ -16198,6 +16225,10 @@ export type Database = {
         }[]
       }
       get_estimated_memory_usage: { Args: never; Returns: number }
+      get_leave_date_constraints: {
+        Args: { p_leave_type_id: string; p_user_id: string }
+        Returns: Json
+      }
       get_limited_profiles_for_admin: {
         Args: never
         Returns: {
@@ -16376,6 +16407,10 @@ export type Database = {
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
       process_monthly_leave_accrual: { Args: never; Returns: undefined }
       process_year_end_carry_forward: { Args: never; Returns: undefined }
+      resolve_effective_leave_policy: {
+        Args: { p_leave_type_id: string }
+        Returns: Json
+      }
       send_notification: {
         Args: {
           message_param: string
@@ -16424,6 +16459,16 @@ export type Database = {
           manager_id: string
           phone_number: string
         }[]
+      }
+      validate_leave_request: {
+        Args: {
+          p_end_date: string
+          p_is_half_day?: boolean
+          p_leave_type_id: string
+          p_start_date: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       verify_hint_answer: {
         Args: { submitted_answer: string; user_email: string }
