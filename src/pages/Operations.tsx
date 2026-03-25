@@ -945,7 +945,7 @@ const Operations = () => {
       await fetchCompetitorData();
       await fetchReturnStockData();
     })();
-  }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
+  }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, cancelledDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
 
   // Use managed interval for auto-refresh (pauses when app is hidden)
   const refreshActiveTab = useCallback(() => {
