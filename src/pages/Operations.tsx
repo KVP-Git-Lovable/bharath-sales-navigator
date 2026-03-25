@@ -102,6 +102,7 @@ const Operations = () => {
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [competitorData, setCompetitorData] = useState<any[]>([]);
   const [returnStockData, setReturnStockData] = useState<any[]>([]);
+  const [cancelledOrders, setCancelledOrders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   
   // Loading states
