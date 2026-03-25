@@ -160,13 +160,21 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
   const fetchInvoiceOptions = async () => {
     setLoadingInvoices(true);
     try {
-      const { data: pastOrders } = await supabase
+      const { data: pastOrders, error: ordersError } = await supabase
         .from('orders')
-        .select('id, invoice_number, created_at, order_items(product_id, variant_id, product_name, quantity, rate)')
+        .select('id, invoice_number, created_at, status, order_items(product_id, product_name, quantity, rate)')
         .eq('retailer_id', retailerId)
         .not('invoice_number', 'is', null)
+        .neq('status', 'cancelled')
         .order('created_at', { ascending: false })
         .limit(50);
+
+      if (ordersError) {
+        console.error('Error fetching invoice options:', ordersError);
+        toast.error('Could not load invoice options. Please try again.');
+        setLoadingInvoices(false);
+        return;
+      }
 
       const optionsMap: Record<string, { invoice_number: string; order_id: string; created_at: string; matched_quantity: number; matched_rate: number }[]> = {};
       const defaultSelections: Record<string, string> = {};
