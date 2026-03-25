@@ -1,27 +1,35 @@
 
 
-## Fix: Order Cancellation Failing on Dev Database
+## Fix: Future Holidays Not Showing as Blue in Attendance Calendar
 
 ### Problem
-The "Confirm Cancellation" button IS correctly connected to the `cancelOrder()` function which calls the `cancel_order_atomic` RPC. The failure occurs because this RPC function **does not exist** in the Dev Supabase database — it was only created on the previous production database.
+In `AttendanceCalendarView.tsx`, the calendar grid logic checks if a date is in the future **before** checking if it's a holiday. This means any holiday falling after today (e.g., March 26 "test") is classified as `'future'` (empty circle) instead of `'holiday'` (blue circle).
 
-The RPC also depends on tables that may be missing: `credit_ledger`, `order_cancellation_log`, `invoices`, `gamification_points`, `retailer_loyalty_points`, `gamification_retailer_sequences`, `gamification_daily_tracking`.
+The priority order is currently:
+1. Outside month → skip
+2. **Future date → mark as future** (blocks holiday check)
+3. Holiday → mark as holiday
+4. Week off → mark as week-off
+5. Leave / Present / Absent
 
 ### Fix
-Run a single database migration that:
+**File**: `src/components/attendance/AttendanceCalendarView.tsx` (lines 111-121)
 
-1. **Creates the `cancel_order_atomic` RPC function** — the full 200-line PL/pgSQL function that atomically cancels orders, reverses credit, gamification, loyalty, and visit status
-2. **Creates missing dependency tables** (with `IF NOT EXISTS`):
-   - `credit_ledger` — tracks credit reversals
-   - `order_cancellation_log` — audit log for cancellations
-   - `invoices` — referenced by the RPC for invoice cancellation
-   - `gamification_retailer_sequences` — consecutive order tracking
-   - `gamification_daily_tracking` — daily action counts
+Move the **holiday check before the future-date check**, so holidays always show as blue regardless of whether they're in the past or future:
 
-All tables will have RLS enabled with authenticated user policies. The RPC uses `SECURITY DEFINER` so it can operate across tables atomically.
+```
+// Holiday (check before future so future holidays show correctly)
+if (holidayDates.has(dateStr)) {
+  days.push({ date: new Date(d), dateStr, status: 'holiday', inMonth });
+  continue;
+}
 
-### Technical Details
-- **File**: New SQL migration
-- **No code changes** — the frontend logic in `CancelOrderDialog.tsx` → `cancelOrder()` → `supabase.rpc('cancel_order_atomic')` is already correct
-- The migration uses `CREATE TABLE IF NOT EXISTS` and `CREATE OR REPLACE FUNCTION` to be safe if some objects already exist
+// Future date
+if (isAfter(d, today) && !isToday(d)) {
+  days.push({ date: new Date(d), dateStr, status: 'future', inMonth });
+  continue;
+}
+```
+
+This is a 2-line swap — no other files need changes. The `holidayDates` Set is already correctly populated from Supabase via `useWorkingDaysConfig`.
 
