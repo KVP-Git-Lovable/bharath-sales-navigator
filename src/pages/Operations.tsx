@@ -2047,7 +2047,121 @@ const Operations = () => {
                   </Table>
                 </div>
               </TabsContent>
-            </Tabs>
+
+              {/* Cancelled Orders Tab */}
+              <TabsContent value="cancelled" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Select value={cancelledDateFilter} onValueChange={setCancelledDateFilter}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="today">Today</SelectItem>
+                        <SelectItem value="week">This Week</SelectItem>
+                        <SelectItem value="month">This Month</SelectItem>
+                        <SelectItem value="all">All Time</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Badge variant="secondary">{filteredCancelledOrders.length} records</Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportToCSV(filteredCancelledOrders.map(o => ({
+                      order_id: o.order_id?.slice(0, 8),
+                      retailer: o.retailer_name,
+                      cancelled_by: o.cancelled_by_name,
+                      reason: o.reason,
+                      cancelled_at: o.cancelled_at ? format(new Date(o.cancelled_at), 'dd/MM/yyyy HH:mm') : '-',
+                      order_amount: o.total_amount,
+                      credit_reversed: o.credit_reversed,
+                      points_removed: o.points_removed,
+                      loyalty_removed: o.loyalty_points_removed,
+                      invoice_cancelled: o.invoice_cancelled ? 'Yes' : 'No',
+                      visit_reverted: o.visit_reverted ? 'Yes' : 'No',
+                    })), 'cancelled-orders')}
+                  >
+                    <Download size={16} className="mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Retailer</TableHead>
+                        <TableHead>Cancelled By</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Cancelled At</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Reversal Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loadingCancelled ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredCancelledOrders.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No cancelled orders found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredCancelledOrders.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-mono text-xs">{item.order_id?.slice(0, 8)}...</TableCell>
+                            <TableCell>{item.retailer_name}</TableCell>
+                            <TableCell>{item.cancelled_by_name}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{item.reason}</TableCell>
+                            <TableCell>
+                              {item.cancelled_at ? format(new Date(item.cancelled_at), 'dd/MM/yyyy HH:mm') : '-'}
+                            </TableCell>
+                            <TableCell>₹{item.total_amount?.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {item.credit_reversed > 0 && (
+                                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]">
+                                    Credit ₹{item.credit_reversed.toLocaleString()}
+                                  </Badge>
+                                )}
+                                {item.points_removed > 0 && (
+                                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px]">
+                                    Points -{item.points_removed}
+                                  </Badge>
+                                )}
+                                {item.loyalty_points_removed > 0 && (
+                                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px]">
+                                    Loyalty -{item.loyalty_points_removed}
+                                  </Badge>
+                                )}
+                                {item.invoice_cancelled && (
+                                  <Badge className="bg-red-100 text-red-800 border-red-200 text-[10px]">
+                                    Invoice Cancelled
+                                  </Badge>
+                                )}
+                                {item.visit_reverted && (
+                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">
+                                    Visit Reverted
+                                  </Badge>
+                                )}
+                                {!item.credit_reversed && !item.points_removed && !item.loyalty_points_removed && !item.invoice_cancelled && !item.visit_reverted && (
+                                  <span className="text-xs text-muted-foreground">No reversals</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
           </CardContent>
         </Card>
       </div>
