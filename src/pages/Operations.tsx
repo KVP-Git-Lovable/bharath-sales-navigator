@@ -2162,6 +2162,7 @@ const Operations = () => {
                   </Table>
                 </div>
               </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
