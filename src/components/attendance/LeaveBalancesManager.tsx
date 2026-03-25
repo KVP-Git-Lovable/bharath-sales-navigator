@@ -68,7 +68,7 @@ const LeaveBalancesManager = () => {
     setIsLoading(true);
     try {
       // Fetch leave types
-      const { data: ltData } = await supabase.from('leave_types').select('*').order('name');
+      const { data: ltData } = await supabase.from('leave_types').select('*').eq('is_active', true).order('name');
       setLeaveTypes(ltData || []);
 
       // Fetch users
