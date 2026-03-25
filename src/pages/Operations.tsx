@@ -1023,6 +1023,7 @@ const Operations = () => {
   const filteredStockData = filterData(stockData, ['user_name', 'retailer_name', 'product_name']);
   const filteredCompetitorData = filterData(competitorData, ['user_name', 'retailer_name', 'competitor_name']);
   const filteredReturnStockData = filterData(returnStockData, ['user_name', 'retailer_name', 'van_name']);
+  const filteredCancelledOrders = filterData(cancelledOrders, ['retailer_name', 'cancelled_by_name', 'reason']);
 
   return (
     <div className="min-h-screen bg-gradient-subtle p-4">
