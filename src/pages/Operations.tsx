@@ -111,6 +111,7 @@ const Operations = () => {
   const [loadingStock, setLoadingStock] = useState(false);
   const [loadingCompetitor, setLoadingCompetitor] = useState(false);
   const [loadingReturnStock, setLoadingReturnStock] = useState(false);
+  const [loadingCancelled, setLoadingCancelled] = useState(false);
   
   // Date filter for competitor and return stock
   const [competitorDateFilter, setCompetitorDateFilter] = useState('today');
