@@ -331,7 +331,8 @@ export const useTeamAttendance = (
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data: steps, error } = await supabase
+      let steps: any[] = [];
+      const { data: joinedSteps, error: joinError } = await supabase
         .from('approval_steps')
         .select(`
           id,
@@ -356,7 +357,30 @@ export const useTeamAttendance = (
         .order('action_taken_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (joinError) {
+        console.warn('[useTeamAttendance] Processed join failed, using fallback:', joinError.message);
+        const { data: rawSteps } = await supabase
+          .from('approval_steps')
+          .select('id, level, approver_id, status, action_taken_at, approval_request_id')
+          .eq('approver_id', user.id)
+          .in('status', ['approved', 'rejected'])
+          .order('action_taken_at', { ascending: false })
+          .limit(50);
+        if (rawSteps && rawSteps.length > 0) {
+          const arIds = [...new Set(rawSteps.map((s: any) => s.approval_request_id))];
+          const { data: arData } = await supabase
+            .from('approval_requests')
+            .select('id, entity_type, entity_id, current_level, total_levels, status, requester_id, final_approved_by')
+            .in('id', arIds);
+          const arMap = new Map((arData || []).map((ar: any) => [ar.id, ar]));
+          steps = rawSteps.map((s: any) => ({
+            ...s,
+            approval_requests: arMap.get(s.approval_request_id) || null,
+          })).filter((s: any) => s.approval_requests);
+        }
+      } else {
+        steps = joinedSteps || [];
+      }
 
       const processedSteps = (steps || []).filter((s: any) =>
         ['approved', 'rejected'].includes(s.approval_requests?.status)
