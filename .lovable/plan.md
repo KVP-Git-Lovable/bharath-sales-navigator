@@ -1,52 +1,55 @@
 
-Goal: Fix leave application so policy is actually enforced (backdated allowed = selectable + submittable) and remove the RPC error shown in your screenshots.
 
-What I found
-1) `global_leave_policy` is correctly set (`allow_backdated_leave=true`, `max_backdate_days=29`), so config is saved.
-2) QuickApp DB is missing these RPCs:
-   - `public.validate_leave_request`
-   - `public.get_leave_date_constraints`
-   - `public.resolve_effective_leave_policy`
-   This matches the error in screenshot 3.
-3) In UI (`LeaveApplicationModal.tsx`), when constraints RPC is unavailable, it falls back to `date < today`, which blocks all backdates (screenshot 1 behavior).
-4) A legacy DB trigger (`validate_leave_application`) is still active and validates against `leave_policy.backdated_days_allowed` (currently `0` for active leave types), which can still block backdated inserts even when global policy allows them.
+## Fix: Approval Workflow Not Working for Leave & Regularization
 
-Implementation plan
-1) Add a new forward migration (new timestamp) to sync QuickApp with staging policy-RPC logic
-   - Create/replace:
-     - `resolve_effective_leave_policy`
-     - `validate_leave_request`
-     - `get_leave_date_constraints`
-   - Keep `validate_leave_request` signature exactly as frontend expects:
-     `(p_user_id uuid, p_leave_type_id uuid, p_start_date date, p_end_date date, p_is_half_day boolean)`
-   - Add execute grants for `authenticated` and reload PostgREST schema cache.
+### Problem
+The approval engine functions and triggers exist in migration files but **were never applied to the production database**. Specifically:
 
-2) Align trigger-based validation with the same policy source (remove legacy conflict)
-   - Update `validate_leave_application` trigger function to validate using effective policy (global + override), not old `leave_policy.backdated_days_allowed/min_days_advance_notice` fields.
-   - Ensure update checks exclude the same row to avoid false overlap on edits.
-   - Keep server-side safety for overlap/balance/day calculation consistent with RPC.
+- **Missing functions**: `get_reporting_chain`, `create_approval_request`, `process_approval_step`, `trigger_create_leave_approval_request`, `trigger_create_regularization_approval_request`, `trigger_sync_entity_status`, `auto_approve_regularization`
+- **Missing triggers**: `trg_leave_approval_request` on `leave_applications`, `trg_regularization_approval_request` on `regularization_requests`, `trg_sync_entity_status` on `approval_requests`, `trg_auto_approve_regularization` on `regularization_requests`
+- **Result**: When amin submits a leave, no `approval_request` or `approval_steps` rows are created, so Ajay Prabhu (the manager) sees nothing in Team Approvals
+- **7 pending leaves** and **1 pending regularization** currently have no approval records
 
-3) Frontend resilience updates in `src/components/LeaveApplicationModal.tsx`
-   - Do not silently treat missing constraints as “no backdate allowed”.
-   - If leave type is selected but constraints RPC failed, show clear policy-load error and block submit with actionable message.
-   - Fetch only active leave types (`.eq('is_active', true)`) so inactive types don’t appear.
+### Reporting Hierarchy (confirmed)
+- **amin** → manager: **Ajay Prabhu**
+- **Ajay** → manager: **Ajay Prabhu**
+- **Ajay Prabhu** → no manager
 
-4) Hook consistency cleanup in `src/hooks/useGlobalLeavePolicy.ts`
-   - Fix incorrect mapping where `max_backdate_days` is currently derived from `min_notice_period_days`.
-   - Return/use explicit backdate-day value from constraints payload for accurate downstream behavior.
+### Plan
 
-Validation checklist after fix
-- Open Apply Leave modal: no RPC error banner.
-- With backdated policy = true and max = 29:
-  - Past dates within 29 days are selectable.
-  - Older past dates are disabled/rejected with proper message.
-- Submit backdated leave: insert succeeds when within policy.
-- Future leave apply/cancel flow still behaves correctly in calendar.
-- SQL sanity check confirms the 3 RPCs exist in `public` and are executable.
+**Step 1: New database migration** — install the full approval engine
 
-Technical details (for implementation)
-- Files to update:
-  - `supabase/migrations/<new_timestamp>_sync_leave_policy_rpcs.sql` (new)
-  - `src/components/LeaveApplicationModal.tsx`
-  - `src/hooks/useGlobalLeavePolicy.ts`
-- Important: do not edit old migration timestamps; create a new forward migration so it always applies in QuickApp.
+Create a single migration that:
+
+1. Creates `get_reporting_chain(uuid)` — recursive CTE walking `employees.manager_id` upward
+2. Creates `create_approval_request(text, uuid, uuid)` — builds approval_request + steps from reporting chain, respecting `approval_config.max_levels`. For single-level manager mode, creates 1 step per manager in chain (any can approve via parallel mode)
+3. Creates/replaces `process_approval_step` — parallel mode: any approver acts, result is final, other steps are skipped
+4. Creates trigger `trg_leave_approval_request` (AFTER INSERT on `leave_applications`) — calls `create_approval_request('leave', ...)`
+5. Creates trigger `trg_regularization_approval_request` (AFTER INSERT on `regularization_requests`) — checks `regularization_policy.approval_mode`:
+   - If `auto`: sets status to `approved`, skips engine
+   - If `manager`: calls `create_approval_request('regularization', ...)`
+6. Creates trigger `trg_sync_entity_status` (AFTER UPDATE on `approval_requests`) — syncs approved/rejected status back to `leave_applications` and `regularization_requests`
+7. Adds `approval_mode` column to `approval_config` if missing
+8. Backfills the 7 orphan pending leaves and 1 orphan pending regularization with proper approval records
+
+**Step 2: No frontend changes needed**
+
+The existing UI code already:
+- Queries `approval_steps` joined with `approval_requests` for pending approvals
+- Calls `process_approval_step` RPC for approve/reject actions
+- Shows legacy fallback for regularizations not in the engine
+- The `RegularizationPolicyConfig.tsx` already has the Approval Mode dropdown (auto/manager/multi_level)
+
+### After Fix
+- All new leave applications will auto-create approval workflow records
+- All new regularization requests respect the policy's `approval_mode` setting
+- Login as **Ajay Prabhu** to see and approve amin's pending leaves
+- The 7+1 existing orphan requests will also appear
+
+### Technical Details
+
+**Files to create/modify:**
+- `supabase/migrations/<timestamp>_install_approval_engine.sql` (new)
+
+**No frontend files need changes** — the hooks (`useTeamAttendance`, `useApprovalEngine`) and components (`PendingApprovalsSection`, `TeamApprovalsScreen`) already handle the approval engine flow correctly.
+
