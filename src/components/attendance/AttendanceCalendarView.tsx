@@ -108,15 +108,9 @@ export const AttendanceCalendarView = ({
         continue;
       }
 
-      // Holiday (check before future so future holidays show correctly)
+      // Holiday
       if (holidayDates.has(dateStr)) {
         days.push({ date: new Date(d), dateStr, status: 'holiday', inMonth });
-        continue;
-      }
-
-      // Future date
-      if (isAfter(d, today) && !isToday(d)) {
-        days.push({ date: new Date(d), dateStr, status: 'future', inMonth });
         continue;
       }
 
@@ -126,7 +120,7 @@ export const AttendanceCalendarView = ({
         continue;
       }
 
-      // Half-day leave (present + half-day leave)
+      // Half-day leave
       const leave = leaveMap.get(dateStr);
       const attendance = attendanceMap.get(dateStr);
 
@@ -144,6 +138,12 @@ export const AttendanceCalendarView = ({
       // Present (including regularized)
       if (attendance && (attendance.status === 'present' || attendance.status === 'regularized')) {
         days.push({ date: new Date(d), dateStr, status: 'present', inMonth });
+        continue;
+      }
+
+      // Future date (no attendance/leave/holiday/week-off) → gray
+      if (isAfter(d, today) && !isToday(d)) {
+        days.push({ date: new Date(d), dateStr, status: 'future', inMonth });
         continue;
       }
 
@@ -184,7 +184,7 @@ export const AttendanceCalendarView = ({
       case 'leave': return 'bg-[hsl(25,95%,53%)] text-white';
       case 'week-off': return 'bg-[hsl(220,9%,46%)] text-white opacity-60';
       case 'holiday': return 'bg-[hsl(217,91%,60%)] text-white';
-      case 'future': return 'border border-border text-muted-foreground';
+      case 'future': return 'bg-muted text-muted-foreground';
       case 'outside': return 'text-transparent';
       default: return '';
     }
