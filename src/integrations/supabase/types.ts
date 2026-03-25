@@ -540,7 +540,15 @@ export type Database = {
           performed_by?: string
           timestamp?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_audit_log_request"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approval_config: {
         Row: {
@@ -645,7 +653,15 @@ export type Database = {
           rejection_reason?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_approval_steps_request"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approvers: {
         Row: {
