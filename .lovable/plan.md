@@ -1,35 +1,32 @@
 
 
-# Add Cancelled Orders Tab to Operations Dashboard
+# Fix: Mass Edit Beats Showing Beats Not Owned by Current User
 
-## Overview
-Add a new "Cancelled Orders" tab in the Operations Dashboard (`/operations`) that shows all cancelled order details with full reversal audit trail from the `order_cancellation_log` table.
+## Problem
+The "Mass Edit Beats" modal shows all active beats in the system instead of only the current user's beats. The query filters by `is_active` but does not filter by `owner_id`.
+
+## Root Cause
+In `src/components/MassEditBeatsModal.tsx` (line 54-58), the query is:
+```ts
+supabase.from('beats').select('beat_id, beat_name').eq('is_active', true)
+```
+Missing: `.eq('owner_id', user.id)`
 
 ## Plan
 
-### File: `src/pages/Operations.tsx`
+### File: `src/components/MassEditBeatsModal.tsx` (line 54-58)
 
-**1. Add new tab trigger** (around line 989)
-- Expand grid from `grid-cols-6` to `grid-cols-7`
-- Add `<TabsTrigger value="cancelled">Cancelled Orders</TabsTrigger>`
+Add `owner_id` filter to the beats query:
+```ts
+const { data, error } = await supabase
+  .from('beats')
+  .select('beat_id, beat_name')
+  .eq('owner_id', user.id)
+  .eq('is_active', true)
+  .order('beat_name');
+```
 
-**2. Add state and fetch function**
-- Add `cancelledOrders` state array
-- Create `fetchCancelledOrders()` that queries:
-  - `order_cancellation_log` joined with `orders` (for order details like retailer_id, total_amount, order_date, user_id)
-  - Map retailer names and user names from existing data/queries
-  - Sort by `cancelled_at` descending
-  - Apply existing date filter and search
+This single-line addition ensures only the logged-in user's beats appear in the dropdown, matching what the "My Beats" page shows (5 beats).
 
-**3. Add tab content panel**
-- Table columns: Order ID (truncated), Retailer, Cancelled By (user), Reason, Cancelled At, Order Amount, Reversal Summary (credit reversed, points removed, invoice cancelled, visit reverted, loyalty points removed)
-- Each reversal summary field parsed from the `reversal_summary` JSON column
-- Show badges for what was reversed (e.g., green badge "Credit Reversed ₹X", amber badge "Points -X")
-- Include CSV download using existing `downloadCSV` utility
-
-**4. Wire up refresh** (line 975-979)
-- Add `if (activeTab === 'cancelled') fetchCancelledOrders();` to the refresh handler
-
-### No database changes needed
-The `order_cancellation_log` table already has all necessary data including `reversal_summary` JSON with credit, gamification, loyalty, invoice, and visit reversal details.
+No other file changes needed.
 
