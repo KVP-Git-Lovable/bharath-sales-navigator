@@ -1,40 +1,35 @@
 
-Goal: make Step 2 (“Link Items to Invoices”) always show selectable invoice options for the retailer, including the recent invoice for the same product.
 
-What I found (root cause):
-- `fetchInvoiceOptions()` currently queries:
-  `order_items(product_id, variant_id, product_name, quantity, rate)`
-- In your DB, `public.order_items` does **not** have `variant_id`.
-- That causes the orders query to fail, so `pastOrders` never populates, and UI falls back to “No matching invoice found”.
+# Add Cancelled Orders Tab to Operations Dashboard
 
-Implementation plan (single file):
-1) Update `src/components/ReturnStockForm.tsx` in `fetchInvoiceOptions()`
-- Change nested select to remove non-existent column:
-  `order_items(product_id, product_name, quantity, rate)`
-- Capture and handle query error explicitly (do not silently continue).
+## Overview
+Add a new "Cancelled Orders" tab in the Operations Dashboard (`/operations`) that shows all cancelled order details with full reversal audit trail from the `order_cancellation_log` table.
 
-2) Keep product-level matching broad (already correct)
-- Continue matching with:
-  `oi.product_id === item.productId`
-- Do not require variant match.
+## Plan
 
-3) Make fallback deterministic
-- If no product match for an item, populate options with all recent retailer invoices (manual selection path), even when matched quantity/rate are 0.
-- Keep dedupe by `invoice_number`.
+### File: `src/pages/Operations.tsx`
 
-4) Improve failure visibility
-- If fetch fails, show a toast/error message like “Could not load invoice options” so this is diagnosable next time (instead of silently showing empty).
+**1. Add new tab trigger** (around line 989)
+- Expand grid from `grid-cols-6` to `grid-cols-7`
+- Add `<TabsTrigger value="cancelled">Cancelled Orders</TabsTrigger>`
 
-5) Quick safety filter
-- Exclude cancelled orders from selectable invoice list (only valid invoice sources should appear).
+**2. Add state and fetch function**
+- Add `cancelledOrders` state array
+- Create `fetchCancelledOrders()` that queries:
+  - `order_cancellation_log` joined with `orders` (for order details like retailer_id, total_amount, order_date, user_id)
+  - Map retailer names and user names from existing data/queries
+  - Sort by `cancelled_at` descending
+  - Apply existing date filter and search
 
-Validation plan (end-to-end):
-- Reproduce with retailer “Shree devi store” and product “KADAK GOLD 250G”.
-- Step 2 must show invoice options (e.g., latest INV entries) instead of empty warning.
-- Confirm selecting an invoice stores in `selectedInvoices` and generated Credit Note uses that selected invoice number.
-- Confirm “manual selection” list still appears for products with no product-level match.
+**3. Add tab content panel**
+- Table columns: Order ID (truncated), Retailer, Cancelled By (user), Reason, Cancelled At, Order Amount, Reversal Summary (credit reversed, points removed, invoice cancelled, visit reverted, loyalty points removed)
+- Each reversal summary field parsed from the `reversal_summary` JSON column
+- Show badges for what was reversed (e.g., green badge "Credit Reversed ₹X", amber badge "Points -X")
+- Include CSV download using existing `downloadCSV` utility
 
-Technical notes:
-- No DB migration required.
-- Only frontend logic change in `ReturnStockForm.tsx`.
-- This specifically addresses why the previous variant-match relaxation alone did not fix the issue.
+**4. Wire up refresh** (line 975-979)
+- Add `if (activeTab === 'cancelled') fetchCancelledOrders();` to the refresh handler
+
+### No database changes needed
+The `order_cancellation_log` table already has all necessary data including `reversal_summary` JSON with credit, gamification, loyalty, invoice, and visit reversal details.
+
