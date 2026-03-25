@@ -102,6 +102,7 @@ const Operations = () => {
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [competitorData, setCompetitorData] = useState<any[]>([]);
   const [returnStockData, setReturnStockData] = useState<any[]>([]);
+  const [cancelledOrders, setCancelledOrders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   
   // Loading states
@@ -110,10 +111,12 @@ const Operations = () => {
   const [loadingStock, setLoadingStock] = useState(false);
   const [loadingCompetitor, setLoadingCompetitor] = useState(false);
   const [loadingReturnStock, setLoadingReturnStock] = useState(false);
+  const [loadingCancelled, setLoadingCancelled] = useState(false);
   
   // Date filter for competitor and return stock
   const [competitorDateFilter, setCompetitorDateFilter] = useState('today');
   const [returnStockDateFilter, setReturnStockDateFilter] = useState('today');
+  const [cancelledDateFilter, setCancelledDateFilter] = useState('today');
   
   // Summary counters
   const [todayStats, setTodayStats] = useState({
@@ -814,7 +817,99 @@ const Operations = () => {
     }
   };
 
-  // Filter data based on search term
+  // Fetch cancelled orders data
+  const fetchCancelledOrders = async () => {
+    setLoadingCancelled(true);
+    try {
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+      let query = supabase
+        .from('order_cancellation_log')
+        .select('id, order_id, reason, cancelled_by, cancelled_at, reversal_summary')
+        .order('cancelled_at', { ascending: false });
+
+      if (cancelledDateFilter === 'today') {
+        query = query.gte('cancelled_at', startOfToday.toISOString());
+      } else if (cancelledDateFilter === 'week') {
+        const weekAgo = new Date(startOfToday);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        query = query.gte('cancelled_at', weekAgo.toISOString());
+      } else if (cancelledDateFilter === 'month') {
+        const monthAgo = new Date(startOfToday);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        query = query.gte('cancelled_at', monthAgo.toISOString());
+      }
+
+      const { data: logs, error } = await query;
+      if (error) throw error;
+
+      if (!logs || logs.length === 0) {
+        setCancelledOrders([]);
+        return;
+      }
+
+      // Fetch order details
+      const orderIds = [...new Set(logs.map(l => l.order_id).filter(Boolean))];
+      const cancelledByIds = [...new Set(logs.map(l => l.cancelled_by).filter(Boolean))];
+
+      const [ordersRes, profilesRes] = await Promise.all([
+        orderIds.length > 0
+          ? supabase.from('orders').select('id, retailer_id, total_amount, order_date, user_id').in('id', orderIds)
+          : { data: [] },
+        cancelledByIds.length > 0
+          ? supabase.from('profiles').select('id, full_name, username').in('id', cancelledByIds)
+          : { data: [] },
+      ]);
+
+      const ordersMap = new Map((ordersRes.data || []).map((o: any) => [o.id, o]));
+      const profilesMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
+
+      // Get retailer names
+      const retailerIds = [...new Set((ordersRes.data || []).map((o: any) => o.retailer_id).filter(Boolean))];
+      let retailerMap = new Map<string, string>();
+      if (retailerIds.length > 0) {
+        const { data: retailers } = await supabase.from('retailers').select('id, name').in('id', retailerIds);
+        retailerMap = new Map((retailers || []).map((r: any) => [r.id, r.name]));
+      }
+
+      const formatted = logs.map(log => {
+        const order = ordersMap.get(log.order_id) as any;
+        const cancelledByProfile = profilesMap.get(log.cancelled_by) as any;
+        const summary = (log.reversal_summary || {}) as any;
+        return {
+          id: log.id,
+          order_id: log.order_id,
+          retailer_name: order ? (retailerMap.get(order.retailer_id) || 'Unknown') : 'Unknown',
+          cancelled_by_name: cancelledByProfile?.full_name || cancelledByProfile?.username || 'Unknown',
+          reason: log.reason || '-',
+          cancelled_at: log.cancelled_at,
+          total_amount: order?.total_amount || 0,
+          order_date: order?.order_date || '-',
+          credit_reversed: Number(summary.credit_reversed) || 0,
+          points_removed: Number(summary.gamification_points_reversed) || 0,
+          invoice_cancelled: summary.invoice_cancelled === true,
+          visit_reverted: summary.visit_reverted === true,
+          loyalty_points_removed: Number(summary.loyalty_points_reversed) || 0,
+        };
+      });
+
+      // Apply user filter
+      if (userFilter !== 'all') {
+        const filteredOrderIds = (ordersRes.data || []).filter((o: any) => o.user_id === userFilter).map((o: any) => o.id);
+        setCancelledOrders(formatted.filter(f => filteredOrderIds.includes(f.order_id)));
+      } else {
+        setCancelledOrders(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching cancelled orders:', error);
+      toast.error('Failed to fetch cancelled orders');
+    } finally {
+      setLoadingCancelled(false);
+    }
+  };
+
+
   const filterData = (data: any[], searchFields: string[]) => {
     if (!searchTerm) return data;
     return data.filter(item =>
@@ -849,8 +944,9 @@ const Operations = () => {
       await fetchStockData();
       await fetchCompetitorData();
       await fetchReturnStockData();
+      await fetchCancelledOrders();
     })();
-  }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
+  }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, cancelledDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
 
   // Use managed interval for auto-refresh (pauses when app is hidden)
   const refreshActiveTab = useCallback(() => {
@@ -859,6 +955,7 @@ const Operations = () => {
     if (activeTab === 'stock') fetchStockData();
     if (activeTab === 'competitor') fetchCompetitorData();
     if (activeTab === 'returnstock') fetchReturnStockData();
+    if (activeTab === 'cancelled') fetchCancelledOrders();
   }, [activeTab]);
   
   useManagedInterval(
@@ -926,6 +1023,7 @@ const Operations = () => {
   const filteredStockData = filterData(stockData, ['user_name', 'retailer_name', 'product_name']);
   const filteredCompetitorData = filterData(competitorData, ['user_name', 'retailer_name', 'competitor_name']);
   const filteredReturnStockData = filterData(returnStockData, ['user_name', 'retailer_name', 'van_name']);
+  const filteredCancelledOrders = filterData(cancelledOrders, ['retailer_name', 'cancelled_by_name', 'reason']);
 
   return (
     <div className="min-h-screen bg-gradient-subtle p-4">
@@ -977,6 +1075,7 @@ const Operations = () => {
                   if (activeTab === 'stock') fetchStockData();
                   if (activeTab === 'competitor') fetchCompetitorData();
                   if (activeTab === 'returnstock') fetchReturnStockData();
+                  if (activeTab === 'cancelled') fetchCancelledOrders();
                 }}
               >
                 <RefreshCw size={16} className="mr-2" />
@@ -986,13 +1085,14 @@ const Operations = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-6">
+              <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="checkins">Check-in/Out</TabsTrigger>
                 <TabsTrigger value="orders">Orders</TabsTrigger>
                 <TabsTrigger value="stock">Stock</TabsTrigger>
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 <TabsTrigger value="competitor">Competitor</TabsTrigger>
                 <TabsTrigger value="returnstock">Return Stock</TabsTrigger>
+                <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
               </TabsList>
 
               {/* Filters */}
@@ -1939,6 +2039,121 @@ const Operations = () => {
                                   </div>
                                 </DialogContent>
                               </Dialog>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+
+              {/* Cancelled Orders Tab */}
+              <TabsContent value="cancelled" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Select value={cancelledDateFilter} onValueChange={setCancelledDateFilter}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="today">Today</SelectItem>
+                        <SelectItem value="week">This Week</SelectItem>
+                        <SelectItem value="month">This Month</SelectItem>
+                        <SelectItem value="all">All Time</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Badge variant="secondary">{filteredCancelledOrders.length} records</Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportToCSV(filteredCancelledOrders.map(o => ({
+                      order_id: o.order_id?.slice(0, 8),
+                      retailer: o.retailer_name,
+                      cancelled_by: o.cancelled_by_name,
+                      reason: o.reason,
+                      cancelled_at: o.cancelled_at ? format(new Date(o.cancelled_at), 'dd/MM/yyyy HH:mm') : '-',
+                      order_amount: o.total_amount,
+                      credit_reversed: o.credit_reversed,
+                      points_removed: o.points_removed,
+                      loyalty_removed: o.loyalty_points_removed,
+                      invoice_cancelled: o.invoice_cancelled ? 'Yes' : 'No',
+                      visit_reverted: o.visit_reverted ? 'Yes' : 'No',
+                    })), 'cancelled-orders')}
+                  >
+                    <Download size={16} className="mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Retailer</TableHead>
+                        <TableHead>Cancelled By</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Cancelled At</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Reversal Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loadingCancelled ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredCancelledOrders.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No cancelled orders found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredCancelledOrders.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-mono text-xs">{item.order_id?.slice(0, 8)}...</TableCell>
+                            <TableCell>{item.retailer_name}</TableCell>
+                            <TableCell>{item.cancelled_by_name}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{item.reason}</TableCell>
+                            <TableCell>
+                              {item.cancelled_at ? format(new Date(item.cancelled_at), 'dd/MM/yyyy HH:mm') : '-'}
+                            </TableCell>
+                            <TableCell>₹{item.total_amount?.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {item.credit_reversed > 0 && (
+                                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]">
+                                    Credit ₹{item.credit_reversed.toLocaleString()}
+                                  </Badge>
+                                )}
+                                {item.points_removed > 0 && (
+                                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px]">
+                                    Points -{item.points_removed}
+                                  </Badge>
+                                )}
+                                {item.loyalty_points_removed > 0 && (
+                                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px]">
+                                    Loyalty -{item.loyalty_points_removed}
+                                  </Badge>
+                                )}
+                                {item.invoice_cancelled && (
+                                  <Badge className="bg-red-100 text-red-800 border-red-200 text-[10px]">
+                                    Invoice Cancelled
+                                  </Badge>
+                                )}
+                                {item.visit_reverted && (
+                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">
+                                    Visit Reverted
+                                  </Badge>
+                                )}
+                                {!item.credit_reversed && !item.points_removed && !item.loyalty_points_removed && !item.invoice_cancelled && !item.visit_reverted && (
+                                  <span className="text-xs text-muted-foreground">No reversals</span>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
