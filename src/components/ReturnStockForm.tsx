@@ -530,9 +530,9 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
                         {getProductOptions().map(option => (
                           <CommandItem
                             key={option.value}
-                            value={option.value}
-                            onSelect={(val) => {
-                              setSelectedProduct(val === selectedProduct ? '' : val);
+                            value={`${option.label} ${option.sku || ''}`}
+                            onSelect={() => {
+                              setSelectedProduct(option.value === selectedProduct ? '' : option.value);
                               setProductDropdownOpen(false);
                             }}
                             className="flex flex-col items-start py-2.5"
