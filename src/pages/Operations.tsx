@@ -116,6 +116,7 @@ const Operations = () => {
   // Date filter for competitor and return stock
   const [competitorDateFilter, setCompetitorDateFilter] = useState('today');
   const [returnStockDateFilter, setReturnStockDateFilter] = useState('today');
+  const [cancelledDateFilter, setCancelledDateFilter] = useState('today');
   
   // Summary counters
   const [todayStats, setTodayStats] = useState({
