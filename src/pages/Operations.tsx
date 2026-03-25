@@ -817,7 +817,99 @@ const Operations = () => {
     }
   };
 
-  // Filter data based on search term
+  // Fetch cancelled orders data
+  const fetchCancelledOrders = async () => {
+    setLoadingCancelled(true);
+    try {
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+      let query = supabase
+        .from('order_cancellation_log')
+        .select('id, order_id, reason, cancelled_by, cancelled_at, reversal_summary')
+        .order('cancelled_at', { ascending: false });
+
+      if (cancelledDateFilter === 'today') {
+        query = query.gte('cancelled_at', startOfToday.toISOString());
+      } else if (cancelledDateFilter === 'week') {
+        const weekAgo = new Date(startOfToday);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        query = query.gte('cancelled_at', weekAgo.toISOString());
+      } else if (cancelledDateFilter === 'month') {
+        const monthAgo = new Date(startOfToday);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        query = query.gte('cancelled_at', monthAgo.toISOString());
+      }
+
+      const { data: logs, error } = await query;
+      if (error) throw error;
+
+      if (!logs || logs.length === 0) {
+        setCancelledOrders([]);
+        return;
+      }
+
+      // Fetch order details
+      const orderIds = [...new Set(logs.map(l => l.order_id).filter(Boolean))];
+      const cancelledByIds = [...new Set(logs.map(l => l.cancelled_by).filter(Boolean))];
+
+      const [ordersRes, profilesRes] = await Promise.all([
+        orderIds.length > 0
+          ? supabase.from('orders').select('id, retailer_id, total_amount, order_date, user_id').in('id', orderIds)
+          : { data: [] },
+        cancelledByIds.length > 0
+          ? supabase.from('profiles').select('id, full_name, username').in('id', cancelledByIds)
+          : { data: [] },
+      ]);
+
+      const ordersMap = new Map((ordersRes.data || []).map((o: any) => [o.id, o]));
+      const profilesMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
+
+      // Get retailer names
+      const retailerIds = [...new Set((ordersRes.data || []).map((o: any) => o.retailer_id).filter(Boolean))];
+      let retailerMap = new Map<string, string>();
+      if (retailerIds.length > 0) {
+        const { data: retailers } = await supabase.from('retailers').select('id, name').in('id', retailerIds);
+        retailerMap = new Map((retailers || []).map((r: any) => [r.id, r.name]));
+      }
+
+      const formatted = logs.map(log => {
+        const order = ordersMap.get(log.order_id) as any;
+        const cancelledByProfile = profilesMap.get(log.cancelled_by) as any;
+        const summary = (log.reversal_summary || {}) as any;
+        return {
+          id: log.id,
+          order_id: log.order_id,
+          retailer_name: order ? (retailerMap.get(order.retailer_id) || 'Unknown') : 'Unknown',
+          cancelled_by_name: cancelledByProfile?.full_name || cancelledByProfile?.username || 'Unknown',
+          reason: log.reason || '-',
+          cancelled_at: log.cancelled_at,
+          total_amount: order?.total_amount || 0,
+          order_date: order?.order_date || '-',
+          credit_reversed: Number(summary.credit_reversed) || 0,
+          points_removed: Number(summary.gamification_points_reversed) || 0,
+          invoice_cancelled: summary.invoice_cancelled === true,
+          visit_reverted: summary.visit_reverted === true,
+          loyalty_points_removed: Number(summary.loyalty_points_reversed) || 0,
+        };
+      });
+
+      // Apply user filter
+      if (userFilter !== 'all') {
+        const filteredOrderIds = (ordersRes.data || []).filter((o: any) => o.user_id === userFilter).map((o: any) => o.id);
+        setCancelledOrders(formatted.filter(f => filteredOrderIds.includes(f.order_id)));
+      } else {
+        setCancelledOrders(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching cancelled orders:', error);
+      toast.error('Failed to fetch cancelled orders');
+    } finally {
+      setLoadingCancelled(false);
+    }
+  };
+
+
   const filterData = (data: any[], searchFields: string[]) => {
     if (!searchTerm) return data;
     return data.filter(item =>
