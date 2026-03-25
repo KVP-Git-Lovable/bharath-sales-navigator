@@ -943,7 +943,8 @@ const Attendance = () => {
       const { data: orders } = await supabase
         .from('orders')
         .select('visit_id, total_amount, id')
-        .in('visit_id', visitIds);
+        .in('visit_id', visitIds)
+        .eq('status', 'confirmed');
 
       const orderMap = new Map(orders?.map(o => [o.visit_id, o]) || []);
 

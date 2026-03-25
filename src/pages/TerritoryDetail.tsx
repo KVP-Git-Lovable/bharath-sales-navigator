@@ -238,6 +238,7 @@ const TerritoryDetail = () => {
         .from('orders')
         .select('id, total_amount, retailer_id, created_at, retailers(address, name)')
         .in('retailer_id', retailerIds)
+        .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
       
       setAllTerritoryOrders(allOrdersData || []);

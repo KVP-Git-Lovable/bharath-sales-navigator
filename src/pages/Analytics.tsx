@@ -369,7 +369,8 @@ const Analytics = () => {
       let ordersQuery = supabase
         .from('orders')
         .select('user_id, total_amount')
-        .gte('created_at', startOfMonth(new Date()).toISOString());
+        .gte('created_at', startOfMonth(new Date()).toISOString())
+        .eq('status', 'confirmed');
       
       const { data: orders } = await ordersQuery;
 

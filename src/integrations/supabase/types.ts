@@ -2634,6 +2634,44 @@ export type Database = {
           },
         ]
       }
+      credit_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          reference_id: string | null
+          retailer_id: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reference_id?: string | null
+          retailer_id: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reference_id?: string | null
+          retailer_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_management_config: {
         Row: {
           config_name: string | null
@@ -8823,6 +8861,33 @@ export type Database = {
           requires_attachment?: boolean | null
           sort_order?: number | null
           task_name?: string
+        }
+        Relationships: []
+      }
+      order_cancellation_log: {
+        Row: {
+          cancelled_at: string
+          cancelled_by: string | null
+          id: string
+          order_id: string
+          reason: string | null
+          reversal_summary: Json | null
+        }
+        Insert: {
+          cancelled_at?: string
+          cancelled_by?: string | null
+          id?: string
+          order_id: string
+          reason?: string | null
+          reversal_summary?: Json | null
+        }
+        Update: {
+          cancelled_at?: string
+          cancelled_by?: string | null
+          id?: string
+          order_id?: string
+          reason?: string | null
+          reversal_summary?: Json | null
         }
         Relationships: []
       }
@@ -17410,6 +17475,7 @@ export type Database = {
           check_out_location: Json | null
           check_out_photo_url: string | null
           check_out_time: string | null
+          completion_source: string | null
           created_at: string
           feedback: Json | null
           id: string
@@ -17434,6 +17500,7 @@ export type Database = {
           check_out_location?: Json | null
           check_out_photo_url?: string | null
           check_out_time?: string | null
+          completion_source?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
@@ -17458,6 +17525,7 @@ export type Database = {
           check_out_location?: Json | null
           check_out_photo_url?: string | null
           check_out_time?: string | null
+          completion_source?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
@@ -17767,6 +17835,10 @@ export type Database = {
       }
       can_view_employee: { Args: { _target_user_id: string }; Returns: boolean }
       can_view_profile: { Args: { _target_user_id: string }; Returns: boolean }
+      cancel_order_atomic: {
+        Args: { p_cancelled_by: string; p_order_id: string; p_reason: string }
+        Returns: Json
+      }
       check_duplicate_competitor: {
         Args: { competitor_name_param: string }
         Returns: {
