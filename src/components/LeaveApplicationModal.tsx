@@ -79,6 +79,7 @@ const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       const { data, error } = await supabase
         .from('leave_types')
         .select('*')
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
