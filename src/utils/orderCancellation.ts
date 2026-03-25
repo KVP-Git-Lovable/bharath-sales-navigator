@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { visitStatusCache } from "@/lib/visitStatusCache";
 import { removeOrderFromSnapshot } from "@/lib/myVisitsSnapshot";
+import { offlineStorage, STORES } from "@/lib/offlineStorage";
 
 /**
  * Order Cancellation Utility — Atomic RPC Version
@@ -85,6 +86,15 @@ async function clearLocalCaches(
   orderId: string,
   visitReverted: boolean
 ): Promise<void> {
+  // Remove cancelled order from IndexedDB offline storage so it doesn't get merged back
+  try {
+    await offlineStorage.delete(STORES.ORDERS, orderId);
+    offlineStorage.invalidateCache(STORES.ORDERS);
+    console.log('[CancelOrder] Removed cancelled order from offline storage:', orderId);
+  } catch (e) {
+    console.warn('[CancelOrder] Failed to remove order from offline storage:', e);
+  }
+
   // Invalidate visit status cache
   await visitStatusCache.invalidate(retailerId, userId, orderDate);
   
