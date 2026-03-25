@@ -179,9 +179,6 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
           for (const order of pastOrders) {
             const orderItems = (order as any).order_items || [];
             const matchedItem = orderItems.find((oi: any) => {
-              if (item.variantId) {
-                return oi.product_id === item.productId && oi.variant_id === item.variantId;
-              }
               return oi.product_id === item.productId;
             });
             
@@ -199,6 +196,24 @@ export function ReturnStockForm({ visitId, retailerId, retailerName, onComplete 
             }
           }
           
+          // Fallback: if no product-level match found, show all retailer invoices for manual selection
+          if (optionsMap[key].length === 0 && pastOrders) {
+            for (const order of pastOrders) {
+              if (order.invoice_number) {
+                const exists = optionsMap[key].some(o => o.invoice_number === order.invoice_number);
+                if (!exists) {
+                  optionsMap[key].push({
+                    invoice_number: order.invoice_number,
+                    order_id: order.id,
+                    created_at: order.created_at,
+                    matched_quantity: 0,
+                    matched_rate: 0,
+                  });
+                }
+              }
+            }
+          }
+
           if (optionsMap[key].length > 0 && !selectedInvoices[key]) {
             defaultSelections[key] = optionsMap[key][0].invoice_number;
           }
