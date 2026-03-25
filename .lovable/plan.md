@@ -1,32 +1,20 @@
 
 
-# Fix: Mass Edit Beats Showing Beats Not Owned by Current User
+## Fix: Credit Note Generation Failing — Missing Tables in Dev Database
 
-## Problem
-The "Mass Edit Beats" modal shows all active beats in the system instead of only the current user's beats. The query filters by `is_active` but does not filter by `owner_id`.
+### Problem
+The error "Failed to generate credit note: undefined" occurs because the `credit_notes` and `credit_note_items` tables do not exist in the Dev Supabase database (`etabpbfokzhhfuybeieu`). The migration that creates these tables was never applied to this branch.
 
-## Root Cause
-In `src/components/MassEditBeatsModal.tsx` (line 54-58), the query is:
-```ts
-supabase.from('beats').select('beat_id, beat_name').eq('is_active', true)
-```
-Missing: `.eq('owner_id', user.id)`
+### Root Cause
+When you switched to the Dev Supabase project, the database doesn't have all the same tables as production. The `credit_notes`, `credit_note_items` tables, and the `credit_note_number_seq` sequence are missing.
 
-## Plan
+### Fix
+Run a database migration on the Dev database to create the missing tables. The SQL is already defined in the existing migration file and includes:
 
-### File: `src/components/MassEditBeatsModal.tsx` (line 54-58)
+1. **`credit_notes` table** — stores credit note header (number, date, retailer, totals, status)
+2. **`credit_note_items` table** — stores line items linked to credit notes
+3. **RLS policies** — allowing authenticated users to select, insert, and update
+4. **Sequence** — `credit_note_number_seq` for auto-numbering
 
-Add `owner_id` filter to the beats query:
-```ts
-const { data, error } = await supabase
-  .from('beats')
-  .select('beat_id, beat_name')
-  .eq('owner_id', user.id)
-  .eq('is_active', true)
-  .order('beat_name');
-```
-
-This single-line addition ensures only the logged-in user's beats appear in the dropdown, matching what the "My Beats" page shows (5 beats).
-
-No other file changes needed.
+This is a single migration with the exact same schema as production. No code changes needed — only the database migration.
 
