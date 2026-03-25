@@ -57,7 +57,8 @@ export const useMyPendingSteps = () => {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
+      let data: any[] = [];
+      const { data: joinedData, error: joinError } = await supabase
         .from('approval_steps')
         .select(`
           id,
@@ -78,7 +79,28 @@ export const useMyPendingSteps = () => {
         .eq('approver_id', user.id)
         .eq('status', 'pending');
 
-      if (error) throw error;
+      if (joinError) {
+        console.warn('[useApprovalEngine] Join failed, using fallback:', joinError.message);
+        const { data: rawSteps } = await supabase
+          .from('approval_steps')
+          .select('id, level, approver_id, status, approval_request_id')
+          .eq('approver_id', user.id)
+          .eq('status', 'pending');
+        if (rawSteps && rawSteps.length > 0) {
+          const arIds = [...new Set(rawSteps.map((s: any) => s.approval_request_id))];
+          const { data: arData } = await supabase
+            .from('approval_requests')
+            .select('id, entity_type, entity_id, current_level, total_levels, status, requester_id')
+            .in('id', arIds);
+          const arMap = new Map((arData || []).map((ar: any) => [ar.id, ar]));
+          data = rawSteps.map((s: any) => ({
+            ...s,
+            approval_requests: arMap.get(s.approval_request_id) || null,
+          })).filter((s: any) => s.approval_requests);
+        }
+      } else {
+        data = joinedData || [];
+      }
 
       return (data || [])
         .filter((s: any) => {
