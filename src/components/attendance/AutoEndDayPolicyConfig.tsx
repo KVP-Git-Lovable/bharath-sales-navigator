@@ -51,7 +51,7 @@ const AutoEndDayPolicyConfig = () => {
     timezone: string;
     last_activity_source: 'all_activity' | 'last_order_only' | 'last_click';
     pre_warning_enabled: boolean;
-    pre_warning_minutes_before: number;
+    pre_warning_time: string;
     close_in_progress_visits: boolean;
     cancel_planned_visits: boolean;
     mark_unproductive: boolean;
@@ -61,7 +61,7 @@ const AutoEndDayPolicyConfig = () => {
     timezone: 'Asia/Kolkata',
     last_activity_source: 'all_activity',
     pre_warning_enabled: true,
-    pre_warning_minutes_before: 60,
+    pre_warning_time: '22:00',
     close_in_progress_visits: true,
     cancel_planned_visits: true,
     mark_unproductive: true,
