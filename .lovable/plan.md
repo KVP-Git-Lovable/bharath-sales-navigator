@@ -1,74 +1,67 @@
 
 
-# Fix Expense Approval System — Missing DB Functions & Triggers
+# Fix: Expense Approvals Not Showing for Manager (RLS Recursion)
 
-## Problem
+## Root Cause
 
-The expense approval system has all the right tables, functions, and RLS policies, but is **non-functional** because:
+The database has the data — Prajwal C's 2 expenses have `approval_requests` (status: pending) assigned to **Ajay Prabhu** as approver. But the manager **cannot read them** due to an RLS recursion deadlock:
 
-1. **`get_reporting_chain()` function is missing** — Despite the migration file existing, the function doesn't exist in the database. Every approval function depends on it.
-2. **No triggers exist on any table** — Zero triggers in the entire public schema. Specifically missing:
-   - `tr_expense_approval_request` on `additional_expenses` (creates approval request when expense is submitted)
-   - `trg_sync_entity_status` on `approval_requests` (syncs approval/rejection back to the entity table)
+- `approval_requests` SELECT policy: "Approvers can view requests" → checks `EXISTS (SELECT 1 FROM approval_steps WHERE approver_id = auth.uid())`
+- `approval_steps` SELECT policy: "Requesters can view their steps" → checks `EXISTS (SELECT 1 FROM approval_requests WHERE requester_id = auth.uid())`
 
-Without these, submitting an expense does nothing (no approval request created), and approving a request doesn't update the expense status.
+These two policies reference each other's tables, causing PostgreSQL to hit an infinite RLS evaluation loop. The query silently returns empty results.
 
-## What's Already Working
-
-- All tables exist: `approval_requests`, `approval_steps`, `approval_audit_log`, `approval_config`, `expense_categories`, `approval_workflows`, `workflow_steps`, `expense_approval_rules`
-- `employees` table has `user_id` and `manager_id` columns
-- `additional_expenses` has `status`, `approved_by`, `approved_at`, `rejection_reason` columns
-- `approval_config` has an `expense` entry
-- Functions exist: `create_approval_request()`, `process_approval_step()`, `trigger_create_expense_approval_request()`, `trigger_sync_entity_status()`
-- RLS policies are in place on all approval tables
-- All frontend files and routes exist
+The `useMyPendingSteps` hook's join query fails, the fallback queries `approval_requests` separately but **that also fails** because the same RLS recursion blocks the manager from reading `approval_requests` rows (manager is not the requester, so it needs the cross-table policy).
 
 ## Fix — Single Migration
 
-One migration to create the missing function and attach the two critical triggers:
+Create two `SECURITY DEFINER` helper functions that bypass RLS internally, then rewrite the policies to use them:
 
-### 1. Recreate `get_reporting_chain()`
+### 1. Helper functions (break the recursion)
+
 ```sql
-CREATE OR REPLACE FUNCTION public.get_reporting_chain(p_user_id uuid)
-RETURNS TABLE(manager_id uuid, level int)
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  WITH RECURSIVE chain AS (
-    SELECT e.manager_id, 1 AS level
-    FROM employees e
-    WHERE e.user_id = p_user_id AND e.manager_id IS NOT NULL
-    UNION ALL
-    SELECT e.manager_id, c.level + 1
-    FROM chain c JOIN employees e ON e.user_id = c.manager_id
-    WHERE e.manager_id IS NOT NULL AND c.level < 10
-  )
-  SELECT chain.manager_id, chain.level FROM chain ORDER BY chain.level;
+-- Check if user is an approver on any step for a given request
+CREATE OR REPLACE FUNCTION public.is_step_approver(p_request_id uuid, p_user_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM approval_steps WHERE approval_request_id = p_request_id AND approver_id = p_user_id
+  );
 $$;
-GRANT EXECUTE ON FUNCTION public.get_reporting_chain(uuid) TO authenticated;
+
+-- Check if user is the requester of a given approval request
+CREATE OR REPLACE FUNCTION public.is_request_participant(p_step_request_id uuid, p_user_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM approval_requests WHERE id = p_step_request_id AND requester_id = p_user_id
+  );
+$$;
 ```
 
-### 2. Attach trigger on `additional_expenses` for creating approval requests
+### 2. Replace the recursive RLS policies
+
+Drop the two cross-table policies and recreate them using the helper functions:
+
+**On `approval_requests`:**
 ```sql
-CREATE TRIGGER tr_expense_approval_request
-  BEFORE INSERT OR UPDATE ON public.additional_expenses
-  FOR EACH ROW
-  EXECUTE FUNCTION public.trigger_create_expense_approval_request();
+DROP POLICY "Approvers can view requests at their step" ON approval_requests;
+CREATE POLICY "Approvers can view requests at their step" ON approval_requests
+  FOR SELECT USING (public.is_step_approver(id, auth.uid()));
 ```
 
-### 3. Attach trigger on `approval_requests` for syncing status back
+**On `approval_steps`:**
 ```sql
-CREATE TRIGGER trg_sync_entity_status
-  AFTER UPDATE ON public.approval_requests
-  FOR EACH ROW
-  EXECUTE FUNCTION public.trigger_sync_entity_status();
+DROP POLICY "Requesters can view their steps" ON approval_steps;
+CREATE POLICY "Requesters can view their steps" ON approval_steps
+  FOR SELECT USING (public.is_request_participant(approval_request_id, auth.uid()));
 ```
 
 ## Impact
 
-After this migration:
-- Submitting an expense → automatically creates `approval_request` + `approval_steps` via the reporting chain
-- Manager approving/rejecting → updates `additional_expenses.status` to `manager_approved` or `rejected`
-- The `ExpenseApprovals` page will show pending items
+- Manager (Ajay Prabhu) will immediately see Prajwal C's pending expenses in the Approvals tab
+- All existing approval flows (leave, regularization, expense) benefit from this fix
 - No frontend changes needed
+
+| Change | Type |
+|---|---|
+| 2 SECURITY DEFINER helper functions + 2 replaced RLS policies | DB Migration |
 
