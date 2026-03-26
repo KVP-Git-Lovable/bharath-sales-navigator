@@ -11,6 +11,7 @@ import { useTeamAttendance, PendingApproval } from '@/hooks/useTeamAttendance';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 import { PaginationControls } from '@/components/ui/PaginationControls';
+import { Layout } from '@/components/Layout';
 
 type ApprovalTab = 'leave' | 'regularization';
 const PAGE_SIZE = 10;
