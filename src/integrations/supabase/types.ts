@@ -8322,22 +8322,25 @@ export type Database = {
       }
       notification_event_types: {
         Row: {
-          created_at: string | null
           description: string | null
+          event_code: string
           id: string
-          name: string | null
+          is_active: boolean
+          label: string
         }
         Insert: {
-          created_at?: string | null
           description?: string | null
+          event_code: string
           id?: string
-          name?: string | null
+          is_active?: boolean
+          label: string
         }
         Update: {
-          created_at?: string | null
           description?: string | null
+          event_code?: string
           id?: string
-          name?: string | null
+          is_active?: boolean
+          label?: string
         }
         Relationships: []
       }
