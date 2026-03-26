@@ -481,6 +481,9 @@ const Operations = () => {
           total_amount,
           status,
           retailer_name,
+          is_credit_order,
+          credit_pending_amount,
+          invoice_number,
           order_items(product_name, quantity, rate, total)
         `)
         .eq('status', 'confirmed')
