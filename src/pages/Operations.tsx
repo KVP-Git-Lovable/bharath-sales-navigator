@@ -1746,6 +1746,27 @@ const Operations = () => {
                                 >
                                   <Pencil size={16} />
                                 </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  title="Cancel Order"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setSelectedOrderForCancel({
+                                      order: {
+                                        id: item.id,
+                                        invoice_number: item.invoice_number || undefined,
+                                        total_amount: item.total_amount,
+                                        is_credit_order: item.is_credit_order,
+                                        credit_pending_amount: item.credit_pending_amount,
+                                      },
+                                      retailerName: item.retailer_name,
+                                    });
+                                    setShowCancelDialog(true);
+                                  }}
+                                >
+                                  <Ban size={16} />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
