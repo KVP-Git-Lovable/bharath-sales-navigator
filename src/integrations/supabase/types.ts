@@ -8301,22 +8301,34 @@ export type Database = {
       }
       notification_event_log: {
         Row: {
-          created_at: string | null
-          event_type: string | null
+          actor_user_id: string | null
+          created_at: string
+          event_code: string
           id: string
-          payload: Json | null
+          metadata: Json | null
+          processed: boolean
+          record_id: string
+          source_table: string
         }
         Insert: {
-          created_at?: string | null
-          event_type?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          event_code: string
           id?: string
-          payload?: Json | null
+          metadata?: Json | null
+          processed?: boolean
+          record_id: string
+          source_table: string
         }
         Update: {
-          created_at?: string | null
-          event_type?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          event_code?: string
           id?: string
-          payload?: Json | null
+          metadata?: Json | null
+          processed?: boolean
+          record_id?: string
+          source_table?: string
         }
         Relationships: []
       }
