@@ -2215,6 +2215,24 @@ const Operations = () => {
           }}
         />
       )}
+
+      {/* Cancel Order Dialog */}
+      {selectedOrderForCancel && (
+        <CancelOrderDialog
+          isOpen={showCancelDialog}
+          onClose={() => {
+            setShowCancelDialog(false);
+            setSelectedOrderForCancel(null);
+          }}
+          orders={[selectedOrderForCancel.order]}
+          retailerName={selectedOrderForCancel.retailerName}
+          onCancelled={() => {
+            fetchOrderData();
+            fetchCancelledOrders();
+            toast.success("Order cancelled successfully");
+          }}
+        />
+      )}
     </div>
   );
 };
