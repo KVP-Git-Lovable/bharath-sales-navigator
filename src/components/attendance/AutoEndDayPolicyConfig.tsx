@@ -75,7 +75,7 @@ const AutoEndDayPolicyConfig = () => {
         timezone: policy.timezone,
         last_activity_source: policy.last_activity_source,
         pre_warning_enabled: policy.pre_warning_enabled,
-        pre_warning_minutes_before: policy.pre_warning_minutes_before,
+        pre_warning_time: policy.pre_warning_time?.substring(0, 5) || '22:00',
         close_in_progress_visits: policy.close_in_progress_visits,
         cancel_planned_visits: policy.cancel_planned_visits,
         mark_unproductive: policy.mark_unproductive,
