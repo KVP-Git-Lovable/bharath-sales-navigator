@@ -299,15 +299,15 @@ export const TeamApprovals = () => {
             />
           </div>
         )}
-      </div>
+        </div>
 
-      <RejectionReasonDialog
-        isOpen={!!rejectionTarget}
-        onClose={() => setRejectionTarget(null)}
-        onConfirm={handleConfirmRejection}
-        title="Reject Request"
-        description="Please provide a reason for rejecting this request."
-      />
+        <RejectionReasonDialog
+          isOpen={!!rejectionTarget}
+          onClose={() => setRejectionTarget(null)}
+          onConfirm={handleConfirmRejection}
+          title="Reject Request"
+          description="Please provide a reason for rejecting this request."
+        />
       </div>
     </Layout>
   );
