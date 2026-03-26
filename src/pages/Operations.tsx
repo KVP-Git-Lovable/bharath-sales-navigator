@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, DollarSign, User, RotateCcw, Pencil } from 'lucide-react';
+import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, DollarSign, User, RotateCcw, Pencil, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ import { downloadCSV } from '@/utils/fileDownloader';
 import { PaymentProofsView } from '@/components/admin/PaymentProofsView';
 import { OperationsSummaryBoxes } from '@/components/operations/OperationsSummaryBoxes';
 import EditOrderDialog from '@/components/EditOrderDialog';
+import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDialog';
 import { SignedImage } from '@/components/ui/signed-image';
 
 interface CheckInOutData {
@@ -65,6 +66,9 @@ interface OrderData {
   status: string;
   items: any[];
   is_edited: boolean;
+  is_credit_order: boolean;
+  credit_pending_amount: number;
+  invoice_number: string | null;
 }
 
 interface StockData {
@@ -128,6 +132,10 @@ const Operations = () => {
   // Edit order dialog state
   const [editOrderDialogOpen, setEditOrderDialogOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<{ id: string; retailer_name: string } | null>(null);
+
+  // Cancel order dialog state
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [selectedOrderForCancel, setSelectedOrderForCancel] = useState<{ order: CancelableOrder; retailerName: string } | null>(null);
 
   // Fetch users for filter (via Edge Function to bypass RLS logging issue)
   const fetchUsers = async () => {
@@ -473,6 +481,9 @@ const Operations = () => {
           total_amount,
           status,
           retailer_name,
+          is_credit_order,
+          credit_pending_amount,
+          invoice_number,
           order_items(product_name, quantity, rate, total)
         `)
         .eq('status', 'confirmed')
@@ -532,7 +543,10 @@ const Operations = () => {
           total_amount: order.total_amount,
           status: order.status,
           items: order.order_items || [],
-          is_edited: isEdited
+          is_edited: isEdited,
+          is_credit_order: order.is_credit_order || false,
+          credit_pending_amount: order.credit_pending_amount || 0,
+          invoice_number: order.invoice_number || null
         };
       }) || [];
 
@@ -1732,6 +1746,27 @@ const Operations = () => {
                                 >
                                   <Pencil size={16} />
                                 </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  title="Cancel Order"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setSelectedOrderForCancel({
+                                      order: {
+                                        id: item.id,
+                                        invoice_number: item.invoice_number || undefined,
+                                        total_amount: item.total_amount,
+                                        is_credit_order: item.is_credit_order,
+                                        credit_pending_amount: item.credit_pending_amount,
+                                      },
+                                      retailerName: item.retailer_name,
+                                    });
+                                    setShowCancelDialog(true);
+                                  }}
+                                >
+                                  <Ban size={16} />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -2177,6 +2212,24 @@ const Operations = () => {
           onSaved={() => {
             fetchOrderData();
             toast.success("Order updated - changes will reflect across the system");
+          }}
+        />
+      )}
+
+      {/* Cancel Order Dialog */}
+      {selectedOrderForCancel && (
+        <CancelOrderDialog
+          isOpen={showCancelDialog}
+          onClose={() => {
+            setShowCancelDialog(false);
+            setSelectedOrderForCancel(null);
+          }}
+          orders={[selectedOrderForCancel.order]}
+          retailerName={selectedOrderForCancel.retailerName}
+          onCancelled={() => {
+            fetchOrderData();
+            fetchCancelledOrders();
+            toast.success("Order cancelled successfully");
           }}
         />
       )}
