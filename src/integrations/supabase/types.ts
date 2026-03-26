@@ -5416,6 +5416,74 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_group_members: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "expense_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_groups: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          description: string | null
+          fixed_ta_amount: number | null
+          id: string
+          max_additional_expense_per_day: number | null
+          max_additional_expense_per_month: number | null
+          name: string
+          ta_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          description?: string | null
+          fixed_ta_amount?: number | null
+          id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          name: string
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          description?: string | null
+          fixed_ta_amount?: number | null
+          id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          name?: string
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expense_master_config: {
         Row: {
           allowed_categories: string[] | null
@@ -13827,6 +13895,42 @@ export type Database = {
           },
         ]
       }
+      team_expense_config: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          fixed_ta_amount: number | null
+          id: string
+          manager_id: string
+          max_additional_expense_per_day: number | null
+          max_additional_expense_per_month: number | null
+          ta_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          manager_id: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          manager_id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          ta_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       territories: {
         Row: {
           assigned_distributor_ids: Json | null
@@ -14533,6 +14637,42 @@ export type Database = {
           data_used_mb?: number | null
           id?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_expense_config: {
+        Row: {
+          created_at: string
+          da_amount: number | null
+          fixed_ta_amount: number | null
+          id: string
+          max_additional_expense_per_day: number | null
+          max_additional_expense_per_month: number | null
+          ta_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          ta_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          da_amount?: number | null
+          fixed_ta_amount?: number | null
+          id?: string
+          max_additional_expense_per_day?: number | null
+          max_additional_expense_per_month?: number | null
+          ta_type?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
