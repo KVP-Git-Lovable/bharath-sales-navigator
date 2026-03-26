@@ -81,21 +81,29 @@ Deno.serve(async (req) => {
       })
     }
 
-    // WARNING MODE: just send notifications
+    // WARNING MODE: send notifications to the users themselves
     if (isWarningWindow && !isCloseWindow) {
       console.log(`⚠️ Sending pre-warning to ${openAttendance.length} users`)
       for (const record of openAttendance) {
         try {
+          // Fetch user name for personalized notification
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', record.user_id)
+            .single()
+
           await supabase.rpc('emit_notification_event', {
             p_event_code: 'AUTO_DAY_WARNING',
             p_source_table: 'attendance',
             p_record_id: record.id,
             p_actor_user_id: record.user_id,
             p_metadata: {
+              user_name: profile?.full_name || 'User',
               record_name: 'Attendance',
               date: dateStr,
               auto_close_time: policy.auto_close_time,
-              minutes_remaining: policy.pre_warning_minutes_before
+              minutes_remaining: String(policy.pre_warning_minutes_before)
             }
           })
         } catch (e) {
@@ -119,11 +127,17 @@ Deno.serve(async (req) => {
           supabase, userId, dateStr, record.check_in_time, policy.last_activity_source
         )
 
-        // Update attendance
+        // Calculate total_hours
+        const checkInDate = new Date(record.check_in_time)
+        const checkOutDate = new Date(lastActivityTime)
+        const totalHours = Math.round(((checkOutDate.getTime() - checkInDate.getTime()) / 3600000) * 100) / 100
+
+        // Update attendance with total_hours
         const { error: updateError } = await supabase
           .from('attendance')
           .update({
             check_out_time: lastActivityTime,
+            total_hours: totalHours,
             check_out_address: 'Auto-closed by system',
             notes: `Auto-closed. Last activity: ${lastActivityTime}`,
             updated_at: new Date().toISOString()
@@ -188,13 +202,25 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Fetch user name for close notification
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', userId)
+          .single()
+
         // Emit close notification
         await supabase.rpc('emit_notification_event', {
           p_event_code: 'AUTO_DAY_CLOSED',
           p_source_table: 'attendance',
           p_record_id: record.id,
           p_actor_user_id: userId,
-          p_metadata: { record_name: 'Attendance', date: dateStr, last_activity: lastActivityTime }
+          p_metadata: {
+            user_name: profile?.full_name || 'User',
+            record_name: 'Attendance',
+            date: dateStr,
+            last_activity: lastActivityTime
+          }
         })
 
         processedUsers.push(userId)
