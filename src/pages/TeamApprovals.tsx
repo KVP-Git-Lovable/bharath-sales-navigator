@@ -11,6 +11,7 @@ import { useTeamAttendance, PendingApproval } from '@/hooks/useTeamAttendance';
 import { useSubordinates } from '@/hooks/useSubordinates';
 import RejectionReasonDialog from '@/components/RejectionReasonDialog';
 import { PaginationControls } from '@/components/ui/PaginationControls';
+import { Layout } from '@/components/Layout';
 
 type ApprovalTab = 'leave' | 'regularization';
 const PAGE_SIZE = 10;
@@ -102,16 +103,15 @@ export const TeamApprovals = () => {
   const getApproveLabel = () => 'Approve';
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-base font-semibold">Approvals</h1>
-      </div>
-
+    <Layout>
       <div className="p-4 space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-base font-semibold">Approvals</h1>
+        </div>
         {/* Summary */}
         <p className="text-center text-sm font-medium text-muted-foreground">
           You have {pendingCount} pending request{pendingCount !== 1 ? 's' : ''}
@@ -297,17 +297,17 @@ export const TeamApprovals = () => {
               onPrevPage={() => setCurrentPage(p => p - 1)}
               onGoToPage={setCurrentPage}
             />
-          </div>
+        </div>
         )}
-      </div>
 
-      <RejectionReasonDialog
-        isOpen={!!rejectionTarget}
-        onClose={() => setRejectionTarget(null)}
-        onConfirm={handleConfirmRejection}
-        title="Reject Request"
-        description="Please provide a reason for rejecting this request."
-      />
-    </div>
+        <RejectionReasonDialog
+          isOpen={!!rejectionTarget}
+          onClose={() => setRejectionTarget(null)}
+          onConfirm={handleConfirmRejection}
+          title="Reject Request"
+          description="Please provide a reason for rejecting this request."
+        />
+      </div>
+    </Layout>
   );
 };
