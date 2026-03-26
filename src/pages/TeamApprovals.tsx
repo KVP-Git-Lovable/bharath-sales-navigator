@@ -297,9 +297,8 @@ export const TeamApprovals = () => {
               onPrevPage={() => setCurrentPage(p => p - 1)}
               onGoToPage={setCurrentPage}
             />
-          </div>
-        )}
         </div>
+        )}
 
         <RejectionReasonDialog
           isOpen={!!rejectionTarget}
