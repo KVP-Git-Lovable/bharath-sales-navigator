@@ -1,67 +1,43 @@
 
 
-# Fix: Expense Approvals Not Showing for Manager (RLS Recursion)
+# Fix: KG Not Displaying in Today's Summary & Target Module
 
 ## Root Cause
 
-The database has the data — Prajwal C's 2 expenses have `approval_requests` (status: pending) assigned to **Ajay Prabhu** as approver. But the manager **cannot read them** due to an RLS recursion deadlock:
+**`order_items` table has RLS enabled but zero policies defined.** This is the same class of bug we just fixed for `profiles` and `profile_object_permissions`.
 
-- `approval_requests` SELECT policy: "Approvers can view requests" → checks `EXISTS (SELECT 1 FROM approval_steps WHERE approver_id = auth.uid())`
-- `approval_steps` SELECT policy: "Requesters can view their steps" → checks `EXISTS (SELECT 1 FROM approval_requests WHERE requester_id = auth.uid())`
-
-These two policies reference each other's tables, causing PostgreSQL to hit an infinite RLS evaluation loop. The query silently returns empty results.
-
-The `useMyPendingSteps` hook's join query fails, the fallback queries `approval_requests` separately but **that also fails** because the same RLS recursion blocks the manager from reading `approval_requests` rows (manager is not the requester, so it needs the cross-table policy).
+When TodaySummary or the Target module queries `orders` with the join `order_items(*)`, Supabase applies RLS to `order_items` separately. Since there are no SELECT policies, the join returns **empty arrays** for every order. This makes:
+- `convertToKg()` loop over zero items → **Total KG Sold = 0 KG**
+- `useUserTargetProgress` quantity calculation → **Actual = 0**
 
 ## Fix — Single Migration
 
-Create two `SECURITY DEFINER` helper functions that bypass RLS internally, then rewrite the policies to use them:
-
-### 1. Helper functions (break the recursion)
+Add a SELECT policy on `order_items` that allows authenticated users to read items belonging to their own orders:
 
 ```sql
--- Check if user is an approver on any step for a given request
-CREATE OR REPLACE FUNCTION public.is_step_approver(p_request_id uuid, p_user_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM approval_steps WHERE approval_request_id = p_request_id AND approver_id = p_user_id
+-- order_items has no user_id column; access is through the parent order
+CREATE POLICY "Users can read own order items"
+  ON public.order_items FOR SELECT
+  TO authenticated
+  USING (
+    order_id IN (SELECT id FROM orders WHERE user_id = auth.uid())
   );
-$$;
 
--- Check if user is the requester of a given approval request
-CREATE OR REPLACE FUNCTION public.is_request_participant(p_step_request_id uuid, p_user_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM approval_requests WHERE id = p_step_request_id AND requester_id = p_user_id
-  );
-$$;
+-- Admins can read all order items
+CREATE POLICY "Admins can read all order items"
+  ON public.order_items FOR SELECT
+  TO authenticated
+  USING (public.is_system_admin(auth.uid()));
 ```
 
-### 2. Replace the recursive RLS policies
-
-Drop the two cross-table policies and recreate them using the helper functions:
-
-**On `approval_requests`:**
-```sql
-DROP POLICY "Approvers can view requests at their step" ON approval_requests;
-CREATE POLICY "Approvers can view requests at their step" ON approval_requests
-  FOR SELECT USING (public.is_step_approver(id, auth.uid()));
-```
-
-**On `approval_steps`:**
-```sql
-DROP POLICY "Requesters can view their steps" ON approval_steps;
-CREATE POLICY "Requesters can view their steps" ON approval_steps
-  FOR SELECT USING (public.is_request_participant(approval_request_id, auth.uid()));
-```
+Note: The `orders` table already has proper RLS (`user_id = auth.uid()`), so this inner query is safe and won't recurse — `orders` RLS doesn't reference `order_items`.
 
 ## Impact
 
-- Manager (Ajay Prabhu) will immediately see Prajwal C's pending expenses in the Approvals tab
-- All existing approval flows (leave, regularization, expense) benefit from this fix
-- No frontend changes needed
-
-| Change | Type |
-|---|---|
-| 2 SECURITY DEFINER helper functions + 2 replaced RLS policies | DB Migration |
+| Area | Before | After |
+|---|---|---|
+| Today's Summary → Total KG Sold | Always "0 KG" | Shows actual KG from order items |
+| Target vs Actual (Quantity basis) | Always 0 | Shows actual quantity in KG |
+| Product breakdown dialogs | Empty | Populated |
+| No frontend changes needed | — | — |
 
