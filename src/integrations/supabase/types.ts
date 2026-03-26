@@ -16786,12 +16786,20 @@ export type Database = {
         Returns: boolean
       }
       is_manager: { Args: { user_id_param: string }; Returns: boolean }
+      is_request_participant: {
+        Args: { p_step_request_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_requester_for_audit: {
         Args: { p_request_id: string }
         Returns: boolean
       }
       is_requester_for_step: {
         Args: { p_request_id: string }
+        Returns: boolean
+      }
+      is_step_approver: {
+        Args: { p_request_id: string; p_user_id: string }
         Returns: boolean
       }
       is_system_admin: { Args: { _user_id: string }; Returns: boolean }
