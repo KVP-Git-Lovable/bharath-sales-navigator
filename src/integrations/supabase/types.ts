@@ -552,6 +552,7 @@ export type Database = {
       }
       approval_config: {
         Row: {
+          approval_mode: string
           created_at: string
           entity_type: string
           final_approval_role: string | null
@@ -562,6 +563,7 @@ export type Database = {
           use_full_hierarchy: boolean
         }
         Insert: {
+          approval_mode?: string
           created_at?: string
           entity_type: string
           final_approval_role?: string | null
@@ -572,6 +574,7 @@ export type Database = {
           use_full_hierarchy?: boolean
         }
         Update: {
+          approval_mode?: string
           created_at?: string
           entity_type?: string
           final_approval_role?: string | null
@@ -5379,6 +5382,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      expense_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          limit_amount: number | null
+          name: string
+          receipt_required: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          limit_amount?: number | null
+          name: string
+          receipt_required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          limit_amount?: number | null
+          name?: string
+          receipt_required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       expense_master_config: {
         Row: {
@@ -16150,6 +16186,47 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_steps: {
+        Row: {
+          approver_role: string | null
+          approver_type: string
+          created_at: string
+          hierarchy_level: number | null
+          id: string
+          specific_user_id: string | null
+          step_number: number
+          workflow_id: string
+        }
+        Insert: {
+          approver_role?: string | null
+          approver_type?: string
+          created_at?: string
+          hierarchy_level?: number | null
+          id?: string
+          specific_user_id?: string | null
+          step_number?: number
+          workflow_id: string
+        }
+        Update: {
+          approver_role?: string | null
+          approver_type?: string
+          created_at?: string
+          hierarchy_level?: number | null
+          id?: string
+          specific_user_id?: string | null
+          step_number?: number
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_steps_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       working_days_config: {
         Row: {
           created_at: string
@@ -16476,13 +16553,6 @@ export type Database = {
           region_pincodes: string[]
           skills: string[]
           state: string
-        }[]
-      }
-      get_reporting_chain: {
-        Args: { p_user_id: string }
-        Returns: {
-          level: number
-          manager_id: string
         }[]
       }
       get_subordinate_users: {
