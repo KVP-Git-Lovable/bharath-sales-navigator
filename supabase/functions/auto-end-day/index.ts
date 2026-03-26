@@ -46,7 +46,14 @@ Deno.serve(async (req) => {
     const [closeH, closeM] = (policy.auto_close_time as string).split(':').map(Number)
     const closeTimeMinutes = closeH * 60 + closeM
 
-    const warningTimeMinutes = closeTimeMinutes - (policy.pre_warning_minutes_before || 60)
+    // Use exact pre_warning_time if available, otherwise fall back to minutes_before
+    let warningTimeMinutes: number
+    if (policy.pre_warning_time) {
+      const [warnH, warnM] = (policy.pre_warning_time as string).split(':').map(Number)
+      warningTimeMinutes = warnH * 60 + warnM
+    } else {
+      warningTimeMinutes = closeTimeMinutes - (policy.pre_warning_minutes_before || 60)
+    }
 
     // Determine if this run is for warning or auto-close (±15 min window)
     const isWarningWindow = policy.pre_warning_enabled &&

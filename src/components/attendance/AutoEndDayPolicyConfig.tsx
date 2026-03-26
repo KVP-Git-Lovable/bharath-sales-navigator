@@ -241,17 +241,15 @@ const AutoEndDayPolicyConfig = () => {
 
             {form.pre_warning_enabled && (
               <div className="space-y-2">
-                <Label htmlFor="warning_minutes">Minutes Before Auto-Close</Label>
+                <Label htmlFor="pre_warning_time">Warning Notification Time</Label>
                 <Input
-                  id="warning_minutes"
-                  type="number"
-                  min={5}
-                  max={180}
-                  value={form.pre_warning_minutes_before}
-                  onChange={(e) => setForm(prev => ({ ...prev, pre_warning_minutes_before: parseInt(e.target.value) || 60 }))}
+                  id="pre_warning_time"
+                  type="time"
+                  value={form.pre_warning_time}
+                  onChange={(e) => setForm(prev => ({ ...prev, pre_warning_time: e.target.value }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  A warning notification will be sent this many minutes before auto-close.
+                  Users will receive a warning notification at this exact time.
                   Configure the message content in Notification Rules → AUTO_DAY_WARNING.
                 </p>
               </div>
