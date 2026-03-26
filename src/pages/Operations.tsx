@@ -543,7 +543,10 @@ const Operations = () => {
           total_amount: order.total_amount,
           status: order.status,
           items: order.order_items || [],
-          is_edited: isEdited
+          is_edited: isEdited,
+          is_credit_order: order.is_credit_order || false,
+          credit_pending_amount: order.credit_pending_amount || 0,
+          invoice_number: order.invoice_number || null
         };
       }) || [];
 
