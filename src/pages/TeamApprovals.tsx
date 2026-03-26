@@ -222,7 +222,7 @@ export const TeamApprovals = () => {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {approval.type === 'leave'
-                        ? `Date${approval.endDate && approval.endDate !== approval.date ? 's' : ''}: ${format(new Date(approval.date), 'MMM dd')}${approval.endDate && approval.endDate !== approval.date ? ` - ${format(new Date(approval.endDate), 'MMM dd')}` : ''} (${getDayCount(approval.date, approval.endDate)})`
+                        ? `Date${approval.endDate && approval.endDate !== approval.date ? 's' : ''}: ${format(new Date(approval.date), 'MMM dd')}${approval.endDate && approval.endDate !== approval.date ? ` - ${format(new Date(approval.endDate), 'MMM dd')}` : ''} (${getDayCount(approval)})`
                         : `Date: ${format(new Date(approval.date), 'MMM dd, yyyy')}`}
                     </p>
                     {approval.type === 'regularization' && (
