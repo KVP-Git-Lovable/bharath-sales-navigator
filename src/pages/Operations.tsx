@@ -133,6 +133,10 @@ const Operations = () => {
   const [editOrderDialogOpen, setEditOrderDialogOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<{ id: string; retailer_name: string } | null>(null);
 
+  // Cancel order dialog state
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [selectedOrderForCancel, setSelectedOrderForCancel] = useState<{ order: CancelableOrder; retailerName: string } | null>(null);
+
   // Fetch users for filter (via Edge Function to bypass RLS logging issue)
   const fetchUsers = async () => {
     try {
