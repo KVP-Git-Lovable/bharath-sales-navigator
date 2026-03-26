@@ -308,6 +308,7 @@ export const TeamApprovals = () => {
         title="Reject Request"
         description="Please provide a reason for rejecting this request."
       />
-    </div>
+      </div>
+    </Layout>
   );
 };
