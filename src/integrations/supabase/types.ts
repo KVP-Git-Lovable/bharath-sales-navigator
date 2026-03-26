@@ -16329,6 +16329,16 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: undefined
       }
+      emit_notification_event: {
+        Args: {
+          p_actor_user_id: string
+          p_event_code: string
+          p_metadata?: Json
+          p_record_id: string
+          p_source_table: string
+        }
+        Returns: string
+      }
       generate_invoice_number: { Args: never; Returns: string }
       get_activity_logging_summary: { Args: { p_days?: number }; Returns: Json }
       get_all_subordinates: {
