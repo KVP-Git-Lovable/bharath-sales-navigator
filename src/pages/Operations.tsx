@@ -66,6 +66,9 @@ interface OrderData {
   status: string;
   items: any[];
   is_edited: boolean;
+  is_credit_order: boolean;
+  credit_pending_amount: number;
+  invoice_number: string | null;
 }
 
 interface StockData {
