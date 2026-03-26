@@ -6234,6 +6234,66 @@ export type Database = {
         }
         Relationships: []
       }
+      goods_receipt_notes: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          distributor_id: string
+          grn_number: string
+          id: string
+          notes: string | null
+          order_id: string
+          receipt_type: string
+          received_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          distributor_id: string
+          grn_number: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          receipt_type?: string
+          received_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          distributor_id?: string
+          grn_number?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          receipt_type?: string
+          received_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipt_notes_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gps_tracking: {
         Row: {
           accuracy: number | null
@@ -6299,6 +6359,81 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      grn_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string | null
+          damaged_quantity: number
+          expiry_date: string | null
+          grn_id: string
+          id: string
+          order_item_id: string
+          ordered_quantity: number
+          product_id: string
+          product_name: string
+          received_quantity: number
+          return_reason: string | null
+          returned_quantity: number
+          unit: string
+          unit_price: number
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string | null
+          damaged_quantity?: number
+          expiry_date?: string | null
+          grn_id: string
+          id?: string
+          order_item_id: string
+          ordered_quantity?: number
+          product_id: string
+          product_name: string
+          received_quantity?: number
+          return_reason?: string | null
+          returned_quantity?: number
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string | null
+          damaged_quantity?: number
+          expiry_date?: string | null
+          grn_id?: string
+          id?: string
+          order_item_id?: string
+          ordered_quantity?: number
+          product_id?: string
+          product_name?: string
+          received_quantity?: number
+          return_reason?: string | null
+          returned_quantity?: number
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grn_items_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grn_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "primary_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hierarchy_target_allocations: {
         Row: {
@@ -7455,6 +7590,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_valuation_config: {
+        Row: {
+          id: string
+          updated_at: string | null
+          updated_by: string | null
+          valuation_method: string
+        }
+        Insert: {
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          valuation_method?: string
+        }
+        Update: {
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          valuation_method?: string
+        }
+        Relationships: []
       }
       invoice_display_settings: {
         Row: {
@@ -9253,6 +9409,168 @@ export type Database = {
         }
         Relationships: []
       }
+      petty_cash_funds: {
+        Row: {
+          allocated_amount: number
+          balance: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          allocated_amount?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          allocated_amount?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_funds_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_funds_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_limits: {
+        Row: {
+          created_at: string
+          fund_id: string
+          id: string
+          max_per_day: number | null
+          max_per_transaction: number | null
+          require_bill_above: number | null
+        }
+        Insert: {
+          created_at?: string
+          fund_id: string
+          id?: string
+          max_per_day?: number | null
+          max_per_transaction?: number | null
+          require_bill_above?: number | null
+        }
+        Update: {
+          created_at?: string
+          fund_id?: string
+          id?: string
+          max_per_day?: number | null
+          max_per_transaction?: number | null
+          require_bill_above?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_limits_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: true
+            referencedRelation: "petty_cash_funds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_transactions: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          bill_url: string | null
+          category: string
+          created_at: string
+          description: string | null
+          fund_id: string
+          id: string
+          rejection_reason: string | null
+          status: string
+          transaction_date: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          bill_url?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          fund_id: string
+          id?: string
+          rejection_reason?: string | null
+          status?: string
+          transaction_date?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          bill_url?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          fund_id?: string
+          id?: string
+          rejection_reason?: string | null
+          status?: string
+          transaction_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_transactions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_funds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pincode_master: {
         Row: {
           created_at: string | null
@@ -10335,6 +10653,78 @@ export type Database = {
           },
         ]
       }
+      primary_invoices: {
+        Row: {
+          created_at: string | null
+          discount_amount: number
+          distributor_id: string
+          due_date: string | null
+          finalized_at: string | null
+          finalized_by: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          order_id: string
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          discount_amount?: number
+          distributor_id: string
+          due_date?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          notes?: string | null
+          order_id: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          discount_amount?: number
+          distributor_id?: string
+          due_date?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          order_id?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_invoices_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       primary_order_items: {
         Row: {
           batch_number: string | null
@@ -10416,6 +10806,57 @@ export type Database = {
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_order_schemes: {
+        Row: {
+          applied_at: string | null
+          discount_amount: number | null
+          free_product_name: string | null
+          free_quantity: number | null
+          id: string
+          order_id: string
+          scheme_id: string
+          scheme_name: string
+          scheme_type: string
+        }
+        Insert: {
+          applied_at?: string | null
+          discount_amount?: number | null
+          free_product_name?: string | null
+          free_quantity?: number | null
+          id?: string
+          order_id: string
+          scheme_id: string
+          scheme_name: string
+          scheme_type: string
+        }
+        Update: {
+          applied_at?: string | null
+          discount_amount?: number | null
+          free_product_name?: string | null
+          free_quantity?: number | null
+          id?: string
+          order_id?: string
+          scheme_id?: string
+          scheme_name?: string
+          scheme_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_order_schemes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_order_schemes_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "product_schemes"
             referencedColumns: ["id"]
           },
         ]
@@ -10540,6 +10981,214 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_return_items: {
+        Row: {
+          batch_number: string | null
+          condition: string | null
+          created_at: string | null
+          id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          return_note_id: string
+          return_reason: string
+          unit: string
+          unit_price: number
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          condition?: string | null
+          created_at?: string | null
+          id?: string
+          product_id: string
+          product_name: string
+          quantity?: number
+          return_note_id: string
+          return_reason: string
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          condition?: string | null
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          return_note_id?: string
+          return_reason?: string
+          unit?: string
+          unit_price?: number
+          variant_id?: string | null
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_return_items_return_note_id_fkey"
+            columns: ["return_note_id"]
+            isOneToOne: false
+            referencedRelation: "primary_return_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_return_notes: {
+        Row: {
+          created_at: string | null
+          distributor_id: string
+          grn_id: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          return_date: string
+          return_number: string
+          status: string
+          total_return_value: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          distributor_id: string
+          grn_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          return_date?: string
+          return_number: string
+          status?: string
+          total_return_value?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          distributor_id?: string
+          grn_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          return_date?: string
+          return_number?: string
+          status?: string
+          total_return_value?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_return_notes_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_return_notes_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_return_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_shipments: {
+        Row: {
+          actual_delivery_date: string | null
+          created_at: string | null
+          dispatch_date: string | null
+          dispatch_warehouse: string | null
+          distributor_id: string
+          driver_name: string | null
+          driver_phone: string | null
+          expected_delivery_date: string | null
+          id: string
+          invoice_id: string | null
+          lr_number: string | null
+          notes: string | null
+          order_id: string
+          shipment_number: string
+          status: string
+          tracking_url: string | null
+          transporter_name: string | null
+          updated_at: string | null
+          vehicle_number: string | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          created_at?: string | null
+          dispatch_date?: string | null
+          dispatch_warehouse?: string | null
+          distributor_id: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          invoice_id?: string | null
+          lr_number?: string | null
+          notes?: string | null
+          order_id: string
+          shipment_number: string
+          status?: string
+          tracking_url?: string | null
+          transporter_name?: string | null
+          updated_at?: string | null
+          vehicle_number?: string | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          created_at?: string | null
+          dispatch_date?: string | null
+          dispatch_warehouse?: string | null
+          distributor_id?: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          invoice_id?: string | null
+          lr_number?: string | null
+          notes?: string | null
+          order_id?: string
+          shipment_number?: string
+          status?: string
+          tracking_url?: string | null
+          transporter_name?: string | null
+          updated_at?: string | null
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_shipments_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_shipments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "primary_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "primary_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -13505,6 +14154,59 @@ export type Database = {
           },
         ]
       }
+      target_breakdowns: {
+        Row: {
+          created_at: string | null
+          fy_config_id: string
+          id: string
+          month_number: number | null
+          parameter_id: string
+          parameter_name: string
+          parameter_type: string
+          quantity_target: number | null
+          revenue_target: number | null
+          updated_at: string | null
+          user_id: string
+          visits_target: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          fy_config_id: string
+          id?: string
+          month_number?: number | null
+          parameter_id: string
+          parameter_name: string
+          parameter_type: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          user_id: string
+          visits_target?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          fy_config_id?: string
+          id?: string
+          month_number?: number | null
+          parameter_id?: string
+          parameter_name?: string
+          parameter_type?: string
+          quantity_target?: number | null
+          revenue_target?: number | null
+          updated_at?: string | null
+          user_id?: string
+          visits_target?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_breakdowns_fy_config_id_fkey"
+            columns: ["fy_config_id"]
+            isOneToOne: false
+            referencedRelation: "fy_target_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       target_kpi_definitions: {
         Row: {
           calculation_method: string
@@ -13621,6 +14323,65 @@ export type Database = {
           parameter_key?: string
         }
         Relationships: []
+      }
+      target_plans: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          fy_year: number
+          id: string
+          is_locked: boolean | null
+          name: string
+          policy_id: string
+          status: string | null
+          target_end_month: number | null
+          target_start_month: number | null
+          total_secondary_value: number | null
+          total_target_value: number | null
+          total_visits_target: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          fy_year: number
+          id?: string
+          is_locked?: boolean | null
+          name: string
+          policy_id: string
+          status?: string | null
+          target_end_month?: number | null
+          target_start_month?: number | null
+          total_secondary_value?: number | null
+          total_target_value?: number | null
+          total_visits_target?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          fy_year?: number
+          id?: string
+          is_locked?: boolean | null
+          name?: string
+          policy_id?: string
+          status?: string | null
+          target_end_month?: number | null
+          target_start_month?: number | null
+          total_secondary_value?: number | null
+          total_target_value?: number | null
+          total_visits_target?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_plans_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "target_policies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       target_policies: {
         Row: {
