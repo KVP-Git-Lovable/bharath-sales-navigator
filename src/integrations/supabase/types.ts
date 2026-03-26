@@ -941,6 +941,7 @@ export type Database = {
           mark_unproductive: boolean
           pre_warning_enabled: boolean
           pre_warning_minutes_before: number
+          pre_warning_time: string
           timezone: string
           updated_at: string
         }
@@ -955,6 +956,7 @@ export type Database = {
           mark_unproductive?: boolean
           pre_warning_enabled?: boolean
           pre_warning_minutes_before?: number
+          pre_warning_time?: string
           timezone?: string
           updated_at?: string
         }
@@ -969,6 +971,7 @@ export type Database = {
           mark_unproductive?: boolean
           pre_warning_enabled?: boolean
           pre_warning_minutes_before?: number
+          pre_warning_time?: string
           timezone?: string
           updated_at?: string
         }

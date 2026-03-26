@@ -51,7 +51,7 @@ const AutoEndDayPolicyConfig = () => {
     timezone: string;
     last_activity_source: 'all_activity' | 'last_order_only' | 'last_click';
     pre_warning_enabled: boolean;
-    pre_warning_minutes_before: number;
+    pre_warning_time: string;
     close_in_progress_visits: boolean;
     cancel_planned_visits: boolean;
     mark_unproductive: boolean;
@@ -61,7 +61,7 @@ const AutoEndDayPolicyConfig = () => {
     timezone: 'Asia/Kolkata',
     last_activity_source: 'all_activity',
     pre_warning_enabled: true,
-    pre_warning_minutes_before: 60,
+    pre_warning_time: '22:00',
     close_in_progress_visits: true,
     cancel_planned_visits: true,
     mark_unproductive: true,
@@ -75,7 +75,7 @@ const AutoEndDayPolicyConfig = () => {
         timezone: policy.timezone,
         last_activity_source: policy.last_activity_source,
         pre_warning_enabled: policy.pre_warning_enabled,
-        pre_warning_minutes_before: policy.pre_warning_minutes_before,
+        pre_warning_time: policy.pre_warning_time?.substring(0, 5) || '22:00',
         close_in_progress_visits: policy.close_in_progress_visits,
         cancel_planned_visits: policy.cancel_planned_visits,
         mark_unproductive: policy.mark_unproductive,
@@ -241,17 +241,15 @@ const AutoEndDayPolicyConfig = () => {
 
             {form.pre_warning_enabled && (
               <div className="space-y-2">
-                <Label htmlFor="warning_minutes">Minutes Before Auto-Close</Label>
+                <Label htmlFor="pre_warning_time">Warning Notification Time</Label>
                 <Input
-                  id="warning_minutes"
-                  type="number"
-                  min={5}
-                  max={180}
-                  value={form.pre_warning_minutes_before}
-                  onChange={(e) => setForm(prev => ({ ...prev, pre_warning_minutes_before: parseInt(e.target.value) || 60 }))}
+                  id="pre_warning_time"
+                  type="time"
+                  value={form.pre_warning_time}
+                  onChange={(e) => setForm(prev => ({ ...prev, pre_warning_time: e.target.value }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  A warning notification will be sent this many minutes before auto-close.
+                  Users will receive a warning notification at this exact time.
                   Configure the message content in Notification Rules → AUTO_DAY_WARNING.
                 </p>
               </div>

@@ -15,6 +15,7 @@ export interface AutoEndDayPolicy {
   last_activity_source: 'all_activity' | 'last_order_only' | 'last_click';
   pre_warning_enabled: boolean;
   pre_warning_minutes_before: number;
+  pre_warning_time: string;
   close_in_progress_visits: boolean;
   cancel_planned_visits: boolean;
   mark_unproductive: boolean;
