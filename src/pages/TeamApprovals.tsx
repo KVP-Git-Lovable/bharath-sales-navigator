@@ -84,9 +84,17 @@ export const TeamApprovals = () => {
 
   const getInitials = (name: string) => name?.substring(0, 2).toUpperCase() || '??';
 
-  const getDayCount = (start: string, end?: string) => {
-    if (!end || end === start) return '1 day';
-    const days = differenceInDays(new Date(end), new Date(start)) + 1;
+  const getDayCount = (approval: PendingApproval) => {
+    if (approval.isHalfDay || approval.daysRequested === 0.5) {
+      const period = approval.halfDayPeriod === 'first_half' ? '1st Half' : 
+                     approval.halfDayPeriod === 'second_half' ? '2nd Half' : '';
+      return `Half Day${period ? ` - ${period}` : ''}`;
+    }
+    const days = approval.daysRequested ?? (
+      !approval.endDate || approval.endDate === approval.date 
+        ? 1 
+        : differenceInDays(new Date(approval.endDate), new Date(approval.date)) + 1
+    );
     return `${days} days`;
   };
 
