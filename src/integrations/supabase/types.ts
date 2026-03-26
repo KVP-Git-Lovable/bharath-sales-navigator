@@ -16555,6 +16555,13 @@ export type Database = {
           state: string
         }[]
       }
+      get_reporting_chain: {
+        Args: { p_user_id: string }
+        Returns: {
+          level: number
+          manager_id: string
+        }[]
+      }
       get_subordinate_users: {
         Args: { user_id_param: string }
         Returns: {
