@@ -8373,27 +8373,62 @@ export type Database = {
       }
       notification_rules: {
         Row: {
-          created_at: string | null
-          event_type_id: string | null
+          created_at: string
+          created_by: string | null
+          event_code: string
           id: string
-          is_active: boolean | null
-          target_role: string | null
+          is_active: boolean
+          message_template: string
+          name: string
+          notification_channel: string
+          receiver_role: string | null
+          receiver_type: string
+          receiver_user_id: string | null
+          source_table: string
+          title_template: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
-          event_type_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_code: string
           id?: string
-          is_active?: boolean | null
-          target_role?: string | null
+          is_active?: boolean
+          message_template?: string
+          name: string
+          notification_channel?: string
+          receiver_role?: string | null
+          receiver_type?: string
+          receiver_user_id?: string | null
+          source_table: string
+          title_template?: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
-          event_type_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_code?: string
           id?: string
-          is_active?: boolean | null
-          target_role?: string | null
+          is_active?: boolean
+          message_template?: string
+          name?: string
+          notification_channel?: string
+          receiver_role?: string | null
+          receiver_type?: string
+          receiver_user_id?: string | null
+          source_table?: string
+          title_template?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_event_code_fkey"
+            columns: ["event_code"]
+            isOneToOne: false
+            referencedRelation: "notification_event_types"
+            referencedColumns: ["event_code"]
+          },
+        ]
       }
       notifications: {
         Row: {
