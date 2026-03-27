@@ -108,6 +108,10 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
       toast.error('Please select an activity type');
       return;
     }
+    if (activityType === 'Other' && !customActivityType.trim()) {
+      toast.error('Please specify the activity type');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const dateStr = format(activityDate, 'yyyy-MM-dd');
