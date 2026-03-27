@@ -17326,7 +17326,7 @@ export type Database = {
         Returns: string
       }
       generate_invoice_number: { Args: never; Returns: string }
-      get_activity_logging_summary: { Args: { p_days?: number }; Returns: Json }
+      get_activity_logging_summary: { Args: { p_days: number }; Returns: Json }
       get_all_subordinates: {
         Args: { manager_user_id: string }
         Returns: {
