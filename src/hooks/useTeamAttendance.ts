@@ -111,7 +111,9 @@ export const useTeamAttendance = (
       return data || [];
     },
     enabled,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchOnMount: 'always' as const,
   });
 
   // 3. Approved leaves overlapping the selected date range
