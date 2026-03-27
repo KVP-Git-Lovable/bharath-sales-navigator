@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, Clock, MapPin, MessageSquare, Loader2, LogIn, LogOut } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, MessageSquare, Loader2, Play, CheckCircle2, Navigation, Timer } from 'lucide-react';
 import { useActivityEvents, ActivityEvent, formatActivityDuration } from '@/hooks/useActivityEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getLocalTodayDate } from '@/utils/dateUtils';
+import { Geolocation } from '@capacitor/geolocation';
 
 interface ActivityEventsTableProps {
   userId: string;
@@ -21,31 +22,48 @@ interface VisitStatus {
 }
 
 const ACTIVITY_TYPE_COLORS: Record<string, string> = {
+  'Doctor Visit': 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
   Celebration: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   Event: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   Promotion: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   Demo: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  Meeting: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
   Other: 'bg-muted text-muted-foreground',
 };
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Play }> = {
+  planned: {
+    label: 'Planned',
+    color: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+    icon: CalendarDays,
+  },
+  'in-progress': {
+    label: 'In Progress',
+    color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+    icon: Play,
+  },
+  productive: {
+    label: 'Completed',
+    color: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700',
+    icon: CheckCircle2,
+  },
+};
+
 export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }: ActivityEventsTableProps) => {
-  const { fetchActivitiesForDate } = useActivityEvents();
+  const { fetchActivitiesForDate, updateActivityLocation } = useActivityEvents();
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [visitStatuses, setVisitStatuses] = useState<Record<string, VisitStatus>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  // FIX: Track whether we've completed at least one load to prevent showing spinner on mount
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const isToday = selectedDate === getLocalTodayDate();
   
-  // FIX: Stabilize onActivitiesLoaded callback ref to prevent re-render cascades
   const onActivitiesLoadedRef = useRef(onActivitiesLoaded);
   onActivitiesLoadedRef.current = onActivitiesLoaded;
 
   const loadActivities = useCallback(async () => {
     if (!userId || !selectedDate) return;
-    // Only show loading if we haven't loaded anything yet
     if (!hasLoadedOnce && activities.length === 0) {
       setIsLoading(true);
     }
@@ -54,7 +72,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
       setActivities(data);
       onActivitiesLoadedRef.current?.(data.length);
 
-      // Fetch visit statuses for all activities with visit_ids
+      // Fetch visit statuses
       const visitIds = data.map(a => a.visit_id).filter(Boolean);
       if (visitIds.length > 0) {
         const { data: visits } = await supabase
@@ -84,7 +102,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
 
   useEffect(() => {
     loadActivities();
-  }, [userId, selectedDate]); // Only reload when userId or date changes, NOT when loadActivities changes
+  }, [userId, selectedDate]);
 
   useEffect(() => {
     const handler = () => loadActivities();
@@ -92,41 +110,94 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
     return () => window.removeEventListener('visitDataChanged', handler);
   }, [loadActivities]);
 
-  const handleCheckIn = async (visitId: string) => {
-    setActionLoading(visitId + '-in');
+  const captureGPS = async (): Promise<{ lat: number; lng: number } | null> => {
     try {
-      const { error } = await supabase
-        .from('visits')
-        .update({ check_in_time: new Date().toISOString(), status: 'in-progress' } as any)
-        .eq('id', visitId);
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
+      });
+      return { lat: position.coords.latitude, lng: position.coords.longitude };
+    } catch {
+      // Fallback to browser
+      return new Promise((resolve) => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 10000 }
+          );
+        } else {
+          resolve(null);
+        }
+      });
+    }
+  };
 
-      if (error) throw error;
-      toast.success('Checked in successfully');
+  const handleStartActivity = async (activity: ActivityEvent) => {
+    if (!activity.visit_id) return;
+    setActionLoading(activity.id + '-start');
+    try {
+      const now = new Date().toISOString();
+      const gps = await captureGPS();
+
+      // Update visit to in-progress with check_in_time
+      const { error: visitError } = await supabase
+        .from('visits')
+        .update({ 
+          check_in_time: now, 
+          status: 'in-progress',
+        } as any)
+        .eq('id', activity.visit_id);
+
+      if (visitError) throw visitError;
+
+      // Update activity_events with start location and time
+      await updateActivityLocation(activity.id, {
+        start_time: now,
+        ...(gps ? { start_latitude: gps.lat, start_longitude: gps.lng } : {}),
+      });
+
+      toast.success('Activity started — tracking in progress');
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       await loadActivities();
     } catch (err) {
-      console.error('[ActivityEventsTable] Check-in failed:', err);
-      toast.error('Check-in failed');
+      console.error('[ActivityEventsTable] Start failed:', err);
+      toast.error('Failed to start activity');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleCheckOut = async (visitId: string) => {
-    setActionLoading(visitId + '-out');
+  const handleCompleteActivity = async (activity: ActivityEvent) => {
+    if (!activity.visit_id) return;
+    setActionLoading(activity.id + '-complete');
     try {
-      const { error } = await supabase
-        .from('visits')
-        .update({ check_out_time: new Date().toISOString(), status: 'productive' } as any)
-        .eq('id', visitId);
+      const now = new Date().toISOString();
+      const gps = await captureGPS();
 
-      if (error) throw error;
-      toast.success('Checked out successfully');
+      // Update visit to productive/completed with check_out_time
+      const { error: visitError } = await supabase
+        .from('visits')
+        .update({ 
+          check_out_time: now, 
+          status: 'productive',
+        } as any)
+        .eq('id', activity.visit_id);
+
+      if (visitError) throw visitError;
+
+      // Update activity_events with end location and time
+      await updateActivityLocation(activity.id, {
+        end_time: now,
+        ...(gps ? { end_latitude: gps.lat, end_longitude: gps.lng } : {}),
+      });
+
+      toast.success('Activity completed!');
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       await loadActivities();
     } catch (err) {
-      console.error('[ActivityEventsTable] Check-out failed:', err);
-      toast.error('Check-out failed');
+      console.error('[ActivityEventsTable] Complete failed:', err);
+      toast.error('Failed to complete activity');
     } finally {
       setActionLoading(null);
     }
@@ -136,8 +207,24 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // FIX: Don't show loading spinner - it causes visual flickering
-  // The parent already waits for hasLoadedOnce before rendering this component
+  const calculateDuration = (checkIn: string, checkOut: string): string => {
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffMs = end.getTime() - start.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const getActivityStatus = (activity: ActivityEvent): string => {
+    const visit = activity.visit_id ? visitStatuses[activity.visit_id] : null;
+    if (!visit) return 'planned';
+    if (visit.status === 'productive' || visit.check_out_time) return 'productive';
+    if (visit.status === 'in-progress' || visit.check_in_time) return 'in-progress';
+    return 'planned';
+  };
+
   if (!hasLoadedOnce || (isLoading && activities.length === 0)) {
     return null;
   }
@@ -158,6 +245,9 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
       <CardContent className="px-4 pb-3 space-y-2">
         {activities.map((activity) => {
           const visitStatus = activity.visit_id ? visitStatuses[activity.visit_id] : null;
+          const status = getActivityStatus(activity);
+          const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
+          const StatusIcon = statusConfig.icon;
           const isCheckedIn = !!visitStatus?.check_in_time;
           const isCheckedOut = !!visitStatus?.check_out_time;
 
@@ -166,14 +256,31 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
               key={activity.id}
               className="rounded-lg border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2"
             >
-              {/* Top row: Name + Type Badge */}
+              {/* Top row: Name + Type Badge + Status */}
               <div className="flex items-start justify-between gap-2">
-                <h4 className="font-medium text-sm leading-tight">
-                  {activity.activity_name || activity.activity_type}
-                </h4>
-                <Badge className={`text-[10px] px-2 py-0.5 shrink-0 ${ACTIVITY_TYPE_COLORS[activity.activity_type] || ACTIVITY_TYPE_COLORS.Other}`}>
-                  {activity.activity_type}
-                </Badge>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm leading-tight">
+                    {activity.activity_name || activity.activity_type}
+                  </h4>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge className={`text-[10px] px-2 py-0.5 ${ACTIVITY_TYPE_COLORS[activity.activity_type] || ACTIVITY_TYPE_COLORS.Other}`}>
+                    {activity.activity_type}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Status Card */}
+              <div className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium ${statusConfig.color}`}>
+                <StatusIcon className="h-3.5 w-3.5" />
+                <span>{statusConfig.label}</span>
+                {/* Duration for completed */}
+                {status === 'productive' && visitStatus?.check_in_time && visitStatus?.check_out_time && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] opacity-80">
+                    <Timer className="h-3 w-3" />
+                    {calculateDuration(visitStatus.check_in_time, visitStatus.check_out_time)}
+                  </span>
+                )}
               </div>
 
               {/* Details row */}
@@ -182,10 +289,16 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                   <Clock className="h-3 w-3" />
                   {formatActivityDuration(activity)}
                 </span>
-                {activity.retailer_name && (
+                {(activity.activity_place || activity.retailer_name) && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
-                    {activity.retailer_name}
+                    {activity.activity_place || activity.retailer_name}
+                  </span>
+                )}
+                {activity.start_latitude && activity.start_longitude && (
+                  <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <Navigation className="h-3 w-3" />
+                    GPS
                   </span>
                 )}
               </div>
@@ -198,56 +311,59 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                 </div>
               )}
 
-              {/* Check-in/Check-out section */}
-              {activity.visit_id && (
-                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                  {/* Check In Button */}
-                  {isToday && !isCheckedIn && (
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => handleCheckIn(activity.visit_id!)}
-                      disabled={actionLoading === activity.visit_id + '-in'}
-                    >
-                      {actionLoading === activity.visit_id + '-in' ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <LogIn className="h-3 w-3" />
-                      )}
-                      Check In
-                    </Button>
-                  )}
-
-                  {/* Check Out Button */}
-                  {isToday && isCheckedIn && !isCheckedOut && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs gap-1"
-                      onClick={() => handleCheckOut(activity.visit_id!)}
-                      disabled={actionLoading === activity.visit_id + '-out'}
-                    >
-                      {actionLoading === activity.visit_id + '-out' ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <LogOut className="h-3 w-3" />
-                      )}
-                      Check Out
-                    </Button>
-                  )}
-
-                  {/* Timestamps */}
+              {/* Timestamps */}
+              {(isCheckedIn || isCheckedOut) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                   {isCheckedIn && (
-                    <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1">
-                      <LogIn className="h-3 w-3" />
-                      In: {formatTime(visitStatus!.check_in_time!)}
+                    <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <Play className="h-3 w-3" />
+                      Started: {formatTime(visitStatus!.check_in_time!)}
                     </span>
                   )}
                   {isCheckedOut && (
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <LogOut className="h-3 w-3" />
-                      Out: {formatTime(visitStatus!.check_out_time!)}
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Ended: {formatTime(visitStatus!.check_out_time!)}
                     </span>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {activity.visit_id && isToday && (
+                <div className="flex items-center gap-2 pt-1">
+                  {/* Start Activity (Planned → In Progress) */}
+                  {status === 'planned' && (
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => handleStartActivity(activity)}
+                      disabled={actionLoading === activity.id + '-start'}
+                    >
+                      {actionLoading === activity.id + '-start' ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Play className="h-3 w-3" />
+                      )}
+                      Start Activity
+                    </Button>
+                  )}
+
+                  {/* Complete Activity (In Progress → Completed) */}
+                  {status === 'in-progress' && (
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleCompleteActivity(activity)}
+                      disabled={actionLoading === activity.id + '-complete'}
+                    >
+                      {actionLoading === activity.id + '-complete' ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-3 w-3" />
+                      )}
+                      Complete Activity
+                    </Button>
                   )}
                 </div>
               )}

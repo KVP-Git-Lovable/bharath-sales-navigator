@@ -65,9 +65,12 @@ export type Database = {
         Row: {
           activity_date: string
           activity_name: string | null
+          activity_place: string | null
           activity_type: string
           created_at: string
           duration_type: string
+          end_latitude: number | null
+          end_longitude: number | null
           end_time: string | null
           from_date: string | null
           half_day_type: string | null
@@ -75,6 +78,8 @@ export type Database = {
           remarks: string | null
           retailer_id: string | null
           retailer_name: string | null
+          start_latitude: number | null
+          start_longitude: number | null
           start_time: string | null
           to_date: string | null
           total_days: number | null
@@ -84,9 +89,12 @@ export type Database = {
         Insert: {
           activity_date?: string
           activity_name?: string | null
+          activity_place?: string | null
           activity_type?: string
           created_at?: string
           duration_type?: string
+          end_latitude?: number | null
+          end_longitude?: number | null
           end_time?: string | null
           from_date?: string | null
           half_day_type?: string | null
@@ -94,6 +102,8 @@ export type Database = {
           remarks?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
+          start_latitude?: number | null
+          start_longitude?: number | null
           start_time?: string | null
           to_date?: string | null
           total_days?: number | null
@@ -103,9 +113,12 @@ export type Database = {
         Update: {
           activity_date?: string
           activity_name?: string | null
+          activity_place?: string | null
           activity_type?: string
           created_at?: string
           duration_type?: string
+          end_latitude?: number | null
+          end_longitude?: number | null
           end_time?: string | null
           from_date?: string | null
           half_day_type?: string | null
@@ -113,6 +126,8 @@ export type Database = {
           remarks?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
+          start_latitude?: number | null
+          start_longitude?: number | null
           start_time?: string | null
           to_date?: string | null
           total_days?: number | null

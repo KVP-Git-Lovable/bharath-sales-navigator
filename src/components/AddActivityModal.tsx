@@ -8,12 +8,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, MapPin, Navigation } from 'lucide-react';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivityEvents } from '@/hooks/useActivityEvents';
 import { toast } from 'sonner';
+import { Geolocation } from '@capacitor/geolocation';
 
 interface AddActivityModalProps {
   open: boolean;
@@ -22,24 +23,27 @@ interface AddActivityModalProps {
 
 type DurationType = 'hour_based' | 'half_day' | 'full_day' | 'multiple_days';
 
-const ACTIVITY_TYPES = ['Celebration', 'Event', 'Promotion', 'Demo', 'Other'];
+const ACTIVITY_TYPES = ['Doctor Visit', 'Celebration', 'Event', 'Promotion', 'Demo', 'Meeting', 'Other'];
 
 export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) => {
   const { user } = useAuth();
   const { createActivity } = useActivityEvents();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form state
+  // Form state — Activity Type and Date at top
+  const [activityType, setActivityType] = useState('Event');
+  const [activityDate, setActivityDate] = useState<Date>(new Date());
   const [activityName, setActivityName] = useState('');
   const [durationType, setDurationType] = useState<DurationType>('full_day');
-  const [activityDate, setActivityDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('11:00');
   const [halfDayType, setHalfDayType] = useState('first_half');
   const [fromDate, setFromDate] = useState<Date>(new Date());
   const [toDate, setToDate] = useState<Date>(new Date());
-  const [activityType, setActivityType] = useState('Event');
-  const [siteName, setSiteName] = useState('');
+  const [activityPlace, setActivityPlace] = useState('');
+  const [placeLatitude, setPlaceLatitude] = useState<number | null>(null);
+  const [placeLongitude, setPlaceLongitude] = useState<number | null>(null);
+  const [capturingLocation, setCapturingLocation] = useState(false);
   const [remarks, setRemarks] = useState('');
 
   // Calculate total days for multiple days
@@ -48,22 +52,61 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
     : null;
 
   const resetForm = () => {
+    setActivityType('Event');
+    setActivityDate(new Date());
     setActivityName('');
     setDurationType('full_day');
-    setActivityDate(new Date());
     setStartTime('09:00');
     setEndTime('11:00');
     setHalfDayType('first_half');
     setFromDate(new Date());
     setToDate(new Date());
-    setActivityType('Event');
-    setSiteName('');
+    setActivityPlace('');
+    setPlaceLatitude(null);
+    setPlaceLongitude(null);
     setRemarks('');
+  };
+
+  const captureLocation = async () => {
+    setCapturingLocation(true);
+    try {
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
+      });
+      setPlaceLatitude(position.coords.latitude);
+      setPlaceLongitude(position.coords.longitude);
+      toast.success('Location captured successfully');
+    } catch (error) {
+      console.error('Error capturing location:', error);
+      // Fallback to browser geolocation
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setPlaceLatitude(position.coords.latitude);
+            setPlaceLongitude(position.coords.longitude);
+            toast.success('Location captured successfully');
+          },
+          () => {
+            toast.error('Unable to capture location. Please allow location access.');
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else {
+        toast.error('Location services not available');
+      }
+    } finally {
+      setCapturingLocation(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!user?.id) {
       toast.error('Please log in first');
+      return;
+    }
+    if (!activityType) {
+      toast.error('Please select an activity type');
       return;
     }
     setIsSubmitting(true);
@@ -89,15 +132,17 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
         from_date: durationType === 'multiple_days' ? format(fromDate, 'yyyy-MM-dd') : undefined,
         to_date: durationType === 'multiple_days' ? format(toDate, 'yyyy-MM-dd') : undefined,
         total_days: totalDays || undefined,
-        retailer_name: siteName || undefined,
+        retailer_name: activityPlace || undefined,
         remarks: remarks || undefined,
+        activity_place: activityPlace || undefined,
+        start_latitude: placeLatitude || undefined,
+        start_longitude: placeLongitude || undefined,
       });
 
       if (result) {
         toast.success('Activity created successfully!');
         resetForm();
         onOpenChange(false);
-        // Trigger refresh so ActivityEventsTable picks up the new activity
         window.dispatchEvent(new Event('visitDataChanged'));
       } else {
         toast.error('Failed to create activity');
@@ -121,6 +166,42 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
+          {/* 1. Activity Type — TOP */}
+          <div>
+            <Label className="text-sm font-medium">Activity Type</Label>
+            <Select value={activityType} onValueChange={setActivityType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select activity type" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACTIVITY_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 2. Activity Date — Second from top */}
+          <div>
+            <Label className="text-sm font-medium">Activity Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start text-left font-normal mt-1">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(activityDate, 'PPP')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={activityDate}
+                  onSelect={(d) => d && setActivityDate(d)}
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {/* Activity Name */}
           <div>
             <Label className="text-sm">Activity Name</Label>
@@ -167,94 +248,30 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
 
           {/* Duration-specific fields */}
           {durationType === 'hour_based' && (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-sm">Activity Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal mt-1">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(activityDate, 'PPP')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={activityDate}
-                      onSelect={(d) => d && setActivityDate(d)}
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label className="text-sm">Start Time</Label>
+                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-1" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm">Start Time</Label>
-                  <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-sm">End Time</Label>
-                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="mt-1" />
-                </div>
+              <div>
+                <Label className="text-sm">End Time</Label>
+                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="mt-1" />
               </div>
             </div>
           )}
 
           {durationType === 'half_day' && (
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm">Activity Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal mt-1">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(activityDate, 'PPP')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={activityDate}
-                      onSelect={(d) => d && setActivityDate(d)}
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <Label className="text-sm">Half Day Type</Label>
-                <Select value={halfDayType} onValueChange={setHalfDayType}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="first_half">First Half</SelectItem>
-                    <SelectItem value="second_half">Second Half</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          {durationType === 'full_day' && (
             <div>
-              <Label className="text-sm">Activity Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal mt-1">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(activityDate, 'PPP')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={activityDate}
-                    onSelect={(d) => d && setActivityDate(d)}
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label className="text-sm">Half Day Type</Label>
+              <Select value={halfDayType} onValueChange={setHalfDayType}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="first_half">First Half</SelectItem>
+                  <SelectItem value="second_half">Second Half</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 
@@ -308,30 +325,41 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
             </div>
           )}
 
-          {/* Activity Type */}
+          {/* Activity Place with GPS capture */}
           <div>
-            <Label className="text-sm">Activity Type</Label>
-            <Select value={activityType} onValueChange={setActivityType}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ACTIVITY_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Site Name */}
-          <div>
-            <Label className="text-sm">Site</Label>
-            <Input
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              placeholder="Enter site name..."
-              className="mt-1"
-            />
+            <Label className="text-sm font-medium">Activity Place</Label>
+            <div className="flex gap-2 mt-1">
+              <Input
+                value={activityPlace}
+                onChange={(e) => setActivityPlace(e.target.value)}
+                placeholder="Enter place name..."
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant={placeLatitude ? "default" : "outline"}
+                size="icon"
+                onClick={captureLocation}
+                disabled={capturingLocation}
+                className={cn(
+                  "shrink-0",
+                  placeLatitude ? "bg-green-600 hover:bg-green-700 text-white" : ""
+                )}
+                title="Capture current location"
+              >
+                {capturingLocation ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Navigation className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {placeLatitude && placeLongitude && (
+              <p className="text-[10px] text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                Location captured: {placeLatitude.toFixed(4)}, {placeLongitude.toFixed(4)}
+              </p>
+            )}
           </div>
 
           {/* Remarks */}

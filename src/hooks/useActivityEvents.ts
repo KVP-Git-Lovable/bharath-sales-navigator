@@ -20,6 +20,11 @@ export interface ActivityEvent {
   retailer_name: string | null;
   remarks: string | null;
   created_at: string;
+  activity_place: string | null;
+  start_latitude: number | null;
+  start_longitude: number | null;
+  end_latitude: number | null;
+  end_longitude: number | null;
 }
 
 interface CreateActivityParams {
@@ -36,6 +41,9 @@ interface CreateActivityParams {
   retailer_id?: string;
   retailer_name?: string;
   remarks?: string;
+  activity_place?: string;
+  start_latitude?: number;
+  start_longitude?: number;
 }
 
 // Cache for activity events by visit_id
@@ -121,6 +129,9 @@ export const useActivityEvents = () => {
         retailer_id: params.retailer_id || null,
         retailer_name: params.retailer_name || null,
         remarks: params.remarks || null,
+        activity_place: params.activity_place || null,
+        start_latitude: params.start_latitude || null,
+        start_longitude: params.start_longitude || null,
       };
 
       const { data: activityData, error: activityError } = await supabase
@@ -144,6 +155,29 @@ export const useActivityEvents = () => {
       console.error('[useActivityEvents] createActivity failed:', error);
       return null;
     }
+  };
+
+  const updateActivityLocation = async (
+    activityId: string,
+    updates: { 
+      start_latitude?: number; 
+      start_longitude?: number; 
+      end_latitude?: number; 
+      end_longitude?: number;
+      start_time?: string;
+      end_time?: string;
+    }
+  ): Promise<boolean> => {
+    const { error } = await supabase
+      .from('activity_events')
+      .update(updates as any)
+      .eq('id', activityId);
+
+    if (error) {
+      console.error('[useActivityEvents] Error updating activity location:', error);
+      return false;
+    }
+    return true;
   };
 
   const fetchActivitiesForDate = useCallback(async (userId: string, date: string): Promise<ActivityEvent[]> => {
@@ -170,6 +204,7 @@ export const useActivityEvents = () => {
     fetchActivityForVisit,
     fetchActivitiesForDate,
     createActivity,
+    updateActivityLocation,
     clearCache,
   };
 };

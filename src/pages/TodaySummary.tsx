@@ -150,6 +150,7 @@ export const TodaySummary = () => {
   }>>([]);
 
   const [pointsEarnedToday, setPointsEarnedToday] = useState(0);
+  const [completedActivitiesCount, setCompletedActivitiesCount] = useState(0);
   
   // Payment method breakdown data for pie chart
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<Array<{
@@ -1489,6 +1490,23 @@ export const TodaySummary = () => {
         variant: "destructive"
       });
     } finally {
+      // Fetch completed activities count
+      try {
+        const activityUserId = managerSelectedUserId !== 'self' ? managerSelectedUserId : user?.id;
+        if (activityUserId) {
+          const { data: activityVisits } = await supabase
+            .from('visits')
+            .select('id')
+            .eq('user_id', activityUserId)
+            .eq('visit_type', 'activity')
+            .eq('status', 'productive')
+            .gte('planned_date', format(dateRange.from, 'yyyy-MM-dd'))
+            .lte('planned_date', format(dateRange.to, 'yyyy-MM-dd'));
+          setCompletedActivitiesCount(activityVisits?.length || 0);
+        }
+      } catch {
+        setCompletedActivitiesCount(0);
+      }
       setLoading(false);
       initialLoadDone.current = true;
     }
@@ -2076,6 +2094,20 @@ export const TodaySummary = () => {
                 <div className="text-xs text-muted-foreground mt-1">Tap to view Leaderboard</div>
               </div>
             </div>
+
+            {/* Activities Completed */}
+            {completedActivitiesCount > 0 && (
+              <div className="grid grid-cols-1 gap-4">
+                <div className="text-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <div className="text-xl font-bold text-purple-600">
+                    {completedActivitiesCount}
+                  </div>
+                  <div className="text-sm text-purple-600/80 font-medium">
+                    {completedActivitiesCount === 1 ? '1 activity was completed' : `${completedActivitiesCount} activities were completed`}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
