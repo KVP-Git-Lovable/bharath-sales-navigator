@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES, MIN_SYNC_INTERVAL_MS } from '@/lib/offlineStorage';
 import { loadMyVisitsSnapshot, saveMyVisitsSnapshot, clearMyVisitsSnapshot } from '@/lib/myVisitsSnapshot';
 import { getLocalTodayDate } from '@/utils/dateUtils';
-import { isSlowConnection, getConnectionQuality, getManualSlowMode } from '@/utils/internetSpeedCheck';
+import { isSlowConnection as detectSlowConnection, getConnectionQuality, getManualSlowMode as getManualSlowModeFlag } from '@/utils/internetSpeedCheck';
 import { getLastChangeTimestamp, clearChangeMarker } from '@/lib/visitChangeMarker';
 
 interface UseVisitsDataOptimizedProps {
