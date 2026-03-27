@@ -3,6 +3,53 @@ import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
 
+/**
+ * Compress an image (URL string or Blob) for PDF embedding.
+ * Returns a JPEG base64 data URL at reduced dimensions and quality.
+ */
+async function compressImageForPDF(
+  input: string | Blob,
+  maxDim: number = 150,
+  quality: number = 0.3
+): Promise<string> {
+  // Get a blob from URL if needed
+  let blob: Blob;
+  if (typeof input === 'string') {
+    const response = await fetch(input);
+    blob = await response.blob();
+  } else {
+    blob = input;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image for PDF compression'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 // Helper function to check if text contains non-English characters (Indian languages)
 const containsNonEnglishChars = (text: string): boolean => {
   if (!text) return false;
