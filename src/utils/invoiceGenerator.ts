@@ -278,7 +278,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     return getShortDisplayName(item.product_name || item.name || '');
   };
 
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
 
