@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { compressImageFile } from "@/utils/imageCompression";
+import { compressImageFile, compressToTargetSize } from "@/utils/imageCompression";
 import { useTranslation } from "react-i18next";
 import { Layout } from "@/components/Layout";
 import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft, User } from "lucide-react";

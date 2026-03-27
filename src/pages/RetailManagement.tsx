@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { compressImageFile } from "@/utils/imageCompression";
+import { compressImageFile, compressToTargetSize } from "@/utils/imageCompression";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate, useNavigate } from "react-router-dom";

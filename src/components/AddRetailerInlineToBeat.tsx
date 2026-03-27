@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { compressImageFile } from "@/utils/imageCompression";
+import { compressImageFile, compressToTargetSize } from "@/utils/imageCompression";
 import { useTranslation } from "react-i18next";
 import { X, Camera, ScanLine, Store, ChevronsUpDown, Check, MapPin, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
