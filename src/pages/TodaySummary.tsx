@@ -2094,6 +2094,20 @@ export const TodaySummary = () => {
                 <div className="text-xs text-muted-foreground mt-1">Tap to view Leaderboard</div>
               </div>
             </div>
+
+            {/* Activities Completed */}
+            {completedActivitiesCount > 0 && (
+              <div className="grid grid-cols-1 gap-4">
+                <div className="text-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <div className="text-xl font-bold text-purple-600">
+                    {completedActivitiesCount}
+                  </div>
+                  <div className="text-sm text-purple-600/80 font-medium">
+                    {completedActivitiesCount === 1 ? '1 activity was completed' : `${completedActivitiesCount} activities were completed`}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
