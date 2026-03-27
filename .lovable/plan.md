@@ -1,48 +1,35 @@
 
 
-## Invoice & Retailer Photo Compression
+## Issue Analysis: Team Attendance Not Showing Present Users
 
-### 1. Invoice PDF Size Reduction (Target: ≤ 50 KB)
+### Root Cause
 
-**Root cause**: Logo and QR code are embedded as full-resolution base64 images without compression.
+After investigating the database and code:
 
-**Changes to `src/utils/invoiceGenerator.ts`**:
-- Change constructor to `new jsPDF({ compress: true })` (line 234) — enables stream compression for all content
-- Add a helper `compressImageForPDF(blobOrUrl, maxDim, quality)` that fetches an image, draws it on a canvas at reduced dimensions, and returns a JPEG base64 data URL
-- Before embedding the **logo** (lines 246-277): compress to max **150px**, JPEG quality **0.3**
-- Before embedding the **QR code** (lines 745-775): compress to max **100px**, JPEG quality **0.3**
-- After `doc.output('blob')`, add a size guard: if blob > 50 KB, log a warning (re-generation at lower quality is optional since aggressive initial compression should suffice)
+- **The database has correct data**: 10 of Girish's subordinates have `present` status for today (2026-03-27).
+- **The code logic is correct**: The attendance query correctly fetches by date and filters statuses.
+- **The problem is stale data / no live refresh**: The attendance query has a `staleTime` of 2 minutes and no `refetchInterval`. Once a manager opens the "My Team" tab, the data doesn't update automatically. If opened before subordinates check in, it stays showing all as "Absent" until the user manually refreshes.
 
-**New helper** (added at top of the file):
-```ts
-async function compressImageForPDF(
-  input: string | Blob, maxDim: number, quality: number
-): Promise<string> {
-  // Fetch if URL string, create Image, draw to canvas at maxDim, 
-  // export as JPEG base64 data URL
-}
-```
+### Fix: Add Auto-Refresh to Team Attendance Queries
 
-### 2. Retailer Photos Compression (Target: 25% of original)
+**File: `src/hooks/useTeamAttendance.ts`**
 
-**Changes to `src/utils/imageCompression.ts`**:
-- Add `compressToTargetSize(input, targetRatio, maxDimension)` — iteratively reduces JPEG quality from 0.5 down to 0.1 (step 0.1) until output ≤ `targetRatio × originalSize`, with floor quality of 0.1
+Add `refetchInterval` to the three key queries so team data stays current while the tab is open:
 
-**Upload point changes** (replace `compressImageFile(file/blob)` with `compressToTargetSize(file/blob, 0.25, 1200)`):
+1. **Today's attendance query** (line 96): Add `refetchInterval: 30 * 1000` (30 seconds) — this is the most critical one for live status
+2. **Today's leaves query** (line 118): Add `refetchInterval: 60 * 1000` (1 minute) — leaves change less frequently
+3. **Monthly counts query** (line 137): Add `refetchInterval: 60 * 1000` (1 minute)
+4. **Reduce staleTime** on the attendance query from 2 minutes to 30 seconds for fresher data on tab switches
 
-| File | Line(s) | Current call |
-|------|---------|-------------|
-| `src/pages/AddRetailer.tsx` | 516, 642 | `compressImageFile(file)` / `compressImageFile(blob)` |
-| `src/components/AddRetailerInlineToBeat.tsx` | 269 | `compressImageFile(file)` |
-| `src/pages/RetailManagement.tsx` | 263 | `compressImageFile(blob)` |
+This ensures managers always see up-to-date team status without manually refreshing the page.
 
-### Files Modified
+### Additional Safety: Add refetchOnMount
 
-| File | What changes |
-|------|-------------|
-| `src/utils/invoiceGenerator.ts` | `compress: true` in jsPDF; add `compressImageForPDF` helper; compress logo & QR before embedding; post-generation size guard |
-| `src/utils/imageCompression.ts` | Add `compressToTargetSize()` with iterative quality reduction |
-| `src/pages/AddRetailer.tsx` | Use `compressToTargetSize(file, 0.25, 1200)` at 2 upload points |
-| `src/components/AddRetailerInlineToBeat.tsx` | Same replacement at 1 upload point |
-| `src/pages/RetailManagement.tsx` | Same replacement at 1 upload point |
+Set `refetchOnMount: 'always'` on the today attendance query to ensure fresh data whenever the My Team tab is opened, even if stale cache exists.
+
+### Technical Summary
+
+| File | Change |
+|------|--------|
+| `src/hooks/useTeamAttendance.ts` | Add `refetchInterval` (30s-60s) and `refetchOnMount: 'always'` to attendance, leaves, and monthly count queries |
 
