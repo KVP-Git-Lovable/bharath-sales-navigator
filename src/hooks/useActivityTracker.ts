@@ -119,11 +119,11 @@ export const useActivityTracker = () => {
       const duration = Math.round((Date.now() - lastVisitTimeRef.current) / 1000);
       supabase
         .from('user_page_views')
-        .update({ duration_seconds: duration })
+        .update({ duration_seconds: duration } as any)
         .eq('session_id', sessionIdRef.current)
-        .eq('page_path', lastPathRef.current)
+        .eq('page', lastPathRef.current)
         .is('duration_seconds', null)
-        .order('visited_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .then(() => {});
     }
