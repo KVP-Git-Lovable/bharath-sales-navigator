@@ -494,48 +494,59 @@ const Attendance = () => {
         console.error('Face verification error:', faceMatchError);
       }
       
-      // If credit/service error, bypass verification completely and proceed with attendance
+      // If there's a service/credit error, allow retry but do NOT bypass
       if (isCreditError || faceMatchError) {
-        console.log('Face verification service unavailable, bypassing verification...');
+        console.error('Face verification service error, blocking attendance');
         toast({
           title: "Face Verification Unavailable ⚠️",
-          description: "Face photo captured. Verification service unavailable, proceeding with attendance.",
-          variant: "default"
+          description: "Verification service is temporarily unavailable. Please try again in a moment.",
+          variant: "destructive"
         });
-        setFaceVerificationAttempts(0);
-        // Continue to record attendance below without blocking
-      } else if (confidence < 50) {
+        setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
+        setShowCamera(false);
+        setAttendanceType(null);
+        setIsMarkingAttendance(false);
+        return; // Block attendance - do not proceed
+      }
+      
+      // Also check if the edge function returned status: 'error' inside the response body
+      if (faceMatchResult?.status === 'error') {
+        console.error('Face verification returned error status:', faceMatchResult?.message);
+        toast({
+          title: "Face Verification Error ⚠️",
+          description: faceMatchResult?.message || "Could not verify face. Please try again.",
+          variant: "destructive"
+        });
+        setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
+        setShowCamera(false);
+        setAttendanceType(null);
+        setIsMarkingAttendance(false);
+        return; // Block attendance
+      }
+      
+      if (confidence < 50) {
+        // Face does NOT match - block attendance, allow retry
         const newAttemptCount = faceVerificationAttempts + 1;
         setFaceVerificationAttempts(newAttemptCount);
         setProcessingState({ isProcessing: false, currentStep: null, stepMessage: '' });
         
-        if (newAttemptCount < 2) {
-          // First attempt failed - ask to retry
-          toast({
-            title: `Face Verification Failed (Attempt ${newAttemptCount}/1) ❌`,
-            description: `Match confidence ${Math.round(confidence)}% is below 50%. Please try again with better lighting.`,
-            variant: "destructive"
-          });
-          setShowCamera(false);
-          setAttendanceType(null);
-          setIsMarkingAttendance(false);
-          return; // Do NOT record attendance, user can retry
-        } else {
-          // 2nd attempt - allow with warning
-          toast({
-            title: "Face Verification Bypassed ⚠️",
-            description: `After 1 failed attempt, attendance is allowed. Please update your profile photo if this persists.`,
-            variant: "default"
-          });
-          setFaceVerificationAttempts(0);
-          // Continue to record attendance below
-        }
+        toast({
+          title: `Face Match Failed ❌`,
+          description: newAttemptCount >= 3 
+            ? `Face did not match after ${newAttemptCount} attempts. Please contact your manager.`
+            : `Match confidence ${Math.round(confidence)}% is too low. Please try again with better lighting (Attempt ${newAttemptCount}/3).`,
+          variant: "destructive"
+        });
+        setShowCamera(false);
+        setAttendanceType(null);
+        setIsMarkingAttendance(false);
+        return; // Do NOT record attendance
       } else {
-        // Successful match - reset attempts counter
+        // Successful match (>=50%) - reset attempts counter
         setFaceVerificationAttempts(0);
         
         const statusMessage = confidence >= 70 
-          ? 'Face Match Verified ✅' 
+          ? 'Face Match Successful ✅' 
           : 'Partial Face Match ⚠️ (Above 50% threshold)';
         
         toast({
