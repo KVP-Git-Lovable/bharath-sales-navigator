@@ -1,14 +1,27 @@
 
 
-## Root Cause Analysis: Analytics Data Not Displaying Properly
+## Root Cause
 
-### Problem
-The Analytics page shows ₹0.00 Lac / 0 Orders when "All Users" is selected, even though the database has 139 confirmed orders worth ₹193,282 for the current week.
+The `get_activity_logging_summary` database function references **wrong column names** that don't exist in the actual tables:
 
-### Root Causes Identified
+| Table | Function References | Actual Column |
+|-------|-------------------|---------------|
+| `user_page_views` | `page_path` | `page` |
+| `user_page_views` | `viewed_at` | `created_at` |
+| `user_data_usage` | `data_bytes` | `data_used_mb` |
+| `user_data_usage` | `recorded_at` | `created_at` |
 
-**1. Missing Admin RLS Policy on `orders` Table (Primary Issue)**
+The error `column pv.page_path does not exist` (code 42703) confirms this — the function crashes before returning any data.
 
-The `orders` table only has a self-only SELECT policy: `user_id = auth.uid()`. There is no system admin policy to allow administrators to view all orders. When "All Users" is selected, the query drops the user filter, but RLS still restricts results to the current user's own orders only.
+Additionally, the `user_sessions` table lacks `login_at`, `logout_at`, `is_active` columns that the `useActivityTracker` hook expects, but the function itself uses `attendance` for usage time, so the main fix is the column name mismatches.
 
-- `order_items` already has an admin read policy (`is_system_admin(auth.uid())`) — but `orders` does
+## Fix
+
+**Database migration** — Recreate the `get_activity_logging_summary` function with corrected column names:
+- `pv.page_path` → `pv.page`
+- `pv.viewed_at` → `pv.created_at`
+- `du.data_bytes` → `(du.data_used_mb * 1024 * 1024)` (convert MB back to bytes for the frontend)
+- `du.recorded_at` → `du.created_at`
+
+No frontend changes needed — the component already handles the response format correctly.
+
