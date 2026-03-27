@@ -53,8 +53,7 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
 
   const resetForm = () => {
     setActivityType('Event');
-    setActivityDate(new Date());
-    setActivityName('');
+    setCustomActivityType('');
     setDurationType('full_day');
     setStartTime('09:00');
     setEndTime('11:00');
