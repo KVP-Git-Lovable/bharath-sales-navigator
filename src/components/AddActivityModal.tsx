@@ -23,7 +23,7 @@ interface AddActivityModalProps {
 
 type DurationType = 'hour_based' | 'half_day' | 'full_day' | 'multiple_days';
 
-const ACTIVITY_TYPES = ['Doctor Visit', 'Celebration', 'Event', 'Promotion', 'Demo', 'Meeting', 'Other'];
+const ACTIVITY_TYPES = ['Celebration', 'Event', 'Promotion', 'Demo', 'Meeting', 'Other'];
 
 export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) => {
   const { user } = useAuth();
