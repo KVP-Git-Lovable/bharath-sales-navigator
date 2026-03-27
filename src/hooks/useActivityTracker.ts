@@ -135,9 +135,9 @@ export const useActivityTracker = () => {
       await supabase.from('user_page_views').insert({
         user_id: user.id,
         session_id: sessionIdRef.current,
-        page_path: path,
+        page: path,
         module_name: getModuleName(path),
-      });
+      } as any);
     } catch (e) {
       console.error('Failed to log page view:', e);
     }
