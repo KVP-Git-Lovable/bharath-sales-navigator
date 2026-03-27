@@ -639,7 +639,7 @@ export const AddRetailer = () => {
               // Convert compressed base64 to blob, then compress for storage
               const fetchRes = await fetch(compressedImage);
               const blob = await fetchRes.blob();
-              const compressedBlob = await compressImageFile(blob);
+              const compressedBlob = await compressToTargetSize(blob, 0.25, 1200);
               
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('retailer-photos')

@@ -260,7 +260,7 @@ export default function RetailManagement() {
     
     setUploadingPhoto(true);
     try {
-      const compressedBlob = await compressImageFile(blob);
+      const compressedBlob = await compressToTargetSize(blob, 0.25, 1200);
       const fileName = `${selectedRetailer.id}/store_${Date.now()}.jpg`;
       
       const { error: uploadError } = await supabase.storage
