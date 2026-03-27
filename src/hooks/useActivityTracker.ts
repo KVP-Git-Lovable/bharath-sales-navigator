@@ -154,7 +154,8 @@ export const useActivityTracker = () => {
         session_id: sessionIdRef.current,
         bytes_uploaded: uploaded,
         bytes_downloaded: downloaded,
-      });
+        data_used_mb: (uploaded + downloaded) / (1024 * 1024),
+      } as any);
     } catch (e) {
       console.error('Failed to flush data usage:', e);
     }

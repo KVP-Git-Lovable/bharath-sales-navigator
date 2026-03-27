@@ -15387,21 +15387,30 @@ export type Database = {
       }
       user_data_usage: {
         Row: {
+          bytes_downloaded: number | null
+          bytes_uploaded: number | null
           created_at: string | null
           data_used_mb: number | null
           id: string
+          session_id: string | null
           user_id: string | null
         }
         Insert: {
+          bytes_downloaded?: number | null
+          bytes_uploaded?: number | null
           created_at?: string | null
           data_used_mb?: number | null
           id?: string
+          session_id?: string | null
           user_id?: string | null
         }
         Update: {
+          bytes_downloaded?: number | null
+          bytes_uploaded?: number | null
           created_at?: string | null
           data_used_mb?: number | null
           id?: string
+          session_id?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -15677,20 +15686,29 @@ export type Database = {
       user_page_views: {
         Row: {
           created_at: string | null
+          duration_seconds: number | null
           id: string
+          module_name: string | null
           page: string | null
+          session_id: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
+          duration_seconds?: number | null
           id?: string
+          module_name?: string | null
           page?: string | null
+          session_id?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
+          duration_seconds?: number | null
           id?: string
+          module_name?: string | null
           page?: string | null
+          session_id?: string | null
           user_id?: string | null
         }
         Relationships: []
