@@ -181,37 +181,20 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
             </Select>
           </div>
 
-          {/* 2. Activity Date — Second from top */}
-          <div>
-            <Label className="text-sm font-medium">Activity Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal mt-1">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(activityDate, 'PPP')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={activityDate}
-                  onSelect={(d) => d && setActivityDate(d)}
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          {/* Custom Activity Type input when "Other" is selected */}
+          {activityType === 'Other' && (
+            <div>
+              <Label className="text-sm font-medium">Specify Activity Type</Label>
+              <Input
+                value={customActivityType}
+                onChange={(e) => setCustomActivityType(e.target.value)}
+                placeholder="Enter activity type..."
+                className="mt-1"
+              />
+            </div>
+          )}
 
-          {/* Activity Name */}
-          <div>
-            <Label className="text-sm">Activity Name</Label>
-            <Input
-              value={activityName}
-              onChange={(e) => setActivityName(e.target.value)}
-              placeholder="e.g., Diwali Celebration, Product Launch"
-              className="mt-1"
-            />
-          </div>
+          {/* 2. Activity Date — Second from top */}
 
           {/* Duration Type Selection */}
           <div className="space-y-2">
