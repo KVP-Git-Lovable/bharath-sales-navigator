@@ -1024,9 +1024,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     }
 
     // 4. No local data - do initial full load from network
-    // SLOW NETWORK FIX: Skip network load if slow connection - show empty state instead
-    const isSlowConn = isSlowConnection();
-    if (navigator.onLine && !isSlowConn) {
+    // IMPORTANT: even on slow connections, attempt at least one network load
+    // so hierarchy view does not appear empty for subordinates.
+    if (navigator.onLine) {
       try {
         setIsLoading(true);
         await doFullInitialLoad(effectiveUserId, selectedDate);
@@ -1035,14 +1035,11 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         setHasLoadedOnce(true);
       }
     } else {
-      // No cache, no network, or slow connection - show empty state
-      if (isSlowConn) {
-        console.log('[LoadData] ⚡ Skipping network load - slow connection, showing empty state');
-      }
+      // No cache and offline - show empty state
       setIsLoading(false);
       setHasLoadedOnce(true);
     }
-    
+
     isFetchingRef.current = false;
   }, [effectiveUserId, selectedDate, isToday, loadFromOfflineStorage, smartDeltaSync, shouldSyncNow]);
 
