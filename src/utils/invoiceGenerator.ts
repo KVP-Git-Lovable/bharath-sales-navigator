@@ -782,14 +782,8 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   // QR Code box (right side)
   if (company.qr_code_url) {
     try {
-      const response = await fetch(company.qr_code_url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      // Compress QR code to max 100px, JPEG quality 0.3 for small PDF size
+      const base64 = await compressImageForPDF(company.qr_code_url, 100, 0.3);
       
       const boxX = pageWidth - 95;
       const boxY = sectionStartY - 10;
