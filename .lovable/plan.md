@@ -1,27 +1,14 @@
 
 
-# Fix: Reporting Manager Not Visible in Admin Dashboard
+## Root Cause Analysis: Analytics Data Not Displaying Properly
 
-## Problem
-The `employees` table has RLS policies restricting SELECT to `user_id = auth.uid()` only. The Admin Dashboard queries all employees to build the reporting manager column, but only gets the current user's row back.
+### Problem
+The Analytics page shows ₹0.00 Lac / 0 Orders when "All Users" is selected, even though the database has 139 confirmed orders worth ₹193,282 for the current week.
 
-## Solution
-Add an admin SELECT policy to the `employees` table so admins can read all employee records (including `manager_id` mappings).
+### Root Causes Identified
 
-### Database Migration
-```sql
--- Add admin read policy to employees table
-DROP POLICY IF EXISTS "Admins can view all employees" ON public.employees;
-CREATE POLICY "Admins can view all employees"
-  ON public.employees FOR SELECT
-  TO authenticated
-  USING (public.is_system_admin(auth.uid()));
-```
+**1. Missing Admin RLS Policy on `orders` Table (Primary Issue)**
 
-This single policy addition will allow admin users to fetch all employee rows, which the Admin Dashboard already uses to build the user→manager mapping. No frontend changes needed — the existing code at `AdminDashboard.tsx:263-295` already fetches from `employees` and joins with `profiles` to display manager names.
+The `orders` table only has a self-only SELECT policy: `user_id = auth.uid()`. There is no system admin policy to allow administrators to view all orders. When "All Users" is selected, the query drops the user filter, but RLS still restricts results to the current user's own orders only.
 
-## Impact
-- Reporting Manager column in Admin Dashboard will show correct names
-- Non-admin users still only see their own employee record (existing policy unchanged)
-- No frontend code changes required
-
+- `order_items` already has an admin read policy (`is_system_admin(auth.uid())`) — but `orders` does
