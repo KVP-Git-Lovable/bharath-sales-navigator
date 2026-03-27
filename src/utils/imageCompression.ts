@@ -51,3 +51,32 @@ export async function compressImageFile(
     img.src = objectUrl;
   });
 }
+
+/**
+ * Iteratively compresses an image until output is ≤ targetRatio × original size.
+ * Starts at quality 0.5 and steps down by 0.1 to a floor of 0.1.
+ *
+ * @param input        - The original File or Blob to compress
+ * @param targetRatio  - Target size as fraction of original (e.g. 0.25 = 25%)
+ * @param maxDimension - Cap width/height to this value. Default 1200
+ * @returns A compressed JPEG Blob
+ */
+export async function compressToTargetSize(
+  input: File | Blob,
+  targetRatio: number = 0.25,
+  maxDimension: number = 1200
+): Promise<Blob> {
+  const originalSize = input.size;
+  const targetSize = originalSize * targetRatio;
+
+  let quality = 0.5;
+  let result = await compressImageFile(input, quality, maxDimension);
+
+  while (result.size > targetSize && quality > 0.1) {
+    quality = Math.max(quality - 0.1, 0.1);
+    result = await compressImageFile(input, quality, maxDimension);
+    if (quality <= 0.1) break;
+  }
+
+  return result;
+}

@@ -3,6 +3,53 @@ import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
 
+/**
+ * Compress an image (URL string or Blob) for PDF embedding.
+ * Returns a JPEG base64 data URL at reduced dimensions and quality.
+ */
+async function compressImageForPDF(
+  input: string | Blob,
+  maxDim: number = 150,
+  quality: number = 0.3
+): Promise<string> {
+  // Get a blob from URL if needed
+  let blob: Blob;
+  if (typeof input === 'string') {
+    const response = await fetch(input);
+    blob = await response.blob();
+  } else {
+    blob = input;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image for PDF compression'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 // Helper function to check if text contains non-English characters (Indian languages)
 const containsNonEnglishChars = (text: string): boolean => {
   if (!text) return false;
@@ -231,7 +278,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     return getShortDisplayName(item.product_name || item.name || '');
   };
 
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
 
@@ -243,17 +290,10 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   let companyNameX = 15;
   if (isEnabled('header_company_logo') && company.logo_url) {
     try {
-      const response = await fetch(company.logo_url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const imgFormat = company.logo_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+      // Compress logo to max 150px, JPEG quality 0.3 for small PDF size
+      const base64 = await compressImageForPDF(company.logo_url, 150, 0.3);
       
-      // Get image dimensions to maintain aspect ratio
+      // Get compressed image dimensions to maintain aspect ratio
       const img = new Image();
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
@@ -274,7 +314,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
         logoHeight = maxWidth / aspectRatio;
       }
       
-      doc.addImage(base64, imgFormat, 15, 12, logoWidth, logoHeight);
+      doc.addImage(base64, 'JPEG', 15, 12, logoWidth, logoHeight);
       companyNameX = 18 + logoWidth;
     } catch (e) {
       console.warn("Failed to load logo image for invoice PDF:", e);
@@ -742,14 +782,8 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   // QR Code box (right side)
   if (company.qr_code_url) {
     try {
-      const response = await fetch(company.qr_code_url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      // Compress QR code to max 100px, JPEG quality 0.3 for small PDF size
+      const base64 = await compressImageForPDF(company.qr_code_url, 100, 0.3);
       
       const boxX = pageWidth - 95;
       const boxY = sectionStartY - 10;
@@ -771,8 +805,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
       doc.setTextColor(55, 65, 81);
       doc.text("Scan QR for Payment", boxX + boxW / 2, boxY + 8, { align: "center" });
 
-      const imgFormat = company.qr_code_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-      doc.addImage(base64, imgFormat, boxX + (boxW - 34) / 2, boxY + 14, 34, 34);
+      doc.addImage(base64, 'JPEG', boxX + (boxW - 34) / 2, boxY + 14, 34, 34);
 
       if (company.qr_upi) {
         doc.setFontSize(7);
@@ -812,7 +845,15 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setFont("helvetica", "bold");
   doc.text("THANK YOU FOR YOUR BUSINESS", pageWidth / 2, footerY + 12, { align: "center" });
 
-  return doc.output('blob');
+  const pdfBlob = doc.output('blob');
+  
+  // Post-generation size guard
+  const sizeKB = pdfBlob.size / 1024;
+  if (sizeKB > 50) {
+    console.warn(`⚠️ Invoice PDF size ${sizeKB.toFixed(1)} KB exceeds 50 KB target`);
+  }
+  
+  return pdfBlob;
 }
 
 /**

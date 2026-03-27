@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { compressImageFile } from "@/utils/imageCompression";
+import { compressImageFile, compressToTargetSize } from "@/utils/imageCompression";
 import { useTranslation } from "react-i18next";
 import { Layout } from "@/components/Layout";
 import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft, User } from "lucide-react";
@@ -513,7 +513,7 @@ export const AddRetailer = () => {
           reader.readAsDataURL(file);
 
           // Compress and upload to Supabase Storage
-          const compressedFile = await compressImageFile(file);
+          const compressedFile = await compressToTargetSize(file, 0.25, 1200);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')
@@ -639,7 +639,7 @@ export const AddRetailer = () => {
               // Convert compressed base64 to blob, then compress for storage
               const fetchRes = await fetch(compressedImage);
               const blob = await fetchRes.blob();
-              const compressedBlob = await compressImageFile(blob);
+              const compressedBlob = await compressToTargetSize(blob, 0.25, 1200);
               
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('retailer-photos')
