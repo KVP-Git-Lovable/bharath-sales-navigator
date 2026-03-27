@@ -290,17 +290,10 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   let companyNameX = 15;
   if (isEnabled('header_company_logo') && company.logo_url) {
     try {
-      const response = await fetch(company.logo_url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const imgFormat = company.logo_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+      // Compress logo to max 150px, JPEG quality 0.3 for small PDF size
+      const base64 = await compressImageForPDF(company.logo_url, 150, 0.3);
       
-      // Get image dimensions to maintain aspect ratio
+      // Get compressed image dimensions to maintain aspect ratio
       const img = new Image();
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
@@ -321,7 +314,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
         logoHeight = maxWidth / aspectRatio;
       }
       
-      doc.addImage(base64, imgFormat, 15, 12, logoWidth, logoHeight);
+      doc.addImage(base64, 'JPEG', 15, 12, logoWidth, logoHeight);
       companyNameX = 18 + logoWidth;
     } catch (e) {
       console.warn("Failed to load logo image for invoice PDF:", e);
