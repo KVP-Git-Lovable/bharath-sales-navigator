@@ -57,7 +57,7 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
   }, [reportContext]);
 
   // Ref for sendMessage to avoid stale closure in speech recognition
-  const sendMessageRef = useRef<(text: string) => void>(() => {});
+  const sendMessageRef = useRef<(text: string, playResponse?: boolean) => void>(() => {});
 
   // Initialize speech recognition
   useEffect(() => {
