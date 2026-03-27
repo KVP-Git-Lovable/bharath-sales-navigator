@@ -150,6 +150,7 @@ export const TodaySummary = () => {
   }>>([]);
 
   const [pointsEarnedToday, setPointsEarnedToday] = useState(0);
+  const [completedActivitiesCount, setCompletedActivitiesCount] = useState(0);
   
   // Payment method breakdown data for pie chart
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<Array<{
