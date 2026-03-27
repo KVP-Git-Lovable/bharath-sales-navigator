@@ -99,7 +99,7 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
         if (event.results[event.results.length - 1].isFinal) {
           const finalTranscript = transcript.trim();
           if (finalTranscript) {
-            sendMessageRef.current(finalTranscript);
+            sendMessageRef.current(finalTranscript, true);
           }
           setTranscript('');
         }
