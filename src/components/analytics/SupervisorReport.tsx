@@ -357,25 +357,49 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Build query with optional user filtering at database level - include order_items for KG calculation
-      let query = supabase
-        .from('orders')
-        .select(`
-          id,
-          user_id,
-          total_amount,
-          order_items(quantity, unit)
-        `)
-        .eq('status', 'confirmed')
-        .gte('order_date', fromDate)
-        .lte('order_date', toDate);
-      
-      // Filter by user IDs if specific users are selected
-      if (selectedUserIds.length > 0) {
-        query = query.in('user_id', selectedUserIds);
+      // Build query with batch pagination to avoid 1000-row limit
+      const BATCH_SIZE = 1000;
+      let allOrdersData: any[] = [];
+      let batchIndex = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = supabase
+          .from('orders')
+          .select(`
+            id,
+            user_id,
+            total_amount,
+            order_items(quantity, unit)
+          `)
+          .eq('status', 'confirmed')
+          .gte('order_date', fromDate)
+          .lte('order_date', toDate)
+          .range(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE - 1);
+        
+        // Filter by user IDs if specific users are selected
+        if (selectedUserIds.length > 0) {
+          query = query.in('user_id', selectedUserIds);
+        }
+
+        const { data: batchData, error: batchError } = await query;
+
+        if (batchError) {
+          console.error('Error fetching orders batch:', batchError);
+          break;
+        }
+
+        if (batchData && batchData.length > 0) {
+          allOrdersData = [...allOrdersData, ...batchData];
+          hasMore = batchData.length === BATCH_SIZE;
+          batchIndex++;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data: ordersData, error: ordersError } = await query;
+      const ordersData = allOrdersData;
+      const ordersError = allOrdersData.length === 0 && batchIndex === 0 ? true : null;
 
       if (ordersError) {
         console.error('Error fetching orders:', ordersError);
