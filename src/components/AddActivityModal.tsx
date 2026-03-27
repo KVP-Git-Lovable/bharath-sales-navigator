@@ -120,9 +120,10 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
         endTimeISO = new Date(`${dateStr}T${endTime}:00`).toISOString();
       }
 
+      const finalActivityType = activityType === 'Other' ? (customActivityType || 'Other') : activityType;
+
       const result = await createActivity({
-        activity_name: activityName || undefined,
-        activity_type: activityType,
+        activity_type: finalActivityType,
         duration_type: durationType,
         activity_date: dateStr,
         start_time: startTimeISO,
