@@ -32,8 +32,8 @@ export const AddActivityModal = ({ open, onOpenChange }: AddActivityModalProps) 
 
   // Form state — Activity Type and Date at top
   const [activityType, setActivityType] = useState('Event');
+  const [customActivityType, setCustomActivityType] = useState('');
   const [activityDate, setActivityDate] = useState<Date>(new Date());
-  const [activityName, setActivityName] = useState('');
   const [durationType, setDurationType] = useState<DurationType>('full_day');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('11:00');
