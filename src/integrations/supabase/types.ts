@@ -84,7 +84,6 @@ export type Database = {
           to_date: string | null
           total_days: number | null
           user_id: string
-          visit_id: string | null
         }
         Insert: {
           activity_date?: string
@@ -108,7 +107,6 @@ export type Database = {
           to_date?: string | null
           total_days?: number | null
           user_id: string
-          visit_id?: string | null
         }
         Update: {
           activity_date?: string
@@ -132,7 +130,6 @@ export type Database = {
           to_date?: string | null
           total_days?: number | null
           user_id?: string
-          visit_id?: string | null
         }
         Relationships: [
           {
@@ -147,13 +144,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activity_events_visit_id_fkey"
-            columns: ["visit_id"]
-            isOneToOne: false
-            referencedRelation: "visits"
             referencedColumns: ["id"]
           },
         ]
