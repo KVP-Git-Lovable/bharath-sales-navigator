@@ -57,7 +57,7 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
   }, [reportContext]);
 
   // Ref for sendMessage to avoid stale closure in speech recognition
-  const sendMessageRef = useRef<(text: string) => void>(() => {});
+  const sendMessageRef = useRef<(text: string, playResponse?: boolean) => void>(() => {});
 
   // Initialize speech recognition
   useEffect(() => {
@@ -99,7 +99,7 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
         if (event.results[event.results.length - 1].isFinal) {
           const finalTranscript = transcript.trim();
           if (finalTranscript) {
-            sendMessageRef.current(finalTranscript);
+            sendMessageRef.current(finalTranscript, true);
           }
           setTranscript('');
         }
@@ -212,7 +212,7 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
     setIsPlaying(false);
   }, []);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, playResponse: boolean = false) => {
     if (!text.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -226,17 +226,9 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
     setIsProcessing(true);
 
     try {
-      // Use the ref to get the latest context
       const currentContext = reportContextRef.current;
       
       console.log('Sending question to assistant:', text);
-      console.log('Using report context:', {
-        dateRange: currentContext.dateRange,
-        allUsersSummary: currentContext.allUsersSummary,
-        orderSummaryDataCount: currentContext.orderSummaryData?.length || 0,
-        skuDataCount: currentContext.skuData?.length || 0,
-        productivityDataCount: currentContext.productivityData?.length || 0,
-      });
       
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/report-voice-assistant`,
@@ -278,12 +270,14 @@ export const useReportVoiceChat = (reportContext: ReportContext) => {
       setMessages(prev => [...prev, assistantMessage]);
       setIsProcessing(false);
 
-      // Play the response
-      try {
-        await playAudio(answer);
-      } catch (audioError) {
-        console.error('Failed to play audio response:', audioError);
-        toast.error('Could not play audio response');
+      // Only play audio if the message was sent via voice (mic button)
+      if (playResponse) {
+        try {
+          await playAudio(answer);
+        } catch (audioError) {
+          console.error('Failed to play audio response:', audioError);
+          toast.error('Could not play audio response');
+        }
       }
     } catch (error) {
       console.error('Failed to get assistant response:', error);
