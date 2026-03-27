@@ -1,70 +1,48 @@
 
 
-## Root Cause
+## Invoice & Retailer Photo Compression
 
-The `user_page_views` and `user_data_usage` tables are **completely empty** (0 rows). The database function was fixed to reference correct column names, but the **tracker hook** (`useActivityTracker.ts`) has been silently failing to insert data because it references columns that don't exist in the actual tables.
+### 1. Invoice PDF Size Reduction (Target: ≤ 50 KB)
 
-### Mismatches in `useActivityTracker.ts`
+**Root cause**: Logo and QR code are embedded as full-resolution base64 images without compression.
 
-**`user_page_views` table** has columns: `id`, `user_id`, `page`, `created_at`
+**Changes to `src/utils/invoiceGenerator.ts`**:
+- Change constructor to `new jsPDF({ compress: true })` (line 234) — enables stream compression for all content
+- Add a helper `compressImageForPDF(blobOrUrl, maxDim, quality)` that fetches an image, draws it on a canvas at reduced dimensions, and returns a JPEG base64 data URL
+- Before embedding the **logo** (lines 246-277): compress to max **150px**, JPEG quality **0.3**
+- Before embedding the **QR code** (lines 745-775): compress to max **100px**, JPEG quality **0.3**
+- After `doc.output('blob')`, add a size guard: if blob > 50 KB, log a warning (re-generation at lower quality is optional since aggressive initial compression should suffice)
 
-The hook tries to insert/query with non-existent columns:
-- `session_id` — does not exist
-- `page_path` — does not exist (actual: `page`)
-- `module_name` — does not exist
-- `duration_seconds` — does not exist
-- `visited_at` — does not exist
-
-**`user_data_usage` table** has columns: `id`, `user_id`, `data_used_mb`, `created_at`
-
-The hook tries to insert with non-existent columns:
-- `session_id` — does not exist
-- `bytes_uploaded` — does not exist
-- `bytes_downloaded` — does not exist
-
-Since these inserts fail silently, no page view or data usage data is ever recorded, so the summary function returns `-` and `0` for those metrics.
-
-## Fix
-
-Two options — fix the **tables** to match the hook, or fix the **hook** to match the tables. Since the tables are empty and the hook has richer tracking logic, the cleanest approach is a combination:
-
-### 1. Database migration — Add missing columns to both tables
-
-**`user_page_views`**: Add `session_id` (nullable uuid), `module_name` (text), `duration_seconds` (integer). Rename is not needed — the hook will be updated to use `page` instead of `page_path`.
-
-**`user_data_usage`**: Add `session_id` (nullable uuid), `bytes_uploaded` (bigint), `bytes_downloaded` (bigint).
-
-### 2. Frontend fix — Update `useActivityTracker.ts`
-
-- Change `page_path` → `page` in all insert/update/query calls
-- Change `visited_at` → `created_at` in the order clause
-- Convert bytes to MB when inserting into `data_used_mb`: `data_used_mb = (uploaded + downloaded) / (1024 * 1024)`
-- Remove references to `bytes_uploaded` and `bytes_downloaded` (or use new columns if added)
-
-### Recommended approach
-
-Add the missing columns to the tables (migration) so the tracker can write richer data, AND fix the hook to use `page` instead of `page_path` and `created_at` instead of `visited_at`. This way both the tracker and the summary function work correctly.
-
-### Technical details
-
-**Migration SQL:**
-```sql
-ALTER TABLE user_page_views
-  ADD COLUMN IF NOT EXISTS session_id uuid,
-  ADD COLUMN IF NOT EXISTS module_name text,
-  ADD COLUMN IF NOT EXISTS duration_seconds integer;
-
-ALTER TABLE user_data_usage
-  ADD COLUMN IF NOT EXISTS session_id uuid,
-  ADD COLUMN IF NOT EXISTS bytes_uploaded bigint DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS bytes_downloaded bigint DEFAULT 0;
+**New helper** (added at top of the file):
+```ts
+async function compressImageForPDF(
+  input: string | Blob, maxDim: number, quality: number
+): Promise<string> {
+  // Fetch if URL string, create Image, draw to canvas at maxDim, 
+  // export as JPEG base64 data URL
+}
 ```
 
-**Hook changes** (`useActivityTracker.ts`):
-- Line 124: `page_path` → `page`
-- Line 126: `visited_at` → `created_at`
-- Line 138: `page_path: path` → `page: path`
-- Data usage insert: keep `bytes_uploaded`/`bytes_downloaded` (now columns exist) and also compute `data_used_mb`
+### 2. Retailer Photos Compression (Target: 25% of original)
 
-**Summary function update**: Update `get_activity_logging_summary` to also use `module_name` column for most/least used (better than raw `page` paths), and use `bytes_uploaded + bytes_downloaded` for data usage instead of `data_used_mb` conversion.
+**Changes to `src/utils/imageCompression.ts`**:
+- Add `compressToTargetSize(input, targetRatio, maxDimension)` — iteratively reduces JPEG quality from 0.5 down to 0.1 (step 0.1) until output ≤ `targetRatio × originalSize`, with floor quality of 0.1
+
+**Upload point changes** (replace `compressImageFile(file/blob)` with `compressToTargetSize(file/blob, 0.25, 1200)`):
+
+| File | Line(s) | Current call |
+|------|---------|-------------|
+| `src/pages/AddRetailer.tsx` | 516, 642 | `compressImageFile(file)` / `compressImageFile(blob)` |
+| `src/components/AddRetailerInlineToBeat.tsx` | 269 | `compressImageFile(file)` |
+| `src/pages/RetailManagement.tsx` | 263 | `compressImageFile(blob)` |
+
+### Files Modified
+
+| File | What changes |
+|------|-------------|
+| `src/utils/invoiceGenerator.ts` | `compress: true` in jsPDF; add `compressImageForPDF` helper; compress logo & QR before embedding; post-generation size guard |
+| `src/utils/imageCompression.ts` | Add `compressToTargetSize()` with iterative quality reduction |
+| `src/pages/AddRetailer.tsx` | Use `compressToTargetSize(file, 0.25, 1200)` at 2 upload points |
+| `src/components/AddRetailerInlineToBeat.tsx` | Same replacement at 1 upload point |
+| `src/pages/RetailManagement.tsx` | Same replacement at 1 upload point |
 
