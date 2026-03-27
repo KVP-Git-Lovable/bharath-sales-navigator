@@ -845,7 +845,15 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setFont("helvetica", "bold");
   doc.text("THANK YOU FOR YOUR BUSINESS", pageWidth / 2, footerY + 12, { align: "center" });
 
-  return doc.output('blob');
+  const pdfBlob = doc.output('blob');
+  
+  // Post-generation size guard
+  const sizeKB = pdfBlob.size / 1024;
+  if (sizeKB > 50) {
+    console.warn(`⚠️ Invoice PDF size ${sizeKB.toFixed(1)} KB exceeds 50 KB target`);
+  }
+  
+  return pdfBlob;
 }
 
 /**
