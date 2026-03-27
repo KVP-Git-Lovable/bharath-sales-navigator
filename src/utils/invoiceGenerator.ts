@@ -805,8 +805,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
       doc.setTextColor(55, 65, 81);
       doc.text("Scan QR for Payment", boxX + boxW / 2, boxY + 8, { align: "center" });
 
-      const imgFormat = company.qr_code_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-      doc.addImage(base64, imgFormat, boxX + (boxW - 34) / 2, boxY + 14, 34, 34);
+      doc.addImage(base64, 'JPEG', boxX + (boxW - 34) / 2, boxY + 14, 34, 34);
 
       if (company.qr_upi) {
         doc.setFontSize(7);
