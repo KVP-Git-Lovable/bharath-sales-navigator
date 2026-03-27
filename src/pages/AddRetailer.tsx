@@ -513,7 +513,7 @@ export const AddRetailer = () => {
           reader.readAsDataURL(file);
 
           // Compress and upload to Supabase Storage
-          const compressedFile = await compressImageFile(file);
+          const compressedFile = await compressToTargetSize(file, 0.25, 1200);
           const fileName = `${user.id}/${Date.now()}_retailer_photo.jpg`;
           const { data, error } = await supabase.storage
             .from('retailer-photos')
