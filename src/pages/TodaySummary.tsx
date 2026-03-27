@@ -1490,6 +1490,20 @@ export const TodaySummary = () => {
         variant: "destructive"
       });
     } finally {
+      // Fetch completed activities count
+      try {
+        const { data: activityVisits } = await supabase
+          .from('visits')
+          .select('id')
+          .eq('user_id', effectiveUserId)
+          .eq('visit_type', 'activity')
+          .eq('status', 'productive')
+          .gte('planned_date', format(dateRange.from, 'yyyy-MM-dd'))
+          .lte('planned_date', format(dateRange.to, 'yyyy-MM-dd'));
+        setCompletedActivitiesCount(activityVisits?.length || 0);
+      } catch {
+        setCompletedActivitiesCount(0);
+      }
       setLoading(false);
       initialLoadDone.current = true;
     }
