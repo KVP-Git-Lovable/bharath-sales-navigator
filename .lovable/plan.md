@@ -1,35 +1,34 @@
 
 
-## Issue Analysis: Team Attendance Not Showing Present Users
+# QuickApp.AI — Customer Benefits & Value Proposition Document (DOCX)
 
-### Root Cause
+## What This Document Will Cover
 
-After investigating the database and code:
+A professionally formatted Word document answering all 9 questions about QuickApp.AI, structured as a product overview document with clear sections, tables, and the landing page screenshot.
 
-- **The database has correct data**: 10 of Girish's subordinates have `present` status for today (2026-03-27).
-- **The code logic is correct**: The attendance query correctly fetches by date and filters statuses.
-- **The problem is stale data / no live refresh**: The attendance query has a `staleTime` of 2 minutes and no `refetchInterval`. Once a manager opens the "My Team" tab, the data doesn't update automatically. If opened before subordinates check in, it stays showing all as "Absent" until the user manually refreshes.
+## Document Structure
 
-### Fix: Add Auto-Refresh to Team Attendance Queries
+1. **Cover Page** — QuickApp.AI logo title, subtitle "Product Overview & Customer Value Proposition", date
+2. **Who Is This For?** — Target audience: FMCG, Beverages, Pharma, Consumer Durables, Personal Care, Building Materials companies with field sales teams
+3. **Key Problems Solved** — Manual data entry, per-user SFA costs, offline gaps, disconnected platforms (field + distributor + van), lack of AI guidance
+4. **Biggest Customer Benefits** — Unlimited users at one price, AI-first guidance (not just tracking), 3-in-1 platform, true offline, gamification, 6 Indian languages
+5. **The WOW Factor** — One price unlimited users + success-based pricing + AI that guides (not just collects data)
+6. **Why Choose QuickApp.AI Over HubSpot/Zoho** — Comparison table: per-user fees, offline mode, AI architecture, distributor portal, Indian language support, gamification, van sales
+7. **Ease of Use & Convenience** — PWA (no app store), WhatsApp integration, voice notes, natural language chat assistant, 6 languages
+8. **Time to Value** — Pre-configured industry workflows, bulk import, PWA install, no complex setup
+9. **Technical Setup & Learning Curve** — No installation needed (PWA), offline-first, minimal training with AI coaching
+10. **Best-Fit Businesses** — Companies with 10+ field reps, distributors, van sales operations in India
 
-**File: `src/hooks/useTeamAttendance.ts`**
+## Technical Approach
 
-Add `refetchInterval` to the three key queries so team data stays current while the tab is open:
+- Generate using `docx` npm library via a Node.js script
+- Include the landing page screenshot already captured
+- Use a professional color scheme (navy headers, amber accents matching QuickApp branding)
+- Include comparison table (QuickApp vs HubSpot vs Zoho)
+- Output to `/mnt/documents/QuickApp_AI_Product_Overview.docx`
+- QA via LibreOffice PDF conversion and visual inspection
 
-1. **Today's attendance query** (line 96): Add `refetchInterval: 30 * 1000` (30 seconds) — this is the most critical one for live status
-2. **Today's leaves query** (line 118): Add `refetchInterval: 60 * 1000` (1 minute) — leaves change less frequently
-3. **Monthly counts query** (line 137): Add `refetchInterval: 60 * 1000` (1 minute)
-4. **Reduce staleTime** on the attendance query from 2 minutes to 30 seconds for fresher data on tab switches
+## Files Involved
 
-This ensures managers always see up-to-date team status without manually refreshing the page.
-
-### Additional Safety: Add refetchOnMount
-
-Set `refetchOnMount: 'always'` on the today attendance query to ensure fresh data whenever the My Team tab is opened, even if stale cache exists.
-
-### Technical Summary
-
-| File | Change |
-|------|--------|
-| `src/hooks/useTeamAttendance.ts` | Add `refetchInterval` (30s-60s) and `refetchOnMount: 'always'` to attendance, leaves, and monthly count queries |
+No project files modified — this is a standalone document generation task using `code--exec`.
 
