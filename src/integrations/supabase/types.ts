@@ -2890,6 +2890,33 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_gps_distance: {
+        Row: {
+          date: string
+          id: string
+          point_count: number
+          total_km: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          date: string
+          id?: string
+          point_count?: number
+          total_km?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          date?: string
+          id?: string
+          point_count?: number
+          total_km?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       device_battery_logs: {
         Row: {
           battery_level: number | null
@@ -10035,27 +10062,60 @@ export type Database = {
       }
       pm_support_requests: {
         Row: {
-          created_at: string | null
+          ai_suggestion: string | null
+          created_at: string
           description: string | null
           id: string
-          status: string | null
-          title: string | null
+          priority: string | null
+          project_id: string
+          requested_by: string
+          resolution_notes: string | null
+          status: string
+          title: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          ai_suggestion?: string | null
+          created_at?: string
           description?: string | null
           id?: string
-          status?: string | null
-          title?: string | null
+          priority?: string | null
+          project_id: string
+          requested_by: string
+          resolution_notes?: string | null
+          status?: string
+          title: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          ai_suggestion?: string | null
+          created_at?: string
           description?: string | null
           id?: string
-          status?: string | null
-          title?: string | null
+          priority?: string | null
+          project_id?: string
+          requested_by?: string
+          resolution_notes?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pm_support_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "pm_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_support_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pm_task_attachments: {
         Row: {
@@ -10443,21 +10503,27 @@ export type Database = {
       pm_templates: {
         Row: {
           created_at: string | null
+          created_by: string
           description: string | null
           id: string
           name: string | null
+          updated_at: string
         }
         Insert: {
           created_at?: string | null
+          created_by: string
           description?: string | null
           id?: string
           name?: string | null
+          updated_at?: string
         }
         Update: {
           created_at?: string | null
+          created_by?: string
           description?: string | null
           id?: string
           name?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -17576,6 +17642,10 @@ export type Database = {
       }
       is_requester_for_audit: {
         Args: { p_request_id: string }
+        Returns: boolean
+      }
+      is_requester_for_request: {
+        Args: { request_id: string; user_id: string }
         Returns: boolean
       }
       is_requester_for_step: {
