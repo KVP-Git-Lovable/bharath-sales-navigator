@@ -42,6 +42,7 @@ import ImplementationToolkitPage from "./pages/website/ImplementationToolkitPage
 import { ProfessionalServicesROIBlog } from "./pages/website/blogs/ProfessionalServicesROIBlog";
 import { ProfessionalServicesChecklistBlog } from "./pages/website/blogs/ProfessionalServicesChecklistBlog";
 import { ContactPage } from "./pages/website/ContactPage";
+import PrivacyPolicyPage from "./pages/website/PrivacyPolicyPage";
 import DemoRequestPage from "./pages/website/DemoRequestPage";
 import Index from "./pages/Index";
 import { MyVisits } from "./pages/MyVisits";
