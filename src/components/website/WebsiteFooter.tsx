@@ -166,7 +166,7 @@ export const WebsiteFooter = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
             <p>© 2024 QuickApp.AI. All rights reserved.</p>
             <div className="flex items-center gap-6">
-              <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
+              <a href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy Policy</a>
               <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
               <a href="#" className="hover:text-foreground transition-colors">Cookie Policy</a>
             </div>
