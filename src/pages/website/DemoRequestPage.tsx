@@ -398,7 +398,7 @@ export default function DemoRequestPage() {
                     </Button>
 
                     <p className="text-center text-muted-foreground text-sm">
-                      By submitting, you agree to our privacy policy. We'll never share your information.
+                      By submitting, you agree to our <a href="/privacy-policy" className="text-accent-gold hover:underline">privacy policy</a>. We'll never share your information.
                     </p>
                   </form>
                 </CardContent>

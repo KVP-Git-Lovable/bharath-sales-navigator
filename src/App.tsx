@@ -42,6 +42,7 @@ import ImplementationToolkitPage from "./pages/website/ImplementationToolkitPage
 import { ProfessionalServicesROIBlog } from "./pages/website/blogs/ProfessionalServicesROIBlog";
 import { ProfessionalServicesChecklistBlog } from "./pages/website/blogs/ProfessionalServicesChecklistBlog";
 import { ContactPage } from "./pages/website/ContactPage";
+import PrivacyPolicyPage from "./pages/website/PrivacyPolicyPage";
 import DemoRequestPage from "./pages/website/DemoRequestPage";
 import Index from "./pages/Index";
 import { MyVisits } from "./pages/MyVisits";
@@ -353,6 +354,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/insights/professional-services-checklist" element={<ProfessionalServicesChecklistBlog />} />
         <Route path="/request-demo" element={<DemoRequestPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/auth" element={<RoleBasedAuthPage />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/change-password" element={<ChangePassword />} />
