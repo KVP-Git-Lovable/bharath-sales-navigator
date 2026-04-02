@@ -354,6 +354,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/insights/professional-services-checklist" element={<ProfessionalServicesChecklistBlog />} />
         <Route path="/request-demo" element={<DemoRequestPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/auth" element={<RoleBasedAuthPage />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/change-password" element={<ChangePassword />} />
