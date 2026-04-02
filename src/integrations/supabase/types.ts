@@ -17409,7 +17409,11 @@ export type Database = {
         }
         Returns: string
       }
+      generate_grn_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
+      generate_primary_invoice_number: { Args: never; Returns: string }
+      generate_return_number: { Args: never; Returns: string }
+      generate_shipment_number: { Args: never; Returns: string }
       get_activity_logging_summary: { Args: { p_days: number }; Returns: Json }
       get_all_subordinates: {
         Args: { manager_user_id: string }
@@ -17552,6 +17556,36 @@ export type Database = {
           manager_id: string
         }[]
       }
+      get_retailer_ext_cities: {
+        Args: { selected_state: string }
+        Returns: {
+          city: string
+        }[]
+      }
+      get_retailer_ext_states: {
+        Args: never
+        Returns: {
+          state: string
+        }[]
+      }
+      get_retailer_unsorted_cities: {
+        Args: { selected_district: string; selected_state: string }
+        Returns: {
+          city: string
+        }[]
+      }
+      get_retailer_unsorted_districts: {
+        Args: { selected_state: string }
+        Returns: {
+          district: string
+        }[]
+      }
+      get_retailer_unsorted_states: {
+        Args: never
+        Returns: {
+          state: string
+        }[]
+      }
       get_subordinate_users: {
         Args: { user_id_param: string }
         Returns: {
@@ -17581,6 +17615,7 @@ export type Database = {
           total_sales: number
         }[]
       }
+      get_user_profile_card: { Args: { p_user_id: string }; Returns: Json }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -17625,6 +17660,10 @@ export type Database = {
         Returns: boolean
       }
       hash_hint_answer: { Args: { answer: string }; Returns: string }
+      initialize_leave_policy_balances: {
+        Args: { p_policy_id: string }
+        Returns: undefined
+      }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       is_admin_or_manager: { Args: never; Returns: boolean }
       is_approver_for_audit: {
