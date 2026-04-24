@@ -144,41 +144,14 @@ export async function submitOrderWithOfflineSupport(
 
     try {
       const submitPromise = (async () => {
-        // Check if order already exists (could be from previous partial sync)
-        const { data: existingOrder } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('id', orderId)
-          .maybeSingle();
-
-        if (!existingOrder) {
-          // Insert order header first
-          const { error: orderError } = await supabase
-            .from('orders')
-            .insert({ ...orderForDirectInsert, id: orderId });
-
-          // Duplicate means already inserted earlier; all other errors must queue for retry
-          if (orderError && orderError.code !== '23505') {
-            throw orderError;
-          }
-        }
-
-        // ALWAYS ensure order items are inserted (even if order already existed)
-        const { data: existingItems } = await supabase
-          .from('order_items')
-          .select('id')
-          .eq('order_id', orderId)
-          .limit(1);
-
-        if (!existingItems || existingItems.length === 0) {
-          const { error: itemsError } = await supabase
-            .from('order_items')
-            .insert(normalizedItems);
-
-          if (itemsError && itemsError.code !== '23505') {
-            throw itemsError;
-          }
-        }
+        // Atomic insert: order header + items in a single transaction.
+        // Guarantees an order row can never exist without its items, which
+        // prevents empty orders from falsely marking visits as productive.
+        const { error: rpcError } = await supabase.rpc('sync_order_with_items', {
+          p_order: { ...orderForDirectInsert, id: orderId },
+          p_items: normalizedItems,
+        });
+        if (rpcError) throw rpcError;
       })();
       
       const timeoutPromise = new Promise<never>((_, reject) => 
