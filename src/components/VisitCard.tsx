@@ -2656,6 +2656,10 @@ export const VisitCard = ({
                   {activityEvent.activity_type}
                 </Badge>
               )}
+              {/* Gamification points (with per-game breakdown popover) */}
+              {displayStatus === 'productive' && pointsBreakdown && pointsBreakdown.totalPoints > 0 && (
+                <VisitPointsDisplay breakdown={pointsBreakdown} />
+              )}
             </div>
             {/* Activity duration info */}
             {visit.visitType === 'activity' && activityEvent && (
