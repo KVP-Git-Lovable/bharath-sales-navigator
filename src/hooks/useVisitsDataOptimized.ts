@@ -14,7 +14,15 @@ interface UseVisitsDataOptimizedProps {
 
 interface PointsData {
   total: number;
-  byRetailer: Map<string, { name: string; points: number; visitId: string | null }>;
+  byRetailer: Map<
+    string,
+    {
+      name: string;
+      points: number;
+      visitId: string | null;
+      entries: Array<{ gameName: string; actionName: string; points: number }>;
+    }
+  >;
 }
 
 interface ProgressStats {
@@ -151,6 +159,33 @@ const calculateStats = (visits: any[], orders: any[], retailers: any[], selected
 
 // Helper to fetch points for a specific date
 const fetchPointsForDate = async (uid: string, date: string): Promise<PointsData> => {
+  // (defined below)
+  return _fetchPointsForDateImpl(uid, date);
+};
+
+// Normalize a serialized byRetailer entry so older cached snapshots (which
+// didn't include the per-game `entries[]` field) don't break the new type.
+const normalizeByRetailerEntries = (raw: any): Map<string, {
+  name: string;
+  points: number;
+  visitId: string | null;
+  entries: Array<{ gameName: string; actionName: string; points: number }>;
+}> => {
+  const source: Iterable<[string, any]> =
+    raw instanceof Map ? raw.entries() : Array.isArray(raw) ? raw : [];
+  const normalized = new Map();
+  for (const [rid, val] of source) {
+    normalized.set(rid, {
+      name: val?.name || '',
+      points: val?.points || 0,
+      visitId: val?.visitId ?? null,
+      entries: Array.isArray(val?.entries) ? val.entries : [],
+    });
+  }
+  return normalized;
+};
+
+const _fetchPointsForDateImpl = async (uid: string, date: string): Promise<PointsData> => {
   const dateStart = new Date(date);
   dateStart.setHours(0, 0, 0, 0);
   const dateEnd = new Date(date);
@@ -158,24 +193,51 @@ const fetchPointsForDate = async (uid: string, date: string): Promise<PointsData
 
   const { data: pointsRaw } = await supabase
     .from('gamification_points')
-    .select('points, reference_id, metadata')
+    .select('points, reference_id, metadata, gamification_games(name), gamification_actions(action_name)')
     .eq('user_id', uid)
     .gte('earned_at', dateStart.toISOString())
     .lte('earned_at', dateEnd.toISOString());
 
   const total = pointsRaw?.reduce((sum, p) => sum + (p.points || 0), 0) || 0;
-  const byRetailer = new Map<string, { name: string; points: number; visitId: string | null }>();
+  const byRetailer = new Map<
+    string,
+    {
+      name: string;
+      points: number;
+      visitId: string | null;
+      entries: Array<{ gameName: string; actionName: string; points: number }>;
+    }
+  >();
   
   // Group points by retailer from metadata
   if (pointsRaw) {
     for (const p of pointsRaw) {
       const retailerId = (p.metadata as any)?.retailer_id;
       if (retailerId) {
-        const existing = byRetailer.get(retailerId) || { name: '', points: 0, visitId: null };
+        const existing = byRetailer.get(retailerId) || {
+          name: '',
+          points: 0,
+          visitId: null,
+          entries: [] as Array<{ gameName: string; actionName: string; points: number }>,
+        };
+        const gameName = (p as any).gamification_games?.name || 'Game';
+        const actionName = (p as any).gamification_actions?.action_name || '';
+        const pts = p.points || 0;
+
+        // Aggregate same (gameName, actionName) entries together for cleaner display
+        const existingEntry = existing.entries.find(
+          (e) => e.gameName === gameName && e.actionName === actionName
+        );
+        if (existingEntry) {
+          existingEntry.points += pts;
+        } else {
+          existing.entries.push({ gameName, actionName, points: pts });
+        }
+
         byRetailer.set(retailerId, {
           ...existing,
-          points: existing.points + (p.points || 0),
-          visitId: p.reference_id || existing.visitId
+          points: existing.points + pts,
+          visitId: p.reference_id || existing.visitId,
         });
       }
     }
@@ -213,7 +275,10 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const [orders, setOrders] = useState<any[]>(() => initialModuleCache?.orders || []);
   const [pointsData, setPointsData] = useState<PointsData>(() => {
     if (initialModuleCache?.points) {
-      return { total: initialModuleCache.points.total, byRetailer: new Map(initialModuleCache.points.byRetailer) };
+      return {
+        total: initialModuleCache.points.total,
+        byRetailer: normalizeByRetailerEntries(initialModuleCache.points.byRetailer),
+      };
     }
     return { total: 0, byRetailer: new Map() };
   });
@@ -820,9 +885,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         setRetailers(cached.retailers || []);
         setOrders(cached.orders || []);
         if (cached.points) {
-          setPointsData({ 
-            total: cached.points.total, 
-            byRetailer: new Map(cached.points.byRetailer) 
+          setPointsData({
+            total: cached.points.total,
+            byRetailer: normalizeByRetailerEntries(cached.points.byRetailer),
           });
         }
         setIsLoading(false);
@@ -933,9 +998,12 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         
         // FIX: Load points from snapshot for instant display
         if (snapshot.pointsTotal !== undefined || snapshot.pointsByRetailer) {
+          // Normalize snapshot entries — older snapshots may not include `entries[]`.
+          // We add an empty entries array as a safe default; fresh sync will hydrate it.
+          const normalizedByRetailer = normalizeByRetailerEntries(snapshot.pointsByRetailer);
           const pointsFromSnapshot: PointsData = {
             total: snapshot.pointsTotal || 0,
-            byRetailer: new Map(snapshot.pointsByRetailer || [])
+            byRetailer: normalizedByRetailer,
           };
           setPointsData(pointsFromSnapshot);
           console.log('[LoadData] Loaded points from snapshot:', pointsFromSnapshot.total);
