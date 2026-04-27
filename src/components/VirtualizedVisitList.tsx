@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, memo, useDeferredValue } from 'react';
 import { VisitCard } from './VisitCard';
+import type { VisitPointsBreakdown } from './VisitPointsDisplay';
 
 interface Visit {
   id: string;
@@ -28,6 +29,7 @@ interface VirtualizedVisitListProps {
   onViewDetails: (visitId: string) => void;
   selectedDate: string;
   viewingUserId?: string;
+  pointsByRetailer?: Map<string, VisitPointsBreakdown>;
 }
 
 // Memoized VisitCard wrapper to prevent unnecessary re-renders
@@ -41,7 +43,8 @@ const MemoizedVisitCard = memo(VisitCard, (prevProps, nextProps) => {
     prevProps.visit.noOrderReason === nextProps.visit.noOrderReason &&
     prevProps.selectedDate === nextProps.selectedDate &&
     prevProps.skipInitialCheck === nextProps.skipInitialCheck &&
-    prevProps.viewingUserId === nextProps.viewingUserId
+    prevProps.viewingUserId === nextProps.viewingUserId &&
+    prevProps.pointsBreakdown === nextProps.pointsBreakdown
   );
 });
 
@@ -56,7 +59,8 @@ export const VirtualizedVisitList = ({
   visits, 
   onViewDetails, 
   selectedDate,
-  viewingUserId
+  viewingUserId,
+  pointsByRetailer
 }: VirtualizedVisitListProps) => {
   const [displayCount, setDisplayCount] = useState(INITIAL_BATCH_SIZE);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +129,11 @@ export const VirtualizedVisitList = ({
           selectedDate={selectedDate}
           skipInitialCheck={true}
           viewingUserId={viewingUserId}
+          pointsBreakdown={
+            visit.retailerId && pointsByRetailer
+              ? pointsByRetailer.get(visit.retailerId) ?? null
+              : null
+          }
         />
       ))}
       
