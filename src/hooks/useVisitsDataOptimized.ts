@@ -159,6 +159,33 @@ const calculateStats = (visits: any[], orders: any[], retailers: any[], selected
 
 // Helper to fetch points for a specific date
 const fetchPointsForDate = async (uid: string, date: string): Promise<PointsData> => {
+  // (defined below)
+  return _fetchPointsForDateImpl(uid, date);
+};
+
+// Normalize a serialized byRetailer entry so older cached snapshots (which
+// didn't include the per-game `entries[]` field) don't break the new type.
+const normalizeByRetailerEntries = (raw: any): Map<string, {
+  name: string;
+  points: number;
+  visitId: string | null;
+  entries: Array<{ gameName: string; actionName: string; points: number }>;
+}> => {
+  const source: Iterable<[string, any]> =
+    raw instanceof Map ? raw.entries() : Array.isArray(raw) ? raw : [];
+  const normalized = new Map();
+  for (const [rid, val] of source) {
+    normalized.set(rid, {
+      name: val?.name || '',
+      points: val?.points || 0,
+      visitId: val?.visitId ?? null,
+      entries: Array.isArray(val?.entries) ? val.entries : [],
+    });
+  }
+  return normalized;
+};
+
+const _fetchPointsForDateImpl = async (uid: string, date: string): Promise<PointsData> => {
   const dateStart = new Date(date);
   dateStart.setHours(0, 0, 0, 0);
   const dateEnd = new Date(date);
