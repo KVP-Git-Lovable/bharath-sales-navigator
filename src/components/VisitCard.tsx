@@ -47,6 +47,7 @@ import { FeedbackListView } from "./FeedbackListView";
 import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { LoyaltyScoreBadge } from "./loyalty/LoyaltyScoreBadge";
 import { VisitTrackingIndicator } from "./VisitTrackingIndicator";
+import { VisitPointsDisplay, type VisitPointsBreakdown } from "./VisitPointsDisplay";
 import { CancelOrderDialog } from "./CancelOrderDialog";
 import { useActivityEvents, formatActivityDuration, type ActivityEvent } from "@/hooks/useActivityEvents";
 import { useFeedbackPolicyCheck } from "@/hooks/useFeedbackPolicyCheck";
@@ -78,13 +79,19 @@ interface VisitCardProps {
   selectedDate?: string; // Add selectedDate prop
   skipInitialCheck?: boolean; // Skip initial DB check when data is pre-loaded
   viewingUserId?: string; // The user whose data we're viewing (for subordinate view)
+  /**
+   * Pre-fetched gamification points breakdown for this visit's retailer on selectedDate.
+   * Sourced from useVisitsDataOptimized so we never make a per-card DB call.
+   */
+  pointsBreakdown?: VisitPointsBreakdown | null;
 }
 export const VisitCard = ({
   visit,
   onViewDetails,
   selectedDate,
   skipInitialCheck = false,
-  viewingUserId
+  viewingUserId,
+  pointsBreakdown
 }: VisitCardProps) => {
   const navigate = useNavigate();
   const [showNoOrderModal, setShowNoOrderModal] = useState(false);
