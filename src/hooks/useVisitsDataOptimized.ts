@@ -14,7 +14,15 @@ interface UseVisitsDataOptimizedProps {
 
 interface PointsData {
   total: number;
-  byRetailer: Map<string, { name: string; points: number; visitId: string | null }>;
+  byRetailer: Map<
+    string,
+    {
+      name: string;
+      points: number;
+      visitId: string | null;
+      entries: Array<{ gameName: string; actionName: string; points: number }>;
+    }
+  >;
 }
 
 interface ProgressStats {
@@ -158,24 +166,51 @@ const fetchPointsForDate = async (uid: string, date: string): Promise<PointsData
 
   const { data: pointsRaw } = await supabase
     .from('gamification_points')
-    .select('points, reference_id, metadata')
+    .select('points, reference_id, metadata, gamification_games(name), gamification_actions(action_name)')
     .eq('user_id', uid)
     .gte('earned_at', dateStart.toISOString())
     .lte('earned_at', dateEnd.toISOString());
 
   const total = pointsRaw?.reduce((sum, p) => sum + (p.points || 0), 0) || 0;
-  const byRetailer = new Map<string, { name: string; points: number; visitId: string | null }>();
+  const byRetailer = new Map<
+    string,
+    {
+      name: string;
+      points: number;
+      visitId: string | null;
+      entries: Array<{ gameName: string; actionName: string; points: number }>;
+    }
+  >();
   
   // Group points by retailer from metadata
   if (pointsRaw) {
     for (const p of pointsRaw) {
       const retailerId = (p.metadata as any)?.retailer_id;
       if (retailerId) {
-        const existing = byRetailer.get(retailerId) || { name: '', points: 0, visitId: null };
+        const existing = byRetailer.get(retailerId) || {
+          name: '',
+          points: 0,
+          visitId: null,
+          entries: [] as Array<{ gameName: string; actionName: string; points: number }>,
+        };
+        const gameName = (p as any).gamification_games?.name || 'Game';
+        const actionName = (p as any).gamification_actions?.action_name || '';
+        const pts = p.points || 0;
+
+        // Aggregate same (gameName, actionName) entries together for cleaner display
+        const existingEntry = existing.entries.find(
+          (e) => e.gameName === gameName && e.actionName === actionName
+        );
+        if (existingEntry) {
+          existingEntry.points += pts;
+        } else {
+          existing.entries.push({ gameName, actionName, points: pts });
+        }
+
         byRetailer.set(retailerId, {
           ...existing,
-          points: existing.points + (p.points || 0),
-          visitId: p.reference_id || existing.visitId
+          points: existing.points + pts,
+          visitId: p.reference_id || existing.visitId,
         });
       }
     }
