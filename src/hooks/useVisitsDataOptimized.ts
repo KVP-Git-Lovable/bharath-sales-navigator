@@ -968,9 +968,22 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         
         // FIX: Load points from snapshot for instant display
         if (snapshot.pointsTotal !== undefined || snapshot.pointsByRetailer) {
+          // Normalize snapshot entries — older snapshots may not include `entries[]`.
+          // We add an empty entries array as a safe default; fresh sync will hydrate it.
+          const normalizedByRetailer = new Map(
+            (snapshot.pointsByRetailer || []).map(([rid, val]: [string, any]) => [
+              rid,
+              {
+                name: val?.name || '',
+                points: val?.points || 0,
+                visitId: val?.visitId ?? null,
+                entries: Array.isArray(val?.entries) ? val.entries : [],
+              },
+            ])
+          );
           const pointsFromSnapshot: PointsData = {
             total: snapshot.pointsTotal || 0,
-            byRetailer: new Map(snapshot.pointsByRetailer || [])
+            byRetailer: normalizedByRetailer,
           };
           setPointsData(pointsFromSnapshot);
           console.log('[LoadData] Loaded points from snapshot:', pointsFromSnapshot.total);
