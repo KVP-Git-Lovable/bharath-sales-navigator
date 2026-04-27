@@ -334,13 +334,14 @@ export default function Leaderboard() {
   const fetchPointsBreakdown = async () => {
     if (!userProfile?.id) return;
 
-    const { startDate } = getDateRange();
+    const { startDate, endDate } = getDateRange();
 
     const { data } = await supabase
       .from("gamification_points")
       .select("action_id, points, gamification_actions(action_name)")
       .eq("user_id", userProfile.id)
-      .gte("earned_at", startDate.toISOString());
+      .gte("earned_at", startDate.toISOString())
+      .lte("earned_at", endDate.toISOString());
 
     if (data) {
       const breakdown = new Map<string, { points: number; count: number }>();
