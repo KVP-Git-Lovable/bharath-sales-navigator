@@ -93,13 +93,15 @@ export default function Leaderboard() {
   const fetchLeaderboardData = async () => {
     setLoading(true);
     
-    // Get date range based on timeFilter
-    const { startDate } = getDateRange();
+    // Get date range based on timeFilter (use BOTH start and end so e.g.
+    // "Yesterday" doesn't accidentally include today's points).
+    const { startDate, endDate } = getDateRange();
     
     const { data, error } = await supabase
       .from("gamification_points")
       .select("user_id, points, earned_at")
       .gte("earned_at", startDate.toISOString())
+      .lte("earned_at", endDate.toISOString())
       .order("earned_at", { ascending: false });
 
     if (error) {
@@ -112,7 +114,7 @@ export default function Leaderboard() {
     const userPointsMap = new Map<string, number>();
     data?.forEach(item => {
       const current = userPointsMap.get(item.user_id) || 0;
-      userPointsMap.set(item.user_id, current + item.points);
+      userPointsMap.set(item.user_id, current + Number(item.points || 0));
     });
 
     // Get user profiles
@@ -128,15 +130,24 @@ export default function Leaderboard() {
       .select("id, full_name, profile_picture_url")
       .in("id", userIds);
 
+    // Drop users whose profile didn't come back (avoids "Unknown User" ghost rows
+    // when a profile was deleted or RLS hides it from the current viewer).
+    const profilesById = new Map((profilesData || []).map(p => [p.id, p] as const));
+    const missingProfiles = userIds.filter(id => !profilesById.has(id));
+    if (missingProfiles.length > 0) {
+      console.warn('[Leaderboard] Skipping points rows with no matching profile:', missingProfiles);
+    }
+
     const leaderboardData: UserPoints[] = userIds
+      .filter(userId => profilesById.has(userId))
       .map(userId => {
-        const profile = profilesData?.find(p => p.id === userId);
+        const profile = profilesById.get(userId)!;
         return {
           user_id: userId,
           total_points: userPointsMap.get(userId) || 0,
           profiles: {
-            full_name: profile?.full_name || "Unknown User",
-            profile_picture_url: profile?.profile_picture_url || null
+            full_name: profile.full_name || "Unknown User",
+            profile_picture_url: profile.profile_picture_url || null
           }
         };
       })
