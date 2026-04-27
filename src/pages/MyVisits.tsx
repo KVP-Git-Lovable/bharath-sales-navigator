@@ -1564,7 +1564,7 @@ export const MyVisits = () => {
                   {t('visits.createNewVisit')}
                 </Button>
               </CardContent>
-            </Card> : filteredVisits.length > 0 && <VirtualizedVisitList visits={filteredVisits} onViewDetails={handleViewDetails} selectedDate={selectedDate} viewingUserId={isViewingSelf ? undefined : selectedUserIds[0]} />}
+            </Card> : filteredVisits.length > 0 && <VirtualizedVisitList visits={filteredVisits} onViewDetails={handleViewDetails} selectedDate={selectedDate} viewingUserId={isViewingSelf ? undefined : selectedUserIds[0]} pointsByRetailer={pointsData?.byRetailer as any} />}
         </div>
 
         {/* Create New Visit Modal */}
