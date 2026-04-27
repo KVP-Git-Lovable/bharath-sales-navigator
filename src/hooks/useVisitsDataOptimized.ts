@@ -275,7 +275,10 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
   const [orders, setOrders] = useState<any[]>(() => initialModuleCache?.orders || []);
   const [pointsData, setPointsData] = useState<PointsData>(() => {
     if (initialModuleCache?.points) {
-      return { total: initialModuleCache.points.total, byRetailer: new Map(initialModuleCache.points.byRetailer) };
+      return {
+        total: initialModuleCache.points.total,
+        byRetailer: normalizeByRetailerEntries(initialModuleCache.points.byRetailer),
+      };
     }
     return { total: 0, byRetailer: new Map() };
   });
@@ -882,9 +885,9 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         setRetailers(cached.retailers || []);
         setOrders(cached.orders || []);
         if (cached.points) {
-          setPointsData({ 
-            total: cached.points.total, 
-            byRetailer: new Map(cached.points.byRetailer) 
+          setPointsData({
+            total: cached.points.total,
+            byRetailer: normalizeByRetailerEntries(cached.points.byRetailer),
           });
         }
         setIsLoading(false);
@@ -997,17 +1000,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
         if (snapshot.pointsTotal !== undefined || snapshot.pointsByRetailer) {
           // Normalize snapshot entries — older snapshots may not include `entries[]`.
           // We add an empty entries array as a safe default; fresh sync will hydrate it.
-          const normalizedByRetailer = new Map(
-            (snapshot.pointsByRetailer || []).map(([rid, val]: [string, any]) => [
-              rid,
-              {
-                name: val?.name || '',
-                points: val?.points || 0,
-                visitId: val?.visitId ?? null,
-                entries: Array.isArray(val?.entries) ? val.entries : [],
-              },
-            ])
-          );
+          const normalizedByRetailer = normalizeByRetailerEntries(snapshot.pointsByRetailer);
           const pointsFromSnapshot: PointsData = {
             total: snapshot.pointsTotal || 0,
             byRetailer: normalizedByRetailer,
