@@ -57,6 +57,432 @@ interface CounterCustomer {
   phone?: string | null;
 }
 
+// ===================================================================
+// MOBILE CUSTOMER CARD — accordion-style, bottom-sheet pickers
+// ===================================================================
+function MobileCustomerCard({
+  index,
+  row,
+  customers,
+  onToggleExpand,
+  onPickCustomer,
+  onCreateRetailer,
+  onAddProduct,
+  onUpdateItem,
+  onRemoveItem,
+  onDelete,
+}: {
+  index: number;
+  row: CounterRow;
+  customers: CounterCustomer[];
+  onToggleExpand: () => void;
+  onPickCustomer: (r: CounterCustomer) => void;
+  onCreateRetailer: (r: CounterCustomer) => void;
+  onAddProduct: () => void;
+  onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
+  onRemoveItem: (itemUid: string) => void;
+  onDelete: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const locked = row.status === "saved" || row.status === "submitted";
+  const total = rowAmount(row);
+
+  return (
+    <Card className="rounded-2xl shadow-sm border overflow-hidden">
+      {/* COLLAPSED HEADER — tappable */}
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-muted/40 transition-colors"
+      >
+        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
+          {index}
+        </div>
+        <div className="min-w-0 flex-1">
+          {row.customer ? (
+            <>
+              <div className="text-sm font-semibold truncate">{row.customer.name}</div>
+              <div className="text-xs text-muted-foreground truncate">
+                {row.phoneOverride || row.customer.phone || "—"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-medium text-primary">Select Customer</div>
+              <div className="text-xs text-muted-foreground">Tap to choose or create</div>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <div className="text-[11px] text-muted-foreground">
+            {row.items.length} item{row.items.length !== 1 ? "s" : ""}
+          </div>
+          <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+            ₹{total.toFixed(2)}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground shrink-0 transition-transform",
+            row.expanded && "rotate-180"
+          )}
+        />
+      </button>
+
+      {/* EXPANDED BODY */}
+      {row.expanded && (
+        <div className="px-3 pb-3 pt-1 border-t bg-muted/10 space-y-3">
+          {/* Customer selector tile if not yet picked, or change link */}
+          {!row.customer ? (
+            <Button
+              variant="outline"
+              className="w-full rounded-xl h-10 justify-start"
+              onClick={() => setPickerOpen(true)}
+              disabled={locked}
+            >
+              <User className="h-4 w-4 mr-2" /> Select Customer
+            </Button>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl bg-background border px-3 py-2">
+              <div className="min-w-0">
+                <div className="text-xs text-muted-foreground">Customer</div>
+                <div className="text-sm font-medium truncate">{row.customer.name}</div>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Phone className="h-3 w-3" /> {row.phoneOverride || row.customer.phone || "—"}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-primary"
+                onClick={() => setPickerOpen(true)}
+                disabled={locked}
+              >
+                Change
+              </Button>
+            </div>
+          )}
+
+          {/* Products */}
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
+              Products ({row.items.length})
+            </div>
+
+            {row.items.length === 0 ? (
+              <div className="rounded-xl bg-background border border-dashed py-6 text-center text-xs text-muted-foreground">
+                No products yet
+              </div>
+            ) : (
+              row.items.map((item) => (
+                <div
+                  key={item.uid}
+                  className="rounded-xl bg-background border p-3 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{item.product_name}</div>
+                      {item.category && (
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {item.category}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                      disabled={locked}
+                      onClick={() => onRemoveItem(item.uid)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Qty</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="decimal"
+                        value={item.quantity}
+                        disabled={locked}
+                        onChange={(e) =>
+                          onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })
+                        }
+                        className="h-8 text-sm px-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Unit</label>
+                      <Select
+                        value={item.unit}
+                        disabled={locked}
+                        onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
+                      >
+                        <SelectTrigger className="h-8 text-sm px-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Price</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        inputMode="decimal"
+                        value={item.rate}
+                        disabled={locked}
+                        onChange={(e) =>
+                          onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })
+                        }
+                        className="h-8 text-sm px-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Amount</label>
+                      <div className="h-8 flex items-center text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        ₹{(item.quantity * item.rate).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={onAddProduct}
+            disabled={locked}
+            className="w-full rounded-xl h-10 border-dashed text-primary"
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add Product
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={onDelete}
+            disabled={row.status === "submitted"}
+            className="w-full rounded-xl h-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Delete Row
+          </Button>
+        </div>
+      )}
+
+      {/* Customer picker bottom sheet */}
+      <CustomerPickerDrawer
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        customers={customers}
+        onPick={(c) => {
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+        onCreated={(c) => {
+          onCreateRetailer(c);
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+      />
+    </Card>
+  );
+}
+
+// ===================================================================
+// CUSTOMER PICKER — bottom sheet with search + inline create
+// ===================================================================
+function CustomerPickerDrawer({
+  open,
+  onOpenChange,
+  customers,
+  onPick,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  customers: CounterCustomer[];
+  onPick: (r: CounterCustomer) => void;
+  onCreated: (r: CounterCustomer) => void;
+}) {
+  const { user } = useAuth();
+  const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<"search" | "create">("search");
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setMode("search");
+      setNewName("");
+      setNewPhone("");
+    }
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return customers.slice(0, 100);
+    return customers
+      .filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) || r.phone?.toLowerCase().includes(q)
+      )
+      .slice(0, 100);
+  }, [customers, search]);
+
+  const handleCreate = async () => {
+    const name = newName.trim();
+    const ph = newPhone.trim();
+    if (!name) return toast.error("Customer name is required");
+    if (!ph) return toast.error("Phone number is required");
+    const dup = customers.find((r) => (r.phone || "").trim() === ph);
+    if (dup) {
+      toast.error("Customer already exists. Selecting it instead.");
+      onPick(dup);
+      return;
+    }
+    if (!user) return toast.error("You must be signed in");
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("counter_customers")
+        .insert({ name, phone: ph, user_id: user.id })
+        .select("id,name,phone")
+        .single();
+      if (error) throw error;
+      onCreated({ id: data.id, name: data.name, phone: data.phone });
+      toast.success("Customer created");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not create customer");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader className="text-left">
+          <DrawerTitle>
+            {mode === "search" ? "Select Customer" : "New Customer"}
+          </DrawerTitle>
+        </DrawerHeader>
+
+        {mode === "search" ? (
+          <div className="px-4 pb-2 flex flex-col min-h-0">
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 pl-8 rounded-xl"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto rounded-xl border divide-y max-h-[45vh]">
+              {filtered.length === 0 ? (
+                <div className="p-6 text-sm text-muted-foreground text-center">
+                  No customers found
+                </div>
+              ) : (
+                filtered.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onPick(r)}
+                    className="w-full text-left px-3 py-3 hover:bg-muted/50 active:bg-muted"
+                  >
+                    <div className="text-sm font-medium truncate">{r.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {r.phone || "—"}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <Button
+              variant="outline"
+              className="w-full mt-3 rounded-xl h-11 text-primary border-dashed"
+              onClick={() => {
+                setNewName(search);
+                setMode("create");
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Create New Customer
+            </Button>
+          </div>
+        ) : (
+          <div className="px-4 pb-2 space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Name *</label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="h-10 rounded-xl"
+                placeholder="Customer name"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Phone *</label>
+              <Input
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                className="h-10 rounded-xl"
+                placeholder="10-digit number"
+                inputMode="tel"
+              />
+            </div>
+          </div>
+        )}
+
+        <DrawerFooter className="pt-2">
+          {mode === "create" ? (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl h-11"
+                onClick={() => setMode("search")}
+                disabled={saving}
+              >
+                Back
+              </Button>
+              <Button
+                className="flex-1 rounded-xl h-11"
+                onClick={handleCreate}
+                disabled={saving}
+              >
+                {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Done
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full rounded-xl h-11"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+          )}
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
 interface CounterLineItem {
   uid: string; // local row id
   product_id: string;
