@@ -922,8 +922,7 @@ function InlineCustomerSelect({
       .filter(
         (r) =>
           r.name?.toLowerCase().includes(q) ||
-          r.phone?.toLowerCase().includes(q) ||
-          r.shop_name?.toLowerCase().includes(q)
+          r.phone?.toLowerCase().includes(q)
       )
       .slice(0, 50);
   }, [customers, search]);
@@ -945,24 +944,19 @@ function InlineCustomerSelect({
     setSaving(true);
     try {
       const { data, error } = await supabase
-        .from("customers")
+        .from("counter_customers")
         .insert({
           name,
           phone: ph,
           user_id: user.id,
-          beat_id: "WALKIN",
-          beat_name: "Walk-in / Counter",
-          category: "General Store",
-          status: "active",
         })
-        .select("id,name,phone,shop_name")
+        .select("id,name,phone")
         .single();
       if (error) throw error;
       const created: CounterCustomer = {
         id: data.id,
         name: data.name,
         phone: data.phone,
-        shop_name: data.shop_name,
       };
       onCreated(created);
       toast.success("Customer created");
