@@ -38,16 +38,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOfflineOrderEntry } from "@/hooks/useOfflineOrderEntry";
 import { submitOrderWithOfflineSupport } from "@/utils/offlineOrderUtils";
 import { supabase } from "@/integrations/supabase/client";
-import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // ---------- types ----------
-interface CounterRetailer {
+interface CounterCustomer {
   id: string;
   name: string;
   phone?: string | null;
-  shop_name?: string | null;
 }
 
 interface CounterLineItem {
@@ -64,7 +62,7 @@ type RowStatus = "draft" | "saved" | "submitted";
 
 interface CounterRow {
   uid: string;
-  retailer: CounterRetailer | null;
+  customer: CounterCustomer | null;
   phoneOverride?: string;
   items: CounterLineItem[];
   status: RowStatus;
@@ -76,7 +74,7 @@ const UOM_OPTIONS = ["Pcs", "Box", "Bag", "Kg", "Ltr", "Pkt", "Carton", "Dozen"]
 
 const newRow = (): CounterRow => ({
   uid: crypto.randomUUID(),
-  retailer: null,
+  customer: null,
   items: [],
   status: "draft",
   expanded: true,

@@ -8939,6 +8939,7 @@ export type Database = {
           cancellation_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          counter_customer_id: string | null
           created_at: string
           credit_paid_amount: number | null
           credit_pending_amount: number | null
@@ -8982,6 +8983,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          counter_customer_id?: string | null
           created_at?: string
           credit_paid_amount?: number | null
           credit_pending_amount?: number | null
@@ -9025,6 +9027,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          counter_customer_id?: string | null
           created_at?: string
           credit_paid_amount?: number | null
           credit_pending_amount?: number | null
@@ -9067,6 +9070,13 @@ export type Database = {
             columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_counter_customer_id_fkey"
+            columns: ["counter_customer_id"]
+            isOneToOne: false
+            referencedRelation: "counter_customers"
             referencedColumns: ["id"]
           },
           {
