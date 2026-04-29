@@ -1,0 +1,974 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Layout } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Trash2,
+  Save,
+  Lock,
+  ArrowLeft,
+  Search,
+  FileText,
+  Pencil,
+  Loader2,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useOfflineOrderEntry } from "@/hooks/useOfflineOrderEntry";
+import { submitOrderWithOfflineSupport } from "@/utils/offlineOrderUtils";
+import { supabase } from "@/integrations/supabase/client";
+import { offlineStorage, STORES } from "@/lib/offlineStorage";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+// ---------- types ----------
+interface CounterRetailer {
+  id: string;
+  name: string;
+  phone?: string | null;
+  shop_name?: string | null;
+}
+
+interface CounterLineItem {
+  uid: string; // local row id
+  product_id: string;
+  product_name: string;
+  category?: string | null;
+  unit: string;
+  quantity: number;
+  rate: number;
+}
+
+type RowStatus = "draft" | "saved" | "submitted";
+
+interface CounterRow {
+  uid: string;
+  retailer: CounterRetailer | null;
+  phoneOverride?: string;
+  items: CounterLineItem[];
+  status: RowStatus;
+  expanded: boolean;
+}
+
+const DRAFT_KEY = "counter_sales_draft_v1";
+const UOM_OPTIONS = ["Pcs", "Box", "Bag", "Kg", "Ltr", "Pkt", "Carton", "Dozen"];
+
+const newRow = (): CounterRow => ({
+  uid: crypto.randomUUID(),
+  retailer: null,
+  items: [],
+  status: "draft",
+  expanded: true,
+});
+
+const rowAmount = (r: CounterRow) =>
+  r.items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.rate) || 0), 0);
+
+const rowItemCount = (r: CounterRow) => r.items.length;
+
+// ---------- main page ----------
+export default function CounterSales() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { products, fetchProducts } = useOfflineOrderEntry();
+
+  const [tab, setTab] = useState<"orders" | "summary">("orders");
+  const [rows, setRows] = useState<CounterRow[]>([newRow()]);
+  const [retailers, setRetailers] = useState<CounterRetailer[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  // product picker modal state
+  const [productModal, setProductModal] = useState<{ rowUid: string } | null>(null);
+  // retailer picker per row
+  const [retailerPickerFor, setRetailerPickerFor] = useState<string | null>(null);
+
+  // ---- load products + retailers ----
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    (async () => {
+      // try cache first for instant UI
+      try {
+        const cached = await offlineStorage.getAll(STORES.RETAILERS);
+        if (cached?.length) {
+          setRetailers(
+            cached.map((r: any) => ({
+              id: r.id,
+              name: r.name || r.shop_name || "Unnamed",
+              phone: r.phone,
+              shop_name: r.shop_name,
+            }))
+          );
+        }
+      } catch {}
+      if (!user || !navigator.onLine) return;
+      const { data } = await supabase
+        .from("retailers")
+        .select("id,name,phone,shop_name")
+        .eq("user_id", user.id)
+        .order("name");
+      if (data?.length) {
+        setRetailers(data as CounterRetailer[]);
+      }
+    })();
+  }, [user]);
+
+  // ---- restore draft ----
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as CounterRow[];
+        if (Array.isArray(parsed) && parsed.length) setRows(parsed);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- row helpers ----
+  const updateRow = (uid: string, patch: Partial<CounterRow>) =>
+    setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, ...patch } : r)));
+
+  const updateItem = (rowUid: string, itemUid: string, patch: Partial<CounterLineItem>) =>
+    setRows((rs) =>
+      rs.map((r) =>
+        r.uid !== rowUid
+          ? r
+          : { ...r, items: r.items.map((i) => (i.uid === itemUid ? { ...i, ...patch } : i)) }
+      )
+    );
+
+  const removeItem = (rowUid: string, itemUid: string) =>
+    setRows((rs) =>
+      rs.map((r) =>
+        r.uid !== rowUid ? r : { ...r, items: r.items.filter((i) => i.uid !== itemUid) }
+      )
+    );
+
+  const addRow = () => setRows((rs) => [...rs, newRow()]);
+  const deleteRow = (uid: string) =>
+    setRows((rs) => (rs.length === 1 ? [newRow()] : rs.filter((r) => r.uid !== uid)));
+
+  const toggleExpand = (uid: string) =>
+    setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, expanded: !r.expanded } : r)));
+
+  // ---- save / submit ----
+  const validateRow = (r: CounterRow): string | null => {
+    if (!r.retailer) return "Select a customer";
+    if (r.items.length === 0) return "Add at least one product";
+    if (r.items.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
+    return null;
+  };
+
+  const saveRow = (uid: string) => {
+    const row = rows.find((r) => r.uid === uid);
+    if (!row) return;
+    const err = validateRow(row);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    updateRow(uid, { status: "saved", expanded: false });
+    toast.success("Row saved");
+  };
+
+  const editRow = (uid: string) => updateRow(uid, { status: "draft", expanded: true });
+
+  const saveDraft = () => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(rows));
+      toast.success("Draft saved on this device");
+    } catch (e: any) {
+      toast.error("Could not save draft");
+    }
+  };
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+  };
+
+  const submittableRows = useMemo(
+    () => rows.filter((r) => r.status !== "submitted" && r.retailer && r.items.length > 0),
+    [rows]
+  );
+
+  const submitAll = async () => {
+    if (!user) {
+      toast.error("You must be signed in");
+      return;
+    }
+    if (submittableRows.length === 0) {
+      toast.error("Nothing to submit");
+      return;
+    }
+    // validate all
+    for (const r of submittableRows) {
+      const err = validateRow(r);
+      if (err) {
+        toast.error(`Customer "${r.retailer?.name || "?"}": ${err}`);
+        return;
+      }
+    }
+    setSubmitting(true);
+    let successCount = 0;
+    const updated = [...rows];
+    for (const r of submittableRows) {
+      const subtotal = rowAmount(r);
+      const total = Math.round(subtotal);
+      const orderData = {
+        user_id: user.id,
+        retailer_id: r.retailer!.id,
+        retailer_name: r.retailer!.name,
+        order_date: new Date().toISOString().slice(0, 10),
+        subtotal,
+        discount_amount: 0,
+        total_amount: total,
+        status: "confirmed",
+        payment_method: "cash",
+        is_credit_order: false,
+        idempotency_key: `counter_${user.id}_${r.uid}_${Date.now()}`,
+      };
+      const items = r.items.map((i) => ({
+        product_id: i.product_id,
+        product_name: i.product_name,
+        category: i.category || null,
+        rate: i.rate,
+        original_rate: i.rate,
+        discount_amount: 0,
+        unit: i.unit,
+        quantity: i.quantity,
+        total: i.rate * i.quantity,
+        hsn_code: null,
+        sgst_amount: 0,
+        cgst_amount: 0,
+      }));
+      try {
+        const res = await submitOrderWithOfflineSupport(orderData, items, {
+          connectivityStatus: navigator.onLine ? "online" : "offline",
+        });
+        if (res?.success) {
+          successCount++;
+          const idx = updated.findIndex((x) => x.uid === r.uid);
+          if (idx >= 0) updated[idx] = { ...updated[idx], status: "submitted", expanded: false };
+        }
+      } catch (e: any) {
+        toast.error(`Failed: ${r.retailer?.name} — ${e?.message || "unknown"}`);
+      }
+    }
+    setRows(updated);
+    setSubmitting(false);
+    if (successCount > 0) {
+      toast.success(`Submitted ${successCount} order${successCount > 1 ? "s" : ""}`);
+      clearDraft();
+      setTab("summary");
+    }
+  };
+
+  // ---- totals ----
+  const totals = useMemo(() => {
+    const customers = rows.filter((r) => r.retailer).length;
+    const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
+    const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
+    return { customers, items, grand };
+  }, [rows]);
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 lg:px-6 py-4 max-w-[1400px] pb-28">
+        {/* header */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold">Counter Sales</h1>
+              <p className="text-sm text-muted-foreground">Add orders for multiple customers</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={saveDraft}>
+              Save Draft
+            </Button>
+            <Button onClick={submitAll} disabled={submitting}>
+              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Submit All
+            </Button>
+          </div>
+        </div>
+
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
+          <TabsList>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="summary">
+              Summary
+              {rows.some((r) => r.status === "saved" || r.status === "submitted") && (
+                <Badge variant="secondary" className="ml-2">
+                  {rows.filter((r) => r.status === "saved" || r.status === "submitted").length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ===== ORDERS TAB ===== */}
+          <TabsContent value="orders" className="mt-4">
+            <Card className="overflow-hidden rounded-2xl border">
+              {/* table header */}
+              <div className="grid grid-cols-[40px_1.6fr_1fr_1fr_220px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
+                <div></div>
+                <div>Customer</div>
+                <div>Products</div>
+                <div>Total Amount</div>
+                <div className="text-right">Actions</div>
+              </div>
+
+              {rows.map((row) => (
+                <OrderRow
+                  key={row.uid}
+                  row={row}
+                  retailers={retailers}
+                  onToggleExpand={() => toggleExpand(row.uid)}
+                  onPickRetailer={() => setRetailerPickerFor(row.uid)}
+                  onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
+                  onAddProduct={() => setProductModal({ rowUid: row.uid })}
+                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
+                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                  onSave={() => saveRow(row.uid)}
+                  onEdit={() => editRow(row.uid)}
+                  onDelete={() => deleteRow(row.uid)}
+                />
+              ))}
+
+              <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-t">
+                <Button variant="outline" size="sm" onClick={addRow}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Row
+                </Button>
+                <div className="text-xs text-muted-foreground">
+                  {rows.length} customer row{rows.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+            </Card>
+
+            <div className="flex justify-end mt-3">
+              <Button variant="outline" size="sm" onClick={addRow}>
+                <Plus className="h-4 w-4 mr-1" /> Add Row
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* ===== SUMMARY TAB ===== */}
+          <TabsContent value="summary" className="mt-4">
+            <SummaryView
+              rows={rows.filter((r) => r.status === "saved" || r.status === "submitted")}
+              onEdit={(uid) => {
+                editRow(uid);
+                setTab("orders");
+              }}
+              onDelete={deleteRow}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* sticky bottom bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="container mx-auto max-w-[1400px] px-4 lg:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-6 text-sm">
+            <div>
+              <span className="text-muted-foreground">Customers: </span>
+              <span className="font-semibold">{totals.customers}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Items: </span>
+              <span className="font-semibold">{totals.items}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Grand Total: </span>
+              <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={saveDraft}>
+              Save Draft
+            </Button>
+            <Button onClick={submitAll} disabled={submitting}>
+              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Submit All
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* product picker modal */}
+      <ProductPickerDialog
+        open={!!productModal}
+        onClose={() => setProductModal(null)}
+        products={products}
+        onAdd={(p, qty, unit, price) => {
+          if (!productModal) return;
+          setRows((rs) =>
+            rs.map((r) =>
+              r.uid !== productModal.rowUid
+                ? r
+                : {
+                    ...r,
+                    items: [
+                      ...r.items,
+                      {
+                        uid: crypto.randomUUID(),
+                        product_id: p.id,
+                        product_name: p.name,
+                        category: p.category?.name || null,
+                        unit,
+                        quantity: qty,
+                        rate: price,
+                      },
+                    ],
+                  }
+            )
+          );
+          setProductModal(null);
+        }}
+      />
+
+      {/* retailer picker */}
+      <RetailerPickerDialog
+        open={!!retailerPickerFor}
+        onClose={() => setRetailerPickerFor(null)}
+        retailers={retailers}
+        onPick={(ret) => {
+          if (!retailerPickerFor) return;
+          updateRow(retailerPickerFor, { retailer: ret });
+          setRetailerPickerFor(null);
+        }}
+      />
+    </Layout>
+  );
+}
+
+// ===================================================================
+// ORDER ROW — full-width expansion, no nested cards, flat grid
+// ===================================================================
+function OrderRow({
+  row,
+  retailers,
+  onToggleExpand,
+  onPickRetailer,
+  onPhoneChange,
+  onAddProduct,
+  onUpdateItem,
+  onRemoveItem,
+  onSave,
+  onEdit,
+  onDelete,
+}: {
+  row: CounterRow;
+  retailers: CounterRetailer[];
+  onToggleExpand: () => void;
+  onPickRetailer: () => void;
+  onPhoneChange: (p: string) => void;
+  onAddProduct: () => void;
+  onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
+  onRemoveItem: (itemUid: string) => void;
+  onSave: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const locked = row.status === "saved" || row.status === "submitted";
+  const total = rowAmount(row);
+
+  return (
+    <div className={cn("border-b last:border-b-0", locked && "bg-muted/10")}>
+      {/* main row */}
+      <div className="grid grid-cols-[40px_1.6fr_1fr_1fr_220px] items-center gap-3 px-4 py-3">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggleExpand}>
+          {row.expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+
+        <div className="min-w-0">
+          {row.retailer ? (
+            <button
+              type="button"
+              disabled={locked}
+              onClick={onPickRetailer}
+              className="text-left disabled:cursor-not-allowed"
+            >
+              <div className="font-medium truncate">{row.retailer.name}</div>
+              <div className="text-xs text-muted-foreground truncate">
+                {row.phoneOverride || row.retailer.phone || "—"}
+              </div>
+            </button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={onPickRetailer}>
+              <Search className="h-3.5 w-3.5 mr-1" /> Select customer
+            </Button>
+          )}
+        </div>
+
+        <div className="text-sm">
+          {row.items.length} item{row.items.length !== 1 ? "s" : ""}
+        </div>
+
+        <div className="text-sm font-semibold">₹{total.toFixed(2)}</div>
+
+        <div className="flex items-center justify-end gap-2">
+          {row.status === "submitted" ? (
+            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15">
+              Submitted
+            </Badge>
+          ) : row.status === "saved" ? (
+            <>
+              <Badge variant="secondary">
+                <Lock className="h-3 w-3 mr-1" /> Saved
+              </Badge>
+              <Button size="sm" variant="ghost" onClick={onEdit}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" onClick={onSave}>
+              <Save className="h-3.5 w-3.5 mr-1" /> Save
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            onClick={onDelete}
+            disabled={row.status === "submitted"}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* expanded — FULL WIDTH, flat */}
+      {row.expanded && (
+        <div className="bg-muted/20 border-t px-4 py-3">
+          {/* products sub-table */}
+          <div className="grid grid-cols-[1.8fr_90px_120px_110px_120px_50px] items-center gap-3 px-2 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+            <div>Product</div>
+            <div>Qty</div>
+            <div>Unit</div>
+            <div>Price</div>
+            <div>Amount</div>
+            <div></div>
+          </div>
+
+          {row.items.length === 0 ? (
+            <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+              No products yet. Click <span className="font-medium">+ Add Product</span> below.
+            </div>
+          ) : (
+            row.items.map((item) => (
+              <div
+                key={item.uid}
+                className="grid grid-cols-[1.8fr_90px_120px_110px_120px_50px] items-center gap-3 px-2 py-2 border-t border-border/50"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{item.product_name}</div>
+                  {item.category && (
+                    <div className="text-xs text-muted-foreground truncate">{item.category}</div>
+                  )}
+                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  value={item.quantity}
+                  disabled={locked}
+                  onChange={(e) =>
+                    onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })
+                  }
+                  className="h-8"
+                />
+                <Select
+                  value={item.unit}
+                  disabled={locked}
+                  onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={item.rate}
+                  disabled={locked}
+                  onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
+                  className="h-8"
+                />
+                <div className="text-sm font-medium">
+                  ₹{(item.quantity * item.rate).toFixed(2)}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  disabled={locked}
+                  onClick={() => onRemoveItem(item.uid)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))
+          )}
+
+          <div className="flex items-center justify-between mt-3">
+            <Button variant="outline" size="sm" onClick={onAddProduct} disabled={locked}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Product
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={onDelete}
+              disabled={row.status === "submitted"}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Customer
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===================================================================
+// SUMMARY VIEW
+// ===================================================================
+function SummaryView({
+  rows,
+  onEdit,
+  onDelete,
+}: {
+  rows: CounterRow[];
+  onEdit: (uid: string) => void;
+  onDelete: (uid: string) => void;
+}) {
+  const navigate = useNavigate();
+  if (rows.length === 0) {
+    return (
+      <Card className="p-10 text-center text-sm text-muted-foreground rounded-2xl">
+        No saved or submitted orders yet. Save a row from the Orders tab to see it here.
+      </Card>
+    );
+  }
+  return (
+    <Card className="overflow-hidden rounded-2xl">
+      <div className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
+        <div>Customer</div>
+        <div>Items</div>
+        <div>Total</div>
+        <div>Status</div>
+        <div className="text-right">Actions</div>
+      </div>
+      {rows.map((r) => (
+        <div
+          key={r.uid}
+          className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 border-b last:border-b-0"
+        >
+          <div className="min-w-0">
+            <div className="font-medium truncate">{r.retailer?.name || "—"}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {r.phoneOverride || r.retailer?.phone || "—"}
+            </div>
+          </div>
+          <div className="text-sm">{rowItemCount(r)}</div>
+          <div className="text-sm font-semibold">₹{rowAmount(r).toFixed(2)}</div>
+          <div>
+            {r.status === "submitted" ? (
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15">
+                Submitted
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Saved</Badge>
+            )}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            {r.status === "submitted" && (
+              <Button size="sm" variant="outline" onClick={() => navigate("/invoices")}>
+                <FileText className="h-3.5 w-3.5 mr-1" /> Invoice
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => onEdit(r.uid)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              onClick={() => onDelete(r.uid)}
+              disabled={r.status === "submitted"}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+// ===================================================================
+// PRODUCT PICKER DIALOG
+// ===================================================================
+function ProductPickerDialog({
+  open,
+  onClose,
+  products,
+  onAdd,
+}: {
+  open: boolean;
+  onClose: () => void;
+  products: any[];
+  onAdd: (p: any, qty: number, unit: string, price: number) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [picked, setPicked] = useState<any | null>(null);
+  const [qty, setQty] = useState(1);
+  const [unit, setUnit] = useState("Pcs");
+  const [price, setPrice] = useState(0);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setPicked(null);
+      setQty(1);
+      setPrice(0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (picked) {
+      setUnit(picked.unit || "Pcs");
+      setPrice(Number(picked.rate) || 0);
+    }
+  }, [picked]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products.slice(0, 50);
+    return products
+      .filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.sku?.toLowerCase().includes(q) ||
+          p.category?.name?.toLowerCase().includes(q)
+      )
+      .slice(0, 50);
+  }, [products, search]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add Product</DialogTitle>
+        </DialogHeader>
+
+        {!picked ? (
+          <>
+            <Input
+              placeholder="Search by name, SKU, or category…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+            />
+            <div className="max-h-80 overflow-y-auto border rounded-lg divide-y">
+              {filtered.length === 0 ? (
+                <div className="p-6 text-sm text-muted-foreground text-center">No products</div>
+              ) : (
+                filtered.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPicked(p)}
+                    className="w-full text-left px-3 py-2 hover:bg-muted/50 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{p.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {p.category?.name || "—"} · {p.unit || "Pcs"}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold">₹{Number(p.rate || 0).toFixed(2)}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-lg border p-3 bg-muted/30">
+              <div className="font-medium">{picked.name}</div>
+              <div className="text-xs text-muted-foreground">
+                {picked.category?.name || "—"}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Quantity</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={qty}
+                  onChange={(e) => setQty(Number(e.target.value) || 0)}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Unit</label>
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(new Set([unit, ...UOM_OPTIONS])).map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Price (₹)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+            <div className="text-right text-sm">
+              Amount: <span className="font-semibold">₹{(qty * price).toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          {picked && (
+            <>
+              <Button variant="ghost" onClick={() => setPicked(null)}>
+                Back
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!qty || qty <= 0) {
+                    toast.error("Quantity must be > 0");
+                    return;
+                  }
+                  onAdd(picked, qty, unit, price);
+                }}
+              >
+                Add to order
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===================================================================
+// RETAILER PICKER DIALOG
+// ===================================================================
+function RetailerPickerDialog({
+  open,
+  onClose,
+  retailers,
+  onPick,
+}: {
+  open: boolean;
+  onClose: () => void;
+  retailers: CounterRetailer[];
+  onPick: (r: CounterRetailer) => void;
+}) {
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return retailers.slice(0, 80);
+    return retailers
+      .filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) ||
+          r.phone?.toLowerCase().includes(q) ||
+          r.shop_name?.toLowerCase().includes(q)
+      )
+      .slice(0, 80);
+  }, [retailers, search]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Select Customer</DialogTitle>
+        </DialogHeader>
+        <Input
+          placeholder="Search by name or phone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+        />
+        <div className="max-h-80 overflow-y-auto border rounded-lg divide-y">
+          {filtered.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground text-center">No customers</div>
+          ) : (
+            filtered.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onPick(r)}
+                className="w-full text-left px-3 py-2 hover:bg-muted/50"
+              >
+                <div className="text-sm font-medium truncate">{r.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{r.phone || "—"}</div>
+              </button>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
