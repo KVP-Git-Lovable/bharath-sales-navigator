@@ -960,3 +960,213 @@ function RetailerPickerDialog({
     </Dialog>
   );
 }
+
+// ===================================================================
+// INLINE CUSTOMER SELECT — searchable dropdown + inline create
+// ===================================================================
+function InlineCustomerSelect({
+  value,
+  phone,
+  disabled,
+  retailers,
+  onPick,
+  onCreated,
+}: {
+  value: CounterRetailer | null;
+  phone?: string;
+  disabled?: boolean;
+  retailers: CounterRetailer[];
+  onPick: (r: CounterRetailer) => void;
+  onCreated: (r: CounterRetailer) => void;
+}) {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<"search" | "create">("search");
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setMode("search");
+      setNewName("");
+      setNewPhone("");
+    }
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return retailers.slice(0, 50);
+    return retailers
+      .filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) ||
+          r.phone?.toLowerCase().includes(q) ||
+          r.shop_name?.toLowerCase().includes(q)
+      )
+      .slice(0, 50);
+  }, [retailers, search]);
+
+  const handleCreate = async () => {
+    const name = newName.trim();
+    const ph = newPhone.trim();
+    if (!name) return toast.error("Customer name is required");
+    if (!ph) return toast.error("Phone number is required");
+    // duplicate check (local)
+    const dup = retailers.find((r) => (r.phone || "").trim() === ph);
+    if (dup) {
+      toast.error("Customer already exists. Selecting it instead.");
+      onPick(dup);
+      setOpen(false);
+      return;
+    }
+    if (!user) return toast.error("You must be signed in");
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("retailers")
+        .insert({
+          name,
+          phone: ph,
+          user_id: user.id,
+          beat_id: "WALKIN",
+          beat_name: "Walk-in / Counter",
+          category: "General Store",
+          status: "active",
+        })
+        .select("id,name,phone,shop_name")
+        .single();
+      if (error) throw error;
+      const created: CounterRetailer = {
+        id: data.id,
+        name: data.name,
+        phone: data.phone,
+        shop_name: data.shop_name,
+      };
+      onCreated(created);
+      toast.success("Customer created");
+      setOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not create customer");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // trigger
+  const trigger = value ? (
+    <button
+      type="button"
+      disabled={disabled}
+      className="text-left w-full disabled:cursor-not-allowed"
+    >
+      <div className="font-medium truncate">{value.name}</div>
+      <div className="text-xs text-muted-foreground truncate">
+        {phone || value.phone || "—"}
+      </div>
+    </button>
+  ) : (
+    <Button variant="outline" size="sm" disabled={disabled} className="w-full justify-start">
+      <Search className="h-3.5 w-3.5 mr-1" /> Select customer
+    </Button>
+  );
+
+  return (
+    <Popover open={open} onOpenChange={(v) => !disabled && setOpen(v)}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className="w-[340px] p-0" align="start">
+        {mode === "search" ? (
+          <div className="p-2">
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 pl-8"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto rounded-md border divide-y">
+              {filtered.length === 0 ? (
+                <div className="p-4 text-xs text-muted-foreground text-center">
+                  No customers
+                </div>
+              ) : (
+                filtered.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      onPick(r);
+                      setOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-muted/50"
+                  >
+                    <div className="text-sm font-medium truncate">{r.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {r.phone || "—"}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start mt-2 text-primary"
+              onClick={() => {
+                setNewName(search);
+                setMode("create");
+              }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Create New Customer
+            </Button>
+          </div>
+        ) : (
+          <div className="p-3 space-y-2">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              New Customer
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Name *</label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="h-9"
+                placeholder="Customer name"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Phone *</label>
+              <Input
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                className="h-9"
+                placeholder="10-digit number"
+                inputMode="tel"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMode("search")}
+                disabled={saving}
+              >
+                Back
+              </Button>
+              <Button size="sm" onClick={handleCreate} disabled={saving}>
+                {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
