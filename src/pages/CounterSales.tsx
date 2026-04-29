@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ChevronDown,
   ChevronUp,
@@ -99,8 +100,9 @@ export default function CounterSales() {
 
   // product picker modal state
   const [productModal, setProductModal] = useState<{ rowUid: string } | null>(null);
-  // retailer picker per row
-  const [retailerPickerFor, setRetailerPickerFor] = useState<string | null>(null);
+  // inline create-new customer state shared with retailers list
+  const addRetailerLocal = (r: CounterRetailer) =>
+    setRetailers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
 
   // ---- load products + retailers ----
   useEffect(() => {
@@ -352,7 +354,8 @@ export default function CounterSales() {
                   row={row}
                   retailers={retailers}
                   onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickRetailer={() => setRetailerPickerFor(row.uid)}
+                  onPickRetailer={(ret) => updateRow(row.uid, { retailer: ret, phoneOverride: ret.phone || undefined })}
+                  onCreateRetailer={addRetailerLocal}
                   onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
                   onAddProduct={() => setProductModal({ rowUid: row.uid })}
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
@@ -455,17 +458,6 @@ export default function CounterSales() {
         }}
       />
 
-      {/* retailer picker */}
-      <RetailerPickerDialog
-        open={!!retailerPickerFor}
-        onClose={() => setRetailerPickerFor(null)}
-        retailers={retailers}
-        onPick={(ret) => {
-          if (!retailerPickerFor) return;
-          updateRow(retailerPickerFor, { retailer: ret });
-          setRetailerPickerFor(null);
-        }}
-      />
     </Layout>
   );
 }
@@ -478,6 +470,7 @@ function OrderRow({
   retailers,
   onToggleExpand,
   onPickRetailer,
+  onCreateRetailer,
   onPhoneChange,
   onAddProduct,
   onUpdateItem,
@@ -489,7 +482,8 @@ function OrderRow({
   row: CounterRow;
   retailers: CounterRetailer[];
   onToggleExpand: () => void;
-  onPickRetailer: () => void;
+  onPickRetailer: (r: CounterRetailer) => void;
+  onCreateRetailer: (r: CounterRetailer) => void;
   onPhoneChange: (p: string) => void;
   onAddProduct: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
@@ -510,23 +504,17 @@ function OrderRow({
         </Button>
 
         <div className="min-w-0">
-          {row.retailer ? (
-            <button
-              type="button"
-              disabled={locked}
-              onClick={onPickRetailer}
-              className="text-left disabled:cursor-not-allowed"
-            >
-              <div className="font-medium truncate">{row.retailer.name}</div>
-              <div className="text-xs text-muted-foreground truncate">
-                {row.phoneOverride || row.retailer.phone || "—"}
-              </div>
-            </button>
-          ) : (
-            <Button variant="outline" size="sm" onClick={onPickRetailer}>
-              <Search className="h-3.5 w-3.5 mr-1" /> Select customer
-            </Button>
-          )}
+          <InlineCustomerSelect
+            value={row.retailer}
+            phone={row.phoneOverride}
+            disabled={locked}
+            retailers={retailers}
+            onPick={onPickRetailer}
+            onCreated={(r) => {
+              onCreateRetailer(r);
+              onPickRetailer(r);
+            }}
+          />
         </div>
 
         <div className="text-sm">
