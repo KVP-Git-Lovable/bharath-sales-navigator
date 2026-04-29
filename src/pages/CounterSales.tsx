@@ -38,16 +38,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOfflineOrderEntry } from "@/hooks/useOfflineOrderEntry";
 import { submitOrderWithOfflineSupport } from "@/utils/offlineOrderUtils";
 import { supabase } from "@/integrations/supabase/client";
-import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // ---------- types ----------
-interface CounterRetailer {
+interface CounterCustomer {
   id: string;
   name: string;
   phone?: string | null;
-  shop_name?: string | null;
 }
 
 interface CounterLineItem {
@@ -64,7 +62,7 @@ type RowStatus = "draft" | "saved" | "submitted";
 
 interface CounterRow {
   uid: string;
-  retailer: CounterRetailer | null;
+  customer: CounterCustomer | null;
   phoneOverride?: string;
   items: CounterLineItem[];
   status: RowStatus;
@@ -76,7 +74,7 @@ const UOM_OPTIONS = ["Pcs", "Box", "Bag", "Kg", "Ltr", "Pkt", "Carton", "Dozen"]
 
 const newRow = (): CounterRow => ({
   uid: crypto.randomUUID(),
-  retailer: null,
+  customer: null,
   items: [],
   status: "draft",
   expanded: true,
@@ -95,44 +93,30 @@ export default function CounterSales() {
 
   const [tab, setTab] = useState<"orders" | "summary">("orders");
   const [rows, setRows] = useState<CounterRow[]>([newRow()]);
-  const [retailers, setRetailers] = useState<CounterRetailer[]>([]);
+  const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // product picker modal state
   const [productModal, setProductModal] = useState<{ rowUid: string } | null>(null);
-  // inline create-new customer state shared with retailers list
-  const addRetailerLocal = (r: CounterRetailer) =>
-    setRetailers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
+  // inline create-new customer state shared with customers list
+  const addRetailerLocal = (r: CounterCustomer) =>
+    setCustomers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
 
-  // ---- load products + retailers ----
+  // ---- load products + customers ----
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
   useEffect(() => {
     (async () => {
-      // try cache first for instant UI
-      try {
-        const cached = await offlineStorage.getAll(STORES.RETAILERS);
-        if (cached?.length) {
-          setRetailers(
-            cached.map((r: any) => ({
-              id: r.id,
-              name: r.name || r.shop_name || "Unnamed",
-              phone: r.phone,
-              shop_name: r.shop_name,
-            }))
-          );
-        }
-      } catch {}
       if (!user || !navigator.onLine) return;
       const { data } = await supabase
-        .from("retailers")
-        .select("id,name,phone,shop_name")
+        .from("counter_customers")
+        .select("id,name,phone")
         .eq("user_id", user.id)
         .order("name");
       if (data?.length) {
-        setRetailers(data as CounterRetailer[]);
+        setCustomers(data as CounterCustomer[]);
       }
     })();
   }, [user]);
@@ -178,7 +162,7 @@ export default function CounterSales() {
 
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
-    if (!r.retailer) return "Select a customer";
+    if (!r.customer) return "Select a customer";
     if (r.items.length === 0) return "Add at least one product";
     if (r.items.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
     return null;
@@ -214,7 +198,7 @@ export default function CounterSales() {
   };
 
   const submittableRows = useMemo(
-    () => rows.filter((r) => r.status !== "submitted" && r.retailer && r.items.length > 0),
+    () => rows.filter((r) => r.status !== "submitted" && r.customer && r.items.length > 0),
     [rows]
   );
 
@@ -231,7 +215,7 @@ export default function CounterSales() {
     for (const r of submittableRows) {
       const err = validateRow(r);
       if (err) {
-        toast.error(`Customer "${r.retailer?.name || "?"}": ${err}`);
+        toast.error(`Customer "${r.customer?.name || "?"}": ${err}`);
         return;
       }
     }
@@ -243,8 +227,9 @@ export default function CounterSales() {
       const total = Math.round(subtotal);
       const orderData = {
         user_id: user.id,
-        retailer_id: r.retailer!.id,
-        retailer_name: r.retailer!.name,
+        retailer_id: null as any,
+        counter_customer_id: r.customer!.id,
+        retailer_name: r.customer!.name,
         order_date: new Date().toISOString().slice(0, 10),
         subtotal,
         discount_amount: 0,
@@ -278,7 +263,7 @@ export default function CounterSales() {
           if (idx >= 0) updated[idx] = { ...updated[idx], status: "submitted", expanded: false };
         }
       } catch (e: any) {
-        toast.error(`Failed: ${r.retailer?.name} — ${e?.message || "unknown"}`);
+        toast.error(`Failed: ${r.customer?.name} — ${e?.message || "unknown"}`);
       }
     }
     setRows(updated);
@@ -292,7 +277,7 @@ export default function CounterSales() {
 
   // ---- totals ----
   const totals = useMemo(() => {
-    const customers = rows.filter((r) => r.retailer).length;
+    const customers = rows.filter((r) => r.customer).length;
     const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
     const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
     return { customers, items, grand };
@@ -352,9 +337,9 @@ export default function CounterSales() {
                 <OrderRow
                   key={row.uid}
                   row={row}
-                  retailers={retailers}
+                  customers={customers}
                   onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickRetailer={(ret) => updateRow(row.uid, { retailer: ret, phoneOverride: ret.phone || undefined })}
+                  onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
                   onCreateRetailer={addRetailerLocal}
                   onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
                   onAddProduct={() => setProductModal({ rowUid: row.uid })}
@@ -467,9 +452,9 @@ export default function CounterSales() {
 // ===================================================================
 function OrderRow({
   row,
-  retailers,
+  customers,
   onToggleExpand,
-  onPickRetailer,
+  onPickCustomer,
   onCreateRetailer,
   onPhoneChange,
   onAddProduct,
@@ -480,10 +465,10 @@ function OrderRow({
   onDelete,
 }: {
   row: CounterRow;
-  retailers: CounterRetailer[];
+  customers: CounterCustomer[];
   onToggleExpand: () => void;
-  onPickRetailer: (r: CounterRetailer) => void;
-  onCreateRetailer: (r: CounterRetailer) => void;
+  onPickCustomer: (r: CounterCustomer) => void;
+  onCreateRetailer: (r: CounterCustomer) => void;
   onPhoneChange: (p: string) => void;
   onAddProduct: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
@@ -505,14 +490,14 @@ function OrderRow({
 
         <div className="min-w-0">
           <InlineCustomerSelect
-            value={row.retailer}
+            value={row.customer}
             phone={row.phoneOverride}
             disabled={locked}
-            retailers={retailers}
-            onPick={onPickRetailer}
+            customers={customers}
+            onPick={onPickCustomer}
             onCreated={(r) => {
               onCreateRetailer(r);
-              onPickRetailer(r);
+              onPickCustomer(r);
             }}
           />
         </div>
@@ -689,9 +674,9 @@ function SummaryView({
           className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 border-b last:border-b-0"
         >
           <div className="min-w-0">
-            <div className="font-medium truncate">{r.retailer?.name || "—"}</div>
+            <div className="font-medium truncate">{r.customer?.name || "—"}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {r.phoneOverride || r.retailer?.phone || "—"}
+              {r.phoneOverride || r.customer?.phone || "—"}
             </div>
           </div>
           <div className="text-sm">{rowItemCount(r)}</div>
@@ -902,16 +887,16 @@ function InlineCustomerSelect({
   value,
   phone,
   disabled,
-  retailers,
+  customers,
   onPick,
   onCreated,
 }: {
-  value: CounterRetailer | null;
+  value: CounterCustomer | null;
   phone?: string;
   disabled?: boolean;
-  retailers: CounterRetailer[];
-  onPick: (r: CounterRetailer) => void;
-  onCreated: (r: CounterRetailer) => void;
+  customers: CounterCustomer[];
+  onPick: (r: CounterCustomer) => void;
+  onCreated: (r: CounterCustomer) => void;
 }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -932,16 +917,15 @@ function InlineCustomerSelect({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return retailers.slice(0, 50);
-    return retailers
+    if (!q) return customers.slice(0, 50);
+    return customers
       .filter(
         (r) =>
           r.name?.toLowerCase().includes(q) ||
-          r.phone?.toLowerCase().includes(q) ||
-          r.shop_name?.toLowerCase().includes(q)
+          r.phone?.toLowerCase().includes(q)
       )
       .slice(0, 50);
-  }, [retailers, search]);
+  }, [customers, search]);
 
   const handleCreate = async () => {
     const name = newName.trim();
@@ -949,7 +933,7 @@ function InlineCustomerSelect({
     if (!name) return toast.error("Customer name is required");
     if (!ph) return toast.error("Phone number is required");
     // duplicate check (local)
-    const dup = retailers.find((r) => (r.phone || "").trim() === ph);
+    const dup = customers.find((r) => (r.phone || "").trim() === ph);
     if (dup) {
       toast.error("Customer already exists. Selecting it instead.");
       onPick(dup);
@@ -960,24 +944,19 @@ function InlineCustomerSelect({
     setSaving(true);
     try {
       const { data, error } = await supabase
-        .from("retailers")
+        .from("counter_customers")
         .insert({
           name,
           phone: ph,
           user_id: user.id,
-          beat_id: "WALKIN",
-          beat_name: "Walk-in / Counter",
-          category: "General Store",
-          status: "active",
         })
-        .select("id,name,phone,shop_name")
+        .select("id,name,phone")
         .single();
       if (error) throw error;
-      const created: CounterRetailer = {
+      const created: CounterCustomer = {
         id: data.id,
         name: data.name,
         phone: data.phone,
-        shop_name: data.shop_name,
       };
       onCreated(created);
       toast.success("Customer created");
