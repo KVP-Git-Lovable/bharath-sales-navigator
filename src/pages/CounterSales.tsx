@@ -109,24 +109,10 @@ export default function CounterSales() {
 
   useEffect(() => {
     (async () => {
-      // try cache first for instant UI
-      try {
-        const cached = await offlineStorage.getAll(STORES.RETAILERS);
-        if (cached?.length) {
-          setCustomers(
-            cached.map((r: any) => ({
-              id: r.id,
-              name: r.name || r.shop_name || "Unnamed",
-              phone: r.phone,
-              shop_name: r.shop_name,
-            }))
-          );
-        }
-      } catch {}
       if (!user || !navigator.onLine) return;
       const { data } = await supabase
-        .from("customers")
-        .select("id,name,phone,shop_name")
+        .from("counter_customers")
+        .select("id,name,phone")
         .eq("user_id", user.id)
         .order("name");
       if (data?.length) {
@@ -241,7 +227,8 @@ export default function CounterSales() {
       const total = Math.round(subtotal);
       const orderData = {
         user_id: user.id,
-        retailer_id: r.customer!.id,
+        retailer_id: null as any,
+        counter_customer_id: r.customer!.id,
         retailer_name: r.customer!.name,
         order_date: new Date().toISOString().slice(0, 10),
         subtotal,
