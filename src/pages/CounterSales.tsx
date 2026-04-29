@@ -332,7 +332,8 @@ export default function CounterSales() {
 
           {/* ===== ORDERS TAB ===== */}
           <TabsContent value="orders" className="mt-4">
-            <Card className="overflow-hidden rounded-2xl border">
+            {/* DESKTOP grid view */}
+            <Card className="hidden md:block overflow-hidden rounded-2xl border">
               {/* table header */}
               <div className="grid grid-cols-[40px_1.6fr_1fr_1fr_220px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
                 <div></div>
@@ -370,7 +371,35 @@ export default function CounterSales() {
               </div>
             </Card>
 
-            <div className="flex justify-end mt-3">
+            {/* MOBILE card view */}
+            <div className="md:hidden space-y-3">
+              {rows.map((row, idx) => (
+                <MobileCustomerCard
+                  key={row.uid}
+                  index={idx + 1}
+                  row={row}
+                  customers={customers}
+                  onToggleExpand={() => toggleExpand(row.uid)}
+                  onPickCustomer={(ret) =>
+                    updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
+                  }
+                  onCreateRetailer={addRetailerLocal}
+                  onAddProduct={() => setProductModal({ rowUid: row.uid })}
+                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
+                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                  onDelete={() => deleteRow(row.uid)}
+                />
+              ))}
+              <Button
+                variant="outline"
+                onClick={addRow}
+                className="w-full rounded-2xl border-dashed h-11 text-primary"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Row
+              </Button>
+            </div>
+
+            <div className="hidden md:flex justify-end mt-3">
               <Button variant="outline" size="sm" onClick={addRow}>
                 <Plus className="h-4 w-4 mr-1" /> Add Row
               </Button>
