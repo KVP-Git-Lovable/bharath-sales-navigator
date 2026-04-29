@@ -21,6 +21,13 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+} from "@/components/ui/drawer";
+import {
   ChevronDown,
   ChevronUp,
   Plus,
@@ -32,6 +39,8 @@ import {
   FileText,
   Pencil,
   Loader2,
+  User,
+  Phone,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,6 +55,432 @@ interface CounterCustomer {
   id: string;
   name: string;
   phone?: string | null;
+}
+
+// ===================================================================
+// MOBILE CUSTOMER CARD — accordion-style, bottom-sheet pickers
+// ===================================================================
+function MobileCustomerCard({
+  index,
+  row,
+  customers,
+  onToggleExpand,
+  onPickCustomer,
+  onCreateRetailer,
+  onAddProduct,
+  onUpdateItem,
+  onRemoveItem,
+  onDelete,
+}: {
+  index: number;
+  row: CounterRow;
+  customers: CounterCustomer[];
+  onToggleExpand: () => void;
+  onPickCustomer: (r: CounterCustomer) => void;
+  onCreateRetailer: (r: CounterCustomer) => void;
+  onAddProduct: () => void;
+  onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
+  onRemoveItem: (itemUid: string) => void;
+  onDelete: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const locked = row.status === "saved" || row.status === "submitted";
+  const total = rowAmount(row);
+
+  return (
+    <Card className="rounded-2xl shadow-sm border overflow-hidden">
+      {/* COLLAPSED HEADER — tappable */}
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-muted/40 transition-colors"
+      >
+        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
+          {index}
+        </div>
+        <div className="min-w-0 flex-1">
+          {row.customer ? (
+            <>
+              <div className="text-sm font-semibold truncate">{row.customer.name}</div>
+              <div className="text-xs text-muted-foreground truncate">
+                {row.phoneOverride || row.customer.phone || "—"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-medium text-primary">Select Customer</div>
+              <div className="text-xs text-muted-foreground">Tap to choose or create</div>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <div className="text-[11px] text-muted-foreground">
+            {row.items.length} item{row.items.length !== 1 ? "s" : ""}
+          </div>
+          <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+            ₹{total.toFixed(2)}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground shrink-0 transition-transform",
+            row.expanded && "rotate-180"
+          )}
+        />
+      </button>
+
+      {/* EXPANDED BODY */}
+      {row.expanded && (
+        <div className="px-3 pb-3 pt-1 border-t bg-muted/10 space-y-3">
+          {/* Customer selector tile if not yet picked, or change link */}
+          {!row.customer ? (
+            <Button
+              variant="outline"
+              className="w-full rounded-xl h-10 justify-start"
+              onClick={() => setPickerOpen(true)}
+              disabled={locked}
+            >
+              <User className="h-4 w-4 mr-2" /> Select Customer
+            </Button>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl bg-background border px-3 py-2">
+              <div className="min-w-0">
+                <div className="text-xs text-muted-foreground">Customer</div>
+                <div className="text-sm font-medium truncate">{row.customer.name}</div>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Phone className="h-3 w-3" /> {row.phoneOverride || row.customer.phone || "—"}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-primary"
+                onClick={() => setPickerOpen(true)}
+                disabled={locked}
+              >
+                Change
+              </Button>
+            </div>
+          )}
+
+          {/* Products */}
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
+              Products ({row.items.length})
+            </div>
+
+            {row.items.length === 0 ? (
+              <div className="rounded-xl bg-background border border-dashed py-6 text-center text-xs text-muted-foreground">
+                No products yet
+              </div>
+            ) : (
+              row.items.map((item) => (
+                <div
+                  key={item.uid}
+                  className="rounded-xl bg-background border p-3 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{item.product_name}</div>
+                      {item.category && (
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {item.category}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                      disabled={locked}
+                      onClick={() => onRemoveItem(item.uid)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Qty</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="decimal"
+                        value={item.quantity}
+                        disabled={locked}
+                        onChange={(e) =>
+                          onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })
+                        }
+                        className="h-8 text-sm px-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Unit</label>
+                      <Select
+                        value={item.unit}
+                        disabled={locked}
+                        onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
+                      >
+                        <SelectTrigger className="h-8 text-sm px-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Price</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        inputMode="decimal"
+                        value={item.rate}
+                        disabled={locked}
+                        onChange={(e) =>
+                          onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })
+                        }
+                        className="h-8 text-sm px-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Amount</label>
+                      <div className="h-8 flex items-center text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        ₹{(item.quantity * item.rate).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={onAddProduct}
+            disabled={locked}
+            className="w-full rounded-xl h-10 border-dashed text-primary"
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add Product
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={onDelete}
+            disabled={row.status === "submitted"}
+            className="w-full rounded-xl h-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Delete Row
+          </Button>
+        </div>
+      )}
+
+      {/* Customer picker bottom sheet */}
+      <CustomerPickerDrawer
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        customers={customers}
+        onPick={(c) => {
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+        onCreated={(c) => {
+          onCreateRetailer(c);
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+      />
+    </Card>
+  );
+}
+
+// ===================================================================
+// CUSTOMER PICKER — bottom sheet with search + inline create
+// ===================================================================
+function CustomerPickerDrawer({
+  open,
+  onOpenChange,
+  customers,
+  onPick,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  customers: CounterCustomer[];
+  onPick: (r: CounterCustomer) => void;
+  onCreated: (r: CounterCustomer) => void;
+}) {
+  const { user } = useAuth();
+  const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<"search" | "create">("search");
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setMode("search");
+      setNewName("");
+      setNewPhone("");
+    }
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return customers.slice(0, 100);
+    return customers
+      .filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) || r.phone?.toLowerCase().includes(q)
+      )
+      .slice(0, 100);
+  }, [customers, search]);
+
+  const handleCreate = async () => {
+    const name = newName.trim();
+    const ph = newPhone.trim();
+    if (!name) return toast.error("Customer name is required");
+    if (!ph) return toast.error("Phone number is required");
+    const dup = customers.find((r) => (r.phone || "").trim() === ph);
+    if (dup) {
+      toast.error("Customer already exists. Selecting it instead.");
+      onPick(dup);
+      return;
+    }
+    if (!user) return toast.error("You must be signed in");
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("counter_customers")
+        .insert({ name, phone: ph, user_id: user.id })
+        .select("id,name,phone")
+        .single();
+      if (error) throw error;
+      onCreated({ id: data.id, name: data.name, phone: data.phone });
+      toast.success("Customer created");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not create customer");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader className="text-left">
+          <DrawerTitle>
+            {mode === "search" ? "Select Customer" : "New Customer"}
+          </DrawerTitle>
+        </DrawerHeader>
+
+        {mode === "search" ? (
+          <div className="px-4 pb-2 flex flex-col min-h-0">
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 pl-8 rounded-xl"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto rounded-xl border divide-y max-h-[45vh]">
+              {filtered.length === 0 ? (
+                <div className="p-6 text-sm text-muted-foreground text-center">
+                  No customers found
+                </div>
+              ) : (
+                filtered.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onPick(r)}
+                    className="w-full text-left px-3 py-3 hover:bg-muted/50 active:bg-muted"
+                  >
+                    <div className="text-sm font-medium truncate">{r.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {r.phone || "—"}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <Button
+              variant="outline"
+              className="w-full mt-3 rounded-xl h-11 text-primary border-dashed"
+              onClick={() => {
+                setNewName(search);
+                setMode("create");
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Create New Customer
+            </Button>
+          </div>
+        ) : (
+          <div className="px-4 pb-2 space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Name *</label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="h-10 rounded-xl"
+                placeholder="Customer name"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Phone *</label>
+              <Input
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                className="h-10 rounded-xl"
+                placeholder="10-digit number"
+                inputMode="tel"
+              />
+            </div>
+          </div>
+        )}
+
+        <DrawerFooter className="pt-2">
+          {mode === "create" ? (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl h-11"
+                onClick={() => setMode("search")}
+                disabled={saving}
+              >
+                Back
+              </Button>
+              <Button
+                className="flex-1 rounded-xl h-11"
+                onClick={handleCreate}
+                disabled={saving}
+              >
+                {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Done
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full rounded-xl h-11"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+          )}
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  );
 }
 
 interface CounterLineItem {
@@ -288,16 +723,18 @@ export default function CounterSales() {
       <div className="container mx-auto px-4 lg:px-6 py-4 max-w-[1400px] pb-28">
         {/* header */}
         <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 min-w-0">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-semibold">Counter Sales</h1>
-              <p className="text-sm text-muted-foreground">Add orders for multiple customers</p>
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-2xl font-semibold truncate">Counter Sales – Orders</h1>
+              <p className="text-xs md:text-sm text-muted-foreground truncate">
+                Add orders for multiple customers
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2">
             <Button variant="outline" onClick={saveDraft}>
               Save Draft
             </Button>
@@ -323,7 +760,8 @@ export default function CounterSales() {
 
           {/* ===== ORDERS TAB ===== */}
           <TabsContent value="orders" className="mt-4">
-            <Card className="overflow-hidden rounded-2xl border">
+            {/* DESKTOP grid view */}
+            <Card className="hidden md:block overflow-hidden rounded-2xl border">
               {/* table header */}
               <div className="grid grid-cols-[40px_1.6fr_1fr_1fr_220px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
                 <div></div>
@@ -361,7 +799,35 @@ export default function CounterSales() {
               </div>
             </Card>
 
-            <div className="flex justify-end mt-3">
+            {/* MOBILE card view */}
+            <div className="md:hidden space-y-3">
+              {rows.map((row, idx) => (
+                <MobileCustomerCard
+                  key={row.uid}
+                  index={idx + 1}
+                  row={row}
+                  customers={customers}
+                  onToggleExpand={() => toggleExpand(row.uid)}
+                  onPickCustomer={(ret) =>
+                    updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
+                  }
+                  onCreateRetailer={addRetailerLocal}
+                  onAddProduct={() => setProductModal({ rowUid: row.uid })}
+                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
+                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                  onDelete={() => deleteRow(row.uid)}
+                />
+              ))}
+              <Button
+                variant="outline"
+                onClick={addRow}
+                className="w-full rounded-2xl border-dashed h-11 text-primary"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Row
+              </Button>
+            </div>
+
+            <div className="hidden md:flex justify-end mt-3">
               <Button variant="outline" size="sm" onClick={addRow}>
                 <Plus className="h-4 w-4 mr-1" /> Add Row
               </Button>
@@ -384,29 +850,57 @@ export default function CounterSales() {
 
       {/* sticky bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container mx-auto max-w-[1400px] px-4 lg:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-6 text-sm">
-            <div>
-              <span className="text-muted-foreground">Customers: </span>
-              <span className="font-semibold">{totals.customers}</span>
+        <div className="container mx-auto max-w-[1400px] px-3 lg:px-6 py-2 md:py-3">
+          {/* totals row */}
+          <div className="grid grid-cols-3 gap-2 md:hidden mb-2">
+            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-[10px] text-muted-foreground">Customers</div>
+              <div className="text-sm font-semibold">{totals.customers}</div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Items: </span>
-              <span className="font-semibold">{totals.items}</span>
+            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-[10px] text-muted-foreground">Items</div>
+              <div className="text-sm font-semibold">{totals.items}</div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Grand Total: </span>
-              <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-[10px] text-muted-foreground">Grand Total</div>
+              <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                ₹{totals.grand.toFixed(2)}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={saveDraft}>
-              Save Draft
-            </Button>
-            <Button onClick={submitAll} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Submit All
-            </Button>
+          <div className="flex items-center justify-between gap-2 md:gap-4 flex-wrap">
+            <div className="hidden md:flex items-center gap-6 text-sm">
+              <div>
+                <span className="text-muted-foreground">Customers: </span>
+                <span className="font-semibold">{totals.customers}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Items: </span>
+                <span className="font-semibold">{totals.items}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Grand Total: </span>
+                <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Button
+                variant="outline"
+                onClick={saveDraft}
+                className="flex-1 md:flex-initial rounded-xl h-10"
+              >
+                <Save className="h-4 w-4 mr-1 md:hidden" />
+                Save Draft
+              </Button>
+              <Button
+                onClick={submitAll}
+                disabled={submitting}
+                className="flex-1 md:flex-initial rounded-xl h-10"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Submit All
+              </Button>
+            </div>
           </div>
         </div>
       </div>
