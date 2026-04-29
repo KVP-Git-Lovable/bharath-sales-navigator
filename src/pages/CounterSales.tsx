@@ -850,29 +850,57 @@ export default function CounterSales() {
 
       {/* sticky bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container mx-auto max-w-[1400px] px-4 lg:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-6 text-sm">
-            <div>
-              <span className="text-muted-foreground">Customers: </span>
-              <span className="font-semibold">{totals.customers}</span>
+        <div className="container mx-auto max-w-[1400px] px-3 lg:px-6 py-2 md:py-3">
+          {/* totals row */}
+          <div className="grid grid-cols-3 gap-2 md:hidden mb-2">
+            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-[10px] text-muted-foreground">Customers</div>
+              <div className="text-sm font-semibold">{totals.customers}</div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Items: </span>
-              <span className="font-semibold">{totals.items}</span>
+            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-[10px] text-muted-foreground">Items</div>
+              <div className="text-sm font-semibold">{totals.items}</div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Grand Total: </span>
-              <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-[10px] text-muted-foreground">Grand Total</div>
+              <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                ₹{totals.grand.toFixed(2)}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={saveDraft}>
-              Save Draft
-            </Button>
-            <Button onClick={submitAll} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Submit All
-            </Button>
+          <div className="flex items-center justify-between gap-2 md:gap-4 flex-wrap">
+            <div className="hidden md:flex items-center gap-6 text-sm">
+              <div>
+                <span className="text-muted-foreground">Customers: </span>
+                <span className="font-semibold">{totals.customers}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Items: </span>
+                <span className="font-semibold">{totals.items}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Grand Total: </span>
+                <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Button
+                variant="outline"
+                onClick={saveDraft}
+                className="flex-1 md:flex-initial rounded-xl h-10"
+              >
+                <Save className="h-4 w-4 mr-1 md:hidden" />
+                Save Draft
+              </Button>
+              <Button
+                onClick={submitAll}
+                disabled={submitting}
+                className="flex-1 md:flex-initial rounded-xl h-10"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Submit All
+              </Button>
+            </div>
           </div>
         </div>
       </div>
