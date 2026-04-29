@@ -93,16 +93,16 @@ export default function CounterSales() {
 
   const [tab, setTab] = useState<"orders" | "summary">("orders");
   const [rows, setRows] = useState<CounterRow[]>([newRow()]);
-  const [retailers, setRetailers] = useState<CounterCustomer[]>([]);
+  const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // product picker modal state
   const [productModal, setProductModal] = useState<{ rowUid: string } | null>(null);
-  // inline create-new customer state shared with retailers list
+  // inline create-new customer state shared with customers list
   const addRetailerLocal = (r: CounterCustomer) =>
-    setRetailers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
+    setCustomers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
 
-  // ---- load products + retailers ----
+  // ---- load products + customers ----
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
@@ -113,7 +113,7 @@ export default function CounterSales() {
       try {
         const cached = await offlineStorage.getAll(STORES.RETAILERS);
         if (cached?.length) {
-          setRetailers(
+          setCustomers(
             cached.map((r: any) => ({
               id: r.id,
               name: r.name || r.shop_name || "Unnamed",
@@ -125,12 +125,12 @@ export default function CounterSales() {
       } catch {}
       if (!user || !navigator.onLine) return;
       const { data } = await supabase
-        .from("retailers")
+        .from("customers")
         .select("id,name,phone,shop_name")
         .eq("user_id", user.id)
         .order("name");
       if (data?.length) {
-        setRetailers(data as CounterCustomer[]);
+        setCustomers(data as CounterCustomer[]);
       }
     })();
   }, [user]);
@@ -352,7 +352,7 @@ export default function CounterSales() {
                   row={row}
                   customers={customers}
                   onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickRetailer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
+                  onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
                   onCreateRetailer={addRetailerLocal}
                   onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
                   onAddProduct={() => setProductModal({ rowUid: row.uid })}
@@ -465,9 +465,9 @@ export default function CounterSales() {
 // ===================================================================
 function OrderRow({
   row,
-  retailers,
+  customers,
   onToggleExpand,
-  onPickRetailer,
+  onPickCustomer,
   onCreateRetailer,
   onPhoneChange,
   onAddProduct,
@@ -478,9 +478,9 @@ function OrderRow({
   onDelete,
 }: {
   row: CounterRow;
-  retailers: CounterCustomer[];
+  customers: CounterCustomer[];
   onToggleExpand: () => void;
-  onPickRetailer: (r: CounterCustomer) => void;
+  onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
   onPhoneChange: (p: string) => void;
   onAddProduct: () => void;
@@ -507,10 +507,10 @@ function OrderRow({
             phone={row.phoneOverride}
             disabled={locked}
             customers={customers}
-            onPick={onPickRetailer}
+            onPick={onPickCustomer}
             onCreated={(r) => {
               onCreateRetailer(r);
-              onPickRetailer(r);
+              onPickCustomer(r);
             }}
           />
         </div>
@@ -900,14 +900,14 @@ function InlineCustomerSelect({
   value,
   phone,
   disabled,
-  retailers,
+  customers,
   onPick,
   onCreated,
 }: {
   value: CounterCustomer | null;
   phone?: string;
   disabled?: boolean;
-  retailers: CounterCustomer[];
+  customers: CounterCustomer[];
   onPick: (r: CounterCustomer) => void;
   onCreated: (r: CounterCustomer) => void;
 }) {
@@ -930,8 +930,8 @@ function InlineCustomerSelect({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return retailers.slice(0, 50);
-    return retailers
+    if (!q) return customers.slice(0, 50);
+    return customers
       .filter(
         (r) =>
           r.name?.toLowerCase().includes(q) ||
@@ -939,7 +939,7 @@ function InlineCustomerSelect({
           r.shop_name?.toLowerCase().includes(q)
       )
       .slice(0, 50);
-  }, [retailers, search]);
+  }, [customers, search]);
 
   const handleCreate = async () => {
     const name = newName.trim();
@@ -947,7 +947,7 @@ function InlineCustomerSelect({
     if (!name) return toast.error("Customer name is required");
     if (!ph) return toast.error("Phone number is required");
     // duplicate check (local)
-    const dup = retailers.find((r) => (r.phone || "").trim() === ph);
+    const dup = customers.find((r) => (r.phone || "").trim() === ph);
     if (dup) {
       toast.error("Customer already exists. Selecting it instead.");
       onPick(dup);
@@ -958,7 +958,7 @@ function InlineCustomerSelect({
     setSaving(true);
     try {
       const { data, error } = await supabase
-        .from("retailers")
+        .from("customers")
         .insert({
           name,
           phone: ph,
