@@ -93,13 +93,13 @@ export default function CounterSales() {
 
   const [tab, setTab] = useState<"orders" | "summary">("orders");
   const [rows, setRows] = useState<CounterRow[]>([newRow()]);
-  const [retailers, setRetailers] = useState<CounterRetailer[]>([]);
+  const [retailers, setRetailers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // product picker modal state
   const [productModal, setProductModal] = useState<{ rowUid: string } | null>(null);
   // inline create-new customer state shared with retailers list
-  const addRetailerLocal = (r: CounterRetailer) =>
+  const addRetailerLocal = (r: CounterCustomer) =>
     setRetailers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
 
   // ---- load products + retailers ----
@@ -130,7 +130,7 @@ export default function CounterSales() {
         .eq("user_id", user.id)
         .order("name");
       if (data?.length) {
-        setRetailers(data as CounterRetailer[]);
+        setRetailers(data as CounterCustomer[]);
       }
     })();
   }, [user]);
@@ -176,7 +176,7 @@ export default function CounterSales() {
 
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
-    if (!r.retailer) return "Select a customer";
+    if (!r.customer) return "Select a customer";
     if (r.items.length === 0) return "Add at least one product";
     if (r.items.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
     return null;
@@ -212,7 +212,7 @@ export default function CounterSales() {
   };
 
   const submittableRows = useMemo(
-    () => rows.filter((r) => r.status !== "submitted" && r.retailer && r.items.length > 0),
+    () => rows.filter((r) => r.status !== "submitted" && r.customer && r.items.length > 0),
     [rows]
   );
 
@@ -229,7 +229,7 @@ export default function CounterSales() {
     for (const r of submittableRows) {
       const err = validateRow(r);
       if (err) {
-        toast.error(`Customer "${r.retailer?.name || "?"}": ${err}`);
+        toast.error(`Customer "${r.customer?.name || "?"}": ${err}`);
         return;
       }
     }
@@ -241,8 +241,8 @@ export default function CounterSales() {
       const total = Math.round(subtotal);
       const orderData = {
         user_id: user.id,
-        retailer_id: r.retailer!.id,
-        retailer_name: r.retailer!.name,
+        retailer_id: r.customer!.id,
+        retailer_name: r.customer!.name,
         order_date: new Date().toISOString().slice(0, 10),
         subtotal,
         discount_amount: 0,
@@ -276,7 +276,7 @@ export default function CounterSales() {
           if (idx >= 0) updated[idx] = { ...updated[idx], status: "submitted", expanded: false };
         }
       } catch (e: any) {
-        toast.error(`Failed: ${r.retailer?.name} — ${e?.message || "unknown"}`);
+        toast.error(`Failed: ${r.customer?.name} — ${e?.message || "unknown"}`);
       }
     }
     setRows(updated);
@@ -290,7 +290,7 @@ export default function CounterSales() {
 
   // ---- totals ----
   const totals = useMemo(() => {
-    const customers = rows.filter((r) => r.retailer).length;
+    const customers = rows.filter((r) => r.customer).length;
     const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
     const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
     return { customers, items, grand };
@@ -350,9 +350,9 @@ export default function CounterSales() {
                 <OrderRow
                   key={row.uid}
                   row={row}
-                  retailers={retailers}
+                  customers={customers}
                   onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickRetailer={(ret) => updateRow(row.uid, { retailer: ret, phoneOverride: ret.phone || undefined })}
+                  onPickRetailer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
                   onCreateRetailer={addRetailerLocal}
                   onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
                   onAddProduct={() => setProductModal({ rowUid: row.uid })}
@@ -478,10 +478,10 @@ function OrderRow({
   onDelete,
 }: {
   row: CounterRow;
-  retailers: CounterRetailer[];
+  retailers: CounterCustomer[];
   onToggleExpand: () => void;
-  onPickRetailer: (r: CounterRetailer) => void;
-  onCreateRetailer: (r: CounterRetailer) => void;
+  onPickRetailer: (r: CounterCustomer) => void;
+  onCreateRetailer: (r: CounterCustomer) => void;
   onPhoneChange: (p: string) => void;
   onAddProduct: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
@@ -503,10 +503,10 @@ function OrderRow({
 
         <div className="min-w-0">
           <InlineCustomerSelect
-            value={row.retailer}
+            value={row.customer}
             phone={row.phoneOverride}
             disabled={locked}
-            retailers={retailers}
+            customers={customers}
             onPick={onPickRetailer}
             onCreated={(r) => {
               onCreateRetailer(r);
@@ -687,9 +687,9 @@ function SummaryView({
           className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 border-b last:border-b-0"
         >
           <div className="min-w-0">
-            <div className="font-medium truncate">{r.retailer?.name || "—"}</div>
+            <div className="font-medium truncate">{r.customer?.name || "—"}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {r.phoneOverride || r.retailer?.phone || "—"}
+              {r.phoneOverride || r.customer?.phone || "—"}
             </div>
           </div>
           <div className="text-sm">{rowItemCount(r)}</div>
@@ -904,12 +904,12 @@ function InlineCustomerSelect({
   onPick,
   onCreated,
 }: {
-  value: CounterRetailer | null;
+  value: CounterCustomer | null;
   phone?: string;
   disabled?: boolean;
-  retailers: CounterRetailer[];
-  onPick: (r: CounterRetailer) => void;
-  onCreated: (r: CounterRetailer) => void;
+  retailers: CounterCustomer[];
+  onPick: (r: CounterCustomer) => void;
+  onCreated: (r: CounterCustomer) => void;
 }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -971,7 +971,7 @@ function InlineCustomerSelect({
         .select("id,name,phone,shop_name")
         .single();
       if (error) throw error;
-      const created: CounterRetailer = {
+      const created: CounterCustomer = {
         id: data.id,
         name: data.name,
         phone: data.phone,
