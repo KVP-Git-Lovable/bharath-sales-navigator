@@ -297,16 +297,18 @@ export default function CounterSales() {
       <div className="container mx-auto px-4 lg:px-6 py-4 max-w-[1400px] pb-28">
         {/* header */}
         <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 min-w-0">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-semibold">Counter Sales</h1>
-              <p className="text-sm text-muted-foreground">Add orders for multiple customers</p>
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-2xl font-semibold truncate">Counter Sales – Orders</h1>
+              <p className="text-xs md:text-sm text-muted-foreground truncate">
+                Add orders for multiple customers
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2">
             <Button variant="outline" onClick={saveDraft}>
               Save Draft
             </Button>
