@@ -21,6 +21,13 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+} from "@/components/ui/drawer";
+import {
   ChevronDown,
   ChevronUp,
   Plus,
@@ -32,6 +39,8 @@ import {
   FileText,
   Pencil,
   Loader2,
+  User,
+  Phone,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
