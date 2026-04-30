@@ -26,6 +26,7 @@ import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
  import { useHindiToEnglish } from '@/hooks/useHindiToEnglish';
  import { RetailerSummarySection } from './RetailerSummarySection';
  import { LeaderboardSection } from './LeaderboardSection';
+import { useCompanyData } from '@/hooks/useCompanyData';
 interface UserOrderSummary {
   full_name: string;
   total_order_value: number;
@@ -58,6 +59,7 @@ const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'
 
 export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeReady = true }: SupervisorReportProps) => {
   const isMobile = useIsMobile();
+  const { company, headerName } = useCompanyData();
   const [loading, setLoading] = useState(false);
   
   // Refs to track previous values and prevent duplicate fetches
@@ -1580,7 +1582,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       doc.setFont('NotoSans', 'normal');
       const periodText = `${format(dateRange.from, 'dd MMM yyyy')} – ${format(dateRange.to, 'dd MMM yyyy')}`;
       const filterLabel = selectedUsers.length === 0 ? 'All Users' : selectedUsers.length <= 3 ? selectedUsers.join(', ') : `${selectedUsers.length} users selected`;
-      doc.text(`Period: ${periodText}   |   Filter: ${filterLabel}`, margin, 52);
+      const companyLabel = headerName || company?.name || '';
+      const headerLine = companyLabel
+        ? `Company: ${companyLabel}   |   Period: ${periodText}   |   Filter: ${filterLabel}`
+        : `Period: ${periodText}   |   Filter: ${filterLabel}`;
+      doc.text(headerLine, margin, 52);
       doc.setTextColor(...COLORS.darkText);
       y = 90;
 
