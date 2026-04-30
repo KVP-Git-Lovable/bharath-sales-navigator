@@ -36,7 +36,17 @@ interface ProductivitySummarySectionProps {
   selectedUserIds?: string[]; // user IDs for querying
   dateRange: { from: Date; to: Date };
   allUsers?: { id: string; full_name: string | null }[];
-  onDataLoaded?: (data: { full_name: string; productivity_percentage: number; productive_visits: number; total_visits: number }[]) => void;
+  onDataLoaded?: (data: {
+    full_name: string;
+    productivity_percentage: number;
+    productive_visits: number;
+    total_visits: number;
+    planned_visits: number;
+    unproductive_visits: number;
+    pending_visits: number;
+    ptv_percentage: number;
+    vto_percentage: number;
+  }[]) => void;
 }
 
 export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dateRange, allUsers = [], onDataLoaded }: ProductivitySummarySectionProps) => {
@@ -283,12 +293,26 @@ export const ProductivitySummarySection = ({ selectedUsers, selectedUserIds, dat
   // Notify parent
   useEffect(() => {
     if (onDataLoaded && userSummaries.length > 0) {
-      onDataLoaded(userSummaries.map(u => ({
-        full_name: u.full_name,
-        productivity_percentage: u.productivity_percentage,
-        productive_visits: u.productive_visits,
-        total_visits: u.total_visits,
-      })));
+      onDataLoaded(userSummaries.map(u => {
+        const ptv = u.planned_visits > 0
+          ? Math.round((u.productive_visits / u.planned_visits) * 100 * 100) / 100
+          : 0;
+        const vtoDen = u.productive_visits + u.unproductive_visits;
+        const vto = vtoDen > 0
+          ? Math.round((u.productive_visits / vtoDen) * 100 * 100) / 100
+          : 0;
+        return {
+          full_name: u.full_name,
+          productivity_percentage: u.productivity_percentage,
+          productive_visits: u.productive_visits,
+          total_visits: u.total_visits,
+          planned_visits: u.planned_visits,
+          unproductive_visits: u.unproductive_visits,
+          pending_visits: u.pending_visits,
+          ptv_percentage: ptv,
+          vto_percentage: vto,
+        };
+      }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userSummaries]);
