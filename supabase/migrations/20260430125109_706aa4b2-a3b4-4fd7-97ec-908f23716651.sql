@@ -1,0 +1,1 @@
+UPDATE public.companies SET header_name = 'Bharath Beverages' WHERE id = '47e8e429-302f-449a-b0d3-4bb1f39174c3';
