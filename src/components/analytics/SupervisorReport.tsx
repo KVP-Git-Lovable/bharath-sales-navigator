@@ -1779,38 +1779,131 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         checkPageBreak(60);
         drawSectionTitle('Productivity Summary');
 
-        const prodRows = productivityDataForSummary.map(p => [
+        // Subtitle (mirrors on-screen: "Visit productivity by user • N users • date range")
+        const usersCount = productivityDataForSummary.length;
+        doc.setFontSize(9);
+        doc.setFont('NotoSans', 'normal');
+        doc.setTextColor(...COLORS.mutedText);
+        doc.text(
+          `Visit productivity by user • ${usersCount} users • ${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`,
+          margin,
+          y
+        );
+        y += 12;
+        doc.setFontSize(8);
+        doc.text('PTV indicates Planned to Visit productivity and VTO indicates Visit to Order productivity', margin, y);
+        y += 14;
+        doc.setTextColor(...COLORS.darkText);
+
+        // Sort: highest PTV first to match on-screen ordering
+        const sortedProd = [...productivityDataForSummary].sort(
+          (a, b) => (b.ptv_percentage ?? b.productivity_percentage) - (a.ptv_percentage ?? a.productivity_percentage)
+        );
+
+        const totals = sortedProd.reduce(
+          (acc, p) => {
+            acc.planned += p.planned_visits ?? 0;
+            acc.productive += p.productive_visits;
+            acc.unproductive += p.unproductive_visits ?? 0;
+            acc.pending += p.pending_visits ?? 0;
+            return acc;
+          },
+          { planned: 0, productive: 0, unproductive: 0, pending: 0 }
+        );
+        const totalPTV = totals.planned > 0
+          ? Math.round((totals.productive / totals.planned) * 100 * 100) / 100
+          : 0;
+        const vtoDen = totals.productive + totals.unproductive;
+        const totalVTO = vtoDen > 0
+          ? Math.round((totals.productive / vtoDen) * 100 * 100) / 100
+          : 0;
+
+        const colorForPct = (pct: number): [number, number, number] => {
+          if (pct >= 70) return COLORS.accent;       // green
+          if (pct >= 50) return COLORS.warning;      // yellow
+          return COLORS.danger;                       // red
+        };
+
+        const prodRows = sortedProd.map(p => [
           p.full_name,
+          (p.ptv_percentage ?? p.productivity_percentage).toFixed(2).replace(/\.00$/, '') + '%',
+          (p.vto_percentage ?? 0).toFixed(2).replace(/\.00$/, '') + '%',
+          String(p.planned_visits ?? 0),
           String(p.productive_visits),
-          String(p.total_visits),
-          p.productivity_percentage.toFixed(1) + '%',
-          '', // placeholder for visual bar
+          String(p.unproductive_visits ?? 0),
+          String(p.pending_visits ?? 0),
         ]);
+
+        // Append totals row
+        prodRows.push([
+          `Total (${usersCount} users)`,
+          totalPTV.toFixed(2).replace(/\.00$/, '') + '%',
+          totalVTO.toFixed(2).replace(/\.00$/, '') + '%',
+          String(totals.planned),
+          String(totals.productive),
+          String(totals.unproductive),
+          String(totals.pending),
+        ]);
+
+        const lastRowIdx = prodRows.length - 1;
 
         autoTable(doc, {
           startY: y,
-          head: [['User', 'Productive', 'Total', '%', 'Performance']],
+          head: [['User', 'PTV %', 'VTO %', 'Planned', 'Productive', 'Unproductive', 'Pending']],
           body: prodRows,
           theme: 'plain',
           margin: { left: margin, right: margin },
-          styles: { font: 'NotoSans', fontSize: 8, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5 },
-          headStyles: { font: 'NotoSans', fillColor: COLORS.warning, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
-          columnStyles: { 4: { cellWidth: 100 } },
-          didDrawCell: (data: any) => {
-            if (data.section === 'body' && data.column.index === 4) {
-              const pct = productivityDataForSummary[data.row.index]?.productivity_percentage || 0;
-              const barMaxW = 80;
-              const barW = (pct / 100) * barMaxW;
-              const bx = data.cell.x + 6;
-              const by = data.cell.y + data.cell.height / 2 - 4;
-              // Background bar
-              doc.setFillColor(226, 232, 240);
-              doc.roundedRect(bx, by, barMaxW, 8, 2, 2, 'F');
-              // Fill bar
-              const barColor = pct >= 80 ? COLORS.accent : pct >= 50 ? COLORS.warning : COLORS.danger;
-              doc.setFillColor(...barColor);
-              doc.roundedRect(bx, by, Math.max(barW, 2), 8, 2, 2, 'F');
+          styles: { font: 'NotoSans', fontSize: 9, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.5, textColor: COLORS.darkText },
+          headStyles: { font: 'NotoSans', fillColor: [241, 245, 249], textColor: COLORS.mutedText, fontStyle: 'normal', fontSize: 9, halign: 'left' },
+          alternateRowStyles: { fillColor: [255, 255, 255] },
+          columnStyles: {
+            0: { halign: 'left' },
+            1: { halign: 'right' },
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+            6: { halign: 'right' },
+          },
+          willDrawCell: (data: any) => {
+            // Bold totals row
+            if (data.section === 'body' && data.row.index === lastRowIdx) {
+              doc.setFont('NotoSans', 'bold');
+            }
+          },
+          didParseCell: (data: any) => {
+            if (data.section !== 'body') return;
+            const isTotal = data.row.index === lastRowIdx;
+            const row = isTotal
+              ? { ptv_percentage: totalPTV, vto_percentage: totalVTO }
+              : sortedProd[data.row.index];
+            const ptv = (row as any).ptv_percentage ?? (row as any).productivity_percentage ?? 0;
+            const vto = (row as any).vto_percentage ?? 0;
+
+            // Color-code matching on-screen cells
+            if (data.column.index === 1) {
+              const c = colorForPct(ptv);
+              data.cell.styles.textColor = c;
+              data.cell.styles.fontStyle = 'bold';
+            } else if (data.column.index === 2) {
+              const c = colorForPct(vto);
+              data.cell.styles.textColor = c;
+              data.cell.styles.fontStyle = 'bold';
+            } else if (data.column.index === 3) {
+              data.cell.styles.textColor = COLORS.secondary; // blue (Planned)
+            } else if (data.column.index === 4) {
+              data.cell.styles.textColor = COLORS.accent;    // green (Productive)
+            } else if (data.column.index === 5) {
+              data.cell.styles.textColor = COLORS.warning;   // orange (Unproductive)
+            } else if (data.column.index === 6) {
+              data.cell.styles.textColor = COLORS.warning;   // orange (Pending)
+            }
+
+            if (isTotal) {
+              data.cell.styles.fillColor = [248, 250, 252];
+              if (data.column.index === 0) {
+                data.cell.styles.textColor = COLORS.darkText;
+              }
             }
           },
         });
