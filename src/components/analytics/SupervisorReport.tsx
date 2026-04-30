@@ -193,6 +193,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
     productivity_percentage: number;
     productive_visits: number;
     total_visits: number;
+    planned_visits?: number;
+    unproductive_visits?: number;
+    pending_visits?: number;
+    ptv_percentage?: number;
+    vto_percentage?: number;
   }[]>([]);
 
   // Business metrics hook for dashboard summary
