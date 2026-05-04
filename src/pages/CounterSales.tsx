@@ -801,12 +801,13 @@ export default function CounterSales() {
                 <OrderRow
                   key={row.uid}
                   row={row}
+                  products={products}
                   customers={customers}
                   onToggleExpand={() => toggleExpand(row.uid)}
                   onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
                   onCreateRetailer={addRetailerLocal}
                   onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
-                  onAddProduct={() => setProductModal({ rowUid: row.uid })}
+                  onAddItemRow={() => addItemRow(row.uid)}
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                   onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                   onSave={() => saveRow(row.uid)}
@@ -832,13 +833,14 @@ export default function CounterSales() {
                   key={row.uid}
                   index={idx + 1}
                   row={row}
+                  products={products}
                   customers={customers}
                   onToggleExpand={() => toggleExpand(row.uid)}
                   onPickCustomer={(ret) =>
                     updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
                   }
                   onCreateRetailer={addRetailerLocal}
-                  onAddProduct={() => setProductModal({ rowUid: row.uid })}
+                  onAddItemRow={() => addItemRow(row.uid)}
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                   onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                   onDelete={() => deleteRow(row.uid)}
@@ -930,38 +932,6 @@ export default function CounterSales() {
           </div>
         </div>
       </div>
-
-      {/* product picker modal */}
-      <ProductPickerDialog
-        open={!!productModal}
-        onClose={() => setProductModal(null)}
-        products={products}
-        onAdd={(p, qty, unit, price) => {
-          if (!productModal) return;
-          setRows((rs) =>
-            rs.map((r) =>
-              r.uid !== productModal.rowUid
-                ? r
-                : {
-                    ...r,
-                    items: [
-                      ...r.items,
-                      {
-                        uid: crypto.randomUUID(),
-                        product_id: p.id,
-                        product_name: p.name,
-                        category: p.category?.name || null,
-                        unit,
-                        quantity: qty,
-                        rate: price,
-                      },
-                    ],
-                  }
-            )
-          );
-          setProductModal(null);
-        }}
-      />
 
     </Layout>
   );
