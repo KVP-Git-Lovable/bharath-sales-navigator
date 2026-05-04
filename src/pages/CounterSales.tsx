@@ -942,12 +942,13 @@ export default function CounterSales() {
 // ===================================================================
 function OrderRow({
   row,
+  products,
   customers,
   onToggleExpand,
   onPickCustomer,
   onCreateRetailer,
   onPhoneChange,
-  onAddProduct,
+  onAddItemRow,
   onUpdateItem,
   onRemoveItem,
   onSave,
@@ -955,12 +956,13 @@ function OrderRow({
   onDelete,
 }: {
   row: CounterRow;
+  products: any[];
   customers: CounterCustomer[];
   onToggleExpand: () => void;
   onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
   onPhoneChange: (p: string) => void;
-  onAddProduct: () => void;
+  onAddItemRow: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onSave: () => void;
@@ -968,7 +970,20 @@ function OrderRow({
   onDelete: () => void;
 }) {
   const locked = row.status === "saved" || row.status === "submitted";
-  const total = rowAmount(row);
+  const subtotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    0
+  );
+  const discountTotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    0
+  );
+  const taxableTotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? itemTaxable(i) : 0),
+    0
+  );
+  const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
+  const total = taxableTotal + taxTotal;
 
   return (
     <div className={cn("border-b last:border-b-0", locked && "bg-muted/10")}>
@@ -993,7 +1008,7 @@ function OrderRow({
         </div>
 
         <div className="text-sm">
-          {row.items.length} item{row.items.length !== 1 ? "s" : ""}
+          {rowItemCount(row)} item{rowItemCount(row) !== 1 ? "s" : ""}
         </div>
 
         <div className="text-sm font-semibold">₹{total.toFixed(2)}</div>
@@ -1032,96 +1047,156 @@ function OrderRow({
       {/* expanded — FULL WIDTH, flat */}
       {row.expanded && (
         <div className="bg-muted/20 border-t px-4 py-3">
-          {/* products sub-table */}
-          <div className="grid grid-cols-[1.8fr_90px_120px_110px_120px_50px] items-center gap-3 px-2 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+          {/* products sub-table — header */}
+          <div className="grid grid-cols-[2fr_90px_70px_100px_100px_110px_110px_40px] items-center gap-2 px-2 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
             <div>Product</div>
-            <div>Qty</div>
             <div>Unit</div>
-            <div>Price</div>
-            <div>Amount</div>
+            <div>Qty</div>
+            <div>Price (₹)</div>
+            <div>Discount (₹)</div>
+            <div>Tax</div>
+            <div>Amount (₹)</div>
             <div></div>
           </div>
 
-          {row.items.length === 0 ? (
-            <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-              No products yet. Click <span className="font-medium">+ Add Product</span> below.
-            </div>
-          ) : (
-            row.items.map((item) => (
-              <div
-                key={item.uid}
-                className="grid grid-cols-[1.8fr_90px_120px_110px_120px_50px] items-center gap-3 px-2 py-2 border-t border-border/50"
+          {row.items.map((item, idx) => (
+            <div
+              key={item.uid}
+              className="grid grid-cols-[2fr_90px_70px_100px_100px_110px_110px_40px] items-start gap-2 px-2 py-1.5 border-t border-border/50"
+            >
+              <InlineProductSelect
+                value={item}
+                products={products}
+                disabled={locked}
+                onPick={(p) =>
+                  onUpdateItem(item.uid, {
+                    product_id: p.id,
+                    product_name: p.name,
+                    category: p.category?.name || null,
+                    sku: p.sku || null,
+                    unit: p.unit || "Unit",
+                    rate: Number(p.rate) || 0,
+                  })
+                }
+                onEnter={() => {
+                  if (idx === row.items.length - 1) onAddItemRow();
+                }}
+              />
+              <Select
+                value={item.unit}
+                disabled={locked}
+                onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
               >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{item.product_name}</div>
-                  {item.category && (
-                    <div className="text-xs text-muted-foreground truncate">{item.category}</div>
-                  )}
-                </div>
-                <Input
-                  type="number"
-                  min={0}
-                  value={item.quantity}
-                  disabled={locked}
-                  onChange={(e) =>
-                    onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })
-                  }
-                  className="h-8"
-                />
-                <Select
-                  value={item.unit}
-                  disabled={locked}
-                  onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
-                      <SelectItem key={u} value={u}>
-                        {u}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={item.rate}
-                  disabled={locked}
-                  onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
-                  className="h-8"
-                />
-                <div className="text-sm font-medium">
-                  ₹{(item.quantity * item.rate).toFixed(2)}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  disabled={locked}
-                  onClick={() => onRemoveItem(item.uid)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))
-          )}
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={0}
+                value={item.quantity}
+                disabled={locked}
+                onChange={(e) =>
+                  onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })
+                }
+                className="h-9"
+              />
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={item.rate}
+                disabled={locked}
+                onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
+                className="h-9"
+              />
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={item.discount}
+                disabled={locked}
+                onChange={(e) =>
+                  onUpdateItem(item.uid, { discount: Number(e.target.value) || 0 })
+                }
+                className="h-9"
+              />
+              <Select
+                value={String(item.tax_rate)}
+                disabled={locked}
+                onValueChange={(v) => onUpdateItem(item.uid, { tax_rate: Number(v) || 0 })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TAX_OPTIONS.map((t) => (
+                    <SelectItem key={t} value={String(t)}>
+                      GST {t}%
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                value={item.product_id ? itemAmount(item).toFixed(2) : ""}
+                placeholder="0.00"
+                readOnly
+                className="h-9 bg-muted/40 text-right font-medium"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-destructive hover:text-destructive"
+                disabled={locked || row.items.length === 1}
+                onClick={() => onRemoveItem(item.uid)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
 
-          <div className="flex items-center justify-between mt-3">
-            <Button variant="outline" size="sm" onClick={onAddProduct} disabled={locked}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add Product
-            </Button>
+          {/* Add row + totals */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-3 mt-3">
             <Button
               variant="outline"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={onDelete}
-              disabled={row.status === "submitted"}
+              onClick={onAddItemRow}
+              disabled={locked}
+              className="border-dashed h-10 text-muted-foreground"
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Customer
+              <Plus className="h-4 w-4 mr-1" /> Add Row
             </Button>
+            <div className="rounded-xl border bg-background px-3 py-2 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>₹{subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Discount</span>
+                <span className="text-destructive">- ₹{discountTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Taxable Amount</span>
+                <span>₹{taxableTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Tax (incl. GST)</span>
+                <span>₹{taxTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-1 mt-1 font-semibold">
+                <span>Total Amount</span>
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  ₹{total.toFixed(2)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
