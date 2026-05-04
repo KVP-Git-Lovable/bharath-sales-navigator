@@ -635,8 +635,9 @@ export default function CounterSales() {
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
     if (!r.customer) return "Select a customer";
-    if (r.items.length === 0) return "Add at least one product";
-    if (r.items.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
+    const filled = r.items.filter((i) => i.product_id);
+    if (filled.length === 0) return "Add at least one product";
+    if (filled.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
     return null;
   };
 
@@ -670,7 +671,7 @@ export default function CounterSales() {
   };
 
   const submittableRows = useMemo(
-    () => rows.filter((r) => r.status !== "submitted" && r.customer && r.items.length > 0),
+    () => rows.filter((r) => r.status !== "submitted" && r.customer && r.items.some((i) => i.product_id)),
     [rows]
   );
 
@@ -695,7 +696,8 @@ export default function CounterSales() {
     let successCount = 0;
     const updated = [...rows];
     for (const r of submittableRows) {
-      const subtotal = rowAmount(r);
+      const filledItems = r.items.filter((i) => i.product_id);
+      const subtotal = filledItems.reduce((s, i) => s + itemAmount(i), 0);
       const total = Math.round(subtotal);
       const orderData = {
         user_id: user.id,
@@ -711,16 +713,16 @@ export default function CounterSales() {
         is_credit_order: false,
         idempotency_key: `counter_${user.id}_${r.uid}_${Date.now()}`,
       };
-      const items = r.items.map((i) => ({
+      const items = filledItems.map((i) => ({
         product_id: i.product_id,
         product_name: i.product_name,
         category: i.category || null,
         rate: i.rate,
         original_rate: i.rate,
-        discount_amount: 0,
+        discount_amount: Number(i.discount) || 0,
         unit: i.unit,
         quantity: i.quantity,
-        total: i.rate * i.quantity,
+        total: itemAmount(i),
         hsn_code: null,
         sgst_amount: 0,
         cgst_amount: 0,
