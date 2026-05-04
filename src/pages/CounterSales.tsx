@@ -63,22 +63,24 @@ interface CounterCustomer {
 function MobileCustomerCard({
   index,
   row,
+  products,
   customers,
   onToggleExpand,
   onPickCustomer,
   onCreateRetailer,
-  onAddProduct,
+  onAddItemRow,
   onUpdateItem,
   onRemoveItem,
   onDelete,
 }: {
   index: number;
   row: CounterRow;
+  products: any[];
   customers: CounterCustomer[];
   onToggleExpand: () => void;
   onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
-  onAddProduct: () => void;
+  onAddItemRow: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onDelete: () => void;
@@ -181,18 +183,27 @@ function MobileCustomerCard({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">{item.product_name}</div>
-                      {item.category && (
-                        <div className="text-[11px] text-muted-foreground truncate">
-                          {item.category}
-                        </div>
-                      )}
+                      <InlineProductSelect
+                        value={item}
+                        products={products}
+                        disabled={locked}
+                        onPick={(p) =>
+                          onUpdateItem(item.uid, {
+                            product_id: p.id,
+                            product_name: p.name,
+                            category: p.category?.name || null,
+                            sku: p.sku || null,
+                            unit: p.unit || "Unit",
+                            rate: Number(p.rate) || 0,
+                          })
+                        }
+                      />
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-                      disabled={locked}
+                      disabled={locked || row.items.length === 1}
                       onClick={() => onRemoveItem(item.uid)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -250,7 +261,7 @@ function MobileCustomerCard({
                     <div>
                       <label className="text-[10px] text-muted-foreground">Amount</label>
                       <div className="h-8 flex items-center text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                        ₹{(item.quantity * item.rate).toFixed(2)}
+                        ₹{(item.product_id ? itemAmount(item) : 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -261,11 +272,11 @@ function MobileCustomerCard({
 
           <Button
             variant="outline"
-            onClick={onAddProduct}
+            onClick={onAddItemRow}
             disabled={locked}
             className="w-full rounded-xl h-10 border-dashed text-primary"
           >
-            <Plus className="h-4 w-4 mr-1" /> Add Product
+            <Plus className="h-4 w-4 mr-1" /> Add Row
           </Button>
 
           <Button
