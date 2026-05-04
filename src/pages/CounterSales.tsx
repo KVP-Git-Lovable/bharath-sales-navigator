@@ -488,9 +488,12 @@ interface CounterLineItem {
   product_id: string;
   product_name: string;
   category?: string | null;
+  sku?: string | null;
   unit: string;
   quantity: number;
   rate: number;
+  discount: number;
+  tax_rate: number;
 }
 
 type RowStatus = "draft" | "saved" | "submitted";
@@ -506,19 +509,39 @@ interface CounterRow {
 
 const DRAFT_KEY = "counter_sales_draft_v1";
 const UOM_OPTIONS = ["Pcs", "Box", "Bag", "Kg", "Ltr", "Pkt", "Carton", "Dozen"];
+const TAX_OPTIONS = [0, 5, 12, 18, 28];
+
+const newItem = (): CounterLineItem => ({
+  uid: crypto.randomUUID(),
+  product_id: "",
+  product_name: "",
+  category: null,
+  sku: null,
+  unit: "Unit",
+  quantity: 1,
+  rate: 0,
+  discount: 0,
+  tax_rate: 5,
+});
 
 const newRow = (): CounterRow => ({
   uid: crypto.randomUUID(),
   customer: null,
-  items: [],
+  items: [newItem(), newItem()],
   status: "draft",
   expanded: true,
 });
 
-const rowAmount = (r: CounterRow) =>
-  r.items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.rate) || 0), 0);
+const itemTaxable = (i: CounterLineItem) =>
+  Math.max(0, (Number(i.quantity) || 0) * (Number(i.rate) || 0) - (Number(i.discount) || 0));
+const itemTax = (i: CounterLineItem) =>
+  itemTaxable(i) * ((Number(i.tax_rate) || 0) / 100);
+const itemAmount = (i: CounterLineItem) => itemTaxable(i) + itemTax(i);
 
-const rowItemCount = (r: CounterRow) => r.items.length;
+const rowAmount = (r: CounterRow) =>
+  r.items.reduce((s, i) => s + (i.product_id ? itemAmount(i) : 0), 0);
+
+const rowItemCount = (r: CounterRow) => r.items.filter((i) => i.product_id).length;
 
 // ---------- main page ----------
 export default function CounterSales() {
