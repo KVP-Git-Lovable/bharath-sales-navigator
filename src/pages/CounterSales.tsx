@@ -1659,3 +1659,113 @@ function InlineCustomerSelect({
     </Popover>
   );
 }
+
+// ===================================================================
+// INLINE PRODUCT SELECT — searchable dropdown with name, SKU, price
+// ===================================================================
+function InlineProductSelect({
+  value,
+  products,
+  disabled,
+  onPick,
+  onEnter,
+}: {
+  value: CounterLineItem;
+  products: any[];
+  disabled?: boolean;
+  onPick: (p: any) => void;
+  onEnter?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = !q
+      ? products
+      : products.filter(
+          (p) =>
+            p.name?.toLowerCase().includes(q) ||
+            p.sku?.toLowerCase().includes(q) ||
+            p.category?.name?.toLowerCase().includes(q)
+        );
+    return list.slice(0, 50);
+  }, [products, search]);
+
+  return (
+    <Popover open={open} onOpenChange={(v) => !disabled && setOpen(v)}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(
+            "h-9 w-full rounded-md border border-input bg-background px-3 text-left text-sm",
+            "flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60",
+            !value.product_id && "text-muted-foreground"
+          )}
+        >
+          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate">
+            {value.product_id
+              ? value.product_name
+              : "Search product by name, SKU or scan…"}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[360px] p-0" align="start">
+        <div className="p-2">
+          <div className="relative mb-2">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && filtered[0]) {
+                  onPick(filtered[0]);
+                  setOpen(false);
+                  onEnter?.();
+                }
+              }}
+              className="h-9 pl-8"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto rounded-md border divide-y">
+            {filtered.length === 0 ? (
+              <div className="p-4 text-xs text-muted-foreground text-center">
+                No products
+              </div>
+            ) : (
+              filtered.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    onPick(p);
+                    setOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-muted/50 flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{p.name}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {p.sku ? `SKU: ${p.sku}` : p.category?.name || "—"}
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold shrink-0">
+                    ₹{Number(p.rate || 0).toFixed(2)}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
