@@ -554,8 +554,6 @@ export default function CounterSales() {
   const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // product picker modal state
-  const [productModal, setProductModal] = useState<{ rowUid: string } | null>(null);
   // inline create-new customer state shared with customers list
   const addRetailerLocal = (r: CounterCustomer) =>
     setCustomers((rs) => (rs.some((x) => x.id === r.id) ? rs : [r, ...rs]));
@@ -609,6 +607,11 @@ export default function CounterSales() {
       rs.map((r) =>
         r.uid !== rowUid ? r : { ...r, items: r.items.filter((i) => i.uid !== itemUid) }
       )
+    );
+
+  const addItemRow = (rowUid: string) =>
+    setRows((rs) =>
+      rs.map((r) => (r.uid !== rowUid ? r : { ...r, items: [...r.items, newItem()] }))
     );
 
   const addRow = () => setRows((rs) => [...rs, newRow()]);
