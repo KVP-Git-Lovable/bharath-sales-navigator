@@ -590,7 +590,14 @@ const rowAmount = (r: CounterRow) =>
 const rowItemCount = (r: CounterRow) => r.items.filter((i) => i.product_id).length;
 
 // ---------- main page ----------
-export default function CounterSales() {
+export interface EventContext {
+  visitId: string;
+  eventName: string;
+  eventDate?: string;
+  location?: string;
+}
+
+export default function CounterSales({ eventContext }: { eventContext?: EventContext } = {}) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { products, fetchProducts } = useOfflineOrderEntry();
@@ -626,6 +633,8 @@ export default function CounterSales() {
 
   // ---- restore draft ----
   useEffect(() => {
+    // Skip restoring counter draft when bound to an event — drafts are session-only.
+    if (eventContext) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -720,6 +729,7 @@ export default function CounterSales() {
       payment_method: "cash",
       is_credit_order: false,
       idempotency_key: `counter_${user.id}_${row.uid}_${Date.now()}`,
+      ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
     };
     const items = filledItems.map((i) => ({
       product_id: i.product_id,
@@ -813,6 +823,7 @@ export default function CounterSales() {
         payment_method: "cash",
         is_credit_order: false,
         idempotency_key: `counter_${user.id}_${r.uid}_${Date.now()}`,
+        ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
       };
       const items = filledItems.map((i) => ({
         product_id: i.product_id,
@@ -868,9 +879,14 @@ export default function CounterSales() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-lg md:text-2xl font-semibold truncate">Counter Sales – Orders</h1>
+              <h1 className="text-lg md:text-2xl font-semibold truncate">
+                {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
+              </h1>
               <p className="text-xs md:text-sm text-muted-foreground truncate">
-                Add orders for multiple customers
+                {eventContext
+                  ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
+                    "Event orders"
+                  : "Add orders for multiple customers"}
               </p>
             </div>
           </div>
