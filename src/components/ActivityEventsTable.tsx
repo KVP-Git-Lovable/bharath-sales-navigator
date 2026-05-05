@@ -253,6 +253,154 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
           const isCheckedIn = !!visitStatus?.check_in_time;
           const isCheckedOut = !!visitStatus?.check_out_time;
 
+          // Dedicated card layout for Event-type activities
+          if (activity.activity_type === 'Event') {
+            const name = activity.activity_name || 'Event';
+            const initials = name
+              .split(/\s+/)
+              .map((w) => w[0])
+              .filter(Boolean)
+              .slice(0, 2)
+              .join('')
+              .toUpperCase();
+            const timeLabel = activity.start_time
+              ? new Date(activity.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : formatActivityDuration(activity);
+            const statusBadgeClass =
+              status === 'productive'
+                ? 'bg-muted text-muted-foreground border-border'
+                : status === 'in-progress'
+                ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300'
+                : 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300';
+            const statusLabel =
+              status === 'productive' ? 'Completed' : status === 'in-progress' ? 'Active' : 'Upcoming';
+
+            return (
+              <div
+                key={activity.id}
+                className="rounded-2xl border bg-card p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                  {/* Left: identity */}
+                  <div className="flex items-center gap-3 lg:min-w-[220px]">
+                    <div className="h-11 w-11 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 flex items-center justify-center text-sm font-semibold shrink-0">
+                      {initials || 'EV'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-sm truncate">{name}</h4>
+                        <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
+                          Event
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <Badge className={`text-[10px] px-2 py-0.5 border ${statusBadgeClass}`}>
+                          {statusLabel}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {timeLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Middle: metrics */}
+                  <div className="grid grid-cols-2 gap-2 flex-1">
+                    <div className="rounded-xl border bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2">
+                      <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs">
+                        <IndianRupee className="h-3.5 w-3.5" />
+                        <span>₹0</span>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">Total Revenue</div>
+                    </div>
+                    <div className="rounded-xl border bg-sky-50/60 dark:bg-sky-950/20 px-3 py-2">
+                      <div className="flex items-center gap-1.5 text-sky-700 dark:text-sky-400 text-xs">
+                        <ShoppingCart className="h-3.5 w-3.5" />
+                        <span>0</span>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">Orders</div>
+                    </div>
+                  </div>
+
+                  {/* Right: actions */}
+                  <div className="flex flex-wrap lg:flex-nowrap gap-2 lg:justify-end">
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs gap-1"
+                      onClick={() => activity.visit_id && navigate(`/visit/${activity.visit_id}`)}
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      Open Event
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs gap-1"
+                      onClick={() => toast.info('Stock Tracker coming soon')}
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Stock Tracker
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs gap-1"
+                      onClick={() => toast.info('Summary coming soon')}
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      View Summary
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Optional: Start/Complete controls */}
+                {activity.visit_id && isToday && status !== 'productive' && (
+                  <div className="flex items-center gap-2 pt-3 mt-3 border-t">
+                    {status === 'planned' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => handleStartActivity(activity)}
+                        disabled={actionLoading === activity.id + '-start'}
+                      >
+                        {actionLoading === activity.id + '-start' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3" />
+                        )}
+                        Start
+                      </Button>
+                    )}
+                    {status === 'in-progress' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => handleCompleteActivity(activity)}
+                        disabled={actionLoading === activity.id + '-complete'}
+                      >
+                        {actionLoading === activity.id + '-complete' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3 w-3" />
+                        )}
+                        Complete
+                      </Button>
+                    )}
+                    {(activity.activity_place || activity.landmark) && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto truncate">
+                        <MapPin className="h-3 w-3" />
+                        {activity.activity_place}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <div
               key={activity.id}
