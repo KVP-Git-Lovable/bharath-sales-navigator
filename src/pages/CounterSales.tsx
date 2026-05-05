@@ -1061,21 +1061,19 @@ function OrderRow({
       {row.expanded && (
         <div className="bg-muted/20 border-t px-4 py-3">
           {/* products sub-table — header */}
-          <div className="grid grid-cols-[2fr_90px_70px_100px_100px_110px_110px_40px] items-center gap-2 px-2 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+          <div className="grid grid-cols-[2fr_90px_70px_100px_100px_40px] items-center gap-2 px-2 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
             <div>Product</div>
             <div>Unit</div>
             <div>Qty</div>
             <div>Price (₹)</div>
             <div>Discount (₹)</div>
-            <div>Tax</div>
-            <div>Amount (₹)</div>
             <div></div>
           </div>
 
           {row.items.map((item, idx) => (
             <div
               key={item.uid}
-              className="grid grid-cols-[2fr_90px_70px_100px_100px_110px_110px_40px] items-start gap-2 px-2 py-1.5 border-t border-border/50"
+              className="grid grid-cols-[2fr_90px_70px_100px_100px_40px] items-start gap-2 px-2 py-1.5 border-t border-border/50"
             >
               <InlineProductSelect
                 value={item}
@@ -1140,29 +1138,6 @@ function OrderRow({
                   onUpdateItem(item.uid, { discount: Number(e.target.value) || 0 })
                 }
                 className="h-9"
-              />
-              <Select
-                value={String(item.tax_rate)}
-                disabled={locked}
-                onValueChange={(v) => onUpdateItem(item.uid, { tax_rate: Number(v) || 0 })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TAX_OPTIONS.map((t) => (
-                    <SelectItem key={t} value={String(t)}>
-                      GST {t}%
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                value={item.product_id ? itemAmount(item).toFixed(2) : ""}
-                placeholder="0.00"
-                readOnly
-                className="h-9 bg-muted/40 text-right font-medium"
               />
               <Button
                 variant="ghost"
