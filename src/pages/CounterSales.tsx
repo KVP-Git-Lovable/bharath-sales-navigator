@@ -1111,11 +1111,21 @@ function OrderRow({
               <Button size="sm" variant="ghost" onClick={onEdit}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
+              <Button size="sm" onClick={onSubmit} disabled={submitting}>
+                {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
             </>
           ) : (
-            <Button size="sm" onClick={onSave}>
-              <Save className="h-3.5 w-3.5 mr-1" /> Save
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={onSave}>
+                <Save className="h-3.5 w-3.5 mr-1" /> Save
+              </Button>
+              <Button size="sm" onClick={onSubmit} disabled={submitting}>
+                {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
+            </>
           )}
           <Button
             size="icon"
