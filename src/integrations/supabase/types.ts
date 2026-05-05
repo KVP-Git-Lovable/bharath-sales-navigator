@@ -67,17 +67,24 @@ export type Database = {
           activity_name: string | null
           activity_place: string | null
           activity_type: string
+          budget: number | null
           created_at: string
+          description: string | null
           duration_type: string
           end_latitude: number | null
           end_longitude: number | null
           end_time: string | null
+          event_name: string | null
+          expected_footfall: string | null
           from_date: string | null
           half_day_type: string | null
           id: string
+          landmark: string | null
           remarks: string | null
           retailer_id: string | null
           retailer_name: string | null
+          sales_reps: string[] | null
+          sales_target: number | null
           start_latitude: number | null
           start_longitude: number | null
           start_time: string | null
@@ -90,17 +97,24 @@ export type Database = {
           activity_name?: string | null
           activity_place?: string | null
           activity_type?: string
+          budget?: number | null
           created_at?: string
+          description?: string | null
           duration_type?: string
           end_latitude?: number | null
           end_longitude?: number | null
           end_time?: string | null
+          event_name?: string | null
+          expected_footfall?: string | null
           from_date?: string | null
           half_day_type?: string | null
           id?: string
+          landmark?: string | null
           remarks?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
+          sales_reps?: string[] | null
+          sales_target?: number | null
           start_latitude?: number | null
           start_longitude?: number | null
           start_time?: string | null
@@ -113,17 +127,24 @@ export type Database = {
           activity_name?: string | null
           activity_place?: string | null
           activity_type?: string
+          budget?: number | null
           created_at?: string
+          description?: string | null
           duration_type?: string
           end_latitude?: number | null
           end_longitude?: number | null
           end_time?: string | null
+          event_name?: string | null
+          expected_footfall?: string | null
           from_date?: string | null
           half_day_type?: string | null
           id?: string
+          landmark?: string | null
           remarks?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
+          sales_reps?: string[] | null
+          sales_target?: number | null
           start_latitude?: number | null
           start_longitude?: number | null
           start_time?: string | null
