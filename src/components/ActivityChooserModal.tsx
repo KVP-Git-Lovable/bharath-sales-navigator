@@ -24,8 +24,7 @@ export const ActivityChooserModal = ({ open, onOpenChange, onPickEvent }: Activi
 
   const handleEvent = () => {
     onOpenChange(false);
-    // Defer slightly so the close animation doesn't fight the next dialog opening
-    setTimeout(() => onPickEvent(), 60);
+    setTimeout(() => navigate("/event-create"), 60);
   };
 
   return (
