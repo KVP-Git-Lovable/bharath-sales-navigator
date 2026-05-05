@@ -295,6 +295,33 @@ function MobileCustomerCard({
           >
             <Trash2 className="h-4 w-4 mr-1" /> Delete Row
           </Button>
+
+          {/* Save / Submit actions */}
+          {row.status === "submitted" ? (
+            <Badge className="w-full justify-center bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 h-10 rounded-xl">
+              Submitted
+            </Badge>
+          ) : row.status === "saved" ? (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onEdit} className="flex-1 rounded-xl h-10">
+                <Pencil className="h-4 w-4 mr-1" /> Edit
+              </Button>
+              <Button onClick={onSubmit} disabled={submitting} className="flex-1 rounded-xl h-10">
+                {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onSave} className="flex-1 rounded-xl h-10">
+                <Save className="h-4 w-4 mr-1" /> Save
+              </Button>
+              <Button onClick={onSubmit} disabled={submitting} className="flex-1 rounded-xl h-10">
+                {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
