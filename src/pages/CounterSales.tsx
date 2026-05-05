@@ -564,6 +564,7 @@ export default function CounterSales() {
   const [rows, setRows] = useState<CounterRow[]>([newRow()]);
   const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingRows, setSubmittingRows] = useState<Set<string>>(new Set());
 
   // inline create-new customer state shared with customers list
   const addRetailerLocal = (r: CounterCustomer) =>
@@ -650,10 +651,75 @@ export default function CounterSales() {
       return;
     }
     updateRow(uid, { status: "saved", expanded: false });
-    toast.success("Row saved");
+    toast.success("Order saved as draft");
   };
 
   const editRow = (uid: string) => updateRow(uid, { status: "draft", expanded: true });
+
+  const submitSingleRow = async (uid: string) => {
+    if (!user) {
+      toast.error("You must be signed in");
+      return;
+    }
+    const row = rows.find((r) => r.uid === uid);
+    if (!row) return;
+    const err = validateRow(row);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    setSubmittingRows((s) => new Set(s).add(uid));
+    const filledItems = row.items.filter((i) => i.product_id);
+    const subtotal = filledItems.reduce((s, i) => s + itemAmount(i), 0);
+    const total = Math.round(subtotal);
+    const orderData = {
+      user_id: user.id,
+      retailer_id: null as any,
+      counter_customer_id: row.customer!.id,
+      retailer_name: row.customer!.name,
+      order_date: new Date().toISOString().slice(0, 10),
+      subtotal,
+      discount_amount: 0,
+      total_amount: total,
+      status: "confirmed",
+      payment_method: "cash",
+      is_credit_order: false,
+      idempotency_key: `counter_${user.id}_${row.uid}_${Date.now()}`,
+    };
+    const items = filledItems.map((i) => ({
+      product_id: i.product_id,
+      product_name: i.product_name,
+      category: i.category || null,
+      rate: i.rate,
+      original_rate: i.rate,
+      discount_amount: Number(i.discount) || 0,
+      unit: i.unit,
+      quantity: i.quantity,
+      total: itemAmount(i),
+      hsn_code: null,
+      sgst_amount: 0,
+      cgst_amount: 0,
+    }));
+    try {
+      const res = await submitOrderWithOfflineSupport(orderData, items, {
+        connectivityStatus: navigator.onLine ? "online" : "offline",
+      });
+      if (res?.success) {
+        updateRow(uid, { status: "submitted", expanded: false });
+        toast.success("Order submitted successfully");
+      } else {
+        toast.error("Submission failed");
+      }
+    } catch (e: any) {
+      toast.error(`Failed: ${e?.message || "unknown"}`);
+    } finally {
+      setSubmittingRows((s) => {
+        const n = new Set(s);
+        n.delete(uid);
+        return n;
+      });
+    }
+  };
 
   const saveDraft = () => {
     try {
@@ -816,6 +882,7 @@ export default function CounterSales() {
                   row={row}
                   products={products}
                   customers={customers}
+                  submitting={submittingRows.has(row.uid)}
                   onToggleExpand={() => toggleExpand(row.uid)}
                   onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
                   onCreateRetailer={addRetailerLocal}
@@ -824,6 +891,7 @@ export default function CounterSales() {
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                   onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                   onSave={() => saveRow(row.uid)}
+                  onSubmit={() => submitSingleRow(row.uid)}
                   onEdit={() => editRow(row.uid)}
                   onDelete={() => deleteRow(row.uid)}
                 />
@@ -848,6 +916,7 @@ export default function CounterSales() {
                   row={row}
                   products={products}
                   customers={customers}
+                  submitting={submittingRows.has(row.uid)}
                   onToggleExpand={() => toggleExpand(row.uid)}
                   onPickCustomer={(ret) =>
                     updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
@@ -856,6 +925,9 @@ export default function CounterSales() {
                   onAddItemRow={() => addItemRow(row.uid)}
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                   onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                  onSave={() => saveRow(row.uid)}
+                  onSubmit={() => submitSingleRow(row.uid)}
+                  onEdit={() => editRow(row.uid)}
                   onDelete={() => deleteRow(row.uid)}
                 />
               ))}
@@ -878,11 +950,7 @@ export default function CounterSales() {
           {/* ===== SUMMARY TAB ===== */}
           <TabsContent value="summary" className="mt-4">
             <SummaryView
-              rows={rows.filter((r) => r.status === "saved" || r.status === "submitted")}
-              onEdit={(uid) => {
-                editRow(uid);
-                setTab("orders");
-              }}
+              rows={rows.filter((r) => r.status === "submitted")}
               onDelete={deleteRow}
             />
           </TabsContent>
