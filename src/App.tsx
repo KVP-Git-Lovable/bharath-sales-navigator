@@ -392,6 +392,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/order-entry" element={<ProtectedRoute><OrderEntry /></ProtectedRoute>} />
         <Route path="/counter-sales" element={<ProtectedRoute><CounterSales /></ProtectedRoute>} />
         <Route path="/event-create" element={<ProtectedRoute><EventCreate /></ProtectedRoute>} />
+        <Route path="/event/:id/orders" element={<ProtectedRoute><EventOrders /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/my-beats" element={<ProtectedRoute><MyBeats /></ProtectedRoute>} />
         <Route path="/today-summary" element={<ProtectedRoute><TodaySummary /></ProtectedRoute>} />
