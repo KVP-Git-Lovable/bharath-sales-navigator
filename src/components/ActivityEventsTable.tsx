@@ -328,7 +328,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                     <Button
                       size="sm"
                       className="h-8 text-xs gap-1"
-                      onClick={() => activity.visit_id && navigate(`/visit/${activity.visit_id}`)}
+                      onClick={() => activity.visit_id && navigate(`/event/${activity.visit_id}/orders`)}
                     >
                       <Play className="h-3.5 w-3.5" />
                       Open Event
