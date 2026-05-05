@@ -65,24 +65,32 @@ function MobileCustomerCard({
   row,
   products,
   customers,
+  submitting,
   onToggleExpand,
   onPickCustomer,
   onCreateRetailer,
   onAddItemRow,
   onUpdateItem,
   onRemoveItem,
+  onSave,
+  onSubmit,
+  onEdit,
   onDelete,
 }: {
   index: number;
   row: CounterRow;
   products: any[];
   customers: CounterCustomer[];
+  submitting?: boolean;
   onToggleExpand: () => void;
   onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
   onAddItemRow: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
+  onSave: () => void;
+  onSubmit: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -287,6 +295,33 @@ function MobileCustomerCard({
           >
             <Trash2 className="h-4 w-4 mr-1" /> Delete Row
           </Button>
+
+          {/* Save / Submit actions */}
+          {row.status === "submitted" ? (
+            <Badge className="w-full justify-center bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 h-10 rounded-xl">
+              Submitted
+            </Badge>
+          ) : row.status === "saved" ? (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onEdit} className="flex-1 rounded-xl h-10">
+                <Pencil className="h-4 w-4 mr-1" /> Edit
+              </Button>
+              <Button onClick={onSubmit} disabled={submitting} className="flex-1 rounded-xl h-10">
+                {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onSave} className="flex-1 rounded-xl h-10">
+                <Save className="h-4 w-4 mr-1" /> Save
+              </Button>
+              <Button onClick={onSubmit} disabled={submitting} className="flex-1 rounded-xl h-10">
+                {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -564,6 +599,7 @@ export default function CounterSales() {
   const [rows, setRows] = useState<CounterRow[]>([newRow()]);
   const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingRows, setSubmittingRows] = useState<Set<string>>(new Set());
 
   // inline create-new customer state shared with customers list
   const addRetailerLocal = (r: CounterCustomer) =>
@@ -650,10 +686,75 @@ export default function CounterSales() {
       return;
     }
     updateRow(uid, { status: "saved", expanded: false });
-    toast.success("Row saved");
+    toast.success("Order saved as draft");
   };
 
   const editRow = (uid: string) => updateRow(uid, { status: "draft", expanded: true });
+
+  const submitSingleRow = async (uid: string) => {
+    if (!user) {
+      toast.error("You must be signed in");
+      return;
+    }
+    const row = rows.find((r) => r.uid === uid);
+    if (!row) return;
+    const err = validateRow(row);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    setSubmittingRows((s) => new Set(s).add(uid));
+    const filledItems = row.items.filter((i) => i.product_id);
+    const subtotal = filledItems.reduce((s, i) => s + itemAmount(i), 0);
+    const total = Math.round(subtotal);
+    const orderData = {
+      user_id: user.id,
+      retailer_id: null as any,
+      counter_customer_id: row.customer!.id,
+      retailer_name: row.customer!.name,
+      order_date: new Date().toISOString().slice(0, 10),
+      subtotal,
+      discount_amount: 0,
+      total_amount: total,
+      status: "confirmed",
+      payment_method: "cash",
+      is_credit_order: false,
+      idempotency_key: `counter_${user.id}_${row.uid}_${Date.now()}`,
+    };
+    const items = filledItems.map((i) => ({
+      product_id: i.product_id,
+      product_name: i.product_name,
+      category: i.category || null,
+      rate: i.rate,
+      original_rate: i.rate,
+      discount_amount: Number(i.discount) || 0,
+      unit: i.unit,
+      quantity: i.quantity,
+      total: itemAmount(i),
+      hsn_code: null,
+      sgst_amount: 0,
+      cgst_amount: 0,
+    }));
+    try {
+      const res = await submitOrderWithOfflineSupport(orderData, items, {
+        connectivityStatus: navigator.onLine ? "online" : "offline",
+      });
+      if (res?.success) {
+        updateRow(uid, { status: "submitted", expanded: false });
+        toast.success("Order submitted successfully");
+      } else {
+        toast.error("Submission failed");
+      }
+    } catch (e: any) {
+      toast.error(`Failed: ${e?.message || "unknown"}`);
+    } finally {
+      setSubmittingRows((s) => {
+        const n = new Set(s);
+        n.delete(uid);
+        return n;
+      });
+    }
+  };
 
   const saveDraft = () => {
     try {
@@ -816,6 +917,7 @@ export default function CounterSales() {
                   row={row}
                   products={products}
                   customers={customers}
+                  submitting={submittingRows.has(row.uid)}
                   onToggleExpand={() => toggleExpand(row.uid)}
                   onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
                   onCreateRetailer={addRetailerLocal}
@@ -824,6 +926,7 @@ export default function CounterSales() {
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                   onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                   onSave={() => saveRow(row.uid)}
+                  onSubmit={() => submitSingleRow(row.uid)}
                   onEdit={() => editRow(row.uid)}
                   onDelete={() => deleteRow(row.uid)}
                 />
@@ -848,6 +951,7 @@ export default function CounterSales() {
                   row={row}
                   products={products}
                   customers={customers}
+                  submitting={submittingRows.has(row.uid)}
                   onToggleExpand={() => toggleExpand(row.uid)}
                   onPickCustomer={(ret) =>
                     updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
@@ -856,6 +960,9 @@ export default function CounterSales() {
                   onAddItemRow={() => addItemRow(row.uid)}
                   onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                   onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                  onSave={() => saveRow(row.uid)}
+                  onSubmit={() => submitSingleRow(row.uid)}
+                  onEdit={() => editRow(row.uid)}
                   onDelete={() => deleteRow(row.uid)}
                 />
               ))}
@@ -878,11 +985,7 @@ export default function CounterSales() {
           {/* ===== SUMMARY TAB ===== */}
           <TabsContent value="summary" className="mt-4">
             <SummaryView
-              rows={rows.filter((r) => r.status === "saved" || r.status === "submitted")}
-              onEdit={(uid) => {
-                editRow(uid);
-                setTab("orders");
-              }}
+              rows={rows.filter((r) => r.status === "submitted")}
               onDelete={deleteRow}
             />
           </TabsContent>
@@ -957,6 +1060,7 @@ function OrderRow({
   row,
   products,
   customers,
+  submitting,
   onToggleExpand,
   onPickCustomer,
   onCreateRetailer,
@@ -965,12 +1069,14 @@ function OrderRow({
   onUpdateItem,
   onRemoveItem,
   onSave,
+  onSubmit,
   onEdit,
   onDelete,
 }: {
   row: CounterRow;
   products: any[];
   customers: CounterCustomer[];
+  submitting?: boolean;
   onToggleExpand: () => void;
   onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
@@ -979,6 +1085,7 @@ function OrderRow({
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onSave: () => void;
+  onSubmit: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -1039,11 +1146,21 @@ function OrderRow({
               <Button size="sm" variant="ghost" onClick={onEdit}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
+              <Button size="sm" onClick={onSubmit} disabled={submitting}>
+                {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
             </>
           ) : (
-            <Button size="sm" onClick={onSave}>
-              <Save className="h-3.5 w-3.5 mr-1" /> Save
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={onSave}>
+                <Save className="h-3.5 w-3.5 mr-1" /> Save
+              </Button>
+              <Button size="sm" onClick={onSubmit} disabled={submitting}>
+                {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                Submit
+              </Button>
+            </>
           )}
           <Button
             size="icon"
@@ -1197,74 +1314,69 @@ function OrderRow({
 // ===================================================================
 function SummaryView({
   rows,
-  onEdit,
   onDelete,
 }: {
   rows: CounterRow[];
-  onEdit: (uid: string) => void;
   onDelete: (uid: string) => void;
 }) {
   const navigate = useNavigate();
   if (rows.length === 0) {
     return (
       <Card className="p-10 text-center text-sm text-muted-foreground rounded-2xl">
-        No saved or submitted orders yet. Save a row from the Orders tab to see it here.
+        No submitted orders yet. Submit an order from the Orders tab to see it here.
       </Card>
     );
   }
   return (
-    <Card className="overflow-hidden rounded-2xl">
-      <div className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-        <div>Customer</div>
-        <div>Items</div>
-        <div>Total</div>
-        <div>Status</div>
-        <div className="text-right">Actions</div>
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="text-base font-semibold">Submitted orders</h3>
+        <Badge variant="secondary">{rows.length}</Badge>
       </div>
-      {rows.map((r) => (
-        <div
-          key={r.uid}
-          className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 border-b last:border-b-0"
-        >
-          <div className="min-w-0">
-            <div className="font-medium truncate">{r.customer?.name || "—"}</div>
-            <div className="text-xs text-muted-foreground truncate">
-              {r.phoneOverride || r.customer?.phone || "—"}
-            </div>
-          </div>
-          <div className="text-sm">{rowItemCount(r)}</div>
-          <div className="text-sm font-semibold">₹{rowAmount(r).toFixed(2)}</div>
-          <div>
-            {r.status === "submitted" ? (
-              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15">
-                Submitted
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Saved</Badge>
-            )}
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            {r.status === "submitted" && (
-              <Button size="sm" variant="outline" onClick={() => navigate("/invoices")}>
-                <FileText className="h-3.5 w-3.5 mr-1" /> Invoice
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {rows.map((r) => {
+          const initials = (r.customer?.name || "?")
+            .split(" ")
+            .map((s) => s[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase();
+          return (
+            <Card key={r.uid} className="rounded-2xl p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 text-primary text-sm font-semibold flex items-center justify-center shrink-0">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium truncate">{r.customer?.name || "—"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {rowItemCount(r)} item{rowItemCount(r) !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-muted-foreground">Total Amount</div>
+                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  ₹{rowAmount(r).toFixed(2)}
+                </div>
+                <Badge className="mt-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15">
+                  Submitted
+                </Badge>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => navigate("/invoices")}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" /> Download Invoice
               </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => onEdit(r.uid)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={() => onDelete(r.uid)}
-              disabled={r.status === "submitted"}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      ))}
-    </Card>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
