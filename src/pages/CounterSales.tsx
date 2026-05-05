@@ -538,7 +538,7 @@ const newItem = (): CounterLineItem => ({
 const newRow = (): CounterRow => ({
   uid: crypto.randomUUID(),
   customer: null,
-  items: [newItem(), newItem()],
+  items: [newItem()],
   status: "draft",
   expanded: true,
 });
