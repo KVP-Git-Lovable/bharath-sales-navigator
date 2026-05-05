@@ -1025,6 +1025,7 @@ function OrderRow({
   row,
   products,
   customers,
+  submitting,
   onToggleExpand,
   onPickCustomer,
   onCreateRetailer,
@@ -1033,12 +1034,14 @@ function OrderRow({
   onUpdateItem,
   onRemoveItem,
   onSave,
+  onSubmit,
   onEdit,
   onDelete,
 }: {
   row: CounterRow;
   products: any[];
   customers: CounterCustomer[];
+  submitting?: boolean;
   onToggleExpand: () => void;
   onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
@@ -1047,6 +1050,7 @@ function OrderRow({
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onSave: () => void;
+  onSubmit: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
