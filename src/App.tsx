@@ -49,6 +49,7 @@ import { MyVisits } from "./pages/MyVisits";
 import { OrderEntry } from "./pages/OrderEntry";
 import CounterSales from "./pages/CounterSales";
 import EventCreate from "./pages/EventCreate";
+import EventOrders from "./pages/EventOrders";
 import { Cart } from "./pages/Cart";
 import { MyRetailers } from "./pages/MyRetailers";
 import { MyBeats } from "./pages/MyBeats";
