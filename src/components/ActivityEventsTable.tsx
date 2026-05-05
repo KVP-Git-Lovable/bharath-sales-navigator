@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, Clock, MapPin, MessageSquare, Loader2, Play, CheckCircle2, Navigation, Timer } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, MessageSquare, Loader2, Play, CheckCircle2, Navigation, Timer, IndianRupee, ShoppingCart, Package, BarChart3 } from 'lucide-react';
 import { useActivityEvents, ActivityEvent, formatActivityDuration } from '@/hooks/useActivityEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { Geolocation } from '@capacitor/geolocation';
+import { useNavigate } from 'react-router-dom';
 
 interface ActivityEventsTableProps {
   userId: string;
@@ -51,6 +52,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 
 export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }: ActivityEventsTableProps) => {
   const { fetchActivitiesForDate, updateActivityLocation } = useActivityEvents();
+  const navigate = useNavigate();
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [visitStatuses, setVisitStatuses] = useState<Record<string, VisitStatus>>({});
   const [isLoading, setIsLoading] = useState(false);
