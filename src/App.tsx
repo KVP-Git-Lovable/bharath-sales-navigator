@@ -48,6 +48,7 @@ import Index from "./pages/Index";
 import { MyVisits } from "./pages/MyVisits";
 import { OrderEntry } from "./pages/OrderEntry";
 import CounterSales from "./pages/CounterSales";
+import EventCreate from "./pages/EventCreate";
 import { Cart } from "./pages/Cart";
 import { MyRetailers } from "./pages/MyRetailers";
 import { MyBeats } from "./pages/MyBeats";
@@ -389,6 +390,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/visits/retailers" element={<ProtectedRoute><MyVisits /></ProtectedRoute>} />
         <Route path="/order-entry" element={<ProtectedRoute><OrderEntry /></ProtectedRoute>} />
         <Route path="/counter-sales" element={<ProtectedRoute><CounterSales /></ProtectedRoute>} />
+        <Route path="/event-create" element={<ProtectedRoute><EventCreate /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/my-beats" element={<ProtectedRoute><MyBeats /></ProtectedRoute>} />
         <Route path="/today-summary" element={<ProtectedRoute><TodaySummary /></ProtectedRoute>} />
