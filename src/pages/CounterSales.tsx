@@ -1314,74 +1314,69 @@ function OrderRow({
 // ===================================================================
 function SummaryView({
   rows,
-  onEdit,
   onDelete,
 }: {
   rows: CounterRow[];
-  onEdit: (uid: string) => void;
   onDelete: (uid: string) => void;
 }) {
   const navigate = useNavigate();
   if (rows.length === 0) {
     return (
       <Card className="p-10 text-center text-sm text-muted-foreground rounded-2xl">
-        No saved or submitted orders yet. Save a row from the Orders tab to see it here.
+        No submitted orders yet. Submit an order from the Orders tab to see it here.
       </Card>
     );
   }
   return (
-    <Card className="overflow-hidden rounded-2xl">
-      <div className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-        <div>Customer</div>
-        <div>Items</div>
-        <div>Total</div>
-        <div>Status</div>
-        <div className="text-right">Actions</div>
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="text-base font-semibold">Submitted orders</h3>
+        <Badge variant="secondary">{rows.length}</Badge>
       </div>
-      {rows.map((r) => (
-        <div
-          key={r.uid}
-          className="grid grid-cols-[1.6fr_1fr_1fr_140px_240px] items-center gap-3 px-4 py-3 border-b last:border-b-0"
-        >
-          <div className="min-w-0">
-            <div className="font-medium truncate">{r.customer?.name || "—"}</div>
-            <div className="text-xs text-muted-foreground truncate">
-              {r.phoneOverride || r.customer?.phone || "—"}
-            </div>
-          </div>
-          <div className="text-sm">{rowItemCount(r)}</div>
-          <div className="text-sm font-semibold">₹{rowAmount(r).toFixed(2)}</div>
-          <div>
-            {r.status === "submitted" ? (
-              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15">
-                Submitted
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Saved</Badge>
-            )}
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            {r.status === "submitted" && (
-              <Button size="sm" variant="outline" onClick={() => navigate("/invoices")}>
-                <FileText className="h-3.5 w-3.5 mr-1" /> Invoice
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {rows.map((r) => {
+          const initials = (r.customer?.name || "?")
+            .split(" ")
+            .map((s) => s[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase();
+          return (
+            <Card key={r.uid} className="rounded-2xl p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 text-primary text-sm font-semibold flex items-center justify-center shrink-0">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium truncate">{r.customer?.name || "—"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {rowItemCount(r)} item{rowItemCount(r) !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-muted-foreground">Total Amount</div>
+                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  ₹{rowAmount(r).toFixed(2)}
+                </div>
+                <Badge className="mt-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15">
+                  Submitted
+                </Badge>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => navigate("/invoices")}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" /> Download Invoice
               </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => onEdit(r.uid)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={() => onDelete(r.uid)}
-              disabled={r.status === "submitted"}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      ))}
-    </Card>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
