@@ -389,7 +389,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                         Complete
                       </Button>
                     )}
-                    {(activity.activity_place || activity.landmark) && (
+                    {activity.activity_place && (
                       <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto truncate">
                         <MapPin className="h-3 w-3" />
                         {activity.activity_place}
