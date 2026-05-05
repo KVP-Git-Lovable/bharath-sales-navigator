@@ -337,7 +337,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                       size="sm"
                       variant="outline"
                       className="h-8 text-xs gap-1"
-                      onClick={() => toast.info('Stock Tracker coming soon')}
+                      onClick={() => activity.visit_id && navigate(`/event/${activity.visit_id}/stock`)}
                     >
                       <Package className="h-3.5 w-3.5" />
                       Stock Tracker
