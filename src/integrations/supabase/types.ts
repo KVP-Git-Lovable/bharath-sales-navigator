@@ -5438,6 +5438,92 @@ export type Database = {
           },
         ]
       }
+      event_stock_days: {
+        Row: {
+          created_at: string
+          date: string
+          day_number: number
+          event_id: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          day_number: number
+          event_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          day_number?: number
+          event_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_stock_days_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_stock_items: {
+        Row: {
+          created_at: string
+          event_stock_day_id: string
+          id: string
+          price: number
+          product_id: string
+          sold_qty: number
+          stock_taken: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_stock_day_id: string
+          id?: string
+          price?: number
+          product_id: string
+          sold_qty?: number
+          stock_taken?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_stock_day_id?: string
+          id?: string
+          price?: number
+          product_id?: string
+          sold_qty?: number
+          stock_taken?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_stock_items_event_stock_day_id_fkey"
+            columns: ["event_stock_day_id"]
+            isOneToOne: false
+            referencedRelation: "event_stock_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_stock_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_approval_rules: {
         Row: {
           condition_type: string
