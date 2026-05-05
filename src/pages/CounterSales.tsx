@@ -65,24 +65,32 @@ function MobileCustomerCard({
   row,
   products,
   customers,
+  submitting,
   onToggleExpand,
   onPickCustomer,
   onCreateRetailer,
   onAddItemRow,
   onUpdateItem,
   onRemoveItem,
+  onSave,
+  onSubmit,
+  onEdit,
   onDelete,
 }: {
   index: number;
   row: CounterRow;
   products: any[];
   customers: CounterCustomer[];
+  submitting?: boolean;
   onToggleExpand: () => void;
   onPickCustomer: (r: CounterCustomer) => void;
   onCreateRetailer: (r: CounterCustomer) => void;
   onAddItemRow: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
+  onSave: () => void;
+  onSubmit: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
