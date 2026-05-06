@@ -868,6 +868,19 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
           successCount++;
           const idx = updated.findIndex((x) => x.uid === r.uid);
           if (idx >= 0) updated[idx] = { ...updated[idx], status: "submitted", expanded: false };
+          if (eventContext?.visitId && navigator.onLine) {
+            try {
+              await supabase.rpc("apply_event_stock_for_order" as any, {
+                p_visit_id: eventContext.visitId,
+                p_order_id: (res as any).order?.id ?? null,
+                p_order_date: orderData.order_date,
+                p_items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+              });
+              window.dispatchEvent(new CustomEvent("event-stock:changed", { detail: { visitId: eventContext.visitId } }));
+            } catch (err) {
+              console.warn("[event-stock] rpc error", err);
+            }
+          }
         }
       } catch (e: any) {
         toast.error(`Failed: ${r.customer?.name} — ${e?.message || "unknown"}`);
