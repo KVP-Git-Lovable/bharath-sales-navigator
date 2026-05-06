@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const { userId, deleteOption, transferToUserId } = body
+    const { userId, deleteOption, transferToUserId, partialPayload, dryRun, transferReason } = body
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'userId is required' }), {
@@ -232,6 +232,73 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Admin ${callerId} initiating ${deleteOption} for user ${userId}`)
+
+    // ============ PARTIAL OWNERSHIP TRANSFER (no user deletion) ============
+    if (deleteOption === 'partial_transfer') {
+      if (!transferToUserId) {
+        return new Response(JSON.stringify({ error: 'transferToUserId is required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      if (transferToUserId === userId) {
+        return new Response(JSON.stringify({ error: 'Cannot transfer to the same user (self-transfer)' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      const payload = {
+        ...(partialPayload || {}),
+        transfer_reason: transferReason || (partialPayload && partialPayload.transfer_reason) || '',
+      }
+
+      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('partial_ownership_transfer', {
+        p_from: userId,
+        p_to: transferToUserId,
+        p_payload: payload,
+        p_dry_run: !!dryRun,
+      })
+
+      if (rpcError) {
+        console.error('partial_ownership_transfer RPC error:', rpcError)
+        return new Response(JSON.stringify({ error: rpcError.message || 'Transfer failed' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // On real (non-dry) runs, write an audit row to recycle_bin
+      if (!dryRun) {
+        const { data: fromProfile } = await supabaseAdmin
+          .from('profiles').select('full_name, username').eq('id', userId).single()
+        const { data: toProfile } = await supabaseAdmin
+          .from('profiles').select('full_name, username').eq('id', transferToUserId).single()
+
+        await supabaseAdmin.from('recycle_bin').insert({
+          original_table: 'profiles',
+          original_id: userId,
+          record_data: {
+            _meta: {
+              archived_at: new Date().toISOString(),
+              transfer_type: 'partial_ownership_transfer',
+              from_user: { id: userId, name: fromProfile?.full_name || fromProfile?.username || '' },
+              to_user:   { id: transferToUserId, name: toProfile?.full_name || toProfile?.username || '' },
+              transfer_reason: payload.transfer_reason,
+              executed_by: callerId,
+              rpc_result: rpcData,
+            }
+          },
+          deleted_by: callerId,
+          module_name: 'partial_ownership_transfer',
+          record_name: `Partial transfer: ${fromProfile?.full_name || userId} → ${toProfile?.full_name || transferToUserId}`,
+        })
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        dry_run: !!dryRun,
+        result: rpcData,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // ============ ARCHIVE TO RECYCLE BIN ============
     console.log('Archiving user data to recycle bin...')
