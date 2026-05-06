@@ -702,7 +702,25 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={transferOwnership}
+                    onCheckedChange={(c) => setTransferOwnership(!!c)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-xs">
+                    <span className="font-medium">Also transfer ownership (revenue moves)</span>
+                    <span className="block text-muted-foreground mt-0.5">
+                      {transferOwnership
+                        ? 'On: full handover. Both day-to-day assignment and revenue/business attribution move to the new user.'
+                        : 'Off (default): the new user takes over visits and pending-payment collection. Revenue history stays attributed to the original owner.'}
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   type="button"
                   variant="outline"
