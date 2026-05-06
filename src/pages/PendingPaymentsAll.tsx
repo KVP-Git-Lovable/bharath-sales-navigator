@@ -15,6 +15,8 @@ interface PendingPaymentRetailer {
   address: string;
   pending_amount: number;
   last_order_date: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
 }
 
 export default function PendingPaymentsAll() {
@@ -51,15 +53,39 @@ export default function PendingPaymentsAll() {
       setIsLoading(true);
       const { data, error } = await supabase
         .from("retailers")
-        .select("id, name, beat_id, address, pending_amount, last_order_date")
+        .select("id, name, beat_id, address, pending_amount, last_order_date, owner_id")
         .eq("user_id", userProfile!.id)
         .gt("pending_amount", 0)
         .order("pending_amount", { ascending: false });
 
       if (error) throw error;
 
-      setRetailers(data || []);
-      setFilteredRetailers(data || []);
+      const me = userProfile!.id;
+      const otherOwnerIds = Array.from(
+        new Set(
+          (data || [])
+            .map((r: any) => r.owner_id)
+            .filter((id: string | null) => !!id && id !== me)
+        )
+      ) as string[];
+      let ownerNameMap: Record<string, string> = {};
+      if (otherOwnerIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name, username")
+          .in("id", otherOwnerIds);
+        (profs || []).forEach((p: any) => {
+          ownerNameMap[p.id] = p.full_name || p.username || p.id;
+        });
+      }
+      const enriched: PendingPaymentRetailer[] = (data || []).map((r: any) => ({
+        ...r,
+        owner_id: r.owner_id || null,
+        owner_name:
+          r.owner_id && r.owner_id !== me ? ownerNameMap[r.owner_id] || null : null,
+      }));
+      setRetailers(enriched);
+      setFilteredRetailers(enriched);
     } catch (error) {
       console.error("Error fetching pending payments:", error);
     } finally {
@@ -152,7 +178,14 @@ export default function PendingPaymentsAll() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between">
-                        <h3 className="text-lg font-semibold">{retailer.name}</h3>
+                        <div>
+                          <h3 className="text-lg font-semibold">{retailer.name}</h3>
+                          {retailer.owner_name && (
+                            <p className="text-[11px] italic text-muted-foreground mt-0.5">
+                              Credited to {retailer.owner_name} — you collect, revenue stays with original owner
+                            </p>
+                          )}
+                        </div>
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Outstanding</p>
                           <p className="text-xl font-bold text-destructive">

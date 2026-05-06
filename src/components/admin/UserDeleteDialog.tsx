@@ -60,6 +60,7 @@ async function runPartialTransferChunked(args: {
   transferReason: string;
   dryRun: boolean;
   includePendingPayments: boolean;
+  transferOwnership: boolean;
 }) {
   const chunks = chunkSelection(args.selection);
   const merged: any = {
@@ -70,6 +71,7 @@ async function runPartialTransferChunked(args: {
     chunks: chunks.length,
     outstanding_preview: null as any,
     include_pending_payments: args.includePendingPayments,
+    transfer_ownership: args.transferOwnership,
   };
   for (let idx = 0; idx < chunks.length; idx++) {
     const partial = chunks[idx];
@@ -82,6 +84,7 @@ async function runPartialTransferChunked(args: {
           ...partial,
           confirmTransferDirectReports: args.confirmDirectReports,
           include_pending_payments: args.includePendingPayments,
+          transfer_ownership: args.transferOwnership,
         },
         transferReason: args.transferReason,
         dryRun: args.dryRun,
@@ -171,6 +174,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const [previewResult, setPreviewResult] = useState<any>(null);
   const [confirmDirectReports, setConfirmDirectReports] = useState(false);
   const [includePendingPayments, setIncludePendingPayments] = useState(false);
+  const [transferOwnership, setTransferOwnership] = useState(false);
   const [beatRetailerCounts, setBeatRetailerCounts] = useState<Record<string, number>>({});
   const [beatNameMap, setBeatNameMap] = useState<Record<string, string>>({});
 
@@ -189,6 +193,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       setPreviewResult(null);
       setConfirmDirectReports(false);
       setIncludePendingPayments(false);
+      setTransferOwnership(false);
       setBeatRetailerCounts({});
       setBeatNameMap({});
     }
@@ -275,6 +280,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           transferReason,
           dryRun: false,
           includePendingPayments,
+          transferOwnership,
         });
       } else {
         const { data, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
@@ -328,6 +334,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
         transferReason: transferReason || 'preview',
         dryRun: true,
         includePendingPayments,
+        transferOwnership,
       });
       // Fetch beat name + retailer count per selected beat for richer preview
       if (partialSelection.beats.length > 0) {
@@ -695,7 +702,25 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={transferOwnership}
+                    onCheckedChange={(c) => setTransferOwnership(!!c)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-xs">
+                    <span className="font-medium">Also transfer ownership (revenue moves)</span>
+                    <span className="block text-muted-foreground mt-0.5">
+                      {transferOwnership
+                        ? 'On: full handover. Both day-to-day assignment and revenue/business attribution move to the new user.'
+                        : 'Off (default): the new user takes over visits and pending-payment collection. Revenue history stays attributed to the original owner.'}
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   type="button"
                   variant="outline"
@@ -809,7 +834,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                 ? 'The user will be moved to Recycle Bin along with all their data. You can restore them later if needed.'
                 : deleteOption === 'transfer'
                 ? 'The user\'s data will be transferred to the selected user. The user profile will then be moved to Recycle Bin.'
-                : 'Only selected ownership records will be reassigned. Source user remains active. Historical transactional data is untouched.'}
+                : transferOwnership
+                ? 'Selected records will be fully reassigned (assignment + ownership). Revenue/business attribution moves to the new user. Source user remains active.'
+                : 'Selected records will be reassigned to the new user for day-to-day work and pending-payment collection. Ownership stays with the source user so revenue/business history is preserved.'}
             </AlertDescription>
           </Alert>
         </div>

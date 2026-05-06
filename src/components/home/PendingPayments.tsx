@@ -14,6 +14,8 @@ interface PendingPayment {
   retailerName: string;
   pendingAmount: number;
   lastOrderDate: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
 }
 
 interface PendingPaymentsProps {
@@ -36,7 +38,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
       
       const { data, error } = await supabase
         .from('retailers')
-        .select('id, name, pending_amount, last_order_date')
+        .select('id, name, pending_amount, last_order_date, owner_id')
         .eq('user_id', userId)
         .gt('pending_amount', 0)
         .order('pending_amount', { ascending: false })
@@ -49,11 +51,35 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
 
       console.log('[PendingPayments] Fetched data:', data);
 
-      const pendingList: PendingPayment[] = (data || []).map(retailer => ({
+      // Resolve owner names for retailers whose owner is someone other than the current user
+      const otherOwnerIds = Array.from(
+        new Set(
+          (data || [])
+            .map((r: any) => r.owner_id)
+            .filter((id: string | null) => !!id && id !== userId)
+        )
+      ) as string[];
+      let ownerNameMap: Record<string, string> = {};
+      if (otherOwnerIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name, username')
+          .in('id', otherOwnerIds);
+        (profs || []).forEach((p: any) => {
+          ownerNameMap[p.id] = p.full_name || p.username || p.id;
+        });
+      }
+
+      const pendingList: PendingPayment[] = (data || []).map((retailer: any) => ({
         retailerId: retailer.id,
         retailerName: retailer.name,
         pendingAmount: retailer.pending_amount || 0,
-        lastOrderDate: retailer.last_order_date
+        lastOrderDate: retailer.last_order_date,
+        ownerId: retailer.owner_id || null,
+        ownerName:
+          retailer.owner_id && retailer.owner_id !== userId
+            ? ownerNameMap[retailer.owner_id] || null
+            : null,
       }));
 
       setPayments(pendingList);
@@ -224,6 +250,11 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
                   {payment.lastOrderDate && (
                     <p className="text-xs text-muted-foreground">
                       {t('home.lastOrder')}: {new Date(payment.lastOrderDate).toLocaleDateString('en-IN')}
+                    </p>
+                  )}
+                  {payment.ownerName && (
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Credited to {payment.ownerName}
                     </p>
                   )}
                 </div>
