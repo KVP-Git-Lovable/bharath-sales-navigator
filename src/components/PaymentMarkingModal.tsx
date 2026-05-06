@@ -63,6 +63,39 @@ export const PaymentMarkingModal = ({
 
   const requiresProof = paymentMethod === "cheque" || paymentMethod === "upi" || paymentMethod === "neft";
 
+  // Records the collection in the audit table (collected_by + revenue_owner)
+  const recordCollection = async (
+    amount: number,
+    proofUrl: string | null
+  ) => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const collectorId = authData?.user?.id;
+      if (!collectorId) return;
+
+      // Resolve the historical revenue owner from the retailer
+      const { data: ret } = await supabase
+        .from("retailers")
+        .select("owner_id, user_id")
+        .eq("id", retailerId)
+        .maybeSingle();
+      const revenueOwnerId =
+        (ret as any)?.owner_id || (ret as any)?.user_id || collectorId;
+
+      await supabase.from("retailer_payment_collections" as any).insert({
+        retailer_id: retailerId,
+        amount,
+        payment_method: paymentMethod,
+        payment_proof_url: proofUrl,
+        collected_by_user_id: collectorId,
+        revenue_owner_id: revenueOwnerId,
+      });
+    } catch (err) {
+      // Non-blocking: log but don't fail the payment flow
+      console.error("[PaymentMarkingModal] failed to record collection audit row:", err);
+    }
+  };
+
   const handleFullPayment = async () => {
     if (requiresProof && !capturedProof) {
       toast.error(`Please capture ${paymentMethod === "cheque" ? "cheque" : paymentMethod === "upi" ? "UPI" : "NEFT"} photo`);
@@ -82,6 +115,8 @@ export const PaymentMarkingModal = ({
         .eq("id", retailerId);
 
       if (error) throw error;
+
+      await recordCollection(currentPendingAmount, proofUrl);
 
       toast.success("Full payment marked successfully!");
       onPaymentMarked(0); // Full payment means 0 pending
@@ -128,6 +163,8 @@ export const PaymentMarkingModal = ({
         .eq("id", retailerId);
 
       if (error) throw error;
+
+      await recordCollection(amount, proofUrl);
 
       toast.success(`Payment of ₹${amount.toLocaleString()} marked successfully!`);
       onPaymentMarked(newPendingAmount); // Pass the new pending amount
