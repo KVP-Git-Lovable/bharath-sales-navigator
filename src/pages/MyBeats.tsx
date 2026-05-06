@@ -281,7 +281,7 @@ export const MyBeats = () => {
       
       // Filter cached beats by selected users
       const userCachedBeats = cachedBeats.filter((b: any) => 
-        effectiveUserIds.includes(b.created_by)
+        effectiveUserIds.includes(b.user_id ?? b.created_by)
       );
       
       if (userCachedBeats.length > 0) {
@@ -323,7 +323,7 @@ export const MyBeats = () => {
             .from('beats')
             .select('*')
             .eq('is_active', true)
-            .in('created_by', effectiveUserIds)
+            .in('user_id', effectiveUserIds)
             .order('created_at', { ascending: true });
 
           if (!beatsError && onlineBeats) {
@@ -618,6 +618,8 @@ export const MyBeats = () => {
         average_km: parseFloat(averageKm) || 0,
         average_time_minutes: parseInt(averageTimeMinutes) || 0,
         created_by: user.id,
+        owner_id: user.id,
+        user_id: user.id,
         is_active: true,
         territory_id: selectedTerritoryId || null,
         created_at: new Date().toISOString()

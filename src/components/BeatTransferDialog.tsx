@@ -58,7 +58,7 @@ export const BeatTransferDialog = ({
       // Update beat ownership
       const { error: beatError } = await supabase
         .from("beats")
-        .update({ created_by: targetUserId, owner_name: selectedUser?.full_name || null })
+        .update({ user_id: targetUserId, owner_id: targetUserId, owner_name: selectedUser?.full_name || null })
         .eq("beat_id", beatId);
 
       if (beatError) throw beatError;
