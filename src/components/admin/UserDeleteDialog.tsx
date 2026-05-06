@@ -14,11 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Trash2, UserCheck, AlertTriangle, Database, ArrowRight, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Trash2, UserCheck, AlertTriangle, Database, ArrowRight, CheckSquare, Square, ChevronDown, ChevronUp, Shuffle, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getUserDataSummary } from '@/utils/userArchiveUtils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { PartialTransferPicker, PartialSelection } from './PartialTransferPicker';
+import { Textarea } from '@/components/ui/textarea';
 
 interface User {
   id: string;
@@ -52,7 +54,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   onOpenChange,
   onSuccess,
 }) => {
-  const [deleteOption, setDeleteOption] = useState<'delete' | 'transfer'>('delete');
+  const [deleteOption, setDeleteOption] = useState<'delete' | 'transfer' | 'partial_transfer'>('delete');
   const [transferToUserId, setTransferToUserId] = useState<string>('');
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [dataSummary, setDataSummary] = useState<DataSummary[]>([]);
@@ -62,6 +64,12 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const [processing, setProcessing] = useState(false);
   const [showAllTables, setShowAllTables] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [partialSelection, setPartialSelection] = useState<PartialSelection>({
+    retailers: [], beats: [], territories: [], distributors: [], vans: [], direct_reports: [],
+  });
+  const [transferReason, setTransferReason] = useState('');
+  const [previewResult, setPreviewResult] = useState<any>(null);
+  const [confirmDirectReports, setConfirmDirectReports] = useState(false);
 
   useEffect(() => {
     if (open && user) {
@@ -71,6 +79,12 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       setTransferToUserId('');
       setShowAllTables(false);
       setExpandedCategories(new Set());
+      setPartialSelection({
+        retailers: [], beats: [], territories: [], distributors: [], vans: [], direct_reports: [],
+      });
+      setTransferReason('');
+      setPreviewResult(null);
+      setConfirmDirectReports(false);
     }
   }, [open, user]);
 
@@ -116,16 +130,49 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       return;
     }
 
+    if (deleteOption === 'partial_transfer') {
+      if (!transferToUserId) {
+        toast.error('Select a target user');
+        return;
+      }
+      if (transferToUserId === user.id) {
+        toast.error('Cannot transfer to the same user');
+        return;
+      }
+      const total = Object.values(partialSelection).reduce((s, a) => s + a.length, 0);
+      if (total === 0) {
+        toast.error('Select at least one record to transfer');
+        return;
+      }
+      if (partialSelection.direct_reports.length > 0 && !confirmDirectReports) {
+        toast.error('Confirm direct-reports transfer warning first');
+        return;
+      }
+      if (transferReason.trim().length < 3) {
+        toast.error('Enter a transfer reason (min 3 characters)');
+        return;
+      }
+    }
+
     setProcessing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
+
+      const partialBody = deleteOption === 'partial_transfer' ? {
+        partialPayload: {
+          ...partialSelection,
+          confirmTransferDirectReports: confirmDirectReports,
+        },
+        transferReason,
+      } : {};
 
       const { data: result, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
         body: {
           userId: user.id,
           deleteOption,
           transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
+          ...(deleteOption === 'partial_transfer' ? { transferToUserId, ...partialBody, dryRun: false } : {}),
         },
       });
 
@@ -138,16 +185,50 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
         toast.warning(result.warning);
       }
 
-      toast.success(
-        deleteOption === 'transfer'
-          ? 'User deleted and data transferred to selected user'
-          : 'User and all related data deleted and archived to recycle bin'
-      );
+      if (deleteOption === 'partial_transfer') {
+        toast.success('Ownership transferred. Source user kept active.');
+      } else if (deleteOption === 'transfer') {
+        toast.success('User deleted and data transferred to selected user');
+      } else {
+        toast.success('User and all related data deleted and archived to recycle bin');
+      }
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error processing user deletion:', error);
       toast.error(error.message || 'Failed to process user deletion');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!user) return;
+    if (!transferToUserId || transferToUserId === user.id) {
+      toast.error('Select a different target user'); return;
+    }
+    const total = Object.values(partialSelection).reduce((s, a) => s + a.length, 0);
+    if (total === 0) { toast.error('Select records first'); return; }
+    setProcessing(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: {
+          userId: user.id,
+          deleteOption: 'partial_transfer',
+          transferToUserId,
+          partialPayload: {
+            ...partialSelection,
+            confirmTransferDirectReports: confirmDirectReports,
+          },
+          transferReason: transferReason || 'preview',
+          dryRun: true,
+        },
+      });
+      if (error) throw error;
+      setPreviewResult(result?.result || result);
+      toast.success('Preview ready — review counts below');
+    } catch (e: any) {
+      toast.error(e.message || 'Preview failed');
     } finally {
       setProcessing(false);
     }
@@ -400,13 +481,29 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                   </p>
                 </div>
               </div>
+
+              <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+                <RadioGroupItem value="partial_transfer" id="partial_transfer" className="mt-1" />
+                <div className="space-y-1 flex-1">
+                  <Label htmlFor="partial_transfer" className="flex items-center gap-2 cursor-pointer font-medium">
+                    <Shuffle className="h-4 w-4 text-primary" />
+                    Partial Ownership Transfer (Keep User Active)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Reassign ownership of selected retailers, beats, territories, distributors, vans or direct reports.
+                    Historical data (orders, invoices, attendance, GPS, gamification) stays with the source user. User is NOT deleted.
+                  </p>
+                </div>
+              </div>
             </RadioGroup>
           </div>
 
           {/* Transfer User Selection */}
-          {deleteOption === 'transfer' && (
+          {(deleteOption === 'transfer' || deleteOption === 'partial_transfer') && (
             <div className="space-y-2 pl-6 animate-in slide-in-from-top-2">
-              <Label className="text-sm">Transfer data to:</Label>
+              <Label className="text-sm">
+                {deleteOption === 'partial_transfer' ? 'Transfer ownership to:' : 'Transfer data to:'}
+              </Label>
               <Select value={transferToUserId} onValueChange={setTransferToUserId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a user to receive the data" />
@@ -417,7 +514,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                       Loading users...
                     </div>
                   ) : (
-                    availableUsers.map((u) => (
+                    availableUsers.filter(u => u.id !== user.id).map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.full_name || u.username}
                       </SelectItem>
@@ -439,13 +536,93 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
             </div>
           )}
 
+          {/* Partial Transfer Picker */}
+          {deleteOption === 'partial_transfer' && transferToUserId && transferToUserId !== user.id && (
+            <div className="space-y-3 pl-6">
+              <PartialTransferPicker
+                fromUserId={user.id}
+                selection={partialSelection}
+                onSelectionChange={setPartialSelection}
+              />
+
+              {partialSelection.direct_reports.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="space-y-2">
+                    <p className="text-xs font-medium">
+                      Direct reports transfer changes reporting hierarchy.
+                      Approval routing, dashboards, and leave escalation will be affected for {partialSelection.direct_reports.length} employee(s).
+                    </p>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={confirmDirectReports}
+                        onCheckedChange={(c) => setConfirmDirectReports(!!c)}
+                      />
+                      <span className="text-xs">I understand and confirm this hierarchy change.</span>
+                    </label>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs">Transfer reason (required, audit-logged)</Label>
+                <Textarea
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  placeholder="e.g. Rahul going on 1-month leave; transferring his beats to Suresh"
+                  className="text-xs"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreview}
+                  disabled={processing}
+                >
+                  {processing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
+                  Preview Transfer
+                </Button>
+              </div>
+
+              {previewResult && (
+                <Alert>
+                  <Database className="h-4 w-4" />
+                  <AlertDescription className="text-xs space-y-1">
+                    <p className="font-medium">Preview (no changes written):</p>
+                    <ul className="list-disc list-inside">
+                      {Object.entries(previewResult.counts || {}).map(([k, v]) => (
+                        <li key={k}><span className="capitalize">{k.replace(/_/g, ' ')}</span>: {String(v)}</li>
+                      ))}
+                    </ul>
+                    {previewResult.warnings && previewResult.warnings.length > 0 && (
+                      <div className="mt-2">
+                        <p className="font-medium text-amber-600">Warnings:</p>
+                        <ul className="list-disc list-inside text-amber-600">
+                          {previewResult.warnings.map((w: any, i: number) => (
+                            <li key={i}>{w.message || JSON.stringify(w)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
           {/* Warning */}
-          <Alert variant="destructive" className="border-destructive/50">
+          <Alert variant={deleteOption === 'partial_transfer' ? 'default' : 'destructive'} className={deleteOption === 'partial_transfer' ? '' : 'border-destructive/50'}>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               {deleteOption === 'delete' 
                 ? 'The user will be moved to Recycle Bin along with all their data. You can restore them later if needed.'
-                : 'The user\'s data will be transferred to the selected user. The user profile will then be moved to Recycle Bin.'}
+                : deleteOption === 'transfer'
+                ? 'The user\'s data will be transferred to the selected user. The user profile will then be moved to Recycle Bin.'
+                : 'Only selected ownership records will be reassigned. Source user remains active. Historical transactional data is untouched.'}
             </AlertDescription>
           </Alert>
         </div>
@@ -459,12 +636,26 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
             Cancel
           </Button>
           <Button
-            variant="destructive"
+            variant={deleteOption === 'partial_transfer' ? 'default' : 'destructive'}
             onClick={handleConfirm}
-            disabled={processing || (deleteOption === 'transfer' && !transferToUserId)}
+            disabled={
+              processing ||
+              (deleteOption === 'transfer' && !transferToUserId) ||
+              (deleteOption === 'partial_transfer' && (
+                !transferToUserId ||
+                transferToUserId === user.id ||
+                Object.values(partialSelection).reduce((s, a) => s + a.length, 0) === 0 ||
+                (partialSelection.direct_reports.length > 0 && !confirmDirectReports) ||
+                transferReason.trim().length < 3
+              ))
+            }
           >
             {processing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {deleteOption === 'transfer' ? 'Transfer & Delete' : 'Delete User'}
+            {deleteOption === 'transfer'
+              ? 'Transfer & Delete'
+              : deleteOption === 'partial_transfer'
+              ? 'Confirm Transfer'
+              : 'Delete User'}
           </Button>
         </DialogFooter>
       </DialogContent>
