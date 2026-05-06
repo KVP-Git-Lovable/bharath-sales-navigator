@@ -170,6 +170,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const [transferReason, setTransferReason] = useState('');
   const [previewResult, setPreviewResult] = useState<any>(null);
   const [confirmDirectReports, setConfirmDirectReports] = useState(false);
+  const [includePendingPayments, setIncludePendingPayments] = useState(false);
+  const [beatRetailerCounts, setBeatRetailerCounts] = useState<Record<string, number>>({});
+  const [beatNameMap, setBeatNameMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open && user) {
@@ -185,6 +188,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       setTransferReason('');
       setPreviewResult(null);
       setConfirmDirectReports(false);
+      setIncludePendingPayments(false);
+      setBeatRetailerCounts({});
+      setBeatNameMap({});
     }
   }, [open, user]);
 
@@ -268,6 +274,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           confirmDirectReports,
           transferReason,
           dryRun: false,
+          includePendingPayments,
         });
       } else {
         const { data, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
@@ -320,7 +327,24 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
         confirmDirectReports,
         transferReason: transferReason || 'preview',
         dryRun: true,
+        includePendingPayments,
       });
+      // Fetch beat name + retailer count per selected beat for richer preview
+      if (partialSelection.beats.length > 0) {
+        const [{ data: beatRows }, { data: rRows }] = await Promise.all([
+          supabase.from('beats').select('beat_id, beat_name').in('beat_id', partialSelection.beats),
+          supabase.from('retailers').select('beat_id').in('beat_id', partialSelection.beats).eq('owner_id', user.id),
+        ]);
+        const nm: Record<string, string> = {};
+        (beatRows || []).forEach((b: any) => { nm[b.beat_id] = b.beat_name || b.beat_id; });
+        const rc: Record<string, number> = {};
+        (rRows || []).forEach((r: any) => { rc[r.beat_id] = (rc[r.beat_id] || 0) + 1; });
+        setBeatNameMap(nm);
+        setBeatRetailerCounts(rc);
+      } else {
+        setBeatNameMap({});
+        setBeatRetailerCounts({});
+      }
       setPreviewResult(merged);
       toast.success('Preview ready — review counts below');
     } catch (e: any) {
