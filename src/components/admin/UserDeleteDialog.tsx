@@ -59,6 +59,7 @@ async function runPartialTransferChunked(args: {
   confirmDirectReports: boolean;
   transferReason: string;
   dryRun: boolean;
+  includePendingPayments: boolean;
 }) {
   const chunks = chunkSelection(args.selection);
   const merged: any = {
@@ -67,6 +68,8 @@ async function runPartialTransferChunked(args: {
     warnings: [] as any[],
     total_records: 0,
     chunks: chunks.length,
+    outstanding_preview: null as any,
+    include_pending_payments: args.includePendingPayments,
   };
   for (let idx = 0; idx < chunks.length; idx++) {
     const partial = chunks[idx];
@@ -78,6 +81,7 @@ async function runPartialTransferChunked(args: {
         partialPayload: {
           ...partial,
           confirmTransferDirectReports: args.confirmDirectReports,
+          include_pending_payments: args.includePendingPayments,
         },
         transferReason: args.transferReason,
         dryRun: args.dryRun,
@@ -92,6 +96,28 @@ async function runPartialTransferChunked(args: {
     }
     if (Array.isArray(r?.warnings)) merged.warnings.push(...r.warnings);
     merged.total_records += Number(r?.total_records) || 0;
+    // Aggregate outstanding preview across chunks (sum amounts/counts).
+    const op = r?.outstanding_preview;
+    if (op) {
+      if (!merged.outstanding_preview) {
+        merged.outstanding_preview = {
+          affected_retailers: 0, open_records: 0, total_amount: 0,
+          breakdown: {
+            credit_ledger: { count: 0, amount: 0 },
+            distributor_payments: { count: 0, amount: 0 },
+            inst_collections: { count: 0, amount: 0 },
+          },
+        };
+      }
+      const m = merged.outstanding_preview;
+      m.affected_retailers += Number(op.affected_retailers) || 0;
+      m.open_records += Number(op.open_records) || 0;
+      m.total_amount += Number(op.total_amount) || 0;
+      for (const k of ['credit_ledger', 'distributor_payments', 'inst_collections'] as const) {
+        m.breakdown[k].count += Number(op?.breakdown?.[k]?.count) || 0;
+        m.breakdown[k].amount += Number(op?.breakdown?.[k]?.amount) || 0;
+      }
+    }
   }
   return merged;
 }
@@ -144,6 +170,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const [transferReason, setTransferReason] = useState('');
   const [previewResult, setPreviewResult] = useState<any>(null);
   const [confirmDirectReports, setConfirmDirectReports] = useState(false);
+  const [includePendingPayments, setIncludePendingPayments] = useState(false);
+  const [beatRetailerCounts, setBeatRetailerCounts] = useState<Record<string, number>>({});
+  const [beatNameMap, setBeatNameMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open && user) {
@@ -159,6 +188,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       setTransferReason('');
       setPreviewResult(null);
       setConfirmDirectReports(false);
+      setIncludePendingPayments(false);
+      setBeatRetailerCounts({});
+      setBeatNameMap({});
     }
   }, [open, user]);
 
@@ -242,6 +274,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           confirmDirectReports,
           transferReason,
           dryRun: false,
+          includePendingPayments,
         });
       } else {
         const { data, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
@@ -294,7 +327,24 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
         confirmDirectReports,
         transferReason: transferReason || 'preview',
         dryRun: true,
+        includePendingPayments,
       });
+      // Fetch beat name + retailer count per selected beat for richer preview
+      if (partialSelection.beats.length > 0) {
+        const [{ data: beatRows }, { data: rRows }] = await Promise.all([
+          supabase.from('beats').select('beat_id, beat_name').in('beat_id', partialSelection.beats),
+          supabase.from('retailers').select('beat_id').in('beat_id', partialSelection.beats).eq('owner_id', user.id),
+        ]);
+        const nm: Record<string, string> = {};
+        (beatRows || []).forEach((b: any) => { nm[b.beat_id] = b.beat_name || b.beat_id; });
+        const rc: Record<string, number> = {};
+        (rRows || []).forEach((r: any) => { rc[r.beat_id] = (rc[r.beat_id] || 0) + 1; });
+        setBeatNameMap(nm);
+        setBeatRetailerCounts(rc);
+      } else {
+        setBeatNameMap({});
+        setBeatRetailerCounts({});
+      }
       setPreviewResult(merged);
       toast.success('Preview ready — review counts below');
     } catch (e: any) {
@@ -656,20 +706,83 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                   {processing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
                   Preview Transfer
                 </Button>
+                <label className="flex items-center gap-2 text-xs cursor-pointer ml-2">
+                  <Checkbox
+                    checked={includePendingPayments}
+                    onCheckedChange={(c) => setIncludePendingPayments(!!c)}
+                  />
+                  <span>Include pending payments / outstanding ledger</span>
+                </label>
               </div>
 
-              {previewResult && (
-                <Alert>
-                  <Database className="h-4 w-4" />
-                  <AlertDescription className="text-xs space-y-1">
-                    <p className="font-medium">Preview (no changes written):</p>
-                    <ul className="list-disc list-inside">
-                      {Object.entries(previewResult.counts || {}).map(([k, v]) => (
-                        <li key={k}><span className="capitalize">{k.replace(/_/g, ' ')}</span>: {String(v)}</li>
+              {previewResult && (() => {
+                const targetUser = availableUsers.find(u => u.id === transferToUserId);
+                const targetName = targetUser?.full_name || targetUser?.username || 'new owner';
+                const sourceName = user.full_name || user.username || user.email;
+                const op = previewResult.outstanding_preview;
+                const fmt = (n: number) => `₹ ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+                return (
+                  <div className="rounded-lg border bg-muted/30 p-3 space-y-3 text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Database className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Preview impact (no changes written)</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-background rounded p-2">
+                      <span className="text-muted-foreground">Owner change:</span>
+                      <span className="font-medium">{sourceName}</span>
+                      <ArrowRight className="h-3 w-3" />
+                      <span className="font-medium text-primary">{targetName}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {Object.entries(previewResult.counts || {}).filter(([k]) => !k.startsWith('pending_')).map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between bg-background rounded p-2">
+                          <span className="text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
+                          <span className="font-semibold">{String(v)}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+
+                    {partialSelection.beats.length > 0 && (
+                      <div className="bg-background rounded p-2 space-y-1">
+                        <p className="font-medium">Beats moving — retailers under each beat will now belong to {targetName}:</p>
+                        <ul className="space-y-0.5">
+                          {partialSelection.beats.slice(0, 10).map(bid => (
+                            <li key={bid} className="flex justify-between">
+                              <span className="truncate">• {beatNameMap[bid] || bid}</span>
+                              <span className="text-muted-foreground">{beatRetailerCounts[bid] || 0} retailer(s)</span>
+                            </li>
+                          ))}
+                          {partialSelection.beats.length > 10 && (
+                            <li className="text-muted-foreground">+{partialSelection.beats.length - 10} more…</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+
+                    {op && op.open_records > 0 && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded p-2 space-y-1">
+                        <p className="font-medium text-amber-700 dark:text-amber-400">
+                          Pending payments / outstanding ledger
+                        </p>
+                        <p>
+                          {op.affected_retailers} retailer(s) in this transfer have <span className="font-semibold">{op.open_records}</span> open record(s) totalling <span className="font-semibold">{fmt(op.total_amount)}</span>.
+                        </p>
+                        <ul className="text-[11px] text-muted-foreground pl-2">
+                          <li>Credit ledger: {op.breakdown?.credit_ledger?.count || 0} ({fmt(op.breakdown?.credit_ledger?.amount || 0)})</li>
+                          <li>Distributor payments (open): {op.breakdown?.distributor_payments?.count || 0} ({fmt(op.breakdown?.distributor_payments?.amount || 0)})</li>
+                          <li>Instalment collections (open): {op.breakdown?.inst_collections?.count || 0} ({fmt(op.breakdown?.inst_collections?.amount || 0)})</li>
+                        </ul>
+                        {!includePendingPayments && (
+                          <p className="text-[11px]">
+                            These stay linked to the source user unless you tick <em>Include pending payments</em> above. With the toggle on, the new owner will see them in their pending-collections view via the transferred retailer ownership.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {previewResult.warnings && previewResult.warnings.length > 0 && (
-                      <div className="mt-2">
+                      <div>
                         <p className="font-medium text-amber-600">Warnings:</p>
                         <ul className="list-disc list-inside text-amber-600">
                           {previewResult.warnings.map((w: any, i: number) => (
@@ -678,9 +791,13 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                         </ul>
                       </div>
                     )}
-                  </AlertDescription>
-                </Alert>
-              )}
+
+                    <p className="text-[11px] text-muted-foreground border-t pt-2">
+                      Stays with source user: orders, invoices, attendance, GPS logs, gamification, expenses (historical, not moved).
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

@@ -1,86 +1,116 @@
-## Problem
+## Goal
 
-Clicking **Preview Transfer** calls the edge function `admin-delete-user` with `deleteOption='partial_transfer'` and `dryRun=true`. The edge function correctly authorizes the caller (checks `admin_user_delete` on their profile), then invokes the Postgres RPC `partial_ownership_transfer` using the **service role** Supabase client.
+Make **Preview Transfer** answer the user's real questions before confirming, and let them optionally include pending-payment / outstanding records.
 
-Inside the RPC:
-```sql
-v_caller := auth.uid();
-IF NOT public.is_system_admin(v_caller) THEN
-  RAISE EXCEPTION 'permission denied: requires system admin';
+Today's preview only shows raw counts like `beats: 3, retailers: 5`. It does NOT show:
+- Which beats are transferring and how many retailers sit under each
+- The new owner (target user) name explicitly
+- Any pending-payment / credit-ledger records
+- A clear "from → to" mapping per bucket
+
+The DB function `partial_ownership_transfer` only changes `owner_id` / `assigned_user_id` / `manager_id` on 6 tables and never touches financial tables. That is intentional but we will surface it and add an opt-in for pending payments.
+
+## What "Preview" will show after this change
+
+A clean impact summary, e.g.:
+
+```text
+Transfer from: Rahul Sharma  →  Suresh Kumar
+
+Retailers (12 will move)
+  • Acme Stores
+  • Bharat Mart
+  …
+
+Beats (3 will move) — retailers under each beat will now belong to Suresh
+  • Beat-MUM-01      (24 retailers, ₹ 18,400 outstanding)
+  • Beat-MUM-02      (11 retailers, ₹ 0)
+  • Beat-PUN-05      (7 retailers,  ₹ 4,200)
+
+Territories (1)  · Distributors (0)  · Vans (1)  · Direct reports (0)
+
+Pending payments / outstanding ledger
+  ⚠ 7 retailers in this transfer have ₹ 22,600 unsettled.
+  [ ] Also reassign open credit-ledger entries to Suresh
+       (default OFF — historical entries stay with source user)
+
+Warnings
+  • 2 selected retailers are already owned by another user.
 ```
 
-When the RPC is called through the service-role client, `auth.uid()` is **NULL**, so `is_system_admin(NULL)` returns false and the RPC aborts with `permission denied: requires system admin` — surfaced to the UI as the 400 error in the screenshot.
+Confirm button stays disabled until preview has been run at least once.
 
-The edge function has already verified admin rights before reaching this point, so the RPC's redundant `auth.uid()`-based check is the bug.
+## Scope of changes
 
-## Fix
+### 1. Frontend — richer preview UI (`UserDeleteDialog.tsx`)
 
-Update the RPC `public.partial_ownership_transfer` so authorization works correctly when invoked from a trusted edge function (service role) **and** when invoked directly by a logged-in admin (defense in depth).
+After `handlePreview` returns, render an **Impact Summary** block instead of the current bullet list:
 
-Approach: accept an explicit `p_caller uuid` (defaulting to `auth.uid()`) and authorize against that. The edge function will pass the verified caller ID; direct callers fall back to `auth.uid()`.
+- Header line: source name → target name (resolved from `availableUsers`).
+- Retailers card: list selected retailer names (truncate after 10, "+N more").
+- Beats card: for each selected beat, fetch `beat_name` + `count(retailers where beat_id = b.beat_id and owner_id = p_from)` + sum of outstanding (see step 3). Use a single batched query with `.in('beat_id', selectedBeats)`.
+- Territories / Distributors / Vans / Direct reports cards: name + small badge.
+- Pending-payments card: see step 3.
+- Warnings (already exist) shown in amber.
 
-### Migration (single small change)
+This is purely client-side composition over data already loaded by `PartialTransferPicker`, plus one extra query for retailer counts/outstanding per beat.
 
-```sql
-CREATE OR REPLACE FUNCTION public.partial_ownership_transfer(
-  p_from uuid,
-  p_to uuid,
-  p_payload jsonb,
-  p_dry_run boolean DEFAULT false,
-  p_caller uuid DEFAULT NULL          -- NEW
-) RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_caller uuid := COALESCE(p_caller, auth.uid());
-  ...
-BEGIN
-  IF v_caller IS NULL THEN
-    RAISE EXCEPTION 'permission denied: caller unknown';
-  END IF;
-  IF NOT public.is_system_admin(v_caller) THEN
-    RAISE EXCEPTION 'permission denied: requires system admin';
-  END IF;
-  ...
-$$;
-```
+### 2. Frontend — clarify what does NOT move
 
-The rest of the RPC body stays exactly as today (self-transfer block, FOR UPDATE row locks, 500-record limit, dry-run handling, bucket processing, return shape). Only the signature and the `v_caller` resolution change.
+Add a small "Stays with source user" footer in the preview:
+"Orders, invoices, attendance, GPS logs, gamification, expenses — historical, do not move."
 
-### Edge function update
+This matches current backend behavior and prevents confusion.
 
-In `supabase/functions/admin-delete-user/index.ts`, pass the verified caller:
+### 3. Optional: include pending payments in transfer
+
+Add a new bucket toggle in `PartialTransferPicker` and `PartialSelection`:
 
 ```ts
-const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('partial_ownership_transfer', {
-  p_from: userId,
-  p_to: transferToUserId,
-  p_payload: payload,
-  p_dry_run: !!dryRun,
-  p_caller: callerId,          // NEW
-});
+include_pending_payments: boolean   // default false
 ```
 
-`callerId` is already validated via `supabaseAuth.auth.getUser()` and gated by the `admin_user_delete` permission check, so this is safe.
+When ON, the RPC additionally reassigns "ownership" rows in:
+- `credit_ledger` rows where `retailer_id ∈ selected retailers OR retailers under selected beats` and `status` is open
+- `distributor_payments` with `status = 'pending'` for selected retailers
+- `inst_collections` with `status = 'pending'` for selected retailers
 
-### Why this is safe
+Reassignment means setting their `user_id` / owning-user column to `p_to` so that the new owner sees them in their pending-collections UI. Schema check confirmed these tables have `retailer_id`, `status`, `amount`. We will add the `user_id` filter when present (verified per table during implementation).
 
-- RPC remains `SECURITY DEFINER` with `is_system_admin` enforcement — no weakening.
-- `p_caller` only takes effect when supplied; without it, behavior is identical to today (uses `auth.uid()`), so any future direct caller still requires a logged-in system admin.
-- Service-role access to this RPC is already restricted to the edge function (no PostgREST exposure path bypasses the edge function's own auth check).
-- Caller still must satisfy `is_system_admin(p_caller)` — if the admin's profile lacks system-admin role, the RPC still rejects.
+Preview (dry-run) returns: `pending_payments: { count, total_amount, by_retailer: [...] }`.
 
-## Files changed
+If the toggle is OFF (default), behavior is unchanged — exactly what the user asked: "sometimes I might want this".
 
-1. **NEW** `supabase/migrations/<ts>_partial_transfer_caller_param.sql` — `CREATE OR REPLACE FUNCTION public.partial_ownership_transfer(...)` adding the `p_caller` parameter and `COALESCE(p_caller, auth.uid())` resolution. No schema/data changes.
-2. **EDIT** `supabase/functions/admin-delete-user/index.ts` — pass `p_caller: callerId` in the `.rpc('partial_ownership_transfer', {...})` call (single line addition).
+### 4. Backend — extend `partial_ownership_transfer`
 
-No frontend changes. No changes to the existing delete/transfer flows. No changes to RLS or other tables.
+Add to the existing RPC (no breaking changes; same signature, payload-driven):
 
-## Verification after deploy
+```text
+v_include_payments := COALESCE((p_payload->>'include_pending_payments')::boolean, false)
+```
 
-1. Open `/admin#users` → click delete on a user → choose **Partial Ownership Transfer** → select target user, pick a few records, enter reason → click **Preview Transfer**. Should return counts/warnings, not 400.
-2. Click **Confirm Transfer**. Should succeed and write a `recycle_bin` audit row with `module_name = 'partial_ownership_transfer'`.
-3. Confirm the source user remains active and only selected ownership rows moved.
+Add a new code branch that, when `v_include_payments` is true:
+- Computes `v_affected_retailers = selected retailers ∪ retailers WHERE beat_id IN (selected beats) AND owner_id = p_from`.
+- Counts pending payment rows per table (dry-run) or updates owning user column (real run).
+- Returns `counts.pending_payments_*` and an aggregate `outstanding_amount`.
+
+Even when the toggle is OFF, the RPC will still return a read-only summary `outstanding_preview = { retailer_count, total_amount }` so the UI can show the warning. This is computed via SELECTs only, no writes.
+
+Also extend warnings with `bucket: 'beats'` info: number of retailers under transferred beats that are NOT owned by source (those won't move automatically — call out clearly).
+
+### 5. Audit
+
+The existing `partial_ownership_transfer` does not yet write to an audit table. Out of scope here — but we will include the `transfer_reason` and the new `include_pending_payments` flag in the returned JSON so it's visible in logs / future audit.
+
+## Files touched
+
+- `supabase/migrations/<new>.sql` — extend `partial_ownership_transfer` RPC (add payments branch + outstanding preview).
+- `src/components/admin/PartialTransferPicker.tsx` — add the "Include pending payments" checkbox + outstanding badge per retailer/beat.
+- `src/components/admin/UserDeleteDialog.tsx` — richer preview block (names, beat→retailer counts, outstanding totals, target user, warnings).
+- No change to existing `transfer` / `delete` flows.
+
+## Out of scope
+
+- Schema migrations for new audit tables.
+- Reassigning historical orders/invoices/attendance.
+- Bulk UI for >500 records (already chunked client-side).

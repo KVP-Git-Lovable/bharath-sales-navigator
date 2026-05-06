@@ -20,6 +20,7 @@ export interface PartialSelection {
   distributors: string[];
   vans: string[];
   direct_reports: string[];
+  include_pending_payments?: boolean;
 }
 
 interface Item { id: string; label: string }
