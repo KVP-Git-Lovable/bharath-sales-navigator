@@ -842,6 +842,20 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
+          {deleteOption === 'partial_transfer' && (() => {
+            const reasons: string[] = [];
+            if (!transferToUserId) reasons.push('select a target user');
+            else if (transferToUserId === user.id) reasons.push('target user must be different');
+            if (Object.values(partialSelection).reduce((s, a) => s + a.length, 0) === 0) reasons.push('select at least one record to transfer');
+            if (partialSelection.direct_reports.length > 0 && !confirmDirectReports) reasons.push('confirm hierarchy change for direct reports');
+            if (transferReason.trim().length < 3) reasons.push('enter a transfer reason (min 3 chars)');
+            if (reasons.length === 0) return null;
+            return (
+              <p className="w-full text-[11px] text-amber-600 mb-1">
+                To enable Confirm Transfer: {reasons.join('; ')}.
+              </p>
+            );
+          })()}
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
