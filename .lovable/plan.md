@@ -1,93 +1,86 @@
-## Revised plan — addresses all 8 concerns
+## Problem
 
-Schema verification confirmed (queried `information_schema`):
+Clicking **Preview Transfer** calls the edge function `admin-delete-user` with `deleteOption='partial_transfer'` and `dryRun=true`. The edge function correctly authorizes the caller (checks `admin_user_delete` on their profile), then invokes the Postgres RPC `partial_ownership_transfer` using the **service role** Supabase client.
 
-
-| Table          | Safe ownership column            | Creator/history column (DO NOT TOUCH) |
-| -------------- | -------------------------------- | ------------------------------------- |
-| `retailers`    | `owner_id` ✅ exists              | `user_id` (NOT NULL)                  |
-| `beats`        | `owner_id` ✅                     | `created_by`                          |
-| `territories`  | `owner_id`, `assigned_user_id` ✅ | `created_by`                          |
-| `distributors` | `owner_id` ✅                     | —                                     |
-| `vans`         | `assigned_user_id` ✅             | `created_by`                          |
-| `employees`    | `manager_id` (gated, see below)  | `user_id`                             |
-| `invoices`     | ❌ only `created_by` exists       | —                                     |
-| `orders`       | ❌ only `user_id` (NOT NULL)      | —                                     |
-
-
-### Resolution of each issue
-
-**ISSUE 1 — `retailers.user_id` risk** ✅ FIXED
-Confirmed `retailers.owner_id` exists. Use **only `owner_id**`. `user_id` is never touched. Same correction applied to `beats` (use `owner_id`, not `created_by`) and `vans` (use `assigned_user_id`).
-
-**ISSUE 2 — `pending_receivables` risk** ✅ DROPPED FROM MVP
-`invoices` has no `collector_id` / `assigned_to` / `collection_owner`. Per your guidance, **pending receivables transfer is removed from MVP**. The bucket will appear in the UI as disabled with the note: *"Requires `invoices.collector_id` column. Postponed."*
-
-**ISSUE 3 — `direct_reports` risk** ✅ GATED
-`direct_reports` (employees.manager_id) is included but:
-
-- Disabled by default.
-- Toggling it on requires a separate confirmation popup: *"This will change reporting hierarchy for N employees. Approval routing, dashboards, and leave escalation will be affected. Continue?"*
-- Backend rejects the bucket unless `confirmTransferDirectReports: true` is in the payload.
-
-**ISSUE 4 — Transaction safety** ✅ ADDED
-Postgres transactions don't span PostgREST calls, so we add a SECURITY DEFINER RPC `partial_ownership_transfer(p_from uuid, p_to uuid, p_payload jsonb)` that performs all updates inside a single transaction. Edge function calls this RPC; on any error the entire transfer rolls back. Function returns `{ counts, errors }`. **This is the only DB migration** — one new function, no schema changes.
-
-**ISSUE 5 — Self-transfer** ✅ ADDED
-
-- Frontend: disables target dropdown options matching `userId`.
-- Edge function: rejects with 400 if `transferToUserId === userId`.
-- RPC: `RAISE EXCEPTION 'self-transfer not allowed' WHEN p_from = p_to`.
-Three-layer check.
-
-**ISSUE 6 — Consistency validation** ✅ ADDED
-Inside the RPC, before any update:
-
-- For each selected retailer: verify its `beat_id` either belongs to a beat being transferred in the same call OR the destination user already owns that beat OR no change required (retailer's beat-owner mismatch is allowed but flagged in returned warnings).
-- For each selected beat: verify `territory_id` similarly.
-- Returned `warnings[]` is shown to admin post-transfer; hard failures (e.g., retailer not owned by source user) abort with rollback.
-
-**ISSUE 7 — Transfer preview** ✅ ADDED
-A two-step UI:
-
-1. Admin picks buckets + records.
-2. Clicks **"Preview Transfer"** → calls RPC with `p_dry_run := true` → returns counts + warnings without writing.
-3. Admin confirms → second call with `p_dry_run := false`.  
-  
-- Use SELECT ... FOR UPDATE on selected records before update to prevent concurrent transfer conflicts.
-  - Add max transfer limit of 500 records per request for MVP safety.
-  - Add mandatory transfer_reason field in audit metadata.
-
-**ISSUE 8 — `recycle_bin` audit** ✅ KEPT TEMPORARILY
-Audit row written to `recycle_bin` with `module_name = 'partial_ownership_transfer'` as agreed. Future migration to `ownership_transfer_log` table noted as out-of-scope.
-
-## Final BUCKET_MAP (only safe columns)
-
-```ts
-const BUCKET_MAP = {
-  retailers:       { table: 'retailers',    idCol: 'id',      ownerCol: 'owner_id' },
-  beats:           { table: 'beats',        idCol: 'beat_id', ownerCol: 'owner_id' },
-  territories:     { table: 'territories',  idCol: 'id',      ownerCol: 'assigned_user_id' },
-  distributors:    { table: 'distributors', idCol: 'id',      ownerCol: 'owner_id' },
-  vans:            { table: 'vans',         idCol: 'id',      ownerCol: 'assigned_user_id' },
-  direct_reports:  { table: 'employees',    idCol: 'user_id', ownerCol: 'manager_id',
-                     requiresConfirmation: true },
-  // pending_receivables: REMOVED — no safe column on invoices
-  // open_orders:        REMOVED — orders.user_id is NOT NULL creator field
-};
+Inside the RPC:
+```sql
+v_caller := auth.uid();
+IF NOT public.is_system_admin(v_caller) THEN
+  RAISE EXCEPTION 'permission denied: requires system admin';
 ```
 
-`created_by`, `user_id` (on retailers/orders/employees), `completed_by`, `approved_by` — **never touched**. Confirms your "MOST IMPORTANT recommendation".
+When the RPC is called through the service-role client, `auth.uid()` is **NULL**, so `is_system_admin(NULL)` returns false and the RPC aborts with `permission denied: requires system admin` — surfaced to the UI as the 400 error in the screenshot.
+
+The edge function has already verified admin rights before reaching this point, so the RPC's redundant `auth.uid()`-based check is the bug.
+
+## Fix
+
+Update the RPC `public.partial_ownership_transfer` so authorization works correctly when invoked from a trusted edge function (service role) **and** when invoked directly by a logged-in admin (defense in depth).
+
+Approach: accept an explicit `p_caller uuid` (defaulting to `auth.uid()`) and authorize against that. The edge function will pass the verified caller ID; direct callers fall back to `auth.uid()`.
+
+### Migration (single small change)
+
+```sql
+CREATE OR REPLACE FUNCTION public.partial_ownership_transfer(
+  p_from uuid,
+  p_to uuid,
+  p_payload jsonb,
+  p_dry_run boolean DEFAULT false,
+  p_caller uuid DEFAULT NULL          -- NEW
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller uuid := COALESCE(p_caller, auth.uid());
+  ...
+BEGIN
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'permission denied: caller unknown';
+  END IF;
+  IF NOT public.is_system_admin(v_caller) THEN
+    RAISE EXCEPTION 'permission denied: requires system admin';
+  END IF;
+  ...
+$$;
+```
+
+The rest of the RPC body stays exactly as today (self-transfer block, FOR UPDATE row locks, 500-record limit, dry-run handling, bucket processing, return shape). Only the signature and the `v_caller` resolution change.
+
+### Edge function update
+
+In `supabase/functions/admin-delete-user/index.ts`, pass the verified caller:
+
+```ts
+const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('partial_ownership_transfer', {
+  p_from: userId,
+  p_to: transferToUserId,
+  p_payload: payload,
+  p_dry_run: !!dryRun,
+  p_caller: callerId,          // NEW
+});
+```
+
+`callerId` is already validated via `supabaseAuth.auth.getUser()` and gated by the `admin_user_delete` permission check, so this is safe.
+
+### Why this is safe
+
+- RPC remains `SECURITY DEFINER` with `is_system_admin` enforcement — no weakening.
+- `p_caller` only takes effect when supplied; without it, behavior is identical to today (uses `auth.uid()`), so any future direct caller still requires a logged-in system admin.
+- Service-role access to this RPC is already restricted to the edge function (no PostgREST exposure path bypasses the edge function's own auth check).
+- Caller still must satisfy `is_system_admin(p_caller)` — if the admin's profile lacks system-admin role, the RPC still rejects.
 
 ## Files changed
 
-1. **NEW** `supabase/migrations/<ts>_partial_ownership_transfer.sql` — single SECURITY DEFINER RPC `partial_ownership_transfer(p_from uuid, p_to uuid, p_payload jsonb, p_dry_run bool)`. Uses `is_system_admin(auth.uid())` for authz. Wraps all updates in implicit function transaction.
-2. **EDIT** `supabase/functions/admin-delete-user/index.ts` — add `partial_transfer` branch that validates input, calls the RPC, writes recycle_bin audit, early-returns. Existing `delete` and `transfer` branches untouched.
-3. **EDIT** `src/components/admin/UserDeleteDialog.tsx` — add 3rd radio option, wire payload, two-step preview→confirm flow, target-user filter excludes source user.
-4. **NEW** `src/components/admin/PartialTransferPicker.tsx` — bucket cards with per-record selection, search Popover, direct_reports confirmation modal, preview panel.
+1. **NEW** `supabase/migrations/<ts>_partial_transfer_caller_param.sql` — `CREATE OR REPLACE FUNCTION public.partial_ownership_transfer(...)` adding the `p_caller` parameter and `COALESCE(p_caller, auth.uid())` resolution. No schema/data changes.
+2. **EDIT** `supabase/functions/admin-delete-user/index.ts` — pass `p_caller: callerId` in the `.rpc('partial_ownership_transfer', {...})` call (single line addition).
 
-## Out of scope (acknowledged)
+No frontend changes. No changes to the existing delete/transfer flows. No changes to RLS or other tables.
 
-- `pending_receivables` and `open_orders` buckets — require new columns (`invoices.collector_id`, etc.). Will revisit when those are added.
-- Dedicated `ownership_transfer_log` table — recycle_bin used as interim audit.
-- Global `updated_by` audit columns across all tables — separate larger initiative.
+## Verification after deploy
+
+1. Open `/admin#users` → click delete on a user → choose **Partial Ownership Transfer** → select target user, pick a few records, enter reason → click **Preview Transfer**. Should return counts/warnings, not 400.
+2. Click **Confirm Transfer**. Should succeed and write a `recycle_bin` audit row with `module_name = 'partial_ownership_transfer'`.
+3. Confirm the source user remains active and only selected ownership rows moved.
