@@ -346,7 +346,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                       size="sm"
                       variant="outline"
                       className="h-8 text-xs gap-1"
-                      onClick={() => toast.info('Summary coming soon')}
+                      onClick={() => activity.visit_id && navigate(`/event/${activity.visit_id}/summary`)}
                     >
                       <BarChart3 className="h-3.5 w-3.5" />
                       View Summary
