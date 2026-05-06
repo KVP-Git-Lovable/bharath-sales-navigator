@@ -645,6 +645,76 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---- load already-submitted orders for this event so the Summary tab persists ----
+  useEffect(() => {
+    if (!eventContext?.visitId || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: orders, error } = await supabase
+          .from("orders")
+          .select("id, retailer_name, counter_customer_id, total_amount, created_at")
+          .eq("visit_id", eventContext.visitId)
+          .neq("status", "cancelled")
+          .order("created_at", { ascending: true });
+        if (error || !orders || orders.length === 0) return;
+
+        const orderIds = orders.map((o: any) => o.id);
+        const { data: itemsData } = await supabase
+          .from("order_items")
+          .select("order_id, product_id, product_name, category, rate, unit, quantity, discount_amount, total")
+          .in("order_id", orderIds);
+        const itemsByOrder = new Map<string, any[]>();
+        (itemsData || []).forEach((it: any) => {
+          const arr = itemsByOrder.get(it.order_id) || [];
+          arr.push(it);
+          itemsByOrder.set(it.order_id, arr);
+        });
+
+        const submittedRows: CounterRow[] = orders.map((o: any) => {
+          const oItems = itemsByOrder.get(o.id) || [];
+          return {
+            uid: `db_${o.id}`,
+            customer: {
+              id: o.counter_customer_id || o.id,
+              name: o.retailer_name || "Customer",
+              phone: null,
+            } as any,
+            items: oItems.length
+              ? oItems.map((it: any) => ({
+                  uid: crypto.randomUUID(),
+                  product_id: it.product_id || "",
+                  product_name: it.product_name || "",
+                  category: it.category || null,
+                  sku: null,
+                  unit: it.unit || "Unit",
+                  quantity: Number(it.quantity) || 0,
+                  rate: Number(it.rate) || 0,
+                  discount: Number(it.discount_amount) || 0,
+                  tax_rate: 0,
+                }))
+              : [newItem()],
+            status: "submitted",
+            expanded: false,
+          };
+        });
+
+        if (cancelled) return;
+        setRows((prev) => {
+          // Keep any in-progress (draft/saved) rows from current session, replace prior submitted set
+          const keepers = prev.filter((r) => r.status !== "submitted" && (r.customer || r.items.some((i) => i.product_id)));
+          const merged = [...submittedRows, ...keepers];
+          return merged.length ? merged : [newRow()];
+        });
+      } catch (err) {
+        console.warn("[CounterSales] failed to load event orders:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventContext?.visitId, user]);
+
   // ---- row helpers ----
   const updateRow = (uid: string, patch: Partial<CounterRow>) =>
     setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, ...patch } : r)));
