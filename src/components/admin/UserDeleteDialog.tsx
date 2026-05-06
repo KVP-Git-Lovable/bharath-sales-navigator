@@ -22,6 +22,80 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PartialTransferPicker, PartialSelection } from './PartialTransferPicker';
 import { Textarea } from '@/components/ui/textarea';
 
+// Bucket order matters only for stable chunking; values come from PartialSelection.
+const BUCKET_KEYS: (keyof PartialSelection)[] = [
+  'retailers', 'beats', 'territories', 'distributors', 'vans', 'direct_reports',
+];
+const CHUNK_SIZE = 500;
+
+function chunkSelection(selection: PartialSelection, size = CHUNK_SIZE) {
+  const chunks: Partial<PartialSelection>[] = [];
+  let current: Partial<PartialSelection> = {};
+  let count = 0;
+  for (const key of BUCKET_KEYS) {
+    const arr = (selection[key] as string[] | undefined) || [];
+    let i = 0;
+    while (i < arr.length) {
+      const remain = size - count;
+      const take = arr.slice(i, i + remain);
+      (current as any)[key] = ((current as any)[key] || []).concat(take);
+      count += take.length;
+      i += take.length;
+      if (count >= size) {
+        chunks.push(current);
+        current = {};
+        count = 0;
+      }
+    }
+  }
+  if (count > 0) chunks.push(current);
+  return chunks.length ? chunks : [{}];
+}
+
+async function runPartialTransferChunked(args: {
+  userId: string;
+  transferToUserId: string;
+  selection: PartialSelection;
+  confirmDirectReports: boolean;
+  transferReason: string;
+  dryRun: boolean;
+}) {
+  const chunks = chunkSelection(args.selection);
+  const merged: any = {
+    dry_run: args.dryRun,
+    counts: {} as Record<string, number>,
+    warnings: [] as any[],
+    total_records: 0,
+    chunks: chunks.length,
+  };
+  for (let idx = 0; idx < chunks.length; idx++) {
+    const partial = chunks[idx];
+    const { data: result, error } = await supabase.functions.invoke('admin-delete-user', {
+      body: {
+        userId: args.userId,
+        deleteOption: 'partial_transfer',
+        transferToUserId: args.transferToUserId,
+        partialPayload: {
+          ...partial,
+          confirmTransferDirectReports: args.confirmDirectReports,
+        },
+        transferReason: args.transferReason,
+        dryRun: args.dryRun,
+      },
+    });
+    if (error) throw new Error(error.message || `Chunk ${idx + 1}/${chunks.length} failed`);
+    const r = (result as any)?.result || result;
+    if (r?.counts) {
+      for (const [k, v] of Object.entries(r.counts as Record<string, number>)) {
+        merged.counts[k] = (merged.counts[k] || 0) + (Number(v) || 0);
+      }
+    }
+    if (Array.isArray(r?.warnings)) merged.warnings.push(...r.warnings);
+    merged.total_records += Number(r?.total_records) || 0;
+  }
+  return merged;
+}
+
 interface User {
   id: string;
   email: string;
@@ -159,29 +233,31 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const partialBody = deleteOption === 'partial_transfer' ? {
-        partialPayload: {
-          ...partialSelection,
-          confirmTransferDirectReports: confirmDirectReports,
-        },
-        transferReason,
-      } : {};
-
-      const { data: result, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
-        body: {
+      let result: any = null;
+      if (deleteOption === 'partial_transfer') {
+        result = await runPartialTransferChunked({
           userId: user.id,
-          deleteOption,
-          transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
-          ...(deleteOption === 'partial_transfer' ? { transferToUserId, ...partialBody, dryRun: false } : {}),
-        },
-      });
-
-      if (invokeError) {
-        throw new Error(invokeError.message || 'Failed to delete user');
+          transferToUserId,
+          selection: partialSelection,
+          confirmDirectReports,
+          transferReason,
+          dryRun: false,
+        });
+      } else {
+        const { data, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
+          body: {
+            userId: user.id,
+            deleteOption,
+            transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
+          },
+        });
+        if (invokeError) {
+          throw new Error(invokeError.message || 'Failed to delete user');
+        }
+        result = data;
       }
 
-
-      if (result.warning) {
+      if (result?.warning) {
         toast.warning(result.warning);
       }
 
@@ -211,21 +287,15 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
     if (total === 0) { toast.error('Select records first'); return; }
     setProcessing(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: {
-          userId: user.id,
-          deleteOption: 'partial_transfer',
-          transferToUserId,
-          partialPayload: {
-            ...partialSelection,
-            confirmTransferDirectReports: confirmDirectReports,
-          },
-          transferReason: transferReason || 'preview',
-          dryRun: true,
-        },
+      const merged = await runPartialTransferChunked({
+        userId: user.id,
+        transferToUserId,
+        selection: partialSelection,
+        confirmDirectReports,
+        transferReason: transferReason || 'preview',
+        dryRun: true,
       });
-      if (error) throw error;
-      setPreviewResult(result?.result || result);
+      setPreviewResult(merged);
       toast.success('Preview ready — review counts below');
     } catch (e: any) {
       toast.error(e.message || 'Preview failed');
