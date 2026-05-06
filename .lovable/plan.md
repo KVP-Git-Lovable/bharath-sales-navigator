@@ -1,5 +1,33 @@
 # Pending Payments & Revenue Ownership — Verification + Hardening
 
+## Status: IMPLEMENTED (steps 1, 2, 3) — Step 4 pending user sign-off
+
+### What was shipped
+
+**Migration `20260506_owner_snapshot_and_payment_audit.sql`** (applied):
+- Added `orders.owner_id_snapshot` and `invoices.owner_id_snapshot` (uuid, nullable, indexed).
+- Added `BEFORE INSERT` triggers `set_order_owner_snapshot` / `set_invoice_owner_snapshot` that copy the value from `retailers.owner_id` (fallback: `user_id` / `created_by`). Snapshot is set once at insert and never rewritten — historical revenue is now immutable at the DB level.
+- Backfilled all existing rows: `orders.owner_id_snapshot = user_id`; `invoices.owner_id_snapshot = orders.owner_id_snapshot ?? created_by`.
+- Created `retailer_payment_collections` audit table with both `collected_by_user_id` (operational credit) and `revenue_owner_id` (revenue credit), plus method/proof/notes/timestamps. RLS: visible to collector OR revenue owner OR system admin; insert only as self.
+
+**Frontend:**
+- `src/components/home/PendingPayments.tsx` — query now uses `.or(user_id.eq.<me>, owner_id.eq.<me>)` so the new user (assignee) AND the historical owner both see the open dues.
+- `src/pages/PendingPaymentsAll.tsx` — same union query.
+- `src/components/PaymentMarkingModal.tsx` — after `retailers.pending_amount` is decremented, a row is inserted into `retailer_payment_collections` capturing collector + revenue owner. Non-blocking (logs on failure, never breaks the payment flow).
+
+### Resulting behaviour (matches the user's required model)
+
+| Activity | Visible to | Operational credit (`collected_by`) | Revenue credit (`owner_id_snapshot` / `revenue_owner_id`) |
+|---|---|---|---|
+| Old ₹10,000 due on Manvith's retailer, collected by New User | New User + Manvith | New User | Manvith |
+| New order placed by New User after transfer | New User | New User | New User (snapshot frozen at insert) |
+| Manvith's historical invoices | Manvith | Manvith | Manvith (frozen forever) |
+
+### Step 4 — NOT yet implemented
+Switch revenue/target metrics in `useBusinessMetrics` / `usePerformanceSummary` from grouping by `orders.user_id` to grouping by `orders.owner_id_snapshot`. Today these are equal for every existing row (because of the backfill), so no behaviour change is visible yet — but the switch makes future retailer-only transfers safe. Awaiting user go-ahead before changing analytics math.
+
+---
+
 ## What I checked in the code
 
 | Layer | Today's behaviour | Matches your model? |
