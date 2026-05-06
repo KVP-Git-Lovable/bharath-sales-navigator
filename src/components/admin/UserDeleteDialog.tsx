@@ -834,7 +834,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                 ? 'The user will be moved to Recycle Bin along with all their data. You can restore them later if needed.'
                 : deleteOption === 'transfer'
                 ? 'The user\'s data will be transferred to the selected user. The user profile will then be moved to Recycle Bin.'
-                : 'Only selected ownership records will be reassigned. Source user remains active. Historical transactional data is untouched.'}
+                : transferOwnership
+                ? 'Selected records will be fully reassigned (assignment + ownership). Revenue/business attribution moves to the new user. Source user remains active.'
+                : 'Selected records will be reassigned to the new user for day-to-day work and pending-payment collection. Ownership stays with the source user so revenue/business history is preserved.'}
             </AlertDescription>
           </Alert>
         </div>
