@@ -7982,6 +7982,7 @@ export type Database = {
           invoice_number: string
           is_edited: boolean | null
           order_id: string | null
+          owner_id_snapshot: string | null
           place_of_supply: string | null
           status: string | null
           sub_total: number | null
@@ -8003,6 +8004,7 @@ export type Database = {
           invoice_number: string
           is_edited?: boolean | null
           order_id?: string | null
+          owner_id_snapshot?: string | null
           place_of_supply?: string | null
           status?: string | null
           sub_total?: number | null
@@ -8024,6 +8026,7 @@ export type Database = {
           invoice_number?: string
           is_edited?: boolean | null
           order_id?: string | null
+          owner_id_snapshot?: string | null
           place_of_supply?: string | null
           status?: string | null
           sub_total?: number | null
@@ -9135,6 +9138,7 @@ export type Database = {
           invoice_number: string | null
           is_credit_order: boolean | null
           order_date: string | null
+          owner_id_snapshot: string | null
           packing_list_id: string | null
           payment_method: string | null
           payment_proof_url: string | null
@@ -9179,6 +9183,7 @@ export type Database = {
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
+          owner_id_snapshot?: string | null
           packing_list_id?: string | null
           payment_method?: string | null
           payment_proof_url?: string | null
@@ -9223,6 +9228,7 @@ export type Database = {
           invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
+          owner_id_snapshot?: string | null
           packing_list_id?: string | null
           payment_method?: string | null
           payment_proof_url?: string | null
@@ -13415,6 +13421,56 @@ export type Database = {
             foreignKeyName: "retailer_loyalty_tracking_retailer_id_fkey"
             columns: ["retailer_id"]
             isOneToOne: true
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retailer_payment_collections: {
+        Row: {
+          amount: number
+          collected_at: string
+          collected_by_user_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          payment_method: string | null
+          payment_proof_url: string | null
+          retailer_id: string
+          revenue_owner_id: string | null
+          upi_last_four: string | null
+        }
+        Insert: {
+          amount: number
+          collected_at?: string
+          collected_by_user_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          payment_proof_url?: string | null
+          retailer_id: string
+          revenue_owner_id?: string | null
+          upi_last_four?: string | null
+        }
+        Update: {
+          amount?: number
+          collected_at?: string
+          collected_by_user_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          payment_proof_url?: string | null
+          retailer_id?: string
+          revenue_owner_id?: string | null
+          upi_last_four?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_payment_collections_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
             referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
