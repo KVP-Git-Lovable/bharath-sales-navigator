@@ -1,126 +1,129 @@
-# Pending Payments & Revenue Ownership — Verification + Hardening
+## Goal
 
-## Status: IMPLEMENTED (steps 1, 2, 3) — Step 4 pending user sign-off
+Establish the clean three-column model you described, fix beat visibility for transferred users, and keep historical financial ownership immutable while still letting the new user collect pending dues.
 
-### What was shipped
+## Current schema reality (verified)
 
-**Migration `20260506_owner_snapshot_and_payment_audit.sql`** (applied):
-- Added `orders.owner_id_snapshot` and `invoices.owner_id_snapshot` (uuid, nullable, indexed).
-- Added `BEFORE INSERT` triggers `set_order_owner_snapshot` / `set_invoice_owner_snapshot` that copy the value from `retailers.owner_id` (fallback: `user_id` / `created_by`). Snapshot is set once at insert and never rewritten — historical revenue is now immutable at the DB level.
-- Backfilled all existing rows: `orders.owner_id_snapshot = user_id`; `invoices.owner_id_snapshot = orders.owner_id_snapshot ?? created_by`.
-- Created `retailer_payment_collections` audit table with both `collected_by_user_id` (operational credit) and `revenue_owner_id` (revenue credit), plus method/proof/notes/timestamps. RLS: visible to collector OR revenue owner OR system admin; insert only as self.
+```text
+beats     : created_by(uuid), owner_id(uuid)            ← NO user_id
+retailers : owner_id(uuid),  user_id(uuid)              ← NO created_by
+credit_ledger        : created_by(uuid),  retailer_id, amount
+distributor_payments : created_by(text),  retailer_id, amount, status
+inst_collections     : retailer_id, amount, status      ← no user column
+```
 
-**Frontend:**
-- `src/components/home/PendingPayments.tsx` — query now uses `.or(user_id.eq.<me>, owner_id.eq.<me>)` so the new user (assignee) AND the historical owner both see the open dues.
-- `src/pages/PendingPaymentsAll.tsx` — same union query.
-- `src/components/PaymentMarkingModal.tsx` — after `retailers.pending_amount` is decremented, a row is inserted into `retailer_payment_collections` capturing collector + revenue owner. Non-blocking (logs on failure, never breaks the payment flow).
+So before anything else, beats are missing the operational column and retailers are missing the historical column. Both must be added so the model becomes uniform.  
+Stop using created_by as operational ownership.
 
-### Resulting behaviour (matches the user's required model)
+## Target model (uniform across beats and retailers)
 
-| Activity | Visible to | Operational credit (`collected_by`) | Revenue credit (`owner_id_snapshot` / `revenue_owner_id`) |
-|---|---|---|---|
-| Old ₹10,000 due on Manvith's retailer, collected by New User | New User + Manvith | New User | Manvith |
-| New order placed by New User after transfer | New User | New User | New User (snapshot frozen at insert) |
-| Manvith's historical invoices | Manvith | Manvith | Manvith (frozen forever) |
 
-### Step 4 — NOT yet implemented
-Switch revenue/target metrics in `useBusinessMetrics` / `usePerformanceSummary` from grouping by `orders.user_id` to grouping by `orders.owner_id_snapshot`. Today these are equal for every existing row (because of the backfill), so no behaviour change is visible yet — but the switch makes future retailer-only transfers safe. Awaiting user go-ahead before changing analytics math.
+| Column       | Meaning                                                     | Mutated on transfer?                        |
+| ------------ | ----------------------------------------------------------- | ------------------------------------------- |
+| `created_by` | Immutable historical creator                                | **No**                                      |
+| `owner_id`   | Business / revenue owner                                    | Only when "Transfer ownership" toggle is ON |
+| `user_id`    | Operational assignee (works the beat / retailer day-to-day) | **Yes**, every transfer                     |
+
+
+## Why pending payments will "just work" after this
+
+`PendingPaymentsAll.tsx` already filters retailers by `user_id = me OR owner_id = me`. Once the operational `user_id` actually moves to the new user during a transfer, pending dues automatically appear for them — without touching any financial table. Historical attribution on `credit_ledger.created_by` / `distributor_payments.created_by` stays untouched. This is exactly the "collector vs revenue owner" separation you asked for, achieved without schema bloat on financial tables.
+
+If you later want a fully explicit `collector_user_id` on the financial tables, that becomes a clean follow-up — but it is not required to fix the current bug.
 
 ---
 
-## What I checked in the code
+## Plan
 
-| Layer | Today's behaviour | Matches your model? |
-|---|---|---|
-| `retailers.owner_id` | Historical owner. Default transfer leaves it on Manvith. Optional toggle moves it. | Yes |
-| `retailers.user_id` | Operational assignee. Transfer always moves this to new user. | Yes |
-| `orders` table | Has `user_id` (whoever placed the order). **No `owner_id` column.** | Partially |
-| `invoices` table | Same — `user_id` only, no `owner_id` snapshot. | Partially |
-| Pending payments UI (`PendingPayments`, `PendingPaymentsAll`) | Lists by `retailers.user_id`, shows "Credited to <owner>" badge when `owner_id ≠ user_id`. | Yes |
-| `PaymentMarkingModal` | Updates `retailers.pending_amount` on the retailer. Doesn't write `user_id`/`owner_id` on a payment row — there's no payment-history row created. | Gap |
-| Revenue/target metrics | Group by `orders.user_id` (= whoever placed the order). | Works, but fragile |
+### 1. Schema migration
 
-## What this means in practice
-
-**Good news:** for orders placed *after* transfer, `orders.user_id` is already the new user, so new revenue automatically credits the new user. For historical orders, `orders.user_id` was Manvith, so historical revenue automatically stays with Manvith. Your three layers (Historical / Operational / Future) are mostly already working through `orders.user_id` alone.
-
-**The fragile parts:**
-
-1. **No snapshot on orders/invoices.** Today revenue is attributed via `orders.user_id`. If an admin ever bulk-fixes that column (e.g., a future cleanup script, or a misuse of the transfer RPC), historical revenue silently moves. The enterprise pattern you described (immutable `owner_id_snapshot`) is missing.
-2. **Pending-amount has no audit trail.** `PaymentMarkingModal` just decrements `retailers.pending_amount`. There's no `payments` row recording *who collected*, *when*, *for which historical owner*. So we can't answer "show me ₹ collected by New User on Manvith's old dues this month" — the data isn't recorded anywhere.
-3. **Pending-payment list filters by `user_id` only.** A retailer that Manvith still owns but is now assigned to New User shows up correctly for New User. But if you ever transfer **only ownership** (not assignee), the new owner won't see the old dues — because the list is keyed on `user_id`, not `owner_id`. Edge case, but worth covering.
-
-## Plan — three small, additive changes
-
-### 1. Snapshot owner on orders & invoices (DB migration)
-
-Add columns + auto-fill via trigger so we never have to remember in app code:
-
-```sql
-ALTER TABLE orders    ADD COLUMN owner_id_snapshot uuid;
-ALTER TABLE invoices  ADD COLUMN owner_id_snapshot uuid;
-
--- Trigger: on insert, copy retailer.owner_id (fallback: NEW.user_id)
-CREATE FUNCTION set_order_owner_snapshot() ...
-  -- if NEW.owner_id_snapshot IS NULL:
-  --   SELECT owner_id INTO NEW.owner_id_snapshot FROM retailers WHERE id = NEW.retailer_id;
-  --   IF NULL THEN NEW.owner_id_snapshot := NEW.user_id;
+```text
+ALTER TABLE public.beats     ADD COLUMN user_id uuid;       -- operational assignee
+ALTER TABLE public.retailers ADD COLUMN created_by uuid;    -- historical creator
+CREATE INDEX idx_beats_user_id        ON public.beats(user_id);
+CREATE INDEX idx_retailers_created_by ON public.retailers(created_by);
 ```
 
-One-time backfill: `UPDATE orders SET owner_id_snapshot = user_id WHERE owner_id_snapshot IS NULL;` (same for invoices). This locks historical revenue to the original creator forever, regardless of any future retailer/order edits.
+Backfill so existing rows behave correctly from day one:
 
-### 2. Record collections in a payment-history row
+- `beats.user_id := COALESCE(owner_id, created_by)` for all existing rows
+- `retailers.created_by := user_id` (best-available historical proxy; original creator unknown for legacy rows, so we seed it once and never touch it again)
 
-Update `PaymentMarkingModal.handleFullPayment` / `handleCustomPayment` to also `INSERT` into a payments table (already exists per earlier RPC inspection — `retailer_credit_ledger` / `distributor_payments`). Each row carries:
+RLS: extend existing beats/retailers SELECT policies so a row is visible if `user_id = auth.uid()` (in addition to current owner/created_by paths). This is additive — no existing access is removed.
 
-- `collected_by_user_id` = current user (operational credit — "who did the collection work")
-- `revenue_owner_id` = `retailers.owner_id` at collection time (revenue credit — "whose dues these were")
-- `amount`, `method`, `proof_url`, `retailer_id`, `collected_at`
+### 2. Update `partial_ownership_transfer` RPC
 
-Now reports can answer both "who collected" and "whose revenue".
+For the **beats bucket**:
 
-### 3. Pending-payment visibility — union of assignee + owner
+- Always (both modes): `UPDATE beats SET user_id = p_to WHERE beat_id IN (...) AND (user_id = p_from OR owner_id = p_from)`
+- "Transfer ownership" ON: also `SET owner_id = p_to` for the same rows
+- **Never** touch `beats.created_by`
 
-In `PendingPayments.tsx` and `PendingPaymentsAll.tsx`, change the query from:
-```ts
-.eq('user_id', me)
+For the **retailers bucket** (already mostly correct, just align):
+
+- Always: `UPDATE retailers SET user_id = p_to WHERE id IN (...) AND owner_id = p_from`
+- "Transfer ownership" ON: also `SET owner_id = p_to`
+- **Never** touch `retailers.created_by`
+
+For **retailers cascaded under selected beats**: same rule — `user_id` always moves; `owner_id` only when ownership toggle is ON; `created_by` never.
+
+Remove the (currently no-op and architecturally wrong) `include_pending_payments` writes against `credit_ledger` / `distributor_payments` / `inst_collections`. Keep only the **preview counts** and a clarified warning: *"Pending dues stay attributed to original owner for revenue history; new user will see them via retailer assignment for collection."*
+
+### 3. Fix `MyBeats.tsx` query (the real Issue 1 fix)
+
+Replace the operational filter from `created_by` to the new operational column, on both the cached and the online path:
+
+```text
+.in('created_by', effectiveUserIds)   →   .in('user_id', effectiveUserIds)
+b.created_by                          →   b.user_id
 ```
-to:
-```ts
-.or(`user_id.eq.${me},owner_id.eq.${me}`)
+
+`useMasterDataCache.ts` line 418 (`.eq('created_by', user.id)` for active beats) — same change to `user_id`.
+
+`created_by` stays in the row for audit/history but is no longer used for visibility.
+
+### 4. Backfill `beats.user_id` for the user who already lost their transferred beat
+
+After the migration runs, the seeded `beats.user_id := COALESCE(owner_id, created_by)` will already place the previously-transferred beats with whichever user owns them now (because earlier transfers updated `owner_id`). So your earlier transfer becomes visible to the new user immediately — no manual cleanup needed.
+
+### 5. Beat creation / existing flows
+
+- `MyBeats.tsx` create flow (line 620) already sets `created_by = user.id`; add `user_id = user.id` and `owner_id = user.id` at creation so all three start aligned.
+- `BeatTransferDialog.tsx` (legacy single-beat transfer) currently updates `beats.created_by` — change it to update `user_id` (and `owner_id` if you also want full ownership). This is the second place where `created_by` was being incorrectly mutated.
+
+### 6. Out of scope (deliberately)
+
+- No writes to `credit_ledger.*`, `distributor_payments.*`, `inst_collections.*`. Historical financial attribution stays immutable.
+- No new `collector_user_id` column on financial tables yet — current retailer-based filter already covers the collection UX. Can be added later as Option A from your message if you want explicit per-row collector assignment.
+
+---
+
+## Files / artefacts
+
+```text
+supabase/migrations/<new>.sql
+  - ALTER TABLE beats ADD user_id, retailers ADD created_by
+  - backfill, indexes, RLS additions
+  - CREATE OR REPLACE FUNCTION partial_ownership_transfer (rewritten per §2)
+
+src/pages/MyBeats.tsx
+  - swap created_by → user_id in the two list filters and cache filter
+  - on create: also set user_id and owner_id
+
+src/hooks/useMasterDataCache.ts
+  - swap created_by → user_id on the active-beats fetch
+
+src/components/BeatTransferDialog.tsx
+  - update user_id (always) + owner_id (if ownership flag); stop touching created_by
+
+src/integrations/supabase/types.ts
+  - regenerated automatically from schema
 ```
 
-So: I see every retailer where I'm either the current assignee **or** the historical owner with open dues. Badge logic stays: "Credited to <name>" whenever `owner_id ≠ me`.
+## Verification
 
-### 4. Revenue metrics use the snapshot (one-line switch)
-
-In `useBusinessMetrics` / `usePerformanceSummary`, group by `orders.owner_id_snapshot` instead of `orders.user_id` for revenue/target/KG cards. Visit/collection-activity counts continue grouping by `user_id` (operational credit). This makes the historical/future split bulletproof even if `user_id` ever gets rewritten.
-
-### What stays unchanged
-
-- `partial_ownership_transfer` RPC and the "Also transfer ownership" toggle — current behaviour is correct.
-- Beat-cascade transfer logic.
-- Existing audit logs.
-- The "credited to <owner>" badge.
-
-## Files touched
-
-| File | Change |
-|---|---|
-| `supabase/migrations/<new>.sql` | Add `owner_id_snapshot` to `orders` + `invoices`, add trigger, backfill. |
-| `src/components/PaymentMarkingModal.tsx` | Insert a payment-history row (with both collector + revenue-owner ids) alongside the `retailers.pending_amount` update. |
-| `src/components/home/PendingPayments.tsx` | `.or(user_id.eq, owner_id.eq)` query; existing badge stays. |
-| `src/pages/PendingPaymentsAll.tsx` | Same query change + badge. |
-| `src/hooks/useBusinessMetrics.ts` (and `usePerformanceSummary` if needed) | Group revenue by `owner_id_snapshot`; visits/calls remain on `user_id`. |
-| `.lovable/plan.md` | Document the new snapshot + collection-record contract. |
-
-## Result after these changes
-
-| Activity | Visible to | Operational credit (`user_id`) | Revenue credit (`owner_id_snapshot`) |
-|---|---|---|---|
-| Old ₹10,000 due on Manvith retailer, collected by New User | Both | New User | Manvith |
-| New order placed by New User after transfer | New User | New User | New User |
-| Manvith's historical invoices | Manvith | Manvith (frozen) | Manvith (frozen) |
-| Future retailer transfer to a third user | New owner | New owner | unchanged on past orders |
-
-This exactly matches the enterprise "Historical / Operational / Future" three-layer model you described, and makes it immutable at the DB level rather than relying on app code to behave.
+1. Run the migration — confirm `beats.user_id` populated for every row, `retailers.created_by` populated.
+2. Reload `/my-beats` as the previously-target user: beats from prior transfers now appear.
+3. New partial transfer (toggle OFF): new user sees the beat in MyBeats and pending dues for those retailers in `/pending-payments`. Original user keeps `owner_id` and all historical revenue / financial rows untouched.
+4. New partial transfer (toggle ON): same as above plus `owner_id` moves to new user; new orders going forward attribute revenue to the new user.
+5. Query `credit_ledger` / `distributor_payments` `created_by` for a sample retailer transferred long ago — values are unchanged from before the migration. Audit integrity preserved.
