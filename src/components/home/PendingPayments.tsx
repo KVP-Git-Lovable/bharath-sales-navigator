@@ -39,7 +39,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
       const { data, error } = await supabase
         .from('retailers')
         .select('id, name, pending_amount, last_order_date, owner_id')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
         .gt('pending_amount', 0)
         .order('pending_amount', { ascending: false })
         .limit(5);
@@ -88,7 +88,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
       const { data: totalData } = await supabase
         .from('retailers')
         .select('pending_amount')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
         .gt('pending_amount', 0);
 
       const total = (totalData || []).reduce((sum, r) => sum + (r.pending_amount || 0), 0);
