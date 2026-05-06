@@ -51,6 +51,7 @@ import CounterSales from "./pages/CounterSales";
 import EventCreate from "./pages/EventCreate";
 import EventOrders from "./pages/EventOrders";
 import EventStockTracker from "./pages/EventStockTracker";
+import EventSummary from "./pages/EventSummary";
 import { Cart } from "./pages/Cart";
 import { MyRetailers } from "./pages/MyRetailers";
 import { MyBeats } from "./pages/MyBeats";
@@ -395,6 +396,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/event-create" element={<ProtectedRoute><EventCreate /></ProtectedRoute>} />
         <Route path="/event/:id/orders" element={<ProtectedRoute><EventOrders /></ProtectedRoute>} />
         <Route path="/event/:id/stock" element={<ProtectedRoute><EventStockTracker /></ProtectedRoute>} />
+        <Route path="/event/:id/summary" element={<ProtectedRoute><EventSummary /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/my-beats" element={<ProtectedRoute><MyBeats /></ProtectedRoute>} />
         <Route path="/today-summary" element={<ProtectedRoute><TodaySummary /></ProtectedRoute>} />
