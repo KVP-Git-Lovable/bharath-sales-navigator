@@ -64,21 +64,30 @@ export const PartialTransferPicker: React.FC<Props> = ({ fromUserId, selection, 
       setLoading(true);
       try {
         const [r, b, t, d, v, dr] = await Promise.all([
-          supabase.from('retailers').select('id, shop_name').eq('owner_id', fromUserId).limit(1000),
+          supabase.from('retailers').select('id, name').eq('owner_id', fromUserId).limit(1000),
           supabase.from('beats').select('beat_id, beat_name').eq('owner_id', fromUserId).limit(1000),
           supabase.from('territories').select('id, name').eq('assigned_user_id', fromUserId).limit(1000),
           supabase.from('distributors').select('id, name').eq('owner_id', fromUserId).limit(1000),
-          supabase.from('vans').select('id, van_number').eq('assigned_user_id', fromUserId).limit(1000),
-          supabase.from('employees').select('user_id, full_name').eq('manager_id', fromUserId).limit(1000),
+          supabase.from('vans').select('id, registration_number').eq('assigned_user_id', fromUserId).limit(1000),
+          supabase.from('employees').select('user_id').eq('manager_id', fromUserId).limit(1000),
         ]);
+        const reportUserIds = (dr.data || []).map((x: any) => x.user_id).filter(Boolean);
+        let profileMap: Record<string, string> = {};
+        if (reportUserIds.length) {
+          const { data: profs } = await supabase
+            .from('profiles').select('id, full_name, username').in('id', reportUserIds);
+          (profs || []).forEach((p: any) => {
+            profileMap[p.id] = p.full_name || p.username || p.id;
+          });
+        }
         if (!alive) return;
         setData({
-          retailers:    (r.data    || []).map((x: any) => ({ id: x.id, label: x.shop_name || x.id })),
+          retailers:    (r.data    || []).map((x: any) => ({ id: x.id, label: x.name || x.id })),
           beats:        (b.data    || []).map((x: any) => ({ id: x.beat_id, label: x.beat_name || x.beat_id })),
           territories:  (t.data    || []).map((x: any) => ({ id: x.id, label: x.name || x.id })),
           distributors: (d.data    || []).map((x: any) => ({ id: x.id, label: x.name || x.id })),
-          vans:         (v.data    || []).map((x: any) => ({ id: x.id, label: x.van_number || x.id })),
-          direct_reports: (dr.data || []).map((x: any) => ({ id: x.user_id, label: x.full_name || x.user_id })),
+          vans:         (v.data    || []).map((x: any) => ({ id: x.id, label: x.registration_number || x.id })),
+          direct_reports: (dr.data || []).map((x: any) => ({ id: x.user_id, label: profileMap[x.user_id] || x.user_id })),
         });
       } finally {
         if (alive) setLoading(false);
