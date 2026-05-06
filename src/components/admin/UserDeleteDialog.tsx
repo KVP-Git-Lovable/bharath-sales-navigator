@@ -59,6 +59,7 @@ async function runPartialTransferChunked(args: {
   confirmDirectReports: boolean;
   transferReason: string;
   dryRun: boolean;
+  includePendingPayments: boolean;
 }) {
   const chunks = chunkSelection(args.selection);
   const merged: any = {
@@ -67,6 +68,8 @@ async function runPartialTransferChunked(args: {
     warnings: [] as any[],
     total_records: 0,
     chunks: chunks.length,
+    outstanding_preview: null as any,
+    include_pending_payments: args.includePendingPayments,
   };
   for (let idx = 0; idx < chunks.length; idx++) {
     const partial = chunks[idx];
@@ -78,6 +81,7 @@ async function runPartialTransferChunked(args: {
         partialPayload: {
           ...partial,
           confirmTransferDirectReports: args.confirmDirectReports,
+          include_pending_payments: args.includePendingPayments,
         },
         transferReason: args.transferReason,
         dryRun: args.dryRun,
@@ -92,6 +96,28 @@ async function runPartialTransferChunked(args: {
     }
     if (Array.isArray(r?.warnings)) merged.warnings.push(...r.warnings);
     merged.total_records += Number(r?.total_records) || 0;
+    // Aggregate outstanding preview across chunks (sum amounts/counts).
+    const op = r?.outstanding_preview;
+    if (op) {
+      if (!merged.outstanding_preview) {
+        merged.outstanding_preview = {
+          affected_retailers: 0, open_records: 0, total_amount: 0,
+          breakdown: {
+            credit_ledger: { count: 0, amount: 0 },
+            distributor_payments: { count: 0, amount: 0 },
+            inst_collections: { count: 0, amount: 0 },
+          },
+        };
+      }
+      const m = merged.outstanding_preview;
+      m.affected_retailers += Number(op.affected_retailers) || 0;
+      m.open_records += Number(op.open_records) || 0;
+      m.total_amount += Number(op.total_amount) || 0;
+      for (const k of ['credit_ledger', 'distributor_payments', 'inst_collections'] as const) {
+        m.breakdown[k].count += Number(op?.breakdown?.[k]?.count) || 0;
+        m.breakdown[k].amount += Number(op?.breakdown?.[k]?.amount) || 0;
+      }
+    }
   }
   return merged;
 }
