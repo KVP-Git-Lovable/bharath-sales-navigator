@@ -1008,6 +1008,8 @@ export const MyBeats = () => {
             beat_id: newBeatId,
             beat_name: newBeatName,
             created_by: targetUserId,
+            owner_id: targetUserId,
+            user_id: targetUserId,
             is_active: true,
             category: 'General',
             owner_name: targetUser?.full_name || null,
@@ -1055,7 +1057,7 @@ export const MyBeats = () => {
         .from('beats')
         .update({ is_active: false })
         .eq('beat_id', deleteItemId)
-        .eq('created_by', user.id);
+        .or(`user_id.eq.${user.id},created_by.eq.${user.id}`);
 
       if (beatError) throw beatError;
 
@@ -1149,7 +1151,7 @@ export const MyBeats = () => {
         .from('beats')
         .update({ is_active: false })
         .eq('beat_id', deactivateBeat.id)
-        .eq('created_by', user.id);
+        .or(`user_id.eq.${user.id},created_by.eq.${user.id}`);
 
       await supabase.from('beat_audit_log' as any).insert({
         beat_id: deactivateBeat.id,
