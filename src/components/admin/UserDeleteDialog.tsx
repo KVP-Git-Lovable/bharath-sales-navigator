@@ -60,6 +60,7 @@ async function runPartialTransferChunked(args: {
   transferReason: string;
   dryRun: boolean;
   includePendingPayments: boolean;
+  transferOwnership: boolean;
 }) {
   const chunks = chunkSelection(args.selection);
   const merged: any = {
@@ -70,6 +71,7 @@ async function runPartialTransferChunked(args: {
     chunks: chunks.length,
     outstanding_preview: null as any,
     include_pending_payments: args.includePendingPayments,
+    transfer_ownership: args.transferOwnership,
   };
   for (let idx = 0; idx < chunks.length; idx++) {
     const partial = chunks[idx];
@@ -82,6 +84,7 @@ async function runPartialTransferChunked(args: {
           ...partial,
           confirmTransferDirectReports: args.confirmDirectReports,
           include_pending_payments: args.includePendingPayments,
+          transfer_ownership: args.transferOwnership,
         },
         transferReason: args.transferReason,
         dryRun: args.dryRun,
