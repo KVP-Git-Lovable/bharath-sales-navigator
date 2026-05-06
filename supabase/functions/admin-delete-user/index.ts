@@ -255,6 +255,7 @@ Deno.serve(async (req) => {
         p_to: transferToUserId,
         p_payload: payload,
         p_dry_run: !!dryRun,
+        p_caller: callerId,
       })
 
       if (rpcError) {
