@@ -18054,6 +18054,15 @@ export type Database = {
         Args: { p_items: Json; p_order: Json }
         Returns: Json
       }
+      transfer_user_data_partial: {
+        Args: {
+          p_dry_run?: boolean
+          p_from: string
+          p_payload: Json
+          p_to: string
+        }
+        Returns: Json
+      }
       unlock_password_reset: { Args: { user_email: string }; Returns: boolean }
       update_security_info: {
         Args: { new_hint_answer: string; new_hint_question: string }
