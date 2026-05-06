@@ -174,6 +174,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
   const [previewResult, setPreviewResult] = useState<any>(null);
   const [confirmDirectReports, setConfirmDirectReports] = useState(false);
   const [includePendingPayments, setIncludePendingPayments] = useState(false);
+  const [transferOwnership, setTransferOwnership] = useState(false);
   const [beatRetailerCounts, setBeatRetailerCounts] = useState<Record<string, number>>({});
   const [beatNameMap, setBeatNameMap] = useState<Record<string, string>>({});
 
@@ -192,6 +193,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       setPreviewResult(null);
       setConfirmDirectReports(false);
       setIncludePendingPayments(false);
+      setTransferOwnership(false);
       setBeatRetailerCounts({});
       setBeatNameMap({});
     }
@@ -278,6 +280,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           transferReason,
           dryRun: false,
           includePendingPayments,
+          transferOwnership,
         });
       } else {
         const { data, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
@@ -331,6 +334,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
         transferReason: transferReason || 'preview',
         dryRun: true,
         includePendingPayments,
+        transferOwnership,
       });
       // Fetch beat name + retailer count per selected beat for richer preview
       if (partialSelection.beats.length > 0) {
