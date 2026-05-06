@@ -211,21 +211,15 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
     if (total === 0) { toast.error('Select records first'); return; }
     setProcessing(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: {
-          userId: user.id,
-          deleteOption: 'partial_transfer',
-          transferToUserId,
-          partialPayload: {
-            ...partialSelection,
-            confirmTransferDirectReports: confirmDirectReports,
-          },
-          transferReason: transferReason || 'preview',
-          dryRun: true,
-        },
+      const merged = await runPartialTransferChunked({
+        userId: user.id,
+        transferToUserId,
+        selection: partialSelection,
+        confirmDirectReports,
+        transferReason: transferReason || 'preview',
+        dryRun: true,
       });
-      if (error) throw error;
-      setPreviewResult(result?.result || result);
+      setPreviewResult(merged);
       toast.success('Preview ready — review counts below');
     } catch (e: any) {
       toast.error(e.message || 'Preview failed');
