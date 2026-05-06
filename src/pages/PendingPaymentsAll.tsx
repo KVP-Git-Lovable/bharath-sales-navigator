@@ -54,7 +54,7 @@ export default function PendingPaymentsAll() {
       const { data, error } = await supabase
         .from("retailers")
         .select("id, name, beat_id, address, pending_amount, last_order_date, owner_id")
-        .eq("user_id", userProfile!.id)
+        .or(`user_id.eq.${userProfile!.id},owner_id.eq.${userProfile!.id}`)
         .gt("pending_amount", 0)
         .order("pending_amount", { ascending: false });
 
