@@ -233,29 +233,31 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const partialBody = deleteOption === 'partial_transfer' ? {
-        partialPayload: {
-          ...partialSelection,
-          confirmTransferDirectReports: confirmDirectReports,
-        },
-        transferReason,
-      } : {};
-
-      const { data: result, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
-        body: {
+      let result: any = null;
+      if (deleteOption === 'partial_transfer') {
+        result = await runPartialTransferChunked({
           userId: user.id,
-          deleteOption,
-          transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
-          ...(deleteOption === 'partial_transfer' ? { transferToUserId, ...partialBody, dryRun: false } : {}),
-        },
-      });
-
-      if (invokeError) {
-        throw new Error(invokeError.message || 'Failed to delete user');
+          transferToUserId,
+          selection: partialSelection,
+          confirmDirectReports,
+          transferReason,
+          dryRun: false,
+        });
+      } else {
+        const { data, error: invokeError } = await supabase.functions.invoke('admin-delete-user', {
+          body: {
+            userId: user.id,
+            deleteOption,
+            transferToUserId: deleteOption === 'transfer' ? transferToUserId : undefined,
+          },
+        });
+        if (invokeError) {
+          throw new Error(invokeError.message || 'Failed to delete user');
+        }
+        result = data;
       }
 
-
-      if (result.warning) {
+      if (result?.warning) {
         toast.warning(result.warning);
       }
 
