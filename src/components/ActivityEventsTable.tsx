@@ -55,6 +55,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
   const navigate = useNavigate();
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [visitStatuses, setVisitStatuses] = useState<Record<string, VisitStatus>>({});
+  const [eventTotals, setEventTotals] = useState<Record<string, { revenue: number; orders: number }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -93,6 +94,23 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
           });
           setVisitStatuses(map);
         }
+
+        // Fetch real revenue/order totals per visit (events)
+        const { data: orderRows } = await supabase
+          .from('orders')
+          .select('visit_id, total_amount, status')
+          .in('visit_id', visitIds);
+
+        const totals: Record<string, { revenue: number; orders: number }> = {};
+        (orderRows || []).forEach((o: any) => {
+          if (!o.visit_id) return;
+          if (o.status === 'cancelled') return;
+          const t = totals[o.visit_id] || { revenue: 0, orders: 0 };
+          t.revenue += Number(o.total_amount) || 0;
+          t.orders += 1;
+          totals[o.visit_id] = t;
+        });
+        setEventTotals(totals);
       }
     } catch (err) {
       console.error('[ActivityEventsTable] Failed to load activities:', err);
@@ -274,6 +292,14 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                 : 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300';
             const statusLabel =
               status === 'productive' ? 'Completed' : status === 'in-progress' ? 'Active' : 'Upcoming';
+            const totals = activity.visit_id ? eventTotals[activity.visit_id] : undefined;
+            const revenue = totals?.revenue || 0;
+            const orderCount = totals?.orders || 0;
+            const formattedRevenue = new Intl.NumberFormat('en-IN', {
+              style: 'currency',
+              currency: 'INR',
+              maximumFractionDigits: 0,
+            }).format(revenue);
 
             return (
               <div
@@ -310,14 +336,14 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                     <div className="rounded-xl border bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 text-xs">
                         <IndianRupee className="h-3.5 w-3.5" />
-                        <span>₹0</span>
+                        <span>{formattedRevenue}</span>
                       </div>
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">Total Revenue</div>
                     </div>
                     <div className="rounded-xl border bg-sky-50/60 dark:bg-sky-950/20 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-sky-700 dark:text-sky-400 text-xs">
                         <ShoppingCart className="h-3.5 w-3.5" />
-                        <span>0</span>
+                        <span>{orderCount}</span>
                       </div>
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">Orders</div>
                     </div>
