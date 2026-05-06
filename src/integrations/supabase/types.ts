@@ -17879,6 +17879,15 @@ export type Database = {
         Args: { _email: string; _user_id: string }
         Returns: boolean
       }
+      partial_ownership_transfer: {
+        Args: {
+          p_dry_run?: boolean
+          p_from: string
+          p_payload: Json
+          p_to: string
+        }
+        Returns: Json
+      }
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
       process_approval_step: {
         Args: {
