@@ -1168,6 +1168,7 @@ export type Database = {
           territory_id: string | null
           travel_allowance: number | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           average_km?: number | null
@@ -1185,6 +1186,7 @@ export type Database = {
           territory_id?: string | null
           travel_allowance?: number | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           average_km?: number | null
@@ -1202,6 +1204,7 @@ export type Database = {
           territory_id?: string | null
           travel_allowance?: number | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -13565,6 +13568,7 @@ export type Database = {
           contact_name: string | null
           contact_title: string | null
           created_at: string
+          created_by: string | null
           distributor_id: string | null
           entity_type: string
           gst_number: string | null
@@ -13620,6 +13624,7 @@ export type Database = {
           contact_name?: string | null
           contact_title?: string | null
           created_at?: string
+          created_by?: string | null
           distributor_id?: string | null
           entity_type?: string
           gst_number?: string | null
@@ -13675,6 +13680,7 @@ export type Database = {
           contact_name?: string | null
           contact_title?: string | null
           created_at?: string
+          created_by?: string | null
           distributor_id?: string | null
           entity_type?: string
           gst_number?: string | null
@@ -18006,26 +18012,16 @@ export type Database = {
         Args: { _email: string; _user_id: string }
         Returns: boolean
       }
-      partial_ownership_transfer:
-        | {
-            Args: {
-              p_dry_run?: boolean
-              p_from: string
-              p_payload: Json
-              p_to: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_caller?: string
-              p_dry_run?: boolean
-              p_from: string
-              p_payload: Json
-              p_to: string
-            }
-            Returns: Json
-          }
+      partial_ownership_transfer: {
+        Args: {
+          p_caller?: string
+          p_dry_run?: boolean
+          p_from: string
+          p_payload: Json
+          p_to: string
+        }
+        Returns: Json
+      }
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
       process_approval_step: {
         Args: {

@@ -415,7 +415,7 @@ export function useMasterDataCache() {
 
       // Beats
       onProgress('beats', 'loading');
-      const { data: beats } = await supabase.from('beats').select('*').eq('is_active', true).eq('created_by', user.id);
+      const { data: beats } = await supabase.from('beats').select('*').eq('is_active', true).eq('user_id', user.id);
       if (beats) {
         await offlineStorage.clear(STORES.BEATS);
         for (const b of beats) await offlineStorage.save(STORES.BEATS, b);
