@@ -192,6 +192,25 @@ export default function EventStockTracker() {
 
   useEffect(() => { if (activeDayId) loadItems(activeDayId); }, [activeDayId, loadItems]);
 
+  // Real-time sync: refresh items when event stock changes (orders submitted, etc.)
+  useEffect(() => {
+    if (!activeDayId) return;
+    const handler = () => loadItems(activeDayId);
+    window.addEventListener("event-stock:changed", handler);
+    const channel = supabase
+      .channel(`event-stock-items-${activeDayId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "event_stock_items", filter: `event_stock_day_id=eq.${activeDayId}` },
+        () => loadItems(activeDayId)
+      )
+      .subscribe();
+    return () => {
+      window.removeEventListener("event-stock:changed", handler);
+      supabase.removeChannel(channel);
+    };
+  }, [activeDayId, loadItems]);
+
   // KPIs
   const kpis = useMemo(() => {
     const taken = items.reduce((s, i) => s + i.stock_taken, 0);

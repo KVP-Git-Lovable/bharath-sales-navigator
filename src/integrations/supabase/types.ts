@@ -5438,6 +5438,65 @@ export type Database = {
           },
         ]
       }
+      event_stock_audit: {
+        Row: {
+          created_at: string
+          delta_qty: number
+          event_id: string
+          event_stock_day_id: string
+          event_stock_item_id: string
+          id: string
+          new_sold_qty: number
+          note: string | null
+          order_id: string | null
+          prev_sold_qty: number
+          product_id: string
+          source: string
+          user_id: string
+          visit_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          delta_qty: number
+          event_id: string
+          event_stock_day_id: string
+          event_stock_item_id: string
+          id?: string
+          new_sold_qty: number
+          note?: string | null
+          order_id?: string | null
+          prev_sold_qty: number
+          product_id: string
+          source?: string
+          user_id: string
+          visit_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          delta_qty?: number
+          event_id?: string
+          event_stock_day_id?: string
+          event_stock_item_id?: string
+          id?: string
+          new_sold_qty?: number
+          note?: string | null
+          order_id?: string | null
+          prev_sold_qty?: number
+          product_id?: string
+          source?: string
+          user_id?: string
+          visit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_stock_audit_event_stock_item_id_fkey"
+            columns: ["event_stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "event_stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_stock_days: {
         Row: {
           created_at: string
@@ -17477,6 +17536,15 @@ export type Database = {
       }
     }
     Functions: {
+      apply_event_stock_for_order: {
+        Args: {
+          p_items: Json
+          p_order_date: string
+          p_order_id: string
+          p_visit_id: string
+        }
+        Returns: Json
+      }
       calculate_beat_adherence: {
         Args: { p_end: string; p_start: string; p_user_id: string }
         Returns: number

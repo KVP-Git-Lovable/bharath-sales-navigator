@@ -752,6 +752,27 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       if (res?.success) {
         updateRow(uid, { status: "submitted", expanded: false });
         toast.success("Order submitted successfully");
+        // Auto-update event stock tracker
+        if (eventContext?.visitId && navigator.onLine) {
+          try {
+            const { data: stockRes, error: stockErr } = await supabase.rpc(
+              "apply_event_stock_for_order" as any,
+              {
+                p_visit_id: eventContext.visitId,
+                p_order_id: (res as any).order?.id ?? null,
+                p_order_date: orderData.order_date,
+                p_items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+              }
+            );
+            if (stockErr) console.warn("[event-stock] update failed:", stockErr.message);
+            else if ((stockRes as any)?.skipped > 0) {
+              toast.message(`Stock updated (${(stockRes as any).skipped} item(s) had no tracker row)`);
+            }
+            window.dispatchEvent(new CustomEvent("event-stock:changed", { detail: { visitId: eventContext.visitId } }));
+          } catch (err) {
+            console.warn("[event-stock] rpc error", err);
+          }
+        }
       } else {
         toast.error("Submission failed");
       }
@@ -847,6 +868,19 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
           successCount++;
           const idx = updated.findIndex((x) => x.uid === r.uid);
           if (idx >= 0) updated[idx] = { ...updated[idx], status: "submitted", expanded: false };
+          if (eventContext?.visitId && navigator.onLine) {
+            try {
+              await supabase.rpc("apply_event_stock_for_order" as any, {
+                p_visit_id: eventContext.visitId,
+                p_order_id: (res as any).order?.id ?? null,
+                p_order_date: orderData.order_date,
+                p_items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+              });
+              window.dispatchEvent(new CustomEvent("event-stock:changed", { detail: { visitId: eventContext.visitId } }));
+            } catch (err) {
+              console.warn("[event-stock] rpc error", err);
+            }
+          }
         }
       } catch (e: any) {
         toast.error(`Failed: ${r.customer?.name} — ${e?.message || "unknown"}`);
