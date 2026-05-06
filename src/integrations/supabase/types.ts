@@ -5449,6 +5449,7 @@ export type Database = {
           new_sold_qty: number
           note: string | null
           order_id: string | null
+          order_item_id: string | null
           prev_sold_qty: number
           product_id: string
           source: string
@@ -5465,6 +5466,7 @@ export type Database = {
           new_sold_qty: number
           note?: string | null
           order_id?: string | null
+          order_item_id?: string | null
           prev_sold_qty: number
           product_id: string
           source?: string
@@ -5481,6 +5483,7 @@ export type Database = {
           new_sold_qty?: number
           note?: string | null
           order_id?: string | null
+          order_item_id?: string | null
           prev_sold_qty?: number
           product_id?: string
           source?: string
