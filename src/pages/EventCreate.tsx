@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, CalendarIcon, Save, Navigation, X, Loader2 } from "lucide-react";
+import {
+  ArrowLeft, CalendarIcon, Save, Navigation, X, Loader2,
+  Info, MapPin, Wallet, Users, Target, UsersRound, Clock,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
@@ -189,38 +192,44 @@ export default function EventCreate() {
     }
   };
 
+  const inputCls =
+    "h-9 text-sm rounded-lg border-border/70 bg-background focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary";
+
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
-              <ArrowLeft className="h-5 w-5" />
+    <div className="min-h-screen bg-slate-50/60 dark:bg-muted/20">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b border-border/60">
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} aria-label="Back">
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold leading-tight">Event Details</h1>
-              <p className="text-xs text-muted-foreground">Add event information</p>
+              <h1 className="text-[15px] font-semibold leading-tight tracking-tight">Event Details</h1>
+              <p className="text-[11px] text-muted-foreground leading-tight">Add event information</p>
             </div>
           </div>
-          <Button onClick={handleSave} disabled={submitting} className="rounded-full">
-            {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          <Button
+            onClick={handleSave}
+            disabled={submitting}
+            className="h-9 px-4 rounded-lg bg-gradient-to-b from-primary to-primary/90 shadow-sm hover:shadow"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
             Save
           </Button>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+      <div className="max-w-5xl mx-auto p-4 space-y-3">
         {/* Basic Information */}
-        <Card className="p-5 rounded-2xl">
-          <h2 className="text-sm font-semibold mb-4">Basic Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SectionCard icon={<Info className="h-3.5 w-3.5" />} title="Basic Information">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
             <Field label="Event Name" required>
-              <Input value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="e.g. Big Deal Mela" />
+              <Input className={inputCls} value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="e.g. Big Deal Mela" />
             </Field>
             <Field label="Event Type">
               <Select value={eventType} onValueChange={setEventType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EVENT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
@@ -228,93 +237,134 @@ export default function EventCreate() {
             </Field>
             <div className="md:col-span-2">
               <Field label="Description">
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description of the event" rows={2} />
+                <Textarea
+                  className="min-h-[60px] text-sm rounded-lg border-border/70 bg-background focus-visible:ring-1 focus-visible:ring-primary"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Brief description of the event"
+                  rows={2}
+                />
               </Field>
             </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
             <Field label="Start Date" required>
               <DatePopover date={startDate} onChange={setStartDate} />
             </Field>
             <Field label="End Date" required>
               <DatePopover date={endDate} onChange={setEndDate} />
             </Field>
-            <div className="md:col-span-2">
-              <Field label="Time">
-                <div className="flex items-center gap-2">
-                  <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="max-w-[160px]" />
-                  <span className="text-muted-foreground text-sm">to</span>
-                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="max-w-[160px]" />
+            <Field label="Time">
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Clock className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 pointer-events-none" />
+                  <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={cn(inputCls, "pl-7")} />
                 </div>
+                <span className="text-muted-foreground text-xs">to</span>
+                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} />
+              </div>
+            </Field>
+          </div>
+        </SectionCard>
+
+        {/* Location */}
+        <SectionCard
+          icon={<MapPin className="h-3.5 w-3.5" />}
+          title="Location"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={captureLocation}
+              disabled={capturingGPS}
+              className="h-7 px-2.5 text-xs rounded-md"
+            >
+              {capturingGPS ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Navigation className="h-3.5 w-3.5 mr-1" />}
+              Use Current Location
+            </Button>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+            <Field label="Address" required>
+              <Input className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" />
+            </Field>
+            <Field label="Landmark">
+              <Input className={inputCls} value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="Nearby landmark" />
+            </Field>
+            <div className="md:col-span-2 grid grid-cols-2 gap-x-4 gap-y-3">
+              <Field label="Latitude (Optional)">
+                <Input className={inputCls} type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} />
+              </Field>
+              <Field label="Longitude (Optional)">
+                <Input className={inputCls} type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} />
               </Field>
             </div>
           </div>
-        </Card>
+        </SectionCard>
 
-        {/* Location */}
-        <Card className="p-5 rounded-2xl">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold">Location</h2>
-            <Button type="button" variant="outline" size="sm" onClick={captureLocation} disabled={capturingGPS} className="rounded-full">
-              {capturingGPS ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Navigation className="h-4 w-4 mr-1" />}
-              Use Current Location
-            </Button>
+        {/* Budget & Targets — KPI style */}
+        <SectionCard icon={<Wallet className="h-3.5 w-3.5" />} title="Budget & Targets">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <KpiField
+              icon={<Wallet className="h-4 w-4" />}
+              tint="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+              label="Budget (₹)"
+              required
+            >
+              <Input className={cn(inputCls, "text-base font-semibold")} type="number" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="25,000" />
+            </KpiField>
+            <KpiField
+              icon={<Target className="h-4 w-4" />}
+              tint="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+              label="Sales Target (₹)"
+            >
+              <Input className={cn(inputCls, "text-base font-semibold")} type="number" value={salesTarget} onChange={(e) => setSalesTarget(e.target.value)} placeholder="60,000" />
+            </KpiField>
+            <KpiField
+              icon={<UsersRound className="h-4 w-4" />}
+              tint="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
+              label="Expected Footfall"
+            >
+              <Input className={cn(inputCls, "text-base font-semibold")} value={expectedFootfall} onChange={(e) => setExpectedFootfall(e.target.value)} placeholder="500+" />
+            </KpiField>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Address" required>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" />
-            </Field>
-            <Field label="Landmark">
-              <Input value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="Nearby landmark" />
-            </Field>
-            <Field label="Latitude (Optional)">
-              <Input type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} />
-            </Field>
-            <Field label="Longitude (Optional)">
-              <Input type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} />
-            </Field>
-          </div>
-        </Card>
-
-        {/* Budget & Targets */}
-        <Card className="p-5 rounded-2xl">
-          <h2 className="text-sm font-semibold mb-4">Budget &amp; Targets</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Field label="Budget (₹)" required>
-              <Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="25000" />
-            </Field>
-            <Field label="Sales Target (₹)">
-              <Input type="number" value={salesTarget} onChange={(e) => setSalesTarget(e.target.value)} placeholder="60000" />
-            </Field>
-            <Field label="Expected Footfall">
-              <Input value={expectedFootfall} onChange={(e) => setExpectedFootfall(e.target.value)} placeholder="500+" />
-            </Field>
-          </div>
-        </Card>
+        </SectionCard>
 
         {/* Team */}
-        <Card className="p-5 rounded-2xl">
-          <h2 className="text-sm font-semibold mb-4">Team</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SectionCard icon={<Users className="h-3.5 w-3.5" />} title="Team">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
             <Field label="Sales Reps Involved" required>
-              <div className="rounded-md border bg-background min-h-12 p-2 flex flex-wrap gap-2 items-center">
+              <div className="rounded-lg border border-border/70 bg-background min-h-9 px-2 py-1.5 flex flex-wrap gap-1.5 items-center">
                 {selectedReps.map((r) => (
-                  <Badge key={r.id} variant="secondary" className="rounded-full pl-3 pr-1 py-1 gap-1">
+                  <Badge
+                    key={r.id}
+                    variant="secondary"
+                    className="rounded-full pl-2 pr-1 py-0.5 gap-1 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15 border-0"
+                  >
                     {r.full_name}
-                    <button type="button" onClick={() => removeRep(r.id)} className="ml-1 rounded-full hover:bg-muted p-0.5" aria-label={`Remove ${r.full_name}`}>
+                    <button
+                      type="button"
+                      onClick={() => removeRep(r.id)}
+                      className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5"
+                      aria-label={`Remove ${r.full_name}`}
+                    >
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
                 ))}
                 {selectedReps.length === 0 && (
-                  <span className="text-sm text-muted-foreground px-1">No reps selected</span>
+                  <span className="text-xs text-muted-foreground px-1">No reps selected</span>
                 )}
               </div>
             </Field>
             <Field label="Add More (Optional)">
               <Popover open={repPickerOpen} onOpenChange={setRepPickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between font-normal">
+                  <Button variant="outline" className={cn(inputCls, "w-full justify-between font-normal text-muted-foreground")}>
                     Choose member
-                    <span className="text-muted-foreground text-xs">{availableReps.length} available</span>
+                    <span className="text-[10px] text-muted-foreground/80">{availableReps.length} available</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
@@ -335,19 +385,74 @@ export default function EventCreate() {
               </Popover>
             </Field>
           </div>
-        </Card>
+        </SectionCard>
       </div>
     </div>
   );
 }
 
+function SectionCard({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="rounded-xl border border-border/60 shadow-sm bg-card">
+      <div className="flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+            {icon}
+          </span>
+          <h2 className="text-[13px] font-semibold tracking-tight">{title}</h2>
+        </div>
+        {action}
+      </div>
+      <div className="px-4 py-3">{children}</div>
+    </Card>
+  );
+}
+
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-muted-foreground">
-        {label} {required && <span className="text-destructive">*</span>}
+    <div className="space-y-1">
+      <Label className="text-[11px] font-medium text-muted-foreground/90 uppercase tracking-wide">
+        {label} {required && <span className="text-destructive normal-case">*</span>}
       </Label>
       {children}
+    </div>
+  );
+}
+
+function KpiField({
+  icon,
+  tint,
+  label,
+  required,
+  children,
+}: {
+  icon: React.ReactNode;
+  tint: string;
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-background/60 p-2.5 flex items-center gap-2.5">
+      <div className={cn("h-9 w-9 shrink-0 rounded-lg flex items-center justify-center", tint)}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <Label className="text-[10px] font-medium text-muted-foreground/90 uppercase tracking-wide">
+          {label} {required && <span className="text-destructive normal-case">*</span>}
+        </Label>
+        {children}
+      </div>
     </div>
   );
 }
@@ -356,8 +461,14 @@ function DatePopover({ date, onChange }: { date: Date | undefined; onChange: (d:
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}>
-          <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
+        <Button
+          variant="outline"
+          className={cn(
+            "h-9 w-full justify-start font-normal text-sm rounded-lg border-border/70",
+            !date && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="h-3.5 w-3.5 mr-2 opacity-60" />
           {date ? format(date, "dd MMM yyyy") : "Pick a date"}
         </Button>
       </PopoverTrigger>
