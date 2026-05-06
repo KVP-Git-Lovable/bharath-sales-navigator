@@ -178,7 +178,14 @@ export default function PendingPaymentsAll() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between">
-                        <h3 className="text-lg font-semibold">{retailer.name}</h3>
+                        <div>
+                          <h3 className="text-lg font-semibold">{retailer.name}</h3>
+                          {retailer.owner_name && (
+                            <p className="text-[11px] italic text-muted-foreground mt-0.5">
+                              Credited to {retailer.owner_name} — you collect, revenue stays with original owner
+                            </p>
+                          )}
+                        </div>
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Outstanding</p>
                           <p className="text-xl font-bold text-destructive">
