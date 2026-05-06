@@ -706,20 +706,83 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                   {processing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
                   Preview Transfer
                 </Button>
+                <label className="flex items-center gap-2 text-xs cursor-pointer ml-2">
+                  <Checkbox
+                    checked={includePendingPayments}
+                    onCheckedChange={(c) => setIncludePendingPayments(!!c)}
+                  />
+                  <span>Include pending payments / outstanding ledger</span>
+                </label>
               </div>
 
-              {previewResult && (
-                <Alert>
-                  <Database className="h-4 w-4" />
-                  <AlertDescription className="text-xs space-y-1">
-                    <p className="font-medium">Preview (no changes written):</p>
-                    <ul className="list-disc list-inside">
-                      {Object.entries(previewResult.counts || {}).map(([k, v]) => (
-                        <li key={k}><span className="capitalize">{k.replace(/_/g, ' ')}</span>: {String(v)}</li>
+              {previewResult && (() => {
+                const targetUser = availableUsers.find(u => u.id === transferToUserId);
+                const targetName = targetUser?.full_name || targetUser?.username || 'new owner';
+                const sourceName = user.full_name || user.username || user.email;
+                const op = previewResult.outstanding_preview;
+                const fmt = (n: number) => `₹ ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+                return (
+                  <div className="rounded-lg border bg-muted/30 p-3 space-y-3 text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Database className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Preview impact (no changes written)</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-background rounded p-2">
+                      <span className="text-muted-foreground">Owner change:</span>
+                      <span className="font-medium">{sourceName}</span>
+                      <ArrowRight className="h-3 w-3" />
+                      <span className="font-medium text-primary">{targetName}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {Object.entries(previewResult.counts || {}).filter(([k]) => !k.startsWith('pending_')).map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between bg-background rounded p-2">
+                          <span className="text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
+                          <span className="font-semibold">{String(v)}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+
+                    {partialSelection.beats.length > 0 && (
+                      <div className="bg-background rounded p-2 space-y-1">
+                        <p className="font-medium">Beats moving — retailers under each beat will now belong to {targetName}:</p>
+                        <ul className="space-y-0.5">
+                          {partialSelection.beats.slice(0, 10).map(bid => (
+                            <li key={bid} className="flex justify-between">
+                              <span className="truncate">• {beatNameMap[bid] || bid}</span>
+                              <span className="text-muted-foreground">{beatRetailerCounts[bid] || 0} retailer(s)</span>
+                            </li>
+                          ))}
+                          {partialSelection.beats.length > 10 && (
+                            <li className="text-muted-foreground">+{partialSelection.beats.length - 10} more…</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+
+                    {op && op.open_records > 0 && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded p-2 space-y-1">
+                        <p className="font-medium text-amber-700 dark:text-amber-400">
+                          Pending payments / outstanding ledger
+                        </p>
+                        <p>
+                          {op.affected_retailers} retailer(s) in this transfer have <span className="font-semibold">{op.open_records}</span> open record(s) totalling <span className="font-semibold">{fmt(op.total_amount)}</span>.
+                        </p>
+                        <ul className="text-[11px] text-muted-foreground pl-2">
+                          <li>Credit ledger: {op.breakdown?.credit_ledger?.count || 0} ({fmt(op.breakdown?.credit_ledger?.amount || 0)})</li>
+                          <li>Distributor payments (open): {op.breakdown?.distributor_payments?.count || 0} ({fmt(op.breakdown?.distributor_payments?.amount || 0)})</li>
+                          <li>Instalment collections (open): {op.breakdown?.inst_collections?.count || 0} ({fmt(op.breakdown?.inst_collections?.amount || 0)})</li>
+                        </ul>
+                        {!includePendingPayments && (
+                          <p className="text-[11px]">
+                            These stay linked to the source user unless you tick <em>Include pending payments</em> above. With the toggle on, the new owner will see them in their pending-collections view via the transferred retailer ownership.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {previewResult.warnings && previewResult.warnings.length > 0 && (
-                      <div className="mt-2">
+                      <div>
                         <p className="font-medium text-amber-600">Warnings:</p>
                         <ul className="list-disc list-inside text-amber-600">
                           {previewResult.warnings.map((w: any, i: number) => (
@@ -728,9 +791,13 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
                         </ul>
                       </div>
                     )}
-                  </AlertDescription>
-                </Alert>
-              )}
+
+                    <p className="text-[11px] text-muted-foreground border-t pt-2">
+                      Stays with source user: orders, invoices, attendance, GPS logs, gamification, expenses (historical, not moved).
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
