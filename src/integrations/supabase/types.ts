@@ -68,6 +68,7 @@ export type Database = {
           activity_place: string | null
           activity_type: string
           budget: number | null
+          comments: string | null
           created_at: string
           description: string | null
           duration_type: string
@@ -99,6 +100,7 @@ export type Database = {
           activity_place?: string | null
           activity_type?: string
           budget?: number | null
+          comments?: string | null
           created_at?: string
           description?: string | null
           duration_type?: string
@@ -130,6 +132,7 @@ export type Database = {
           activity_place?: string | null
           activity_type?: string
           budget?: number | null
+          comments?: string | null
           created_at?: string
           description?: string | null
           duration_type?: string
