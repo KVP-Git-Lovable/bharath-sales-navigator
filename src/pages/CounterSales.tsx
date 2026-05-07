@@ -969,6 +969,10 @@ interface CounterRow {
   expanded: boolean;
   paymentMode?: "full" | "partial" | "credit";
   updatedAt?: number;
+  customerType?: "existing" | "walkin";
+  walkInName?: string;
+  walkInPhone?: string;
+  saveWalkIn?: boolean;
 }
 
 const DRAFT_KEY = "counter_sales_draft_v1";
@@ -996,6 +1000,10 @@ const newRow = (): CounterRow => ({
   expanded: true,
   paymentMode: "full",
   updatedAt: Date.now(),
+  customerType: "existing",
+  walkInName: "",
+  walkInPhone: "",
+  saveWalkIn: false,
 });
 
 const itemTaxable = (i: CounterLineItem) =>
