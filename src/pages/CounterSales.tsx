@@ -1540,7 +1540,9 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   // ---- totals ----
   const totals = useMemo(() => {
-    const customers = rows.filter((r) => r.customer).length;
+    const customers = rows.filter(
+      (r) => r.customer || (r.customerType === "walkin" && r.items.some((i) => i.product_id))
+    ).length;
     const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
     const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
     const subtotal = rows.reduce(
