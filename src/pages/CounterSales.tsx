@@ -979,200 +979,162 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 lg:px-6 py-4 max-w-[1400px] pb-28">
-        {/* header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-start gap-2 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-lg md:text-2xl font-semibold truncate">
-                {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
-              </h1>
-              <p className="text-xs md:text-sm text-muted-foreground truncate">
-                {eventContext
-                  ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
-                    "Event orders"
-                  : "Add orders for multiple customers"}
-              </p>
+      <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 max-w-3xl pb-32">
+          {/* Page header */}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-start gap-2 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="rounded-full h-9 w-9 -ml-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                  {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                  {eventContext
+                    ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
+                      "Event orders"
+                    : "Add orders for multiple customers"}
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <Button variant="outline" onClick={saveDraft}>
-              Save Draft
-            </Button>
-            <Button onClick={submitAll} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            <Button
+              onClick={submitAll}
+              disabled={submitting}
+              className="rounded-xl h-11 px-4 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <svg className="h-4 w-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              )}
               Submit All
             </Button>
           </div>
-        </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
-          <TabsList>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="summary">
-              Summary
-              {rows.some((r) => r.status === "saved" || r.status === "submitted") && (
-                <Badge variant="secondary" className="ml-2">
-                  {rows.filter((r) => r.status === "saved" || r.status === "submitted").length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          {/* ===== ORDERS TAB ===== */}
-          <TabsContent value="orders" className="mt-4">
-            {/* DESKTOP grid view */}
-            <Card className="hidden md:block overflow-hidden rounded-2xl border">
-              {/* table header */}
-              <div className="grid grid-cols-[40px_1.6fr_1fr_1fr_220px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-                <div></div>
-                <div>Customer</div>
-                <div>Products</div>
-                <div>Total Amount</div>
-                <div className="text-right">Actions</div>
-              </div>
-
-              {rows.map((row) => (
-                <OrderRow
-                  key={row.uid}
-                  row={row}
-                  products={products}
-                  customers={customers}
-                  submitting={submittingRows.has(row.uid)}
-                  onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
-                  onCreateRetailer={addRetailerLocal}
-                  onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
-                  onAddItemRow={() => addItemRow(row.uid)}
-                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
-                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
-                  onSave={() => saveRow(row.uid)}
-                  onSubmit={() => submitSingleRow(row.uid)}
-                  onEdit={() => editRow(row.uid)}
-                  onDelete={() => deleteRow(row.uid)}
-                />
-              ))}
-
-              <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-t">
-                <Button variant="outline" size="sm" onClick={addRow}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Row
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  {rows.length} customer row{rows.length !== 1 ? "s" : ""}
+          {/* Overview summary card */}
+          <Card className="rounded-2xl border bg-card shadow-sm mb-4">
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
+              <div className="grid grid-cols-3 flex-1 divide-x">
+                <div className="flex items-center gap-2.5 pr-3">
+                  <div className="h-9 w-9 rounded-full bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
+                    <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted-foreground leading-tight">Customers</div>
+                    <div className="text-base font-bold leading-tight">{totals.customers}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 px-3">
+                  <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted-foreground leading-tight">Total Items</div>
+                    <div className="text-base font-bold leading-tight">{totals.items}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 pl-3">
+                  <div className="h-9 w-9 rounded-full bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center">
+                    <span className="text-amber-600 dark:text-amber-400 text-sm font-bold">₹</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted-foreground leading-tight">Grand Total</div>
+                    <div className="text-base font-bold leading-tight">₹{totals.grand.toFixed(2)}</div>
+                  </div>
                 </div>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            {/* MOBILE card view */}
-            <div className="md:hidden space-y-3">
-              {rows.map((row, idx) => (
-                <MobileCustomerCard
-                  key={row.uid}
-                  index={idx + 1}
-                  row={row}
-                  products={products}
-                  customers={customers}
-                  submitting={submittingRows.has(row.uid)}
-                  onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickCustomer={(ret) =>
-                    updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
-                  }
-                  onCreateRetailer={addRetailerLocal}
-                  onAddItemRow={() => addItemRow(row.uid)}
-                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
-                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
-                  onSave={() => saveRow(row.uid)}
-                  onSubmit={() => submitSingleRow(row.uid)}
-                  onEdit={() => editRow(row.uid)}
-                  onDelete={() => deleteRow(row.uid)}
-                />
-              ))}
-              <Button
-                variant="outline"
-                onClick={addRow}
-                className="w-full rounded-2xl border-dashed h-11 text-primary"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
-            </div>
-
-            <div className="hidden md:flex justify-end mt-3">
-              <Button variant="outline" size="sm" onClick={addRow}>
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
-            </div>
-          </TabsContent>
-
-          {/* ===== SUMMARY TAB ===== */}
-          <TabsContent value="summary" className="mt-4">
-            <SummaryView
-              rows={rows.filter((r) => r.status === "submitted")}
-              onDelete={deleteRow}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container mx-auto max-w-[1400px] px-3 lg:px-6 py-2 md:py-3">
-          {/* totals row */}
-          <div className="grid grid-cols-3 gap-2 md:hidden mb-2">
-            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-[10px] text-muted-foreground">Customers</div>
-              <div className="text-sm font-semibold">{totals.customers}</div>
-            </div>
-            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-[10px] text-muted-foreground">Items</div>
-              <div className="text-sm font-semibold">{totals.items}</div>
-            </div>
-            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-[10px] text-muted-foreground">Grand Total</div>
-              <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                ₹{totals.grand.toFixed(2)}
-              </div>
-            </div>
+          {/* Customer cards */}
+          <div className="space-y-3">
+            {rows.map((row, idx) => (
+              <CounterCustomerCard
+                key={row.uid}
+                index={idx + 1}
+                row={row}
+                products={products}
+                customers={customers}
+                submitting={submittingRows.has(row.uid)}
+                onToggleExpand={() => toggleExpand(row.uid)}
+                onPickCustomer={(ret) =>
+                  updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined, updatedAt: Date.now() })
+                }
+                onCreateRetailer={addRetailerLocal}
+                onAddItemRow={() => addItemRow(row.uid)}
+                onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
+                onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                onPaymentModeChange={(m) => updateRow(row.uid, { paymentMode: m, updatedAt: Date.now() })}
+                onSave={() => saveRow(row.uid)}
+                onSubmit={() => submitSingleRow(row.uid)}
+                onEdit={() => editRow(row.uid)}
+                onDelete={() => deleteRow(row.uid)}
+              />
+            ))}
           </div>
-          <div className="flex items-center justify-between gap-2 md:gap-4 flex-wrap">
-            <div className="hidden md:flex items-center gap-6 text-sm">
-              <div>
-                <span className="text-muted-foreground">Customers: </span>
-                <span className="font-semibold">{totals.customers}</span>
+
+          {/* Add Customer */}
+          <Card className="rounded-2xl border-dashed border-2 mt-3 bg-card/40">
+            <Button
+              variant="ghost"
+              onClick={addRow}
+              className="w-full h-12 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 font-semibold rounded-2xl"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Add Customer
+            </Button>
+          </Card>
+
+          {/* Footer overview totals */}
+          <Card className="rounded-2xl border bg-card mt-3">
+            <div className="grid grid-cols-2 gap-4 px-4 py-3 items-center">
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span className="font-medium text-destructive">- ₹{totals.discount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">GST</span>
+                  <span className="font-medium">₹{totals.tax.toFixed(2)}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">Items: </span>
-                <span className="font-semibold">{totals.items}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Grand Total: </span>
-                <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+              <div className="text-right">
+                <div className="text-[11px] text-muted-foreground">Grand Total</div>
+                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight">
+                  ₹{totals.grand.toFixed(2)}
+                </div>
+                <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-[11px] text-blue-700 dark:text-blue-300">
+                  {totals.items} items <span className="opacity-50">•</span> {totals.customers} customers
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <Button
-                variant="outline"
-                onClick={saveDraft}
-                className="flex-1 md:flex-initial rounded-xl h-10"
-              >
-                <Save className="h-4 w-4 mr-1 md:hidden" />
-                Save Draft
-              </Button>
-              <Button
-                onClick={submitAll}
-                disabled={submitting}
-                className="flex-1 md:flex-initial rounded-xl h-10"
-              >
-                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Submit All
-              </Button>
-            </div>
+          </Card>
+        </div>
+
+        {/* Sticky Submit bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="container mx-auto max-w-3xl px-3 sm:px-4 py-3">
+            <Button
+              onClick={submitAll}
+              disabled={submitting}
+              className="w-full h-12 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 text-sm font-semibold"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Submit All Orders <span className="opacity-60 mx-2">•</span> ₹{totals.grand.toFixed(2)}
+            </Button>
           </div>
         </div>
       </div>
-
     </Layout>
   );
 }
