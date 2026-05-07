@@ -37,6 +37,7 @@ export default function EventCreate() {
   const [eventName, setEventName] = useState("");
   const [eventType, setEventType] = useState("Sales Promotion");
   const [description, setDescription] = useState("");
+  const [comments, setComments] = useState("");
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState("10:00");
@@ -157,6 +158,7 @@ export default function EventCreate() {
         activity_name: eventName,
         event_name: eventName,
         description: description || null,
+        comments: comments || null,
         duration_type: isMulti ? "multiple_days" : "hour_based",
         activity_date: startDateStr,
         from_date: isMulti ? startDateStr : null,
@@ -242,6 +244,17 @@ export default function EventCreate() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Brief description of the event"
+                  rows={2}
+                />
+              </Field>
+            </div>
+            <div className="md:col-span-2">
+              <Field label="Comments">
+                <Textarea
+                  className="min-h-[60px] text-sm rounded-lg border-border/70 bg-background focus-visible:ring-1 focus-visible:ring-primary"
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  placeholder="Additional comments or notes"
                   rows={2}
                 />
               </Field>
