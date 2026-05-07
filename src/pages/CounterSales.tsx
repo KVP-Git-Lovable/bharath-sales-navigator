@@ -1305,11 +1305,35 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     const filledItems = row.items.filter((i) => i.product_id);
     const subtotal = filledItems.reduce((s, i) => s + itemAmount(i), 0);
     const total = Math.round(subtotal);
+    const isWalkIn = (row.customerType || "existing") === "walkin";
+    let walkInCustomerId: string | null = null;
+    if (isWalkIn && row.saveWalkIn && (row.walkInName || "").trim() && user) {
+      try {
+        const { data: created } = await supabase
+          .from("counter_customers")
+          .insert({
+            name: (row.walkInName || "").trim(),
+            phone: (row.walkInPhone || "").trim() || null,
+            user_id: user.id,
+          })
+          .select("id,name,phone")
+          .single();
+        if (created) {
+          walkInCustomerId = created.id;
+          addRetailerLocal({ id: created.id, name: created.name, phone: created.phone });
+        }
+      } catch (err: any) {
+        console.warn("[counter-sales] save walk-in failed:", err?.message);
+      }
+    }
+    const walkInName = (row.walkInName || "").trim();
     const orderData = {
       user_id: user.id,
       retailer_id: null as any,
-      counter_customer_id: row.customer!.id,
-      retailer_name: row.customer!.name,
+      counter_customer_id: isWalkIn ? walkInCustomerId : row.customer!.id,
+      retailer_name: isWalkIn
+        ? walkInName || "Walk-in Customer"
+        : row.customer!.name,
       order_date: new Date().toISOString().slice(0, 10),
       subtotal,
       discount_amount: 0,
