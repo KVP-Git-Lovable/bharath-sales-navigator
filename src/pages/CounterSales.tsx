@@ -345,6 +345,422 @@ function MobileCustomerCard({
 }
 
 // ===================================================================
+// COUNTER CUSTOMER CARD — premium unified card matching reference design
+// ===================================================================
+function CounterCustomerCard({
+  index,
+  row,
+  products,
+  customers,
+  submitting,
+  onToggleExpand,
+  onPickCustomer,
+  onCreateRetailer,
+  onAddItemRow,
+  onUpdateItem,
+  onRemoveItem,
+  onPaymentModeChange,
+  onSave,
+  onSubmit,
+  onEdit,
+  onDelete,
+}: {
+  index: number;
+  row: CounterRow;
+  products: any[];
+  customers: CounterCustomer[];
+  submitting?: boolean;
+  onToggleExpand: () => void;
+  onPickCustomer: (r: CounterCustomer) => void;
+  onCreateRetailer: (r: CounterCustomer) => void;
+  onAddItemRow: () => void;
+  onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
+  onRemoveItem: (itemUid: string) => void;
+  onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
+  onSave: () => void;
+  onSubmit: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const locked = row.status === "saved" || row.status === "submitted";
+  const itemCount = rowItemCount(row);
+
+  const subtotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    0
+  );
+  const discountTotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    0
+  );
+  const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
+  const total = subtotal - discountTotal + taxTotal;
+
+  const initials = row.customer
+    ? row.customer.name
+        .split(" ")
+        .map((p) => p[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : `#${index}`;
+
+  const paymentMode = row.paymentMode || "full";
+  const paymentLabel: Record<string, { label: string; cls: string }> = {
+    full: { label: "Full Payment", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+    partial: { label: "Partial Payment", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+    credit: { label: "Full Credit", cls: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
+  };
+
+  const updatedTime = row.updatedAt
+    ? new Date(row.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  return (
+    <Card className="rounded-2xl shadow-sm border bg-card overflow-hidden">
+      {/* HEADER */}
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="relative shrink-0">
+          <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-sm font-bold flex items-center justify-center">
+            {initials}
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+        </div>
+        <div className="min-w-0 flex-1">
+          {row.customer ? (
+            <>
+              <div className="text-[15px] font-semibold truncate text-foreground">{row.customer.name}</div>
+              <div className="text-[11px] text-muted-foreground truncate">
+                Retailer <span className="opacity-50">•</span>{" "}
+                {row.phoneOverride || row.customer.phone || "—"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[15px] font-semibold text-blue-600 dark:text-blue-400">Select Customer</div>
+              <div className="text-[11px] text-muted-foreground">Tap to choose or create</div>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 font-medium">
+            {itemCount} item{itemCount !== 1 ? "s" : ""}
+          </span>
+          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+            ₹{total.toFixed(2)}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground shrink-0 transition-transform ml-1",
+            row.expanded && "rotate-180"
+          )}
+        />
+      </button>
+
+      {/* META row (under header) */}
+      <div className="flex items-center gap-2 flex-wrap px-4 pb-3 -mt-1">
+        <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", paymentLabel[paymentMode].cls)}>
+          {paymentLabel[paymentMode].label}
+        </span>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 font-medium">
+          {row.status === "submitted" ? "Submitted" : row.status === "saved" ? "Saved" : "Active"}
+        </span>
+        {updatedTime && (
+          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+            <ChevronUp className="h-3 w-3" /> Updated {updatedTime}
+          </span>
+        )}
+      </div>
+
+      {/* EXPANDED BODY */}
+      {row.expanded && (
+        <div className="border-t bg-muted/10">
+          {/* Customer pick / change tile */}
+          <div className="px-4 pt-3">
+            {!row.customer ? (
+              <Button
+                variant="outline"
+                className="w-full rounded-xl h-10 justify-start"
+                onClick={() => setPickerOpen(true)}
+                disabled={locked}
+              >
+                <User className="h-4 w-4 mr-2" /> Select Customer
+              </Button>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl bg-background border px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Customer</div>
+                  <div className="text-sm font-medium truncate">{row.customer.name}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> {row.phoneOverride || row.customer.phone || "—"}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-blue-600 dark:text-blue-400"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={locked}
+                >
+                  Change
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* PRODUCTS */}
+          <div className="px-4 pt-4">
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
+              Products
+            </div>
+
+            {/* column headers */}
+            <div className="hidden sm:grid grid-cols-[1.6fr_90px_70px_120px] gap-3 px-1 pb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+              <div>Product</div>
+              <div>Unit</div>
+              <div>Qty</div>
+              <div>Unit Price (₹)</div>
+            </div>
+
+            <div className="space-y-3">
+              {row.items.map((item, idx) => {
+                const lineTotal = item.product_id ? itemAmount(item) : 0;
+                const product = products.find((p) => p.id === item.product_id);
+                const mrp = product?.mrp || product?.MRP;
+                return (
+                  <div key={item.uid} className="space-y-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-[1.6fr_90px_70px_120px] gap-2 sm:gap-3 items-center">
+                      <div className="col-span-2 sm:col-span-1">
+                        <InlineProductSelect
+                          value={item}
+                          products={products}
+                          disabled={locked}
+                          onPick={(p) =>
+                            onUpdateItem(item.uid, {
+                              product_id: p.id,
+                              product_name: p.name,
+                              category: p.category?.name || null,
+                              sku: p.sku || null,
+                              unit: p.unit || "Unit",
+                              rate: Number(p.rate) || 0,
+                            })
+                          }
+                          onEnter={() => {
+                            if (idx === row.items.length - 1) onAddItemRow();
+                          }}
+                        />
+                      </div>
+                      <Select
+                        value={item.unit}
+                        disabled={locked}
+                        onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
+                      >
+                        <SelectTrigger className="h-9 rounded-lg text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="decimal"
+                        value={item.quantity}
+                        disabled={locked}
+                        onChange={(e) => onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })}
+                        className="h-9 rounded-lg text-sm px-2"
+                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          value={item.rate}
+                          disabled={locked}
+                          onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
+                          className="h-9 rounded-lg text-sm px-2 pr-8"
+                        />
+                        <Pencil className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* SKU/MRP/Total meta line */}
+                    <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground px-1">
+                      <div className="flex items-center gap-2">
+                        {item.sku && (
+                          <span>
+                            SKU: <span className="font-medium text-foreground/80">{item.sku}</span>
+                          </span>
+                        )}
+                        {mrp && (
+                          <>
+                            <span className="opacity-40">|</span>
+                            <span>
+                              MRP: <span className="font-medium text-foreground/80">₹{Number(mrp).toFixed(2)}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          Total:{" "}
+                          <span className="font-semibold text-foreground">
+                            ₹{lineTotal.toFixed(2)} / {item.unit}
+                          </span>
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          disabled={locked || row.items.length === 1}
+                          onClick={() => onRemoveItem(item.uid)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="ghost"
+              onClick={onAddItemRow}
+              disabled={locked}
+              className="mt-2 h-8 text-blue-600 dark:text-blue-400 px-2 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Product
+            </Button>
+          </div>
+
+          {/* PAYMENT MODE */}
+          <div className="px-4 pt-4">
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
+              Payment Mode
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(["full", "partial", "credit"] as const).map((mode) => {
+                const labels = { full: "Full Payment", partial: "Partial Payment", credit: "Full Credit" };
+                const active = paymentMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onPaymentModeChange(mode)}
+                    className={cn(
+                      "h-10 rounded-xl border text-xs font-medium transition-colors",
+                      active
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300"
+                        : "bg-background border-border text-foreground/80 hover:bg-muted/40"
+                    )}
+                  >
+                    {labels[mode]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* TOTALS */}
+          <div className="px-4 pt-4 pb-3">
+            <div className="rounded-xl bg-background border px-3 py-3">
+              <div className="grid grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Subtotal</div>
+                  <div className="text-sm font-semibold">₹{subtotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Discount</div>
+                  <div className="text-sm font-semibold text-destructive">- ₹{discountTotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">GST</div>
+                  <div className="text-sm font-semibold">₹{taxTotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Total</div>
+                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    ₹{total.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                {row.status === "submitted" ? (
+                  <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 h-9 px-4 rounded-xl">
+                    Submitted
+                  </Badge>
+                ) : row.status === "saved" ? (
+                  <>
+                    <Button variant="outline" onClick={onEdit} className="rounded-xl h-9">
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                    <Button onClick={onSubmit} disabled={submitting} className="rounded-xl h-9 bg-primary text-primary-foreground hover:bg-primary/90 px-5">
+                      {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                      Submit
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={onSave} className="rounded-xl h-9">
+                      <Save className="h-3.5 w-3.5 mr-1" /> Save
+                    </Button>
+                    <Button onClick={onSubmit} disabled={submitting} className="rounded-xl h-9 bg-primary text-primary-foreground hover:bg-primary/90 px-5">
+                      {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                      Submit
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                  disabled={row.status === "submitted"}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CustomerPickerDrawer
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        customers={customers}
+        onPick={(c) => {
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+        onCreated={(c) => {
+          onCreateRetailer(c);
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+      />
+    </Card>
+  );
+}
+
+// ===================================================================
 // CUSTOMER PICKER — bottom sheet with search + inline create
 // ===================================================================
 function CustomerPickerDrawer({
