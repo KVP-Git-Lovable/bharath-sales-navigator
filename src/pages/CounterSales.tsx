@@ -522,11 +522,11 @@ function CounterCustomerCard({
             </div>
 
             {/* column headers */}
-            <div className="hidden sm:grid grid-cols-[1.6fr_90px_70px_120px] gap-3 px-1 pb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+            <div className="grid grid-cols-[1.4fr_70px_55px_90px] sm:grid-cols-[1.6fr_90px_70px_120px] gap-1.5 sm:gap-3 px-1 pb-1.5 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
               <div>Product</div>
               <div>Unit</div>
               <div>Qty</div>
-              <div>Unit Price (₹)</div>
+              <div>Price (₹)</div>
             </div>
 
             <div className="space-y-3">
@@ -536,8 +536,8 @@ function CounterCustomerCard({
                 const mrp = product?.mrp || product?.MRP;
                 return (
                   <div key={item.uid} className="space-y-1">
-                    <div className="grid grid-cols-2 sm:grid-cols-[1.6fr_90px_70px_120px] gap-2 sm:gap-3 items-center">
-                      <div className="col-span-2 sm:col-span-1">
+                    <div className="grid grid-cols-[1.4fr_70px_55px_90px] sm:grid-cols-[1.6fr_90px_70px_120px] gap-1.5 sm:gap-3 items-center">
+                      <div>
                         <InlineProductSelect
                           value={item}
                           products={products}
@@ -562,7 +562,7 @@ function CounterCustomerCard({
                         disabled={locked}
                         onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
                       >
-                        <SelectTrigger className="h-9 rounded-lg text-sm">
+                        <SelectTrigger className="h-9 rounded-lg text-xs sm:text-sm px-2">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -580,7 +580,7 @@ function CounterCustomerCard({
                         value={item.quantity}
                         disabled={locked}
                         onChange={(e) => onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })}
-                        className="h-9 rounded-lg text-sm px-2"
+                        className="h-9 rounded-lg text-xs sm:text-sm px-1.5 sm:px-2"
                       />
                       <div className="relative">
                         <Input
@@ -591,7 +591,7 @@ function CounterCustomerCard({
                           value={item.rate}
                           disabled={locked}
                           onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
-                          className="h-9 rounded-lg text-sm px-2 pr-8"
+                          className="h-9 rounded-lg text-xs sm:text-sm px-1.5 sm:px-2 pr-6 sm:pr-8"
                         />
                         <Pencil className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                       </div>
