@@ -1415,21 +1415,21 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 max-w-3xl pb-32">
           {/* Page header */}
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex items-start gap-2 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="rounded-full h-9 w-9 -ml-1"
+                className="rounded-full h-8 w-8 sm:h-9 sm:w-9 -ml-1 shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                <h1 className="text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
                   {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                <p className="text-[11px] sm:text-sm text-muted-foreground truncate">
                   {eventContext
                     ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
                       "Event orders"
@@ -1440,12 +1440,12 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
             <Button
               onClick={submitAll}
               disabled={submitting}
-              className="rounded-xl h-11 px-4 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+              className="rounded-xl h-9 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm shrink-0 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
             >
               {submitting ? (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 animate-spin" />
               ) : (
-                <svg className="h-4 w-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               )}
               Submit All
             </Button>
@@ -1453,33 +1453,33 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
           {/* Overview summary card */}
           <Card className="rounded-2xl border bg-card shadow-sm mb-4">
-            <div className="flex items-center justify-between gap-2 px-4 py-3">
-              <div className="grid grid-cols-3 flex-1 divide-x">
-                <div className="flex items-center gap-2.5 pr-3">
-                  <div className="h-9 w-9 rounded-full bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
-                    <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3">
+              <div className="grid grid-cols-3 flex-1 divide-x min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 pr-2 sm:pr-3 min-w-0">
+                  <div className="h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-full bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
+                    <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] text-muted-foreground leading-tight">Customers</div>
-                    <div className="text-base font-bold leading-tight">{totals.customers}</div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground leading-tight whitespace-nowrap">Customers</div>
+                    <div className="text-sm sm:text-base font-bold leading-tight">{totals.customers}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5 px-3">
-                  <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center">
-                    <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                <div className="flex items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3 min-w-0">
+                  <div className="h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center">
+                    <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] text-muted-foreground leading-tight">Total Items</div>
-                    <div className="text-base font-bold leading-tight">{totals.items}</div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground leading-tight whitespace-nowrap">Total Items</div>
+                    <div className="text-sm sm:text-base font-bold leading-tight">{totals.items}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5 pl-3">
-                  <div className="h-9 w-9 rounded-full bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center">
-                    <span className="text-amber-600 dark:text-amber-400 text-sm font-bold">₹</span>
+                <div className="flex items-center gap-1.5 sm:gap-2.5 pl-2 sm:pl-3 min-w-0">
+                  <div className="h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-full bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center">
+                    <span className="text-amber-600 dark:text-amber-400 text-xs sm:text-sm font-bold">₹</span>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] text-muted-foreground leading-tight">Grand Total</div>
-                    <div className="text-base font-bold leading-tight">₹{totals.grand.toFixed(2)}</div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground leading-tight whitespace-nowrap">Grand Total</div>
+                    <div className="text-sm sm:text-base font-bold leading-tight whitespace-nowrap">₹{totals.grand.toFixed(2)}</div>
                   </div>
                 </div>
               </div>
