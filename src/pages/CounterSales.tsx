@@ -522,7 +522,7 @@ function CounterCustomerCard({
             </div>
 
             {/* column headers */}
-            <div className="grid grid-cols-[1.4fr_70px_55px_90px] sm:grid-cols-[1.6fr_90px_70px_120px] gap-1.5 sm:gap-3 px-1 pb-1.5 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+            <div className="grid grid-cols-[minmax(0,1fr)_60px_44px_72px] sm:grid-cols-[minmax(0,1.6fr)_90px_70px_120px] gap-1.5 sm:gap-3 px-1 pb-1.5 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
               <div>Product</div>
               <div>Unit</div>
               <div>Qty</div>
@@ -536,8 +536,8 @@ function CounterCustomerCard({
                 const mrp = product?.mrp || product?.MRP;
                 return (
                   <div key={item.uid} className="space-y-1">
-                    <div className="grid grid-cols-[1.4fr_70px_55px_90px] sm:grid-cols-[1.6fr_90px_70px_120px] gap-1.5 sm:gap-3 items-center">
-                      <div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_60px_44px_72px] sm:grid-cols-[minmax(0,1.6fr)_90px_70px_120px] gap-1.5 sm:gap-3 items-center">
+                      <div className="min-w-0">
                         <InlineProductSelect
                           value={item}
                           products={products}
