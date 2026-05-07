@@ -1565,6 +1565,19 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     return { customers, items, grand, subtotal, discount, tax };
   }, [rows]);
 
+  const orderedRows = useMemo(
+    () =>
+      [...rows]
+        .map((row, originalIdx) => ({ row, originalIdx }))
+        .sort((a, b) => {
+          const aDone = a.row.status === "saved" || a.row.status === "submitted" ? 1 : 0;
+          const bDone = b.row.status === "saved" || b.row.status === "submitted" ? 1 : 0;
+          if (aDone !== bDone) return aDone - bDone;
+          return a.originalIdx - b.originalIdx;
+        }),
+    [rows]
+  );
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
@@ -1641,17 +1654,20 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
             </div>
           </Card>
 
+          {/* Add Customer */}
+          <Card className="rounded-2xl border-dashed border-2 mb-3 bg-card/40">
+            <Button
+              variant="ghost"
+              onClick={addRow}
+              className="w-full h-12 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 font-semibold rounded-2xl"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Add Customer
+            </Button>
+          </Card>
+
           {/* Customer cards */}
           <div className="space-y-3">
-            {[...rows]
-              .map((row, originalIdx) => ({ row, originalIdx }))
-              .sort((a, b) => {
-                const aDone = a.row.status === "saved" || a.row.status === "submitted" ? 1 : 0;
-                const bDone = b.row.status === "saved" || b.row.status === "submitted" ? 1 : 0;
-                if (aDone !== bDone) return aDone - bDone;
-                return a.originalIdx - b.originalIdx;
-              })
-              .map(({ row, originalIdx: idx }) => (
+            {orderedRows.map(({ row, originalIdx: idx }) => (
               <CounterCustomerCard
                 key={row.uid}
                 index={idx + 1}
@@ -1683,17 +1699,6 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
               />
             ))}
           </div>
-
-          {/* Add Customer */}
-          <Card className="rounded-2xl border-dashed border-2 mt-3 bg-card/40">
-            <Button
-              variant="ghost"
-              onClick={addRow}
-              className="w-full h-12 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 font-semibold rounded-2xl"
-            >
-              <Plus className="h-4 w-4 mr-1.5" /> Add Customer
-            </Button>
-          </Card>
 
         </div>
 
