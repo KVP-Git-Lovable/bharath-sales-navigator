@@ -1415,21 +1415,21 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 max-w-3xl pb-32">
           {/* Page header */}
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex items-start gap-2 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="rounded-full h-9 w-9 -ml-1"
+                className="rounded-full h-8 w-8 sm:h-9 sm:w-9 -ml-1 shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                <h1 className="text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
                   {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                <p className="text-[11px] sm:text-sm text-muted-foreground truncate">
                   {eventContext
                     ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
                       "Event orders"
@@ -1440,12 +1440,12 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
             <Button
               onClick={submitAll}
               disabled={submitting}
-              className="rounded-xl h-11 px-4 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+              className="rounded-xl h-9 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm shrink-0 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
             >
               {submitting ? (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 animate-spin" />
               ) : (
-                <svg className="h-4 w-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               )}
               Submit All
             </Button>
