@@ -1695,34 +1695,6 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
             </Button>
           </Card>
 
-          {/* Footer overview totals */}
-          <Card className="rounded-2xl border bg-card mt-3">
-            <div className="grid grid-cols-2 gap-4 px-4 py-3 items-center">
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Discount</span>
-                  <span className="font-medium text-destructive">- ₹{totals.discount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">GST</span>
-                  <span className="font-medium">₹{totals.tax.toFixed(2)}</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[11px] text-muted-foreground">Grand Total</div>
-                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight">
-                  ₹{totals.grand.toFixed(2)}
-                </div>
-                <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-[11px] text-blue-700 dark:text-blue-300">
-                  {totals.items} items <span className="opacity-50">•</span> {totals.customers} customers
-                </div>
-              </div>
-            </div>
-          </Card>
         </div>
 
         {/* Sticky Submit bar */}
