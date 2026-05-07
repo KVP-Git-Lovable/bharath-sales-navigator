@@ -1392,7 +1392,13 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
   };
 
   const submittableRows = useMemo(
-    () => rows.filter((r) => r.status !== "submitted" && r.customer && r.items.some((i) => i.product_id)),
+    () =>
+      rows.filter(
+        (r) =>
+          r.status !== "submitted" &&
+          r.items.some((i) => i.product_id) &&
+          ((r.customerType || "existing") === "walkin" || !!r.customer)
+      ),
     [rows]
   );
 
