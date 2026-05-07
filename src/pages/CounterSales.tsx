@@ -1643,7 +1643,15 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
           {/* Customer cards */}
           <div className="space-y-3">
-            {rows.map((row, idx) => (
+            {[...rows]
+              .map((row, originalIdx) => ({ row, originalIdx }))
+              .sort((a, b) => {
+                const aDone = a.row.status === "saved" || a.row.status === "submitted" ? 1 : 0;
+                const bDone = b.row.status === "saved" || b.row.status === "submitted" ? 1 : 0;
+                if (aDone !== bDone) return aDone - bDone;
+                return a.originalIdx - b.originalIdx;
+              })
+              .map(({ row, originalIdx: idx }) => (
               <CounterCustomerCard
                 key={row.uid}
                 index={idx + 1}
