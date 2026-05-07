@@ -974,7 +974,24 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     const customers = rows.filter((r) => r.customer).length;
     const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
     const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
-    return { customers, items, grand };
+    const subtotal = rows.reduce(
+      (s, r) =>
+        s +
+        r.items.reduce(
+          (a, i) => a + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+          0
+        ),
+      0
+    );
+    const discount = rows.reduce(
+      (s, r) => s + r.items.reduce((a, i) => a + (i.product_id ? Number(i.discount) || 0 : 0), 0),
+      0
+    );
+    const tax = rows.reduce(
+      (s, r) => s + r.items.reduce((a, i) => a + (i.product_id ? itemTax(i) : 0), 0),
+      0
+    );
+    return { customers, items, grand, subtotal, discount, tax };
   }, [rows]);
 
   return (
