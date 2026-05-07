@@ -540,8 +540,8 @@ function CounterCustomerCard({
             {isWalkIn ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Customer Name (optional)</label>
+                  <div className="min-w-0">
+                    <label className="block text-[10px] text-muted-foreground uppercase tracking-wide truncate whitespace-nowrap">Name (optional)</label>
                     <Input
                       value={row.walkInName || ""}
                       disabled={locked}
@@ -550,8 +550,8 @@ function CounterCustomerCard({
                       className="h-9 rounded-lg text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Phone Number (optional)</label>
+                  <div className="min-w-0">
+                    <label className="block text-[10px] text-muted-foreground uppercase tracking-wide truncate whitespace-nowrap">Phone (optional)</label>
                     <Input
                       value={row.walkInPhone || ""}
                       disabled={locked}
