@@ -360,6 +360,8 @@ function CounterCustomerCard({
   onUpdateItem,
   onRemoveItem,
   onPaymentModeChange,
+  onCustomerTypeChange,
+  onWalkInChange,
   onSave,
   onSubmit,
   onEdit,
@@ -377,6 +379,8 @@ function CounterCustomerCard({
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
+  onCustomerTypeChange: (t: "existing" | "walkin") => void;
+  onWalkInChange: (patch: { walkInName?: string; walkInPhone?: string; saveWalkIn?: boolean }) => void;
   onSave: () => void;
   onSubmit: () => void;
   onEdit: () => void;
@@ -397,8 +401,20 @@ function CounterCustomerCard({
   const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
   const total = subtotal - discountTotal + taxTotal;
 
-  const initials = row.customer
-    ? row.customer.name
+  const isWalkIn = row.customerType === "walkin";
+  const walkInDisplayName = (row.walkInName || "").trim();
+  const headerName = isWalkIn
+    ? walkInDisplayName || "Walk-in Customer"
+    : row.customer?.name;
+  const headerSub = isWalkIn
+    ? walkInDisplayName
+      ? "Walk-in Customer"
+      : "Guest Customer"
+    : row.customer
+    ? `Retailer • ${row.phoneOverride || row.customer.phone || "—"}`
+    : "Tap to choose or create";
+  const initials = headerName
+    ? headerName
         .split(" ")
         .map((p) => p[0])
         .filter(Boolean)
@@ -433,7 +449,12 @@ function CounterCustomerCard({
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
         </div>
         <div className="min-w-0 flex-1">
-          {row.customer ? (
+          {isWalkIn ? (
+            <>
+              <div className="text-[15px] font-semibold truncate text-foreground">{headerName}</div>
+              <div className="text-[11px] text-muted-foreground truncate">{headerSub}</div>
+            </>
+          ) : row.customer ? (
             <>
               <div className="text-[15px] font-semibold truncate text-foreground">{row.customer.name}</div>
               <div className="text-[11px] text-muted-foreground truncate">
@@ -482,9 +503,77 @@ function CounterCustomerCard({
       {/* EXPANDED BODY */}
       {row.expanded && (
         <div className="border-t bg-muted/10">
-          {/* Customer pick / change tile */}
+          {/* CUSTOMER TYPE segmented control */}
           <div className="px-4 pt-3">
-            {!row.customer ? (
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
+              Customer Type
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted/50 border">
+              {(["existing", "walkin"] as const).map((t) => {
+                const active = (row.customerType || "existing") === t;
+                const label = t === "existing" ? "Existing Customer" : "Walk-in Customer";
+                const activeCls =
+                  t === "existing"
+                    ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300 shadow-sm"
+                    : "bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-300 shadow-sm";
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onCustomerTypeChange(t)}
+                    className={cn(
+                      "h-9 rounded-lg border text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5",
+                      active ? activeCls : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t === "existing" ? <User className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Customer pick / change tile (Existing) OR Walk-in optional fields */}
+          <div className="px-4 pt-3">
+            {isWalkIn ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Customer Name (optional)</label>
+                    <Input
+                      value={row.walkInName || ""}
+                      disabled={locked}
+                      onChange={(e) => onWalkInChange({ walkInName: e.target.value })}
+                      placeholder="e.g. Suresh"
+                      className="h-9 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Phone Number (optional)</label>
+                    <Input
+                      value={row.walkInPhone || ""}
+                      disabled={locked}
+                      onChange={(e) => onWalkInChange({ walkInPhone: e.target.value })}
+                      placeholder="91234 56789"
+                      inputMode="tel"
+                      className="h-9 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-foreground/80 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    disabled={locked}
+                    checked={!!row.saveWalkIn}
+                    onChange={(e) => onWalkInChange({ saveWalkIn: e.target.checked })}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  Save customer for future orders
+                </label>
+              </div>
+            ) : !row.customer ? (
               <Button
                 variant="outline"
                 className="w-full rounded-xl h-10 justify-start"
