@@ -1619,6 +1619,29 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
             </Button>
           </div>
 
+          {/* Orders / Summary tabs */}
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "orders" | "summary")} className="mb-3">
+            <TabsList className="grid grid-cols-2 w-full rounded-xl h-9">
+              <TabsTrigger value="orders" className="rounded-lg text-xs sm:text-sm">
+                Orders
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">{rows.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="summary" className="rounded-lg text-xs sm:text-sm">
+                Summary
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                  {rows.filter((r) => r.status === "saved" || r.status === "submitted").length}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {tab === "summary" ? (
+            <SummaryView
+              rows={rows.filter((r) => r.status === "saved" || r.status === "submitted")}
+              onDelete={(uid) => deleteRow(uid)}
+            />
+          ) : (
+          <>
           {/* Overview summary card */}
           <Card className="rounded-2xl border bg-card shadow-sm mb-4">
             <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3">
@@ -1699,6 +1722,8 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
               />
             ))}
           </div>
+          </>
+          )}
 
         </div>
 
