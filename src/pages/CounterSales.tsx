@@ -360,6 +360,8 @@ function CounterCustomerCard({
   onUpdateItem,
   onRemoveItem,
   onPaymentModeChange,
+  onCustomerTypeChange,
+  onWalkInChange,
   onSave,
   onSubmit,
   onEdit,
@@ -377,6 +379,8 @@ function CounterCustomerCard({
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
+  onCustomerTypeChange: (t: "existing" | "walkin") => void;
+  onWalkInChange: (patch: { walkInName?: string; walkInPhone?: string; saveWalkIn?: boolean }) => void;
   onSave: () => void;
   onSubmit: () => void;
   onEdit: () => void;
@@ -397,8 +401,20 @@ function CounterCustomerCard({
   const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
   const total = subtotal - discountTotal + taxTotal;
 
-  const initials = row.customer
-    ? row.customer.name
+  const isWalkIn = row.customerType === "walkin";
+  const walkInDisplayName = (row.walkInName || "").trim();
+  const headerName = isWalkIn
+    ? walkInDisplayName || "Walk-in Customer"
+    : row.customer?.name;
+  const headerSub = isWalkIn
+    ? walkInDisplayName
+      ? "Walk-in Customer"
+      : "Guest Customer"
+    : row.customer
+    ? `Retailer • ${row.phoneOverride || row.customer.phone || "—"}`
+    : "Tap to choose or create";
+  const initials = headerName
+    ? headerName
         .split(" ")
         .map((p) => p[0])
         .filter(Boolean)
@@ -433,7 +449,12 @@ function CounterCustomerCard({
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
         </div>
         <div className="min-w-0 flex-1">
-          {row.customer ? (
+          {isWalkIn ? (
+            <>
+              <div className="text-[15px] font-semibold truncate text-foreground">{headerName}</div>
+              <div className="text-[11px] text-muted-foreground truncate">{headerSub}</div>
+            </>
+          ) : row.customer ? (
             <>
               <div className="text-[15px] font-semibold truncate text-foreground">{row.customer.name}</div>
               <div className="text-[11px] text-muted-foreground truncate">
@@ -482,9 +503,77 @@ function CounterCustomerCard({
       {/* EXPANDED BODY */}
       {row.expanded && (
         <div className="border-t bg-muted/10">
-          {/* Customer pick / change tile */}
+          {/* CUSTOMER TYPE segmented control */}
           <div className="px-4 pt-3">
-            {!row.customer ? (
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
+              Customer Type
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted/50 border">
+              {(["existing", "walkin"] as const).map((t) => {
+                const active = (row.customerType || "existing") === t;
+                const label = t === "existing" ? "Existing Customer" : "Walk-in Customer";
+                const activeCls =
+                  t === "existing"
+                    ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300 shadow-sm"
+                    : "bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-300 shadow-sm";
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onCustomerTypeChange(t)}
+                    className={cn(
+                      "h-9 rounded-lg border text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5",
+                      active ? activeCls : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t === "existing" ? <User className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Customer pick / change tile (Existing) OR Walk-in optional fields */}
+          <div className="px-4 pt-3">
+            {isWalkIn ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Customer Name (optional)</label>
+                    <Input
+                      value={row.walkInName || ""}
+                      disabled={locked}
+                      onChange={(e) => onWalkInChange({ walkInName: e.target.value })}
+                      placeholder="e.g. Suresh"
+                      className="h-9 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Phone Number (optional)</label>
+                    <Input
+                      value={row.walkInPhone || ""}
+                      disabled={locked}
+                      onChange={(e) => onWalkInChange({ walkInPhone: e.target.value })}
+                      placeholder="91234 56789"
+                      inputMode="tel"
+                      className="h-9 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-foreground/80 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    disabled={locked}
+                    checked={!!row.saveWalkIn}
+                    onChange={(e) => onWalkInChange({ saveWalkIn: e.target.checked })}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  Save customer for future orders
+                </label>
+              </div>
+            ) : !row.customer ? (
               <Button
                 variant="outline"
                 className="w-full rounded-xl h-10 justify-start"
@@ -969,6 +1058,10 @@ interface CounterRow {
   expanded: boolean;
   paymentMode?: "full" | "partial" | "credit";
   updatedAt?: number;
+  customerType?: "existing" | "walkin";
+  walkInName?: string;
+  walkInPhone?: string;
+  saveWalkIn?: boolean;
 }
 
 const DRAFT_KEY = "counter_sales_draft_v1";
@@ -996,6 +1089,10 @@ const newRow = (): CounterRow => ({
   expanded: true,
   paymentMode: "full",
   updatedAt: Date.now(),
+  customerType: "existing",
+  walkInName: "",
+  walkInPhone: "",
+  saveWalkIn: false,
 });
 
 const itemTaxable = (i: CounterLineItem) =>
@@ -1169,7 +1266,9 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
-    if (!r.customer) return "Select a customer";
+    if ((r.customerType || "existing") === "existing") {
+      if (!r.customer) return "Select a customer";
+    }
     const filled = r.items.filter((i) => i.product_id);
     if (filled.length === 0) return "Add at least one product";
     if (filled.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
@@ -1206,11 +1305,35 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     const filledItems = row.items.filter((i) => i.product_id);
     const subtotal = filledItems.reduce((s, i) => s + itemAmount(i), 0);
     const total = Math.round(subtotal);
+    const isWalkIn = (row.customerType || "existing") === "walkin";
+    let walkInCustomerId: string | null = null;
+    if (isWalkIn && row.saveWalkIn && (row.walkInName || "").trim() && user) {
+      try {
+        const { data: created } = await supabase
+          .from("counter_customers")
+          .insert({
+            name: (row.walkInName || "").trim(),
+            phone: (row.walkInPhone || "").trim() || null,
+            user_id: user.id,
+          })
+          .select("id,name,phone")
+          .single();
+        if (created) {
+          walkInCustomerId = created.id;
+          addRetailerLocal({ id: created.id, name: created.name, phone: created.phone });
+        }
+      } catch (err: any) {
+        console.warn("[counter-sales] save walk-in failed:", err?.message);
+      }
+    }
+    const walkInName = (row.walkInName || "").trim();
     const orderData = {
       user_id: user.id,
       retailer_id: null as any,
-      counter_customer_id: row.customer!.id,
-      retailer_name: row.customer!.name,
+      counter_customer_id: isWalkIn ? walkInCustomerId : row.customer!.id,
+      retailer_name: isWalkIn
+        ? walkInName || "Walk-in Customer"
+        : row.customer!.name,
       order_date: new Date().toISOString().slice(0, 10),
       subtotal,
       discount_amount: 0,
@@ -1293,7 +1416,13 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
   };
 
   const submittableRows = useMemo(
-    () => rows.filter((r) => r.status !== "submitted" && r.customer && r.items.some((i) => i.product_id)),
+    () =>
+      rows.filter(
+        (r) =>
+          r.status !== "submitted" &&
+          r.items.some((i) => i.product_id) &&
+          ((r.customerType || "existing") === "walkin" || !!r.customer)
+      ),
     [rows]
   );
 
@@ -1321,11 +1450,35 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       const filledItems = r.items.filter((i) => i.product_id);
       const subtotal = filledItems.reduce((s, i) => s + itemAmount(i), 0);
       const total = Math.round(subtotal);
+      const isWalkIn = (r.customerType || "existing") === "walkin";
+      let walkInCustomerId: string | null = null;
+      if (isWalkIn && r.saveWalkIn && (r.walkInName || "").trim() && user) {
+        try {
+          const { data: created } = await supabase
+            .from("counter_customers")
+            .insert({
+              name: (r.walkInName || "").trim(),
+              phone: (r.walkInPhone || "").trim() || null,
+              user_id: user.id,
+            })
+            .select("id,name,phone")
+            .single();
+          if (created) {
+            walkInCustomerId = created.id;
+            addRetailerLocal({ id: created.id, name: created.name, phone: created.phone });
+          }
+        } catch (err: any) {
+          console.warn("[counter-sales] save walk-in failed:", err?.message);
+        }
+      }
+      const walkInName = (r.walkInName || "").trim();
       const orderData = {
         user_id: user.id,
         retailer_id: null as any,
-        counter_customer_id: r.customer!.id,
-        retailer_name: r.customer!.name,
+        counter_customer_id: isWalkIn ? walkInCustomerId : r.customer!.id,
+        retailer_name: isWalkIn
+          ? walkInName || "Walk-in Customer"
+          : r.customer!.name,
         order_date: new Date().toISOString().slice(0, 10),
         subtotal,
         discount_amount: 0,
@@ -1387,7 +1540,9 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   // ---- totals ----
   const totals = useMemo(() => {
-    const customers = rows.filter((r) => r.customer).length;
+    const customers = rows.filter(
+      (r) => r.customer || (r.customerType === "walkin" && r.items.some((i) => i.product_id))
+    ).length;
     const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
     const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
     const subtotal = rows.reduce(
@@ -1505,6 +1660,14 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                 onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                 onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                 onPaymentModeChange={(m) => updateRow(row.uid, { paymentMode: m, updatedAt: Date.now() })}
+                onCustomerTypeChange={(t) =>
+                  updateRow(row.uid, {
+                    customerType: t,
+                    ...(t === "walkin" ? { customer: null, phoneOverride: undefined } : {}),
+                    updatedAt: Date.now(),
+                  })
+                }
+                onWalkInChange={(patch) => updateRow(row.uid, { ...patch, updatedAt: Date.now() })}
                 onSave={() => saveRow(row.uid)}
                 onSubmit={() => submitSingleRow(row.uid)}
                 onEdit={() => editRow(row.uid)}
