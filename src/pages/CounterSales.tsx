@@ -345,6 +345,422 @@ function MobileCustomerCard({
 }
 
 // ===================================================================
+// COUNTER CUSTOMER CARD — premium unified card matching reference design
+// ===================================================================
+function CounterCustomerCard({
+  index,
+  row,
+  products,
+  customers,
+  submitting,
+  onToggleExpand,
+  onPickCustomer,
+  onCreateRetailer,
+  onAddItemRow,
+  onUpdateItem,
+  onRemoveItem,
+  onPaymentModeChange,
+  onSave,
+  onSubmit,
+  onEdit,
+  onDelete,
+}: {
+  index: number;
+  row: CounterRow;
+  products: any[];
+  customers: CounterCustomer[];
+  submitting?: boolean;
+  onToggleExpand: () => void;
+  onPickCustomer: (r: CounterCustomer) => void;
+  onCreateRetailer: (r: CounterCustomer) => void;
+  onAddItemRow: () => void;
+  onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
+  onRemoveItem: (itemUid: string) => void;
+  onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
+  onSave: () => void;
+  onSubmit: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const locked = row.status === "saved" || row.status === "submitted";
+  const itemCount = rowItemCount(row);
+
+  const subtotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    0
+  );
+  const discountTotal = row.items.reduce(
+    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    0
+  );
+  const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
+  const total = subtotal - discountTotal + taxTotal;
+
+  const initials = row.customer
+    ? row.customer.name
+        .split(" ")
+        .map((p) => p[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : `#${index}`;
+
+  const paymentMode = row.paymentMode || "full";
+  const paymentLabel: Record<string, { label: string; cls: string }> = {
+    full: { label: "Full Payment", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+    partial: { label: "Partial Payment", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+    credit: { label: "Full Credit", cls: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
+  };
+
+  const updatedTime = row.updatedAt
+    ? new Date(row.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  return (
+    <Card className="rounded-2xl shadow-sm border bg-card overflow-hidden">
+      {/* HEADER */}
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="relative shrink-0">
+          <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-sm font-bold flex items-center justify-center">
+            {initials}
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+        </div>
+        <div className="min-w-0 flex-1">
+          {row.customer ? (
+            <>
+              <div className="text-[15px] font-semibold truncate text-foreground">{row.customer.name}</div>
+              <div className="text-[11px] text-muted-foreground truncate">
+                Retailer <span className="opacity-50">•</span>{" "}
+                {row.phoneOverride || row.customer.phone || "—"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[15px] font-semibold text-blue-600 dark:text-blue-400">Select Customer</div>
+              <div className="text-[11px] text-muted-foreground">Tap to choose or create</div>
+            </>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 font-medium">
+            {itemCount} item{itemCount !== 1 ? "s" : ""}
+          </span>
+          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+            ₹{total.toFixed(2)}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground shrink-0 transition-transform ml-1",
+            row.expanded && "rotate-180"
+          )}
+        />
+      </button>
+
+      {/* META row (under header) */}
+      <div className="flex items-center gap-2 flex-wrap px-4 pb-3 -mt-1">
+        <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", paymentLabel[paymentMode].cls)}>
+          {paymentLabel[paymentMode].label}
+        </span>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 font-medium">
+          {row.status === "submitted" ? "Submitted" : row.status === "saved" ? "Saved" : "Active"}
+        </span>
+        {updatedTime && (
+          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+            <ChevronUp className="h-3 w-3" /> Updated {updatedTime}
+          </span>
+        )}
+      </div>
+
+      {/* EXPANDED BODY */}
+      {row.expanded && (
+        <div className="border-t bg-muted/10">
+          {/* Customer pick / change tile */}
+          <div className="px-4 pt-3">
+            {!row.customer ? (
+              <Button
+                variant="outline"
+                className="w-full rounded-xl h-10 justify-start"
+                onClick={() => setPickerOpen(true)}
+                disabled={locked}
+              >
+                <User className="h-4 w-4 mr-2" /> Select Customer
+              </Button>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl bg-background border px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Customer</div>
+                  <div className="text-sm font-medium truncate">{row.customer.name}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> {row.phoneOverride || row.customer.phone || "—"}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-blue-600 dark:text-blue-400"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={locked}
+                >
+                  Change
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* PRODUCTS */}
+          <div className="px-4 pt-4">
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
+              Products
+            </div>
+
+            {/* column headers */}
+            <div className="hidden sm:grid grid-cols-[1.6fr_90px_70px_120px] gap-3 px-1 pb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+              <div>Product</div>
+              <div>Unit</div>
+              <div>Qty</div>
+              <div>Unit Price (₹)</div>
+            </div>
+
+            <div className="space-y-3">
+              {row.items.map((item, idx) => {
+                const lineTotal = item.product_id ? itemAmount(item) : 0;
+                const product = products.find((p) => p.id === item.product_id);
+                const mrp = product?.mrp || product?.MRP;
+                return (
+                  <div key={item.uid} className="space-y-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-[1.6fr_90px_70px_120px] gap-2 sm:gap-3 items-center">
+                      <div className="col-span-2 sm:col-span-1">
+                        <InlineProductSelect
+                          value={item}
+                          products={products}
+                          disabled={locked}
+                          onPick={(p) =>
+                            onUpdateItem(item.uid, {
+                              product_id: p.id,
+                              product_name: p.name,
+                              category: p.category?.name || null,
+                              sku: p.sku || null,
+                              unit: p.unit || "Unit",
+                              rate: Number(p.rate) || 0,
+                            })
+                          }
+                          onEnter={() => {
+                            if (idx === row.items.length - 1) onAddItemRow();
+                          }}
+                        />
+                      </div>
+                      <Select
+                        value={item.unit}
+                        disabled={locked}
+                        onValueChange={(v) => onUpdateItem(item.uid, { unit: v })}
+                      >
+                        <SelectTrigger className="h-9 rounded-lg text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set([item.unit, ...UOM_OPTIONS])).map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="decimal"
+                        value={item.quantity}
+                        disabled={locked}
+                        onChange={(e) => onUpdateItem(item.uid, { quantity: Number(e.target.value) || 0 })}
+                        className="h-9 rounded-lg text-sm px-2"
+                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          value={item.rate}
+                          disabled={locked}
+                          onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
+                          className="h-9 rounded-lg text-sm px-2 pr-8"
+                        />
+                        <Pencil className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* SKU/MRP/Total meta line */}
+                    <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground px-1">
+                      <div className="flex items-center gap-2">
+                        {item.sku && (
+                          <span>
+                            SKU: <span className="font-medium text-foreground/80">{item.sku}</span>
+                          </span>
+                        )}
+                        {mrp && (
+                          <>
+                            <span className="opacity-40">|</span>
+                            <span>
+                              MRP: <span className="font-medium text-foreground/80">₹{Number(mrp).toFixed(2)}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          Total:{" "}
+                          <span className="font-semibold text-foreground">
+                            ₹{lineTotal.toFixed(2)} / {item.unit}
+                          </span>
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          disabled={locked || row.items.length === 1}
+                          onClick={() => onRemoveItem(item.uid)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="ghost"
+              onClick={onAddItemRow}
+              disabled={locked}
+              className="mt-2 h-8 text-blue-600 dark:text-blue-400 px-2 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Product
+            </Button>
+          </div>
+
+          {/* PAYMENT MODE */}
+          <div className="px-4 pt-4">
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
+              Payment Mode
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(["full", "partial", "credit"] as const).map((mode) => {
+                const labels = { full: "Full Payment", partial: "Partial Payment", credit: "Full Credit" };
+                const active = paymentMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onPaymentModeChange(mode)}
+                    className={cn(
+                      "h-10 rounded-xl border text-xs font-medium transition-colors",
+                      active
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300"
+                        : "bg-background border-border text-foreground/80 hover:bg-muted/40"
+                    )}
+                  >
+                    {labels[mode]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* TOTALS */}
+          <div className="px-4 pt-4 pb-3">
+            <div className="rounded-xl bg-background border px-3 py-3">
+              <div className="grid grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Subtotal</div>
+                  <div className="text-sm font-semibold">₹{subtotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Discount</div>
+                  <div className="text-sm font-semibold text-destructive">- ₹{discountTotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">GST</div>
+                  <div className="text-sm font-semibold">₹{taxTotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Total</div>
+                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    ₹{total.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                {row.status === "submitted" ? (
+                  <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 h-9 px-4 rounded-xl">
+                    Submitted
+                  </Badge>
+                ) : row.status === "saved" ? (
+                  <>
+                    <Button variant="outline" onClick={onEdit} className="rounded-xl h-9">
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                    <Button onClick={onSubmit} disabled={submitting} className="rounded-xl h-9 bg-primary text-primary-foreground hover:bg-primary/90 px-5">
+                      {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                      Submit
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={onSave} className="rounded-xl h-9">
+                      <Save className="h-3.5 w-3.5 mr-1" /> Save
+                    </Button>
+                    <Button onClick={onSubmit} disabled={submitting} className="rounded-xl h-9 bg-primary text-primary-foreground hover:bg-primary/90 px-5">
+                      {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                      Submit
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                  disabled={row.status === "submitted"}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CustomerPickerDrawer
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        customers={customers}
+        onPick={(c) => {
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+        onCreated={(c) => {
+          onCreateRetailer(c);
+          onPickCustomer(c);
+          setPickerOpen(false);
+        }}
+      />
+    </Card>
+  );
+}
+
+// ===================================================================
 // CUSTOMER PICKER — bottom sheet with search + inline create
 // ===================================================================
 function CustomerPickerDrawer({
@@ -551,6 +967,8 @@ interface CounterRow {
   items: CounterLineItem[];
   status: RowStatus;
   expanded: boolean;
+  paymentMode?: "full" | "partial" | "credit";
+  updatedAt?: number;
 }
 
 const DRAFT_KEY = "counter_sales_draft_v1";
@@ -576,6 +994,8 @@ const newRow = (): CounterRow => ({
   items: [newItem()],
   status: "draft",
   expanded: true,
+  paymentMode: "full",
+  updatedAt: Date.now(),
 });
 
 const itemTaxable = (i: CounterLineItem) =>
@@ -970,205 +1390,184 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     const customers = rows.filter((r) => r.customer).length;
     const items = rows.reduce((s, r) => s + rowItemCount(r), 0);
     const grand = rows.reduce((s, r) => s + rowAmount(r), 0);
-    return { customers, items, grand };
+    const subtotal = rows.reduce(
+      (s, r) =>
+        s +
+        r.items.reduce(
+          (a, i) => a + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+          0
+        ),
+      0
+    );
+    const discount = rows.reduce(
+      (s, r) => s + r.items.reduce((a, i) => a + (i.product_id ? Number(i.discount) || 0 : 0), 0),
+      0
+    );
+    const tax = rows.reduce(
+      (s, r) => s + r.items.reduce((a, i) => a + (i.product_id ? itemTax(i) : 0), 0),
+      0
+    );
+    return { customers, items, grand, subtotal, discount, tax };
   }, [rows]);
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 lg:px-6 py-4 max-w-[1400px] pb-28">
-        {/* header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-start gap-2 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-lg md:text-2xl font-semibold truncate">
-                {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
-              </h1>
-              <p className="text-xs md:text-sm text-muted-foreground truncate">
-                {eventContext
-                  ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
-                    "Event orders"
-                  : "Add orders for multiple customers"}
-              </p>
+      <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 max-w-3xl pb-32">
+          {/* Page header */}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-start gap-2 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="rounded-full h-9 w-9 -ml-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                  {eventContext ? eventContext.eventName : "Counter Sales – Orders"}
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                  {eventContext
+                    ? [eventContext.eventDate, eventContext.location].filter(Boolean).join(" • ") ||
+                      "Event orders"
+                    : "Add orders for multiple customers"}
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <Button variant="outline" onClick={saveDraft}>
-              Save Draft
-            </Button>
-            <Button onClick={submitAll} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            <Button
+              onClick={submitAll}
+              disabled={submitting}
+              className="rounded-xl h-11 px-4 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <svg className="h-4 w-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              )}
               Submit All
             </Button>
           </div>
-        </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
-          <TabsList>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="summary">
-              Summary
-              {rows.some((r) => r.status === "saved" || r.status === "submitted") && (
-                <Badge variant="secondary" className="ml-2">
-                  {rows.filter((r) => r.status === "saved" || r.status === "submitted").length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          {/* ===== ORDERS TAB ===== */}
-          <TabsContent value="orders" className="mt-4">
-            {/* DESKTOP grid view */}
-            <Card className="hidden md:block overflow-hidden rounded-2xl border">
-              {/* table header */}
-              <div className="grid grid-cols-[40px_1.6fr_1fr_1fr_220px] items-center gap-3 px-4 py-3 bg-muted/40 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-                <div></div>
-                <div>Customer</div>
-                <div>Products</div>
-                <div>Total Amount</div>
-                <div className="text-right">Actions</div>
-              </div>
-
-              {rows.map((row) => (
-                <OrderRow
-                  key={row.uid}
-                  row={row}
-                  products={products}
-                  customers={customers}
-                  submitting={submittingRows.has(row.uid)}
-                  onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickCustomer={(ret) => updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })}
-                  onCreateRetailer={addRetailerLocal}
-                  onPhoneChange={(p) => updateRow(row.uid, { phoneOverride: p })}
-                  onAddItemRow={() => addItemRow(row.uid)}
-                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
-                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
-                  onSave={() => saveRow(row.uid)}
-                  onSubmit={() => submitSingleRow(row.uid)}
-                  onEdit={() => editRow(row.uid)}
-                  onDelete={() => deleteRow(row.uid)}
-                />
-              ))}
-
-              <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-t">
-                <Button variant="outline" size="sm" onClick={addRow}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Row
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  {rows.length} customer row{rows.length !== 1 ? "s" : ""}
+          {/* Overview summary card */}
+          <Card className="rounded-2xl border bg-card shadow-sm mb-4">
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
+              <div className="grid grid-cols-3 flex-1 divide-x">
+                <div className="flex items-center gap-2.5 pr-3">
+                  <div className="h-9 w-9 rounded-full bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
+                    <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted-foreground leading-tight">Customers</div>
+                    <div className="text-base font-bold leading-tight">{totals.customers}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 px-3">
+                  <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted-foreground leading-tight">Total Items</div>
+                    <div className="text-base font-bold leading-tight">{totals.items}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 pl-3">
+                  <div className="h-9 w-9 rounded-full bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center">
+                    <span className="text-amber-600 dark:text-amber-400 text-sm font-bold">₹</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted-foreground leading-tight">Grand Total</div>
+                    <div className="text-base font-bold leading-tight">₹{totals.grand.toFixed(2)}</div>
+                  </div>
                 </div>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            {/* MOBILE card view */}
-            <div className="md:hidden space-y-3">
-              {rows.map((row, idx) => (
-                <MobileCustomerCard
-                  key={row.uid}
-                  index={idx + 1}
-                  row={row}
-                  products={products}
-                  customers={customers}
-                  submitting={submittingRows.has(row.uid)}
-                  onToggleExpand={() => toggleExpand(row.uid)}
-                  onPickCustomer={(ret) =>
-                    updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined })
-                  }
-                  onCreateRetailer={addRetailerLocal}
-                  onAddItemRow={() => addItemRow(row.uid)}
-                  onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
-                  onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
-                  onSave={() => saveRow(row.uid)}
-                  onSubmit={() => submitSingleRow(row.uid)}
-                  onEdit={() => editRow(row.uid)}
-                  onDelete={() => deleteRow(row.uid)}
-                />
-              ))}
-              <Button
-                variant="outline"
-                onClick={addRow}
-                className="w-full rounded-2xl border-dashed h-11 text-primary"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
-            </div>
-
-            <div className="hidden md:flex justify-end mt-3">
-              <Button variant="outline" size="sm" onClick={addRow}>
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
-            </div>
-          </TabsContent>
-
-          {/* ===== SUMMARY TAB ===== */}
-          <TabsContent value="summary" className="mt-4">
-            <SummaryView
-              rows={rows.filter((r) => r.status === "submitted")}
-              onDelete={deleteRow}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container mx-auto max-w-[1400px] px-3 lg:px-6 py-2 md:py-3">
-          {/* totals row */}
-          <div className="grid grid-cols-3 gap-2 md:hidden mb-2">
-            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-[10px] text-muted-foreground">Customers</div>
-              <div className="text-sm font-semibold">{totals.customers}</div>
-            </div>
-            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-[10px] text-muted-foreground">Items</div>
-              <div className="text-sm font-semibold">{totals.items}</div>
-            </div>
-            <div className="rounded-xl bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-[10px] text-muted-foreground">Grand Total</div>
-              <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                ₹{totals.grand.toFixed(2)}
-              </div>
-            </div>
+          {/* Customer cards */}
+          <div className="space-y-3">
+            {rows.map((row, idx) => (
+              <CounterCustomerCard
+                key={row.uid}
+                index={idx + 1}
+                row={row}
+                products={products}
+                customers={customers}
+                submitting={submittingRows.has(row.uid)}
+                onToggleExpand={() => toggleExpand(row.uid)}
+                onPickCustomer={(ret) =>
+                  updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined, updatedAt: Date.now() })
+                }
+                onCreateRetailer={addRetailerLocal}
+                onAddItemRow={() => addItemRow(row.uid)}
+                onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
+                onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
+                onPaymentModeChange={(m) => updateRow(row.uid, { paymentMode: m, updatedAt: Date.now() })}
+                onSave={() => saveRow(row.uid)}
+                onSubmit={() => submitSingleRow(row.uid)}
+                onEdit={() => editRow(row.uid)}
+                onDelete={() => deleteRow(row.uid)}
+              />
+            ))}
           </div>
-          <div className="flex items-center justify-between gap-2 md:gap-4 flex-wrap">
-            <div className="hidden md:flex items-center gap-6 text-sm">
-              <div>
-                <span className="text-muted-foreground">Customers: </span>
-                <span className="font-semibold">{totals.customers}</span>
+
+          {/* Add Customer */}
+          <Card className="rounded-2xl border-dashed border-2 mt-3 bg-card/40">
+            <Button
+              variant="ghost"
+              onClick={addRow}
+              className="w-full h-12 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 font-semibold rounded-2xl"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Add Customer
+            </Button>
+          </Card>
+
+          {/* Footer overview totals */}
+          <Card className="rounded-2xl border bg-card mt-3">
+            <div className="grid grid-cols-2 gap-4 px-4 py-3 items-center">
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span className="font-medium text-destructive">- ₹{totals.discount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">GST</span>
+                  <span className="font-medium">₹{totals.tax.toFixed(2)}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">Items: </span>
-                <span className="font-semibold">{totals.items}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Grand Total: </span>
-                <span className="font-semibold">₹{totals.grand.toFixed(2)}</span>
+              <div className="text-right">
+                <div className="text-[11px] text-muted-foreground">Grand Total</div>
+                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight">
+                  ₹{totals.grand.toFixed(2)}
+                </div>
+                <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-[11px] text-blue-700 dark:text-blue-300">
+                  {totals.items} items <span className="opacity-50">•</span> {totals.customers} customers
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <Button
-                variant="outline"
-                onClick={saveDraft}
-                className="flex-1 md:flex-initial rounded-xl h-10"
-              >
-                <Save className="h-4 w-4 mr-1 md:hidden" />
-                Save Draft
-              </Button>
-              <Button
-                onClick={submitAll}
-                disabled={submitting}
-                className="flex-1 md:flex-initial rounded-xl h-10"
-              >
-                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Submit All
-              </Button>
-            </div>
+          </Card>
+        </div>
+
+        {/* Sticky Submit bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="container mx-auto max-w-3xl px-3 sm:px-4 py-3">
+            <Button
+              onClick={submitAll}
+              disabled={submitting}
+              className="w-full h-12 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 text-sm font-semibold"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Submit All Orders <span className="opacity-60 mx-2">•</span> ₹{totals.grand.toFixed(2)}
+            </Button>
           </div>
         </div>
       </div>
-
     </Layout>
   );
 }
