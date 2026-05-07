@@ -1266,7 +1266,9 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
-    if (!r.customer) return "Select a customer";
+    if ((r.customerType || "existing") === "existing") {
+      if (!r.customer) return "Select a customer";
+    }
     const filled = r.items.filter((i) => i.product_id);
     if (filled.length === 0) return "Add at least one product";
     if (filled.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
