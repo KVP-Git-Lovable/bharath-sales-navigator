@@ -1089,7 +1089,7 @@ const newRow = (): CounterRow => ({
   expanded: true,
   paymentMode: "full",
   updatedAt: Date.now(),
-  customerType: "existing",
+  customerType: "walkin",
   walkInName: "",
   walkInPhone: "",
   saveWalkIn: false,
