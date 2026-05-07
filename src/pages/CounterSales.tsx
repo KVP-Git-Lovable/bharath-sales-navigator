@@ -551,6 +551,8 @@ interface CounterRow {
   items: CounterLineItem[];
   status: RowStatus;
   expanded: boolean;
+  paymentMode?: "full" | "partial" | "credit";
+  updatedAt?: number;
 }
 
 const DRAFT_KEY = "counter_sales_draft_v1";
@@ -576,6 +578,8 @@ const newRow = (): CounterRow => ({
   items: [newItem()],
   status: "draft",
   expanded: true,
+  paymentMode: "full",
+  updatedAt: Date.now(),
 });
 
 const itemTaxable = (i: CounterLineItem) =>
