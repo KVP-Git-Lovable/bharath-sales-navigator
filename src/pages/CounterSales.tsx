@@ -430,6 +430,7 @@ function CounterCustomerCard({
     : `#${index}`;
 
   const paymentMode = row.paymentMode || "full";
+  const paymentMethod = row.paymentMethod || "cash";
   const paymentLabel: Record<string, { label: string; cls: string }> = {
     full: { label: "Full Payment", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
     partial: { label: "Partial Payment", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
