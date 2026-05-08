@@ -1277,7 +1277,31 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       rs.map((r) =>
         r.uid !== rowUid
           ? r
-          : { ...r, items: r.items.map((i) => (i.uid === itemUid ? { ...i, ...patch } : i)) }
+          : {
+              ...r,
+              items: r.items.map((i) => {
+                if (i.uid !== itemUid) return i;
+                const merged = { ...i, ...patch };
+                // Auto-derive discount from price drop vs original_rate when
+                // rate/quantity/product changes (user hasn't explicitly set discount in this patch).
+                const touchesPriceQty =
+                  "rate" in patch ||
+                  "quantity" in patch ||
+                  "product_id" in patch ||
+                  "original_rate" in patch;
+                if (touchesPriceQty && !("discount" in patch)) {
+                  const orig = Number(merged.original_rate) || 0;
+                  const rate = Number(merged.rate) || 0;
+                  const qty = Number(merged.quantity) || 0;
+                  if (orig > 0 && rate < orig) {
+                    merged.discount = Math.max(0, (orig - rate) * qty);
+                  } else {
+                    merged.discount = 0;
+                  }
+                }
+                return merged;
+              }),
+            }
       )
     );
 
