@@ -506,9 +506,11 @@ function CounterCustomerCard({
 
       {/* META row (under header) */}
       <div className="flex items-center gap-1.5 flex-wrap px-3 pb-1.5 -mt-0.5">
-        <span className={cn("text-[9px] px-1.5 py-0 rounded-full font-medium leading-4", paymentLabel[paymentMode].cls)}>
-          {paymentLabel[paymentMode].label}
-        </span>
+        {paymentMode && paymentLabel[paymentMode] && (
+          <span className={cn("text-[9px] px-1.5 py-0 rounded-full font-medium leading-4", paymentLabel[paymentMode].cls)}>
+            {paymentLabel[paymentMode].label}
+          </span>
+        )}
         <span className="text-[9px] px-1.5 py-0 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 font-medium leading-4">
           {row.status === "submitted" ? "Submitted" : row.status === "saved" ? "Saved" : "Active"}
         </span>
