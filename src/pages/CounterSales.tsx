@@ -772,6 +772,33 @@ function CounterCustomerCard({
                 );
               })}
             </div>
+
+            {/* PAYMENT METHOD */}
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mt-3 mb-2">
+              Payment Method
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(["cash", "upi", "neft", "cheque"] as const).map((method) => {
+                const labels = { cash: "Cash", upi: "UPI", neft: "NEFT", cheque: "Cheque" };
+                const active = paymentMethod === method;
+                return (
+                  <button
+                    key={method}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onPaymentMethodChange(method)}
+                    className={cn(
+                      "h-10 rounded-xl border text-xs font-medium transition-colors",
+                      active
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300"
+                        : "bg-background border-border text-foreground/80 hover:bg-muted/40"
+                    )}
+                  >
+                    {labels[method]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* TOTALS */}
