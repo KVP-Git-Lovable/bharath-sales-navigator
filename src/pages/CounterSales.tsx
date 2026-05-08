@@ -1591,7 +1591,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         discount_amount: 0,
         total_amount: total,
         status: "confirmed",
-        payment_method: row.paymentMethod || "cash",
+        payment_method: r.paymentMethod || "cash",
         is_credit_order: false,
         idempotency_key: `counter_${user.id}_${r.uid}_${Date.now()}`,
         ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
