@@ -1050,6 +1050,7 @@ interface CounterLineItem {
   rate: number;
   discount: number;
   tax_rate: number;
+  original_rate?: number;
 }
 
 type RowStatus = "draft" | "saved" | "submitted";
@@ -1084,6 +1085,7 @@ const newItem = (): CounterLineItem => ({
   rate: 0,
   discount: 0,
   tax_rate: 5,
+  original_rate: 0,
 });
 
 const newRow = (): CounterRow => ({
