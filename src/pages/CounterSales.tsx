@@ -41,6 +41,7 @@ import {
   Loader2,
   User,
   Phone,
+  Camera,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,6 +51,9 @@ import { getLocalTodayDate } from "@/utils/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CameraCapture } from "@/components/CameraCapture";
+import { usePaymentProofMandatory } from "@/hooks/usePaymentProofMandatory";
+import { offlineStorage } from "@/lib/offlineStorage";
 
 // ---------- types ----------
 interface CounterCustomer {
@@ -365,6 +369,10 @@ function CounterCustomerCard({
   onPaymentMethodChange,
   onCustomerTypeChange,
   onWalkInChange,
+  onPatchRow,
+  onOpenCamera,
+  companyQrCode,
+  isPaymentProofMandatory,
   onSave,
   onSubmit,
   onEdit,
@@ -382,10 +390,14 @@ function CounterCustomerCard({
   onAddItemRow: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
-  onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
-  onPaymentMethodChange: (method: "cash" | "upi" | "neft" | "cheque") => void;
+  onPaymentModeChange: (mode: "" | "full" | "partial" | "credit") => void;
+  onPaymentMethodChange: (method: "" | "cash" | "upi" | "neft" | "cheque") => void;
   onCustomerTypeChange: (t: "existing" | "walkin") => void;
   onWalkInChange: (patch: { walkInName?: string; walkInPhone?: string; saveWalkIn?: boolean }) => void;
+  onPatchRow: (patch: Partial<CounterRow>) => void;
+  onOpenCamera: (mode: "cheque" | "upi" | "neft") => void;
+  companyQrCode: string | null;
+  isPaymentProofMandatory: boolean;
   onSave: () => void;
   onSubmit: () => void;
   onEdit: () => void;
@@ -393,7 +405,6 @@ function CounterCustomerCard({
   eventMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [methodTouched, setMethodTouched] = useState(false);
   const locked = row.status === "saved" || row.status === "submitted";
   const itemCount = rowItemCount(row);
 
@@ -430,8 +441,8 @@ function CounterCustomerCard({
         .toUpperCase()
     : `#${index}`;
 
-  const paymentMode = row.paymentMode || "full";
-  const paymentMethod = row.paymentMethod || "cash";
+  const paymentMode = row.paymentMode || "";
+  const paymentMethod = row.paymentMethod || "";
   const paymentLabel: Record<string, { label: string; cls: string }> = {
     full: { label: "Full Payment", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
     partial: { label: "Partial Payment", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
@@ -495,9 +506,11 @@ function CounterCustomerCard({
 
       {/* META row (under header) */}
       <div className="flex items-center gap-1.5 flex-wrap px-3 pb-1.5 -mt-0.5">
-        <span className={cn("text-[9px] px-1.5 py-0 rounded-full font-medium leading-4", paymentLabel[paymentMode].cls)}>
-          {paymentLabel[paymentMode].label}
-        </span>
+        {paymentMode && paymentLabel[paymentMode] && (
+          <span className={cn("text-[9px] px-1.5 py-0 rounded-full font-medium leading-4", paymentLabel[paymentMode].cls)}>
+            {paymentLabel[paymentMode].label}
+          </span>
+        )}
         <span className="text-[9px] px-1.5 py-0 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 font-medium leading-4">
           {row.status === "submitted" ? "Submitted" : row.status === "saved" ? "Saved" : "Active"}
         </span>
@@ -752,7 +765,9 @@ function CounterCustomerCard({
                     disabled={locked}
                     onClick={() => {
                       onPaymentModeChange(mode);
-                      setMethodTouched(true);
+                      // Reset method when switching modes (cart-style flow)
+                      onPaymentMethodChange("");
+                      onPatchRow({ partialAmount: "" });
                     }}
                     className={cn(
                       "h-10 rounded-xl border text-xs font-medium transition-colors",
@@ -767,38 +782,158 @@ function CounterCustomerCard({
               })}
             </div>
 
-            {/* PAYMENT METHOD — hidden until a payment mode is tapped */}
-            {methodTouched && (
-            <>
-            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mt-3 mb-2">
-              Payment Method
-            </div>
-            <div className="rounded-xl border bg-background px-3 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-              {(["cash", "cheque", "upi", "neft"] as const).map((method) => {
-                const labels = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
-                const active = paymentMethod === method;
-                return (
-                  <label
-                    key={method}
-                    className={cn(
-                      "flex items-center gap-1.5 cursor-pointer select-none text-xs font-medium",
-                      locked && "opacity-60 cursor-not-allowed"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name={`pm-${row.uid}`}
+            {/* PARTIAL AMOUNT INPUT */}
+            {paymentMode === "partial" && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
+                  Partial Payment Amount
+                </div>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={row.partialAmount || ""}
+                  onChange={(e) => onPatchRow({ partialAmount: e.target.value })}
+                  max={total}
+                  disabled={locked}
+                  className="h-8 text-sm border-primary ring-2 ring-primary/20 focus:ring-primary/40"
+                />
+                {row.partialAmount && parseFloat(row.partialAmount) > 0 && (
+                  <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-emerald-700 dark:text-emerald-400">Paying Now:</span>
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">₹{parseFloat(row.partialAmount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs pt-1 border-t border-amber-200 dark:border-amber-800">
+                      <span className="font-medium text-amber-700 dark:text-amber-400">Remaining:</span>
+                      <span className="font-bold text-amber-700 dark:text-amber-400">₹{Math.max(0, total - parseFloat(row.partialAmount)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PAYMENT METHOD — only when full or partial selected */}
+            {(paymentMode === "full" || paymentMode === "partial") && (
+              <div className="mt-3 space-y-2 p-2.5 border rounded-xl bg-muted/40">
+                <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
+                  Payment Method
+                </div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  {(["cash", "cheque", "upi", "neft"] as const).map((method) => {
+                    const labels = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
+                    const active = paymentMethod === method;
+                    return (
+                      <label
+                        key={method}
+                        className={cn(
+                          "flex items-center gap-1.5 cursor-pointer select-none text-xs font-medium",
+                          locked && "opacity-60 cursor-not-allowed"
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name={`pm-${row.uid}`}
+                          disabled={locked}
+                          checked={active}
+                          onChange={() => onPaymentMethodChange(method)}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        <span>{labels[method]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Cheque Bank Details + Photo */}
+                {paymentMethod === "cheque" && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="p-2 bg-background rounded-md border">
+                      <p className="text-xs font-medium mb-1.5">Bank Details for Cheque</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p><span className="font-medium">Bank Name:</span> HDFC Bank</p>
+                        <p><span className="font-medium">Account Name:</span> Bharath Beverages Pvt Ltd</p>
+                        <p><span className="font-medium">Account Number:</span> 1234567890</p>
+                        <p><span className="font-medium">IFSC Code:</span> HDFC0001234</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => onOpenCamera("cheque")}
+                      variant="outline"
                       disabled={locked}
-                      checked={active}
-                      onChange={() => onPaymentMethodChange(method)}
-                      className="h-3.5 w-3.5 accent-primary"
-                    />
-                    <span>{labels[method]}</span>
-                  </label>
-                );
-              })}
-            </div>
-            </>
+                      className="w-full h-8 text-xs"
+                    >
+                      <Camera className="mr-1.5" size={12} />
+                      {row.chequePhotoUrl ? "Retake Cheque" : "Capture Cheque"}
+                    </Button>
+                    {row.chequePhotoUrl && <p className="text-[10px] text-emerald-600">✓ Cheque photo captured</p>}
+                  </div>
+                )}
+
+                {/* UPI QR + last-4 + photo */}
+                {paymentMethod === "upi" && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="p-2 bg-background rounded-md border">
+                      <p className="text-xs font-medium mb-1.5 text-center">Scan QR for Payment</p>
+                      <div className="flex items-center justify-center bg-white p-2 rounded">
+                        {companyQrCode ? (
+                          <img src={companyQrCode} alt="UPI QR Code" className="w-32 h-32 object-contain" />
+                        ) : (
+                          <div className="w-32 h-32 flex items-center justify-center bg-muted rounded">
+                            <p className="text-xs text-muted-foreground">No QR Code</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">UPI Last-4 Code</div>
+                      <Input
+                        type="text"
+                        maxLength={4}
+                        value={row.upiLastFourCode || ""}
+                        onChange={(e) => onPatchRow({ upiLastFourCode: e.target.value.replace(/\D/g, "") })}
+                        placeholder="Enter last 4 digits"
+                        disabled={locked}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => onOpenCamera("upi")}
+                      variant="outline"
+                      disabled={locked}
+                      className="w-full h-8 text-xs"
+                    >
+                      <Camera className="mr-1.5" size={12} />
+                      {row.upiPhotoUrl ? "Retake Proof" : "Capture Proof"}
+                    </Button>
+                    {row.upiPhotoUrl && <p className="text-[10px] text-emerald-600">✓ Payment proof captured</p>}
+                  </div>
+                )}
+
+                {/* NEFT Bank Details + Photo */}
+                {paymentMethod === "neft" && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="p-2 bg-background rounded-md border">
+                      <p className="text-xs font-medium mb-1.5">Bank Details for NEFT</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p><span className="font-medium">Bank Name:</span> HDFC Bank</p>
+                        <p><span className="font-medium">Account Name:</span> Bharath Beverages Pvt Ltd</p>
+                        <p><span className="font-medium">Account Number:</span> 1234567890</p>
+                        <p><span className="font-medium">IFSC Code:</span> HDFC0001234</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => onOpenCamera("neft")}
+                      variant="outline"
+                      disabled={locked}
+                      className="w-full h-8 text-xs"
+                    >
+                      <Camera className="mr-1.5" size={12} />
+                      {row.neftPhotoUrl ? "Retake NEFT Proof" : "Capture NEFT Proof"}
+                    </Button>
+                    {row.neftPhotoUrl && <p className="text-[10px] text-emerald-600">✓ NEFT confirmation captured</p>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -1094,8 +1229,13 @@ interface CounterRow {
   items: CounterLineItem[];
   status: RowStatus;
   expanded: boolean;
-  paymentMode?: "full" | "partial" | "credit";
-  paymentMethod?: "cash" | "upi" | "neft" | "cheque";
+  paymentMode?: "" | "full" | "partial" | "credit";
+  paymentMethod?: "" | "cash" | "upi" | "neft" | "cheque";
+  partialAmount?: string;
+  chequePhotoUrl?: string;
+  upiPhotoUrl?: string;
+  upiLastFourCode?: string;
+  neftPhotoUrl?: string;
   updatedAt?: number;
   customerType?: "existing" | "walkin";
   walkInName?: string;
@@ -1127,8 +1267,13 @@ const newRow = (): CounterRow => ({
   items: [newItem()],
   status: "draft",
   expanded: true,
-  paymentMode: "full",
-  paymentMethod: "cash",
+  paymentMode: "",
+  paymentMethod: "",
+  partialAmount: "",
+  chequePhotoUrl: "",
+  upiPhotoUrl: "",
+  upiLastFourCode: "",
+  neftPhotoUrl: "",
   updatedAt: Date.now(),
   customerType: "walkin",
   walkInName: "",
@@ -1183,6 +1328,76 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
   const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submittingRows, setSubmittingRows] = useState<Set<string>>(new Set());
+  const [companyQrCode, setCompanyQrCode] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<"cheque" | "upi" | "neft">("cheque");
+  const [cameraRowUid, setCameraRowUid] = useState<string | null>(null);
+  const { isPaymentProofMandatory } = usePaymentProofMandatory();
+
+  // Load company QR code (for UPI display)
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("companies")
+          .select("qr_code_url")
+          .limit(1)
+          .single();
+        if (data?.qr_code_url) setCompanyQrCode(data.qr_code_url);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  const handleCameraCapture = async (blob: Blob) => {
+    if (!cameraRowUid) {
+      setIsCameraOpen(false);
+      return;
+    }
+    try {
+      const fileName = `payment-${Date.now()}.jpg`;
+      let url = "";
+      if (navigator.onLine) {
+        const { data, error } = await supabase.storage
+          .from("expense-bills")
+          .upload(fileName, blob);
+        if (error) throw error;
+        const { data: pub } = supabase.storage.from("expense-bills").getPublicUrl(fileName);
+        url = pub.publicUrl;
+      } else {
+        url = URL.createObjectURL(blob);
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          await offlineStorage.addToSyncQueue("UPLOAD_PAYMENT_PROOF", {
+            fileName,
+            blobBase64: reader.result as string,
+            type: cameraMode,
+          });
+        };
+        reader.readAsDataURL(blob);
+      }
+      const patch: Partial<CounterRow> =
+        cameraMode === "cheque"
+          ? { chequePhotoUrl: url }
+          : cameraMode === "upi"
+          ? { upiPhotoUrl: url }
+          : { neftPhotoUrl: url };
+      updateRow(cameraRowUid, { ...patch, updatedAt: Date.now() });
+      toast.success(
+        cameraMode === "cheque"
+          ? "Cheque photo captured"
+          : cameraMode === "upi"
+          ? "Payment proof captured"
+          : "NEFT proof captured"
+      );
+    } catch (e: any) {
+      toast.error(`Capture failed: ${e?.message || "unknown"}`);
+    } finally {
+      setIsCameraOpen(false);
+    }
+  };
 
   // inline create-new customer state shared with customers list
   const addRetailerLocal = (r: CounterCustomer) =>
@@ -1371,7 +1586,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, expanded: !r.expanded } : r)));
 
   // ---- save / submit ----
-  const validateRow = (r: CounterRow): string | null => {
+  const validateRow = (r: CounterRow, requirePayment = false): string | null => {
     if (eventContext) {
       if (!(r.walkInName || "").trim()) return "Enter walk-in customer name";
     } else if ((r.customerType || "existing") === "existing") {
@@ -1380,6 +1595,21 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     const filled = r.items.filter((i) => i.product_id);
     if (filled.length === 0) return "Add at least one product";
     if (filled.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
+    if (requirePayment) {
+      if (!r.paymentMode) return "Please select payment type";
+      if ((r.paymentMode === "full" || r.paymentMode === "partial") && !r.paymentMethod) {
+        return "Please select payment method";
+      }
+      if (r.paymentMode === "partial") {
+        const amt = parseFloat(r.partialAmount || "");
+        if (!amt || amt <= 0) return "Enter a valid partial payment amount";
+      }
+      if (isPaymentProofMandatory && navigator.onLine) {
+        if (r.paymentMethod === "cheque" && !r.chequePhotoUrl) return "Capture cheque photo";
+        if (r.paymentMethod === "upi" && !r.upiPhotoUrl) return "Capture payment confirmation";
+        if (r.paymentMethod === "neft" && !r.neftPhotoUrl) return "Capture NEFT confirmation";
+      }
+    }
     return null;
   };
 
@@ -1404,7 +1634,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     }
     const row = rows.find((r) => r.uid === uid);
     if (!row) return;
-    const err = validateRow(row);
+    const err = validateRow(row, true);
     if (err) {
       toast.error(err);
       return;
@@ -1435,6 +1665,46 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       }
     }
     const walkInName = (row.walkInName || "").trim();
+    // ----- payment derivation (mirrors Cart flow) -----
+    let isCreditOrder = false;
+    let creditPending = 0;
+    let creditPaid = 0;
+    let orderPaymentMethod = "";
+    let paymentProofUrl = "";
+    if (row.paymentMode === "credit") {
+      isCreditOrder = true;
+      creditPending = total;
+      creditPaid = 0;
+      orderPaymentMethod = "credit";
+    } else if (row.paymentMode === "full") {
+      isCreditOrder = false;
+      creditPaid = total;
+      orderPaymentMethod = row.paymentMethod || "cash";
+      paymentProofUrl =
+        row.paymentMethod === "cheque"
+          ? row.chequePhotoUrl || ""
+          : row.paymentMethod === "upi"
+          ? row.upiPhotoUrl || ""
+          : row.paymentMethod === "neft"
+          ? row.neftPhotoUrl || ""
+          : "";
+    } else if (row.paymentMode === "partial") {
+      isCreditOrder = true;
+      const paid = parseFloat(row.partialAmount || "0") || 0;
+      creditPaid = paid;
+      creditPending = Math.max(0, total - paid);
+      orderPaymentMethod = row.paymentMethod || "cash";
+      paymentProofUrl =
+        row.paymentMethod === "cheque"
+          ? row.chequePhotoUrl || ""
+          : row.paymentMethod === "upi"
+          ? row.upiPhotoUrl || ""
+          : row.paymentMethod === "neft"
+          ? row.neftPhotoUrl || ""
+          : "";
+    } else {
+      orderPaymentMethod = "cash";
+    }
     const orderData = {
       user_id: user.id,
       retailer_id: null as any,
@@ -1447,8 +1717,12 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       discount_amount: 0,
       total_amount: total,
       status: "confirmed",
-      payment_method: row.paymentMethod || "cash",
-      is_credit_order: false,
+      payment_method: orderPaymentMethod,
+      is_credit_order: isCreditOrder,
+      credit_pending_amount: creditPending,
+      credit_paid_amount: creditPaid,
+      payment_proof_url: paymentProofUrl || null,
+      upi_last_four_code: row.paymentMethod === "upi" ? row.upiLastFourCode || null : null,
       idempotency_key: `counter_${user.id}_${row.uid}_${Date.now()}`,
       ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
     };
@@ -1545,7 +1819,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     }
     // validate all
     for (const r of submittableRows) {
-      const err = validateRow(r);
+      const err = validateRow(r, true);
       if (err) {
         toast.error(`Customer "${r.customer?.name || "?"}": ${err}`);
         return;
@@ -1580,6 +1854,38 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         }
       }
       const walkInName = (r.walkInName || "").trim();
+      // payment derivation
+      let isCreditOrder = false;
+      let creditPending = 0;
+      let creditPaid = 0;
+      let orderPaymentMethod = "";
+      let paymentProofUrl = "";
+      if (r.paymentMode === "credit") {
+        isCreditOrder = true;
+        creditPending = total;
+        orderPaymentMethod = "credit";
+      } else if (r.paymentMode === "full") {
+        creditPaid = total;
+        orderPaymentMethod = r.paymentMethod || "cash";
+        paymentProofUrl =
+          r.paymentMethod === "cheque" ? r.chequePhotoUrl || ""
+          : r.paymentMethod === "upi" ? r.upiPhotoUrl || ""
+          : r.paymentMethod === "neft" ? r.neftPhotoUrl || ""
+          : "";
+      } else if (r.paymentMode === "partial") {
+        isCreditOrder = true;
+        const paid = parseFloat(r.partialAmount || "0") || 0;
+        creditPaid = paid;
+        creditPending = Math.max(0, total - paid);
+        orderPaymentMethod = r.paymentMethod || "cash";
+        paymentProofUrl =
+          r.paymentMethod === "cheque" ? r.chequePhotoUrl || ""
+          : r.paymentMethod === "upi" ? r.upiPhotoUrl || ""
+          : r.paymentMethod === "neft" ? r.neftPhotoUrl || ""
+          : "";
+      } else {
+        orderPaymentMethod = "cash";
+      }
       const orderData = {
         user_id: user.id,
         retailer_id: null as any,
@@ -1592,8 +1898,12 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         discount_amount: 0,
         total_amount: total,
         status: "confirmed",
-        payment_method: r.paymentMethod || "cash",
-        is_credit_order: false,
+        payment_method: orderPaymentMethod,
+        is_credit_order: isCreditOrder,
+        credit_pending_amount: creditPending,
+        credit_paid_amount: creditPaid,
+        payment_proof_url: paymentProofUrl || null,
+        upi_last_four_code: r.paymentMethod === "upi" ? r.upiLastFourCode || null : null,
         idempotency_key: `counter_${user.id}_${r.uid}_${Date.now()}`,
         ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
       };
@@ -1688,6 +1998,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
   );
 
   return (
+    <>
     <Layout>
       <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 max-w-3xl pb-32">
@@ -1829,6 +2140,14 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                   })
                 }
                 onWalkInChange={(patch) => updateRow(row.uid, { ...patch, updatedAt: Date.now() })}
+                onPatchRow={(patch) => updateRow(row.uid, { ...patch, updatedAt: Date.now() })}
+                onOpenCamera={(mode) => {
+                  setCameraRowUid(row.uid);
+                  setCameraMode(mode);
+                  setIsCameraOpen(true);
+                }}
+                companyQrCode={companyQrCode}
+                isPaymentProofMandatory={isPaymentProofMandatory}
                 onSave={() => saveRow(row.uid)}
                 onSubmit={() => submitSingleRow(row.uid)}
                 onEdit={() => editRow(row.uid)}
@@ -1856,6 +2175,19 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         </div>
       </div>
     </Layout>
+    <CameraCapture
+      isOpen={isCameraOpen}
+      onClose={() => setIsCameraOpen(false)}
+      onCapture={handleCameraCapture}
+      title={
+        cameraMode === "cheque"
+          ? "Capture Cheque Photo"
+          : cameraMode === "upi"
+          ? "Capture Payment Confirmation"
+          : "Capture NEFT Confirmation"
+      }
+    />
+    </>
   );
 }
 
