@@ -1861,11 +1861,11 @@ function OrderRow({
 }) {
   const locked = row.status === "saved" || row.status === "submitted";
   const subtotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    (s, i) => s + (i.product_id ? itemSubtotal(i) : 0),
     0
   );
   const discountTotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    (s, i) => s + (i.product_id ? itemDiscount(i) : 0),
     0
   );
   const taxableTotal = row.items.reduce(
