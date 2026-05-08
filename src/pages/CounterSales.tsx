@@ -393,6 +393,7 @@ function CounterCustomerCard({
   eventMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [methodTouched, setMethodTouched] = useState(false);
   const locked = row.status === "saved" || row.status === "submitted";
   const itemCount = rowItemCount(row);
 
