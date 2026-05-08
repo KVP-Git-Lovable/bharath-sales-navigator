@@ -362,6 +362,7 @@ function CounterCustomerCard({
   onUpdateItem,
   onRemoveItem,
   onPaymentModeChange,
+  onPaymentMethodChange,
   onCustomerTypeChange,
   onWalkInChange,
   onSave,
@@ -382,6 +383,7 @@ function CounterCustomerCard({
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
+  onPaymentMethodChange: (method: "cash" | "upi" | "neft" | "cheque") => void;
   onCustomerTypeChange: (t: "existing" | "walkin") => void;
   onWalkInChange: (patch: { walkInName?: string; walkInPhone?: string; saveWalkIn?: boolean }) => void;
   onSave: () => void;
@@ -428,6 +430,7 @@ function CounterCustomerCard({
     : `#${index}`;
 
   const paymentMode = row.paymentMode || "full";
+  const paymentMethod = row.paymentMethod || "cash";
   const paymentLabel: Record<string, { label: string; cls: string }> = {
     full: { label: "Full Payment", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
     partial: { label: "Partial Payment", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
@@ -769,6 +772,33 @@ function CounterCustomerCard({
                 );
               })}
             </div>
+
+            {/* PAYMENT METHOD */}
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mt-3 mb-2">
+              Payment Method
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(["cash", "upi", "neft", "cheque"] as const).map((method) => {
+                const labels = { cash: "Cash", upi: "UPI", neft: "NEFT", cheque: "Cheque" };
+                const active = paymentMethod === method;
+                return (
+                  <button
+                    key={method}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onPaymentMethodChange(method)}
+                    className={cn(
+                      "h-10 rounded-xl border text-xs font-medium transition-colors",
+                      active
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300"
+                        : "bg-background border-border text-foreground/80 hover:bg-muted/40"
+                    )}
+                  >
+                    {labels[method]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* TOTALS */}
@@ -1064,6 +1094,7 @@ interface CounterRow {
   status: RowStatus;
   expanded: boolean;
   paymentMode?: "full" | "partial" | "credit";
+  paymentMethod?: "cash" | "upi" | "neft" | "cheque";
   updatedAt?: number;
   customerType?: "existing" | "walkin";
   walkInName?: string;
@@ -1096,6 +1127,7 @@ const newRow = (): CounterRow => ({
   status: "draft",
   expanded: true,
   paymentMode: "full",
+  paymentMethod: "cash",
   updatedAt: Date.now(),
   customerType: "walkin",
   walkInName: "",
@@ -1414,7 +1446,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       discount_amount: 0,
       total_amount: total,
       status: "confirmed",
-      payment_method: "cash",
+      payment_method: row.paymentMethod || "cash",
       is_credit_order: false,
       idempotency_key: `counter_${user.id}_${row.uid}_${Date.now()}`,
       ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
@@ -1559,7 +1591,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         discount_amount: 0,
         total_amount: total,
         status: "confirmed",
-        payment_method: "cash",
+        payment_method: r.paymentMethod || "cash",
         is_credit_order: false,
         idempotency_key: `counter_${user.id}_${r.uid}_${Date.now()}`,
         ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
@@ -1787,6 +1819,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                 onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                 onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                 onPaymentModeChange={(m) => updateRow(row.uid, { paymentMode: m, updatedAt: Date.now() })}
+                onPaymentMethodChange={(pm) => updateRow(row.uid, { paymentMethod: pm, updatedAt: Date.now() })}
                 onCustomerTypeChange={(t) =>
                   updateRow(row.uid, {
                     customerType: t,
