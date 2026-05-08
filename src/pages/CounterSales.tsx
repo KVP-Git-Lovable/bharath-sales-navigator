@@ -1634,7 +1634,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     }
     const row = rows.find((r) => r.uid === uid);
     if (!row) return;
-    const err = validateRow(row);
+    const err = validateRow(row, true);
     if (err) {
       toast.error(err);
       return;
@@ -1665,6 +1665,46 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       }
     }
     const walkInName = (row.walkInName || "").trim();
+    // ----- payment derivation (mirrors Cart flow) -----
+    let isCreditOrder = false;
+    let creditPending = 0;
+    let creditPaid = 0;
+    let orderPaymentMethod = "";
+    let paymentProofUrl = "";
+    if (row.paymentMode === "credit") {
+      isCreditOrder = true;
+      creditPending = total;
+      creditPaid = 0;
+      orderPaymentMethod = "credit";
+    } else if (row.paymentMode === "full") {
+      isCreditOrder = false;
+      creditPaid = total;
+      orderPaymentMethod = row.paymentMethod || "cash";
+      paymentProofUrl =
+        row.paymentMethod === "cheque"
+          ? row.chequePhotoUrl || ""
+          : row.paymentMethod === "upi"
+          ? row.upiPhotoUrl || ""
+          : row.paymentMethod === "neft"
+          ? row.neftPhotoUrl || ""
+          : "";
+    } else if (row.paymentMode === "partial") {
+      isCreditOrder = true;
+      const paid = parseFloat(row.partialAmount || "0") || 0;
+      creditPaid = paid;
+      creditPending = Math.max(0, total - paid);
+      orderPaymentMethod = row.paymentMethod || "cash";
+      paymentProofUrl =
+        row.paymentMethod === "cheque"
+          ? row.chequePhotoUrl || ""
+          : row.paymentMethod === "upi"
+          ? row.upiPhotoUrl || ""
+          : row.paymentMethod === "neft"
+          ? row.neftPhotoUrl || ""
+          : "";
+    } else {
+      orderPaymentMethod = "cash";
+    }
     const orderData = {
       user_id: user.id,
       retailer_id: null as any,
@@ -1677,8 +1717,12 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       discount_amount: 0,
       total_amount: total,
       status: "confirmed",
-      payment_method: row.paymentMethod || "cash",
-      is_credit_order: false,
+      payment_method: orderPaymentMethod,
+      is_credit_order: isCreditOrder,
+      credit_pending_amount: creditPending,
+      credit_paid_amount: creditPaid,
+      payment_proof_url: paymentProofUrl || null,
+      upi_last_four_code: row.paymentMethod === "upi" ? row.upiLastFourCode || null : null,
       idempotency_key: `counter_${user.id}_${row.uid}_${Date.now()}`,
       ...(eventContext?.visitId ? { visit_id: eventContext.visitId } : {}),
     };
