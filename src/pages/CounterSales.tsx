@@ -393,6 +393,7 @@ function CounterCustomerCard({
   eventMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [methodTouched, setMethodTouched] = useState(false);
   const locked = row.status === "saved" || row.status === "submitted";
   const itemCount = rowItemCount(row);
 
@@ -447,62 +448,62 @@ function CounterCustomerCard({
       <button
         type="button"
         onClick={onToggleExpand}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+        className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/30 transition-colors"
       >
         <div className="relative shrink-0">
-          <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-sm font-bold flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-[11px] font-bold flex items-center justify-center">
             {initials}
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+          <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-card" />
         </div>
         <div className="min-w-0 flex-1">
           {isWalkIn ? (
             <>
-              <div className="text-[15px] font-semibold truncate text-foreground">{headerName}</div>
-              <div className="text-[11px] text-muted-foreground truncate">{headerSub}</div>
+              <div className="text-[13px] font-semibold truncate text-foreground leading-tight">{headerName}</div>
+              <div className="text-[10px] text-muted-foreground truncate leading-tight">{headerSub}</div>
             </>
           ) : row.customer ? (
             <>
-              <div className="text-[15px] font-semibold truncate text-foreground">{row.customer.name}</div>
-              <div className="text-[11px] text-muted-foreground truncate">
+              <div className="text-[13px] font-semibold truncate text-foreground leading-tight">{row.customer.name}</div>
+              <div className="text-[10px] text-muted-foreground truncate leading-tight">
                 Retailer <span className="opacity-50">•</span>{" "}
                 {row.phoneOverride || row.customer.phone || "—"}
               </div>
             </>
           ) : (
             <>
-              <div className="text-[15px] font-semibold text-blue-600 dark:text-blue-400">Select Customer</div>
-              <div className="text-[11px] text-muted-foreground">Tap to choose or create</div>
+              <div className="text-[13px] font-semibold text-blue-600 dark:text-blue-400 leading-tight">Select Customer</div>
+              <div className="text-[10px] text-muted-foreground leading-tight">Tap to choose or create</div>
             </>
           )}
         </div>
-        <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 font-medium">
+        <div className="flex flex-col items-end gap-0 shrink-0 leading-tight">
+          <span className="text-[10px] text-muted-foreground">
             {itemCount} item{itemCount !== 1 ? "s" : ""}
           </span>
-          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+          <div className="text-[13px] font-bold text-emerald-600 dark:text-emerald-400">
             ₹{total.toFixed(2)}
           </div>
         </div>
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-muted-foreground shrink-0 transition-transform ml-1",
+            "h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ml-0.5",
             row.expanded && "rotate-180"
           )}
         />
       </button>
 
       {/* META row (under header) */}
-      <div className="flex items-center gap-2 flex-wrap px-4 pb-3 -mt-1">
-        <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", paymentLabel[paymentMode].cls)}>
+      <div className="flex items-center gap-1.5 flex-wrap px-3 pb-1.5 -mt-0.5">
+        <span className={cn("text-[9px] px-1.5 py-0 rounded-full font-medium leading-4", paymentLabel[paymentMode].cls)}>
           {paymentLabel[paymentMode].label}
         </span>
-        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 font-medium">
+        <span className="text-[9px] px-1.5 py-0 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 font-medium leading-4">
           {row.status === "submitted" ? "Submitted" : row.status === "saved" ? "Saved" : "Active"}
         </span>
         {updatedTime && (
-          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-            <ChevronUp className="h-3 w-3" /> Updated {updatedTime}
+          <span className="text-[9px] text-muted-foreground leading-4">
+            • {updatedTime}
           </span>
         )}
       </div>
@@ -510,42 +511,8 @@ function CounterCustomerCard({
       {/* EXPANDED BODY */}
       {row.expanded && (
         <div className="border-t bg-muted/10">
-          {/* CUSTOMER TYPE segmented control — hidden in event mode (walk-in only) */}
-          {!eventMode && (
-          <div className="px-4 pt-3">
-            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
-              Customer Type
-            </div>
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted/50 border">
-              {(["existing", "walkin"] as const).map((t) => {
-                const active = (row.customerType || "existing") === t;
-                const label = t === "existing" ? "Existing Customer" : "Walk-in Customer";
-                const activeCls =
-                  t === "existing"
-                    ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/40 dark:text-blue-300 shadow-sm"
-                    : "bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-300 shadow-sm";
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    disabled={locked}
-                    onClick={() => onCustomerTypeChange(t)}
-                    className={cn(
-                      "h-9 rounded-lg border text-xs font-medium transition-colors inline-flex items-center justify-center gap-1.5",
-                      active ? activeCls : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t === "existing" ? <User className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          )}
-
           {/* Customer pick / change tile (Existing) OR Walk-in optional fields */}
-          <div className="px-4 pt-3">
+          <div className="px-3 pt-3">
             {isWalkIn ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -556,7 +523,7 @@ function CounterCustomerCard({
                       disabled={locked}
                       onChange={(e) => onWalkInChange({ walkInName: e.target.value })}
                       placeholder="e.g. Suresh"
-                      className="h-9 rounded-lg text-sm"
+                      className="h-8 rounded-lg text-sm"
                     />
                   </div>
                   <div className="min-w-0">
@@ -567,30 +534,54 @@ function CounterCustomerCard({
                       onChange={(e) => onWalkInChange({ walkInPhone: e.target.value })}
                       placeholder="91234 56789"
                       inputMode="tel"
-                      className="h-9 rounded-lg text-sm"
+                      className="h-8 rounded-lg text-sm"
                     />
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-foreground/80 select-none cursor-pointer">
-                  <input
-                    type="checkbox"
-                    disabled={locked}
-                    checked={!!row.saveWalkIn}
-                    onChange={(e) => onWalkInChange({ saveWalkIn: e.target.checked })}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  Save customer for future orders
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-xs text-foreground/80 select-none cursor-pointer">
+                    <input
+                      type="checkbox"
+                      disabled={locked}
+                      checked={!!row.saveWalkIn}
+                      onChange={(e) => onWalkInChange({ saveWalkIn: e.target.checked })}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    Save for future
+                  </label>
+                  {!eventMode && (
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => onCustomerTypeChange("existing")}
+                      className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                    >
+                      Use Existing Customer →
+                    </button>
+                  )}
+                </div>
               </div>
             ) : !row.customer ? (
-              <Button
-                variant="outline"
-                className="w-full rounded-xl h-10 justify-start"
-                onClick={() => setPickerOpen(true)}
-                disabled={locked}
-              >
-                <User className="h-4 w-4 mr-2" /> Select Customer
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl h-9 justify-start"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={locked}
+                >
+                  <User className="h-4 w-4 mr-2" /> Select Customer
+                </Button>
+                {!eventMode && (
+                  <button
+                    type="button"
+                    disabled={locked}
+                    onClick={() => onCustomerTypeChange("walkin")}
+                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground hover:underline disabled:opacity-50"
+                  >
+                    ← Back to Walk-in Customer
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="flex items-center justify-between rounded-xl bg-background border px-3 py-2">
                 <div className="min-w-0">
@@ -759,7 +750,10 @@ function CounterCustomerCard({
                     key={mode}
                     type="button"
                     disabled={locked}
-                    onClick={() => onPaymentModeChange(mode)}
+                    onClick={() => {
+                      onPaymentModeChange(mode);
+                      setMethodTouched(true);
+                    }}
                     className={cn(
                       "h-10 rounded-xl border text-xs font-medium transition-colors",
                       active
@@ -773,7 +767,9 @@ function CounterCustomerCard({
               })}
             </div>
 
-            {/* PAYMENT METHOD */}
+            {/* PAYMENT METHOD — hidden until a payment mode is tapped */}
+            {methodTouched && (
+            <>
             <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mt-3 mb-2">
               Payment Method
             </div>
@@ -802,6 +798,8 @@ function CounterCustomerCard({
                 );
               })}
             </div>
+            </>
+            )}
           </div>
 
           {/* TOTALS */}
