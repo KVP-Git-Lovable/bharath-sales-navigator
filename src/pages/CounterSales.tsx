@@ -204,6 +204,7 @@ function MobileCustomerCard({
                             sku: p.sku || null,
                             unit: p.unit || "Unit",
                             rate: Number(p.rate) || 0,
+                              original_rate: Number(p.rate) || 0,
                           })
                         }
                       />
@@ -394,11 +395,11 @@ function CounterCustomerCard({
   const itemCount = rowItemCount(row);
 
   const subtotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    (s, i) => s + (i.product_id ? itemSubtotal(i) : 0),
     0
   );
   const discountTotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    (s, i) => s + (i.product_id ? itemDiscount(i) : 0),
     0
   );
   const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
@@ -644,6 +645,7 @@ function CounterCustomerCard({
                               sku: p.sku || null,
                               unit: p.unit || "Unit",
                               rate: Number(p.rate) || 0,
+                              original_rate: Number(p.rate) || 0,
                             })
                           }
                           onEnter={() => {
@@ -1050,6 +1052,7 @@ interface CounterLineItem {
   rate: number;
   discount: number;
   tax_rate: number;
+  original_rate?: number;
 }
 
 type RowStatus = "draft" | "saved" | "submitted";
@@ -1084,6 +1087,7 @@ const newItem = (): CounterLineItem => ({
   rate: 0,
   discount: 0,
   tax_rate: 5,
+  original_rate: 0,
 });
 
 const newRow = (): CounterRow => ({
@@ -1100,8 +1104,20 @@ const newRow = (): CounterRow => ({
   saveWalkIn: false,
 });
 
+const itemGrossRate = (i: CounterLineItem) => {
+  const r = Number(i.rate) || 0;
+  const o = Number(i.original_rate) || 0;
+  return o > r ? o : r;
+};
+const itemSubtotal = (i: CounterLineItem) =>
+  (Number(i.quantity) || 0) * itemGrossRate(i);
+const itemDiscount = (i: CounterLineItem) => {
+  const qty = Number(i.quantity) || 0;
+  const drop = itemGrossRate(i) - (Number(i.rate) || 0);
+  return Math.max(0, qty * drop);
+};
 const itemTaxable = (i: CounterLineItem) =>
-  Math.max(0, (Number(i.quantity) || 0) * (Number(i.rate) || 0) - (Number(i.discount) || 0));
+  Math.max(0, (Number(i.quantity) || 0) * (Number(i.rate) || 0));
 const itemTax = (i: CounterLineItem) =>
   itemTaxable(i) * ((Number(i.tax_rate) || 0) / 100);
 const itemAmount = (i: CounterLineItem) => itemTaxable(i) + itemTax(i);
@@ -1275,7 +1291,31 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       rs.map((r) =>
         r.uid !== rowUid
           ? r
-          : { ...r, items: r.items.map((i) => (i.uid === itemUid ? { ...i, ...patch } : i)) }
+          : {
+              ...r,
+              items: r.items.map((i) => {
+                if (i.uid !== itemUid) return i;
+                const merged = { ...i, ...patch };
+                // Auto-derive discount from price drop vs original_rate when
+                // rate/quantity/product changes (user hasn't explicitly set discount in this patch).
+                const touchesPriceQty =
+                  "rate" in patch ||
+                  "quantity" in patch ||
+                  "product_id" in patch ||
+                  "original_rate" in patch;
+                if (touchesPriceQty && !("discount" in patch)) {
+                  const orig = Number(merged.original_rate) || 0;
+                  const rate = Number(merged.rate) || 0;
+                  const qty = Number(merged.quantity) || 0;
+                  if (orig > 0 && rate < orig) {
+                    merged.discount = Math.max(0, (orig - rate) * qty);
+                  } else {
+                    merged.discount = 0;
+                  }
+                }
+                return merged;
+              }),
+            }
       )
     );
 
@@ -1585,13 +1625,14 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       (s, r) =>
         s +
         r.items.reduce(
-          (a, i) => a + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+          (a, i) => a + (i.product_id ? itemSubtotal(i) : 0),
           0
         ),
       0
     );
     const discount = rows.reduce(
-      (s, r) => s + r.items.reduce((a, i) => a + (i.product_id ? Number(i.discount) || 0 : 0), 0),
+      (s, r) =>
+        s + r.items.reduce((a, i) => a + (i.product_id ? itemDiscount(i) : 0), 0),
       0
     );
     const tax = rows.reduce(
@@ -1823,11 +1864,11 @@ function OrderRow({
 }) {
   const locked = row.status === "saved" || row.status === "submitted";
   const subtotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    (s, i) => s + (i.product_id ? itemSubtotal(i) : 0),
     0
   );
   const discountTotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    (s, i) => s + (i.product_id ? itemDiscount(i) : 0),
     0
   );
   const taxableTotal = row.items.reduce(
@@ -1936,6 +1977,7 @@ function OrderRow({
                     sku: p.sku || null,
                     unit: p.unit || "Unit",
                     rate: Number(p.rate) || 0,
+                              original_rate: Number(p.rate) || 0,
                   })
                 }
                 onEnter={() => {
@@ -1981,12 +2023,11 @@ function OrderRow({
                 type="number"
                 min={0}
                 step="0.01"
-                value={item.discount}
-                disabled={locked}
-                onChange={(e) =>
-                  onUpdateItem(item.uid, { discount: Number(e.target.value) || 0 })
-                }
-                className="h-9"
+                value={itemDiscount(item).toFixed(2)}
+                readOnly
+                tabIndex={-1}
+                title="Auto-calculated from price drop vs original rate"
+                className="h-9 bg-muted/40"
               />
               <Button
                 variant="ghost"
