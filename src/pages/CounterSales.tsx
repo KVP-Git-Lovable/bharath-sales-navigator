@@ -46,6 +46,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineOrderEntry } from "@/hooks/useOfflineOrderEntry";
 import { submitOrderWithOfflineSupport } from "@/utils/offlineOrderUtils";
+import { getLocalTodayDate } from "@/utils/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -1195,7 +1196,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
           query = query.eq("visit_id", eventContext.visitId);
         } else {
           // Regular counter sales: restore TODAY's counter orders for this user
-          const today = new Date().toISOString().slice(0, 10);
+          const today = getLocalTodayDate();
           query = query
             .eq("user_id", user.id)
             .eq("order_date", today)
@@ -1363,7 +1364,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       retailer_name: isWalkIn
         ? walkInName || "Walk-in Customer"
         : row.customer!.name,
-      order_date: new Date().toISOString().slice(0, 10),
+        order_date: getLocalTodayDate(),
       subtotal,
       discount_amount: 0,
       total_amount: total,
@@ -1508,7 +1509,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         retailer_name: isWalkIn
           ? walkInName || "Walk-in Customer"
           : r.customer!.name,
-        order_date: new Date().toISOString().slice(0, 10),
+        order_date: getLocalTodayDate(),
         subtotal,
         discount_amount: 0,
         total_amount: total,
