@@ -367,6 +367,7 @@ function CounterCustomerCard({
   onSubmit,
   onEdit,
   onDelete,
+  eventMode,
 }: {
   index: number;
   row: CounterRow;
@@ -386,6 +387,7 @@ function CounterCustomerCard({
   onSubmit: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  eventMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const locked = row.status === "saved" || row.status === "submitted";
@@ -504,7 +506,8 @@ function CounterCustomerCard({
       {/* EXPANDED BODY */}
       {row.expanded && (
         <div className="border-t bg-muted/10">
-          {/* CUSTOMER TYPE segmented control */}
+          {/* CUSTOMER TYPE segmented control — hidden in event mode (walk-in only) */}
+          {!eventMode && (
           <div className="px-4 pt-3">
             <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
               Customer Type
@@ -535,6 +538,7 @@ function CounterCustomerCard({
               })}
             </div>
           </div>
+          )}
 
           {/* Customer pick / change tile (Existing) OR Walk-in optional fields */}
           <div className="px-4 pt-3">
