@@ -750,7 +750,10 @@ function CounterCustomerCard({
                     key={mode}
                     type="button"
                     disabled={locked}
-                    onClick={() => onPaymentModeChange(mode)}
+                    onClick={() => {
+                      onPaymentModeChange(mode);
+                      setMethodTouched(true);
+                    }}
                     className={cn(
                       "h-10 rounded-xl border text-xs font-medium transition-colors",
                       active
@@ -764,7 +767,9 @@ function CounterCustomerCard({
               })}
             </div>
 
-            {/* PAYMENT METHOD */}
+            {/* PAYMENT METHOD — hidden until a payment mode is tapped */}
+            {methodTouched && (
+            <>
             <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mt-3 mb-2">
               Payment Method
             </div>
@@ -793,6 +798,8 @@ function CounterCustomerCard({
                 );
               })}
             </div>
+            </>
+            )}
           </div>
 
           {/* TOTALS */}
