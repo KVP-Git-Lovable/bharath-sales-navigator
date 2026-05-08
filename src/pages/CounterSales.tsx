@@ -1102,8 +1102,20 @@ const newRow = (): CounterRow => ({
   saveWalkIn: false,
 });
 
+const itemGrossRate = (i: CounterLineItem) => {
+  const r = Number(i.rate) || 0;
+  const o = Number(i.original_rate) || 0;
+  return o > r ? o : r;
+};
+const itemSubtotal = (i: CounterLineItem) =>
+  (Number(i.quantity) || 0) * itemGrossRate(i);
+const itemDiscount = (i: CounterLineItem) => {
+  const qty = Number(i.quantity) || 0;
+  const drop = itemGrossRate(i) - (Number(i.rate) || 0);
+  return Math.max(0, qty * drop);
+};
 const itemTaxable = (i: CounterLineItem) =>
-  Math.max(0, (Number(i.quantity) || 0) * (Number(i.rate) || 0) - (Number(i.discount) || 0));
+  Math.max(0, (Number(i.quantity) || 0) * (Number(i.rate) || 0));
 const itemTax = (i: CounterLineItem) =>
   itemTaxable(i) * ((Number(i.tax_rate) || 0) / 100);
 const itemAmount = (i: CounterLineItem) => itemTaxable(i) + itemTax(i);
