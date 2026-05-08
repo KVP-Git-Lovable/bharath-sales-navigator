@@ -1586,7 +1586,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, expanded: !r.expanded } : r)));
 
   // ---- save / submit ----
-  const validateRow = (r: CounterRow): string | null => {
+  const validateRow = (r: CounterRow, requirePayment = false): string | null => {
     if (eventContext) {
       if (!(r.walkInName || "").trim()) return "Enter walk-in customer name";
     } else if ((r.customerType || "existing") === "existing") {
@@ -1595,6 +1595,21 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     const filled = r.items.filter((i) => i.product_id);
     if (filled.length === 0) return "Add at least one product";
     if (filled.some((i) => !i.quantity || i.quantity <= 0)) return "Quantity must be > 0";
+    if (requirePayment) {
+      if (!r.paymentMode) return "Please select payment type";
+      if ((r.paymentMode === "full" || r.paymentMode === "partial") && !r.paymentMethod) {
+        return "Please select payment method";
+      }
+      if (r.paymentMode === "partial") {
+        const amt = parseFloat(r.partialAmount || "");
+        if (!amt || amt <= 0) return "Enter a valid partial payment amount";
+      }
+      if (isPaymentProofMandatory && navigator.onLine) {
+        if (r.paymentMethod === "cheque" && !r.chequePhotoUrl) return "Capture cheque photo";
+        if (r.paymentMethod === "upi" && !r.upiPhotoUrl) return "Capture payment confirmation";
+        if (r.paymentMethod === "neft" && !r.neftPhotoUrl) return "Capture NEFT confirmation";
+      }
+    }
     return null;
   };
 
