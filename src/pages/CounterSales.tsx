@@ -1618,7 +1618,10 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  if (window.history.length > 1) navigate(-1);
+                  else navigate("/");
+                }}
                 className="rounded-full h-8 w-8 sm:h-9 sm:w-9 -ml-1 shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
