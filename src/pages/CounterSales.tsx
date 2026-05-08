@@ -1098,8 +1098,13 @@ interface CounterRow {
   items: CounterLineItem[];
   status: RowStatus;
   expanded: boolean;
-  paymentMode?: "full" | "partial" | "credit";
-  paymentMethod?: "cash" | "upi" | "neft" | "cheque";
+  paymentMode?: "" | "full" | "partial" | "credit";
+  paymentMethod?: "" | "cash" | "upi" | "neft" | "cheque";
+  partialAmount?: string;
+  chequePhotoUrl?: string;
+  upiPhotoUrl?: string;
+  upiLastFourCode?: string;
+  neftPhotoUrl?: string;
   updatedAt?: number;
   customerType?: "existing" | "walkin";
   walkInName?: string;
@@ -1131,8 +1136,13 @@ const newRow = (): CounterRow => ({
   items: [newItem()],
   status: "draft",
   expanded: true,
-  paymentMode: "full",
-  paymentMethod: "cash",
+  paymentMode: "",
+  paymentMethod: "",
+  partialAmount: "",
+  chequePhotoUrl: "",
+  upiPhotoUrl: "",
+  upiLastFourCode: "",
+  neftPhotoUrl: "",
   updatedAt: Date.now(),
   customerType: "walkin",
   walkInName: "",
