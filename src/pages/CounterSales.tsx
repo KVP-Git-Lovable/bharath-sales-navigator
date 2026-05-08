@@ -1791,6 +1791,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                 onUpdateItem={(itemUid, patch) => updateItem(row.uid, itemUid, patch)}
                 onRemoveItem={(itemUid) => removeItem(row.uid, itemUid)}
                 onPaymentModeChange={(m) => updateRow(row.uid, { paymentMode: m, updatedAt: Date.now() })}
+                onPaymentMethodChange={(pm) => updateRow(row.uid, { paymentMethod: pm, updatedAt: Date.now() })}
                 onCustomerTypeChange={(t) =>
                   updateRow(row.uid, {
                     customerType: t,
