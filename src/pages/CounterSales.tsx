@@ -41,6 +41,7 @@ import {
   Loader2,
   User,
   Phone,
+  Camera,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,6 +51,9 @@ import { getLocalTodayDate } from "@/utils/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CameraCapture } from "@/components/CameraCapture";
+import { usePaymentProofMandatory } from "@/hooks/usePaymentProofMandatory";
+import { offlineStorage } from "@/lib/offlineStorage";
 
 // ---------- types ----------
 interface CounterCustomer {
