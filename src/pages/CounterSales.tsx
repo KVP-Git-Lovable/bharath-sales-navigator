@@ -765,7 +765,9 @@ function CounterCustomerCard({
                     disabled={locked}
                     onClick={() => {
                       onPaymentModeChange(mode);
-                      setMethodTouched(true);
+                      // Reset method when switching modes (cart-style flow)
+                      onPaymentMethodChange("");
+                      onPatchRow({ partialAmount: "" });
                     }}
                     className={cn(
                       "h-10 rounded-xl border text-xs font-medium transition-colors",
@@ -780,38 +782,158 @@ function CounterCustomerCard({
               })}
             </div>
 
-            {/* PAYMENT METHOD — hidden until a payment mode is tapped */}
-            {methodTouched && (
-            <>
-            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mt-3 mb-2">
-              Payment Method
-            </div>
-            <div className="rounded-xl border bg-background px-3 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-              {(["cash", "cheque", "upi", "neft"] as const).map((method) => {
-                const labels = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
-                const active = paymentMethod === method;
-                return (
-                  <label
-                    key={method}
-                    className={cn(
-                      "flex items-center gap-1.5 cursor-pointer select-none text-xs font-medium",
-                      locked && "opacity-60 cursor-not-allowed"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name={`pm-${row.uid}`}
+            {/* PARTIAL AMOUNT INPUT */}
+            {paymentMode === "partial" && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
+                  Partial Payment Amount
+                </div>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={row.partialAmount || ""}
+                  onChange={(e) => onPatchRow({ partialAmount: e.target.value })}
+                  max={total}
+                  disabled={locked}
+                  className="h-8 text-sm border-primary ring-2 ring-primary/20 focus:ring-primary/40"
+                />
+                {row.partialAmount && parseFloat(row.partialAmount) > 0 && (
+                  <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-emerald-700 dark:text-emerald-400">Paying Now:</span>
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">₹{parseFloat(row.partialAmount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs pt-1 border-t border-amber-200 dark:border-amber-800">
+                      <span className="font-medium text-amber-700 dark:text-amber-400">Remaining:</span>
+                      <span className="font-bold text-amber-700 dark:text-amber-400">₹{Math.max(0, total - parseFloat(row.partialAmount)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PAYMENT METHOD — only when full or partial selected */}
+            {(paymentMode === "full" || paymentMode === "partial") && (
+              <div className="mt-3 space-y-2 p-2.5 border rounded-xl bg-muted/40">
+                <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
+                  Payment Method
+                </div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  {(["cash", "cheque", "upi", "neft"] as const).map((method) => {
+                    const labels = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
+                    const active = paymentMethod === method;
+                    return (
+                      <label
+                        key={method}
+                        className={cn(
+                          "flex items-center gap-1.5 cursor-pointer select-none text-xs font-medium",
+                          locked && "opacity-60 cursor-not-allowed"
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name={`pm-${row.uid}`}
+                          disabled={locked}
+                          checked={active}
+                          onChange={() => onPaymentMethodChange(method)}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        <span>{labels[method]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Cheque Bank Details + Photo */}
+                {paymentMethod === "cheque" && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="p-2 bg-background rounded-md border">
+                      <p className="text-xs font-medium mb-1.5">Bank Details for Cheque</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p><span className="font-medium">Bank Name:</span> HDFC Bank</p>
+                        <p><span className="font-medium">Account Name:</span> Bharath Beverages Pvt Ltd</p>
+                        <p><span className="font-medium">Account Number:</span> 1234567890</p>
+                        <p><span className="font-medium">IFSC Code:</span> HDFC0001234</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => onOpenCamera("cheque")}
+                      variant="outline"
                       disabled={locked}
-                      checked={active}
-                      onChange={() => onPaymentMethodChange(method)}
-                      className="h-3.5 w-3.5 accent-primary"
-                    />
-                    <span>{labels[method]}</span>
-                  </label>
-                );
-              })}
-            </div>
-            </>
+                      className="w-full h-8 text-xs"
+                    >
+                      <Camera className="mr-1.5" size={12} />
+                      {row.chequePhotoUrl ? "Retake Cheque" : "Capture Cheque"}
+                    </Button>
+                    {row.chequePhotoUrl && <p className="text-[10px] text-emerald-600">✓ Cheque photo captured</p>}
+                  </div>
+                )}
+
+                {/* UPI QR + last-4 + photo */}
+                {paymentMethod === "upi" && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="p-2 bg-background rounded-md border">
+                      <p className="text-xs font-medium mb-1.5 text-center">Scan QR for Payment</p>
+                      <div className="flex items-center justify-center bg-white p-2 rounded">
+                        {companyQrCode ? (
+                          <img src={companyQrCode} alt="UPI QR Code" className="w-32 h-32 object-contain" />
+                        ) : (
+                          <div className="w-32 h-32 flex items-center justify-center bg-muted rounded">
+                            <p className="text-xs text-muted-foreground">No QR Code</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">UPI Last-4 Code</div>
+                      <Input
+                        type="text"
+                        maxLength={4}
+                        value={row.upiLastFourCode || ""}
+                        onChange={(e) => onPatchRow({ upiLastFourCode: e.target.value.replace(/\D/g, "") })}
+                        placeholder="Enter last 4 digits"
+                        disabled={locked}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => onOpenCamera("upi")}
+                      variant="outline"
+                      disabled={locked}
+                      className="w-full h-8 text-xs"
+                    >
+                      <Camera className="mr-1.5" size={12} />
+                      {row.upiPhotoUrl ? "Retake Proof" : "Capture Proof"}
+                    </Button>
+                    {row.upiPhotoUrl && <p className="text-[10px] text-emerald-600">✓ Payment proof captured</p>}
+                  </div>
+                )}
+
+                {/* NEFT Bank Details + Photo */}
+                {paymentMethod === "neft" && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="p-2 bg-background rounded-md border">
+                      <p className="text-xs font-medium mb-1.5">Bank Details for NEFT</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p><span className="font-medium">Bank Name:</span> HDFC Bank</p>
+                        <p><span className="font-medium">Account Name:</span> Bharath Beverages Pvt Ltd</p>
+                        <p><span className="font-medium">Account Number:</span> 1234567890</p>
+                        <p><span className="font-medium">IFSC Code:</span> HDFC0001234</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => onOpenCamera("neft")}
+                      variant="outline"
+                      disabled={locked}
+                      className="w-full h-8 text-xs"
+                    >
+                      <Camera className="mr-1.5" size={12} />
+                      {row.neftPhotoUrl ? "Retake NEFT Proof" : "Capture NEFT Proof"}
+                    </Button>
+                    {row.neftPhotoUrl && <p className="text-[10px] text-emerald-600">✓ NEFT confirmation captured</p>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
