@@ -394,11 +394,11 @@ function CounterCustomerCard({
   const itemCount = rowItemCount(row);
 
   const subtotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+    (s, i) => s + (i.product_id ? itemSubtotal(i) : 0),
     0
   );
   const discountTotal = row.items.reduce(
-    (s, i) => s + (i.product_id ? Number(i.discount) || 0 : 0),
+    (s, i) => s + (i.product_id ? itemDiscount(i) : 0),
     0
   );
   const taxTotal = row.items.reduce((s, i) => s + (i.product_id ? itemTax(i) : 0), 0);
