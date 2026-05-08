@@ -1328,6 +1328,76 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
   const [customers, setCustomers] = useState<CounterCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submittingRows, setSubmittingRows] = useState<Set<string>>(new Set());
+  const [companyQrCode, setCompanyQrCode] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<"cheque" | "upi" | "neft">("cheque");
+  const [cameraRowUid, setCameraRowUid] = useState<string | null>(null);
+  const { isPaymentProofMandatory } = usePaymentProofMandatory();
+
+  // Load company QR code (for UPI display)
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("companies")
+          .select("qr_code_url")
+          .limit(1)
+          .single();
+        if (data?.qr_code_url) setCompanyQrCode(data.qr_code_url);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  const handleCameraCapture = async (blob: Blob) => {
+    if (!cameraRowUid) {
+      setIsCameraOpen(false);
+      return;
+    }
+    try {
+      const fileName = `payment-${Date.now()}.jpg`;
+      let url = "";
+      if (navigator.onLine) {
+        const { data, error } = await supabase.storage
+          .from("expense-bills")
+          .upload(fileName, blob);
+        if (error) throw error;
+        const { data: pub } = supabase.storage.from("expense-bills").getPublicUrl(fileName);
+        url = pub.publicUrl;
+      } else {
+        url = URL.createObjectURL(blob);
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          await offlineStorage.addToSyncQueue("UPLOAD_PAYMENT_PROOF", {
+            fileName,
+            blobBase64: reader.result as string,
+            type: cameraMode,
+          });
+        };
+        reader.readAsDataURL(blob);
+      }
+      const patch: Partial<CounterRow> =
+        cameraMode === "cheque"
+          ? { chequePhotoUrl: url }
+          : cameraMode === "upi"
+          ? { upiPhotoUrl: url }
+          : { neftPhotoUrl: url };
+      updateRow(cameraRowUid, { ...patch, updatedAt: Date.now() });
+      toast.success(
+        cameraMode === "cheque"
+          ? "Cheque photo captured"
+          : cameraMode === "upi"
+          ? "Payment proof captured"
+          : "NEFT proof captured"
+      );
+    } catch (e: any) {
+      toast.error(`Capture failed: ${e?.message || "unknown"}`);
+    } finally {
+      setIsCameraOpen(false);
+    }
+  };
 
   // inline create-new customer state shared with customers list
   const addRetailerLocal = (r: CounterCustomer) =>
