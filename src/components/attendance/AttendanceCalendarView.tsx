@@ -124,13 +124,13 @@ export const AttendanceCalendarView = ({
       const leave = leaveMap.get(dateStr);
       const attendance = attendanceMap.get(dateStr);
 
-      if (leave && leave.is_half_day) {
+      if ((leave && leave.is_half_day) || attendance?.status === 'half_day') {
         days.push({ date: new Date(d), dateStr, status: 'half-day', inMonth });
         continue;
       }
 
-      // Full leave
-      if (leave) {
+      // Full leave (from leave_applications OR attendance.status)
+      if (leave || attendance?.status === 'leave' || attendance?.status === 'on_leave') {
         days.push({ date: new Date(d), dateStr, status: 'leave', inMonth });
         continue;
       }
