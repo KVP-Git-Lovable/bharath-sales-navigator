@@ -117,7 +117,8 @@ const Attendance = () => {
       return data || [];
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always',
   });
   // Use cached data IMMEDIATELY for instant UI - don't wait for loading
   // The hooks now return cached data synchronously via placeholderData
