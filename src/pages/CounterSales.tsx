@@ -367,6 +367,7 @@ function CounterCustomerCard({
   onSubmit,
   onEdit,
   onDelete,
+  eventMode,
 }: {
   index: number;
   row: CounterRow;
@@ -386,6 +387,7 @@ function CounterCustomerCard({
   onSubmit: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  eventMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const locked = row.status === "saved" || row.status === "submitted";
@@ -504,7 +506,8 @@ function CounterCustomerCard({
       {/* EXPANDED BODY */}
       {row.expanded && (
         <div className="border-t bg-muted/10">
-          {/* CUSTOMER TYPE segmented control */}
+          {/* CUSTOMER TYPE segmented control — hidden in event mode (walk-in only) */}
+          {!eventMode && (
           <div className="px-4 pt-3">
             <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground mb-2">
               Customer Type
@@ -535,6 +538,7 @@ function CounterCustomerCard({
               })}
             </div>
           </div>
+          )}
 
           {/* Customer pick / change tile (Existing) OR Walk-in optional fields */}
           <div className="px-4 pt-3">
@@ -1296,7 +1300,9 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
-    if ((r.customerType || "existing") === "existing") {
+    if (eventContext) {
+      if (!(r.walkInName || "").trim()) return "Enter walk-in customer name";
+    } else if ((r.customerType || "existing") === "existing") {
       if (!r.customer) return "Select a customer";
     }
     const filled = r.items.filter((i) => i.product_id);
@@ -1731,6 +1737,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                 products={products}
                 customers={customers}
                 submitting={submittingRows.has(row.uid)}
+                eventMode={!!eventContext}
                 onToggleExpand={() => toggleExpand(row.uid)}
                 onPickCustomer={(ret) =>
                   updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined, updatedAt: Date.now() })
