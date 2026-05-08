@@ -2023,12 +2023,11 @@ function OrderRow({
                 type="number"
                 min={0}
                 step="0.01"
-                value={item.discount}
-                disabled={locked}
-                onChange={(e) =>
-                  onUpdateItem(item.uid, { discount: Number(e.target.value) || 0 })
-                }
-                className="h-9"
+                value={itemDiscount(item).toFixed(2)}
+                readOnly
+                tabIndex={-1}
+                title="Auto-calculated from price drop vs original rate"
+                className="h-9 bg-muted/40"
               />
               <Button
                 variant="ghost"
