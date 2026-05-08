@@ -204,6 +204,7 @@ function MobileCustomerCard({
                             sku: p.sku || null,
                             unit: p.unit || "Unit",
                             rate: Number(p.rate) || 0,
+                              original_rate: Number(p.rate) || 0,
                           })
                         }
                       />
@@ -644,6 +645,7 @@ function CounterCustomerCard({
                               sku: p.sku || null,
                               unit: p.unit || "Unit",
                               rate: Number(p.rate) || 0,
+                              original_rate: Number(p.rate) || 0,
                             })
                           }
                           onEnter={() => {
@@ -1975,6 +1977,7 @@ function OrderRow({
                     sku: p.sku || null,
                     unit: p.unit || "Unit",
                     rate: Number(p.rate) || 0,
+                              original_rate: Number(p.rate) || 0,
                   })
                 }
                 onEnter={() => {
