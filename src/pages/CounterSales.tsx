@@ -362,6 +362,7 @@ function CounterCustomerCard({
   onUpdateItem,
   onRemoveItem,
   onPaymentModeChange,
+  onPaymentMethodChange,
   onCustomerTypeChange,
   onWalkInChange,
   onSave,
@@ -382,6 +383,7 @@ function CounterCustomerCard({
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
   onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
+  onPaymentMethodChange: (method: "cash" | "upi" | "neft" | "cheque") => void;
   onCustomerTypeChange: (t: "existing" | "walkin") => void;
   onWalkInChange: (patch: { walkInName?: string; walkInPhone?: string; saveWalkIn?: boolean }) => void;
   onSave: () => void;
