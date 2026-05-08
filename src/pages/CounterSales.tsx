@@ -687,9 +687,8 @@ function CounterCustomerCard({
                           value={item.rate}
                           disabled={locked}
                           onChange={(e) => onUpdateItem(item.uid, { rate: Number(e.target.value) || 0 })}
-                          className="h-9 rounded-lg text-xs sm:text-sm px-1.5 sm:px-2 pr-6 sm:pr-8"
+                          className="h-9 rounded-lg text-xs sm:text-sm px-1.5 sm:px-2"
                         />
-                        <Pencil className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                       </div>
                     </div>
 
@@ -714,7 +713,7 @@ function CounterCustomerCard({
                         <span>
                           Total:{" "}
                           <span className="font-semibold text-foreground">
-                            ₹{lineTotal.toFixed(2)} / {item.unit}
+                            ₹{lineTotal.toFixed(2)}
                           </span>
                         </span>
                         <Button
