@@ -1162,18 +1162,28 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- load already-submitted orders for this event so the Summary tab persists ----
+  // ---- load already-submitted orders so the Summary tab persists across navigation ----
   useEffect(() => {
-    if (!eventContext?.visitId || !user) return;
+    if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const { data: orders, error } = await supabase
+        let query = supabase
           .from("orders")
           .select("id, retailer_name, counter_customer_id, total_amount, created_at")
-          .eq("visit_id", eventContext.visitId)
           .neq("status", "cancelled")
           .order("created_at", { ascending: true });
+        if (eventContext?.visitId) {
+          query = query.eq("visit_id", eventContext.visitId);
+        } else {
+          // Regular counter sales: restore TODAY's counter orders for this user
+          const today = new Date().toISOString().slice(0, 10);
+          query = query
+            .eq("user_id", user.id)
+            .eq("order_date", today)
+            .not("counter_customer_id", "is", null);
+        }
+        const { data: orders, error } = await query;
         if (error || !orders || orders.length === 0) return;
 
         const orderIds = orders.map((o: any) => o.id);
