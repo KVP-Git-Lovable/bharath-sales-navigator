@@ -2044,6 +2044,14 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                   })
                 }
                 onWalkInChange={(patch) => updateRow(row.uid, { ...patch, updatedAt: Date.now() })}
+                onPatchRow={(patch) => updateRow(row.uid, { ...patch, updatedAt: Date.now() })}
+                onOpenCamera={(mode) => {
+                  setCameraRowUid(row.uid);
+                  setCameraMode(mode);
+                  setIsCameraOpen(true);
+                }}
+                companyQrCode={companyQrCode}
+                isPaymentProofMandatory={isPaymentProofMandatory}
                 onSave={() => saveRow(row.uid)}
                 onSubmit={() => submitSingleRow(row.uid)}
                 onEdit={() => editRow(row.uid)}
