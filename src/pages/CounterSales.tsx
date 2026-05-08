@@ -1735,6 +1735,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
                 products={products}
                 customers={customers}
                 submitting={submittingRows.has(row.uid)}
+                eventMode={!!eventContext}
                 onToggleExpand={() => toggleExpand(row.uid)}
                 onPickCustomer={(ret) =>
                   updateRow(row.uid, { customer: ret, phoneOverride: ret.phone || undefined, updatedAt: Date.now() })
