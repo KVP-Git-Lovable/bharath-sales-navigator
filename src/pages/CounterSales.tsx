@@ -1066,6 +1066,7 @@ interface CounterRow {
   status: RowStatus;
   expanded: boolean;
   paymentMode?: "full" | "partial" | "credit";
+  paymentMethod?: "cash" | "upi" | "neft" | "cheque";
   updatedAt?: number;
   customerType?: "existing" | "walkin";
   walkInName?: string;
@@ -1098,6 +1099,7 @@ const newRow = (): CounterRow => ({
   status: "draft",
   expanded: true,
   paymentMode: "full",
+  paymentMethod: "cash",
   updatedAt: Date.now(),
   customerType: "walkin",
   walkInName: "",
