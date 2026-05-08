@@ -46,6 +46,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineOrderEntry } from "@/hooks/useOfflineOrderEntry";
 import { submitOrderWithOfflineSupport } from "@/utils/offlineOrderUtils";
+import { getLocalTodayDate } from "@/utils/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -1106,6 +1107,12 @@ const rowAmount = (r: CounterRow) =>
 
 const rowItemCount = (r: CounterRow) => r.items.filter((i) => i.product_id).length;
 
+const hasRestorableContent = (row: CounterRow) =>
+  !!row.customer ||
+  !!(row.walkInName || "").trim() ||
+  !!(row.walkInPhone || "").trim() ||
+  row.items.some((i) => i.product_id);
+
 // ---------- main page ----------
 export interface EventContext {
   visitId: string;
@@ -1162,6 +1169,18 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (eventContext) return;
+    try {
+      const restorableRows = rows.filter((row) => row.status !== "submitted" && hasRestorableContent(row));
+      if (restorableRows.length > 0) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(restorableRows));
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {}
+  }, [eventContext, rows]);
+
   // ---- load already-submitted orders so the Summary tab persists across navigation ----
   useEffect(() => {
     if (!user) return;
@@ -1177,11 +1196,12 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
           query = query.eq("visit_id", eventContext.visitId);
         } else {
           // Regular counter sales: restore TODAY's counter orders for this user
-          const today = new Date().toISOString().slice(0, 10);
+          const today = getLocalTodayDate();
           query = query
             .eq("user_id", user.id)
             .eq("order_date", today)
-            .not("counter_customer_id", "is", null);
+            .is("retailer_id", null)
+            .is("visit_id", null);
         }
         const { data: orders, error } = await query;
         if (error || !orders || orders.length === 0) return;
@@ -1229,7 +1249,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         if (cancelled) return;
         setRows((prev) => {
           // Keep any in-progress (draft/saved) rows from current session, replace prior submitted set
-          const keepers = prev.filter((r) => r.status !== "submitted" && (r.customer || r.items.some((i) => i.product_id)));
+          const keepers = prev.filter((r) => r.status !== "submitted" && hasRestorableContent(r));
           const merged = [...submittedRows, ...keepers];
           return merged.length ? merged : [newRow()];
         });
@@ -1344,7 +1364,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       retailer_name: isWalkIn
         ? walkInName || "Walk-in Customer"
         : row.customer!.name,
-      order_date: new Date().toISOString().slice(0, 10),
+        order_date: getLocalTodayDate(),
       subtotal,
       discount_amount: 0,
       total_amount: total,
@@ -1489,7 +1509,7 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         retailer_name: isWalkIn
           ? walkInName || "Walk-in Customer"
           : r.customer!.name,
-        order_date: new Date().toISOString().slice(0, 10),
+        order_date: getLocalTodayDate(),
         subtotal,
         discount_amount: 0,
         total_amount: total,
