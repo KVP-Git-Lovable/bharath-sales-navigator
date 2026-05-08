@@ -1623,13 +1623,14 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
       (s, r) =>
         s +
         r.items.reduce(
-          (a, i) => a + (i.product_id ? (Number(i.quantity) || 0) * (Number(i.rate) || 0) : 0),
+          (a, i) => a + (i.product_id ? itemSubtotal(i) : 0),
           0
         ),
       0
     );
     const discount = rows.reduce(
-      (s, r) => s + r.items.reduce((a, i) => a + (i.product_id ? Number(i.discount) || 0 : 0), 0),
+      (s, r) =>
+        s + r.items.reduce((a, i) => a + (i.product_id ? itemDiscount(i) : 0), 0),
       0
     );
     const tax = rows.reduce(
