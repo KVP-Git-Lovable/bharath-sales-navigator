@@ -2079,6 +2079,19 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         </div>
       </div>
     </Layout>
+    <CameraCapture
+      isOpen={isCameraOpen}
+      onClose={() => setIsCameraOpen(false)}
+      onCapture={handleCameraCapture}
+      title={
+        cameraMode === "cheque"
+          ? "Capture Cheque Photo"
+          : cameraMode === "upi"
+          ? "Capture Payment Confirmation"
+          : "Capture NEFT Confirmation"
+      }
+    />
+    </>
   );
 }
 
