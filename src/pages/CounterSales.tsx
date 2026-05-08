@@ -1300,7 +1300,9 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
 
   // ---- save / submit ----
   const validateRow = (r: CounterRow): string | null => {
-    if ((r.customerType || "existing") === "existing") {
+    if (eventContext) {
+      if (!(r.walkInName || "").trim()) return "Enter walk-in customer name";
+    } else if ((r.customerType || "existing") === "existing") {
       if (!r.customer) return "Select a customer";
     }
     const filled = r.items.filter((i) => i.product_id);
