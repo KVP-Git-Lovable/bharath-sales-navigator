@@ -369,6 +369,10 @@ function CounterCustomerCard({
   onPaymentMethodChange,
   onCustomerTypeChange,
   onWalkInChange,
+  onPatchRow,
+  onOpenCamera,
+  companyQrCode,
+  isPaymentProofMandatory,
   onSave,
   onSubmit,
   onEdit,
@@ -386,10 +390,14 @@ function CounterCustomerCard({
   onAddItemRow: () => void;
   onUpdateItem: (itemUid: string, patch: Partial<CounterLineItem>) => void;
   onRemoveItem: (itemUid: string) => void;
-  onPaymentModeChange: (mode: "full" | "partial" | "credit") => void;
-  onPaymentMethodChange: (method: "cash" | "upi" | "neft" | "cheque") => void;
+  onPaymentModeChange: (mode: "" | "full" | "partial" | "credit") => void;
+  onPaymentMethodChange: (method: "" | "cash" | "upi" | "neft" | "cheque") => void;
   onCustomerTypeChange: (t: "existing" | "walkin") => void;
   onWalkInChange: (patch: { walkInName?: string; walkInPhone?: string; saveWalkIn?: boolean }) => void;
+  onPatchRow: (patch: Partial<CounterRow>) => void;
+  onOpenCamera: (mode: "cheque" | "upi" | "neft") => void;
+  companyQrCode: string | null;
+  isPaymentProofMandatory: boolean;
   onSave: () => void;
   onSubmit: () => void;
   onEdit: () => void;
@@ -397,7 +405,6 @@ function CounterCustomerCard({
   eventMode?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [methodTouched, setMethodTouched] = useState(false);
   const locked = row.status === "saved" || row.status === "submitted";
   const itemCount = rowItemCount(row);
 
@@ -434,8 +441,8 @@ function CounterCustomerCard({
         .toUpperCase()
     : `#${index}`;
 
-  const paymentMode = row.paymentMode || "full";
-  const paymentMethod = row.paymentMethod || "cash";
+  const paymentMode = row.paymentMode || "";
+  const paymentMethod = row.paymentMethod || "";
   const paymentLabel: Record<string, { label: string; cls: string }> = {
     full: { label: "Full Payment", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
     partial: { label: "Partial Payment", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
