@@ -56,7 +56,8 @@ export const TeamMemberDetailSheet = ({ isOpen, onClose, userId, userName }: Tea
       return data || [];
     },
     enabled: isOpen && !!userId,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always',
   });
 
   // Fetch week-off config
