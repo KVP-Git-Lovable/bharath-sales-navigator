@@ -326,21 +326,21 @@ export default function EventCreate() {
               label="Budget (₹)"
               required
             >
-              <Input className={cn(inputCls, "text-base font-semibold")} type="number" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="25,000" />
+              <Input className={cn(inputCls, "text-base font-semibold placeholder:font-normal placeholder:text-muted-foreground/50")} type="number" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="25,000" />
             </KpiField>
             <KpiField
               icon={<Target className="h-4 w-4" />}
               tint="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
               label="Sales Target (₹)"
             >
-              <Input className={cn(inputCls, "text-base font-semibold")} type="number" value={salesTarget} onChange={(e) => setSalesTarget(e.target.value)} placeholder="60,000" />
+              <Input className={cn(inputCls, "text-base font-semibold placeholder:font-normal placeholder:text-muted-foreground/50")} type="number" value={salesTarget} onChange={(e) => setSalesTarget(e.target.value)} placeholder="60,000" />
             </KpiField>
             <KpiField
               icon={<UsersRound className="h-4 w-4" />}
               tint="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
               label="Expected Footfall"
             >
-              <Input className={cn(inputCls, "text-base font-semibold")} value={expectedFootfall} onChange={(e) => setExpectedFootfall(e.target.value)} placeholder="500+" />
+              <Input className={cn(inputCls, "text-base font-semibold placeholder:font-normal placeholder:text-muted-foreground/50")} value={expectedFootfall} onChange={(e) => setExpectedFootfall(e.target.value)} placeholder="500+" />
             </KpiField>
           </div>
         </SectionCard>
