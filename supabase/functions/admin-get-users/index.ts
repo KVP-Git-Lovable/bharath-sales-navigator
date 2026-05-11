@@ -98,13 +98,41 @@ Deno.serve(async (req) => {
       console.error('Error fetching user roles:', rolesError)
     }
 
+    // Fetch actual emails from auth.users via admin API (paginated)
+    const emailMap = new Map<string, { email: string | null; email_confirmed_at: string | null; last_sign_in_at: string | null; phone: string | null }>()
+    try {
+      let page = 1
+      const perPage = 1000
+      while (true) {
+        const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+        if (authErr) {
+          console.error('Error listing auth users (page ' + page + '):', authErr)
+          break
+        }
+        const users = authData?.users || []
+        for (const u of users) {
+          emailMap.set(u.id, {
+            email: u.email ?? null,
+            email_confirmed_at: u.email_confirmed_at ?? null,
+            last_sign_in_at: u.last_sign_in_at ?? null,
+            phone: u.phone ?? null,
+          })
+        }
+        if (users.length < perPage) break
+        page += 1
+      }
+    } catch (e) {
+      console.error('Exception fetching auth users:', e)
+    }
+
     // Combine all data
     const usersWithDetails = (profiles || []).map(profile => {
       const roleData = userRoles?.find(r => r.user_id === profile.id)
-      
+      const authInfo = emailMap.get(profile.id)
+
       return {
         id: profile.id,
-        email: profile.username || 'No email',
+        email: authInfo?.email || profile.recovery_email || profile.username || 'No email',
         username: profile.username || 'N/A',
         full_name: profile.full_name || 'N/A',
         phone_number: profile.phone_number || 'N/A',
@@ -112,10 +140,10 @@ Deno.serve(async (req) => {
         role: roleData?.role || 'user',
         assigned_at: roleData?.assigned_at || profile.created_at,
         created_at: profile.created_at,
-        last_sign_in_at: null,
-        email_confirmed_at: null,
-        confirmed_at: null,
-        phone: null,
+        last_sign_in_at: authInfo?.last_sign_in_at || null,
+        email_confirmed_at: authInfo?.email_confirmed_at || null,
+        confirmed_at: authInfo?.email_confirmed_at || null,
+        phone: authInfo?.phone || null,
         app_metadata: {},
         user_metadata: {},
         profile: {
