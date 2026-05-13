@@ -1841,58 +1841,64 @@ const Operations = () => {
                                         )}
                                       </DialogTitle>
                                     </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                          <label className="text-sm font-medium">User</label>
-                                          <p className="text-sm text-muted-foreground">{item.user_name}</p>
+                                    <div className="space-y-5">
+                                      {/* Customer & order meta */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer</div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">User</div>
+                                            <div className="text-sm font-medium">{item.user_name}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Retailer</div>
+                                            <div className="text-sm font-medium">{item.retailer_name}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Mobile</div>
+                                            <div className="text-sm font-medium">
+                                              {item.retailer_phone ? (
+                                                <a href={`tel:${item.retailer_phone}`} className="text-primary inline-flex items-center gap-1 hover:underline">
+                                                  <Phone size={12} /> {item.retailer_phone}
+                                                </a>
+                                              ) : '—'}
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Order Date & Time</div>
+                                            <div className="text-sm font-medium">{format(new Date(item.created_at), 'PPpp')}</div>
+                                          </div>
                                         </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Retailer</label>
-                                          <p className="text-sm text-muted-foreground">{item.retailer_name}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Mobile</label>
-                                          <p className="text-sm text-muted-foreground">{item.retailer_phone || '—'}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Order Date & Time</label>
-                                          <p className="text-sm text-muted-foreground">
-                                            {format(new Date(item.created_at), 'PPpp')}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Payment Type</label>
-                                          <p className="text-sm text-muted-foreground capitalize">{getPaymentTypeLabel(item)}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Payment Mode</label>
-                                          <p className="text-sm text-muted-foreground capitalize">
-                                            {item.payment_method ? item.payment_method.replace(/_/g, ' ') : '—'}
-                                          </p>
-                                        </div>
-                                        {item.is_credit_order && (
-                                          <>
+                                        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</div>
+                                          <div className="grid grid-cols-2 gap-2">
                                             <div>
-                                              <label className="text-sm font-medium">Paid</label>
-                                              <p className="text-sm text-muted-foreground">₹{Number(item.credit_paid_amount || 0).toLocaleString()}</p>
+                                              <div className="text-xs text-muted-foreground">Payment Type</div>
+                                              <div className="text-sm font-medium capitalize">{getPaymentTypeLabel(item)}</div>
                                             </div>
                                             <div>
-                                              <label className="text-sm font-medium">Pending</label>
-                                              <p className="text-sm text-destructive">₹{Number(item.credit_pending_amount || 0).toLocaleString()}</p>
+                                              <div className="text-xs text-muted-foreground">Payment Mode</div>
+                                              <div className="text-sm font-medium capitalize">{item.payment_method ? item.payment_method.replace(/_/g, ' ') : '—'}</div>
                                             </div>
-                                          </>
-                                        )}
-                                        <div>
-                                          <label className="text-sm font-medium">Total Amount</label>
-                                          <p className="text-sm font-medium">₹{item.total_amount.toLocaleString()}</p>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Paid</div>
+                                              <div className="text-sm font-medium text-emerald-600">₹{Number(item.credit_paid_amount || 0).toLocaleString('en-IN')}</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Pending</div>
+                                              <div className={cn("text-sm font-medium", Number(item.credit_pending_amount || 0) > 0 ? "text-destructive" : "text-muted-foreground")}>
+                                                ₹{Number(item.credit_pending_amount || 0).toLocaleString('en-IN')}
+                                              </div>
+                                            </div>
+                                            <div className="col-span-2 pt-1 border-t">
+                                              <div className="text-xs text-muted-foreground">Total Amount</div>
+                                              <div className="text-base font-semibold">₹{Number(item.total_amount).toLocaleString('en-IN')}</div>
+                                            </div>
+                                          </div>
                                         </div>
                                         {item.is_edited && (
-                                          <div className="col-span-2">
-                                            <label className="text-sm font-medium">Last Modified</label>
-                                            <p className="text-sm text-muted-foreground">
-                                              {format(new Date(item.updated_at), 'PPpp')}
-                                            </p>
+                                          <div className="md:col-span-2 text-xs text-muted-foreground">
+                                            Last modified: {format(new Date(item.updated_at), 'PPpp')}
                                           </div>
                                         )}
                                       </div>
@@ -1922,8 +1928,13 @@ const Operations = () => {
                                                 return (
                                                   <TableRow key={index}>
                                                     <TableCell>{orderItem.product_name}</TableCell>
-                                                    <TableCell className="text-right">{qty}</TableCell>
-                                                    <TableCell className="text-right">₹{rate.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right">{formatItemQty(qty, orderItem.unit)}</TableCell>
+                                                    <TableCell className="text-right">
+                                                      ₹{rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                      {orderItem.unit && (
+                                                        <span className="text-xs text-muted-foreground"> /{String(orderItem.unit).toLowerCase()}</span>
+                                                      )}
+                                                    </TableCell>
                                                     <TableCell className="text-right">₹{taxable.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                                                     <TableCell className="text-right">₹{sgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                                                     <TableCell className="text-right">₹{cgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
@@ -1960,22 +1971,17 @@ const Operations = () => {
                                           );
                                         })()}
                                       </div>
-                                      {item.invoice_id && (
-                                        <div className="flex justify-end">
-                                          <InvoicePDFGenerator invoiceId={item.invoice_id} buttonLabel="Download Invoice" buttonIcon={<FileText className="mr-2 h-4 w-4" />} />
-                                        </div>
-                                      )}
+                                      <div className="flex justify-end">
+                                        <OrderInvoiceButton orderId={item.id} label="Download Invoice" icon={<FileText className="mr-2 h-4 w-4" />} />
+                                      </div>
                                     </div>
                                   </DialogContent>
                                 </Dialog>
-                                {item.invoice_id && (
-                                  <InvoicePDFGenerator
-                                    invoiceId={item.invoice_id}
-                                    buttonLabel=""
-                                    buttonIcon={<FileText size={16} />}
-                                    className="h-8 w-8 p-0"
-                                  />
-                                )}
+                                <OrderInvoiceButton
+                                  orderId={item.id}
+                                  iconOnly
+                                  icon={<FileText size={16} />}
+                                />
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
