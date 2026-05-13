@@ -137,6 +137,17 @@ const Operations = () => {
     orders: 0,
     stockUpdates: 0
   });
+
+  const getPaymentTypeLabel = (o: { is_credit_order?: boolean; credit_paid_amount?: number; payment_status?: string | null }) => {
+    const paid = Number(o.credit_paid_amount || 0);
+    if (o.is_credit_order) {
+      if (paid > 0) return 'Partial Payment';
+      return 'Full Credit';
+    }
+    if (o.payment_status === 'partial') return 'Partial Payment';
+    if (o.payment_status === 'pending') return 'Pending';
+    return 'Full Payment';
+  };
   
   // Edit order dialog state
   const [editOrderDialogOpen, setEditOrderDialogOpen] = useState(false);
