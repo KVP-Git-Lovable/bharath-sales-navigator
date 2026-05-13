@@ -14005,7 +14005,6 @@ export type Database = {
           id: string
           is_active: boolean | null
           policy_name: string
-          policy_value: Json
           updated_at: string | null
           updated_by: string | null
         }
@@ -14014,7 +14013,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           policy_name: string
-          policy_value: Json
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -14023,7 +14021,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           policy_name?: string
-          policy_value?: Json
           updated_at?: string | null
           updated_by?: string | null
         }
