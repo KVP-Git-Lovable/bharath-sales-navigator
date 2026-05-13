@@ -110,7 +110,10 @@ const initialSchemeForm = {
   multi_product_mode: false,
   target_product_ids: [] as string[],
   discount_mode: 'same' as 'same' | 'different',
-  per_product_discounts: {} as Record<string, { discount_percentage: number }>
+  per_product_discounts: {} as Record<string, { discount_percentage: number }>,
+  // Manual per-unit discount fields
+  max_discount_per_unit: 0,
+  discount_unit: 'kg',
 };
 
 export const SchemeMaster = () => {
