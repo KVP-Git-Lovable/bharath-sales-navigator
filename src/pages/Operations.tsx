@@ -1669,18 +1669,63 @@ const Operations = () => {
 
               {/* Orders Tab */}
               <TabsContent value="orders">
-                <div className="rounded-md border">
+                {/* Orders Tab Header */}
+                {(() => {
+                  const totalValue = filteredOrderData.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+                  const creditCount = filteredOrderData.filter(o => o.is_credit_order).length;
+                  const paidCount = filteredOrderData.filter(o => !o.is_credit_order && o.payment_status !== 'pending').length;
+                  const pendingAmt = filteredOrderData.reduce((s, o) => s + Number(o.credit_pending_amount || 0), 0);
+                  return (
+                    <div className="mb-4 rounded-xl border bg-gradient-to-br from-primary/5 via-background to-accent/5 p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Package size={20} className="text-primary" />
+                          </div>
+                          <div>
+                            <h2 className="text-xl font-semibold tracking-tight">Order Management</h2>
+                            <p className="text-sm text-muted-foreground">
+                              Track confirmed orders, payment status, and download invoices in one place.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Orders</div>
+                            <div className="text-lg font-semibold">{filteredOrderData.length}</div>
+                          </div>
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Value</div>
+                            <div className="text-lg font-semibold">₹{totalValue.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Paid</div>
+                            <div className="text-lg font-semibold text-emerald-600">{paidCount}</div>
+                          </div>
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Credit Pending</div>
+                            <div className="text-lg font-semibold text-amber-600">
+                              {creditCount} <span className="text-xs font-normal text-muted-foreground">(₹{pendingAmt.toLocaleString('en-IN')})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="rounded-xl border bg-card overflow-hidden">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="hover:bg-transparent">
                         <TableHead>User Name</TableHead>
                         <TableHead>Retailer Name</TableHead>
                         <TableHead>Mobile</TableHead>
                         <TableHead>Order Date & Time</TableHead>
-                        <TableHead>Order Value</TableHead>
+                        <TableHead className="text-right">Order Value</TableHead>
                         <TableHead>Payment</TableHead>
                         <TableHead>Items</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1698,7 +1743,7 @@ const Operations = () => {
                         </TableRow>
                       ) : (
                         filteredOrderData.map((item) => (
-                          <TableRow key={item.id}>
+                          <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
                             <TableCell className="font-medium">{item.user_name}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
