@@ -1258,8 +1258,26 @@ const Operations = () => {
                         </button>
                       </div>
                     </div>
+                    <div className="px-2 pt-2 pb-1 border-b">
+                      <Input
+                        autoFocus
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Search user…"
+                        className="h-7 text-xs"
+                      />
+                    </div>
                     <div className="max-h-64 overflow-y-auto py-1">
-                      {users.map(user => {
+                      {users
+                        .filter(u => {
+                          const q = userSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            (u.full_name || '').toLowerCase().includes(q) ||
+                            (u.username || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .map(user => {
                         const checked = userFilter.includes(user.id);
                         return (
                           <label
