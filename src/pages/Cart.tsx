@@ -250,14 +250,22 @@ export const Cart = () => {
 
   // Calculate order totals using scheme engine
   const orderCalculation = React.useMemo(() => {
-    const schemeItems: SchemeItem[] = cartItems.map(item => ({
-      id: item.id,
-      product_id: item.id.includes('_variant_') ? item.id.split('_variant_')[0] : item.id,
-      variant_id: item.id.includes('_variant_') ? item.id.split('_variant_')[1] : undefined,
-      quantity: item.quantity,
-      rate: getDisplayRate(item),
-      name: item.name
-    }));
+    const schemeItems: SchemeItem[] = cartItems.map(item => {
+      const { qty: displayQuantity } = getDisplayQuantityAndUnit(item);
+      const isKgDisplayUnit = (item.display_unit || item.unit || '').toLowerCase() === 'kg';
+      const displayRate = isKgDisplayUnit && item.unit?.toLowerCase() === 'grams'
+        ? getDisplayRate(item) * 1000
+        : getDisplayRate(item);
+
+      return {
+        id: item.id,
+        product_id: item.id.includes('_variant_') ? item.id.split('_variant_')[0] : item.id,
+        variant_id: item.id.includes('_variant_') ? item.id.split('_variant_')[1] : undefined,
+        quantity: displayQuantity,
+        rate: displayRate,
+        name: item.name
+      };
+    });
     
     return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds, manualSelections);
   }, [cartItems, schemes, appliedSchemeIds, manualSelections]);
