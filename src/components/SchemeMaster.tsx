@@ -520,6 +520,7 @@ export const SchemeMaster = () => {
       // Manual per-unit discount fields
       max_discount_per_unit: schemeAny.max_discount_per_unit || 0,
       discount_unit: schemeAny.discount_unit || 'kg',
+      discount_value_type: (schemeAny.discount_value_type === 'percentage' ? 'percentage' : 'amount') as 'amount' | 'percentage',
     });
     // Load applicability rules for this scheme
     loadApplicabilityRules(scheme.id);
