@@ -503,7 +503,10 @@ export const SchemeMaster = () => {
       multi_product_mode: isMultiProduct,
       target_product_ids: schemeAny.target_product_ids || [],
       discount_mode: hasPerProductDiscounts ? 'different' : 'same',
-      per_product_discounts: schemeAny.per_product_discounts || {}
+      per_product_discounts: schemeAny.per_product_discounts || {},
+      // Manual per-unit discount fields
+      max_discount_per_unit: schemeAny.max_discount_per_unit || 0,
+      discount_unit: schemeAny.discount_unit || 'kg',
     });
     // Load applicability rules for this scheme
     loadApplicabilityRules(scheme.id);
