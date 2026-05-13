@@ -23,6 +23,7 @@ import EditOrderDialog from '@/components/EditOrderDialog';
 import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDialog';
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
+import { OrderInvoiceButton } from '@/components/invoice/OrderInvoiceButton';
 import { FileText, Phone } from 'lucide-react';
 
 interface CheckInOutData {
@@ -138,15 +139,37 @@ const Operations = () => {
     stockUpdates: 0
   });
 
-  const getPaymentTypeLabel = (o: { is_credit_order?: boolean; credit_paid_amount?: number; payment_status?: string | null }) => {
+  const getPaymentTypeLabel = (o: { is_credit_order?: boolean; credit_paid_amount?: number; credit_pending_amount?: number; total_amount?: number; payment_status?: string | null }) => {
     const paid = Number(o.credit_paid_amount || 0);
+    const pending = Number(o.credit_pending_amount || 0);
+    const total = Number(o.total_amount || 0);
     if (o.is_credit_order) {
-      if (paid > 0) return 'Partial Payment';
-      return 'Full Credit';
+      if (paid <= 0) return 'Full Credit';
+      if (pending > 0 || paid < total) return 'Partial Payment';
+      return 'Full Payment';
     }
+    // Non-credit order: derive from amount paid vs total (payment_status is unreliable)
+    if (total > 0 && paid >= total) return 'Full Payment';
+    if (paid > 0) return 'Partial Payment';
     if (o.payment_status === 'partial') return 'Partial Payment';
-    if (o.payment_status === 'pending') return 'Pending';
-    return 'Full Payment';
+    return 'Pending';
+  };
+
+  // Format an order-item quantity using its stored unit.
+  // Grams >= 1000 are shown as KG for readability.
+  const formatItemQty = (qty: number | string | null | undefined, unit: string | null | undefined): string => {
+    const n = Number(qty || 0);
+    const u = String(unit || '').trim();
+    const ul = u.toLowerCase();
+    if ((ul === 'grams' || ul === 'gram' || ul === 'g') && n >= 1000) {
+      const kg = n / 1000;
+      return `${kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(2)} KG`;
+    }
+    if ((ul === 'ml' || ul === 'milliliter' || ul === 'milliliters') && n >= 1000) {
+      const l = n / 1000;
+      return `${l % 1 === 0 ? l.toFixed(0) : l.toFixed(2)} L`;
+    }
+    return u ? `${n} ${u}` : String(n);
   };
   
   // Edit order dialog state
@@ -510,8 +533,7 @@ const Operations = () => {
           credit_paid_amount,
           payment_method,
           payment_status,
-          invoice_number,
-          order_items(product_name, quantity, rate, total, sgst_amount, cgst_amount, hsn_code, unit)
+          invoice_number
         `)
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
@@ -552,7 +574,7 @@ const Operations = () => {
       const counterIds = [...new Set((ordersData || []).map(o => o.counter_customer_id).filter(Boolean) as string[])];
       const orderIds = (ordersData || []).map(o => o.id);
 
-      const [{ data: usersData }, { data: retailersData }, { data: counterData }, { data: invoicesData }] = await Promise.all([
+      const [{ data: usersData }, { data: retailersData }, { data: counterData }, { data: invoicesData }, { data: itemsData }] = await Promise.all([
         supabase.from('profiles').select('id, full_name, username').in('id', userIds),
         retailerIds.length
           ? supabase.from('retailers').select('id, phone').in('id', retailerIds)
@@ -563,6 +585,12 @@ const Operations = () => {
         orderIds.length
           ? supabase.from('invoices').select('id, order_id').in('order_id', orderIds)
           : Promise.resolve({ data: [] as any[] }),
+        orderIds.length
+          ? supabase
+              .from('order_items')
+              .select('order_id, product_name, quantity, rate, total, sgst_amount, cgst_amount, hsn_code, unit')
+              .in('order_id', orderIds)
+          : Promise.resolve({ data: [] as any[] }),
       ]);
 
       const formattedData = ordersData?.map(order => {
@@ -570,6 +598,7 @@ const Operations = () => {
         const retailer = retailersData?.find((r: any) => r.id === order.retailer_id);
         const counter = counterData?.find((c: any) => c.id === order.counter_customer_id);
         const invoice = invoicesData?.find((i: any) => i.order_id === order.id);
+        const itemsForOrder = (itemsData || []).filter((it: any) => it.order_id === order.id);
         
         // Check if order was edited (updated_at differs from created_at by more than 5 seconds)
         const createdTime = new Date(order.created_at).getTime();
@@ -587,7 +616,7 @@ const Operations = () => {
           subtotal: Number(order.subtotal || 0),
           discount_amount: Number(order.discount_amount || 0),
           status: order.status,
-          items: order.order_items || [],
+          items: itemsForOrder,
           is_edited: isEdited,
           is_credit_order: order.is_credit_order || false,
           credit_pending_amount: order.credit_pending_amount || 0,
@@ -1671,10 +1700,16 @@ const Operations = () => {
               <TabsContent value="orders">
                 {/* Orders Tab Header */}
                 {(() => {
-                  const totalValue = filteredOrderData.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-                  const creditCount = filteredOrderData.filter(o => o.is_credit_order).length;
-                  const paidCount = filteredOrderData.filter(o => !o.is_credit_order && o.payment_status !== 'pending').length;
-                  const pendingAmt = filteredOrderData.reduce((s, o) => s + Number(o.credit_pending_amount || 0), 0);
+                   const totalValue = filteredOrderData.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+                   const isFullyPaid = (o: OrderData) => {
+                     const paid = Number(o.credit_paid_amount || 0);
+                     const total = Number(o.total_amount || 0);
+                     if (o.is_credit_order) return Number(o.credit_pending_amount || 0) <= 0 && paid >= total;
+                     return total > 0 && paid >= total;
+                   };
+                   const paidCount = filteredOrderData.filter(isFullyPaid).length;
+                   const creditCount = filteredOrderData.filter(o => o.is_credit_order && Number(o.credit_pending_amount || 0) > 0).length;
+                   const pendingAmt = filteredOrderData.reduce((s, o) => s + Number(o.credit_pending_amount || 0), 0);
                   return (
                     <div className="mb-4 rounded-xl border bg-gradient-to-br from-primary/5 via-background to-accent/5 p-5">
                       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1806,58 +1841,64 @@ const Operations = () => {
                                         )}
                                       </DialogTitle>
                                     </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                          <label className="text-sm font-medium">User</label>
-                                          <p className="text-sm text-muted-foreground">{item.user_name}</p>
+                                    <div className="space-y-5">
+                                      {/* Customer & order meta */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer</div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">User</div>
+                                            <div className="text-sm font-medium">{item.user_name}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Retailer</div>
+                                            <div className="text-sm font-medium">{item.retailer_name}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Mobile</div>
+                                            <div className="text-sm font-medium">
+                                              {item.retailer_phone ? (
+                                                <a href={`tel:${item.retailer_phone}`} className="text-primary inline-flex items-center gap-1 hover:underline">
+                                                  <Phone size={12} /> {item.retailer_phone}
+                                                </a>
+                                              ) : '—'}
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Order Date & Time</div>
+                                            <div className="text-sm font-medium">{format(new Date(item.created_at), 'PPpp')}</div>
+                                          </div>
                                         </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Retailer</label>
-                                          <p className="text-sm text-muted-foreground">{item.retailer_name}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Mobile</label>
-                                          <p className="text-sm text-muted-foreground">{item.retailer_phone || '—'}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Order Date & Time</label>
-                                          <p className="text-sm text-muted-foreground">
-                                            {format(new Date(item.created_at), 'PPpp')}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Payment Type</label>
-                                          <p className="text-sm text-muted-foreground capitalize">{getPaymentTypeLabel(item)}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium">Payment Mode</label>
-                                          <p className="text-sm text-muted-foreground capitalize">
-                                            {item.payment_method ? item.payment_method.replace(/_/g, ' ') : '—'}
-                                          </p>
-                                        </div>
-                                        {item.is_credit_order && (
-                                          <>
+                                        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</div>
+                                          <div className="grid grid-cols-2 gap-2">
                                             <div>
-                                              <label className="text-sm font-medium">Paid</label>
-                                              <p className="text-sm text-muted-foreground">₹{Number(item.credit_paid_amount || 0).toLocaleString()}</p>
+                                              <div className="text-xs text-muted-foreground">Payment Type</div>
+                                              <div className="text-sm font-medium capitalize">{getPaymentTypeLabel(item)}</div>
                                             </div>
                                             <div>
-                                              <label className="text-sm font-medium">Pending</label>
-                                              <p className="text-sm text-destructive">₹{Number(item.credit_pending_amount || 0).toLocaleString()}</p>
+                                              <div className="text-xs text-muted-foreground">Payment Mode</div>
+                                              <div className="text-sm font-medium capitalize">{item.payment_method ? item.payment_method.replace(/_/g, ' ') : '—'}</div>
                                             </div>
-                                          </>
-                                        )}
-                                        <div>
-                                          <label className="text-sm font-medium">Total Amount</label>
-                                          <p className="text-sm font-medium">₹{item.total_amount.toLocaleString()}</p>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Paid</div>
+                                              <div className="text-sm font-medium text-emerald-600">₹{Number(item.credit_paid_amount || 0).toLocaleString('en-IN')}</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Pending</div>
+                                              <div className={cn("text-sm font-medium", Number(item.credit_pending_amount || 0) > 0 ? "text-destructive" : "text-muted-foreground")}>
+                                                ₹{Number(item.credit_pending_amount || 0).toLocaleString('en-IN')}
+                                              </div>
+                                            </div>
+                                            <div className="col-span-2 pt-1 border-t">
+                                              <div className="text-xs text-muted-foreground">Total Amount</div>
+                                              <div className="text-base font-semibold">₹{Number(item.total_amount).toLocaleString('en-IN')}</div>
+                                            </div>
+                                          </div>
                                         </div>
                                         {item.is_edited && (
-                                          <div className="col-span-2">
-                                            <label className="text-sm font-medium">Last Modified</label>
-                                            <p className="text-sm text-muted-foreground">
-                                              {format(new Date(item.updated_at), 'PPpp')}
-                                            </p>
+                                          <div className="md:col-span-2 text-xs text-muted-foreground">
+                                            Last modified: {format(new Date(item.updated_at), 'PPpp')}
                                           </div>
                                         )}
                                       </div>
@@ -1887,8 +1928,13 @@ const Operations = () => {
                                                 return (
                                                   <TableRow key={index}>
                                                     <TableCell>{orderItem.product_name}</TableCell>
-                                                    <TableCell className="text-right">{qty}</TableCell>
-                                                    <TableCell className="text-right">₹{rate.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right">{formatItemQty(qty, orderItem.unit)}</TableCell>
+                                                    <TableCell className="text-right">
+                                                      ₹{rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                      {orderItem.unit && (
+                                                        <span className="text-xs text-muted-foreground"> /{String(orderItem.unit).toLowerCase()}</span>
+                                                      )}
+                                                    </TableCell>
                                                     <TableCell className="text-right">₹{taxable.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                                                     <TableCell className="text-right">₹{sgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                                                     <TableCell className="text-right">₹{cgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
@@ -1925,22 +1971,17 @@ const Operations = () => {
                                           );
                                         })()}
                                       </div>
-                                      {item.invoice_id && (
-                                        <div className="flex justify-end">
-                                          <InvoicePDFGenerator invoiceId={item.invoice_id} buttonLabel="Download Invoice" buttonIcon={<FileText className="mr-2 h-4 w-4" />} />
-                                        </div>
-                                      )}
+                                      <div className="flex justify-end">
+                                        <OrderInvoiceButton orderId={item.id} label="Download Invoice" icon={<FileText className="mr-2 h-4 w-4" />} />
+                                      </div>
                                     </div>
                                   </DialogContent>
                                 </Dialog>
-                                {item.invoice_id && (
-                                  <InvoicePDFGenerator
-                                    invoiceId={item.invoice_id}
-                                    buttonLabel=""
-                                    buttonIcon={<FileText size={16} />}
-                                    className="h-8 w-8 p-0"
-                                  />
-                                )}
+                                <OrderInvoiceButton
+                                  orderId={item.id}
+                                  iconOnly
+                                  icon={<FileText size={16} />}
+                                />
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
