@@ -647,5 +647,35 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         )}
       </DialogContent>
     </Dialog>
+
+    <ManualPerUnitApplyDialog
+      isOpen={!!pickerScheme}
+      onClose={() => setPickerScheme(null)}
+      scheme={pickerScheme}
+      cartLines={orderRows
+        .filter(r => r.product && r.quantity > 0)
+        .map(r => ({
+          id: r.variant?.id || r.product!.id,
+          productId: r.product!.id,
+          variantId: r.variant?.id,
+          name: r.variant?.variant_name || r.product!.name,
+          quantity: r.quantity,
+          rate: r.variant?.price ?? r.product!.rate,
+          unit: r.product!.unit,
+        }))}
+      initialSelection={pickerScheme ? manualSelections[pickerScheme.id] : undefined}
+      onConfirm={(selection) => {
+        if (!pickerScheme) return;
+        onSetManualSelection?.(pickerScheme.id, selection);
+        if (!appliedSchemeIds.includes(pickerScheme.id)) {
+          onApplyScheme(pickerScheme);
+        }
+        toast({
+          title: 'Offer Applied',
+          description: `${pickerScheme.name} added to selected line`,
+        });
+      }}
+    />
+    </>
   );
 };
