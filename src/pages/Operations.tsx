@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useManagedInterval } from '@/utils/intervalManager';
+import { useManagedInterval, debounce } from '@/utils/intervalManager';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
@@ -97,9 +97,13 @@ const Operations = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
   const navigate = useNavigate();
   
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try { return localStorage.getItem('operations_active_tab') || 'orders'; } catch { return 'orders'; }
+  });
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState<string>(() => {
+    try { return localStorage.getItem('operations_search_term') || ''; } catch { return ''; }
+  });
   const [userFilter, setUserFilter] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('operations_user_filter');
@@ -115,16 +119,33 @@ const Operations = () => {
     try { localStorage.setItem('operations_user_filter', JSON.stringify(userFilter)); } catch {}
   }, [userFilter]);
   const [summaryDateFilter, setSummaryDateFilter] = useState<'today' | 'week' | 'month'>('today');
-  
-  // Separate date filters for each section
-  const [checkinDateFilter, setCheckinDateFilter] = useState('today');
-  const [orderDateFilter, setOrderDateFilter] = useState('today');
-  const [stockDateFilter, setStockDateFilter] = useState('today');
-  
-  // Custom date ranges
-  const [checkinCustomRange, setCheckinCustomRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
-  const [orderCustomRange, setOrderCustomRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
-  const [stockCustomRange, setStockCustomRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
+
+  // Helper: hydrate string filter from localStorage
+  const hydrateString = (key: string, fallback: string): string => {
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+  };
+  // Helper: hydrate {from,to} Date range from localStorage
+  const hydrateRange = (key: string): { from: Date | null; to: Date | null } => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return { from: null, to: null };
+      const parsed = JSON.parse(raw);
+      return {
+        from: parsed?.from ? new Date(parsed.from) : null,
+        to: parsed?.to ? new Date(parsed.to) : null,
+      };
+    } catch { return { from: null, to: null }; }
+  };
+
+  // Separate date filters for each section (persisted)
+  const [checkinDateFilter, setCheckinDateFilter] = useState(() => hydrateString('operations_checkin_date_filter', 'today'));
+  const [orderDateFilter, setOrderDateFilter] = useState(() => hydrateString('operations_order_date_filter', 'today'));
+  const [stockDateFilter, setStockDateFilter] = useState(() => hydrateString('operations_stock_date_filter', 'today'));
+
+  // Custom date ranges (persisted)
+  const [checkinCustomRange, setCheckinCustomRange] = useState<{ from: Date | null; to: Date | null }>(() => hydrateRange('operations_checkin_custom_range'));
+  const [orderCustomRange, setOrderCustomRange] = useState<{ from: Date | null; to: Date | null }>(() => hydrateRange('operations_order_custom_range'));
+  const [stockCustomRange, setStockCustomRange] = useState<{ from: Date | null; to: Date | null }>(() => hydrateRange('operations_stock_custom_range'));
   
   // Data states
   const [checkInData, setCheckInData] = useState<CheckInOutData[]>([]);
@@ -144,9 +165,43 @@ const Operations = () => {
   const [loadingCancelled, setLoadingCancelled] = useState(false);
   
   // Date filter for competitor and return stock
-  const [competitorDateFilter, setCompetitorDateFilter] = useState('today');
-  const [returnStockDateFilter, setReturnStockDateFilter] = useState('today');
-  const [cancelledDateFilter, setCancelledDateFilter] = useState('today');
+  const [competitorDateFilter, setCompetitorDateFilter] = useState(() => hydrateString('operations_competitor_date_filter', 'today'));
+  const [returnStockDateFilter, setReturnStockDateFilter] = useState(() => hydrateString('operations_return_stock_date_filter', 'today'));
+  const [cancelledDateFilter, setCancelledDateFilter] = useState(() => hydrateString('operations_cancelled_date_filter', 'today'));
+
+  // Persist all filter state back to localStorage
+  useEffect(() => { try { localStorage.setItem('operations_active_tab', activeTab); } catch {} }, [activeTab]);
+  useEffect(() => { try { localStorage.setItem('operations_search_term', searchTerm); } catch {} }, [searchTerm]);
+  useEffect(() => { try { localStorage.setItem('operations_checkin_date_filter', checkinDateFilter); } catch {} }, [checkinDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_order_date_filter', orderDateFilter); } catch {} }, [orderDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_stock_date_filter', stockDateFilter); } catch {} }, [stockDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_competitor_date_filter', competitorDateFilter); } catch {} }, [competitorDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_return_stock_date_filter', returnStockDateFilter); } catch {} }, [returnStockDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_cancelled_date_filter', cancelledDateFilter); } catch {} }, [cancelledDateFilter]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('operations_checkin_custom_range', JSON.stringify({
+        from: checkinCustomRange.from?.toISOString() ?? null,
+        to: checkinCustomRange.to?.toISOString() ?? null,
+      }));
+    } catch {}
+  }, [checkinCustomRange]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('operations_order_custom_range', JSON.stringify({
+        from: orderCustomRange.from?.toISOString() ?? null,
+        to: orderCustomRange.to?.toISOString() ?? null,
+      }));
+    } catch {}
+  }, [orderCustomRange]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('operations_stock_custom_range', JSON.stringify({
+        from: stockCustomRange.from?.toISOString() ?? null,
+        to: stockCustomRange.to?.toISOString() ?? null,
+      }));
+    } catch {}
+  }, [stockCustomRange]);
   
   // Summary counters
   const [todayStats, setTodayStats] = useState({
@@ -226,8 +281,8 @@ const Operations = () => {
     }
   };
   // Fetch check-in/check-out data
-  const fetchCheckInData = async () => {
-    setLoadingCheckins(true);
+  const fetchCheckInData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCheckins(true);
     try {
       let query = supabase
         .from('visits')
@@ -520,15 +575,15 @@ const Operations = () => {
       setTodayStats(prev => ({ ...prev, checkins: todayCheckins }));
     } catch (error) {
       console.error('Error fetching check-in data:', error);
-      toast.error('Failed to fetch check-in data');
+      if (!silent) toast.error('Failed to fetch check-in data');
     } finally {
-      setLoadingCheckins(false);
+      if (!silent) setLoadingCheckins(false);
     }
-  };
+  }, [userFilter, checkinDateFilter, checkinCustomRange, users]);
 
   // Fetch order data
-  const fetchOrderData = async () => {
-    setLoadingOrders(true);
+  const fetchOrderData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingOrders(true);
     try {
       let query = supabase
         .from('orders')
@@ -654,15 +709,15 @@ const Operations = () => {
       setTodayStats(prev => ({ ...prev, orders: todayOrders }));
     } catch (error) {
       console.error('Error fetching order data:', error);
-      toast.error('Failed to fetch order data');
+      if (!silent) toast.error('Failed to fetch order data');
     } finally {
-      setLoadingOrders(false);
+      if (!silent) setLoadingOrders(false);
     }
-  };
+  }, [userFilter, orderDateFilter, orderCustomRange]);
 
   // Fetch stock data
-  const fetchStockData = async () => {
-    setLoadingStock(true);
+  const fetchStockData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingStock(true);
     try {
       let query = supabase
         .from('stock')
@@ -739,15 +794,15 @@ const Operations = () => {
       setTodayStats(prev => ({ ...prev, stockUpdates: todayStock }));
     } catch (error) {
       console.error('Error fetching stock data:', error);
-      toast.error('Failed to fetch stock data');
+      if (!silent) toast.error('Failed to fetch stock data');
     } finally {
-      setLoadingStock(false);
+      if (!silent) setLoadingStock(false);
     }
-  };
+  }, [userFilter, stockDateFilter, stockCustomRange]);
 
   // Fetch competitor data
-  const fetchCompetitorData = async () => {
-    setLoadingCompetitor(true);
+  const fetchCompetitorData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCompetitor(true);
     try {
       const competitorToday = new Date();
       const startOfToday = new Date(competitorToday.getFullYear(), competitorToday.getMonth(), competitorToday.getDate());
@@ -827,15 +882,15 @@ const Operations = () => {
       setCompetitorData(formattedData);
     } catch (error) {
       console.error('Error fetching competitor data:', error);
-      toast.error('Failed to fetch competitor data');
+      if (!silent) toast.error('Failed to fetch competitor data');
     } finally {
-      setLoadingCompetitor(false);
+      if (!silent) setLoadingCompetitor(false);
     }
-  };
+  }, [userFilter, competitorDateFilter]);
 
   // Fetch return stock data
-  const fetchReturnStockData = async () => {
-    setLoadingReturnStock(true);
+  const fetchReturnStockData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingReturnStock(true);
     try {
       const returnToday = new Date();
       const startOfToday = new Date(returnToday.getFullYear(), returnToday.getMonth(), returnToday.getDate());
@@ -930,15 +985,15 @@ const Operations = () => {
       setReturnStockData(formattedData);
     } catch (error) {
       console.error('Error fetching return stock data:', error);
-      toast.error('Failed to fetch return stock data');
+      if (!silent) toast.error('Failed to fetch return stock data');
     } finally {
-      setLoadingReturnStock(false);
+      if (!silent) setLoadingReturnStock(false);
     }
-  };
+  }, [userFilter, returnStockDateFilter]);
 
   // Fetch cancelled orders data
-  const fetchCancelledOrders = async () => {
-    setLoadingCancelled(true);
+  const fetchCancelledOrders = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCancelled(true);
     try {
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -1022,11 +1077,11 @@ const Operations = () => {
       }
     } catch (error) {
       console.error('Error fetching cancelled orders:', error);
-      toast.error('Failed to fetch cancelled orders');
+      if (!silent) toast.error('Failed to fetch cancelled orders');
     } finally {
-      setLoadingCancelled(false);
+      if (!silent) setLoadingCancelled(false);
     }
-  };
+  }, [userFilter, cancelledDateFilter]);
 
 
   const filterData = (data: any[], searchFields: string[]) => {
@@ -1054,75 +1109,82 @@ const Operations = () => {
     await downloadCSV(csvContent, `${filename}-${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
-  // Initial data fetch (ensure users are loaded before building check-ins)
-  useEffect(() => {
-    (async () => {
-      await fetchUsers();
-      await fetchCheckInData();
-      await fetchOrderData();
-      await fetchStockData();
-      await fetchCompetitorData();
-      await fetchReturnStockData();
-      await fetchCancelledOrders();
-    })();
-  }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, cancelledDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
+  // Initial users fetch (once)
+  useEffect(() => { fetchUsers(); }, []);
 
-  // Use managed interval for auto-refresh (pauses when app is hidden)
+  // Per-dataset effects: only re-fetch when own filters change
+  useEffect(() => { fetchOrderData(false); }, [fetchOrderData]);
+  useEffect(() => { fetchCheckInData(false); }, [fetchCheckInData]);
+  useEffect(() => { fetchStockData(false); }, [fetchStockData]);
+  useEffect(() => { fetchCompetitorData(false); }, [fetchCompetitorData]);
+  useEffect(() => { fetchReturnStockData(false); }, [fetchReturnStockData]);
+  useEffect(() => { fetchCancelledOrders(false); }, [fetchCancelledOrders]);
+
+  // Refs to latest fetch fns so realtime / interval don't resubscribe
+  const fetchOrderDataRef = useRef(fetchOrderData);
+  const fetchCheckInDataRef = useRef(fetchCheckInData);
+  const fetchStockDataRef = useRef(fetchStockData);
+  const fetchCompetitorDataRef = useRef(fetchCompetitorData);
+  const fetchReturnStockDataRef = useRef(fetchReturnStockData);
+  const fetchCancelledOrdersRef = useRef(fetchCancelledOrders);
+  useEffect(() => { fetchOrderDataRef.current = fetchOrderData; }, [fetchOrderData]);
+  useEffect(() => { fetchCheckInDataRef.current = fetchCheckInData; }, [fetchCheckInData]);
+  useEffect(() => { fetchStockDataRef.current = fetchStockData; }, [fetchStockData]);
+  useEffect(() => { fetchCompetitorDataRef.current = fetchCompetitorData; }, [fetchCompetitorData]);
+  useEffect(() => { fetchReturnStockDataRef.current = fetchReturnStockData; }, [fetchReturnStockData]);
+  useEffect(() => { fetchCancelledOrdersRef.current = fetchCancelledOrders; }, [fetchCancelledOrders]);
+
+  // Silent 60s background refresh of the active tab only
   const refreshActiveTab = useCallback(() => {
-    if (activeTab === 'checkins') fetchCheckInData();
-    if (activeTab === 'orders') fetchOrderData();
-    if (activeTab === 'stock') fetchStockData();
-    if (activeTab === 'competitor') fetchCompetitorData();
-    if (activeTab === 'returnstock') fetchReturnStockData();
-    if (activeTab === 'cancelled') fetchCancelledOrders();
+    if (activeTab === 'checkins') fetchCheckInDataRef.current(true);
+    if (activeTab === 'orders') fetchOrderDataRef.current(true);
+    if (activeTab === 'stock') fetchStockDataRef.current(true);
+    if (activeTab === 'competitor') fetchCompetitorDataRef.current(true);
+    if (activeTab === 'returnstock') fetchReturnStockDataRef.current(true);
+    if (activeTab === 'cancelled') fetchCancelledOrdersRef.current(true);
   }, [activeTab]);
-  
+
   useManagedInterval(
     `operations-refresh-${activeTab}`,
     refreshActiveTab,
-    60000, // Increased from 30s to 60s
+    60000,
     { enabled: autoRefresh, runWhenHidden: false }
   );
 
-  // Real-time subscriptions
+  // Real-time subscriptions — subscribe ONCE per autoRefresh toggle.
+  // Callbacks read from refs so filter changes don't tear down channels.
   useEffect(() => {
     if (!autoRefresh) return;
 
-    const visitsChannel = supabase
-      .channel('visits-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
-        fetchCheckInData();
-      })
-      .subscribe();
+    const silentRefetchOrders = debounce(() => fetchOrderDataRef.current(true), 800);
+    const silentRefetchCheckins = debounce(() => fetchCheckInDataRef.current(true), 800);
+    const silentRefetchStock = debounce(() => fetchStockDataRef.current(true), 800);
+    const silentRefetchReturns = debounce(() => fetchReturnStockDataRef.current(true), 800);
 
     const ordersChannel = supabase
-      .channel('orders-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrderData();
-      })
+      .channel('operations-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, silentRefetchOrders)
       .subscribe();
-
+    const visitsChannel = supabase
+      .channel('operations-visits')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, silentRefetchCheckins)
+      .subscribe();
     const stockChannel = supabase
-      .channel('stock-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, () => {
-        fetchStockData();
-      })
+      .channel('operations-stock')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, silentRefetchStock)
       .subscribe();
-
-    const returnStockChannel = supabase
-      .channel('return-stock-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'van_return_grn' }, () => {
-        fetchReturnStockData();
-      })
+    const returnChannel = supabase
+      .channel('operations-returns')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'van_return_grn' }, silentRefetchReturns)
       .subscribe();
 
     return () => {
-      supabase.removeChannel(visitsChannel);
       supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(visitsChannel);
       supabase.removeChannel(stockChannel);
-      supabase.removeChannel(returnStockChannel);
+      supabase.removeChannel(returnChannel);
     };
-  }, [autoRefresh, userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, returnStockDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
+  }, [autoRefresh]);
 
   if (loading) {
     return (
@@ -1139,12 +1201,30 @@ const Operations = () => {
     return null;
   }
 
-  const filteredCheckInData = filterData(checkInData, ['user_name', 'retailer_name']);
-  const filteredOrderData = filterData(orderData, ['user_name', 'retailer_name']);
-  const filteredStockData = filterData(stockData, ['user_name', 'retailer_name', 'product_name']);
-  const filteredCompetitorData = filterData(competitorData, ['user_name', 'retailer_name', 'competitor_name']);
-  const filteredReturnStockData = filterData(returnStockData, ['user_name', 'retailer_name', 'van_name']);
-  const filteredCancelledOrders = filterData(cancelledOrders, ['retailer_name', 'cancelled_by_name', 'reason']);
+  const filteredCheckInData = useMemo(
+    () => filterData(checkInData, ['user_name', 'retailer_name']),
+    [checkInData, searchTerm]
+  );
+  const filteredOrderData = useMemo(
+    () => filterData(orderData, ['user_name', 'retailer_name']),
+    [orderData, searchTerm]
+  );
+  const filteredStockData = useMemo(
+    () => filterData(stockData, ['user_name', 'retailer_name', 'product_name']),
+    [stockData, searchTerm]
+  );
+  const filteredCompetitorData = useMemo(
+    () => filterData(competitorData, ['user_name', 'retailer_name', 'competitor_name']),
+    [competitorData, searchTerm]
+  );
+  const filteredReturnStockData = useMemo(
+    () => filterData(returnStockData, ['user_name', 'retailer_name', 'van_name']),
+    [returnStockData, searchTerm]
+  );
+  const filteredCancelledOrders = useMemo(
+    () => filterData(cancelledOrders, ['retailer_name', 'cancelled_by_name', 'reason']),
+    [cancelledOrders, searchTerm]
+  );
 
   return (
     <Layout>
