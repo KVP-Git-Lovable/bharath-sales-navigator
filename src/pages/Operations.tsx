@@ -1003,7 +1003,7 @@ const Operations = () => {
 
       // Apply user filter
       if (userFilter.length > 0) {
-        const filteredOrderIds = (ordersRes.data || []).filter((o: any) => o.user_id === userFilter).map((o: any) => o.id);
+        const filteredOrderIds = (ordersRes.data || []).filter((o: any) => userFilter.includes(o.user_id)).map((o: any) => o.id);
         setCancelledOrders(formatted.filter(f => filteredOrderIds.includes(f.order_id)));
       } else {
         setCancelledOrders(formatted);
