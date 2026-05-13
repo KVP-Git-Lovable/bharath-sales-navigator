@@ -114,6 +114,7 @@ const initialSchemeForm = {
   // Manual per-unit discount fields
   max_discount_per_unit: 0,
   discount_unit: 'kg',
+  discount_value_type: 'amount' as 'amount' | 'percentage',
 };
 
 export const SchemeMaster = () => {
@@ -318,6 +319,9 @@ export const SchemeMaster = () => {
             discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_unit || 'kg')
               : null,
+            discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
+              : null,
           })
           .eq('id', schemeForm.id);
         
@@ -361,6 +365,9 @@ export const SchemeMaster = () => {
               : null,
             discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_unit || 'kg')
+              : null,
+            discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
               : null,
           })
           .select('id')
@@ -519,6 +526,7 @@ export const SchemeMaster = () => {
       // Manual per-unit discount fields
       max_discount_per_unit: schemeAny.max_discount_per_unit || 0,
       discount_unit: schemeAny.discount_unit || 'kg',
+      discount_value_type: (schemeAny.discount_value_type === 'percentage' ? 'percentage' : 'amount') as 'amount' | 'percentage',
     });
     // Load applicability rules for this scheme
     loadApplicabilityRules(scheme.id);
