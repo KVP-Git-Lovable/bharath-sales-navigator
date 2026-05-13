@@ -26,6 +26,11 @@ export interface AppliedScheme {
     original_rate?: number;
     unit?: string;
   }[];
+  // For manual_per_unit_discount
+  per_unit_discount?: number;
+  unit?: string;
+  applied_to_item_id?: string;
+  applied_to_product_name?: string;
 }
 
 export interface ItemSchemeDetail {
@@ -37,6 +42,9 @@ export interface ItemSchemeDetail {
   // BOGO specific fields
   freeItemName?: string;
   freeItemQty?: number;
+  // Manual per-unit discount fields
+  perUnitDiscount?: number;
+  unit?: string;
 }
 
 export interface SchemeCalculationResult {
@@ -74,6 +82,18 @@ export interface ProductScheme {
   // Multi-product support
   target_product_ids?: string[] | null;
   per_product_discounts?: Record<string, { discount_percentage: number }> | null;
+  // Manual per-unit discount support
+  max_discount_per_unit?: number | null;
+  discount_unit?: string | null;
+}
+
+/**
+ * Manual selection made by salesperson for a manual_per_unit_discount scheme.
+ * Keyed by scheme id.
+ */
+export interface ManualSchemeSelection {
+  itemId: string;          // cart line id (matches SchemeItem.id)
+  perUnitDiscount: number; // amount entered, ≤ scheme.max_discount_per_unit
 }
 
 /**
