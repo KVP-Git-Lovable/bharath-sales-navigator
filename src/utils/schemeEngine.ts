@@ -536,7 +536,7 @@ function calculateSchemeDiscount(
       break;
   }
 
-  return { discount, itemDiscounts, itemSchemeDetails, freeItems };
+  return { discount, itemDiscounts, itemSchemeDetails, freeItems, manualMeta };
 }
 
 /**
@@ -545,7 +545,8 @@ function calculateSchemeDiscount(
 export function calculateOrderWithSchemes(
   items: SchemeItem[],
   allSchemes: ProductScheme[],
-  appliedSchemeIds: string[] = []
+  appliedSchemeIds: string[] = [],
+  manualSelections: Record<string, ManualSchemeSelection> = {}
 ): SchemeCalculationResult {
   // Calculate subtotal
   const subtotal = items.reduce((sum, item) => sum + (item.rate * item.quantity), 0);
@@ -566,8 +567,9 @@ export function calculateOrderWithSchemes(
       discount,
       itemDiscounts: schemeItemDiscounts,
       itemSchemeDetails: schemeItemDetails,
-      freeItems
-    } = calculateSchemeDiscount(scheme, items, subtotal);
+      freeItems,
+      manualMeta
+    } = calculateSchemeDiscount(scheme, items, subtotal, manualSelections[scheme.id]);
 
     const hasFreeItems = !!(freeItems && freeItems.length > 0);
 
@@ -595,7 +597,11 @@ export function calculateOrderWithSchemes(
         discount_amount: discount,
         discount_percentage: scheme.discount_percentage || undefined,
         product_id: scheme.product_id,
-        free_items: freeItems
+        free_items: freeItems,
+        per_unit_discount: manualMeta?.perUnitDiscount,
+        unit: manualMeta?.unit,
+        applied_to_item_id: manualMeta?.itemId,
+        applied_to_product_name: manualMeta?.productName,
       });
     }
   }
