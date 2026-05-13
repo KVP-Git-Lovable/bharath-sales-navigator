@@ -101,7 +101,20 @@ const Operations = () => {
   const [activeTab, setActiveTab] = useState('orders');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [userFilter, setUserFilter] = useState<string[]>([]); // empty = all users
+  const [userFilter, setUserFilter] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('operations_user_filter');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === 'string');
+      }
+    } catch {}
+    return [];
+  });
+  const [userSearch, setUserSearch] = useState('');
+  useEffect(() => {
+    try { localStorage.setItem('operations_user_filter', JSON.stringify(userFilter)); } catch {}
+  }, [userFilter]);
   const [summaryDateFilter, setSummaryDateFilter] = useState<'today' | 'week' | 'month'>('today');
   
   // Separate date filters for each section
@@ -1245,8 +1258,26 @@ const Operations = () => {
                         </button>
                       </div>
                     </div>
+                    <div className="px-2 pt-2 pb-1 border-b">
+                      <Input
+                        autoFocus
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Search user…"
+                        className="h-7 text-xs"
+                      />
+                    </div>
                     <div className="max-h-64 overflow-y-auto py-1">
-                      {users.map(user => {
+                      {users
+                        .filter(u => {
+                          const q = userSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            (u.full_name || '').toLowerCase().includes(q) ||
+                            (u.username || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .map(user => {
                         const checked = userFilter.includes(user.id);
                         return (
                           <label

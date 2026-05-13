@@ -6,11 +6,18 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
 import * as pdfjsLib from "pdfjs-dist";
-// Vite worker import
+// Bundle the pdf.js worker as a Web Worker via Vite — avoids URL/CSP issues
+// inside sandboxed preview iframes where dynamic worker URLs can fail to load.
 // @ts-ignore
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+try {
+  // workerPort takes precedence and is the most reliable path in iframes.
+  // @ts-ignore
+  pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
+} catch (e) {
+  console.warn("pdf.js worker init failed, falling back to fake worker", e);
+}
 
 // Module-level cache so re-opening / downloading is instant
 type CachedInvoice = { blob: Blob; invoiceNumber: string };
