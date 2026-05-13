@@ -311,7 +311,13 @@ export const SchemeMaster = () => {
             priority: schemeForm.priority,
             exclusion_group: schemeForm.exclusion_group || null,
             target_product_ids: targetProductIds,
-            per_product_discounts: perProductDiscounts
+            per_product_discounts: perProductDiscounts,
+            max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (Number(schemeForm.max_discount_per_unit) || 0)
+              : null,
+            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_unit || 'kg')
+              : null,
           })
           .eq('id', schemeForm.id);
         
@@ -349,7 +355,13 @@ export const SchemeMaster = () => {
             priority: schemeForm.priority,
             exclusion_group: schemeForm.exclusion_group || null,
             target_product_ids: targetProductIds,
-            per_product_discounts: perProductDiscounts
+            per_product_discounts: perProductDiscounts,
+            max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (Number(schemeForm.max_discount_per_unit) || 0)
+              : null,
+            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_unit || 'kg')
+              : null,
           })
           .select('id')
           .single();
