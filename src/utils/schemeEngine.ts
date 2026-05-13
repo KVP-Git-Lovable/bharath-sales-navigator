@@ -259,17 +259,20 @@ function isQuantityConditionMet(scheme: ProductScheme, quantity: number): boolea
 function calculateSchemeDiscount(
   scheme: ProductScheme, 
   items: SchemeItem[], 
-  subtotal: number
+  subtotal: number,
+  manualSelection?: ManualSchemeSelection
 ): { 
   discount: number; 
   itemDiscounts: Record<string, number>; 
   itemSchemeDetails: Record<string, ItemSchemeDetail[]>;
-  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] 
+  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[];
+  manualMeta?: { perUnitDiscount: number; unit: string; itemId: string; productName: string };
 } {
   let discount = 0;
   const itemDiscounts: Record<string, number> = {};
   const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
   let freeItems: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] | undefined;
+  let manualMeta: { perUnitDiscount: number; unit: string; itemId: string; productName: string } | undefined;
 
   // Get applicable items
   const applicableItems = items.filter(item => schemeAppliesToItem(scheme, item));
@@ -278,6 +281,46 @@ function calculateSchemeDiscount(
 
   // Calculate based on scheme type
   switch (scheme.scheme_type) {
+    case 'manual_per_unit_discount': {
+      // Salesperson must have made a selection
+      if (!manualSelection) break;
+      const cap = Number(scheme.max_discount_per_unit || 0);
+      if (cap <= 0) break;
+
+      // The chosen item must still exist in the cart and be applicable to this scheme
+      const item = items.find(i => i.id === manualSelection.itemId);
+      if (!item) break;
+      if (!schemeAppliesToItem(scheme, item)) break;
+      // Optional min-quantity gate
+      if (!isQuantityConditionMet(scheme, item.quantity)) break;
+
+      const perUnit = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
+      if (perUnit <= 0) break;
+
+      const itemDiscount = perUnit * item.quantity;
+      discount = itemDiscount;
+      itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+
+      const unit = scheme.discount_unit || 'unit';
+      if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+      itemSchemeDetails[item.id].push({
+        schemeId: scheme.id,
+        schemeName: scheme.name,
+        schemeType: scheme.scheme_type,
+        discountAmount: itemDiscount,
+        perUnitDiscount: perUnit,
+        unit,
+      });
+
+      manualMeta = {
+        perUnitDiscount: perUnit,
+        unit,
+        itemId: item.id,
+        productName: item.name || '',
+      };
+      break;
+    }
+
     case 'percentage_discount':
     case 'percentage': {
       const hasMultiProduct = scheme.target_product_ids && scheme.target_product_ids.length > 0;
