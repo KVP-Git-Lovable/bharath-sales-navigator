@@ -7,7 +7,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 export function NotificationBell() {
@@ -56,7 +55,7 @@ export function NotificationBell() {
           )}
         </div>
 
-        <ScrollArea className="max-h-[360px]">
+        <div className="h-[360px] overflow-y-auto overscroll-contain">
           {isLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
               Loading...
@@ -68,7 +67,7 @@ export function NotificationBell() {
             </div>
           ) : (
             <div className="divide-y">
-              {notifications.slice(0, 20).map((notification) => (
+              {notifications.map((notification) => (
                 <button
                   key={notification.id}
                   onClick={() => markAsRead(notification.id)}
@@ -96,12 +95,12 @@ export function NotificationBell() {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
-        {notifications.length > 20 && (
+        {notifications.length > 0 && (
           <div className="px-4 py-2 border-t text-center">
             <span className="text-xs text-muted-foreground">
-              Showing 20 of {notifications.length} notifications
+              {notifications.length} notification{notifications.length === 1 ? '' : 's'}
             </span>
           </div>
         )}
