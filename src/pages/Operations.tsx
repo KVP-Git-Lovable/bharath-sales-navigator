@@ -281,8 +281,8 @@ const Operations = () => {
     }
   };
   // Fetch check-in/check-out data
-  const fetchCheckInData = async () => {
-    setLoadingCheckins(true);
+  const fetchCheckInData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCheckins(true);
     try {
       let query = supabase
         .from('visits')
@@ -575,11 +575,11 @@ const Operations = () => {
       setTodayStats(prev => ({ ...prev, checkins: todayCheckins }));
     } catch (error) {
       console.error('Error fetching check-in data:', error);
-      toast.error('Failed to fetch check-in data');
+      if (!silent) toast.error('Failed to fetch check-in data');
     } finally {
-      setLoadingCheckins(false);
+      if (!silent) setLoadingCheckins(false);
     }
-  };
+  }, [userFilter, checkinDateFilter, checkinCustomRange, users]);
 
   // Fetch order data
   const fetchOrderData = async () => {
