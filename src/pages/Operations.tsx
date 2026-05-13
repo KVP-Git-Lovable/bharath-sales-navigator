@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, DollarSign, User, RotateCcw, Pencil, Ban } from 'lucide-react';
+import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, DollarSign, User, RotateCcw, Pencil, Ban, ChevronDown, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,9 @@ import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDial
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
 import { OrderInvoiceButton } from '@/components/invoice/OrderInvoiceButton';
-import { InvoicePreviewDialog } from '@/components/invoice/InvoicePreviewDialog';
+import { InvoicePreviewDialog, DownloadInvoiceButton } from '@/components/invoice/InvoicePreviewDialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Phone } from 'lucide-react';
 
 interface CheckInOutData {
@@ -99,7 +101,7 @@ const Operations = () => {
   const [activeTab, setActiveTab] = useState('orders');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [userFilter, setUserFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState<string[]>([]); // empty = all users
   const [summaryDateFilter, setSummaryDateFilter] = useState<'today' | 'week' | 'month'>('today');
   
   // Separate date filters for each section
