@@ -1769,8 +1769,8 @@ const Operations = () => {
                                 {format(new Date(item.created_at), 'MMM dd, HH:mm')}
                               </Badge>
                             </TableCell>
-                            <TableCell>
-                              <span className="font-medium">₹{item.total_amount.toLocaleString()}</span>
+                            <TableCell className="text-right">
+                              <span className="font-semibold">₹{item.total_amount.toLocaleString('en-IN')}</span>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-0.5 text-xs">
@@ -1788,7 +1788,7 @@ const Operations = () => {
                               <Badge variant="secondary">{item.items.length} items</Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-end gap-1">
                                 <Dialog>
                                   <DialogTrigger asChild>
                                     <Button variant="ghost" size="sm" title="View">
