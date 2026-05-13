@@ -721,8 +721,7 @@ const Operations = () => {
           impact_level,
           created_at,
           competition_master(competitor_name),
-          competition_skus(sku_name),
-          retailers(name)
+          competition_skus(sku_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -757,12 +756,24 @@ const Operations = () => {
         usersData = profiles || [];
       }
 
+      // Fetch retailer names separately (no FK relationship for embed)
+      const retailerIds = [...new Set((data || []).map(d => d.retailer_id).filter(Boolean) as string[])];
+      let retailersData: any[] = [];
+      if (retailerIds.length > 0) {
+        const { data: rows } = await supabase
+          .from('retailers')
+          .select('id, name')
+          .in('id', retailerIds);
+        retailersData = rows || [];
+      }
+
       const formattedData = data?.map(item => {
         const user = usersData.find(u => u.id === item.user_id);
+        const retailer = retailersData.find(r => r.id === item.retailer_id);
         return {
           ...item,
           user_name: user?.full_name || user?.username || 'Unknown',
-          retailer_name: (item.retailers as any)?.name || 'Unknown',
+          retailer_name: retailer?.name || 'Unknown',
           competitor_name: (item.competition_master as any)?.competitor_name || 'Unknown',
           sku_name: (item.competition_skus as any)?.sku_name || '-'
         };
