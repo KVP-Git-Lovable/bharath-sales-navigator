@@ -656,6 +656,13 @@ export function formatSchemeDetailsForInvoice(appliedSchemes: AppliedScheme[]): 
     if (scheme.discount_percentage) {
       detail += ` (${scheme.discount_percentage}% off)`;
     }
+    if (scheme.scheme_type === 'manual_per_unit_discount' && scheme.per_unit_discount) {
+      detail += ` (₹${scheme.per_unit_discount}/${scheme.unit || 'unit'}`;
+      if (scheme.applied_to_product_name) {
+        detail += ` on ${scheme.applied_to_product_name}`;
+      }
+      detail += `)`;
+    }
     
     detail += ` - Saved ₹${scheme.discount_amount.toFixed(2)}`;
     
