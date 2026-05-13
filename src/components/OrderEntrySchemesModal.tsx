@@ -561,6 +561,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
